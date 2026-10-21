@@ -1,30 +1,26 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
-import numpy as np
 import pytest
 
 from puripuly_heart.core import messages
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.orchestrator.channel_runtime import _MergeBuffer
-from puripuly_heart.core.orchestrator.peer_translation_channel import (
-    PeerTranslationChannelOwner,
-)
 from puripuly_heart.core.orchestrator.translation_output_projection import (
     TranslationOverlayProjection,
 )
 from puripuly_heart.core.orchestrator.translation_request import DirectTranslationRequest
-from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.translation_backend import LlmTranslationBackend
-from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
+from puripuly_heart.core.vad.gating import SpeechEnd
 from puripuly_heart.domain.events import STTFinalEvent, STTPartialEvent, UIEventType
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
@@ -35,26 +31,21 @@ from tests.core.test_translation_owner_branch_coverage import (
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import (
     compose_translation_test_harness,
-    make_speculative_attempt,
 )
 
-_TRANSLATION_ACTIVE_SELF_MIRROR_FIELDS = {
-    "_overlay_active_self_text",
-    "_overlay_active_self_secondary_text",
-    "_overlay_active_self_utterance_id",
-    "_overlay_active_self_occupant_key",
-    "_overlay_active_self_update_id",
-    "_overlay_active_self_origin_wall_clock_ms",
-    "_overlay_active_self_session_scope",
-    "_overlay_active_self_source_text_hash",
-    "_overlay_active_self_source_text_len",
-    "_overlay_active_self_logical_turn_key",
-}
+
+async def _eventually(predicate):
+    async with asyncio.timeout(1.0):
+        while not predicate():
+            await asyncio.sleep(0)
 
 
-def test_translation_does_not_declare_active_self_overlay_mirror_fields() -> None:
-    assert _TRANSLATION_ACTIVE_SELF_MIRROR_FIELDS.isdisjoint(
-        PeerTranslationChannelOwner.__dataclass_fields__
+async def _source_revision(harness, source_id, text):
+    await harness.self_owner.handle_stt_event(
+        STTFinalEvent(
+            source_id,
+            Transcript(utterance_id=source_id, text=text, is_final=True),
+        )
     )
 
 
@@ -67,6 +58,16 @@ class RecordingOverlaySink:
         self.events.append(event)
         event_type = getattr(event, "type", None)
         if event_type == "self_active_update":
+            if getattr(event, "caption_complete", False):
+                if (
+                    self.active_self_metadata is not None
+                    and self.active_self_metadata.utterance_id
+                    == getattr(event, "utterance_id", None)
+                ):
+                    self.active_self_metadata = None
+                return
+            if getattr(event, "retained_only", False):
+                return
             utterance_id = getattr(event, "utterance_id", None)
             if not isinstance(utterance_id, UUID):
                 return
@@ -103,32 +104,6 @@ def _latest_peer_chatbox_decision(harness):
         decision
         for decision in reversed(harness.output_runtime.routing_decisions)
         if decision.route == "self_chatbox" and decision.publication_kind == "peer_subtitle"
-    )
-
-
-def _active_self_metadata_for_buffer(
-    buffer: _MergeBuffer,
-    *,
-    text: str,
-    secondary_text: str,
-    update_id: str | None = None,
-    origin_wall_clock_ms: int | None = None,
-    session_scope: str | None = None,
-    source_text_hash: str | None = None,
-    source_text_len: int | None = None,
-    logical_turn_key: str | None = None,
-) -> ActiveSelfOverlayMetadata:
-    return ActiveSelfOverlayMetadata(
-        text=text,
-        secondary_text=secondary_text,
-        utterance_id=buffer.merge_id,
-        occupant_key=f"self:{buffer.merge_id}",
-        update_id=update_id,
-        origin_wall_clock_ms=origin_wall_clock_ms,
-        session_scope=session_scope,
-        source_text_hash=source_text_hash,
-        source_text_len=source_text_len,
-        logical_turn_key=logical_turn_key,
     )
 
 
@@ -473,151 +448,76 @@ async def test_translation_emits_self_and_peer_finals_to_overlay_sink() -> None:
 
 
 @pytest.mark.asyncio
-async def test_translation_active_self_overlay_snapshot_uses_spec_translation_languages_not_current_settings() -> (
+async def test_translation_sentence_caption_uses_provider_languages_not_configured_languages() -> (
     None
 ):
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
+    presenter = OverlayPresenter(calibration=OverlayCalibration())
+    llm = ReleasableTranslateLLMProvider(
+        response_text="hello",
+        response_source_language="ja",
+        response_target_language="zh-TW",
     )
     harness = compose_translation_test_harness(
         stt=None,
-        llm=None,
+        llm=llm,
         osc=RecordingOscQueue(),
         overlay_sink=presenter,
         source_language="ko",
         target_language="en",
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
     )
-    merge_id = uuid4()
-    source_utterance_id = uuid4()
-    buffer = _MergeBuffer(
-        merge_id=merge_id,
-        parts=["こんにちは"],
-        utterance_ids=[source_utterance_id],
-        speculative_attempt=make_speculative_attempt(
-            source_text="こんにちは",
-            result=Translation(
-                utterance_id=merge_id,
-                text="hello",
-                source_text="こんにちは",
-                source_language="ja",
-                target_language="zh-TW",
-            ),
-        ),
-    )
-
-    await harness.self_owner._sync_overlay_active_self(buffer)
-
-    block = presenter.snapshot().blocks[0]
-    assert block.channel == "self"
-    assert block.block_variant == "active_self"
-    assert block.primary_text == "こんにちは"
-    assert block.secondary_text == "hello"
-    assert block.primary_language == "ja"
-    assert block.secondary_language == "zh-TW"
+    try:
+        await _source_revision(harness, uuid4(), "こんにちは。")
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        llm.release.set_result(None)
+        await _eventually(
+            lambda: bool(presenter.snapshot().blocks)
+            and presenter.snapshot().blocks[0].secondary_text == "hello"
+        )
+        block = presenter.snapshot().blocks[0]
+        assert block.block_variant == "active_self"
+        assert block.primary_text == "こんにちは。"
+        assert block.primary_language == "ja"
+        assert block.secondary_language == "zh-TW"
+    finally:
+        await harness.stop()
 
 
 @pytest.mark.asyncio
-async def test_translation_blank_spec_translation_active_update_keeps_spec_language_metadata() -> (
-    None
-):
+async def test_translation_blank_spec_translation_keeps_source_first_until_final() -> None:
     sink = RecordingOverlaySink()
+    llm = ReleasableTranslateLLMProvider(
+        response_text="   ",
+        response_source_language="ja",
+        response_target_language="zh-TW",
+    )
     harness = compose_translation_test_harness(
         stt=None,
-        llm=None,
+        llm=llm,
         osc=RecordingOscQueue(),
         overlay_sink=sink,
         source_language="ko",
         target_language="en",
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
     )
-    merge_id = uuid4()
-    buffer = _MergeBuffer(
-        merge_id=merge_id,
-        parts=["こんにちは"],
-        utterance_ids=[uuid4()],
-        speculative_attempt=make_speculative_attempt(
-            source_text="こんにちは",
-            result=Translation(
-                utterance_id=merge_id,
-                text="   ",
-                source_text="こんにちは",
-                source_language="ja",
-                target_language="zh-TW",
-            ),
-        ),
-    )
-
-    await harness.self_owner._sync_overlay_active_self(buffer)
-
-    assert len(sink.events) == 1
-    event = sink.events[0]
-    assert getattr(event, "type", None) == "self_active_update"
-    assert event.secondary_text == ""
-    assert event.source_language == "ja"
-    assert event.target_language == "zh-TW"
-
-
-@pytest.mark.asyncio
-async def test_translation_same_text_blank_spec_language_update_feeds_final_transcript_language() -> (
-    None
-):
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
-    )
-    adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
-    merge_id = uuid4()
-    await presenter.emit(
-        adapter.self_active_update(
-            text="こんにちは",
-            secondary_text="",
-            utterance_id=merge_id,
-            occupant_key=f"self:{merge_id}",
-            source_language="ko",
-            target_language="en",
-            created_at=10.0,
+    source_id = uuid4()
+    try:
+        await _source_revision(harness, source_id, "こんにちは")
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        assert sink.events == []
+        llm.release.set_result(None)
+        await harness.self_owner.handle_vad_event(SpeechEnd(source_id))
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+        assert all(not getattr(event, "secondary_text", "").strip() for event in sink.events)
+        assert harness.osc.messages[-1].text == "こんにちは"
+        final_source = next(
+            event for event in sink.events if getattr(event, "caption_complete", False)
         )
-    )
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        overlay_sink=presenter,
-        source_language="ko",
-        target_language="en",
-    )
-    buffer = _MergeBuffer(
-        merge_id=merge_id,
-        parts=["こんにちは"],
-        utterance_ids=[uuid4()],
-        speculative_attempt=make_speculative_attempt(
-            source_text="こんにちは",
-            result=Translation(
-                utterance_id=merge_id,
-                text="   ",
-                source_text="こんにちは",
-                source_language="ja",
-                target_language="zh-TW",
-            ),
-        ),
-    )
-
-    await harness.self_owner._sync_overlay_active_self(buffer)
-    await harness.output_projection.project_self_final_transcript(
-        transcript=Transcript(
-            utterance_id=merge_id,
-            text="こんにちは",
-            is_final=True,
-            created_at=10.1,
-            channel="self",
-        ),
-        source_language=harness.configuration.snapshot().value.source_language,
-        target_language=harness.configuration.snapshot().value.target_language,
-        translation_will_follow=True,
-    )
-
-    block = presenter.snapshot().blocks[0]
-    assert block.block_variant == "finalized"
-    assert block.primary_text == "こんにちは"
-    assert block.primary_language == "ja"
+        assert final_source.source_language == "ja"
+    finally:
+        await harness.stop()
 
 
 @pytest.mark.asyncio
@@ -806,7 +706,7 @@ async def test_translation_peer_translation_overlay_uses_translation_languages_n
 
 
 @pytest.mark.asyncio
-async def test_translation_active_self_sticky_secondary_preserves_cached_secondary_language() -> (
+async def test_active_resync_preserves_cached_translation_without_publishing_unowned_source() -> (
     None
 ):
     presenter = OverlayPresenter(
@@ -842,13 +742,13 @@ async def test_translation_active_self_sticky_secondary_preserves_cached_seconda
     await harness.self_owner._sync_overlay_active_self(buffer)
 
     block = presenter.snapshot().blocks[0]
-    assert block.primary_text == "こんにちは続き"
+    assert block.primary_text == "こんにちは"
     assert block.secondary_text == "你好"
     assert block.secondary_language == "zh-TW"
 
 
 @pytest.mark.asyncio
-async def test_translation_active_self_blank_secondary_preserves_cached_primary_language() -> None:
+async def test_active_resync_preserves_cached_primary_language_without_unowned_source() -> None:
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
     )
@@ -882,113 +782,169 @@ async def test_translation_active_self_blank_secondary_preserves_cached_primary_
     await harness.self_owner._sync_overlay_active_self(buffer)
 
     block = presenter.snapshot().blocks[0]
-    assert block.primary_text == "こんにちは続き"
+    assert block.primary_text == "こんにちは"
     assert block.secondary_text == ""
     assert block.primary_language == "ja"
 
 
 @pytest.mark.asyncio
-async def test_translation_self_final_transcript_preserves_active_display_language_metadata() -> (
-    None
-):
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
+async def test_translation_self_final_preserves_active_display_language_metadata() -> None:
+    presenter = OverlayPresenter(calibration=OverlayCalibration())
+    llm = ReleasableTranslateLLMProvider(
+        response_text="你好",
+        response_source_language="ja",
+        response_target_language="zh-TW",
     )
     harness = compose_translation_test_harness(
         stt=None,
-        llm=None,
+        llm=llm,
         osc=RecordingOscQueue(),
         overlay_sink=presenter,
         source_language="ko",
         target_language="en",
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
     )
-    merge_id = uuid4()
-    buffer = _MergeBuffer(
-        merge_id=merge_id,
-        parts=["こんにちは"],
-        utterance_ids=[uuid4()],
-        speculative_attempt=make_speculative_attempt(
-            source_text="こんにちは",
-            result=Translation(
-                utterance_id=merge_id,
-                text="你好",
-                source_text="こんにちは",
-                source_language="ja",
-                target_language="zh-TW",
-            ),
-        ),
-    )
-    await harness.self_owner._sync_overlay_active_self(buffer)
-
-    await harness.output_projection.project_self_final_transcript(
-        transcript=Transcript(
-            utterance_id=merge_id,
-            text="こんにちは",
-            is_final=True,
-            created_at=10.0,
-            channel="self",
-        ),
-        source_language=harness.configuration.snapshot().value.source_language,
-        target_language=harness.configuration.snapshot().value.target_language,
-        translation_will_follow=True,
-    )
-
-    block = presenter.snapshot().blocks[0]
-    assert block.block_variant == "finalized"
-    assert block.primary_text == "こんにちは"
-    assert block.secondary_text == "你好"
-    assert block.primary_language == "ja"
-    assert block.secondary_language == "zh-TW"
+    source_id = uuid4()
+    try:
+        await _source_revision(harness, source_id, "こんにちは。")
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        llm.release.set_result(None)
+        await _eventually(
+            lambda: bool(presenter.snapshot().blocks)
+            and presenter.snapshot().blocks[0].secondary_text == "你好"
+        )
+        active_block = presenter.snapshot().blocks[0]
+        assert active_block.block_variant == "active_self"
+        assert active_block.primary_text == "こんにちは。"
+        assert active_block.primary_language == "ja"
+        assert active_block.secondary_language == "zh-TW"
+        await harness.self_owner.handle_vad_event(SpeechEnd(source_id))
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+        block = presenter.snapshot().blocks[0]
+        assert block.block_variant == "finalized"
+        assert block.id == active_block.id
+        assert block.primary_text == "こんにちは。"
+        assert block.secondary_text == "你好"
+        assert block.primary_language == "ja"
+        assert block.secondary_language == "zh-TW"
+    finally:
+        await harness.stop()
 
 
 @pytest.mark.asyncio
-async def test_translation_stale_secondary_blanking_preserves_active_primary_language() -> None:
-    bridge = RecordingPresentationBridge()
-    presenter = OverlayPresenter(
-        bridge=bridge,
-        calibration=OverlayCalibration(),
+async def test_source_closure_preserves_coherent_caption_and_languages_until_current_result() -> (
+    None
+):
+    presenter = OverlayPresenter(calibration=OverlayCalibration())
+    llm = ReleasableTranslateLLMProvider(
+        response_text="你好",
+        response_source_language="ja",
+        response_target_language="zh-TW",
     )
-    adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
-    merge_id = uuid4()
-    await presenter.emit(
-        adapter.self_active_update(
-            text="こんにちは",
-            secondary_text="你好",
-            utterance_id=merge_id,
-            occupant_key=f"self:{merge_id}",
-            source_language="ja",
-            target_language="zh-TW",
-            created_at=10.0,
-        )
-    )
-    first_new_snapshot_index = len(bridge.snapshots)
     harness = compose_translation_test_harness(
         stt=None,
-        llm=None,
+        llm=llm,
         osc=RecordingOscQueue(),
         overlay_sink=presenter,
         source_language="ko",
         target_language="en",
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
     )
-    buffer = _MergeBuffer(
-        merge_id=merge_id,
-        parts=["こんにちは"],
-        utterance_ids=[uuid4()],
+    source_id = uuid4()
+    try:
+        await _source_revision(harness, source_id, "こんにちは。")
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        llm.release.set_result(None)
+        await _eventually(
+            lambda: bool(presenter.snapshot().blocks)
+            and presenter.snapshot().blocks[0].secondary_text == "你好"
+        )
+        original_id = presenter.snapshot().blocks[0].id
+        llm.release = None
+        llm.started.clear()
+        llm.response_text = "current"
+        llm.response_source_language = "ko"
+        llm.response_target_language = "fr"
+        await _source_revision(harness, source_id, "こんにちは。続きです。")
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        await harness.self_owner.handle_vad_event(SpeechEnd(source_id))
+        assert harness.self_owner.merge_buffer is None
+        block = presenter.snapshot().blocks[0]
+        assert block.id == original_id
+        assert block.block_variant == "active_self"
+        assert block.primary_text == "こんにちは。"
+        assert block.secondary_text == "你好"
+        assert block.primary_language == "ja"
+        assert block.secondary_language == "zh-TW"
+        llm.release.set_result(None)
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+        block = presenter.snapshot().blocks[0]
+        assert block.id == original_id
+        assert block.block_variant == "finalized"
+        assert block.primary_text == "こんにちは。続きです。"
+        assert block.secondary_text == "current"
+        assert block.primary_language == "ko"
+        assert block.secondary_language == "fr"
+        assert llm.calls == ["こんにちは。", "こんにちは。続きです。"]
+    finally:
+        await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_failed_current_source_replaces_prior_coverage_with_untranslated_fallback() -> None:
+    release = asyncio.Event()
+    calls = []
+
+    class RevisionFailingProvider(StubTranslateLLMProvider):
+        async def translate(self, **kwargs):
+            calls.append(kwargs["text"])
+            if len(calls) == 1:
+                return Translation(utterance_id=kwargs["utterance_id"], text="old translation")
+            await release.wait()
+            raise RuntimeError("current revision failed")
+
+    presenter = OverlayPresenter(calibration=OverlayCalibration())
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=RevisionFailingProvider(text="old translation"),
+        osc=RecordingOscQueue(),
+        overlay_sink=presenter,
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+        fallback_transcript_only=True,
     )
-    harness.self_owner.merge_buffer = buffer
-
-    await harness.self_owner._commit_merge(buffer, reason="test_stale_secondary")
-
-    blank_active_blocks = [
-        snapshot.blocks[0]
-        for snapshot in bridge.snapshots[first_new_snapshot_index:]
-        if snapshot.blocks
-        and snapshot.blocks[0].block_variant == "active_self"
-        and snapshot.blocks[0].secondary_text == ""
-    ]
-    assert blank_active_blocks
-    assert blank_active_blocks[0].primary_text == "こんにちは"
-    assert blank_active_blocks[0].primary_language == "ja"
+    source_id = uuid4()
+    try:
+        await _source_revision(harness, source_id, "hello.")
+        await _eventually(
+            lambda: bool(presenter.snapshot().blocks)
+            and presenter.snapshot().blocks[0].secondary_text == "old translation"
+        )
+        original_id = presenter.snapshot().blocks[0].id
+        await _source_revision(harness, source_id, "goodbye")
+        await _eventually(lambda: len(calls) == 2)
+        await harness.self_owner.handle_vad_event(SpeechEnd(source_id))
+        block = presenter.snapshot().blocks[0]
+        assert block.id == original_id
+        assert block.block_variant == "active_self"
+        assert block.primary_text == "hello."
+        assert block.secondary_text == "old translation"
+        release.set()
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+        block = presenter.snapshot().blocks[0]
+        assert block.id == original_id
+        assert block.block_variant == "finalized"
+        assert block.primary_text == "goodbye"
+        assert block.secondary_text == ""
+        assert block.secondary_language is None
+        assert calls == ["hello.", "goodbye", "goodbye"]
+        assert harness.osc.messages[-1].text == "goodbye"
+    finally:
+        release.set()
+        await harness.stop()
+        await presenter.close()
 
 
 @pytest.mark.asyncio
@@ -2064,7 +2020,7 @@ async def test_peer_failure_waiting_for_ui_is_retired_without_replay() -> None:
 
 
 @pytest.mark.asyncio
-async def test_translation_provider_failure_uses_message_ref_and_safe_runtime_log() -> None:
+async def test_translation_provider_failure_uses_safe_report_and_retained_diagnostics() -> None:
     raw_detail = "provider raw detail token=translation-secret-789"
     runtime_logging, log_stream = _make_runtime_logging_capture()
     harness = compose_translation_test_harness(
@@ -2091,8 +2047,13 @@ async def test_translation_provider_failure_uses_message_ref_and_safe_runtime_lo
 
         runtime_log = "\n".join(_runtime_log_messages(log_stream))
         assert raw_detail not in runtime_log
-        assert "category=unknown" in runtime_log
-        assert "code=provider.unknown" in runtime_log
+        retained = runtime_logging.diagnostic_history(
+            {"diagnostic_id": error_event.payload.diagnostics.diagnostic_id}
+        )["records"]
+        assert len(retained) == 1
+        assert retained[0]["code"] == error_event.payload.diagnostics.code
+        assert retained[0]["category"] == messages.DIAGNOSTIC_CATEGORY_UNKNOWN
+        assert raw_detail not in json.dumps(retained)
     finally:
         runtime_logging.close()
 
@@ -2236,7 +2197,7 @@ async def test_self_osc_sent_channel_uses_utterance_runtime_when_peer_chatbox_ac
         overlay_sink=RecordingOverlaySink(),
     )
 
-    utterance_id = await harness.self_owner.submit_text("self text", source="You")
+    utterance_id = (await harness.self_owner.submit_text("self text", source="You")).turn_id
     events = [harness.ui_events.get_nowait() for _ in range(harness.ui_events.qsize())]
 
     assert [event.type for event in events] == [
@@ -2388,13 +2349,13 @@ async def test_translation_newer_self_row_replaces_older_translated_self_row_wit
         clock=clock,
     )
 
-    first_id = await harness.self_owner.submit_text("first", source="You")
+    first_id = (await harness.self_owner.submit_text("first", source="You")).turn_id
     await asyncio.gather(*harness.self_runtime.translation_tasks.values(), return_exceptions=True)
 
     assert [block.id for block in presenter.snapshot().blocks] == [f"self:{first_id}"]
     assert presenter.snapshot().blocks[0].secondary_text == "translated first"
 
-    second_id = await harness.self_owner.submit_text("second", source="You")
+    second_id = (await harness.self_owner.submit_text("second", source="You")).turn_id
 
     assert [block.id for block in presenter.snapshot().blocks] == [f"self:{second_id}"]
     assert presenter.snapshot().blocks[0].secondary_text == ""
@@ -2437,7 +2398,7 @@ async def test_self_translation_failure_closes_overlay_line_as_incomplete() -> N
         overlay_sink=sink,
     )
 
-    utterance_id = await harness.self_owner.submit_text("self text", source="You")
+    utterance_id = (await harness.self_owner.submit_text("self text", source="You")).turn_id
     await asyncio.gather(*harness.self_runtime.translation_tasks.values(), return_exceptions=True)
 
     assert [event.type for event in sink.events] == [
@@ -2692,7 +2653,7 @@ async def test_self_translation_cancellation_closes_overlay_line_as_incomplete()
         overlay_sink=sink,
     )
 
-    utterance_id = await harness.self_owner.submit_text("self text", source="You")
+    utterance_id = (await harness.self_owner.submit_text("self text", source="You")).turn_id
     await llm.started.wait()
     await harness.self_runtime.reset_runtime_state()
 
@@ -2728,421 +2689,170 @@ async def test_low_latency_self_partial_no_longer_emits_overlay_event() -> None:
 
 
 @pytest.mark.asyncio
-async def test_low_latency_self_final_emits_active_update_with_merge_occupant_key() -> None:
-    sink = RecordingOverlaySink()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        overlay_sink=sink,
-        clock=FakeClock(_now=10.0),
-        low_latency_mode=True,
-    )
-    utterance_id = uuid4()
-
-    await harness.dispatch_stt_event(
-        STTFinalEvent(
-            utterance_id=utterance_id,
-            transcript=Transcript(
-                utterance_id=utterance_id,
-                text="hello live",
-                is_final=True,
-                created_at=11.0,
-            ),
-        )
-    )
-
-    assert [event.type for event in sink.events] == ["self_active_update"]
-    assert sink.events[0].text == "hello live"
-    assert sink.events[0].occupant_key == f"self:{harness.self_owner.merge_buffer.merge_id}"
-    assert harness.ui_events.empty()
-
-
-@pytest.mark.asyncio
-async def test_low_latency_self_active_updates_only_when_merged_text_changes() -> None:
-    sink = RecordingOverlaySink()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        overlay_sink=sink,
-        clock=FakeClock(_now=10.0),
-        low_latency_mode=True,
-    )
-    utterance_id = uuid4()
-
-    await harness.dispatch_stt_event(
-        STTFinalEvent(
-            utterance_id=utterance_id,
-            transcript=Transcript(
-                utterance_id=utterance_id,
-                text="hello",
-                is_final=True,
-                created_at=12.0,
-            ),
-        )
-    )
-    await harness.dispatch_stt_event(
-        STTFinalEvent(
-            utterance_id=utterance_id,
-            transcript=Transcript(
-                utterance_id=utterance_id,
-                text="hello",
-                is_final=True,
-                created_at=13.0,
-            ),
-        )
-    )
-    await harness.dispatch_stt_event(
-        STTFinalEvent(
-            utterance_id=utterance_id,
-            transcript=Transcript(
-                utterance_id=utterance_id,
-                text="hello world",
-                is_final=True,
-                created_at=14.0,
-            ),
-        )
-    )
-
-    assert [event.type for event in sink.events] == [
-        "self_active_update",
-        "self_active_update",
-    ]
-    assert [event.text for event in sink.events] == ["hello", "hello world"]
-    assert harness.self_owner.merge_buffer is not None
-    assert [event.utterance_id for event in sink.events] == [
-        harness.self_owner.merge_buffer.merge_id,
-        harness.self_owner.merge_buffer.merge_id,
-    ]
-
-
-@pytest.mark.asyncio
-async def test_low_latency_self_spec_translation_re_emits_active_update_with_secondary_only() -> (
-    None
-):
-    sink = RecordingOverlaySink()
-    osc = RecordingOscQueue()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=SequencedTranslateLLMProvider(responses=["translated live"]),
-        osc=osc,
-        overlay_sink=sink,
-        clock=FakeClock(_now=10.0),
-        low_latency_mode=True,
-        low_latency_awaiting_vad_timeout_s=10.0,
-    )
-    utterance_id = uuid4()
-
-    await harness.dispatch_stt_event(
-        STTFinalEvent(
-            utterance_id=utterance_id,
-            transcript=Transcript(
-                utterance_id=utterance_id,
-                text="hello live",
-                is_final=True,
-                created_at=11.0,
-            ),
-        )
-    )
-    buffer = harness.self_owner.merge_buffer
-    assert buffer is not None
-    assert buffer.speculative_attempt is not None
-    assert buffer.speculative_attempt.task is not None
-    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
-
-    assert [event.type for event in sink.events] == [
-        "self_active_update",
-        "self_active_update",
-    ]
-    assert sink.events[0].text == "hello live"
-    assert sink.events[0].secondary_text == ""
-    assert sink.events[1].occupant_key == sink.events[0].occupant_key
-    assert sink.events[1].text == "hello live"
-    assert sink.events[1].secondary_text == "translated live"
-    assert [event.type for event in sink.events if event.type != "self_active_update"] == []
-    assert harness.self_owner.merge_buffer is buffer
-    assert osc.messages == []
-
-
-@pytest.mark.asyncio
-async def test_low_latency_self_active_secondary_stays_sticky_on_soft_reuse_mismatch_then_recovers() -> (
-    None
-):
-    sink = RecordingOverlaySink()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=SequencedTranslateLLMProvider(responses=["translated one", "translated two"]),
-        osc=RecordingOscQueue(),
-        overlay_sink=sink,
-        clock=FakeClock(_now=10.0),
-        low_latency_mode=True,
-        low_latency_awaiting_vad_timeout_s=10.0,
-    )
-    utterance_id = uuid4()
-
-    await harness.dispatch_stt_event(
-        STTFinalEvent(
-            utterance_id=utterance_id,
-            transcript=Transcript(
-                utterance_id=utterance_id,
-                text="hello live",
-                is_final=True,
-                created_at=11.0,
-            ),
-        )
-    )
-    buffer = harness.self_owner.merge_buffer
-    assert buffer is not None
-    assert buffer.speculative_attempt is not None
-    assert buffer.speculative_attempt.task is not None
-    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
-
-    await harness.dispatch_stt_event(
-        STTFinalEvent(
-            utterance_id=utterance_id,
-            transcript=Transcript(
-                utterance_id=utterance_id,
-                text="bye now",
-                is_final=True,
-                created_at=12.0,
-            ),
-        )
-    )
-    assert buffer.speculative_attempt is not None
-    assert buffer.speculative_attempt.task is not None
-    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
-
-    active_events = [event for event in sink.events if event.type == "self_active_update"]
-    assert [event.secondary_text for event in active_events] == [
-        "",
-        "translated one",
-        "translated one",
-        "translated two",
-    ]
-    assert [event.text for event in active_events] == [
-        "hello live",
-        "hello live",
-        "bye now",
-        "bye now",
-    ]
-    assert [event.type for event in sink.events if event.type != "self_active_update"] == []
-
-
-@pytest.mark.asyncio
-async def test_low_latency_self_active_secondary_diagnostics_record_blank_sticky_and_spec_sources(
-    tmp_path,
+@pytest.mark.parametrize("second_translation", ["translated two", "translated one"])
+async def test_sentence_replacement_updates_source_coverage_even_when_translation_text_repeats(
+    second_translation,
 ) -> None:
-    sink = RecordingOverlaySink()
-    diagnostics = OverlayDiagnosticsRecorder(
-        overlay_instance_id="overlay-test",
-        diagnostics_dir=tmp_path,
-    )
+    presenter = OverlayPresenter(calibration=OverlayCalibration())
+    llm = ReleasableTranslateLLMProvider(response_text="translated one")
     harness = compose_translation_test_harness(
         stt=None,
-        llm=SequencedTranslateLLMProvider(responses=["translated one", "translated two"]),
+        llm=llm,
         osc=RecordingOscQueue(),
-        overlay_sink=sink,
-        overlay_diagnostics=diagnostics,
+        overlay_sink=presenter,
         clock=FakeClock(_now=10.0),
         low_latency_mode=True,
         low_latency_awaiting_vad_timeout_s=10.0,
     )
-    utterance_id = uuid4()
-
-    await harness.dispatch_stt_event(
-        STTFinalEvent(
-            utterance_id=utterance_id,
-            transcript=Transcript(
-                utterance_id=utterance_id,
-                text="hello live",
-                is_final=True,
-                created_at=11.0,
-            ),
+    source_id = uuid4()
+    try:
+        await _source_revision(harness, source_id, "hello live.")
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        llm.release.set_result(None)
+        await _eventually(
+            lambda: bool(presenter.snapshot().blocks)
+            and presenter.snapshot().blocks[0].secondary_text == "translated one"
         )
-    )
-    buffer = harness.self_owner.merge_buffer
-    assert buffer is not None
-    assert buffer.speculative_attempt is not None
-    assert buffer.speculative_attempt.task is not None
-    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
-
-    await harness.dispatch_stt_event(
-        STTFinalEvent(
-            utterance_id=utterance_id,
-            transcript=Transcript(
-                utterance_id=utterance_id,
-                text="bye now",
-                is_final=True,
-                created_at=12.0,
-            ),
+        original = presenter.snapshot().blocks[0]
+        assert original.primary_text == "hello live."
+        llm.release = None
+        llm.started.clear()
+        llm.response_text = second_translation
+        await _source_revision(harness, source_id, "bye now.")
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        assert presenter.snapshot().blocks == [original]
+        llm.release.set_result(None)
+        await _eventually(lambda: presenter.snapshot().blocks[0].primary_text == "bye now.")
+        current = presenter.snapshot().blocks[0]
+        assert current.secondary_text == second_translation
+        assert (current.id, current.occupant_key, current.appearance_seq) == (
+            original.id,
+            original.occupant_key,
+            original.appearance_seq,
         )
-    )
-
-    assert buffer.speculative_attempt is not None
-    assert buffer.speculative_attempt.task is not None
-    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
-    assert list(diagnostics.translation_events) == []
+        assert current.update_id != original.update_id
+        assert current.source_text_hash == hashlib.sha256(b"bye now.").hexdigest()[:16]
+        assert current.source_text_len == len("bye now.")
+        assert llm.calls == ["hello live.", "bye now."]
+    finally:
+        await harness.stop()
+        await presenter.close()
 
 
 @pytest.mark.asyncio
-async def test_translation_active_self_metadata_flows_through_presenter_accessor() -> None:
-    bridge = RecordingPresentationBridge()
+async def test_active_caption_metadata_tracks_visible_coverage_not_latest_speculative_result() -> (
+    None
+):
+    class MetadataProvider(ReleasableTranslateLLMProvider):
+        async def translate(self, **kwargs):
+            result = await super().translate(**kwargs)
+            return Translation(
+                utterance_id=kwargs["utterance_id"],
+                text=result.text,
+                source_text=kwargs["text"],
+                source_language="ja",
+                target_language="zh-TW",
+                update_id=f"metadata-{len(self.calls)}",
+                origin_wall_clock_ms=1000 + len(self.calls),
+                session_scope="caption-metadata",
+            )
+
     clock = FakeClock(_now=10.0)
-    presenter = OverlayPresenter(
-        bridge=bridge,
-        calibration=OverlayCalibration(),
-        clock=clock,
-    )
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    llm = MetadataProvider(response_text="translated live")
     harness = compose_translation_test_harness(
         stt=None,
-        llm=None,
+        llm=llm,
         osc=RecordingOscQueue(),
         overlay_sink=presenter,
         clock=clock,
         low_latency_mode=True,
-    )
-    merge_id = uuid4()
-    logical_turn_key = f"self:{merge_id}"
-    expected_metadata = {
-        "update_id": "self-active-update-1",
-        "origin_wall_clock_ms": 123456789,
-        "session_scope": "self-active-session",
-        "source_text_hash": "0123456789abcdef",
-        "source_text_len": len("hello live"),
-        "logical_turn_key": logical_turn_key,
-    }
-    buffer = _MergeBuffer(
-        merge_id=merge_id,
-        parts=["hello live"],
-        utterance_ids=[uuid4()],
-        speculative_attempt=make_speculative_attempt(
-            source_text="hello live",
-            result=Translation(
-                utterance_id=merge_id,
-                text="translated live",
-                source_text="hello live",
-                source_language="ko",
-                target_language="en",
-                channel="self",
-                created_at=10.0,
-                **expected_metadata,
-            ),
-        ),
-    )
-    harness.self_owner.merge_buffer = buffer
-
-    await harness.self_owner._sync_overlay_active_self(buffer, created_at=harness.clock.now())
-
-    metadata = presenter.active_self_overlay_metadata()
-    assert metadata == ActiveSelfOverlayMetadata(
-        text="hello live",
-        secondary_text="translated live",
-        utterance_id=merge_id,
-        occupant_key=f"self:{merge_id}",
-        update_id="self-active-update-1",
-        origin_wall_clock_ms=123456789,
-        session_scope="self-active-session",
-        source_text_hash="0123456789abcdef",
-        source_text_len=len("hello live"),
-        logical_turn_key=logical_turn_key,
-        primary_language="ko",
-        secondary_language="en",
-    )
-    active_block = presenter.snapshot().blocks[0]
-    assert active_block.id == f"self:{merge_id}"
-    assert active_block.primary_text == "hello live"
-    assert active_block.secondary_text == "translated live"
-    assert active_block.primary_language == "ko"
-    assert active_block.secondary_language == "en"
-    assert active_block.occupant_key == f"self:{merge_id}"
-    assert {
-        "update_id": active_block.update_id,
-        "origin_wall_clock_ms": active_block.origin_wall_clock_ms,
-        "session_scope": active_block.session_scope,
-        "source_text_hash": active_block.source_text_hash,
-        "source_text_len": active_block.source_text_len,
-        "logical_turn_key": active_block.logical_turn_key,
-    } == expected_metadata
-
-
-@pytest.mark.asyncio
-async def test_low_latency_self_active_secondary_stays_sticky_through_resume_continuation() -> None:
-    sink = RecordingOverlaySink()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=SequencedTranslateLLMProvider(responses=["translated live", "translated continued"]),
-        osc=RecordingOscQueue(),
-        overlay_sink=sink,
-        clock=FakeClock(_now=10.0),
-        low_latency_mode=True,
         low_latency_awaiting_vad_timeout_s=10.0,
     )
-    first_utterance_id = uuid4()
-    resumed_utterance_id = uuid4()
-
-    await harness.dispatch_stt_event(
-        STTFinalEvent(
-            utterance_id=first_utterance_id,
-            transcript=Transcript(
-                utterance_id=first_utterance_id,
-                text="hello live",
-                is_final=True,
-                created_at=11.0,
-            ),
-        )
+    source_id = uuid4()
+    first, intermediate, final = (
+        "hello live.",
+        "hello live. continued",
+        "hello live. continued here.",
     )
-    buffer = harness.self_owner.merge_buffer
-    assert buffer is not None
-    assert buffer.speculative_attempt is not None
-    assert buffer.speculative_attempt.task is not None
-    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
-
-    await harness.self_owner.handle_vad_event(
-        SpeechStart(
-            resumed_utterance_id,
-            pre_roll=np.zeros((0,), dtype=np.float32),
-            chunk=np.zeros((1,), dtype=np.float32),
+    try:
+        await _source_revision(harness, source_id, first)
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        llm.release.set_result(None)
+        await _eventually(
+            lambda: bool(presenter.snapshot().blocks)
+            and presenter.snapshot().blocks[0].secondary_text == "translated live"
         )
-    )
-    for _ in range(3):
-        await harness.self_owner.handle_vad_event(
-            SpeechChunk(
-                resumed_utterance_id,
-                chunk=np.zeros((1,), dtype=np.float32),
-            )
+        metadata = presenter.active_self_overlay_metadata()
+        block = presenter.snapshot().blocks[0]
+        assert metadata is not None
+        assert metadata.text == block.primary_text == first
+        assert metadata.secondary_text == block.secondary_text == "translated live"
+        assert metadata.occupant_key == block.occupant_key == f"self:{metadata.utterance_id}"
+        assert metadata.update_id == block.update_id == "metadata-1"
+        assert metadata.origin_wall_clock_ms == block.origin_wall_clock_ms == 1001
+        assert metadata.session_scope == block.session_scope == "caption-metadata"
+        assert (
+            metadata.source_text_hash
+            == block.source_text_hash
+            == (hashlib.sha256(first.encode("utf-8")).hexdigest()[:16])
         )
-
-    await harness.dispatch_stt_event(
-        STTFinalEvent(
-            utterance_id=resumed_utterance_id,
-            transcript=Transcript(
-                utterance_id=resumed_utterance_id,
-                text="again",
-                is_final=True,
-                created_at=12.0,
-            ),
+        assert metadata.source_text_len == block.source_text_len == len(first)
+        assert (
+            metadata.logical_turn_key == block.logical_turn_key == f"self:{metadata.utterance_id}"
         )
-    )
-    assert buffer.speculative_attempt is not None
-    assert buffer.speculative_attempt.task is not None
-    await asyncio.gather(buffer.speculative_attempt.task, return_exceptions=True)
+        assert metadata.primary_language == block.primary_language == "ja"
+        assert metadata.secondary_language == block.secondary_language == "zh-TW"
 
-    active_events = [event for event in sink.events if event.type == "self_active_update"]
-    assert [event.secondary_text for event in active_events] == [
-        "",
-        "translated live",
-        "translated live",
-        "translated continued",
-    ]
-    assert [event.text for event in active_events] == [
-        "hello live",
-        "hello live",
-        "hello live again",
-        "hello live again",
-    ]
-    assert [event.type for event in sink.events if event.type != "self_active_update"] == []
-    assert harness.self_owner.merge_buffer is buffer
+        llm.release = None
+        llm.started.clear()
+        llm.response_text = "intermediate result"
+        await _source_revision(harness, source_id, intermediate)
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        llm.release.set_result(None)
+        await _eventually(
+            lambda: any("intermediate result" in message.text for message in harness.osc.messages)
+        )
+        assert presenter.active_self_overlay_metadata() == metadata
+        assert presenter.snapshot().blocks == [block]
+
+        llm.release = None
+        llm.started.clear()
+        llm.response_text = "translated continued"
+        await _source_revision(harness, source_id, final)
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        assert presenter.active_self_overlay_metadata() == metadata
+        llm.release.set_result(None)
+        await _eventually(
+            lambda: presenter.snapshot().blocks[0].secondary_text == "translated continued"
+        )
+        current_metadata = presenter.active_self_overlay_metadata()
+        current = presenter.snapshot().blocks[0]
+        assert current_metadata is not None
+        assert current_metadata.text == current.primary_text == final
+        assert current_metadata.secondary_text == current.secondary_text == "translated continued"
+        assert current_metadata.utterance_id == metadata.utterance_id
+        assert current.id == block.id
+        assert current_metadata.occupant_key == current.occupant_key == metadata.occupant_key
+        assert (
+            current_metadata.logical_turn_key
+            == current.logical_turn_key
+            == metadata.logical_turn_key
+        )
+        assert current_metadata.update_id == current.update_id == "metadata-3"
+        assert current_metadata.origin_wall_clock_ms == current.origin_wall_clock_ms == 1003
+        assert current_metadata.session_scope == current.session_scope == "caption-metadata"
+        assert (
+            current_metadata.source_text_hash
+            == current.source_text_hash
+            == (hashlib.sha256(final.encode("utf-8")).hexdigest()[:16])
+        )
+        assert current_metadata.source_text_len == current.source_text_len == len(final)
+        assert current_metadata.primary_language == current.primary_language == "ja"
+        assert current_metadata.secondary_language == current.secondary_language == "zh-TW"
+    finally:
+        await harness.stop()
+        await presenter.close()
 
 
 @pytest.mark.asyncio
@@ -3170,8 +2880,9 @@ async def test_low_latency_merge_commit_reuses_merge_identity_without_emitting_c
             ),
         )
     )
-    active_event = sink.events[-1]
+    assert sink.events == []
     await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
+    active_event = sink.events[0]
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=utterance_id,
@@ -3184,12 +2895,9 @@ async def test_low_latency_merge_commit_reuses_merge_identity_without_emitting_c
         )
     )
 
-    assert [event.type for event in sink.events] == [
-        "self_active_update",
-        "self_transcript_final",
-        "utterance_closed",
-    ]
-    final_event = next(event for event in sink.events if event.type == "self_transcript_final")
+    await harness.translation_turns.wait_for_idle()
+    assert all(event.type == "self_active_update" for event in sink.events)
+    final_event = next(event for event in sink.events if event.caption_complete)
     assert active_event.utterance_id == final_event.utterance_id
     assert active_event.occupant_key == f"self:{final_event.utterance_id}"
 
@@ -3218,6 +2926,13 @@ async def test_low_latency_self_active_update_failures_do_not_break_harness() ->
             ),
         )
     )
+    await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
 
+    await _eventually(
+        lambda: harness.translation_diagnostics.snapshot().last_error_source == "overlay_sink"
+    )
     assert harness.translation_diagnostics.snapshot().last_error_source == "overlay_sink"
-    assert harness.ui_events.empty()
+    events = [harness.ui_events.get_nowait() for _ in range(harness.ui_events.qsize())]
+    assert events
+    assert all(event.type == UIEventType.SELF_TURN_UPDATED for event in events)
+    assert all(event.payload.source_text == "hello live" for event in events)

@@ -154,6 +154,16 @@ class ProviderObservationSink(Protocol):
 class ProviderObservationPort(Protocol):
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None: ...
 
+    def emit_failure(
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
+        exception: BaseException | None = None,
+    ) -> dict: ...
+
 
 class ConversationRecordSink(Protocol):
     async def record_conversation(self, record: ConversationRecord) -> None: ...

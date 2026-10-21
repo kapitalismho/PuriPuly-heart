@@ -264,6 +264,17 @@ def ensure_managed_identity_bundle(
         broker_device_public_key=broker_device_public_key,
     ):
         return existing
+    if any(
+        secret_store.get(key) is not None
+        for key in (
+            MANAGED_DEVICE_PRIVATE_KEY_SECRET,
+            MANAGED_DEVICE_PUBLIC_KEY_SECRET,
+            MANAGED_IDENTITY_BINDING_SECRET,
+            OPENROUTER_MANAGED_API_KEY_SECRET,
+            "openrouter_managed_qq_api_key",
+        )
+    ):
+        raise ValueError("managed identity binding requires recovery")
     return _replace_managed_identity_bundle(state, secret_store)
 
 
@@ -310,9 +321,6 @@ def _load_existing_bundle(
     secret_store: SecretStore,
 ) -> ManagedIdentityBundle | None:
     installation_id = state.installation_id.strip()
-    if not _is_uuid7(installation_id):
-        return None
-
     private_key_value = secret_store.get(MANAGED_DEVICE_PRIVATE_KEY_SECRET)
     public_key_value = secret_store.get(MANAGED_DEVICE_PUBLIC_KEY_SECRET)
     binding_value = secret_store.get(MANAGED_IDENTITY_BINDING_SECRET)
@@ -327,8 +335,30 @@ def _load_existing_bundle(
     derived_public_key = encode_base64url(private_key.public_key().public_bytes_raw())
     if derived_public_key != public_key_value:
         return None
-    if binding_value != _managed_identity_binding_value(installation_id, derived_public_key):
+    candidates = [installation_id]
+    if not _is_uuid7(installation_id):
+        candidates.extend(
+            (
+                getattr(state, "pending_managed_operation_installation_id", None),
+                secret_store.get(OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET),
+            )
+        )
+    matched = next(
+        (
+            candidate
+            for candidate in candidates
+            if isinstance(candidate, str)
+            and _is_uuid7(candidate)
+            and binding_value == _managed_identity_binding_value(candidate, derived_public_key)
+        ),
+        None,
+    )
+    if matched is None:
         return None
+    if matched != installation_id:
+        state.installation_id = matched
+        state.persist()
+        installation_id = matched
 
     return ManagedIdentityBundle(
         installation_id=installation_id,

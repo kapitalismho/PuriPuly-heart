@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from puripuly_heart.cli.transport import ControlServer
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 
 class HostedApplication:
@@ -20,6 +21,8 @@ class HostedApplication:
         self.control = boundary.control()
         self.control.bind_instance(self.instance_id)
         self.server = ControlServer(self.control, instance_id=self.instance_id, token=self.token)
+        self._endpoint_lock = asyncio.Lock()
+        self._closing = False
         from puripuly_heart.app.services.application_shutdown import application_shutdown_callback
         from puripuly_heart.core.lifecycle import (
             SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
@@ -32,7 +35,7 @@ class HostedApplication:
                     phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
                     owner_name="LocalControlHost",
                     callback_name="freeze_control_ingress",
-                    callback=self.server.freeze,
+                    callback=self._freeze_ingress,
                 ),
                 application_shutdown_callback(
                     phase=SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
@@ -43,30 +46,48 @@ class HostedApplication:
             )
         )
 
+    def _freeze_ingress(self) -> None:
+        self._closing = True
+        self.server.freeze()
+
     async def _close_endpoint(self) -> None:
-        try:
-            await self.server.close()
-        finally:
-            self.lease.close()
+        self._freeze_ingress()
+        async with self._endpoint_lock:
+            try:
+                await self.server.close()
+            finally:
+                self.lease.close()
 
     async def start(self) -> None:
         try:
+            if self._closing:
+                raise asyncio.CancelledError
             await self.boundary.start()
-            port = await self.server.start()
-            self.lease.publish(port=port, token=self.token, instance_id=self.instance_id)
+            async with self._endpoint_lock:
+                if self._closing:
+                    raise asyncio.CancelledError
+                port = await self.server.start()
+                if self._closing:
+                    raise asyncio.CancelledError
+                await run_owned_thread_call(
+                    lambda: self.lease.publish(
+                        port=port, token=self.token, instance_id=self.instance_id
+                    )
+                )
+                if self._closing:
+                    raise asyncio.CancelledError
         except BaseException:
-            await self.server.close()
-            self.lease.close()
+            await self._close_endpoint()
             raise
 
     async def wait_for_stop(self) -> None:
         await self.control.wait_for_stop_request()
-        self.server.freeze()
+        self._freeze_ingress()
         self.control.freeze_ingress()
         await self.server.wait_for_idle()
 
     async def close(self) -> None:
-        self.server.freeze()
+        self._freeze_ingress()
         self.control.freeze_ingress()
         try:
             await self.boundary.stop()

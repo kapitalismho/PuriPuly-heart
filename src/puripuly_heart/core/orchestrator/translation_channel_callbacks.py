@@ -26,6 +26,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTRecognitionUnitTerminal,
+    scoped_event_for_delivery,
 )
 from puripuly_heart.core.stt.recognition_units import RecognitionConsumptionLedger
 from puripuly_heart.domain.events import STTSessionState, STTSessionStateEvent
@@ -79,12 +80,16 @@ class TranslationChannelOwnerCallbacks:
         self._self_capture = owner
 
     async def self_event_handler(self, event: object) -> None:
+        event = scoped_event_for_delivery(event)
+        if event is None:
+            return
         if isinstance(event, STTProviderInputTerminal):
             if event.channel != "self":
                 raise ValueError("Self input terminal belongs to another channel")
             if self._self_capture is not None:
                 self._self_capture.note_input_terminal(event)
-            self._require_self().release_input_segment(event.identity.segment.segment_id)
+            if self._self_scoped_event_is_current(event):
+                self._require_self().release_input_segment(event)
             await self._after_self_input_terminal(event)
             return
         if isinstance(event, STTProviderEpochEnded):
@@ -94,6 +99,9 @@ class TranslationChannelOwnerCallbacks:
             await self._admit_recognition_unit(event, channel="self")
             return
         await self._before_self_event(event)
+        event = scoped_event_for_delivery(event)
+        if event is None:
+            return
         self._stt_sessions.record(event)
         await self._require_self().handle_stt_event(event)
         await self._after_self_event(event)
@@ -122,7 +130,7 @@ class TranslationChannelOwnerCallbacks:
             await self._publish_self_session_state(STTSessionState.DISCONNECTED)
 
     def _self_scoped_event_is_current(
-        self, event: STTProviderTurnUpdate | STTProviderTurnTerminal
+        self, event: STTProviderTurnUpdate | STTProviderTurnTerminal | STTProviderInputTerminal
     ) -> bool:
         return (
             self._self_capture is None
@@ -270,7 +278,8 @@ class TranslationChannelOwnerCallbacks:
             if event.channel == "self":
                 if self._self_capture is not None:
                     self._self_capture.note_input_terminal(event)
-                self._require_self().release_input_segment(event.identity.segment.segment_id)
+                if self._self_scoped_event_is_current(event):
+                    self._require_self().release_input_segment(event)
                 await self._after_self_input_terminal(event)
             else:
                 admissions = self._require_peer_capture().note_input_terminal(event)

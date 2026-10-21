@@ -9,8 +9,11 @@ inputs:
     description: Exact uv version to install.
     required: true
   sync-args:
-    description: Arguments to pass to uv sync before --frozen.
+    description: Arguments to pass to uv sync before the lock enforcement flag.
     required: true
+  lock-mode:
+    description: Lock enforcement mode (frozen for release callers, locked for PR verification).
+    default: frozen
 
 runs:
   using: composite
@@ -26,4 +29,4 @@ runs:
       shell: bash
       run: |
         python -m pip install --upgrade pip "uv==${{ inputs.uv-version }}"
-        uv sync ${{ inputs.sync-args }} --frozen
+        uv sync ${{ inputs.sync-args }} --${{ inputs.lock-mode }}

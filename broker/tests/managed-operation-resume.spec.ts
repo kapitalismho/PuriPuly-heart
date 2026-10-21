@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import app from '../src/index';
 import {
-  attachReferralToOperation,
   buildManagedOperationId,
   buildManagedOperationResumeToken,
   createManagedOperation,
@@ -69,10 +68,6 @@ function mockProviderPlane(options: {
     calls.push(`${method} ${url}`);
     if (url === OPENROUTER_KEYS_URL && method === 'POST') {
       createCalls += 1;
-      if (options.createMode === 'throw-once' && !threwOnce) {
-        threwOnce = true;
-        throw new TypeError('OpenRouter create response was interrupted');
-      }
       if (options.createMode === 'fail-400-once' && createCalls === 1) {
         return jsonResponse({ error: { message: 'bad request' } }, 400);
       }
@@ -84,6 +79,10 @@ function mockProviderPlane(options: {
       const limit = typeof body.limit === 'number' ? body.limit : 0.07;
       const hash = `hash_provider_key_${createCalls}`;
       keys.set(name, { hash, limit });
+      if (options.createMode === 'throw-once' && !threwOnce) {
+        threwOnce = true;
+        throw new TypeError('OpenRouter create response was interrupted');
+      }
       return jsonResponse({ key: `sk-or-resume-test-${createCalls}`, data: { hash, limit } }, 201);
     }
     if (url.startsWith(`${OPENROUTER_KEYS_URL}?limit=`) && method === 'GET') {
@@ -95,6 +94,11 @@ function mockProviderPlane(options: {
       return jsonResponse({ data: entries });
     }
     const keyMatch = url.match(/\/keys\/([^/?]+)$/u);
+    if (keyMatch && method === 'GET') {
+      const hash = keyMatch[1] ?? '';
+      const found = [...keys.values()].find((record) => record.hash === hash);
+      return found ? jsonResponse({ data: found }) : jsonResponse({ error: { message: 'not found' } }, 404);
+    }
     if (keyMatch && method === 'PATCH') {
       const hash = keyMatch[1] ?? '';
       const found = [...keys.entries()].find(([, record]) => record.hash === hash);
@@ -308,7 +312,9 @@ describe('managed operation resume issuance', () => {
 
     const attemptsAfterFailure = readAttempts(env, operationId);
     expect(attemptsAfterFailure).toHaveLength(1);
-    expect(attemptsAfterFailure[0]).toMatchObject({ attempt_index: 1, outcome: 'cleaned' });
+    expect(attemptsAfterFailure[0]).toMatchObject({ attempt_index: 1, outcome: 'cleaned', create_in_flight: 0, managed_credential_ref: 'hash_provider_key_1' });
+    expect(provider.keys.size).toBe(0);
+    expect(provider.calls).toContain(`DELETE ${OPENROUTER_KEYS_URL}/hash_provider_key_1`);
 
     const statusResponse = await postStatus(env, {
       operation_id: operationId,
@@ -400,11 +406,11 @@ describe('managed operation resume issuance', () => {
         `INSERT INTO managed_operations (
           operation_id, issue_source, subject_ref, installation_id, device_public_key,
           state, attempt_count, current_attempt_index, resume_token_hash, auth_expires_at,
-          failure_reason, client_action, referral_reward_id, referral_status, settlement_status,
+          failure_reason, client_action,
           hardware_hash, hardware_hash_salt_version, app_version,
           created_at, updated_at, last_reconciled_at, cleanup_attempts
         ) VALUES (?, 'discord', ?, ?, ?, 'RETRY_READY', 1, 1, ?, ?, NULL, 'retry_authorized',
-          NULL, 'none', 'none', ?, 1, ?, ?, ?, NULL, 0)`,
+          ?, 1, ?, ?, ?, NULL, 0)`,
       )
       .run(
         operationId,
@@ -421,8 +427,8 @@ describe('managed operation resume issuance', () => {
     env.__db
       .prepare(
         `INSERT INTO managed_operation_attempts (
-          operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at
-        ) VALUES (?, 1, ?, NULL, 'cleaned', ?, ?)`,
+          operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at, legacy_cleanup_state
+        ) VALUES (?, 1, ?, NULL, 'cleaned', ?, ?, 'resolved')`,
       )
       .run(operationId, `puripuly-heart:mop:discord:resume_race:a1`, NOW_ISO, NOW_ISO);
 
@@ -484,11 +490,11 @@ describe('managed operation resume issuance', () => {
         `INSERT INTO managed_operations (
           operation_id, issue_source, subject_ref, installation_id, device_public_key,
           state, attempt_count, current_attempt_index, resume_token_hash, auth_expires_at,
-          failure_reason, client_action, referral_reward_id, referral_status, settlement_status,
+          failure_reason, client_action,
           hardware_hash, hardware_hash_salt_version, app_version,
           created_at, updated_at, last_reconciled_at, cleanup_attempts
         ) VALUES (?, 'discord', ?, ?, ?, 'CREATE_UNKNOWN', 1, 1, ?, ?, NULL, 'wait',
-          NULL, 'none', 'none', ?, 1, ?, ?, ?, NULL, 0)`,
+          ?, 1, ?, ?, ?, NULL, 0)`,
       )
       .run(
         operationId,
@@ -542,118 +548,6 @@ describe('managed operation resume issuance', () => {
     expect(attempts[1]).toMatchObject({ attempt_index: 2, outcome: 'created' });
   });
 
-  it('reuses the existing operation referral instead of reserving again', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(NOW_ISO));
-
-    const env = createTestBrokerEnv();
-    const installationId = 'install-discord-resume-referral';
-    const devicePublicKey = 'device-public-key-resume-referral';
-    env.__db
-      .prepare(
-        `INSERT INTO installations (
-          installation_id, device_public_key, hardware_hash, hardware_hash_salt_version,
-          app_version, created_at, last_seen_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(installationId, devicePublicKey, 'hardware-hash-resume-referral', 1, APP_VERSION, NOW_ISO, NOW_ISO);
-    const subjectRef = 'ph-discord-user-v1_resume_referral_subject';
-    env.__db
-      .prepare(
-        `INSERT INTO discord_identities (discord_user_ref, entitlement_installation_id, status, created_at, updated_at)
-         VALUES (?, ?, 'issuing', ?, ?)`,
-      )
-      .run(subjectRef, installationId, NOW_ISO, NOW_ISO);
-    insertEntitlement(env, {
-      installation_id: installationId,
-      status: 'pending_release',
-      budget_usd: 0.07,
-      discord_user_ref: subjectRef,
-      discord_issue_status: 'issuing',
-      discord_issue_reserved_at: NOW_ISO,
-    });
-    const operationId = buildManagedOperationId();
-    const resumeToken = buildManagedOperationResumeToken();
-    env.__db
-      .prepare(
-        `INSERT INTO managed_operations (
-          operation_id, issue_source, subject_ref, installation_id, device_public_key,
-          state, attempt_count, current_attempt_index, resume_token_hash, auth_expires_at,
-          failure_reason, client_action, referral_reward_id, referral_status, settlement_status,
-          hardware_hash, hardware_hash_salt_version, app_version,
-          created_at, updated_at, last_reconciled_at, cleanup_attempts
-        ) VALUES (?, 'discord', ?, ?, ?, 'RETRY_READY', 1, 1, ?, ?, NULL, 'retry_authorized',
-          NULL, 'none', 'none', ?, 1, ?, ?, ?, NULL, 0)`,
-      )
-      .run(
-        operationId,
-        subjectRef,
-        installationId,
-        devicePublicKey,
-        await hashManagedOperationResumeToken(resumeToken),
-        new Date(Date.parse(NOW_ISO) + 60 * 60_000).toISOString(),
-        'hardware-hash-resume-referral',
-        APP_VERSION,
-        NOW_ISO,
-        NOW_ISO,
-      );
-    env.__db
-      .prepare(
-        `INSERT INTO managed_operation_attempts (
-          operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at
-        ) VALUES (?, 1, ?, NULL, 'cleaned', ?, ?)`,
-      )
-      .run(operationId, `puripuly-heart:mop:discord:resume_referral:a1`, NOW_ISO, NOW_ISO);
-    env.__db
-      .prepare(
-        `INSERT INTO referral_rewards (
-          referral_id, referrer_source, referrer_subject_ref, referrer_installation_id,
-          referred_source, referred_subject_ref, referred_installation_id,
-          referred_hardware_hash, referred_hardware_hash_salt_version,
-          referred_bonus_status, referrer_bonus_status, operation_id, created_at, updated_at
-        ) VALUES (?, 'discord', ?, ?, 'discord', ?, ?, ?, 1, 'reserved', 'pending', ?, ?, ?)`,
-      )
-      .run(
-        'ABCDEF',
-        'ph-discord-user-v1_resume_referrer',
-        'install-resume-referrer',
-        subjectRef,
-        installationId,
-        'hardware-hash-resume-referral',
-        operationId,
-        NOW_ISO,
-        NOW_ISO,
-      );
-    const rewardId = Number(
-      (env.__db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id,
-    );
-    await attachReferralToOperation(env.BROKER_DB, operationId, rewardId, 'reserved', 'none', new Date(NOW_ISO));
-
-    const provider = mockProviderPlane();
-    stubFetch([(input, init) => provider.fetchMock(input, init)]);
-    const resumeResponse = await postResume(env, {
-      operation_id: operationId,
-      resume_token: resumeToken,
-      installation_id: installationId,
-    });
-    expect(resumeResponse.status).toBe(200);
-    const payload = (await resumeResponse.json()) as Record<string, unknown>;
-    expect(typeof payload.openrouter_api_key).toBe('string');
-    const resumeCreateBody = JSON.parse(
-      String(provider.fetchMock.mock.calls.find(([input]) => String(input) === OPENROUTER_KEYS_URL)?.[1]?.body ?? '{}'),
-    ) as Record<string, unknown>;
-    expect(resumeCreateBody.limit).toBe(0.07);
-
-    const rewards = env.__db
-      .prepare('SELECT * FROM referral_rewards WHERE operation_id = ?')
-      .all(operationId) as Array<Record<string, unknown>>;
-    expect(rewards).toHaveLength(1);
-    expect(rewards[0]).toMatchObject({ id: rewardId, referred_bonus_status: 'reserved' });
-    expect(readOperation(env, operationId)).toMatchObject({
-      referral_reward_id: rewardId,
-      referral_status: 'reserved',
-    });
-  });
 
   it('resumes a timed-out QQ issue without the raw identity or credential', async () => {
     vi.useFakeTimers();
@@ -695,6 +589,9 @@ describe('managed operation resume issuance', () => {
       env,
     );
     expect(assertResponse.status).toBe(500);
+    expect(readAttempts(env, operationId)[0]).toMatchObject({ outcome: 'cleaned', create_in_flight: 0, managed_credential_ref: 'hash_provider_key_1' });
+    expect(provider.keys.size).toBe(0);
+    expect(provider.calls).toContain(`DELETE ${OPENROUTER_KEYS_URL}/hash_provider_key_1`);
 
     const statusResponse = await postStatus(env, {
       operation_id: operationId,
@@ -779,11 +676,11 @@ describe('managed operation resume issuance', () => {
         `INSERT INTO managed_operations (
           operation_id, issue_source, subject_ref, installation_id, device_public_key,
           state, attempt_count, current_attempt_index, resume_token_hash, auth_expires_at,
-          failure_reason, client_action, referral_reward_id, referral_status, settlement_status,
+          failure_reason, client_action,
           hardware_hash, hardware_hash_salt_version, app_version,
           created_at, updated_at, last_reconciled_at, cleanup_attempts
         ) VALUES (?, 'discord', ?, ?, ?, 'RETRY_READY', 1, 1, ?, ?, NULL, 'retry_authorized',
-          NULL, 'none', 'none', ?, 1, ?, ?, ?, NULL, 0)`,
+          ?, 1, ?, ?, ?, NULL, 0)`,
       )
       .run(
         operationId,
@@ -800,8 +697,8 @@ describe('managed operation resume issuance', () => {
     env.__db
       .prepare(
         `INSERT INTO managed_operation_attempts (
-          operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at
-        ) VALUES (?, 1, ?, NULL, 'cleaned', ?, ?)`,
+          operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at, legacy_cleanup_state
+        ) VALUES (?, 1, ?, NULL, 'cleaned', ?, ?, 'resolved')`,
       )
       .run(operationId, `puripuly-heart:mop:discord:resume_repeat:a1`, NOW_ISO, NOW_ISO);
 
@@ -863,11 +760,11 @@ describe('managed operation resume issuance', () => {
         `INSERT INTO managed_operations (
           operation_id, issue_source, subject_ref, installation_id, device_public_key,
           state, attempt_count, current_attempt_index, resume_token_hash, auth_expires_at,
-          failure_reason, client_action, referral_reward_id, referral_status, settlement_status,
+          failure_reason, client_action,
           hardware_hash, hardware_hash_salt_version, app_version,
           created_at, updated_at, last_reconciled_at, cleanup_attempts
         ) VALUES (?, 'discord', ?, ?, ?, 'RETRY_READY', 1, 1, ?, ?, NULL, 'retry_authorized',
-          NULL, 'none', 'none', ?, 1, ?, ?, ?, NULL, 0)`,
+          ?, 1, ?, ?, ?, NULL, 0)`,
       )
       .run(
         operationId,
@@ -884,8 +781,8 @@ describe('managed operation resume issuance', () => {
     env.__db
       .prepare(
         `INSERT INTO managed_operation_attempts (
-          operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at
-        ) VALUES (?, 1, ?, NULL, 'cleaned', ?, ?)`,
+          operation_id, attempt_index, provider_key_name, managed_credential_ref, outcome, created_at, updated_at, legacy_cleanup_state
+        ) VALUES (?, 1, ?, NULL, 'cleaned', ?, ?, 'resolved')`,
       )
       .run(operationId, `puripuly-heart:mop:discord:resume_ambiguous:a1`, NOW_ISO, NOW_ISO);
 
@@ -903,6 +800,8 @@ describe('managed operation resume issuance', () => {
     expect(ambiguousPayload).toMatchObject({ state: 'CREATE_UNKNOWN', client_action: 'wait' });
     expect(readAttempts(env, operationId)).toHaveLength(2);
     expect(readDeliveries(env, operationId)).toHaveLength(0);
+    expect(readAttempts(env, operationId)[1]).toMatchObject({ outcome: 'unknown', create_in_flight: 1 });
+    expect(provider.keys.size).toBe(1);
 
     const retry = await postResume(env, body);
     expect(retry.status).toBe(200);
@@ -910,6 +809,9 @@ describe('managed operation resume issuance', () => {
     expect(typeof retryPayload.openrouter_api_key).toBe('string');
     expect(provider.createCalls).toBe(2);
     expect(readAttempts(env, operationId)).toHaveLength(3);
+    expect(readAttempts(env, operationId)[1]).toMatchObject({ outcome: 'cleaned', create_in_flight: 0, managed_credential_ref: 'hash_provider_key_1' });
+    expect(provider.keys.size).toBe(1);
+    expect(provider.calls).toContain(`DELETE ${OPENROUTER_KEYS_URL}/hash_provider_key_1`);
   });
 
   it('keeps status read-only while resume progresses recovery', async () => {
@@ -1025,6 +927,7 @@ describe('managed operation resume issuance', () => {
     if (!ownerStarted.ok) {
       return;
     }
+    await recordAttemptCredential(env.BROKER_DB, ownerId, 1, 'hash_resume_conflict_1', new Date());
     await createManagedKeyDelivery(env.BROKER_DB, {
       issueSource: 'discord',
       subjectRef,
@@ -1131,11 +1034,11 @@ describe('managed operation resume issuance', () => {
         `INSERT INTO managed_operations (
           operation_id, issue_source, subject_ref, installation_id, device_public_key,
           state, attempt_count, current_attempt_index, resume_token_hash, auth_expires_at,
-          failure_reason, client_action, referral_reward_id, referral_status, settlement_status,
+          failure_reason, client_action,
           hardware_hash, hardware_hash_salt_version, app_version,
           created_at, updated_at, last_reconciled_at, cleanup_attempts
         ) VALUES (?, 'discord', ?, ?, ?, 'RETRY_READY', 1, 1, ?, ?, NULL, 'retry_authorized',
-          NULL, 'none', 'none', ?, 1, ?, ?, ?, NULL, 0)`,
+          ?, 1, ?, ?, ?, NULL, 0)`,
       )
       .run(
         operationId,
@@ -1156,16 +1059,13 @@ describe('managed operation resume issuance', () => {
         ) VALUES (?, 1, ?, NULL, 'cleaned', ?, ?)`,
       )
       .run(operationId, `puripuly-heart:mop:discord:resume_release:a1`, NOW_ISO, NOW_ISO);
-    await createManagedKeyDelivery(env.BROKER_DB, {
-      issueSource: 'discord',
-      subjectRef,
-      installationId,
-      managedCredentialRef: 'hash_resume_release_1',
-      createdAt: new Date(NOW_ISO),
-      expiresAt: new Date(Date.parse(NOW_ISO) + 15 * 60_000),
-      operationId,
-      attemptIndex: 1,
-    });
+    env.__db.prepare(`INSERT INTO managed_key_deliveries (
+      delivery_id, issue_source, subject_ref, installation_id, managed_credential_ref,
+      ack_token_hash, status, created_at, expires_at, operation_id, attempt_index
+    ) VALUES ('persisted-inconsistent-delivery', 'discord', ?, ?, 'hash_resume_release_1', ?, 'pending', ?, ?, ?, 1)`).run(
+      subjectRef, installationId, `ph-delivery-ack-token-v1_${'a'.repeat(64)}`, NOW_ISO,
+      new Date(Date.parse(NOW_ISO) + 15 * 60_000).toISOString(), operationId,
+    );
 
     const provider = mockProviderPlane();
     stubFetch([(input, init) => provider.fetchMock(input, init)]);
@@ -1182,9 +1082,9 @@ describe('managed operation resume issuance', () => {
     });
     expect(provider.createCalls).toBe(0);
     const attempts = readAttempts(env, operationId);
-    expect(attempts).toHaveLength(2);
-    expect(attempts[1]).toMatchObject({ attempt_index: 2, outcome: 'cleaned' });
-    expect(readOperation(env, operationId)).toMatchObject({ state: 'RETRY_READY', attempt_count: 2 });
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).toMatchObject({ attempt_index: 1, outcome: 'cleaned' });
+    expect(readOperation(env, operationId)).toMatchObject({ state: 'RETRY_READY', attempt_count: 1 });
 
     const statusResponse = await postStatus(env, {
       operation_id: operationId,

@@ -17,9 +17,10 @@ from puripuly_heart.core.audio.process_identity import (
     PsutilCurrentUserProcessSnapshots,
     PsutilProcessIdentityWatcher,
 )
+from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
-from puripuly_heart.core.runtime_logging import emit_basic_log
 from puripuly_heart.core.vrchat_scene import SceneSnapshotProvider, VrchatSceneSnapshot
 from puripuly_heart.core.vrchat_scene_events import UNAVAILABLE_SNAPSHOT
 from puripuly_heart.core.vrchat_scene_parser import parse_vrchat_scene_line
@@ -96,6 +97,9 @@ class VrchatSceneService(SceneSnapshotProvider):
     _log_candidate: VrchatSceneLogCandidate | None = field(default=None, init=False, repr=False)
     _last_activity: float = field(default=0.0, init=False, repr=False)
     _watch: object | None = field(default=None, init=False, repr=False)
+    _process_observation_succeeded: bool | None = field(default=None, init=False, repr=False)
+    _process_present: bool | None = field(default=None, init=False, repr=False)
+    _observation_diagnostics: ErrorDiagnostics | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.poll_interval_s <= 0:
@@ -125,6 +129,13 @@ class VrchatSceneService(SceneSnapshotProvider):
             "status": self._snapshot.status,
             "in_lifecycle": self._in_lifecycle,
             "generation": self._generation,
+            "process_observation_succeeded": self._process_observation_succeeded,
+            "process_present": self._process_present,
+            "observation_diagnostic_id": (
+                self._observation_diagnostics.diagnostic_id
+                if self._observation_diagnostics
+                else None
+            ),
         }
 
     async def start(self) -> None:
@@ -162,7 +173,7 @@ class VrchatSceneService(SceneSnapshotProvider):
             except asyncio.CancelledError:
                 raise
             except Exception as error:
-                self._mark_file_failure(self._generation, type(error).__name__)
+                self._mark_file_failure(self._generation, error)
             try:
                 await asyncio.sleep(self.poll_interval_s)
             except asyncio.CancelledError:
@@ -175,9 +186,35 @@ class VrchatSceneService(SceneSnapshotProvider):
             await self._poll_log(generation)
             self._settle_if_quiet(generation)
             return
-        identity = await run_owned_thread_call(self._find_vrchat_identity)
+        try:
+            identity = await run_owned_thread_call(self._find_vrchat_identity)
+        except Exception as exc:
+            if generation != self._generation or not self._started:
+                return
+            self._process_observation_succeeded = False
+            self._process_present = None
+            self._snapshot = UNAVAILABLE_SNAPSHOT
+            if self._observation_diagnostics is None:
+                self._observation_diagnostics = self._diagnostics(
+                    "vrchat_process_observation_failed",
+                    "process_enumeration",
+                    exc,
+                    observation_succeeded=False,
+                    process_present=None,
+                )
+            emit_failure(
+                logger,
+                self._observation_diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="process_enumeration",
+            )
+            return
         if generation != self._generation or not self._started:
             return
+        self._process_observation_succeeded = True
+        self._process_present = identity is not None
+        self._observation_diagnostics = None
         if identity is None:
             self._end_lifecycle()
             return
@@ -202,10 +239,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         return True
 
     def _find_vrchat_identity(self) -> ResolvedProcessCaptureIdentity | None:
-        try:
-            items = tuple(self.snapshots.snapshots())
-        except Exception:
-            return None
+        items = tuple(self.snapshots.snapshots())
         best: ProcessSnapshot | None = None
         best_create = -1.0
         for item in items:
@@ -226,16 +260,10 @@ class VrchatSceneService(SceneSnapshotProvider):
             return None
         if not isinstance(best.executable_path, str) or not best.instance_id:
             return None
-        try:
-            target = ProcessCaptureTargetIntent.vrchat(best.executable_path)
-        except Exception:
-            return None
-        try:
-            return ResolvedProcessCaptureIdentity(
-                pid=best.pid, target=target, instance_id=best.instance_id
-            )
-        except Exception:
-            return None
+        target = ProcessCaptureTargetIntent.vrchat(best.executable_path)
+        return ResolvedProcessCaptureIdentity(
+            pid=best.pid, target=target, instance_id=best.instance_id
+        )
 
     def _begin_lifecycle(self, identity: ResolvedProcessCaptureIdentity) -> None:
         self._close_watch()
@@ -258,8 +286,15 @@ class VrchatSceneService(SceneSnapshotProvider):
                 identity,
                 lambda: loop.call_soon_threadsafe(self._handle_terminal, generation, instance_id),
             )
-        except Exception:
+        except Exception as exc:
             self._watch = None
+            emit_failure(
+                logger,
+                self._diagnostics("vrchat_process_watch_failed", "process_watch", exc),
+                severity="warning",
+                disposition="degraded",
+                stage="process_watch",
+            )
 
     def _end_lifecycle(self) -> None:
         if not self._in_lifecycle:
@@ -297,7 +332,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         try:
             lines = await run_owned_thread_call(lambda: tailer.begin_replay(selected))
         except Exception as error:
-            self._mark_file_failure(generation, type(error).__name__)
+            self._mark_file_failure(generation, error)
             return
         if not self._fresh(generation) or tailer is not self._tailer:
             return
@@ -331,7 +366,7 @@ class VrchatSceneService(SceneSnapshotProvider):
             await self._rebuild_same_file(generation, tailer)
             return
         except Exception as error:
-            self._mark_file_failure(generation, type(error).__name__)
+            self._mark_file_failure(generation, error)
             return
         if not self._fresh(generation) or tailer is not self._tailer:
             return
@@ -351,7 +386,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         try:
             lines = await run_owned_thread_call(lambda: tailer.begin_replay(selected.path))
         except Exception as error:
-            self._mark_file_failure(generation, type(error).__name__)
+            self._mark_file_failure(generation, error)
             return
         if not self._fresh(generation) or tailer is not self._tailer:
             return
@@ -369,7 +404,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         try:
             rebuilt = await run_owned_thread_call(lambda: tailer.begin_replay(current.path))
         except Exception as error:
-            self._mark_file_failure(generation, type(error).__name__)
+            self._mark_file_failure(generation, error)
             return
         if not self._fresh(generation) or tailer is not self._tailer:
             return
@@ -398,7 +433,7 @@ class VrchatSceneService(SceneSnapshotProvider):
             return
         return
 
-    def _mark_file_failure(self, generation: int, reason: str = "unknown") -> None:
+    def _mark_file_failure(self, generation: int, error: BaseException | None = None) -> None:
         if generation != self._generation or not self._started or not self._in_lifecycle:
             return
         previous = self._snapshot.status
@@ -406,11 +441,12 @@ class VrchatSceneService(SceneSnapshotProvider):
         self._snapshot = self._tracker.snapshot()
         if self._snapshot.status == previous:
             return
-        emit_basic_log(
+        emit_failure(
             logger,
-            "[VRChat Scene] Scene context became unavailable · Cause %s",
-            reason if reason.isidentifier() else "unclassified",
-            level=logging.WARNING,
+            self._diagnostics("vrchat_scene_log_read_failed", "scene_log_read", error),
+            severity="warning",
+            disposition="degraded",
+            stage="scene_log_read",
         )
 
     def _feed_lines(self, lines: list[str]) -> int:
@@ -441,8 +477,38 @@ class VrchatSceneService(SceneSnapshotProvider):
             return
         try:
             close()
-        except Exception:
-            return
+        except Exception as exc:
+            emit_failure(
+                logger,
+                self._diagnostics("vrchat_process_watch_close_failed", "watch_close", exc),
+                severity="warning",
+                disposition="degraded",
+                stage="watch_close",
+            )
+
+    def _diagnostics(
+        self,
+        code: str,
+        phase: str,
+        exception: BaseException | None = None,
+        **fields: bool | None,
+    ) -> ErrorDiagnostics:
+        return ErrorDiagnostics(
+            component="vrchat_scene",
+            operation=phase,
+            code=code,
+            category="lifecycle",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={
+                "phase": phase,
+                **fields,
+                **(safe_exception_fields(exception) if exception is not None else {}),
+            },
+            generation=self._generation,
+        )
 
 
 __all__ = ["VrchatSceneService"]

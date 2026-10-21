@@ -16,7 +16,6 @@ from puripuly_heart.config.llm_profiles import (
     OPENROUTER_MODEL_GPT_6_LUNA,
 )
 from puripuly_heart.core import network_clients
-from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
@@ -27,6 +26,7 @@ from puripuly_heart.core.openrouter_routing import (
     OpenRouterRoutingMode,
 )
 from puripuly_heart.domain.models import Translation
+from puripuly_heart.providers.llm.error_details import LLMResponseError
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ _LIMIT_REASONS = frozenset({"in_flight_budget_exhausted", "weight_exceeds_budget
 _MAX_RETRY_AFTER_SECONDS = 86_400
 
 
-class OpenRouterResponseError(RuntimeError):
+class OpenRouterResponseError(LLMResponseError):
     diagnostic_provider = "openrouter"
 
     def __init__(
@@ -49,11 +49,12 @@ class OpenRouterResponseError(RuntimeError):
         limit_reason: str | None = None,
         retry_after_ms: int | None = None,
     ) -> None:
-        self.status_code = status_code
         self.limit_source = limit_source
         self.limit_reason = limit_reason
         self.retry_after_ms = retry_after_ms
-        super().__init__(f"OpenRouter request failed (status={status_code})")
+        super().__init__(
+            "OpenRouter request failed", provider="openrouter", status_code=status_code
+        )
 
 
 def _payment_limit_metadata(response: httpx.Response) -> tuple[str | None, str | None]:
@@ -98,23 +99,6 @@ def _retry_after_ms(response: httpx.Response) -> int | None:
     return None
 
 
-def _log_basic_request_failure(
-    *,
-    runtime_logging: ProviderObservationPort | None,
-    operation: str,
-    error: OpenRouterResponseError,
-) -> None:
-    report = provider_failure_report(error, provider="openrouter", operation=operation)
-    rendered = "[Basic][LLM] OpenRouter request failed [%s]: %s" % (
-        operation,
-        format_error_report_for_log(report),
-    )
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(rendered, level=logging.ERROR)
-        return
-    logger.error(rendered)
-
-
 def _build_system_prompt(
     *,
     system_prompt: str,
@@ -145,7 +129,9 @@ def _extract_message_content(content: object) -> str:
         result = content.strip()
         if result:
             return result
-        raise RuntimeError("OpenRouter response contained empty message content")
+        raise LLMResponseError(
+            "OpenRouter response contained empty message content", provider="openrouter"
+        )
 
     if isinstance(content, list):
         parts: list[str] = []
@@ -157,7 +143,9 @@ def _extract_message_content(content: object) -> str:
         if parts:
             return "\n".join(parts)
 
-    raise RuntimeError("OpenRouter response did not contain message content")
+    raise LLMResponseError(
+        "OpenRouter response did not contain message content", provider="openrouter"
+    )
 
 
 def _has_length_finish_reason(data: object) -> bool:
@@ -559,33 +547,41 @@ class HttpxOpenRouterClient:
                 limit_reason=reason,
                 retry_after_ms=_retry_after_ms(response),
             )
-            _log_basic_request_failure(
-                runtime_logging=self.runtime_logging,
-                operation="translate",
-                error=error,
-            )
+
             raise error
 
         try:
             data = response.json()
-        except ValueError:
-            raise RuntimeError("OpenRouter response was not valid JSON") from None
+        except ValueError as exc:
+            raise LLMResponseError(
+                "OpenRouter response was not valid JSON", provider="openrouter"
+            ) from exc
         if not isinstance(data, dict):
-            raise RuntimeError("OpenRouter response did not contain a valid payload")
+            raise LLMResponseError(
+                "OpenRouter response did not contain a valid payload", provider="openrouter"
+            )
         if observation is not None:
             observation.record_openai_response(data)
         self._last_reasoning_tokens = _reasoning_token_count(data)
         choices = data.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise RuntimeError("OpenRouter response did not contain choices")
+            raise LLMResponseError(
+                "OpenRouter response did not contain choices", provider="openrouter"
+            )
         if _has_length_finish_reason(data):
-            raise RuntimeError("OpenRouter response was truncated by max_tokens limit")
+            raise LLMResponseError(
+                "OpenRouter response was truncated by max_tokens limit", provider="openrouter"
+            )
         first_choice = choices[0]
         if not isinstance(first_choice, dict):
-            raise RuntimeError("OpenRouter response did not contain a valid choice")
+            raise LLMResponseError(
+                "OpenRouter response did not contain a valid choice", provider="openrouter"
+            )
         message = first_choice.get("message")
         if not isinstance(message, dict):
-            raise RuntimeError("OpenRouter response did not contain message content")
+            raise LLMResponseError(
+                "OpenRouter response did not contain message content", provider="openrouter"
+            )
         return _extract_message_content(message.get("content"))
 
     async def close(self) -> None:

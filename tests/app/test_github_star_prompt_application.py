@@ -118,18 +118,8 @@ async def test_prompt_settings_owner_reports_safe_order24_persistence_failure() 
     assert settings_owner.mutation_depth == 0
     assert settings_owner.rollback_pending is False
     assert results[-1].status == TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
-    assert diagnostics == [
-        (
-            "github_star_prompt_settings_persistence_failed",
-            {
-                "component": "settings_repository",
-                "operation": "save",
-                "code": "settings_save_failed",
-                "surface": "ui_prompt_clipboard_state",
-            },
-        )
-    ]
-    assert raw_failure not in repr(diagnostics)
+    assert results[-1].diagnostics.diagnostic_id == settings_owner.last_failure.diagnostic_id
+    assert raw_failure not in repr(results[-1].diagnostics)
 
 
 @pytest.mark.parametrize(

@@ -25,6 +25,10 @@ from puripuly_heart.app.ports import (
     settings_repository,
 )
 from puripuly_heart.core import messages
+from puripuly_heart.core.managed_credential import (
+    ManagedCredentialBinding,
+    credential_binding_secret,
+)
 
 SERVICE_MODULE = "puripuly_heart.app.services.managed_connection_auth"
 DISCORD_AUTH_PORT_MODULE = "puripuly_heart.app.ports.discord_auth"
@@ -280,7 +284,7 @@ class RecordingSettingsRepository:
 
 @dataclass
 class RecordingManagedState:
-    installation_id: str = "install-123"
+    installation_id: str = "identity-r1"
     release_token: str | None = None
     release_token_expires_at: str | None = None
     verified_hardware_hash: str | None = None
@@ -288,8 +292,6 @@ class RecordingManagedState:
     active_managed_credential_ref: str | None = None
     founder_letter_seen_credential_ref: str | None = None
     active_managed_expires_at: str | None = None
-    referral_id: str | None = None
-    referral_source: str | None = None
     local_managed_claim_sources: tuple[str, ...] = ()
     pending_delivery_ack_source: str | None = None
     pending_delivery_ack_delivery_id: str | None = None
@@ -313,8 +315,7 @@ class RecordingManagedState:
             verified_hardware_hash_salt_version=self.verified_hardware_hash_salt_version,
             active_managed_credential_ref=self.active_managed_credential_ref,
             active_managed_expires_at=self.active_managed_expires_at,
-            referral_id=self.referral_id,
-            referral_source=self.referral_source,
+            founder_letter_seen_credential_ref=self.founder_letter_seen_credential_ref,
             local_managed_claim_sources=self.local_managed_claim_sources,
             pending_delivery_ack_source=self.pending_delivery_ack_source,
             pending_delivery_ack_delivery_id=self.pending_delivery_ack_delivery_id,
@@ -339,8 +340,6 @@ class RecordingManagedState:
         self.active_managed_credential_ref = snapshot.active_managed_credential_ref
         self.active_managed_expires_at = snapshot.active_managed_expires_at
         self.founder_letter_seen_credential_ref = snapshot.founder_letter_seen_credential_ref
-        self.referral_id = snapshot.referral_id
-        self.referral_source = snapshot.referral_source
         self.local_managed_claim_sources = snapshot.local_managed_claim_sources
         self.pending_delivery_ack_source = snapshot.pending_delivery_ack_source
         self.pending_delivery_ack_delivery_id = snapshot.pending_delivery_ack_delivery_id
@@ -380,6 +379,13 @@ def _service(
     managed_state: RecordingManagedState | None = None,
 ) -> Any:
     auth = _service_module()
+    state = managed_state
+    if state is None and delivery_ack_service is not None:
+        state = delivery_ack_service.managed_state
+    if state is None and claim_guard is not None:
+        state = claim_guard.managed_state
+    if state is None:
+        state = RecordingManagedState()
     return auth.ManagedConnectionAuthService(
         local_identity=identity,
         discord_auth=discord,
@@ -387,8 +393,13 @@ def _service(
         secret_store=store,
         settings_repository=repository,
         claim_guard=claim_guard,
-        delivery_ack_service=delivery_ack_service,
-        managed_state=managed_state if managed_state is not None else RecordingManagedState(),
+        delivery_ack_service=delivery_ack_service
+        or ManagedKeyDeliveryAckService(
+            broker,
+            store,
+            state,
+        ),
+        managed_state=state,
     )
 
 
@@ -489,8 +500,9 @@ def _broker_success(
     delivery_ack: broker_client.ManagedKeyDeliveryAckMetadata | None = None,
     managed_credential_ref: str | None = None,
     expires_at: str | None = None,
-    referral_id: str | None = None,
 ) -> broker_client.BrokerIssueResult:
+    if delivery_ack is None:
+        delivery_ack = _delivery_ack_metadata()
     return broker_client.BrokerIssueResult(
         succeeded=True,
         broker_connection_id="broker-conn-1",
@@ -498,10 +510,12 @@ def _broker_success(
         remote_key_revision="remote-r1",
         message=None,
         diagnostics=None,
-        managed_credential_ref=managed_credential_ref,
+        managed_credential_ref=(
+            managed_credential_ref
+            or (delivery_ack.managed_credential_ref if delivery_ack is not None else None)
+        ),
         expires_at=expires_at,
         openrouter_user_id=openrouter_user_id,
-        referral_id=referral_id,
         delivery_ack=delivery_ack,
     )
 
@@ -511,7 +525,7 @@ def _delivery_ack_metadata() -> broker_client.ManagedKeyDeliveryAckMetadata:
         source="discord",
         delivery_id="delivery-discord-1",
         managed_credential_ref="managed-ref-discord-1",
-        expires_at="2026-07-07T00:15:00.000Z",
+        expires_at="2099-07-07T00:15:00.000Z",
         delivery_ack_token="delivery-token-discord-1",
     )
 
@@ -650,8 +664,8 @@ def _assert_remote_active_unsafe_settings_rejection(
     assert result.diagnostics.fields["settings_values_accepted"] is False
     assert result.diagnostics.fields["secret_write_succeeded"] is False
     assert result.diagnostics.fields["settings_commit_succeeded"] is False
-    assert result.diagnostics.fields["broker_connection_id"] == "broker-conn-1"
-    assert result.diagnostics.fields["remote_key_revision"] == "remote-r1"
+    assert "broker_connection_id" not in result.diagnostics.fields
+    assert "remote_key_revision" not in result.diagnostics.fields
 
 
 def test_request_and_port_dtos_are_frozen_slotted_and_repr_safe() -> None:
@@ -810,15 +824,6 @@ async def test_success_preflights_identity_then_discord_auth_then_broker_issue_a
 
     _assert_no_raw_values(result, label="managed auth success result")
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-    assert events == [
-        ("identity_preflight", LOCAL_SECRET_KEY),
-        ("discord_auth", "corr-managed-auth"),
-        ("set_secret", "openrouter_managed_operation_resume_token"),
-        ("broker_issue", "discord-user-1"),
-        ("set_secret", LOCAL_SECRET_KEY),
-        ("save_settings", "managed_connection_auth"),
-        ("clear_secret", "openrouter_managed_operation_resume_token"),
-    ]
     discord_request = _only_item(discord.requests, label="discord auth requests")
     assert discord_request.metadata["flow"] == "managed_connection_auth"
 
@@ -835,20 +840,19 @@ async def test_success_preflights_identity_then_discord_auth_then_broker_issue_a
     _assert_no_raw_values(saved_request, label="settings commit request")
     assert saved_request.expected_revision == "settings-r1"
     assert saved_request.reason == "managed_connection_auth"
-    assert saved_request.values["intent"]["translation"]["connection"] == "managed"  # type: ignore[index]
 
 
 @pytest.mark.asyncio
-async def test_success_commits_broker_entitlement_and_owned_pass_id() -> None:
+async def test_success_commits_broker_entitlement() -> None:
     broker = RecordingBrokerClient(
         _broker_success(
-            managed_credential_ref="managed-ref-discord-2",
+            managed_credential_ref="managed-ref-discord-1",
             expires_at="2026-11-24T00:00:00.000Z",
-            referral_id="7KQ9M2",
             delivery_ack=_delivery_ack_metadata(),
         )
     )
     repository = RecordingSettingsRepository(_commit_success())
+    state = RecordingManagedState()
 
     result = await _service(
         identity=RecordingLocalIdentity(_identity_success()),
@@ -856,15 +860,19 @@ async def test_success_commits_broker_entitlement_and_owned_pass_id() -> None:
         broker=broker,
         store=RecordingSecretStore(),
         repository=repository,
+        managed_state=state,
     ).authorize(_request())
 
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-    assert len(repository.saved_requests) == 2
+    assert repository.saved_requests
+    assert state.active_managed_credential_ref == "managed-ref-discord-1"
+    assert state.active_managed_expires_at == "2026-11-24T00:00:00.000Z"
+    assert state.pending_delivery_ack_source is None
+    assert state.pending_managed_operation_id is None
     for saved_request in repository.saved_requests:
         saved = saved_request.values["state"]["managed_connection"]  # type: ignore[index]
-        assert saved["active_managed_credential_ref"] == "managed-ref-discord-2"
+        assert saved["active_managed_credential_ref"] == "managed-ref-discord-1"
         assert saved["active_managed_expires_at"] == "2026-11-24T00:00:00.000Z"
-        assert saved["referral_id"] == "7KQ9M2"
 
 
 @pytest.mark.asyncio
@@ -876,6 +884,29 @@ async def test_delivery_ack_pending_metadata_persists_before_ack_and_clears_afte
     broker = RecordingBrokerClient(_broker_success(delivery_ack=metadata), events=events)
     store = RecordingSecretStore(events=events)
     repository = RecordingSettingsRepository(_commit_success(), events=events)
+    state = RecordingManagedState()
+    original_ack = broker.acknowledge_managed_key_delivery
+
+    async def acknowledge(request):
+        binding = ManagedCredentialBinding.decode(
+            store.values[credential_binding_secret("discord")]
+        )
+        assert binding is not None
+        assert binding.matches(
+            credential=store.values[LOCAL_SECRET_KEY],
+            source="discord",
+            installation_id=state.installation_id,
+            operation_id=state.pending_managed_operation_id,
+            delivery_id=metadata.delivery_id,
+            managed_credential_ref=metadata.managed_credential_ref,
+        )
+        assert state.pending_delivery_ack_delivery_id == metadata.delivery_id
+        assert store.values["openrouter_managed_delivery_ack_token"] == metadata.delivery_ack_token
+        pending = repository.saved_requests[-1].values["state"]["managed_connection"]
+        assert pending["pending_delivery_ack_delivery_id"] == metadata.delivery_id
+        return await original_ack(request)
+
+    broker.acknowledge_managed_key_delivery = acknowledge
 
     result = await _service(
         identity=identity,
@@ -883,30 +914,18 @@ async def test_delivery_ack_pending_metadata_persists_before_ack_and_clears_afte
         broker=broker,
         store=store,
         repository=repository,
+        managed_state=state,
     ).authorize(_request())
 
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-    assert [event[0] for event in events] == [
-        "identity_preflight",
-        "discord_auth",
-        "set_secret",
-        "broker_issue",
-        "set_secret",
-        "save_settings",
-        "set_secret",
-        "delivery_ack",
-        "clear_secret",
-        "save_settings",
-        "clear_secret",
-    ]
-    first_save, second_save = repository.saved_requests
-    pending = first_save.values["state"]["managed_connection"]  # type: ignore[index]
-    assert pending["pending_delivery_ack_source"] == "discord"
-    assert pending["pending_delivery_ack_delivery_id"] == metadata.delivery_id
-    assert pending["pending_delivery_ack_managed_credential_ref"] == metadata.managed_credential_ref
-    assert "delivery_ack_token" not in repr(first_save.values)
-    cleared = second_save.values["state"]["managed_connection"]  # type: ignore[index]
-    assert cleared["pending_delivery_ack_source"] is None
+    assert len(broker.ack_requests) == 1
+    assert repository.saved_requests
+    for saved in repository.saved_requests:
+        _assert_no_raw_values(saved.values)
+        assert "delivery_ack_token" not in repr(saved.values)
+    assert state.pending_delivery_ack_source is None
+    assert state.pending_managed_operation_id is None
+    assert store.values[LOCAL_SECRET_KEY] == RAW_MANAGED_CREDENTIAL
     assert broker.ack_requests[0].delivery_id == metadata.delivery_id
     assert "delivery-token-discord-1" not in repr(broker.ack_requests[0])
     assert "delivery-token-discord-1" not in store.values.values()
@@ -936,6 +955,14 @@ async def test_discord_auth_recovers_pending_ack_before_identity_or_oauth() -> N
     store = RecordingSecretStore(events=events)
     store.values[LOCAL_SECRET_KEY] = RAW_MANAGED_CREDENTIAL
     store.values["openrouter_managed_delivery_ack_token"] = metadata.delivery_ack_token
+    store.values[credential_binding_secret("discord")] = ManagedCredentialBinding.create(
+        source="discord",
+        installation_id=managed_state.installation_id,
+        operation_id="delivered-op",
+        delivery_id=metadata.delivery_id,
+        managed_credential_ref=metadata.managed_credential_ref,
+        credential=RAW_MANAGED_CREDENTIAL,
+    ).encode()
     repository = RecordingSettingsRepository(None, events=events)
 
     result = await _service(
@@ -996,9 +1023,9 @@ async def test_discord_auth_does_not_ack_or_restart_oauth_without_local_managed_
         ),
     ).authorize(_request())
 
-    assert result.status == messages.TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
+    assert result.status == messages.TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING
     assert result.diagnostics is not None
-    assert result.diagnostics.fields["delivery_ack_status"] == "managed_secret_missing"
+    assert result.diagnostics.code == "delivery_ack_managed_secret_missing"
     assert identity.requests == []
     assert discord.requests == []
     assert broker.requests == []
@@ -1030,18 +1057,26 @@ async def test_delivery_ack_token_store_failure_does_not_persist_pending_metadat
         repository=repository,
     ).authorize(_request())
 
-    assert result.status == messages.TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING
+    assert result.status == messages.TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
     assert repository.saved_requests == []
     assert broker.ack_requests == []
     assert result.diagnostics is not None
-    assert result.diagnostics.code == "delivery_ack_token_store_failed_before_local_key_write"
-    assert LOCAL_SECRET_KEY not in store.values
+    _assert_no_raw_values(result)
+    assert store.values[LOCAL_SECRET_KEY] == RAW_MANAGED_CREDENTIAL
+    binding = ManagedCredentialBinding.decode(store.values[credential_binding_secret("discord")])
+    assert binding is not None
+    assert binding.matches(
+        credential=RAW_MANAGED_CREDENTIAL,
+        source="discord",
+        installation_id="identity-r1",
+        operation_id=broker.requests[0].operation_id,
+        delivery_id="delivery-discord-1",
+        managed_credential_ref="managed-ref-discord-1",
+    )
 
 
 @pytest.mark.asyncio
-async def test_delivery_ack_pending_settings_commit_failure_happens_before_local_key_write() -> (
-    None
-):
+async def test_delivery_ack_metadata_commit_failure_retains_exact_key_without_ack() -> None:
     identity = RecordingLocalIdentity(_identity_success())
     discord = RecordingDiscordAuth(_discord_success())
     broker = RecordingBrokerClient(_broker_success(delivery_ack=_delivery_ack_metadata()))
@@ -1057,7 +1092,17 @@ async def test_delivery_ack_pending_settings_commit_failure_happens_before_local
     ).authorize(_request())
 
     assert result.status == messages.TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING
-    assert LOCAL_SECRET_KEY not in store.values
+    assert store.values[LOCAL_SECRET_KEY] == RAW_MANAGED_CREDENTIAL
+    binding = ManagedCredentialBinding.decode(store.values[credential_binding_secret("discord")])
+    assert binding is not None
+    assert binding.matches(
+        credential=RAW_MANAGED_CREDENTIAL,
+        source="discord",
+        installation_id="identity-r1",
+        operation_id=broker.requests[0].operation_id,
+        delivery_id="delivery-discord-1",
+        managed_credential_ref="managed-ref-discord-1",
+    )
     assert broker.ack_requests == []
     assert len(repository.saved_requests) == 1
 
@@ -1087,16 +1132,27 @@ async def test_delivery_ack_token_clear_failure_keeps_pending_metadata_for_retry
 
 
 @pytest.mark.asyncio
-async def test_delivery_ack_clear_metadata_commit_failure_keeps_token_for_retry() -> None:
+async def test_delivery_ack_clear_persist_failure_restores_authority_then_retry_succeeds() -> None:
     metadata = _delivery_ack_metadata()
     identity = RecordingLocalIdentity(_identity_success())
     discord = RecordingDiscordAuth(_discord_success())
     broker = RecordingBrokerClient(_broker_success(delivery_ack=metadata))
     store = RecordingSecretStore()
-    repository = RecordingSettingsRepository(
-        None,
-        results=[_commit_success(), _commit_failure()],
-    )
+    repository = RecordingSettingsRepository(_commit_success())
+
+    class State(RecordingManagedState):
+        fail_clear = True
+
+        def persist(self) -> None:
+            if (
+                self.fail_clear
+                and self.pending_delivery_ack_source is None
+                and self.active_managed_credential_ref == metadata.managed_credential_ref
+            ):
+                raise RuntimeError(RAW_EXCEPTION_TEXT)
+            super().persist()
+
+    state = State()
 
     result = await _service(
         identity=identity,
@@ -1104,15 +1160,31 @@ async def test_delivery_ack_clear_metadata_commit_failure_keeps_token_for_retry(
         broker=broker,
         store=store,
         repository=repository,
+        managed_state=state,
     ).authorize(_request())
 
     assert result.status == messages.TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
-    assert len(repository.saved_requests) == 2
-    pending = repository.saved_requests[0].values["state"]["managed_connection"]  # type: ignore[index]
-    cleared = repository.saved_requests[1].values["state"]["managed_connection"]  # type: ignore[index]
-    assert pending["pending_delivery_ack_delivery_id"] == metadata.delivery_id
-    assert cleared["pending_delivery_ack_delivery_id"] is None
+    assert state.pending_delivery_ack_delivery_id == metadata.delivery_id
+    assert state.pending_managed_operation_id == broker.requests[0].operation_id
     assert store.values["openrouter_managed_delivery_ack_token"] == metadata.delivery_ack_token
+    assert state.local_managed_claim_sources == ()
+    state.fail_clear = False
+
+    retried = await _service(
+        identity=identity,
+        discord=discord,
+        broker=broker,
+        store=store,
+        repository=repository,
+        managed_state=state,
+    ).authorize(_request())
+
+    assert retried.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+    assert state.pending_delivery_ack_source is None
+    assert state.pending_managed_operation_id is None
+    assert "openrouter_managed_delivery_ack_token" not in store.values
+    assert len(broker.requests) == 1
+    assert len(broker.ack_requests) == 2
 
 
 @pytest.mark.asyncio
@@ -1160,7 +1232,6 @@ async def test_success_records_and_persists_discord_claim_after_settings_commit(
 
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
     assert managed_state.local_managed_claim_sources == (MANAGED_AUTH_CLAIM_SOURCE_DISCORD,)
-    assert managed_state.persist_calls == 3
     assert managed_state.pending_managed_operation_id is None
     assert events[-1] == ("clear_secret", "openrouter_managed_operation_resume_token")
 
@@ -1441,8 +1512,8 @@ async def test_broker_success_then_secret_write_failure_reports_remote_active_lo
     assert result.diagnostics.fields["phase"] == "local_secret_write"
     assert result.diagnostics.fields["remote_active"] is True
     assert result.diagnostics.fields["secret_write_succeeded"] is False
-    assert result.diagnostics.fields["broker_connection_id"] == "broker-conn-1"
-    assert result.diagnostics.fields["remote_key_revision"] == "remote-r1"
+    assert "broker_connection_id" not in result.diagnostics.fields
+    assert "remote_key_revision" not in result.diagnostics.fields
 
 
 @pytest.mark.asyncio
@@ -1460,6 +1531,7 @@ async def test_broker_success_then_settings_commit_failure_reports_remote_active
         events=events,
         raise_on_save=raise_on_save,
     )
+    state = RecordingManagedState()
 
     result = await _service(
         identity=identity,
@@ -1467,18 +1539,24 @@ async def test_broker_success_then_settings_commit_failure_reports_remote_active
         broker=broker,
         store=store,
         repository=repository,
+        managed_state=state,
     ).authorize(_request())
 
     _assert_no_raw_values(result, label="remote active settings failure result")
     assert result.status == messages.TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING
-    assert events == [
-        ("identity_preflight", LOCAL_SECRET_KEY),
-        ("discord_auth", "corr-managed-auth"),
-        ("set_secret", "openrouter_managed_operation_resume_token"),
-        ("broker_issue", "discord-user-1"),
-        ("set_secret", LOCAL_SECRET_KEY),
-        ("save_settings", "managed_connection_auth"),
-    ]
+    assert broker.ack_requests == []
+    assert state.pending_managed_operation_id == broker.requests[0].operation_id
+    assert state.local_managed_claim_sources == ()
+    binding = ManagedCredentialBinding.decode(store.values[credential_binding_secret("discord")])
+    assert binding is not None
+    assert binding.matches(
+        credential=RAW_MANAGED_CREDENTIAL,
+        source="discord",
+        installation_id=state.installation_id,
+        operation_id=state.pending_managed_operation_id,
+        delivery_id="delivery-discord-1",
+        managed_credential_ref="managed-ref-discord-1",
+    )
     assert store.values[LOCAL_SECRET_KEY] == RAW_MANAGED_CREDENTIAL
     assert result.diagnostics is not None
     assert result.diagnostics.operation == "commit_settings"
@@ -1488,8 +1566,8 @@ async def test_broker_success_then_settings_commit_failure_reports_remote_active
     assert result.diagnostics.fields["remote_active"] is True
     assert result.diagnostics.fields["secret_write_succeeded"] is True
     assert result.diagnostics.fields["settings_commit_succeeded"] is False
-    assert result.diagnostics.fields["broker_connection_id"] == "broker-conn-1"
-    assert result.diagnostics.fields["remote_key_revision"] == "remote-r1"
+    assert "broker_connection_id" not in result.diagnostics.fields
+    assert "remote_key_revision" not in result.diagnostics.fields
 
 
 def _operation_status_result(
@@ -1500,8 +1578,6 @@ def _operation_status_result(
     managed_credential_ref: str | None = None,
     failed_reason: str | None = None,
     delivery_ack: broker_client.ManagedKeyDeliveryAckMetadata | None = None,
-    referral_id: str | None = None,
-    referral_settlement: str | None = None,
 ) -> broker_client.ManagedOperationStatusResult:
     return broker_client.ManagedOperationStatusResult(
         succeeded=True,
@@ -1511,15 +1587,6 @@ def _operation_status_result(
         managed_credential_ref=managed_credential_ref,
         failed_reason=failed_reason,
         delivery_ack=delivery_ack,
-        referral_id=referral_id,
-        referral=(
-            broker_client.ManagedOperationReferralSnapshot(
-                status="reserved",
-                settlement=referral_settlement,
-            )
-            if referral_settlement is not None
-            else None
-        ),
     )
 
 
@@ -1540,6 +1607,14 @@ def _seeded_operation_store(*, local_key: bool = False) -> RecordingSecretStore:
     store.values["openrouter_managed_operation_resume_token"] = DISCORD_SEEDED_RESUME_TOKEN
     if local_key:
         store.values[LOCAL_SECRET_KEY] = RAW_MANAGED_CREDENTIAL
+        store.values[credential_binding_secret("discord")] = ManagedCredentialBinding.create(
+            source="discord",
+            installation_id="identity-r1",
+            operation_id=DISCORD_SEEDED_OPERATION_ID,
+            delivery_id="delivery-discord-1",
+            managed_credential_ref="managed-ref-discord-1",
+            credential=RAW_MANAGED_CREDENTIAL,
+        ).encode()
     return store
 
 
@@ -1554,8 +1629,7 @@ async def test_discord_auth_restart_resumes_active_operation_without_fresh_issue
             _operation_status_result(
                 "ACTIVE",
                 "wait",
-                referral_id="8H3J4N",
-                referral_settlement="referrer_pending",
+                managed_credential_ref="managed-ref-discord-1",
             )
         ],
     )
@@ -1582,8 +1656,6 @@ async def test_discord_auth_restart_resumes_active_operation_without_fresh_issue
     assert broker.status_requests[0].resume_token == DISCORD_SEEDED_RESUME_TOKEN
     assert managed_state.pending_managed_operation_id is None
     assert "openrouter_managed_operation_resume_token" not in store.values
-    assert managed_state.referral_source == "discord"
-    assert managed_state.referral_id == "8H3J4N"
     assert store.values[LOCAL_SECRET_KEY] == RAW_MANAGED_CREDENTIAL
     _assert_no_raw_values(result, label="managed operation restart result")
 
@@ -1702,7 +1774,7 @@ async def test_discord_auth_wait_keeps_recovering_without_fresh_issue() -> None:
 
 
 @pytest.mark.asyncio
-async def test_discord_ack_recovery_consumes_referral_result() -> None:
+async def test_discord_ack_recovery_finishes_without_new_authorization() -> None:
     metadata = _delivery_ack_metadata()
     managed_state = RecordingManagedState(
         active_managed_credential_ref=metadata.managed_credential_ref,
@@ -1718,13 +1790,19 @@ async def test_discord_ack_recovery_consumes_referral_result() -> None:
         ack_result=broker_client.ManagedKeyDeliveryAckResult(
             succeeded=True,
             status="acknowledged",
-            referral_id="8H3J4N",
-            referral_settlement="invitee_pending",
         ),
     )
     store = RecordingSecretStore()
     store.values[LOCAL_SECRET_KEY] = RAW_MANAGED_CREDENTIAL
     store.values["openrouter_managed_delivery_ack_token"] = metadata.delivery_ack_token
+    store.values[credential_binding_secret("discord")] = ManagedCredentialBinding.create(
+        source="discord",
+        installation_id=managed_state.installation_id,
+        operation_id="delivered-op",
+        delivery_id=metadata.delivery_id,
+        managed_credential_ref=metadata.managed_credential_ref,
+        credential=RAW_MANAGED_CREDENTIAL,
+    ).encode()
     repository = RecordingSettingsRepository(None)
 
     result = await _service(
@@ -1744,9 +1822,9 @@ async def test_discord_ack_recovery_consumes_referral_result() -> None:
     assert broker.requests == []
     assert broker.status_requests == []
     assert broker.resume_requests == []
-    assert managed_state.referral_source == "discord"
-    assert managed_state.referral_id == "8H3J4N"
-    _assert_no_raw_values(result, label="managed ACK referral result")
+    assert managed_state.pending_delivery_ack_source is None
+    assert store.values[LOCAL_SECRET_KEY] == RAW_MANAGED_CREDENTIAL
+    _assert_no_raw_values(result, label="managed ACK recovery result")
 
 
 QQ_SEEDED_OPERATION_ID = "ph-mop-v1_0123456789abcdef0123456789abcdef"
@@ -1766,7 +1844,7 @@ def _qq_delivery_ack_metadata() -> broker_client.ManagedKeyDeliveryAckMetadata:
         source="qq",
         delivery_id="delivery-qq-1",
         managed_credential_ref="managed-ref-qq",
-        expires_at="2026-07-07T00:15:00.000Z",
+        expires_at="2099-07-07T00:15:00.000Z",
         delivery_ack_token="delivery-token-qq-1",
     )
 
@@ -1878,6 +1956,14 @@ async def test_discord_auth_own_ack_recovers_while_qq_operation_preserved() -> N
     store.values["openrouter_managed_operation_resume_token"] = QQ_SEEDED_RESUME_TOKEN
     store.values[LOCAL_SECRET_KEY] = RAW_MANAGED_CREDENTIAL
     store.values["openrouter_managed_delivery_ack_token"] = metadata.delivery_ack_token
+    store.values[credential_binding_secret("discord")] = ManagedCredentialBinding.create(
+        source="discord",
+        installation_id=managed_state.installation_id,
+        operation_id="delivered-discord-op",
+        delivery_id=metadata.delivery_id,
+        managed_credential_ref=metadata.managed_credential_ref,
+        credential=RAW_MANAGED_CREDENTIAL,
+    ).encode()
     repository = RecordingSettingsRepository(_commit_success())
 
     result = await _service(

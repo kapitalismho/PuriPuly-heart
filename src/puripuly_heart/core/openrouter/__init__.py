@@ -41,8 +41,6 @@ _EXPORT_SOURCES = {
     "ManagedOpenRouterReleaseError": "managed_openrouter_release",
     "ManagedOpenRouterReleaseResult": "managed_openrouter_release",
     "ManagedOpenRouterReleaseService": "managed_openrouter_release",
-    "ManagedOpenRouterStatusRefreshResult": "managed_openrouter_release",
-    "ManagedOpenRouterTrialStatusSuccess": "managed_openrouter_release",
     "ManagedOpenRouterUserFacingError": "managed_openrouter_release",
     "ManagedOpenRouterVerifySuccess": "managed_openrouter_release",
     "mark_founder_letter_shown": "openrouter_handoff",
@@ -75,7 +73,6 @@ _EXPORT_SOURCES = {
     "RETRYABLE_ERROR_CODE": "managed_openrouter_broker_client",
     "should_auto_show_founder_letter": "openrouter_handoff",
     "store_managed_entitlement_snapshot": "openrouter_handoff",
-    "TalkTogetherPassStatus": "managed_openrouter_release",
     "UnavailableManagedOpenRouterReleaseClient": "managed_openrouter_release",
 }
 
@@ -112,8 +109,6 @@ __all__ = [
     "ManagedOpenRouterReleaseError",
     "ManagedOpenRouterReleaseResult",
     "ManagedOpenRouterReleaseService",
-    "ManagedOpenRouterStatusRefreshResult",
-    "ManagedOpenRouterTrialStatusSuccess",
     "ManagedOpenRouterUserFacingError",
     "ManagedOpenRouterVerifySuccess",
     "mark_founder_letter_shown",
@@ -150,7 +145,6 @@ __all__ = [
     "RETRYABLE_ERROR_CODE",
     "should_auto_show_founder_letter",
     "store_managed_entitlement_snapshot",
-    "TalkTogetherPassStatus",
     "UnavailableManagedOpenRouterReleaseClient",
 ]
 

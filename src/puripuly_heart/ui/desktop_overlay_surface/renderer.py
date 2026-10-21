@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import math
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from typing import Any
 
@@ -24,7 +25,9 @@ from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_CJK_WIDTH_EM,
     _DESKTOP_CAPTION_DYNAMIC_WIDTH_SAFETY,
     _DESKTOP_CAPTION_EMOJI_WIDTH_EM,
+    _DESKTOP_CAPTION_FIT_OVERFLOW_TOLERANCE,
     _DESKTOP_CAPTION_FONT_FAMILY,
+    _DESKTOP_CAPTION_FONT_SCALES,
     _DESKTOP_CAPTION_LATIN_NARROW_WIDTH_EM,
     _DESKTOP_CAPTION_LATIN_WIDE_WIDTH_EM,
     _DESKTOP_CAPTION_LINE_HEIGHT,
@@ -135,7 +138,7 @@ def build_desktop_caption_plan(
     secondary_region_height = (
         secondary_font_size * _DESKTOP_CAPTION_LINE_HEIGHT * _DESKTOP_CAPTION_SECONDARY_MAX_LINES
     )
-    return DesktopCaptionPlan(
+    plan = DesktopCaptionPlan(
         slots=slots,
         lines=lines,
         size_preset=preset.id,
@@ -161,6 +164,7 @@ def build_desktop_caption_plan(
         speaker_divider_fill_height=primary_font_size * _DESKTOP_SPEAKER_DIVIDER_FILL_EM,
         speaker_divider_outline_width=primary_font_size * _DESKTOP_SPEAKER_DIVIDER_OUTLINE_EM,
     )
+    return _caption_plan_with_fitted_fonts(plan)
 
 
 def desktop_empty_lock_action_label(locale: str | None) -> str:
@@ -1014,11 +1018,59 @@ def _caption_card_width_memory_key(slot: DesktopCaptionSlot) -> tuple[str, str, 
     return (slot.block_id, slot.occupant_key, slot.appearance_seq)
 
 
-def _estimated_caption_line_width(text: str, font_size: int) -> float:
+def _caption_plan_with_fitted_fonts(
+    plan: DesktopCaptionPlan,
+    font_scale_ceiling_by_region: Mapping[tuple[str, int, str], float] | None = None,
+) -> DesktopCaptionPlan:
+    fitted_slots: list[DesktopCaptionSlot] = []
+    for slot in plan.slots:
+        text_width = (
+            plan.text_width
+            if plan.full_window_background_visible
+            else slot.card_text_width or plan.text_width
+        )
+        fitted_lines: list[DesktopCaptionLine] = []
+        for line in slot.lines:
+            font_size = (
+                plan.primary_font_size if line.slot == "primary" else plan.secondary_font_size
+            )
+            scale = _caption_font_scale(line, font_size=font_size, text_width=text_width)
+            if font_scale_ceiling_by_region is not None:
+                key = (slot.occupant_key, slot.appearance_seq, line.slot)
+                scale = min(scale, font_scale_ceiling_by_region.get(key, 1.0))
+            fitted_lines.append(replace(line, font_size=font_size * scale, font_scale=scale))
+        fitted_slots.append(replace(slot, lines=tuple(fitted_lines)))
+    return replace(
+        plan,
+        slots=tuple(fitted_slots),
+        lines=tuple(line for slot in fitted_slots for line in slot.lines),
+    )
+
+
+def _caption_font_scale(
+    line: DesktopCaptionLine,
+    *,
+    font_size: float,
+    text_width: float,
+) -> float:
+    estimated_widths = tuple(
+        _estimated_caption_line_width(text, font_size) for text in line.text.split("\n")
+    )
+    tolerated_width = max(1.0, text_width) * _DESKTOP_CAPTION_FIT_OVERFLOW_TOLERANCE
+    for scale in _DESKTOP_CAPTION_FONT_SCALES:
+        estimated_lines = sum(
+            max(1, math.ceil(width * scale / tolerated_width)) for width in estimated_widths
+        )
+        if estimated_lines <= line.max_lines:
+            return scale
+    return _DESKTOP_CAPTION_FONT_SCALES[-1]
+
+
+def _estimated_caption_line_width(text: str, font_size: float) -> float:
     return sum(_estimated_caption_char_width(char, font_size) for char in text)
 
 
-def _estimated_caption_char_width(char: str, font_size: int) -> float:
+def _estimated_caption_char_width(char: str, font_size: float) -> float:
     codepoint = ord(char)
     if char.isspace():
         return font_size * _DESKTOP_CAPTION_SPACE_WIDTH_EM

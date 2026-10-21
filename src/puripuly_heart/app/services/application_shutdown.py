@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Final, Literal, TypeAlias
 
+from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.lifecycle import (
     LIFECYCLE_SHUTDOWN_PHASE_ORDER,
     LifecycleShutdownPhase,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+
+logger = logging.getLogger(__name__)
 
 ApplicationLifecycleState: TypeAlias = Literal[
     "running",
@@ -49,6 +54,7 @@ class ApplicationShutdownFailure:
     callback_name: str
     exception_class: str
     timed_out: bool
+    diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +65,7 @@ class ApplicationShutdownDiagnostic:
     exception_class: str
     timed_out: bool
     stall_diagnostic: ApplicationShutdownStallDiagnostic | None = None
+    diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +165,7 @@ class ApplicationShutdownCoordinator:
         self._timed_out_callback_tasks: set[asyncio.Task[None]] = set()
         self._shutdown_phases_completed = False
         self._active_callback: ApplicationShutdownCallback | None = None
+        self._primary_failure_id: str | None = None
 
     @property
     def accepting_intents(self) -> bool:
@@ -181,6 +189,10 @@ class ApplicationShutdownCoordinator:
                 sorted(task.get_name() for task in self._timed_out_callback_tasks)
             ),
         )
+
+    def set_primary_failure(self, diagnostic_id: str) -> None:
+        if self._primary_failure_id is None:
+            self._primary_failure_id = diagnostic_id
 
     def admit_intent(self, intent_name: str) -> None:
         if not self.accepting_intents:
@@ -312,6 +324,35 @@ class ApplicationShutdownCoordinator:
             except BaseException as exc:
                 if isinstance(exc, (KeyboardInterrupt, SystemExit)):
                     raise
+                diagnostics = ErrorDiagnostics(
+                    component="application_shutdown",
+                    operation=callback.phase,
+                    code=(
+                        "application_shutdown_timeout"
+                        if isinstance(exc, TimeoutError)
+                        else "application_shutdown_failed"
+                    ),
+                    category="lifecycle",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={
+                        "phase": callback.phase,
+                        "owner_name": callback.owner_name,
+                        "callback_name": callback.callback_name,
+                        "timed_out": isinstance(exc, TimeoutError),
+                        "abandoned": bool(self._timed_out_callback_tasks),
+                        "cleanup_confirmed": False,
+                        **safe_exception_fields(exc),
+                    },
+                    cause_id=self._primary_failure_id
+                    or (
+                        self._failures[0].summary.diagnostics.diagnostic_id
+                        if self._failures and self._failures[0].summary.diagnostics is not None
+                        else None
+                    ),
+                )
                 failure = _RecordedFailure(
                     summary=ApplicationShutdownFailure(
                         phase=callback.phase,
@@ -319,6 +360,7 @@ class ApplicationShutdownCoordinator:
                         callback_name=callback.callback_name,
                         exception_class=type(exc).__name__,
                         timed_out=isinstance(exc, TimeoutError),
+                        diagnostics=diagnostics,
                     ),
                     exception=exc,
                 )
@@ -385,6 +427,8 @@ class ApplicationShutdownCoordinator:
         *,
         stall_diagnostic: ApplicationShutdownStallDiagnostic | None = None,
     ) -> None:
+        if failure.diagnostics is not None:
+            emit_failure(logger, failure.diagnostics, stage=failure.phase)
         if self._diagnostics_sink is None:
             return
         diagnostic = ApplicationShutdownDiagnostic(
@@ -394,6 +438,7 @@ class ApplicationShutdownCoordinator:
             exception_class=failure.exception_class,
             timed_out=failure.timed_out,
             stall_diagnostic=stall_diagnostic,
+            diagnostics=failure.diagnostics,
         )
         try:
             result = self._diagnostics_sink(diagnostic)
@@ -419,6 +464,24 @@ class ApplicationShutdownCoordinator:
         except BaseException as exc:
             if isinstance(exc, (KeyboardInterrupt, SystemExit)):
                 raise
+            secondary = ErrorDiagnostics(
+                component="application_shutdown",
+                operation=failure.phase,
+                code="application_shutdown_diagnostic_delivery_failed",
+                category="lifecycle",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={
+                    "phase": failure.phase,
+                    "notification_delivered": False,
+                    "timed_out": isinstance(exc, TimeoutError),
+                    **safe_exception_fields(exc),
+                },
+                cause_id=failure.diagnostics.diagnostic_id if failure.diagnostics else None,
+            )
+            emit_failure(logger, secondary, severity="warning", disposition="degraded")
             self._failures.append(
                 _RecordedFailure(
                     summary=ApplicationShutdownFailure(
@@ -427,6 +490,7 @@ class ApplicationShutdownCoordinator:
                         callback_name="emit_diagnostic",
                         exception_class=type(exc).__name__,
                         timed_out=isinstance(exc, TimeoutError),
+                        diagnostics=secondary,
                     ),
                     exception=exc,
                 )

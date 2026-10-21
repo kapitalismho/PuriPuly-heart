@@ -1,8 +1,10 @@
 use std::collections::VecDeque;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::Duration;
 
 use tokio::time::Instant;
 
+use crate::presentation::PresentationCorrelation;
 use crate::state::{NativeQuietTailEpisode, NativeQuietTailPhase};
 
 pub(crate) const RETRY_AUDIT_CAPACITY: usize = 128;
@@ -98,6 +100,17 @@ pub(crate) struct FreshAuditFact {
     pub(crate) outcome: &'static str,
     pub(crate) completed: u32,
     pub(crate) at: Duration,
+    pub(crate) sequence: u64,
+    pub(crate) scene_generation: u64,
+    pub(crate) episode_generation: u64,
+    pub(crate) phase: NativeQuietTailPhase,
+    pub(crate) target_identity_hash: u64,
+    pub(crate) max_completed: u32,
+    pub(crate) active: bool,
+    pub(crate) due_in: Duration,
+    pub(crate) deadline_in: Duration,
+    pub(crate) correlation: Option<PresentationCorrelation>,
+    pub(crate) execution: Option<(bool, bool, bool)>,
 }
 
 #[derive(Debug, Clone)]
@@ -133,6 +146,7 @@ pub(crate) struct RetryEpisodes {
     audit_started_at: Instant,
     audit: VecDeque<FreshAuditFact>,
     audit_dropped: u64,
+    next_audit_sequence: u64,
 }
 
 impl RetryEpisodes {
@@ -149,6 +163,7 @@ impl RetryEpisodes {
             audit_started_at: Instant::now(),
             audit: VecDeque::with_capacity(RETRY_AUDIT_CAPACITY),
             audit_dropped: 0,
+            next_audit_sequence: 1,
         }
     }
 
@@ -406,7 +421,15 @@ impl RetryEpisodes {
         }
         result.transitions.push(RetryTransition {
             schedule: next,
-            outcome: "scheduled",
+            outcome: if max_completed == 0 {
+                "disabled"
+            } else if completed >= max_completed {
+                "exhausted"
+            } else if now > deadline {
+                "expired"
+            } else {
+                "scheduled"
+            },
         });
         result
     }
@@ -469,7 +492,13 @@ impl RetryEpisodes {
         Some(completed)
     }
 
-    pub(crate) fn record(&mut self, schedule: &FreshSchedule, outcome: &'static str) {
+    pub(crate) fn record(
+        &mut self,
+        schedule: &FreshSchedule,
+        outcome: &'static str,
+        correlation: Option<PresentationCorrelation>,
+        execution: Option<(bool, bool, bool)>,
+    ) {
         if self.audit.len() == RETRY_AUDIT_CAPACITY {
             self.audit.pop_front();
             self.audit_dropped = self.audit_dropped.saturating_add(1);
@@ -480,7 +509,31 @@ impl RetryEpisodes {
             outcome,
             completed: schedule.completed,
             at: self.audit_started_at.elapsed(),
+            sequence: self.next_audit_sequence,
+            scene_generation: schedule.required_scene_generation,
+            episode_generation: schedule.episode_generation,
+            phase: schedule.phase,
+            target_identity_hash: {
+                let mut hasher = DefaultHasher::new();
+                schedule.target_identity.hash(&mut hasher);
+                hasher.finish()
+            },
+            max_completed: schedule.max_completed,
+            active: self
+                .schedule(schedule.channel)
+                .is_some_and(|active| active.same_intent(schedule)),
+            due_in: schedule.next_due.saturating_duration_since(Instant::now()),
+            deadline_in: schedule.deadline.saturating_duration_since(Instant::now()),
+            correlation,
+            execution,
         });
+        self.next_audit_sequence = self.next_audit_sequence.saturating_add(1);
+    }
+
+    pub(crate) fn diagnostics_since(&self, sequence: u64) -> impl Iterator<Item = &FreshAuditFact> {
+        self.audit
+            .iter()
+            .filter(move |fact| fact.sequence > sequence)
     }
 
     pub(crate) fn audit(&self) -> Vec<(&'static str, u64, &'static str, u32, Duration)> {

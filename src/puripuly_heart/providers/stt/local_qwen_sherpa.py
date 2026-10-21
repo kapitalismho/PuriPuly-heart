@@ -39,6 +39,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnTerminal,
     STTSessionProjection,
 )
+from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.core.stt.local_qwen_hallucination import (
     is_known_local_qwen_hallucination,
 )
@@ -485,6 +486,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
         final_language_runs: tuple[FinalLanguageRun, ...] = (),
         failure_reason: str | None = None,
         retire: bool = False,
+        exception: BaseException | None = None,
     ) -> None:
         if not self._event_projection.can_terminal(identity):
             return
@@ -501,6 +503,20 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 text_authority=authority,
                 failure_reason=failure_reason,
                 epoch_disposition="retire" if should_retire else "reuse",
+                failure_diagnostics=(
+                    recognition_failure_diagnostics(
+                        exception,
+                        provider=self.backend.provider_id,
+                        channel=self._event_projection.channel
+                        or self.backend.stream_label
+                        or "unknown",
+                        operation="decode",
+                        reason=failure_reason or "local_decode_failed",
+                        identity=identity,
+                    )
+                    if outcome in {"failed", "expired", "degraded"}
+                    else None
+                ),
             )
         )
 
@@ -588,7 +604,8 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 self._terminalize_scoped(
                     identity,
                     outcome="failed",
-                    failure_reason=type(failure.error).__name__,
+                    failure_reason="local_decode_failed",
+                    exception=failure.error,
                     retire=True,
                 )
         if legacy_failure:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import copy
 import logging
@@ -16,11 +17,11 @@ from puripuly_heart.app.adapters.local_asr_application import LocalASRApplicatio
 from puripuly_heart.app.adapters.peer_application_state import PeerApplicationSettings
 from puripuly_heart.app.adapters.system_directory_opener import SystemDirectoryOpener
 from puripuly_heart.app.adapters.ui_runtime import (
+    UiAudioTestRuntimeAdapter,
     UiDiagnosticsRuntimeAdapter,
     UiEngagementRuntimeAdapter,
     UiInputRuntimeAdapter,
     UiManagedRuntimeAdapter,
-    UiMicrophoneRuntimeAdapter,
     UiOverlayRuntimeAdapter,
     UiPeerCaptureRuntimeAdapter,
     UiProviderRuntimeAdapter,
@@ -86,6 +87,11 @@ from puripuly_heart.app.services.gpu_runtime_interaction import (
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
+from puripuly_heart.app.services.index_selection import (
+    IndexManagedAllowanceObservation,
+    IndexSelectionOwner,
+    translation_selection,
+)
 from puripuly_heart.app.services.llm_connection_readiness import LlmConnectionReadinessOwner
 from puripuly_heart.app.services.local_asr_diagnostics import LocalASRDiagnosticsOwner
 from puripuly_heart.app.services.local_asr_gpu_provisioning import (
@@ -103,6 +109,7 @@ from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
+from puripuly_heart.app.services.model_assets import ModelAssetsApplication
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
 from puripuly_heart.app.services.overlay_application import (
@@ -157,6 +164,12 @@ from puripuly_heart.app.wiring import (
     resolve_overlay_config_from_vnext,
     runtime_pipeline_inputs_from_vnext,
 )
+from puripuly_heart.app.wiring.wiring_index_selection import (
+    IndexManagedAllowanceObserver,
+    check_index_availability,
+    gemma_fallback_settings,
+    unknown_managed_allowance,
+)
 from puripuly_heart.app.wiring.wiring_managed_gemma import (
     create_managed_gemma_runtime,
     managed_gemma_selection,
@@ -164,10 +177,16 @@ from puripuly_heart.app.wiring.wiring_managed_gemma import (
     sync_managed_gemma_demand,
 )
 from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
+    build_llm_provider_signature,
     provider_llm_for_translation,
 )
 from puripuly_heart.app.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
+)
+from puripuly_heart.app.wiring_audio_test import (
+    AudioTestCaptureControl,
+    AudioTestRuntime,
+    compose_audio_test_runtime,
 )
 from puripuly_heart.app.wiring_capture_runtime import CaptureOwnerFactory
 from puripuly_heart.app.wiring_composition import (
@@ -190,10 +209,6 @@ from puripuly_heart.app.wiring_managed_account import (
     ManagedTranslationRuntimeAccess,
     compose_managed_account,
 )
-from puripuly_heart.app.wiring_microphone_test import (
-    MicrophoneTestAudioSettings,
-    MicrophoneTestRuntime,
-)
 from puripuly_heart.app.wiring_peer_application import (
     PeerApplicationRuntime,
     compose_peer_application,
@@ -209,6 +224,9 @@ from puripuly_heart.app.wiring_runtime_pipeline import (
     RuntimePipelineHandle,
     RuntimePipelineLauncher,
 )
+from puripuly_heart.app.wiring_translation_runtime_configuration import (
+    replace_translation_runtime_enabled,
+)
 from puripuly_heart.app.wiring_vrc_mic_sync import compose_vrc_mic_sync
 from puripuly_heart.composition.application_settings import load_application_settings
 from puripuly_heart.composition.application_startup import (
@@ -219,7 +237,6 @@ from puripuly_heart.composition.application_state import ApplicationUiStateAdapt
 from puripuly_heart.config.alibaba_connection import resolve_alibaba_connection
 from puripuly_heart.config.paths import default_http_extensions_dir, user_config_dir
 from puripuly_heart.config.provider_values import (
-    STT_INTERNAL_SAMPLE_RATE_HZ,
     LLMProviderName,
     OpenRouterCredentialSource,
     QwenRegion,
@@ -246,6 +263,7 @@ from puripuly_heart.core.local_asr_provisioning import (
     LocalASRProvisioningSnapshot,
 )
 from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
+from puripuly_heart.core.local_translation.assets import GEMMA_26B_MODEL_ID
 from puripuly_heart.core.observability import DiagnosticEvent
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
@@ -487,7 +505,7 @@ def compose_application_runtime(
     local_asr_diagnostics: LocalASRDiagnosticsOwner | None = None
     audio_diagnostics: AudioDiagnosticsApplicationOwner | None = None
     self_application: SelfCaptureApplicationOwner | None = None
-    microphone: MicrophoneTestRuntime | None = None
+    audio_test: AudioTestRuntime | None = None
     last_self_capture_lifecycle: str | None = None
     vrc_mic_sync: OscControlIntegrationOwner | None = None
     manual_typing: ManualTypingOwner | None = None
@@ -527,17 +545,6 @@ def compose_application_runtime(
             provider_id=canonical.intent.peer_stt.provider,
         )
 
-    def microphone_audio_settings() -> MicrophoneTestAudioSettings | None:
-        canonical = settings.canonical
-        if canonical is None:
-            return None
-        return MicrophoneTestAudioSettings(
-            input_host_api=canonical.intent.audio.input_host_api,
-            input_device=canonical.intent.audio.input_device,
-            internal_sample_rate_hz=STT_INTERNAL_SAMPLE_RATE_HZ,
-            internal_channels=1,
-        )
-
     def current_canonical() -> AppSettingsVNext:
         canonical = settings.canonical
         if canonical is None:
@@ -567,6 +574,7 @@ def compose_application_runtime(
         sinks=runtime_logging_sinks,
     )
     runtime_logging.control_event_sink = control_events.publish
+    control_events.diagnostic_recorder = runtime_logging.emit_failure
     settings = compose_settings_owner(
         config_path,
         retired_asset_cleanup_logging=runtime_logging,
@@ -608,6 +616,8 @@ def compose_application_runtime(
                 status=snapshot.state,
                 backend=snapshot.backend,
                 progress_percent=snapshot.progress_percent,
+                gpu_only=snapshot.model_id == GEMMA_26B_MODEL_ID,
+                failure_phase=snapshot.failure_phase,
             )
         )
 
@@ -832,6 +842,7 @@ def compose_application_runtime(
                 ),
                 sync_local_notice=lambda: require_local_asr().adapters.notice.sync(),
                 presentation_changed=refresh_overlay_presentation,
+                mutation_settled=lambda: publish_osc_state_from_runtime(),
                 disclosure_sink=enqueue_peer_disclosure,
                 superseded_sink=lambda: signatures.mark_superseded(settings.canonical),
                 localize=presentation.localize,
@@ -839,6 +850,7 @@ def compose_application_runtime(
                 log_basic=log_basic,
                 log_diagnostic=log_diagnostic,
                 translation_demand_sink=sync_local_translation_demand,
+                stop_audio_test=lambda: require_audio_test().stop(),
             )
         return peer
 
@@ -875,7 +887,7 @@ def compose_application_runtime(
             return
         await require_gpu_recovery().recover(
             lambda: gpu_recovery_request(
-                current_canonical(),
+                settings.require_committed(),
                 reason="manual_retry",
                 plan=None,
                 peer_enabled=settings.peer_translation_enabled(),
@@ -1030,7 +1042,9 @@ def compose_application_runtime(
                 error_sink=lambda key: show_short_message(key, is_error=True),
                 notice_sink=presentation.set_dashboard_local_stt_notice,
                 rebuild_self_provider=lambda: (
-                    require_runtime_components().provider_runtime.effects.rebuild_self_stt()
+                    require_runtime_components().provider_runtime.effects.rebuild_self_stt(
+                        settings.require_committed()
+                    )
                 ),
                 resume_self=resume_self_after_cpu_repair,
                 resume_peer=resume_peer_after_cpu_repair,
@@ -1235,16 +1249,28 @@ def compose_application_runtime(
             )
         return vrc_mic_sync
 
-    def require_microphone() -> MicrophoneTestRuntime:
-        nonlocal microphone
-        if microphone is None:
-            microphone = MicrophoneTestRuntime(
-                audio_provider=microphone_audio_settings,
-                self_capture_provider=lambda: pipeline.self_capture,
-                local_pending_provider=lambda: require_local_asr().self_pending,
-                disable_self_capture=stop_self_capture,
-                clock=clock,
+    async def set_peer_capture_enabled(enabled: bool) -> object:
+        return await require_peer().owner.set_enabled(enabled)
+
+    def peer_capture_session() -> object | None:
+        components = pipeline.current
+        return components.resource_owner.peer_capture if components is not None else None
+
+    def require_audio_test() -> AudioTestRuntime:
+        nonlocal audio_test
+        if audio_test is None:
+            audio_test = compose_audio_test_runtime(
+                settings_provider=lambda: settings.canonical,
+                capture_control=AudioTestCaptureControl(
+                    self_capture_provider=lambda: pipeline.self_capture,
+                    local_pending_provider=lambda: require_local_asr().self_pending,
+                    set_self_enabled=require_self_application().set_enabled,
+                    peer_owner_provider=lambda: peer.owner if peer is not None else None,
+                    peer_capture_provider=peer_capture_session,
+                    set_peer_enabled=set_peer_capture_enabled,
+                ),
                 log_sink=log_basic,
+                log_diagnostic=log_diagnostic,
                 diagnostic_sink=lambda message, level, exception: log_diagnostic(
                     message,
                     level=level,
@@ -1252,7 +1278,7 @@ def compose_application_runtime(
                 ),
                 error_sink=log_error,
             )
-        return microphone
+        return audio_test
 
     def require_manual_typing() -> ManualTypingOwner:
         nonlocal manual_typing
@@ -1271,7 +1297,6 @@ def compose_application_runtime(
                 output_provider=output_provider,
                 completion_provider=completion_provider,
                 log_diagnostic=log_diagnostic,
-                log_error=log_error,
                 idle_timeout_seconds=MANUAL_INPUT_TYPING_IDLE_TIMEOUT_S,
                 submit_timeout_seconds=MANUAL_SUBMIT_TYPING_TIMEOUT_S,
             )
@@ -1406,7 +1431,7 @@ def compose_application_runtime(
                     runtime_logging=runtime_logging,
                     pipeline=pipeline,
                     runtime_signatures=signatures,
-                    microphone=require_microphone(),
+                    audio_test=require_audio_test(),
                     clipboard=require_clipboard(),
                     provisioning=require_provisioning(),
                     gpu=require_gpu(),
@@ -1444,7 +1469,6 @@ def compose_application_runtime(
                 mutation_service_provider=lambda: None,
                 consume_superseded_settings=signatures.consume_superseded,
                 active_local_asr_change=active_local_asr_change,
-                failure_sink=log_error,
                 success_sink=log_basic,
             )
         return settings_application
@@ -1503,17 +1527,22 @@ def compose_application_runtime(
         )
 
     def sync_non_provider_signatures(_value=None) -> None:
-        effects_state.microphone_audio_signature = MicrophoneTestRuntime.audio_signature(
-            microphone_audio_settings()
-        )
+        effects_state.audio_test_signature = AudioTestRuntime.audio_signature(settings.canonical)
 
-    def sync_signature_caches(value) -> None:
-        signatures.sync(
+    def sync_stt_signature_caches(value) -> None:
+        signatures.sync_stt(
             value,
             canonical=canonical_settings(value),
             peer=require_peer().owner,
             peer_translation_enabled=settings.peer_translation_enabled(),
         )
+        sync_non_provider_signatures()
+
+    def record_initial_llm_binding(value: AppSettingsVNext, provider: object | None) -> None:
+        if provider is None:
+            signatures.mark_llm_retry()
+        else:
+            signatures.sync_llm(value)
         sync_non_provider_signatures()
 
     def require_provider_verifier() -> ProviderVerifierPort:
@@ -1544,7 +1573,6 @@ def compose_application_runtime(
                     value.intent.secrets,
                     config_path=config_path,
                 ).get(secret_key),
-                save_failure_sink=log_error,
                 results=require_settings_application().results,
             )
         return provider_settings
@@ -1565,21 +1593,6 @@ def compose_application_runtime(
                     ),
                 ),
                 low_latency=(FIXED_TRANSLATION_POLICY.fast_translation_enabled),
-                diagnostics_sink=lambda event, metadata, exception: (
-                    log_error(str(metadata["report"]))
-                    if metadata.get("provider") == "openrouter" and "report" in metadata
-                    else log_diagnostic(
-                        "[ProviderVerification] Credential verification "
-                        f"failed event={event} "
-                        f"provider={metadata.get('provider')} "
-                        f"error_type={metadata.get('error_type')}",
-                        level=logging.WARNING,
-                        exception=exception,
-                    )
-                ),
-                error_sink=lambda provider, error_text: log_error(
-                    f"Verification error for {provider}: {error_text}"
-                ),
             )
         return credential_verification
 
@@ -1722,6 +1735,13 @@ def compose_application_runtime(
                 gpu_device_id=gpu_device_id,
                 warmup=True,
             ),
+            ensure_self_switch=lambda: replace_self_stt_for_settings(canonical, True),
+            refresh_self=lambda: (
+                require_runtime_components().provider_runtime.effects.refresh_self_stt(canonical)
+            ),
+            refresh_peer=lambda: (
+                require_runtime_components().provider_runtime.effects.refresh_peer(canonical)
+            ),
             should_refresh_self=bool(plan is not None and plan.should_refresh_self_stt),
             should_refresh_peer=bool(plan is not None and plan.should_refresh_peer),
         )
@@ -1772,11 +1792,6 @@ def compose_application_runtime(
                 self_owner_factory=(require_runtime_components().self_capture_owner),
                 peer_owner_provider=lambda: require_peer().owner.runtime,
                 self_state_sink=on_self_capture_state,
-                ensure_self_switch=require_self_application().run_switch,
-                refresh_self=(
-                    require_runtime_components().provider_runtime.effects.refresh_self_stt
-                ),
-                refresh_peer=(require_runtime_components().provider_runtime.effects.refresh_peer),
                 diagnostic_sink=on_gpu_recovery_diagnostic,
             )
         return gpu_recovery
@@ -1827,6 +1842,19 @@ def compose_application_runtime(
     async def refresh_managed_usage() -> None:
         await require_managed_account().usage.refresh_best_effort()
 
+    async def refresh_peer_for_settings(value: AppSettingsVNext) -> None:
+        peer_runtime = require_peer()
+        await peer_runtime.owner.refresh_runtime_with_config(
+            build_peer_capture_session_config_from_vnext(canonical_settings(value)),
+            state=peer_runtime.state_for(peer_application_settings(value)),
+        )
+
+    async def replace_self_stt_for_settings(value: AppSettingsVNext, smooth: bool) -> None:
+        await require_self_application().replace_provider_with_config(
+            build_self_capture_session_config_from_vnext(canonical_settings(value)),
+            smooth_local=smooth,
+        )
+
     async def recover_gpu(value, plan: ProviderRuntimeApplyPlan) -> None:
         await require_gpu_recovery().recover(
             lambda: gpu_recovery_request(
@@ -1857,6 +1885,29 @@ def compose_application_runtime(
     )
 
     def on_llm_availability_changed(needs_key: bool) -> None:
+        current = settings.canonical
+        if current is not None:
+            translation = current.intent.translation
+            provider = provider_llm_for_translation(translation.model, translation.connection)
+            verification_provider = None
+            if translation.connection == "official_byok":
+                verification_provider = {
+                    "gemini": "google",
+                    "openai": "openai",
+                    "deepseek": "deepseek",
+                }.get(provider)
+            elif (
+                translation.connection == "openrouter"
+                and translation.openrouter_selected_source == "byok"
+            ):
+                verification_provider = "openrouter"
+            if verification_provider is not None:
+                entry = getattr(current.state.provider_verification, verification_provider)
+                needs_key = needs_key or entry.status != "verified"
+            elif needs_key:
+                auth_state = require_managed_account().auth_runtime.state()
+                if auth_state.managed_selected:
+                    needs_key = not auth_state.local_key_available
         presentation.set_dashboard_translation_needs_key(needs_key)
         llm_connection_readiness.sync()
 
@@ -1872,7 +1923,7 @@ def compose_application_runtime(
         self_capture_provider=lambda: pipeline.self_capture,
         self_capture_owner=self_capture_owner,
         peer=lambda: require_peer().owner,
-        peer_desired=peer_runtime_desired,
+        peer_state=lambda value: require_peer().state_for(peer_application_settings(value)),
         canonical_settings=canonical_settings,
         clear_local_pending=lambda: (
             require_local_asr().cpu_repair.clear_if_provider_switched_away()
@@ -1883,10 +1934,8 @@ def compose_application_runtime(
         dashboard_managed_pending_sink=(presentation.set_dashboard_managed_auth_pending),
         sync_effective_flags=sync_effective_flags,
         refresh_overlay=refresh_overlay_presentation,
-        refresh_peer_runtime=lambda: require_peer().owner.refresh_runtime(),
-        replace_self_stt=lambda smooth: require_self_application().replace_provider(
-            smooth_local=smooth
-        ),
+        refresh_peer_runtime=refresh_peer_for_settings,
+        replace_self_stt=replace_self_stt_for_settings,
         self_state_sink=on_self_capture_state,
         self_availability=require_self_application().project_availability,
         gpu_recovery=recover_gpu,
@@ -1907,8 +1956,6 @@ def compose_application_runtime(
         presentation.set_settings_managed_key_state(
             visible=state.visible,
             remaining_percent=state.remaining_percent,
-            referral_id=state.referral_id,
-            pass_status=state.pass_status,
         )
 
     def maybe_show_founder_letter(launch_source: str) -> None:
@@ -1979,11 +2026,10 @@ def compose_application_runtime(
         apply_order24=(require_settings_application().apply_ui_prompt_clipboard_state),
         remember_order22=require_projection().remember_order22,
         mutation_service_provider=lambda: None,
-        save_failure_sink=log_error,
         results=require_settings_application().results,
         sync_memory=(require_settings_application().runtime_effects.restore_memory),
         capture_runtime_signatures=capture_runtime_signatures_before_mutation,
-        sync_signatures=sync_signature_caches,
+        sync_stt_signatures=sync_stt_signature_caches,
         consume_superseded_settings=signatures.consume_superseded,
         active_local_asr_change=active_local_asr_change,
         compensate_local_asr=(
@@ -1993,9 +2039,97 @@ def compose_application_runtime(
         mark_llm_retry=signatures.mark_llm_retry,
         rolling_stt_secret_rebind=provider_runtime.effects.rebind_rolling_stt_secret,
     )
+    require_settings_application().provider_runtime = provider_runtime.runtime
+
+    def selected_translation_runtime_applied() -> bool:
+        current = settings.canonical
+        return bool(
+            current is not None
+            and pipeline.llm_runtime is not None
+            and pipeline.llm_runtime.provider is not None
+            and signatures.last_llm_provider
+            == build_llm_provider_signature(current, http_extensions=http_extensions)
+        )
+
+    async def commit_index_fallback(
+        observation: IndexManagedAllowanceObservation,
+        guard: Callable[[], bool],
+        transition_guard: Callable[[], bool],
+    ):
+        async with control._resource_lock:
+            async with control._lock:
+                if ingress.frozen or not guard():
+                    return None
+                connection = "managed"
+                if observation.state == "exhausted":
+                    if (
+                        observation.confirm_current is not None
+                        and await observation.confirm_current()
+                    ):
+                        connection = "openrouter"
+                    else:
+                        unknown = unknown_managed_allowance("credential_not_current")
+                        index_selection.allowance_observation = unknown
+                        if unknown.diagnostics is not None:
+                            runtime_logging.emit_failure(
+                                unknown.diagnostics, severity="warning", disposition="degraded"
+                            )
+                current = settings.canonical
+                if current is None or translation_selection(current) != (
+                    "index_translate_35b",
+                    "public_api",
+                ):
+                    return None
+                result = await provider_application.apply_translation_selection(
+                    gemma_fallback_settings(current, connection),
+                    commit_guard=lambda: (
+                        not ingress.frozen
+                        and guard()
+                        and translation_selection(settings.canonical)
+                        == ("index_translate_35b", "public_api")
+                    ),
+                    runtime_guard=lambda: not ingress.frozen and transition_guard(),
+                )
+                if (
+                    result is not None
+                    and result.status
+                    in {
+                        "settings_commit_success_runtime_applied",
+                        "settings_commit_success_runtime_degraded",
+                        "settings_commit_success_runtime_interrupted",
+                    }
+                    and (
+                        not selected_translation_runtime_applied()
+                        or not await index_allowance.destination_credential_available()
+                    )
+                ):
+                    managed_account.translation.disable_for_provider_transition()
+                return result
+
+    index_allowance = IndexManagedAllowanceObserver(
+        settings=settings,
+        config_path=config_path,
+        verifier=require_provider_verifier(),
+        ingress_frozen=lambda: ingress.frozen,
+    )
+    index_selection = IndexSelectionOwner(
+        settings_provider=lambda: settings.committed_settings or settings.canonical,
+        probe=check_index_availability,
+        observe_allowance=index_allowance.observe,
+        commit_fallback=commit_index_fallback,
+        message_sink=show_short_message,
+        diagnostic_sink=lambda diagnostic: runtime_logging.emit_failure(
+            diagnostic, severity="warning", disposition="degraded"
+        ),
+        selected_runtime_applied=selected_translation_runtime_applied,
+        timeout_sink=managed_account.translation.disable_for_provider_transition,
+    )
 
     def install_pipeline(components: RuntimePipelineComponents) -> None:
+        replace_translation_runtime_enabled(components.translation_runtime_configuration, False)
         pipeline.install(components)
+        components.translation_requests.settled_failure_sink = index_selection.request_failed
+        index_selection.start()
         llm_connection_readiness.sync()
 
     pipeline_launcher = RuntimePipelineLauncher(
@@ -2091,13 +2225,12 @@ def compose_application_runtime(
         provisioning=require_provisioning(),
         gpu_state=gpu_state,
         manual_fallback=manual_fallback,
-        save_failure_sink=lambda exc: log_error(f"Failed to save settings: {exc}"),
         calibration=require_calibration(),
         presentation=presentation,
         sync_presentation=sync_ui_from_settings,
         notify_fallback=require_settings_application().notify_fallback,
         runtime_logging=runtime_logging,
-        sync_runtime_signatures=sync_signature_caches,
+        initial_llm_binding_sink=record_initial_llm_binding,
         pipeline_launcher=pipeline_launcher,
         pipeline=pipeline,
         sync_local_asr_notice=lambda: require_local_asr().adapters.notice.sync(),
@@ -2121,10 +2254,12 @@ def compose_application_runtime(
 
     async def close_openrouter_oauth() -> None:
         try:
-            await managed_account.pkce_flow.close()
-        finally:
             await llm_connection_readiness.close()
-            await chatgpt_account.close()
+        finally:
+            try:
+                await managed_account.pkce_flow.close()
+            finally:
+                await chatgpt_account.close()
 
     def clear_event_runtime() -> None:
         nonlocal event_bridge, bridge_task
@@ -2148,20 +2283,68 @@ def compose_application_runtime(
         vrc_mic_sync=lambda: vrc_mic_sync,
         github_prompt=lambda: github_prompt,
         clipboard=lambda: clipboard,
-        microphone=lambda: microphone,
+        audio_test=lambda: audio_test,
         close_managed_gemma_owner=managed_gemma.close,
         local_asr_provisioning=lambda: provisioning,
     )
 
+    def model_assets_active_ids() -> frozenset[str]:
+        from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
+
+        active: set[str] = set()
+        runtime = pipeline.local_asr_runtime
+        snapshot = getattr(runtime, "snapshot", None) if runtime is not None else None
+        if snapshot is not None:
+            active.update(
+                channel.model_id
+                for channel in snapshot.channels
+                if channel.model_id and channel.has_resources
+            )
+            if snapshot.gpu.model_resident:
+                active.add(LOCAL_QWEN_GPU_MODEL_ID)
+        if managed_gemma.active_model_id is not None:
+            active.add(managed_gemma.active_model_id)
+        return frozenset(active)
+
+    model_assets = ModelAssetsApplication(
+        provisioning=lambda: provisioning,
+        gemma=lambda: managed_gemma,
+        locale=lambda: (
+            settings.canonical.intent.ui.locale if settings.canonical is not None else None
+        ),
+        active_model_ids=model_assets_active_ids,
+    )
     overlay_owner = require_overlay()
     peer_runtime = require_peer()
-    microphone_runtime = require_microphone()
+    audio_test_runtime = require_audio_test()
     desktop_owner = require_desktop()
     calibration_owner = require_calibration()
     settings_owner = require_settings_application()
     gpu_owner = require_gpu()
     github_owner = require_github_prompt()
     audio_owner = require_audio_diagnostics()
+
+    def runtime_control_authority(parameter: str, task: asyncio.Task | None) -> bool | None:
+        if parameter == "PuriPuly_Trans":
+            return managed_account.translation.mutation_authority(task)
+        if parameter == "PuriPuly_Listen":
+            return peer_runtime.owner.mutation_authority(task)
+        if parameter == "PuriPuly_Talk" and pipeline.self_capture is not None:
+            return pipeline.self_capture.mutation_authority(task)
+        return None
+
+    def runtime_control_activity() -> tuple[tuple[str, bool], ...]:
+        pending = [
+            ("PuriPuly_Trans", value) for value in managed_account.translation.pending_mutations()
+        ]
+        pending.extend(
+            ("PuriPuly_Listen", value) for value in peer_runtime.owner.pending_mutations()
+        )
+        if pipeline.self_capture is not None:
+            pending.extend(
+                ("PuriPuly_Talk", value) for value in pipeline.self_capture.pending_mutations()
+            )
+        return tuple(pending)
 
     application = UiApplicationBoundary(
         startup=startup,
@@ -2194,14 +2377,13 @@ def compose_application_runtime(
             build_byok_target_settings=settings.build_managed_openrouter_byok_target,
             managed_gemma=managed_gemma,
             chatgpt=chatgpt_account,
+            connection_readiness=llm_connection_readiness,
+            model_assets=model_assets,
             llm_devices_sink=lambda devices: presentation.set_dashboard_llm_gpu_devices(
                 devices=devices
             ),
         ),
-        microphone=UiMicrophoneRuntimeAdapter(
-            microphone=microphone_runtime,
-            level_log_interval_seconds=1.0,
-        ),
+        audio_test=UiAudioTestRuntimeAdapter(audio_test=audio_test_runtime),
         overlay=UiOverlayRuntimeAdapter(
             overlay=overlay_owner,
             desktop=desktop_owner,
@@ -2231,7 +2413,7 @@ def compose_application_runtime(
                 desktop_overlay=desktop_owner,
                 managed=managed_account,
                 calibration=calibration_owner,
-                microphone=lambda: microphone,
+                audio_test=lambda: audio_test,
             ),
         ),
         runtime_shutdown=runtime_shutdown,
@@ -2239,7 +2421,10 @@ def compose_application_runtime(
         settings_secrets=SettingsSecretsOwner(
             secret_store_factory=create_settings_secret_store,
         ),
+        index_selection=index_selection,
         osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
+        runtime_control_authority=runtime_control_authority,
+        runtime_control_activity=runtime_control_activity,
         output_status_provider=lambda: {
             "overlay": {
                 **overlay_owner.output_snapshot(),
@@ -2247,6 +2432,11 @@ def compose_application_runtime(
             },
             "osc": require_vrc_mic_sync().output_snapshot(),
         },
+        scene_observation_provider=lambda: (
+            pipeline_launcher.vrchat_scene.lifecycle_owner_snapshot()
+            if pipeline_launcher.vrchat_scene is not None
+            else None
+        ),
         http_extension_registry=HttpExtensionRegistryService(
             http_extensions,
             SystemDirectoryOpener(),
@@ -2268,6 +2458,7 @@ def compose_application_runtime(
         locale_choices=presentation.available_locales(),
         localize=presentation.localize,
         gemma_selection=managed_gemma_selection,
+        selection_committed=index_selection.selection_changed,
     )
     application.attach_control(control)
     settings.observe_commits(control._publish_committed)
@@ -2278,6 +2469,18 @@ def compose_application_runtime(
                 owner_name="ApplicationControlOwner",
                 callback_name="freeze_ingress",
                 callback=control.freeze_ingress,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="IndexSelectionOwner",
+                callback_name="stop_ingress",
+                callback=index_selection.stop_ingress,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="IndexSelectionOwner",
+                callback_name="close",
+                callback=index_selection.close,
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
@@ -2298,8 +2501,7 @@ def compose_application_runtime(
         settings.canonical = value
         canonical = settings.project(value, authoritative=True)
         require_provisioning()
-        sync_signature_caches(value)
-        await pipeline_launcher.launch(
+        components = await pipeline_launcher.launch(
             runtime_pipeline_inputs_from_vnext(
                 canonical,
                 peer_translation_enabled=settings.peer_translation_enabled(),
@@ -2309,6 +2511,7 @@ def compose_application_runtime(
             vrc_mic_audio_gate=pipeline.vrc_mic_audio_gate,
             receiver_active=require_vrc_mic_sync().receiver is not None,
         )
+        record_initial_llm_binding(canonical, components.llm_runtime.provider)
 
     if local_asr_evidence_sink is not None:
         local_asr_evidence_sink(

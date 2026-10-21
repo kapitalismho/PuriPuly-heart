@@ -1,46 +1,22 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 from dataclasses import dataclass
 from typing import Mapping, Protocol
 from uuid import UUID
 
 from puripuly_heart.core import network_clients
-from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.network_requests import ExternalRequestsSession
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
+from puripuly_heart.providers.llm.error_details import LLMResponseError, record_probe_failure
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
 _QWEN_COMPATIBLE_MODELS = frozenset({"qwen3.5-flash", "qwen3.5-plus", "qwen3.8-flash"})
 _QWEN_PROBE_MODEL = "qwen3.8-flash"
-
-
-def _log_basic_request_failure(
-    *,
-    runtime_logging: ProviderObservationPort | None,
-    operation: str,
-    status: int | None,
-    message: str,
-) -> None:
-    status_text = "unknown" if status is None else str(status)
-    report = provider_failure_report(
-        RuntimeError(f"status={status_text} message={message}"),
-        provider="qwen",
-        operation=operation,
-    )
-    rendered = "[Basic][LLM] Qwen request failed [%s]: %s" % (
-        operation,
-        format_error_report_for_log(report),
-    )
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(rendered, level=logging.ERROR)
-        return
-    logger.error(rendered)
 
 
 def _build_system_prompt(
@@ -73,7 +49,9 @@ def _extract_message_content(content: object) -> str:
         result = content.strip()
         if result:
             return result
-        raise RuntimeError("DashScope response contained empty message content")
+        raise LLMResponseError(
+            "DashScope response contained empty message content", provider="qwen"
+        )
 
     if isinstance(content, list):
         parts: list[str] = []
@@ -85,7 +63,7 @@ def _extract_message_content(content: object) -> str:
         if parts:
             return "\n".join(parts)
 
-    raise RuntimeError("DashScope response did not contain message content")
+    raise LLMResponseError("DashScope response did not contain message content", provider="qwen")
 
 
 def _normalize_qwen_model(value: object) -> str:
@@ -106,22 +84,6 @@ def _to_compatible_base_url(base_url: str) -> str:
     if normalized.endswith("/api/v1"):
         return normalized[: -len("/api/v1")] + "/compatible-mode/v1"
     return normalized + "/compatible-mode/v1"
-
-
-def _extract_error_message(data: object) -> str:
-    if not isinstance(data, dict):
-        return ""
-    message = data.get("message")
-    if isinstance(message, str) and message.strip():
-        return message.strip()
-    error = data.get("error")
-    if isinstance(error, dict):
-        nested = error.get("message")
-        if isinstance(nested, str) and nested.strip():
-            return nested.strip()
-    if isinstance(error, str) and error.strip():
-        return error.strip()
-    return ""
 
 
 class QwenClient(Protocol):
@@ -212,8 +174,13 @@ class QwenLLMProvider:
                             "max_tokens": 1,
                         },
                     )
+                    if response.status_code != 200:
+                        record_probe_failure(
+                            None, provider="qwen", status_code=response.status_code
+                        )
                     return response.status_code == 200
-            except Exception:
+            except Exception as exc:
+                record_probe_failure(exc, provider="qwen")
                 return False
 
         try:
@@ -231,12 +198,18 @@ class QwenLLMProvider:
                             result_format="message",
                             session=session,
                         )
+                    if response.status_code != 200:
+                        record_probe_failure(
+                            None, provider="qwen", status_code=response.status_code
+                        )
                     return response.status_code == 200
-                except Exception:
+                except Exception as exc:
+                    record_probe_failure(exc, provider="qwen")
                     return False
 
             return await asyncio.to_thread(_check)
-        except Exception:
+        except Exception as exc:
+            record_probe_failure(exc, provider="qwen")
             return False
 
 
@@ -330,28 +303,36 @@ class DashScopeQwenClient:
                         json=compatible_body,
                     )
                 if response.status_code != 200:
-                    error_message = ""
-                    with contextlib.suppress(Exception):
-                        error_message = _extract_error_message(response.json())
-                    if not error_message:
-                        error_message = response.text[:200]
-                    _log_basic_request_failure(
-                        runtime_logging=self.runtime_logging,
-                        operation="translate",
-                        status=response.status_code,
-                        message=error_message or "unknown error",
+
+                    raise LLMResponseError(
+                        "DashScope compatible-mode request failed",
+                        provider="qwen",
+                        status_code=response.status_code,
                     )
-                    raise RuntimeError(
-                        "DashScope compatible-mode request failed "
-                        f"(status={response.status_code}, message={error_message})"
-                    )
-                data = response.json()
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    raise LLMResponseError(
+                        "DashScope response was not valid JSON", provider="qwen"
+                    ) from exc
+                if not isinstance(data, dict):
+                    raise LLMResponseError("DashScope response was not an object", provider="qwen")
                 if observation is not None:
                     observation.record_openai_response(data)
                 choices = data.get("choices", [])
-                if not choices:
-                    raise RuntimeError("DashScope response did not contain choices")
+                if not isinstance(choices, list) or not choices:
+                    raise LLMResponseError(
+                        "DashScope response did not contain choices", provider="qwen"
+                    )
+                if not isinstance(choices[0], dict):
+                    raise LLMResponseError(
+                        "DashScope response choice was malformed", provider="qwen"
+                    )
                 message = choices[0].get("message", {})
+                if not isinstance(message, dict):
+                    raise LLMResponseError(
+                        "DashScope response message was malformed", provider="qwen"
+                    )
                 result = _extract_message_content(message.get("content"))
 
                 return result
@@ -396,17 +377,11 @@ class DashScopeQwenClient:
             output = getattr(response, "output", None)
             if not output:
                 status = getattr(response, "status_code", None)
-                code = getattr(response, "code", None)
-                message = getattr(response, "message", None)
-                _log_basic_request_failure(
-                    runtime_logging=self.runtime_logging,
-                    operation="translate",
-                    status=status,
-                    message=str(message or code or "missing output"),
-                )
-                raise RuntimeError(
-                    "DashScope response did not contain output "
-                    f"(status={status}, code={code}, message={message})"
+
+                raise LLMResponseError(
+                    "DashScope response did not contain output",
+                    provider="qwen",
+                    status_code=status if type(status) is int else None,
                 )
             choice = output.get("choices", [{}])[0]
             message = choice.get("message", {})

@@ -12,7 +12,9 @@ pytest.importorskip("flet")
 
 from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
 
-from puripuly_heart.app.services import canonical_settings_persistence as settings_module
+from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
+    SettingsVNextCanonicalPersistenceAdapter,
+)
 from puripuly_heart.app.services.canonical_settings_persistence import (
     compose_settings_owner,
     materialize_canonical_translation_settings,
@@ -20,6 +22,7 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 from puripuly_heart.app.services.github_star_prompt_settings import (
     compose_github_star_prompt_owner,
 )
+from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.settings_vnext.serialization import to_dict as canonical_to_dict
 from puripuly_heart.domain.events import UIEvent, UIEventType
@@ -32,10 +35,18 @@ from puripuly_heart.ui.event_bridge import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _isolated_prompt_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+
 class PromptBackend:
     def __init__(self, settings: AppSettingsVNext) -> None:
-        self.settings_owner = compose_settings_owner(Path("settings.json"))
-        self.settings_owner.canonical = settings
+        path = Path("settings.json").resolve()
+        SettingsVNextCanonicalPersistenceAdapter().persist(path, settings)
+        self.settings_owner = compose_settings_owner(path)
+        self.settings_owner.start()
+        self.settings_owner.remember_projection(self.settings_owner.require_canonical())
         self.usage = SimpleNamespace(usage_metadata=None)
         self.owner = compose_github_star_prompt_owner(
             settings=self.settings_owner,
@@ -72,11 +83,25 @@ def _prompt_backend_for(settings: AppSettingsVNext) -> PromptBackend:
     return PromptBackend(settings)
 
 
-def _patch_settings_save(monkeypatch: pytest.MonkeyPatch, callback) -> None:
-    def persist(owner) -> None:
-        callback(owner.path, owner.canonical)
+def _patch_settings_save(
+    monkeypatch: pytest.MonkeyPatch, controller: PromptBackend, callback
+) -> None:
+    persistence = controller.settings_owner.persistence
+    original = persistence.persist
 
-    monkeypatch.setattr(settings_module.SettingsOwner, "persist", persist)
+    def persist(path: Path, updated: AppSettingsVNext) -> None:
+        callback(path, updated)
+        original(path, updated)
+
+    monkeypatch.setattr(persistence, "persist", persist)
+
+
+def _persisted_settings(controller: PromptBackend) -> AppSettingsVNext:
+    return (
+        SettingsVNextCanonicalPersistenceAdapter()
+        .load_active(controller.settings_owner.path)
+        .canonical_settings
+    )
 
 
 def _settings_for_connection(connection: str) -> AppSettingsVNext:
@@ -100,6 +125,11 @@ def _settings_for_connection(connection: str) -> AppSettingsVNext:
                     model=model,
                     connection=connection,
                     connection_history=history,
+                    openrouter_model=(
+                        OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
+                        if connection == "official_byok"
+                        else settings.intent.translation.openrouter_model
+                    ),
                 ),
             ),
         )
@@ -117,14 +147,6 @@ def _with_star_success(settings: AppSettingsVNext) -> AppSettingsVNext:
             ),
         ),
     )
-
-
-async def _wait_until(predicate, *, attempts: int = 20) -> None:
-    for _ in range(attempts):
-        if predicate():
-            return
-        await asyncio.sleep(0)
-    raise AssertionError("condition was not met in time")
 
 
 def test_official_byok_fixture_uses_supported_model_provider_combo() -> None:
@@ -223,14 +245,15 @@ def test_user_owned_cloud_translation_success_observation_persists_through_setti
     def fake_save_settings(_path: Path, updated: AppSettingsVNext) -> None:
         saved_payloads.append(canonical_to_dict(updated))
 
-    _patch_settings_save(monkeypatch, fake_save_settings)
+    _patch_settings_save(monkeypatch, controller, fake_save_settings)
 
     assert controller._get_github_star_prompt_owner().record_translation_success_observed() is True
 
     assert controller.settings.state.github_star_prompt.translation_success_observed is True
     assert saved_payloads
-    restored = saved_payloads[-1]["state"]["github_star_prompt"]
-    assert restored["translation_success_observed"] is True
+    restored = _persisted_settings(controller)
+    assert restored.state.github_star_prompt.translation_success_observed is True
+    assert saved_payloads[-1]["state"]["github_star_prompt"]["translation_success_observed"] is True
 
 
 @pytest.mark.parametrize(
@@ -251,6 +274,7 @@ def test_translation_success_observation_ignores_non_user_owned_cloud_connection
 
     _patch_settings_save(
         monkeypatch,
+        controller,
         lambda _path, _updated: save_calls.append("save"),
     )
 
@@ -324,7 +348,7 @@ async def test_event_bridge_records_successful_translation_for_user_owned_cloud_
     def fake_save_settings(_path: Path, updated: AppSettingsVNext) -> None:
         saved_payloads.append(canonical_to_dict(updated))
 
-    _patch_settings_save(monkeypatch, fake_save_settings)
+    _patch_settings_save(monkeypatch, controller, fake_save_settings)
 
     app = SimpleNamespace(
         controller=controller,
@@ -349,7 +373,8 @@ async def test_event_bridge_records_successful_translation_for_user_owned_cloud_
         )
     )
 
-    await _wait_until(lambda: bool(saved_payloads))
+    await asyncio.wait_for(controller.owner.drain_translation_success_observation(), timeout=1)
 
     assert controller.settings.state.github_star_prompt.translation_success_observed is True
     assert saved_payloads
+    assert _persisted_settings(controller).state.github_star_prompt.translation_success_observed

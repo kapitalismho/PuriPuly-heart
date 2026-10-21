@@ -35,22 +35,39 @@ def _write_wav(path: Path, *, target_amplitude: float, control_amplitude: float)
         recording.writeframes(stereo.tobytes())
 
 
-def test_official_wav_parser_uses_shared_threshold_analysis(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("target_amplitude", "control_amplitude", "passed"),
+    [(0.18, 0.001, True), (0.0, 0.0, False), (0.18, 0.04, False)],
+    ids=["isolated_target", "no_signal", "control_leak"],
+)
+def test_official_wav_parser_preserves_signal_and_control_exclusion(
+    tmp_path: Path,
+    target_amplitude: float,
+    control_amplitude: float,
+    passed: bool,
+) -> None:
     recording = tmp_path / "official.wav"
-    _write_wav(recording, target_amplitude=0.18, control_amplitude=0.001)
+    _write_wav(
+        recording,
+        target_amplitude=target_amplitude,
+        control_amplitude=control_amplitude,
+    )
 
     measurements, sample_rate_hz = analyze_official_wav(recording)
 
     assert sample_rate_hz == 44100
-    assert measurements.target_amplitude == pytest.approx(0.18, abs=1e-4)
-    assert measurements.control_amplitude == pytest.approx(0.001, abs=1e-4)
-    assert isolation_passes(
-        measurements,
-        IsolationThresholds(
-            target_present_amplitude_min=0.05,
-            control_excluded_amplitude_max=0.005,
-            control_to_target_ratio_max=0.1,
-        ),
+    assert measurements.target_amplitude == pytest.approx(target_amplitude, abs=1e-4)
+    assert measurements.control_amplitude == pytest.approx(control_amplitude, abs=1e-4)
+    assert (
+        isolation_passes(
+            measurements,
+            IsolationThresholds(
+                target_present_amplitude_min=0.05,
+                control_excluded_amplitude_max=0.005,
+                control_to_target_ratio_max=0.1,
+            ),
+        )
+        is passed
     )
 
 

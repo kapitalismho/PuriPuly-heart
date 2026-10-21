@@ -235,6 +235,8 @@ class OSCMessage:
     target_indexes: tuple[int, ...] = ()
     target_languages: tuple[str, ...] = ()
     self_speech: bool = False
+    operation_id: str | None = None
+    request_id: str | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.presentation_revision, bool) or not isinstance(

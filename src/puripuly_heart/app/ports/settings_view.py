@@ -103,7 +103,6 @@ class ProviderSettingsSnapshot:
     openrouter_selected_source: OpenRouterCredentialSource
     openrouter_selection_alias: OpenRouterSelectionAlias | None
     verified: ProviderVerificationSnapshot
-    managed_referral_id: str | None
     qwen_api_host_beijing: str = ""
     qwen_api_host_singapore: str = ""
 
@@ -235,6 +234,7 @@ class ClipboardSettingsIntent:
 @dataclass(frozen=True, slots=True)
 class PeerExpectedLanguagesIntent:
     languages: tuple[str, ...]
+    recent_languages: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -395,11 +395,6 @@ class CustomSttExtraEdit:
 
 
 @dataclass(frozen=True, slots=True)
-class ManagedReferralEdit:
-    referral_id: str | None
-
-
-@dataclass(frozen=True, slots=True)
 class SystemPromptEdit:
     value: str
 
@@ -422,7 +417,6 @@ ProviderSettingsEdit: TypeAlias = (
     | CustomSttEndpointEdit
     | CustomSttModelEdit
     | CustomSttExtraEdit
-    | ManagedReferralEdit
     | SystemPromptEdit
 )
 
@@ -472,7 +466,6 @@ __all__ = [
     "LocalLlmExtraBodyEdit",
     "LocalLlmModelEdit",
     "LocaleSettingsIntent",
-    "ManagedReferralEdit",
     "OpenRouterPkceTarget",
     "OscConnectionSettingsIntent",
     "OverlayCalibrationSnapshot",

@@ -12,8 +12,10 @@ import sys
 import tempfile
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 
+import httpx
 import pytest
 from puripuly_heart.core.local_stt_assets import (
     InstalledLocalSTTManifest,
@@ -215,6 +217,180 @@ def _write_manifest_file(path: Path, payload: InstalledLocalSTTManifest) -> None
     path.write_text(json.dumps(payload.to_dict(), indent=2), encoding="utf-8")
 
 
+class _MirrorDownloader:
+    def __init__(self, base_url: str) -> None:
+        self.base_url = base_url
+        self.requests = []
+
+    async def download(self, request, **kwargs):
+        self.requests.append(request)
+        assert request.endpoint == "https://hf-mirror.net"
+        assert request.repo_id == "example/repo"
+        assert request.revision == "hf-rev-1"
+        async with httpx.AsyncClient(trust_env=False) as client:
+            response = await client.get(f"{self.base_url}/mirror/{request.remote_path}")
+            response.raise_for_status()
+        target = request.local_dir / request.remote_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(response.content)
+        return target
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("locale", "preferred_source", "expected_source"),
+    [
+        ("en", None, "huggingface"),
+        ("zh-CN", None, "hf_mirror"),
+        ("zh-CN", "huggingface", "huggingface"),
+    ],
+)
+async def test_http_mirror_selection_respects_locale_and_explicit_preference(
+    temp_dir: Path,
+    file_server,
+    locale: str,
+    preferred_source: str | None,
+    expected_source: str,
+) -> None:
+    source_dir, base_url = file_server
+    model_bytes = b"model-bytes"
+    token_bytes = b"token-bytes"
+    for name in ("hf", "mirror"):
+        source = source_dir / name
+        (source / "tokenizer").mkdir(parents=True)
+        (source / "model.int8.onnx").write_bytes(model_bytes)
+        (source / "tokenizer" / "tokens.txt").write_bytes(token_bytes)
+    manifest = _build_manifest(
+        huggingface_url=f"{base_url}/hf",
+        modelscope_url=f"{base_url}/unused",
+        model_bytes=model_bytes,
+        token_bytes=token_bytes,
+    )
+    manifest = replace(
+        manifest,
+        sources={
+            "huggingface": manifest.sources["huggingface"],
+            "hf_mirror": LocalSTTAssetSource(
+                name="hf_mirror",
+                revision="hf-rev-1",
+                repo_id="example/repo",
+                download_url_template="https://hf-mirror.net/example/repo/resolve/hf-rev-1/{path}",
+            ),
+        },
+    )
+    model_root = temp_dir / "appdata" / "models"
+    downloader = _MirrorDownloader(base_url)
+
+    installed = await ensure_local_stt_installed(
+        locale=locale,
+        preferred_source=preferred_source,
+        model_root=model_root,
+        manifest=manifest,
+        huggingface_downloader=downloader,
+    )
+
+    assert installed.selected_source == expected_source
+    assert len(downloader.requests) == (2 if expected_source == "hf_mirror" else 0)
+    install_dir = model_root / manifest.install_dirname
+    assert (install_dir / "model.int8.onnx").read_bytes() == model_bytes
+    assert (install_dir / "tokenizer" / "tokens.txt").read_bytes() == token_bytes
+
+
+@pytest.mark.asyncio
+async def test_http_mirror_corruption_falls_back_to_verified_huggingface_assets(
+    temp_dir: Path,
+    file_server,
+) -> None:
+    source_dir, base_url = file_server
+    model_bytes = b"model-bytes"
+    token_bytes = b"token-bytes"
+    (source_dir / "mirror").mkdir()
+    (source_dir / "mirror" / "model.int8.onnx").write_bytes(b"wrong-bytes")
+    (source_dir / "hf" / "tokenizer").mkdir(parents=True)
+    (source_dir / "hf" / "model.int8.onnx").write_bytes(model_bytes)
+    (source_dir / "hf" / "tokenizer" / "tokens.txt").write_bytes(token_bytes)
+    manifest = _build_manifest(
+        huggingface_url=f"{base_url}/hf",
+        modelscope_url=f"{base_url}/unused",
+        model_bytes=model_bytes,
+        token_bytes=token_bytes,
+    )
+    manifest = replace(
+        manifest,
+        sources={
+            "huggingface": manifest.sources["huggingface"],
+            "hf_mirror": LocalSTTAssetSource(
+                name="hf_mirror",
+                revision="hf-rev-1",
+                repo_id="example/repo",
+                download_url_template="https://hf-mirror.net/example/repo/resolve/hf-rev-1/{path}",
+            ),
+        },
+    )
+    model_root = temp_dir / "appdata" / "models"
+    downloader = _MirrorDownloader(base_url)
+
+    installed = await ensure_local_stt_installed(
+        locale="zh-CN",
+        model_root=model_root,
+        manifest=manifest,
+        huggingface_downloader=downloader,
+    )
+
+    assert installed.selected_source == "huggingface"
+    assert len(downloader.requests) == 1
+    assert (model_root / manifest.install_dirname / "model.int8.onnx").read_bytes() == model_bytes
+    assert list(model_root.glob(f"{manifest.install_dirname}.staging-*")) == []
+
+
+@pytest.mark.asyncio
+async def test_existing_huggingface_install_is_reused_after_chinese_mirror_is_added(
+    temp_dir: Path,
+    file_server,
+) -> None:
+    source_dir, base_url = file_server
+    model_bytes = b"model-bytes"
+    token_bytes = b"token-bytes"
+    (source_dir / "model.int8.onnx").write_bytes(model_bytes)
+    (source_dir / "tokenizer").mkdir()
+    (source_dir / "tokenizer" / "tokens.txt").write_bytes(token_bytes)
+    manifest = _build_manifest(
+        huggingface_url=base_url,
+        modelscope_url=f"{base_url}/unused",
+        model_bytes=model_bytes,
+        token_bytes=token_bytes,
+    )
+    manifest = replace(manifest, sources={"huggingface": manifest.sources["huggingface"]})
+    model_root = temp_dir / "appdata" / "models"
+    installed = await ensure_local_stt_installed(
+        model_root=model_root,
+        manifest=manifest,
+    )
+    updated = replace(
+        manifest,
+        sources={
+            "huggingface": replace(
+                manifest.sources["huggingface"],
+                download_url_template=f"{base_url}/missing-hf/{{path}}",
+            ),
+            "hf_mirror": LocalSTTAssetSource(
+                name="hf_mirror",
+                revision="hf-rev-1",
+                download_url_template=f"{base_url}/missing-mirror/{{path}}",
+            ),
+        },
+    )
+
+    reused = await ensure_local_stt_installed(
+        locale="zh-CN",
+        model_root=model_root,
+        manifest=updated,
+    )
+
+    assert reused == installed
+    assert (model_root / manifest.install_dirname / "model.int8.onnx").read_bytes() == model_bytes
+
+
 @pytest.mark.asyncio
 async def test_ensure_local_stt_installed_downloads_preferred_source_successfully(
     temp_dir: Path,
@@ -251,7 +427,7 @@ async def test_ensure_local_stt_installed_downloads_preferred_source_successfull
 
 
 @pytest.mark.asyncio
-async def test_ensure_local_stt_installed_falls_back_once_when_preferred_source_fails(
+async def test_ensure_local_stt_installed_falls_back_to_next_source_in_locale_order(
     temp_dir: Path,
     file_server,
 ) -> None:
@@ -270,7 +446,7 @@ async def test_ensure_local_stt_installed_falls_back_once_when_preferred_source_
     )
 
     installed = await ensure_local_stt_installed(
-        preferred_source="huggingface",
+        locale="en",
         model_root=temp_dir / "appdata" / "models",
         manifest=manifest,
     )
@@ -320,7 +496,7 @@ async def test_ensure_local_stt_installed_raises_after_both_sources_fail(
     )
     statuses: list[RuntimeLocalSTTStatusUpdate] = []
 
-    with pytest.raises(LocalSTTRuntimeInstallError):
+    with pytest.raises(LocalSTTRuntimeInstallError) as caught:
         await ensure_local_stt_installed(
             preferred_source="huggingface",
             model_root=temp_dir / "appdata" / "models",
@@ -331,6 +507,9 @@ async def test_ensure_local_stt_installed_raises_after_both_sources_fail(
     assert statuses[0] == RuntimeLocalSTTStatusUpdate(status="downloading", percent=0)
     assert statuses[-1] == RuntimeLocalSTTStatusUpdate(status="download_failed", percent=None)
     assert not ((temp_dir / "appdata" / "models") / manifest.install_dirname).exists()
+    assert isinstance(caught.value.__cause__, httpx.HTTPStatusError)
+    assert caught.value.__cause__.response.status_code == 404
+    assert caught.value.__cause__.request.url.path == "/missing-a/model.int8.onnx"
 
 
 @pytest.mark.asyncio

@@ -1,19 +1,24 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import ssl
 from dataclasses import dataclass, field, replace
 from typing import Any, cast
 from uuid import uuid4
 
 import numpy as np
 import pytest
+from websockets.asyncio.client import ClientConnection
+from websockets.asyncio.server import serve
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import (
     AudioRetentionBinding,
     AudioRetentionBudget,
     AudioSegmentSettingsSnapshot,
+    AudioSegmentTerminalReceipt,
     CaptureStreamInput,
     OwnedStreamInput,
     OwnedVadEvent,
@@ -31,6 +36,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
+    STTSessionProjection,
 )
 from puripuly_heart.core.stt.diagnostics import recognition_cause
 from puripuly_heart.core.stt.scoped_engine import (
@@ -46,6 +52,7 @@ from puripuly_heart.core.stt.scoped_normalizer import (
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.domain.models import FinalLanguageRun
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity
+from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 
 
 @dataclass(slots=True)
@@ -520,7 +527,7 @@ async def test_successor_begin_failure_drains_predecessor_terminal_from_retiring
 
     assert [(item.outcome, item.text, item.failure_reason) for item in emitted] == [
         ("final", "a-final-text", None),
-        ("failed", "", "provider_begin_failed:RuntimeError"),
+        ("failed", "", "provider_begin_failed"),
     ]
     assert [item.identity for item in emitted] == [
         session.requests[0].identity,
@@ -1197,7 +1204,7 @@ async def test_local_write_timeout_keeps_one_quarantined_resource() -> None:
     terminals = [item for item in emitted if isinstance(item, STTProviderTurnTerminal)]
     assert factory_calls == 1
     assert [item.outcome for item in terminals] == ["failed", "failed"]
-    assert terminals[1].failure_reason == "provider_not_ready:RuntimeError"
+    assert terminals[1].failure_reason == "provider_not_ready"
 
     session.send_gate.set()
     await wait_until(lambda: engine.cleanup_debt == 0)
@@ -1340,8 +1347,8 @@ async def test_cloud_cleanup_quarantines_one_epoch_until_physical_release() -> N
     assert len(terminals) == 3
     assert [item.outcome for item in terminals] == ["failed", "failed", "failed"]
     assert [item.failure_reason for item in terminals[1:]] == [
-        "provider_not_ready:RuntimeError",
-        "provider_not_ready:RuntimeError",
+        "provider_not_ready",
+        "provider_not_ready",
     ]
     assert len(provider_failures) == 1
     assert session.calls.count(("stop",)) == 1
@@ -1443,10 +1450,250 @@ async def test_recovery_is_three_attempts_with_point_eight_and_one_point_six_bac
     assert delays == [0.8, 1.6]
     terminal = next(item for item in emitted if isinstance(item, STTProviderTurnTerminal))
     assert terminal.outcome == "failed"
-    assert terminal.failure_reason == "provider_not_ready:RuntimeError"
+    assert terminal.failure_reason == "provider_not_ready"
     assert len(terminal_failures) == 1
-    assert str(terminal_failures[0]) == "provider_recovery_exhausted"
+    assert terminal_failures[0].diagnostic_id
+    assert terminal_failures[0].channel == engine.channel
+    assert terminal.failure_diagnostics is not None
+    assert terminal.failure_diagnostics.fields["outcome"] == "failed"
     await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cause", ["timeout", "network", "service_unavailable", "rate_limit"])
+async def test_connection_cooldown_retries_new_audio_after_repeated_outages(cause: str) -> None:
+    class StatusError(RuntimeError):
+        def __init__(self, status_code: int) -> None:
+            self.status_code = status_code
+            super().__init__("temporarily unavailable")
+
+    unavailable = {
+        "timeout": TimeoutError("unavailable"),
+        "network": ConnectionError("unavailable"),
+        "service_unavailable": StatusError(503),
+        "rate_limit": StatusError(429),
+    }[cause]
+    clock = ControlledMonotonicClock()
+    emitted: list[object] = []
+    failures: list[object] = []
+    attempts: list[float] = []
+    session = ControlledScopedSession()
+    session.terminal_on_seal = ("final", "recovered speech")
+
+    async def factory(_settings, _epoch):
+        attempts.append(clock.now())
+        if len(attempts) <= 6:
+            raise RuntimeError("connection failed") from unavailable
+        return session
+
+    engine = ScopedRecognitionEngine(
+        session_factory=factory,
+        channel="peer",
+        event_sink=emitted.append,
+        terminal_failure_sink=failures.append,
+        monotonic_clock=clock.now,
+        sleep=lambda _delay: asyncio.sleep(0),
+        watchdog_resolver=lambda _: watchdogs(connect_recovery_cooldown_s=30.0),
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("qwen_audio"))
+    times = (0.0, 29.999, 30.0, 59.999, 60.0)
+    starts: list[OwnedVadEvent] = []
+    try:
+        for index, now in enumerate(times):
+            await clock.advance_to(now)
+            start, chunk, end = segment_events(ledger, start_sample=800 + index * 20, now=now)
+            starts.append(start)
+            await engine.handle_owned_vad_event(start)
+            await engine.handle_owned_vad_event(chunk)
+            await engine.handle_owned_vad_event(end)
+        terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
+        assert attempts == [0.0] * 3 + [30.0] * 3 + [60.0]
+        assert [(event.outcome, event.recovery_pending) for event in terminals] == [
+            ("failed", True),
+            ("failed", True),
+            ("failed", True),
+            ("failed", True),
+            ("final", False),
+        ]
+        assert terminals[-1].text == "recovered speech"
+        assert [request.identity.segment for request in session.requests] == [
+            starts[-1].segment.identity
+        ]
+        assert sum(call[3] for call in session.calls if call[0] == "send") == 20
+        failure_diagnostics = [event.failure_diagnostics for event in terminals[:-1]]
+        assert all(diagnostics is not None for diagnostics in failure_diagnostics)
+        assert len({diagnostics.diagnostic_id for diagnostics in failure_diagnostics}) == 4
+        assert len({diagnostics.cause_id for diagnostics in failure_diagnostics}) == 1
+        assert failures == []
+    finally:
+        await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "cause", ["auth", "configuration", "quota", "tls", "missing_certificate", "unknown"]
+)
+async def test_connection_cooldown_does_not_reopen_permanent_failures(cause: str) -> None:
+    class StatusError(RuntimeError):
+        def __init__(self, status_code: int) -> None:
+            self.status_code = status_code
+            super().__init__("rejected")
+
+    rejection = {
+        "auth": StatusError(401),
+        "configuration": StatusError(400),
+        "quota": StatusError(402),
+        "tls": ssl.SSLCertVerificationError("certificate rejected"),
+        "missing_certificate": FileNotFoundError("certificate file missing"),
+        "unknown": RuntimeError("unclassified failure"),
+    }[cause]
+    clock = ControlledMonotonicClock()
+    emitted: list[object] = []
+    failures: list[object] = []
+    attempts = 0
+    recovered = ControlledScopedSession()
+    recovered.terminal_on_seal = ("final", "must not be admitted")
+
+    async def factory(_settings, _epoch):
+        nonlocal attempts
+        attempts += 1
+        if attempts <= 3:
+            raise RuntimeError("connection failed") from rejection
+        return recovered
+
+    engine = ScopedRecognitionEngine(
+        session_factory=factory,
+        event_sink=emitted.append,
+        terminal_failure_sink=failures.append,
+        monotonic_clock=clock.now,
+        sleep=lambda _delay: asyncio.sleep(0),
+        watchdog_resolver=lambda _: watchdogs(connect_recovery_cooldown_s=30.0),
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("qwen_audio"))
+    try:
+        for index, now in enumerate((0.0, 60.0)):
+            await clock.advance_to(now)
+            start, _chunk, end = segment_events(ledger, start_sample=1000 + index * 20, now=now)
+            await engine.handle_owned_vad_event(start)
+            await engine.handle_owned_vad_event(end)
+        terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
+        assert [(event.outcome, event.recovery_pending) for event in terminals] == [
+            ("failed", False),
+            ("failed", False),
+        ]
+        assert attempts == 3
+        assert len(failures) == 1
+        assert recovered.requests == []
+    finally:
+        await engine.close()
+
+
+@pytest.mark.asyncio
+async def test_toggle_off_clears_connection_cooldown_for_explicit_reenable() -> None:
+    clock = ControlledMonotonicClock()
+    emitted: list[object] = []
+    failures: list[object] = []
+    attempts = 0
+    recovered = ControlledScopedSession()
+    recovered.terminal_on_seal = ("final", "fresh activation")
+
+    async def factory(_settings, _epoch):
+        nonlocal attempts
+        attempts += 1
+        if attempts <= 3:
+            raise TimeoutError("unavailable")
+        return recovered
+
+    engine = ScopedRecognitionEngine(
+        session_factory=factory,
+        event_sink=emitted.append,
+        terminal_failure_sink=failures.append,
+        monotonic_clock=clock.now,
+        sleep=lambda _delay: asyncio.sleep(0),
+        watchdog_resolver=lambda _: watchdogs(connect_recovery_cooldown_s=30.0),
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("qwen_audio"))
+    start, _chunk, end = segment_events(ledger, start_sample=1200, now=0.0)
+    try:
+        await engine.handle_owned_vad_event(start)
+        await engine.handle_owned_vad_event(end)
+        await engine.abort_for_toggle_off()
+        await clock.advance_to(1.0)
+        fresh = PeerAudioSegmentLedger(activation_generation=2, settings=settings("qwen_audio"))
+        start, _chunk, end = segment_events(fresh, start_sample=1300, now=1.0)
+        await engine.handle_owned_vad_event(start)
+        await engine.handle_owned_vad_event(end)
+        terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
+        assert [(event.outcome, event.text) for event in terminals] == [
+            ("failed", ""),
+            ("final", "fresh activation"),
+        ]
+        assert terminals[-1].identity.segment.activation_generation == 2
+        assert attempts == 4
+        assert failures == []
+    finally:
+        await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stop", ["toggle_off", "close_backend"])
+async def test_stopping_cooldown_recovery_reclaims_late_connection(stop: str) -> None:
+    clock = ControlledMonotonicClock()
+    emitted: list[object] = []
+    failures: list[object] = []
+    attempts = 0
+    open_gate = asyncio.Event()
+    late = ControlledScopedSession()
+    late.terminal_on_seal = ("final", "must not publish")
+
+    async def factory(_settings, _epoch):
+        nonlocal attempts
+        attempts += 1
+        if attempts <= 3:
+            raise TimeoutError("unavailable")
+        await open_gate.wait()
+        return late
+
+    engine = ScopedRecognitionEngine(
+        session_factory=factory,
+        event_sink=emitted.append,
+        terminal_failure_sink=failures.append,
+        monotonic_clock=clock.now,
+        sleep=lambda _delay: asyncio.sleep(0),
+        watchdog_resolver=lambda _: watchdogs(
+            readiness_timeout_s=1.0, connect_recovery_cooldown_s=30.0
+        ),
+        event_drain_timeout_s=0.01,
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("qwen_audio"))
+    start, _chunk, end = segment_events(ledger, start_sample=1400, now=0.0)
+    pending = None
+    try:
+        await engine.handle_owned_vad_event(start)
+        await engine.handle_owned_vad_event(end)
+        await clock.advance_to(30.0)
+        next_start, _chunk, _end = segment_events(ledger, start_sample=1500, now=30.0)
+        pending = asyncio.create_task(engine.handle_owned_vad_event(next_start))
+        await wait_until(lambda: attempts == 4)
+        if stop == "toggle_off":
+            await engine.abort_for_toggle_off()
+        else:
+            await engine.close_backend()
+        open_gate.set()
+        await pending
+        await wait_until(lambda: engine.cleanup_debt == 0)
+        terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
+        assert [(event.outcome, event.recovery_pending) for event in terminals] == [
+            ("failed", True)
+        ]
+        assert late.requests == []
+        assert ("close",) in late.calls
+        assert failures == []
+    finally:
+        open_gate.set()
+        if pending is not None:
+            await asyncio.gather(pending, return_exceptions=True)
+        await engine.close()
 
 
 @pytest.mark.asyncio
@@ -1492,7 +1739,7 @@ async def test_ready_then_failed_epochs_exhaust_one_recovery_episode() -> None:
     assert len(sessions) == 3
     assert [terminal.outcome for terminal in terminals] == ["failed"] * 4
     assert [terminal.failure_reason for terminal in terminals[:3]] == ["ready_then_failed"] * 3
-    assert terminals[3].failure_reason == "provider_not_ready:RuntimeError"
+    assert terminals[3].failure_reason == "provider_not_ready"
     await engine.close()
 
 
@@ -1794,43 +2041,367 @@ async def test_soniox_toggle_during_recovery_never_installs_late_epoch(phase: st
 
 
 @pytest.mark.asyncio
-async def test_soniox_idle_auth_failure_blocks_reopening_and_notifies_once() -> None:
-    emitted: list[object] = []
-    sessions: list[ControlledScopedSession] = []
-    failures: list[Exception] = []
+@pytest.mark.parametrize("phase", ["backoff", "opening"])
+async def test_soniox_local_server_cancelled_recovery_never_activates_late_connection(
+    phase: str,
+) -> None:
+    sessions = []
+    failures = []
+    requests = []
+    configurations = []
+    error_gate = asyncio.Event()
+    backoff_started = asyncio.Event()
+    backoff_release = asyncio.Event()
+    opening_started = asyncio.Event()
+    opening_release = asyncio.Event()
+    opening_closed = asyncio.Event()
 
-    async def factory(_settings: AudioSegmentSettingsSnapshot, _epoch: str):
-        session = ControlledScopedSession()
-        sessions.append(session)
-        return session
+    async def process_request(connection, request):
+        requests.append(request.headers.get("Authorization") == "Bearer local-cancel-key")
+        if len(requests) == 2:
+            opening_started.set()
+            await opening_release.wait()
 
-    engine = ScopedRecognitionEngine(
-        session_factory=factory,
-        channel="self",
-        event_sink=emitted.append,
-        terminal_failure_sink=failures.append,
-        watchdog_resolver=lambda _settings: watchdogs(),
-    )
-    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("soniox"))
-    first_start, _chunk, first_end = segment_events(ledger, start_sample=8000, now=80.0)
-    next_start, _chunk, next_end = segment_events(ledger, start_sample=8020, now=81.0)
-    await engine.handle_owned_vad_event(first_start)
-    sessions[0].terminal_on_seal = ("final", "healthy")
-    await engine.handle_owned_vad_event(first_end)
-    sessions[0].emit(
-        STTProviderEpochEnded(
-            provider_epoch_id=sessions[0].requests[0].identity.provider_epoch_id,
-            orderly=False,
-            reason="soniox_request_failed",
-            failure_retryable=False,
+    async def handler(connection) -> None:
+        configurations.append(json.loads(await connection.recv()))
+        if len(configurations) == 2:
+            await connection.wait_closed()
+            opening_closed.set()
+            return
+        await error_gate.wait()
+        await connection.send(
+            json.dumps({"error_code": 429, "error_type": "max_concurrent_connections_reached"})
         )
-    )
-    await wait_until(lambda: bool(failures))
-    await engine.handle_owned_vad_event(next_start)
-    await engine.handle_owned_vad_event(next_end)
-    assert len(sessions) == 1
-    assert len(failures) == 1
-    await engine.close()
+        await connection.close()
+
+    async def sleep(delay: float) -> None:
+        if delay <= 1.6:
+            backoff_started.set()
+            await backoff_release.wait()
+        else:
+            await asyncio.sleep(delay)
+
+    async with serve(
+        handler, "127.0.0.1", 0, process_request=process_request, ping_interval=None
+    ) as server:
+        host, port = server.sockets[0].getsockname()[:2]
+        backend = SonioxRealtimeSTTBackend(
+            api_key="local-cancel-key", language_hints=["en"], endpoint=f"ws://{host}:{port}"
+        )
+
+        async def factory(_settings: AudioSegmentSettingsSnapshot, epoch: str):
+            session = await backend.open_session(
+                projection=STTSessionProjection(mode="scoped", provider_epoch_id=epoch)
+            )
+            sessions.append(session)
+            return session
+
+        engine = ScopedRecognitionEngine(
+            session_factory=factory,
+            event_sink=lambda _event: None,
+            terminal_failure_sink=failures.append,
+            watchdog_resolver=lambda _settings: watchdogs(readiness_timeout_s=2),
+            sleep=sleep,
+        )
+        ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("soniox"))
+        start, _chunk, end = segment_events(ledger, start_sample=7000, now=70.0)
+        next_start, _chunk, _end = segment_events(ledger, start_sample=7020, now=71.0)
+        pending = None
+        try:
+            await engine.handle_owned_vad_event(start)
+            error_gate.set()
+            await wait_until(lambda: sessions[0]._recv_task.done())
+            await engine.handle_owned_vad_event(end)
+            await wait_until(lambda: sessions[0]._ws is None)
+            pending = asyncio.create_task(engine.handle_owned_vad_event(next_start))
+            await asyncio.wait_for(backoff_started.wait(), timeout=1)
+            if phase == "opening":
+                backoff_release.set()
+                await asyncio.wait_for(opening_started.wait(), timeout=1)
+            await engine.abort_for_toggle_off()
+            backoff_release.set()
+            opening_release.set()
+            await asyncio.wait_for(pending, timeout=1)
+            if phase == "opening":
+                await asyncio.wait_for(opening_closed.wait(), timeout=1)
+            assert requests == [True] * (2 if phase == "opening" else 1)
+            assert len(configurations) == len(sessions) == (2 if phase == "opening" else 1)
+            assert all("api_key" not in config for config in configurations)
+            assert all(session._ws is None for session in sessions)
+            assert all(
+                task.done()
+                for session in sessions
+                for task in (session._send_task, session._recv_task, session._keepalive_task)
+            )
+            assert not failures
+        finally:
+            error_gate.set()
+            backoff_release.set()
+            opening_release.set()
+            if pending is not None:
+                await asyncio.gather(pending, return_exceptions=True)
+            await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize(
+    ("error", "retryable"),
+    [
+        ({"error_code": 401, "error_type": "unauthenticated"}, False),
+        ({"error_code": 400, "error_type": "invalid_request"}, False),
+        ({"error_code": 403, "error_type": "permission_denied"}, False),
+        ({"error_code": 429, "error_type": "limit_exceeded"}, True),
+        ({"error_code": 429, "error_type": "max_concurrent_connections_reached"}, True),
+        ({"error_code": 429, "error": "legacy"}, True),
+        ({"error_code": 429, "error_type": "unknown"}, False),
+        ({"error_code": 429, "error_type": "unauthenticated"}, False),
+        ({"error_code": 429, "error_type": None}, False),
+        ({"error_code": 401, "error_type": "max_concurrent_connections_reached"}, False),
+        ({}, True),
+    ],
+    ids=[
+        "early401",
+        "early400",
+        "early403",
+        "limit",
+        "concurrency-limit",
+        "legacy-limit",
+        "unknown-type",
+        "contradictory-type",
+        "null-type",
+        "mismatched-code",
+        "closure-only",
+    ],
+)
+async def test_soniox_error_before_configuration_send_prioritizes_structured_failure(
+    channel: str, error: dict[str, object], retryable: bool, monkeypatch, caplog
+) -> None:
+    requests = []
+    clients = []
+    configurations = []
+    failures = []
+    delays = []
+    emitted = []
+    marker = "early-start-private-key"
+    original_send = ClientConnection.send
+
+    async def send_after_server_close(connection, payload, **kwargs):
+        clients.append(connection)
+        await asyncio.wait_for(connection.wait_closed(), timeout=1)
+        return await original_send(connection, payload, **kwargs)
+
+    monkeypatch.setattr(ClientConnection, "send", send_after_server_close)
+
+    async def handler(connection):
+        requests.append(
+            connection.request.headers.get("Authorization") == f"Bearer {marker}"
+            and "Sec-WebSocket-Protocol" not in connection.request.headers
+        )
+        await connection.send(json.dumps({"tokens": []}))
+        if error:
+            await connection.send(json.dumps({**error, "error_message": marker}))
+        await connection.close(code=1000)
+        async for message in connection:
+            configurations.append(message)
+
+    async def sleep(delay):
+        delays.append(delay)
+
+    async with serve(handler, "127.0.0.1", 0, ping_interval=None) as server:
+        host, port = server.sockets[0].getsockname()[:2]
+        backend = SonioxRealtimeSTTBackend(
+            api_key=marker, language_hints=["en"], endpoint=f"ws://{host}:{port}"
+        )
+
+        async def factory(_settings, epoch):
+            assert all(client.close_code == 1000 for client in clients)
+            return await backend.open_session(
+                projection=STTSessionProjection(mode="scoped", provider_epoch_id=epoch)
+            )
+
+        engine = ScopedRecognitionEngine(
+            session_factory=factory,
+            channel=cast(Any, channel),
+            event_sink=emitted.append,
+            terminal_failure_sink=failures.append,
+            watchdog_resolver=lambda _settings: watchdogs(
+                connect_retry_base_s=0.8, connect_retry_max_s=1.6
+            ),
+            sleep=sleep,
+        )
+        ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("soniox"))
+        try:
+            with caplog.at_level(logging.INFO):
+                for index in range(3):
+                    start, _chunk, end = segment_events(
+                        ledger, start_sample=7500 + index * 20, now=75.0 + index
+                    )
+                    await engine.handle_owned_vad_event(start)
+                    await engine.handle_owned_vad_event(end)
+                attempts = 3 if retryable else 1
+                assert requests == [True] * attempts
+                assert len(clients) == attempts
+                assert configurations == []
+                assert len(failures) == 1
+                if error and not retryable:
+                    assert failures[0].code == "stt.soniox_request_failed"
+                    assert failures[0].channel == channel
+                assert delays == ([0.8, 1.6] if retryable else [])
+                assert engine._session is None
+                assert not engine.cleanup_debt
+                assert not engine._factory_tasks
+                assert all(client.close_code == 1000 for client in clients)
+                assert marker not in caplog.text
+                assert all(marker not in str(failure) for failure in failures)
+                assert (
+                    len([event for event in emitted if isinstance(event, STTProviderTurnTerminal)])
+                    == 3
+                )
+        finally:
+            await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize(
+    ("error", "retryable", "idle"),
+    [
+        ({"error_code": 401, "error_type": "unauthenticated"}, False, False),
+        ({"error_code": 401, "error_type": "unauthenticated"}, False, True),
+        ({"error_code": 400, "error_type": "invalid_request"}, False, False),
+        ({"error_code": 403, "error_type": "permission_denied"}, False, False),
+        ({"error_code": 429, "error_type": "limit_exceeded"}, True, False),
+        ({"error_code": 429, "error_type": "max_concurrent_connections_reached"}, True, False),
+        ({"error_code": 429, "error": "legacy"}, True, False),
+        ({"error_code": 429, "error_type": "unknown"}, False, False),
+        ({"error_code": 429, "error_type": "unauthenticated"}, False, False),
+        ({"error_code": 401, "error_type": "max_concurrent_connections_reached"}, False, False),
+    ],
+)
+async def test_soniox_post_connect_error_releases_epochs_and_bounds_recovery(
+    channel: str, error: dict[str, object], retryable: bool, idle: bool, caplog
+) -> None:
+    emitted: list[object] = []
+    sessions = []
+    failures: list[Exception] = []
+    delays: list[float] = []
+    gates: list[asyncio.Event] = []
+    closed: list[bool] = []
+    authenticated: list[bool] = []
+    configurations: list[dict[str, object]] = []
+    marker = "local-runtime-private-key"
+
+    async def handler(connection) -> None:
+        gate = asyncio.Event()
+        gates.append(gate)
+        closed.append(False)
+        index = len(gates) - 1
+        authenticated.append(
+            connection.request.headers.get("Authorization") == f"Bearer {marker}"
+            and "Sec-WebSocket-Protocol" not in connection.request.headers
+        )
+        configurations.append(json.loads(await connection.recv()))
+        if idle:
+            async for message in connection:
+                if isinstance(message, str) and json.loads(message).get("type") == "finalize":
+                    await connection.send(
+                        json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]})
+                    )
+                    break
+        await gate.wait()
+        await connection.send(json.dumps({**error, "error_message": marker}))
+        await connection.close(code=1000)
+        closed[index] = True
+
+    async def sleep(delay: float) -> None:
+        if delay <= 1.6:
+            delays.append(delay)
+        else:
+            await asyncio.sleep(delay)
+
+    async with serve(handler, "127.0.0.1", 0, ping_interval=None) as server:
+        host, port = server.sockets[0].getsockname()[:2]
+        backend = SonioxRealtimeSTTBackend(
+            api_key=marker,
+            endpoint=f"ws://{host}:{port}",
+            language_hints=["en"],
+            keepalive_interval_s=0.01,
+        )
+
+        async def factory(_settings: AudioSegmentSettingsSnapshot, epoch: str):
+            assert all(closed)
+            assert all(session._ws is None for session in sessions)
+            session = await backend.open_session(
+                projection=STTSessionProjection(mode="scoped", provider_epoch_id=epoch)
+            )
+            sessions.append(session)
+            return session
+
+        engine = ScopedRecognitionEngine(
+            session_factory=factory,
+            channel=cast(Any, channel),
+            event_sink=emitted.append,
+            terminal_failure_sink=failures.append,
+            watchdog_resolver=lambda _settings: watchdogs(
+                connect_retry_base_s=0.8, connect_retry_max_s=1.6
+            ),
+            sleep=sleep,
+            session_lifetime_enabled=False,
+        )
+        ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("soniox"))
+        attempts = 3 if retryable else 1
+        try:
+            with caplog.at_level(logging.INFO):
+                for index in range(attempts + 2):
+                    start, _chunk, end = segment_events(
+                        ledger, start_sample=8000 + index * 20, now=80.0 + index
+                    )
+                    await engine.handle_owned_vad_event(start)
+                    if index < attempts:
+                        await wait_until(lambda: len(gates) == index + 1)
+                        if idle:
+                            await engine.handle_owned_vad_event(end)
+                            await wait_until(
+                                lambda: any(
+                                    isinstance(event, STTProviderTurnTerminal)
+                                    and event.outcome == "empty"
+                                    for event in emitted
+                                )
+                            )
+                        gates[index].set()
+                        await wait_until(lambda: sessions[index]._recv_task.done())
+                        if not idle:
+                            await engine.handle_owned_vad_event(end)
+                        await wait_until(lambda: sessions[index]._ws is None and closed[index])
+                    else:
+                        await engine.handle_owned_vad_event(end)
+                assert len(sessions) == attempts
+                assert len(failures) == 1
+                terminals = [
+                    event for event in emitted if isinstance(event, STTProviderTurnTerminal)
+                ]
+                if not idle:
+                    assert [event.failure_retryable for event in terminals[:attempts]] == [
+                        retryable
+                    ] * attempts
+                    assert [event.recovery_pending for event in terminals[:attempts]] == (
+                        [True, True, False] if retryable else [False]
+                    )
+                assert delays == ([0.8, 1.6] if retryable else [])
+                assert authenticated == [True] * attempts
+                assert all("api_key" not in config for config in configurations)
+                assert marker not in caplog.text
+                assert all(marker not in str(failure) for failure in failures)
+                assert all(
+                    task.done()
+                    for session in sessions
+                    for task in (session._send_task, session._recv_task, session._keepalive_task)
+                )
+        finally:
+            for gate in gates:
+                gate.set()
+            await engine.close()
 
 
 @pytest.mark.asyncio
@@ -3181,9 +3752,21 @@ async def test_queued_capture_discontinuity_retires_stream_after_successor_arriv
         _current_stream_capture_epoch=None,
         is_current_generation=lambda generation: generation == 3,
     )
+    retired_sources: list[AudioSegmentTerminalReceipt] = []
+
+    class NativeCaptureBoundary:
+        async def handle_vad_event(self, event: OwnedVadEvent) -> None:
+            await engine.handle_owned_vad_event(event)
+
+        async def handle_stream_input(self, event: OwnedStreamInput) -> None:
+            await engine.handle_stream_input(event)
+
+        async def handle_source_segment_retired(self, receipt: AudioSegmentTerminalReceipt) -> None:
+            retired_sources.append(receipt)
+
     if channel == "self":
         guard = self_capture._GenerationGuardedVadSink(
-            sink=engine,
+            sink=NativeCaptureBoundary(),
             owner=runtime,
             capture_generation=self_capture._CaptureGeneration(3),
             ledger=ledger,
@@ -3234,6 +3817,7 @@ async def test_queued_capture_discontinuity_retires_stream_after_successor_arriv
             for capture in ranges
         ] == [(1, 0, 2), (1, 2, 6), (1, 6, 10)]
         assert guard.retention_budget.used_bytes == 0
+        assert retired_sources == []
     finally:
         session.send_gate.set()
         await guard.abort()
@@ -3332,7 +3916,8 @@ async def test_stream_recovery_connection_failure_exhausts_once_not_on_every_fra
             await engine.handle_stream_input(stream_input(ledger, left, left + 4))
         await wait_until(lambda: len(failures) == 1)
         assert opens == 3
-        assert str(failures[0]) == "provider_recovery_exhausted"
+        assert failures[0].diagnostic_id
+        assert failures[0].channel == engine.channel
     finally:
         await engine.close()
 
@@ -3452,7 +4037,9 @@ async def test_continuous_stream_recovery_waits_for_physical_cleanup_and_stops_i
         await engine.handle_stream_input(stream_input(ledger, 10, 14))
         await engine.handle_stream_input(stream_input(ledger, 14, 18))
         assert opens == 1
-        assert [str(failure) for failure in failures] == ["provider_resource_quarantined"]
+        assert len(failures) == 1
+        assert failures[0].category == "timeout"
+        assert failures[0].code == "stt.provider_stream_write_timeout"
         session.release.set()
         await wait_until(lambda: engine.cleanup_debt == 0)
         await engine.handle_stream_input(stream_input(ledger, 18, 22))
@@ -3843,6 +4430,7 @@ async def test_independent_retirement_resumes_unsent_audio_without_new_local_tur
         terminals = [e for e in emitted if isinstance(e, STTProviderInputTerminal)]
         assert len(terminals) == 1
         assert terminals[0].outcome == ("failed" if open_turn else "submitted")
+        assert terminals[0].independent_recognition
         if open_turn:
             assert terminals[0].recovery_pending
         assert failures == []
@@ -3893,7 +4481,9 @@ async def test_retired_stream_recovery_exhaustion_faults_once_and_stops_reopenin
         for left in range(6, 46, 4):
             await engine.handle_stream_input(stream_input(ledger, left, left + 4))
         assert opens == 3
-        assert [str(exc) for exc in failures] == ["provider_recovery_exhausted"]
+        assert len(failures) == 1
+        assert failures[0].diagnostic_id
+        assert failures[0].channel == engine.channel
     finally:
         await engine.close()
 

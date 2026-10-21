@@ -130,6 +130,10 @@ def managed_gemma_capture_notice(
     if notice is None or notice.status not in MANAGED_GEMMA_NOTICE_KEYS:
         return None
     key = MANAGED_GEMMA_NOTICE_KEYS[notice.status]
+    if notice.status == "failed" and notice.failure_phase == "runtime_files":
+        key = "dashboard.managed_gemma_notice.runtime_files_failed"
+    elif notice.status == "failed" and notice.gpu_only and notice.failure_phase == "runtime":
+        key = "dashboard.managed_gemma_notice.gpu_only_failed"
     text = (
         t(key, percent=notice.progress_percent or 0) if notice.status == "downloading" else t(key)
     )

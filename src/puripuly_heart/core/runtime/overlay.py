@@ -44,9 +44,13 @@ class OverlayRuntimeHandle:
         *,
         overlay_instance_id: str | None = None,
         shutdown_grace_s: float = 0.05,
+        operation_id: str | None = None,
+        request_id: str | None = None,
     ) -> None:
         self._overlay_instance_id = overlay_instance_id
         self._shutdown_grace_s = shutdown_grace_s
+        self.operation_id = operation_id
+        self.request_id = request_id
         self._presenter: object | None = None
         self._bridge: object | None = None
         self._process_manager: object | None = None

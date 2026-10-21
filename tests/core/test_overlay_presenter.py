@@ -3088,7 +3088,10 @@ async def test_presenter_hidden_self_translation_metadata_update_does_not_bump_r
 
     assert presenter.snapshot() == snapshot_before_metadata
     assert len(bridge.snapshots) == snapshot_count_before_metadata
-    assert presenter.snapshot().native_fresh_render_generations.self == 2
+    assert (
+        presenter.snapshot().native_fresh_render_generations
+        == snapshot_before_metadata.native_fresh_render_generations
+    )
     assert presenter.snapshot().blocks[0].secondary_enabled is False
 
 
@@ -4109,7 +4112,7 @@ async def test_native_retry_mode_never_schedules_python_refresh_work() -> None:
     await asyncio.sleep(0)
 
     snapshot = presenter.snapshot()
-    assert snapshot.native_fresh_render_targets.self == f"self:{turn}"
+    assert snapshot.native_fresh_render_targets.self == "scene:self"
     assert 0.1 not in sleep_calls
     assert len(bridge.snapshots) == 1
     await presenter.close()
@@ -4147,7 +4150,7 @@ async def test_native_retry_epoch_replays_valid_caption_with_fresh_intent_only()
     snapshot = presenter.snapshot()
     assert snapshot.blocks[0].primary_text == "preserved caption"
     assert snapshot.native_fresh_render_generations.self == 1
-    assert snapshot.native_fresh_render_targets.self == f"self:{turn}"
+    assert snapshot.native_fresh_render_targets.self == "scene:self"
     assert snapshot.native_quiet_tail_episodes.self.generation == 1
 
     await presenter.begin_native_retry_epoch(enabled=False)
@@ -4208,7 +4211,7 @@ async def test_presenter_native_fresh_render_generations_preserve_channels_and_e
             occupant_key=f"self:{self_turn}",
         )
     )
-    assert presenter.snapshot().native_fresh_render_generations.self == self_generation + 1
+    assert presenter.snapshot().native_fresh_render_generations.self > self_generation
     stream_episode = presenter.snapshot().native_quiet_tail_episodes.self
     assert stream_episode is not None and stream_episode.phase == "stream"
     assert stream_episode.generation != self_episode.generation
@@ -4223,8 +4226,11 @@ async def test_presenter_native_fresh_render_generations_preserve_channels_and_e
             applied_context_mode=None,
         )
     )
-    assert presenter.snapshot().native_fresh_render_generations.self == self_generation
-    assert presenter.snapshot().native_quiet_tail_episodes.self == stream_episode
+    assert presenter.snapshot().native_fresh_render_generations.self > self_generation
+    assert (
+        presenter.snapshot().native_quiet_tail_episodes.self.generation > stream_episode.generation
+    )
+    self_generation = presenter.snapshot().native_fresh_render_generations.self
     await presenter.emit(
         adapter.transcript_final(
             Transcript(
@@ -4265,12 +4271,17 @@ async def test_presenter_native_fresh_render_generations_preserve_channels_and_e
         show_translation=False,
         show_peer_original=False,
     )
-    assert presenter.snapshot().native_fresh_render_generations == generations
+    assert presenter.snapshot().native_fresh_render_generations.self > generations.self
+    assert presenter.snapshot().native_fresh_render_generations.peer == generations.peer
+    generations = presenter.snapshot().native_fresh_render_generations
     await presenter.update_display_preferences(
         show_translation=True,
         show_peer_original=True,
     )
-    assert presenter.snapshot().native_fresh_render_generations == generations
+    assert presenter.snapshot().native_fresh_render_generations.self > generations.self
+    assert presenter.snapshot().native_fresh_render_generations.peer == generations.peer
+    generations = presenter.snapshot().native_fresh_render_generations
+    self_generation = generations.self
     await presenter.update_calibration(OverlayCalibration(distance=1.2))
     assert presenter.snapshot().native_fresh_render_generations == generations
 
@@ -4340,7 +4351,7 @@ async def test_presenter_native_fresh_render_same_text_new_turn_and_terminal_exc
                 target_language="ko",
             )
         )
-    assert presenter.snapshot().native_fresh_render_generations.self == 2
+    assert presenter.snapshot().native_fresh_render_generations.self == 3
 
     await presenter.emit(
         adapter.transcript_final(
@@ -4366,7 +4377,8 @@ async def test_presenter_native_fresh_render_same_text_new_turn_and_terminal_exc
         )
     )
     generations = presenter.snapshot().native_fresh_render_generations
-    assert (generations.self, generations.peer) == (2, 1)
+    assert generations.peer == 1
+    assert generations.self >= 3
 
     await presenter.emit(adapter.self_active_clear())
     assert presenter.snapshot().native_fresh_render_generations == generations

@@ -56,6 +56,9 @@ class GpuProviderRecoveryApplicationRequest:
     peer_config_factory: GpuProviderRecoveryPeerConfigFactory = field(repr=False)
     self_request_factory: GpuProviderRecoveryProviderRequestFactory = field(repr=False)
     peer_request_factory: GpuProviderRecoveryPeerRequestFactory = field(repr=False)
+    ensure_self_switch: GpuProviderRecoveryAsyncEffect = field(repr=False)
+    refresh_self: GpuProviderRecoveryAsyncEffect = field(repr=False)
+    refresh_peer: GpuProviderRecoveryAsyncEffect = field(repr=False)
     should_refresh_self: bool = False
     should_refresh_peer: bool = False
 
@@ -78,9 +81,6 @@ class GpuProviderRecoveryApplicationOwner:
     self_owner_factory: GpuProviderRecoverySelfOwnerFactory = field(repr=False)
     peer_owner_provider: GpuProviderRecoveryPeerOwnerProvider = field(repr=False)
     self_state_sink: GpuProviderRecoverySelfStateSink = field(repr=False)
-    ensure_self_switch: GpuProviderRecoveryAsyncEffect = field(repr=False)
-    refresh_self: GpuProviderRecoveryAsyncEffect = field(repr=False)
-    refresh_peer: GpuProviderRecoveryAsyncEffect = field(repr=False)
 
     @property
     def owner_name(self) -> str:
@@ -159,7 +159,7 @@ class GpuProviderRecoveryApplicationOwner:
                 )
                 self.self_state_sink(snapshot)
                 if request.self_desired:
-                    await self.ensure_self_switch()
+                    await request.ensure_self_switch()
 
             plans.append(
                 GpuProviderRecoveryChannelPlan(
@@ -183,7 +183,7 @@ class GpuProviderRecoveryApplicationOwner:
                     peer_config,
                     on_terminal_failure=failure_handler,
                 )
-                await self.refresh_peer()
+                await request.refresh_peer()
 
             plans.append(
                 GpuProviderRecoveryChannelPlan(
@@ -205,9 +205,9 @@ class GpuProviderRecoveryApplicationOwner:
             self.pending_clear(recovered_channels)
             return
         if request.should_refresh_self and "self" not in recovered_channels:
-            await self.refresh_self()
+            await request.refresh_self()
         if request.should_refresh_peer and "peer" not in recovered_channels:
-            await self.refresh_peer()
+            await request.refresh_peer()
 
 
 __all__ = [

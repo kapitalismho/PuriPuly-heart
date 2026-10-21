@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import ast
 import asyncio
-import contextlib
 import json
-import re
 from dataclasses import dataclass, field
 from typing import Mapping, Protocol
 from urllib.parse import urlsplit, urlunsplit
@@ -14,6 +11,11 @@ import httpx
 
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.domain.models import Translation
+from puripuly_heart.providers.llm.error_details import (
+    LLMResponseError,
+    record_probe_cleanup_failure,
+    record_probe_failure,
+)
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 LOCAL_OPENAI_RESERVED_EXTRA_BODY_KEYS = frozenset(
@@ -32,7 +34,6 @@ LOCAL_OPENAI_SENSITIVE_EXTRA_BODY_KEYS = frozenset(
     {"api_key", "authorization", "headers", "token", "secret", "password"}
 )
 _DEFAULT_BASE_URL = "http://127.0.0.1:11434/v1"
-_MODEL_TOKEN_CHARS = r"A-Za-z0-9_./:+-"
 
 
 class LocalOpenAIReservedExtraBodyKeyError(ValueError):
@@ -101,7 +102,9 @@ def _extract_message_content(content: object) -> str:
         stripped = content.strip()
         if stripped:
             return stripped
-        raise RuntimeError("Local LLM response contained empty message content")
+        raise LLMResponseError(
+            "Local LLM response contained empty message content", provider="local_llm"
+        )
     if isinstance(content, list):
         parts: list[str] = []
         for item in content:
@@ -111,244 +114,9 @@ def _extract_message_content(content: object) -> str:
                     parts.append(text.strip())
         if parts:
             return "\n".join(parts)
-    raise RuntimeError("Local LLM response did not contain message content")
-
-
-def _extract_error_message(data: object) -> str:
-    if isinstance(data, dict):
-        message = data.get("message")
-        if isinstance(message, str) and message.strip():
-            return message.strip()
-        error = data.get("error")
-        if isinstance(error, dict):
-            nested = error.get("message")
-            if isinstance(nested, str) and nested.strip():
-                return nested.strip()
-        if isinstance(error, str) and error.strip():
-            return error.strip()
-    return ""
-
-
-def _redact_extra_body_fragments(text: str, extra_body: Mapping[str, object] | None) -> str:
-    if not extra_body:
-        return text
-    sanitized = text
-    for rendered in (
-        json.dumps(dict(extra_body), ensure_ascii=False, sort_keys=True),
-        json.dumps(dict(extra_body), ensure_ascii=False, sort_keys=True, separators=(",", ":")),
-    ):
-        sanitized = sanitized.replace(rendered, "[extra-body-redacted]")
-    sanitized = _redact_extra_body_json_objects(sanitized, extra_body)
-    sanitized = _redact_extra_body_key_value_fragments(sanitized, extra_body)
-    return sanitized
-
-
-def _contains_extra_body_pair(value: object, extra_body: Mapping[str, object]) -> bool:
-    if isinstance(value, dict):
-        if any(key in value and value[key] == expected for key, expected in extra_body.items()):
-            return True
-        return any(_contains_extra_body_pair(child, extra_body) for child in value.values())
-    if isinstance(value, list):
-        return any(_contains_extra_body_pair(item, extra_body) for item in value)
-    return False
-
-
-def _redact_extra_body_json_objects(text: str, extra_body: Mapping[str, object]) -> str:
-    decoder = json.JSONDecoder()
-    parts: list[str] = []
-    index = 0
-    while index < len(text):
-        start = text.find("{", index)
-        if start < 0:
-            parts.append(text[index:])
-            break
-        parts.append(text[index:start])
-        try:
-            parsed, end = decoder.raw_decode(text[start:])
-        except ValueError:
-            parts.append(text[start])
-            index = start + 1
-            continue
-        if _contains_extra_body_pair(parsed, extra_body):
-            parts.append("[extra-body-redacted]")
-        else:
-            parts.append(text[start : start + end])
-        index = start + end
-    return "".join(parts)
-
-
-def _extra_body_value_patterns(value: object) -> list[str]:
-    rendered: set[str] = set()
-    for kwargs in ({}, {"separators": (",", ":")}):
-        with contextlib.suppress(TypeError, ValueError):
-            rendered.add(json.dumps(value, ensure_ascii=False, allow_nan=False, **kwargs))
-    if isinstance(value, bool):
-        rendered.add(str(value))
-    elif value is None:
-        rendered.add("None")
-    elif isinstance(value, str) and value:
-        rendered.add(value)
-        rendered.add(f"'{value}'")
-    return [re.escape(item) for item in sorted(rendered, key=len, reverse=True)]
-
-
-def _redact_extra_body_key_value_fragments(text: str, extra_body: Mapping[str, object]) -> str:
-    sanitized = _redact_extra_body_structured_key_value_fragments(text, extra_body)
-    for key, value in sorted(extra_body.items(), key=lambda item: len(item[0]), reverse=True):
-        value_pattern = "|".join(_extra_body_value_patterns(value))
-        if not value_pattern:
-            continue
-        escaped_key = re.escape(key)
-        key_pattern = rf"(?:[\"']{escaped_key}[\"']|(?<![\w.-]){escaped_key}(?![\w.-]))"
-        sanitized = re.sub(
-            rf"{key_pattern}\s*[:=]\s*(?:{value_pattern})(?=$|[\s,;.)\]}}])",
-            "[extra-body-redacted]",
-            sanitized,
-            flags=re.IGNORECASE,
-        )
-    return sanitized
-
-
-def _redact_extra_body_structured_key_value_fragments(
-    text: str, extra_body: Mapping[str, object]
-) -> str:
-    sanitized = text
-    for key, value in sorted(extra_body.items(), key=lambda item: len(item[0]), reverse=True):
-        if not isinstance(value, dict):
-            continue
-        escaped_key = re.escape(key)
-        key_pattern = rf"(?:[\"']{escaped_key}[\"']|(?<![\w.-]){escaped_key}(?![\w.-]))"
-        sanitized = _redact_matching_structured_value(sanitized, key_pattern, value)
-    return sanitized
-
-
-def _redact_matching_structured_value(text: str, key_pattern: str, expected: object) -> str:
-    pattern = re.compile(rf"{key_pattern}\s*[:=]\s*", flags=re.IGNORECASE)
-    parts: list[str] = []
-    index = 0
-    while index < len(text):
-        match = pattern.search(text, index)
-        if match is None:
-            parts.append(text[index:])
-            break
-        parts.append(text[index : match.start()])
-        literal_start = match.end()
-        literal_end = _balanced_literal_end(text, literal_start)
-        if literal_end is None:
-            parts.append(text[match.start() : match.end()])
-            index = match.end()
-            continue
-        literal = text[literal_start:literal_end]
-        if _loads_expected_literal(literal, expected):
-            parts.append("[extra-body-redacted]")
-        else:
-            parts.append(text[match.start() : literal_end])
-        index = literal_end
-    return "".join(parts)
-
-
-def _balanced_literal_end(text: str, start: int) -> int | None:
-    if start >= len(text) or text[start] != "{":
-        return None
-    stack = ["}"]
-    quote: str | None = None
-    escaped = False
-    for index in range(start + 1, len(text)):
-        char = text[index]
-        if quote is not None:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == quote:
-                quote = None
-            continue
-        if char in {"'", '"'}:
-            quote = char
-        elif char == "{":
-            stack.append("}")
-        elif char == "}":
-            stack.pop()
-            if not stack:
-                return index + 1
-    return None
-
-
-def _loads_expected_literal(literal: str, expected: object) -> bool:
-    with contextlib.suppress(json.JSONDecodeError, TypeError):
-        return json.loads(literal) == expected
-    with contextlib.suppress(ValueError, SyntaxError):
-        return ast.literal_eval(literal) == expected
-    return False
-
-
-def _redact_model_name(text: str, model: str) -> str:
-    model_name = model.strip()
-    if not model_name:
-        return text
-    escaped = re.escape(model_name)
-    suffix_boundary = r"(?=$|[\s,;)\]}]|[.:](?:$|[\s,;)\]}'\"]))"
-    sanitized = text
-    for pattern in (
-        rf"(?P<prefix>[\"']model[\"']\s*:\s*[\"'])(?P<value>{escaped})(?P<suffix>[\"'])",
-        rf"(?P<prefix>\bmodel\s*[:=]\s*[\"']?)(?P<value>{escaped})(?P<suffix>[\"']?){suffix_boundary}",
-        rf"(?P<prefix>\bmodel\s+[\"']?)(?P<value>{escaped})(?P<suffix>[\"']?){suffix_boundary}",
-    ):
-        sanitized = re.sub(
-            pattern,
-            lambda match: f"{match.group('prefix')}[model-redacted]{match.group('suffix')}",
-            sanitized,
-            flags=re.IGNORECASE,
-        )
-    sanitized = re.sub(
-        rf"(?<![{_MODEL_TOKEN_CHARS}]){escaped}(?:(?![{_MODEL_TOKEN_CHARS}])|(?=[.:](?:$|[\s,;)\]}}'\"])))",
-        "[model-redacted]",
-        sanitized,
-        flags=re.IGNORECASE,
+    raise LLMResponseError(
+        "Local LLM response did not contain message content", provider="local_llm"
     )
-    return sanitized
-
-
-def _redact_request_body_fragments(text: str) -> str:
-    sanitized = re.sub(
-        r"\b(?:body|json|request_body|payload|messages)\s*[:=]\s*.*",
-        "[request-body-redacted]",
-        text,
-        flags=re.IGNORECASE | re.DOTALL,
-    )
-    return re.sub(
-        r"\{(?=[\s\S]*[\"']messages[\"']\s*:)[\s\S]*\}",
-        "[request-body-redacted]",
-        sanitized,
-        flags=re.IGNORECASE,
-    )
-
-
-def _sanitize_error_text(
-    text: str,
-    *,
-    api_key: str = "",
-    model: str = "",
-    extra_body: Mapping[str, object] | None = None,
-    source_text: str = "",
-) -> str:
-    sanitized = text
-    sanitized = re.sub(r"Bearer\s+[^\s,}]+", "Bearer [redacted]", sanitized, flags=re.IGNORECASE)
-    if api_key:
-        sanitized = sanitized.replace(api_key, "[redacted]")
-    if source_text:
-        sanitized = sanitized.replace(source_text, "[source-text-redacted]")
-    sanitized = _redact_model_name(sanitized, model)
-    sanitized = re.sub(
-        r"Authorization\s*[:=]\s*(?!Bearer\s+\[redacted\])[^\s,}]+",
-        "Authorization: [redacted]",
-        sanitized,
-        flags=re.IGNORECASE,
-    )
-    sanitized = re.sub(r"https?://[^\s'\"]+", "[url-redacted]", sanitized)
-    sanitized = _redact_request_body_fragments(sanitized)
-    sanitized = _redact_extra_body_fragments(sanitized, extra_body)
-    return sanitized[:300]
 
 
 def _has_length_finish_reason(data: object) -> bool:
@@ -491,52 +259,43 @@ class HttpxLocalOpenAIClient:
             )
         except asyncio.CancelledError:
             raise
-        except httpx.HTTPError as exc:
-            message = _sanitize_error_text(
-                str(exc),
-                api_key=self.api_key,
-                model=self.model,
-                extra_body=self.extra_body,
-                source_text=text,
-            )
-            raise RuntimeError(f"Local LLM request failed: {message}") from exc
+        except httpx.HTTPError:
+            raise
 
         if response.status_code != 200:
-            error_message = ""
-            with contextlib.suppress(Exception):
-                error_message = _extract_error_message(response.json())
-            if not error_message:
-                error_message = response.text
-            message = _sanitize_error_text(
-                error_message or "unknown error",
-                api_key=self.api_key,
-                model=self.model,
-                extra_body=self.extra_body,
-                source_text=text,
-            )
-            raise RuntimeError(
-                f"Local LLM request failed (status={response.status_code}, message={message})"
+            raise LLMResponseError(
+                "Local LLM request failed",
+                provider="local_llm",
+                status_code=response.status_code,
             )
 
         try:
             data = response.json()
         except Exception as exc:
-            raise RuntimeError("Local LLM response was not valid JSON") from exc
+            raise LLMResponseError(
+                "Local LLM response was not valid JSON", provider="local_llm"
+            ) from exc
         if not isinstance(data, dict):
-            raise RuntimeError("Local LLM response was not a JSON object")
+            raise LLMResponseError("Local LLM response was not a JSON object", provider="local_llm")
         if observation is not None:
             observation.record_openai_response(data)
         choices = data.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise RuntimeError("Local LLM response did not contain choices")
+            raise LLMResponseError(
+                "Local LLM response did not contain choices", provider="local_llm"
+            )
         if _has_length_finish_reason(data):
-            raise RuntimeError("Local LLM response was truncated by max_tokens limit")
+            raise LLMResponseError(
+                "Local LLM response was truncated by max_tokens limit", provider="local_llm"
+            )
         first = choices[0]
         if not isinstance(first, dict):
-            raise RuntimeError("Local LLM response choice was malformed")
+            raise LLMResponseError("Local LLM response choice was malformed", provider="local_llm")
         message = first.get("message")
         if not isinstance(message, dict):
-            raise RuntimeError("Local LLM response did not contain message")
+            raise LLMResponseError(
+                "Local LLM response did not contain message", provider="local_llm"
+            )
         return _extract_message_content(message.get("content"))
 
     async def close(self) -> None:
@@ -625,6 +384,7 @@ class LocalOpenAICompatibleLLMProvider:
         extra_body: Mapping[str, object] | None = None,
     ) -> bool:
         client: HttpxLocalOpenAIClient | None = None
+        primary_failure = None
         try:
             client = HttpxLocalOpenAIClient(
                 base_url=base_url,
@@ -644,8 +404,16 @@ class LocalOpenAICompatibleLLMProvider:
             return True
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
+            primary_failure = record_probe_failure(exc, provider="local_llm")
             return False
         finally:
             if client is not None:
-                await client.close()
+                try:
+                    await client.close()
+                except Exception as exc:
+                    record_probe_cleanup_failure(
+                        exc, provider="local_llm", primary_failure=primary_failure
+                    )
+                    if primary_failure is None:
+                        raise

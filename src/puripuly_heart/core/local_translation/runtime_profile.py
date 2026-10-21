@@ -9,22 +9,25 @@ from typing import Literal
 
 from puripuly_heart.config.paths import user_config_dir
 from puripuly_heart.core.local_translation.assets import (
+    GEMMA_26B_MODEL_ID,
     GemmaModelSpec,
     e4b_gemma_spec,
 )
 from puripuly_heart.runtime_layout import current_runtime_layout
 
-LLAMA_CPP_BUILD = "b10423"
-LLAMA_CPP_COMMIT = "a94d563ed801d1da1b8c2432946de07d0231bb3d"
-LLAMA_CPP_CPU_ARCHIVE = "llama-b10423-bin-win-cpu-x64.zip"
-LLAMA_CPP_CPU_ARCHIVE_SIZE = 18_456_396
-LLAMA_CPP_CPU_ARCHIVE_SHA256 = "b5a396f113a344578c0766331704bd541fd743c4c8e92858bea18440ee0ab19a"
-LLAMA_CPP_VULKAN_ARCHIVE = "llama-b10423-bin-win-vulkan-x64.zip"
-LLAMA_CPP_VULKAN_ARCHIVE_SIZE = 34_563_676
-LLAMA_CPP_VULKAN_ARCHIVE_SHA256 = "510447fb021c80a264b2181c885b5f2ce9cc5b66c65d447cd1f9ce7ba81dc222"
-LLAMA_CPP_RUNTIME_DIRNAME = "llama.cpp-b10423"
+LLAMA_CPP_BUILD = "b11537"
+LLAMA_CPP_COMMIT = "8e2d31e0eb658d0382d3106a61369dff81f0c080"
+LLAMA_CPP_CPU_ARCHIVE = "llama-b11537-bin-win-cpu-x64.zip"
+LLAMA_CPP_CPU_ARCHIVE_SIZE = 19_513_247
+LLAMA_CPP_CPU_ARCHIVE_SHA256 = "a05c2d35ebe9787489277d6e039b391fd006384a6c49d069395f3a7b47186fd2"
+LLAMA_CPP_VULKAN_ARCHIVE = "llama-b11537-bin-win-vulkan-x64.zip"
+LLAMA_CPP_VULKAN_ARCHIVE_SIZE = 33_458_882
+LLAMA_CPP_VULKAN_ARCHIVE_SHA256 = "ae34d6a850c5d362cdfc0ef8f88f31fc499dab6df8853cec7887a32891aa5bbe"
+LLAMA_CPP_RUNTIME_DIRNAME = "llama.cpp-b11537"
 LLAMA_CPP_SOURCE_RELATIVE_DIR = Path("llama.cpp") / LLAMA_CPP_RUNTIME_DIRNAME
 MANAGED_GEMMA_MODEL_ALIAS = "puripuly-gemma-4-e4b-q4"
+MANAGED_GEMMA_26B_MODEL_ALIAS = "puripuly-gemma-4-26b-a4b-q4"
+GEMMA_RUNTIME_PROFILE_VERSION = "managed-gemma-v2"
 THREADS_PROFILE_FILENAME = "llama_cpp_threads.json"
 
 # Generalization rule from benchmark (Stage 10):
@@ -156,17 +159,22 @@ def build_gemma_server_command(
     slot_save_path: Path | None = None,
     spec: GemmaModelSpec | None = None,
 ) -> tuple[str, ...]:
-    if threads_profile is None:
-        threads_profile = load_or_detect_thread_profile()
     resolved_spec = spec or e4b_gemma_spec()
+    is_26b = resolved_spec.model_id == GEMMA_26B_MODEL_ID
+    if backend not in {"cpu", "gpu"}:
+        raise ValueError("managed Gemma backend must be cpu or gpu")
+    if is_26b and backend != "gpu":
+        raise ValueError("Gemma 4 26B requires a working Vulkan GPU; select E4B for CPU inference")
+    if backend == "cpu" and threads_profile is None:
+        threads_profile = load_or_detect_thread_profile()
     common = (
         str(executable),
         "--model",
         str(install_dir / resolved_spec.model_filename),
         "--alias",
-        MANAGED_GEMMA_MODEL_ALIAS,
+        MANAGED_GEMMA_26B_MODEL_ALIAS if is_26b else MANAGED_GEMMA_MODEL_ALIAS,
         "--load-mode",
-        "mmap",
+        "none" if is_26b else "mmap",
         "--ctx-size",
         "4608",
         "--parallel",
@@ -212,7 +220,20 @@ def build_gemma_server_command(
             "--flash-attn",
             "on",
         )
+        if is_26b:
+            command += (
+                "--n-cpu-moe",
+                "22",
+                "--moe-cache-mib",
+                "2132",
+                "--swa-full",
+                "--cache-ram",
+                "0",
+                "--fit",
+                "off",
+            )
     else:
+        assert threads_profile is not None
         command = common + (
             "--threads",
             str(threads_profile.threads),
@@ -254,6 +275,8 @@ def build_gemma_server_command(
 
 
 __all__ = [
+    "GEMMA_RUNTIME_PROFILE_VERSION",
+    "MANAGED_GEMMA_26B_MODEL_ALIAS",
     "EffectiveGemmaBackend",
     "GemmaBackend",
     "GemmaRuntimePaths",

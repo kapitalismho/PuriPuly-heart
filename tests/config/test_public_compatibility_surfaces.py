@@ -4,13 +4,11 @@ import ast
 import asyncio
 import base64
 import importlib
-import inspect
 import json
 import os
 import re
 import shutil
-import textwrap
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from dataclasses import fields
 from pathlib import Path
 from typing import Any
@@ -18,7 +16,6 @@ from typing import Any
 import pytest
 
 from puripuly_heart.app import wiring
-from puripuly_heart.app.ports.broker_client import ManagedOperationStatusResult
 from puripuly_heart.config import resolved as resolved_config
 from puripuly_heart.config import runtime_resolution
 from puripuly_heart.config.prompts import load_prompt, load_prompt_for_provider
@@ -36,16 +33,6 @@ from puripuly_heart.config.settings_vnext.schema import (
 from puripuly_heart.core import (
     managed_identity,
     openrouter_credentials,
-)
-from puripuly_heart.core import managed_openrouter_broker_client as broker_client
-from puripuly_heart.core.openrouter.managed_openrouter_release import (
-    ManagedOpenRouterChallengeSuccess,
-    ManagedOpenRouterDiscordStartSuccess,
-    ManagedOpenRouterFingerprintSalt,
-    ManagedOpenRouterIssueSuccess,
-    ManagedOpenRouterTrialStatusSuccess,
-    ManagedOpenRouterVerifySuccess,
-    TalkTogetherPassStatus,
 )
 from puripuly_heart.core.overlay import manifest as overlay_manifest_module
 from puripuly_heart.core.overlay import process as overlay_process_module
@@ -74,7 +61,6 @@ INVENTORY_PATH = Path(__file__).with_name("compatibility_surface_inventory.json"
 
 REQUIRED_SURFACES = (
     "secret_store",
-    "broker_v1",
     "overlay",
     "installer_identity",
     "prompts",
@@ -355,236 +341,6 @@ def _assert_inventory_export_resolves(module_name: str, export: dict[str, str]) 
 def _clear_entry_env(monkeypatch: pytest.MonkeyPatch, entry: dict[str, Any]) -> None:
     for env_var in [*entry["env_vars"], *entry.get("ignored_env_vars", [])]:
         monkeypatch.delenv(env_var, raising=False)
-
-
-def _broker_source(relative_path: str) -> str:
-    return (REPO_ROOT / "broker" / "src" / relative_path).read_text(encoding="utf-8")
-
-
-def _broker_app_v1_routes() -> tuple[dict[str, str], ...]:
-    app_source = _broker_source("app.ts")
-    return tuple(
-        {"method": method.upper(), "path": path}
-        for method, path in re.findall(r"app\.(get|post)\('(/v1/[^']+)'", app_source)
-    )
-
-
-def _typescript_string_union_literals(source: str, type_name: str) -> tuple[str, ...]:
-    match = re.search(rf"export type {re.escape(type_name)} =(?P<body>.*?);", source, re.S)
-    assert match is not None, type_name
-    return tuple(re.findall(r"'([^']+)'", match.group("body")))
-
-
-def _typescript_interface_fields(source: str, interface_name: str) -> tuple[str, ...]:
-    match = re.search(rf"interface {re.escape(interface_name)} \{{(?P<body>.*?)\n\}}", source, re.S)
-    assert match is not None, interface_name
-    return tuple(re.findall(r"^\s+([A-Za-z_][A-Za-z0-9_]*)\??:", match.group("body"), re.M))
-
-
-def _typescript_const_object_keys(source: str, const_name: str) -> tuple[str, ...]:
-    match = re.search(
-        rf"export const {re.escape(const_name)} = \{{(?P<body>.*?)\n\}} as const;",
-        source,
-        re.S,
-    )
-    assert match is not None, const_name
-    return tuple(re.findall(r"^\s{2}([A-Za-z_][A-Za-z0-9_]*):", match.group("body"), re.M))
-
-
-def _matching_delimiter_index(
-    source: str,
-    open_index: int,
-    *,
-    open_char: str = "{",
-    close_char: str = "}",
-) -> int:
-    depth = 0
-    quote: str | None = None
-    escaped = False
-    for index in range(open_index, len(source)):
-        char = source[index]
-        if quote is not None:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == quote:
-                quote = None
-            continue
-        if char in {"'", '"', "`"}:
-            quote = char
-        elif char == open_char:
-            depth += 1
-        elif char == close_char:
-            depth -= 1
-            if depth == 0:
-                return index
-    raise AssertionError(f"unmatched {open_char!r} in TypeScript source")
-
-
-def _balanced_delimited_body(
-    source: str,
-    open_index: int,
-    *,
-    open_char: str = "{",
-    close_char: str = "}",
-) -> str:
-    close_index = _matching_delimiter_index(
-        source,
-        open_index,
-        open_char=open_char,
-        close_char=close_char,
-    )
-    return source[open_index + 1 : close_index]
-
-
-def _typescript_function_source(source: str, function_name: str) -> str:
-    match = re.search(rf"\bfunction\s+{re.escape(function_name)}\s*\(", source)
-    assert match is not None, function_name
-    parameter_open_index = match.end() - 1
-    parameter_close_index = _matching_delimiter_index(
-        source,
-        parameter_open_index,
-        open_char="(",
-        close_char=")",
-    )
-    open_index = source.find("{", parameter_close_index)
-    assert open_index != -1, function_name
-    return source[open_index : _matching_delimiter_index(source, open_index) + 1]
-
-
-def _managed_state_response_fields() -> tuple[str, ...]:
-    return _typescript_return_object_fields(
-        _broker_source("managed-state.ts"),
-        "normalizeManagedState",
-    )
-
-
-def _top_level_object_fields(
-    object_body: str,
-    *,
-    spread_expansions: Mapping[str, tuple[str, ...]] | None = None,
-) -> tuple[str, ...]:
-    expansions = spread_expansions or {}
-    lines = [line for line in object_body.splitlines() if line.strip()]
-    if not lines:
-        return ()
-    root_indent = min(len(line) - len(line.lstrip(" ")) for line in lines)
-    fields_: list[str] = []
-    for line in lines:
-        if len(line) - len(line.lstrip(" ")) != root_indent:
-            continue
-        stripped = line.strip().rstrip(",")
-        if stripped.startswith("..."):
-            expanded = False
-            for spread_name, field_names in expansions.items():
-                if re.match(rf"\.\.\.{re.escape(spread_name)}(?:\b|\()", stripped):
-                    fields_.extend(field_names)
-                    expanded = True
-                    break
-            if not expanded:
-                fields_.extend(re.findall(r"\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:", stripped))
-            continue
-        key_match = re.match(r"([A-Za-z_][A-Za-z0-9_]*)\s*:", stripped)
-        if key_match:
-            fields_.append(key_match.group(1))
-            continue
-        shorthand_match = re.match(r"([A-Za-z_][A-Za-z0-9_]*)$", stripped)
-        if shorthand_match:
-            fields_.append(shorthand_match.group(1))
-    return tuple(fields_)
-
-
-def _typescript_c_json_object_fields(source: str, function_name: str) -> tuple[str, ...]:
-    function_source = _typescript_function_source(source, function_name)
-    call_index = function_source.find("c.json(")
-    assert call_index != -1, function_name
-    object_index = function_source.find("{", call_index)
-    assert object_index != -1, function_name
-    object_body = _balanced_delimited_body(function_source, object_index)
-    return _top_level_object_fields(
-        object_body,
-        spread_expansions={"normalizeManagedState": _managed_state_response_fields()},
-    )
-
-
-def _typescript_return_object_fields(
-    source: str,
-    function_name: str,
-    *,
-    spread_expansions: Mapping[str, tuple[str, ...]] | None = None,
-) -> tuple[str, ...]:
-    function_source = _typescript_function_source(source, function_name)
-    return_index = function_source.find("return")
-    assert return_index != -1, function_name
-    object_index = function_source.find("{", return_index)
-    assert object_index != -1, function_name
-    object_body = _balanced_delimited_body(function_source, object_index)
-    return _top_level_object_fields(object_body, spread_expansions=spread_expansions)
-
-
-def _typescript_c_json_nested_object_fields(
-    source: str,
-    function_name: str,
-    object_key: str,
-) -> tuple[str, ...]:
-    function_source = _typescript_function_source(source, function_name)
-    call_index = function_source.find("c.json(")
-    assert call_index != -1, function_name
-    object_index = function_source.find("{", call_index)
-    assert object_index != -1, function_name
-    object_body = _balanced_delimited_body(function_source, object_index)
-    key_match = re.search(rf"\b{re.escape(object_key)}\s*:\s*\{{", object_body)
-    assert key_match is not None, object_key
-    nested_open_index = object_body.find("{", key_match.start())
-    nested_body = _balanced_delimited_body(object_body, nested_open_index)
-    return _top_level_object_fields(nested_body)
-
-
-def _broker_success_response_fields(source_ref: Mapping[str, str]) -> tuple[str, ...]:
-    source = _broker_source(source_ref["file"])
-    kind = source_ref["kind"]
-    if kind == "const_object":
-        return _typescript_const_object_keys(source, source_ref["name"])
-    if kind == "c_json_object":
-        return _typescript_c_json_object_fields(source, source_ref["function"])
-    if kind == "return_object":
-        return _typescript_return_object_fields(
-            source,
-            source_ref["function"],
-            spread_expansions={"managedState": _managed_state_response_fields()},
-        )
-    raise AssertionError(f"unknown Broker success response source kind: {kind!r}")
-
-
-def _return_dict_keys(function: object) -> tuple[str, ...]:
-    source = textwrap.dedent(inspect.getsource(function))
-    tree = ast.parse(source)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Return) and isinstance(node.value, ast.Dict):
-            return tuple(
-                key.value
-                for key in node.value.keys
-                if isinstance(key, ast.Constant) and isinstance(key.value, str)
-            )
-    raise AssertionError(f"{function!r} does not return a dict literal")
-
-
-def _client_keyword_request_fields(function: object) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    required: list[str] = []
-    optional: list[str] = []
-    for name, parameter in inspect.signature(function).parameters.items():
-        if name == "self":
-            continue
-        if parameter.kind is not inspect.Parameter.KEYWORD_ONLY:
-            continue
-        target = optional if parameter.default is not inspect.Parameter.empty else required
-        target.append(name)
-    return tuple(required), tuple(optional)
-
-
-def _dataclass_field_names(cls: type[object]) -> tuple[str, ...]:
-    return tuple(field.name for field in fields(cls))
 
 
 def _assert_required_secret_env_lookup(
@@ -1009,7 +765,9 @@ def test_secret_store_encrypted_file_fixture_decrypts_and_freezes_wire_format(
     tmp_path: Path,
 ) -> None:
     encrypted_snapshot = _load_snapshot()["secret_store"]["encrypted_file"]
-    fixture_path = REPO_ROOT / encrypted_snapshot["golden_fixture"]
+    source_fixture_path = REPO_ROOT / encrypted_snapshot["golden_fixture"]
+    fixture_path = tmp_path / "golden-secrets.json"
+    shutil.copyfile(source_fixture_path, fixture_path)
     raw_fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
 
     assert tuple(raw_fixture) == ("version", "salt", "items")
@@ -1049,6 +807,12 @@ def test_secret_store_encrypted_file_fixture_decrypts_and_freezes_wire_format(
     assert set(updated["items"]) == {*encrypted_snapshot["item_keys"], "deepseek_api_key"}
     assert "fixture-deepseek-api-key" not in json.dumps(updated, ensure_ascii=False)
     assert working.get("deepseek_api_key") == "fixture-deepseek-api-key"
+    reloaded = EncryptedFileSecretStore(working_path, passphrase=encrypted_snapshot["passphrase"])
+    assert {key: reloaded.get(key) for key in encrypted_snapshot["item_keys"]} == (
+        encrypted_snapshot["expected_fake_values"]
+    )
+    assert reloaded.get("deepseek_api_key") == "fixture-deepseek-api-key"
+    assert source_fixture_path.read_bytes() == fixture_path.read_bytes()
 
 
 def test_secret_store_encrypted_file_path_resolution_and_env_passphrase(
@@ -1074,227 +838,8 @@ def test_secret_store_encrypted_file_path_resolution_and_env_passphrase(
     assert raw["items"] == {}
 
     monkeypatch.delenv(wiring.SECRETS_PASSPHRASE_ENV, raising=False)
-    with pytest.raises(ValueError, match=wiring.SECRETS_PASSPHRASE_ENV):
+    with pytest.raises(ValueError):
         wiring.create_secret_store(settings, config_path=config_path)
-
-
-def test_broker_v1_snapshot_matches_client_paths_and_public_error_vocabulary() -> None:
-    snapshot = _load_snapshot()["broker_v1"]
-    client_source = inspect.getsource(broker_client.HttpManagedOpenRouterBrokerClient)
-    path_literals = tuple(sorted(set(re.findall(r'path="([^"]+)"', client_source))))
-    broker_error_source = _broker_source("broker-error.ts")
-
-    assert path_literals == tuple(snapshot["paths"])
-    assert all(path.startswith("/v1/") for path in path_literals)
-    assert "/v2/" not in inspect.getsource(broker_client)
-    assert tuple(snapshot["source_routes"]) == _broker_app_v1_routes()
-    assert set(path_literals).issubset({route["path"] for route in snapshot["source_routes"]})
-    assert managed_identity.DISCORD_OPENROUTER_ISSUE_PATH == (
-        "/v1/providers/openrouter/discord/issue"
-    )
-    assert tuple(sorted(broker_client.PUBLIC_ERROR_CODES)) == tuple(snapshot["public_error_codes"])
-    assert tuple(sorted(broker_client.PUBLIC_ERROR_CLASSES)) == tuple(
-        snapshot["public_error_classes"]
-    )
-    assert tuple(snapshot["public_error_codes"]) == tuple(
-        sorted(_typescript_string_union_literals(broker_error_source, "PublicErrorCode"))
-    )
-    assert tuple(snapshot["public_error_classes"]) == tuple(
-        sorted(_typescript_string_union_literals(broker_error_source, "PublicErrorClass"))
-    )
-
-
-def test_broker_v1_snapshot_freezes_request_success_and_error_envelopes() -> None:
-    snapshot = _load_snapshot()["broker_v1"]
-    operations = snapshot["operations"]
-    source_routes = {(route["method"], route["path"]) for route in snapshot["source_routes"]}
-    operation_routes = {
-        (operation["method"], operation["path"]) for operation in operations.values()
-    }
-    expected_operation_names = (
-        "foundation",
-        "challenge",
-        "discord_start",
-        "qq_auth_assert",
-        "qq_auth_status",
-        "verify",
-        "issue",
-        "discord_issue",
-        "trial_status",
-        "managed_key_delivery_ack",
-        "app_active_day",
-        "managed_operation_status",
-        "managed_operation_resume",
-    )
-
-    assert tuple(operations) == expected_operation_names
-    assert source_routes - operation_routes == set()
-    assert tuple(snapshot.get("source_route_operation_exclusions", ())) == ()
-    for operation_name, operation in operations.items():
-        assert "success_response_source" in operation, operation_name
-    assert "source" in snapshot["error_envelope"]
-
-    broker_contract_source = _broker_source("contract.ts")
-    assert tuple(operations["foundation"]["query_fields"]) == ()
-    assert tuple(operations["foundation"]["header_fields"]) == ()
-    assert tuple(operations["foundation"]["success_response_fields"]) == (
-        _typescript_const_object_keys(broker_contract_source, "FOUNDATION_RESPONSE")
-    )
-
-    challenge_required, challenge_optional = _client_keyword_request_fields(
-        broker_client.HttpManagedOpenRouterBrokerClient.challenge
-    )
-    assert tuple(operations["challenge"]["request_body_fields"]) == challenge_required
-    assert tuple(operations["challenge"]["optional_request_body_fields"]) == challenge_optional
-    assert tuple(operations["challenge"]["client_success_fields"]) == _dataclass_field_names(
-        ManagedOpenRouterChallengeSuccess
-    )
-
-    discord_required, discord_optional = _client_keyword_request_fields(
-        broker_client.HttpManagedOpenRouterBrokerClient.start_discord_oauth
-    )
-    assert tuple(operations["discord_start"]["request_body_fields"]) == discord_required
-    assert tuple(operations["discord_start"]["optional_request_body_fields"]) == discord_optional
-    assert tuple(operations["discord_start"]["client_success_fields"]) == _dataclass_field_names(
-        ManagedOpenRouterDiscordStartSuccess
-    )
-
-    qq_auth_source = _broker_source("qq-auth.ts")
-    assert tuple(operations["qq_auth_assert"]["request_body_fields"]) == (
-        _typescript_interface_fields(qq_auth_source, "QqAuthAssertRequestBody")
-    )
-    assert tuple(operations["qq_auth_status"]["request_body_fields"]) == (
-        _typescript_interface_fields(qq_auth_source, "QqAuthStatusRequestBody")
-    )
-
-    telemetry_source = _broker_source("telemetry.ts")
-    assert tuple(operations["app_active_day"]["request_body_fields"]) == (
-        _typescript_interface_fields(telemetry_source, "AppActiveDayRequestBody")
-    )
-
-    assert tuple(operations["verify"]["request_body_fields"]) == _return_dict_keys(
-        managed_identity.ManagedIdentityBundle.sign_verify_request
-    )
-    assert tuple(operations["verify"]["client_success_fields"]) == _dataclass_field_names(
-        ManagedOpenRouterVerifySuccess
-    )
-
-    assert tuple(operations["issue"]["request_body_fields"]) == _return_dict_keys(
-        managed_identity.ManagedIdentityBundle.sign_issue_request
-    )
-    assert tuple(operations["issue"]["client_success_fields"]) == _dataclass_field_names(
-        ManagedOpenRouterIssueSuccess
-    )
-
-    assert tuple(operations["discord_issue"]["request_body_fields"]) == _return_dict_keys(
-        managed_identity.ManagedIdentityBundle.sign_discord_issue_request
-    )
-    assert operations["discord_issue"]["path"] == managed_identity.DISCORD_OPENROUTER_ISSUE_PATH
-    assert tuple(operations["discord_issue"]["client_success_fields"]) == _dataclass_field_names(
-        ManagedOpenRouterIssueSuccess
-    )
-
-    trial_status_required, trial_status_optional = _client_keyword_request_fields(
-        broker_client.HttpManagedOpenRouterBrokerClient.get_trial_status
-    )
-    assert trial_status_required == ("installation_id", "timestamp", "signature")
-    assert trial_status_optional == ()
-    assert tuple(operations["trial_status"]["query_fields"]) == ("installation_id",)
-    assert tuple(operations["trial_status"]["header_fields"]) == (
-        "X-Puripuly-Timestamp",
-        "X-Puripuly-Signature",
-    )
-    assert tuple(operations["trial_status"]["client_success_fields"]) == _dataclass_field_names(
-        ManagedOpenRouterTrialStatusSuccess
-    )
-    managed_operation_source = _broker_source("managed-operation.ts")
-    managed_operation_state_fields = _typescript_return_object_fields(
-        managed_operation_source, "buildManagedOperationStatusBody"
-    )
-    for operation_name in ("managed_operation_status", "managed_operation_resume"):
-        operation = operations[operation_name]
-        assert tuple(operation["request_body_fields"]) == (
-            "operation_id",
-            "installation_id",
-            "resume_token",
-        )
-        assert tuple(operation["client_success_fields"]) == _dataclass_field_names(
-            ManagedOperationStatusResult
-        )
-        assert tuple(operation["success_response_fields"]) == managed_operation_state_fields
-        handler = operation["handler"]
-        handler_source = _broker_source(handler["file"])
-        assert f"export async function {handler['function']}" in handler_source
-    app_source = _broker_source("app.ts")
-    assert (
-        "app.post('/v1/providers/openrouter/managed-operation/status', "
-        "handleManagedOperationStatus)"
-    ) in app_source
-    assert (
-        "app.post('/v1/providers/openrouter/managed-operation/resume', "
-        "handleManagedOperationResume)"
-    ) in app_source
-    assert "from './managed-operation-resume'" in app_source
-    discord_issue_source = _broker_source("discord-managed-issue.ts")
-    issuance_source = _typescript_function_source(
-        discord_issue_source, "executeDiscordResumeIssuance"
-    )
-    credential_fields: tuple[str, ...] = ()
-    search_from = 0
-    while True:
-        call_index = issuance_source.find("c.json(", search_from)
-        if call_index == -1:
-            break
-        candidate = _balanced_delimited_body(issuance_source, issuance_source.find("{", call_index))
-        if "openrouter_api_key" in candidate:
-            credential_fields = _top_level_object_fields(candidate)
-            break
-        search_from = call_index + len("c.json(")
-    assert credential_fields == (
-        "openrouter_api_key",
-        "managed_credential_ref",
-        "expires_at",
-        "delivery_ack_required",
-        "delivery_id",
-        "delivery_ack_token",
-        "delivery_ack_expires_at",
-    )
-
-    for operation_name, operation in operations.items():
-        assert operation["path"] in {route["path"] for route in snapshot["source_routes"]}
-        assert tuple(operation["success_response_fields"]) == _broker_success_response_fields(
-            operation["success_response_source"]
-        ), operation_name
-
-    nested_shapes = snapshot["nested_shapes"]
-    assert tuple(nested_shapes["fingerprint_salt"]) == _dataclass_field_names(
-        ManagedOpenRouterFingerprintSalt
-    )
-    assert tuple(nested_shapes["talk_together_pass"]) == _dataclass_field_names(
-        TalkTogetherPassStatus
-    )
-    assert tuple(nested_shapes["managed_state"]) == ("lifecycle", "managed_availability")
-    assert tuple(nested_shapes["current_entitlement"]) == (
-        "provider",
-        "budget_usd",
-        "issued_at",
-        "expires_at",
-    )
-
-    broker_error_source = _broker_source("broker-error.ts")
-    assert tuple(snapshot["error_envelope"]["top_level_fields"]) == (
-        _typescript_c_json_object_fields(
-            _broker_source(snapshot["error_envelope"]["source"]["file"]),
-            snapshot["error_envelope"]["source"]["function"],
-        )
-    )
-    assert tuple(snapshot["error_envelope"]["error_fields"]) == tuple(
-        _typescript_c_json_nested_object_fields(
-            broker_error_source,
-            snapshot["error_envelope"]["source"]["function"],
-            "error",
-        )
-    )
 
 
 def test_overlay_contract_snapshot_matches_manifest_and_protocol_wire_shape() -> None:

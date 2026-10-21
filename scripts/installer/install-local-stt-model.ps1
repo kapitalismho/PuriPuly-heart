@@ -7,7 +7,7 @@ param(
     [string]$AppDataRoot,
 
     [Parameter(Mandatory = $true)]
-    [ValidateSet("huggingface", "modelscope")]
+    [ValidateSet("huggingface", "modelscope", "hf_mirror")]
     [string]$SelectedSource,
 
     [switch]$Reinstall
@@ -341,18 +341,32 @@ function Download-SourceIntoStaging {
 
         $remotePath = Resolve-AssetRemotePath -Asset $asset -SourceName $SourceName
         $downloadUrl = ([string](Get-NamedPropertyValue -InputObject $source -Name "download_url_template")).Replace("{path}", $remotePath)
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $assetPath -UseBasicParsing
+        try {
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $assetPath -UseBasicParsing
+        } catch {
+            $exception = $_.Exception
+            $exceptionType = $exception.GetType().FullName
+            $transferFailed = (
+                ($exception -is [System.Net.WebException] -and $exception.Status -ne [System.Net.WebExceptionStatus]::RequestCanceled) -or
+                $exceptionType -eq "System.Net.Http.HttpRequestException" -or
+                $exceptionType -eq "Microsoft.PowerShell.Commands.HttpResponseException"
+            )
+            if (-not $transferFailed) {
+                throw
+            }
+            throw [System.IO.InvalidDataException]::new("download failed for required model file: $($asset.relative_path)", $exception)
+        }
 
         $downloadHash = Get-Sha256Hex -Path $assetPath
         if ($downloadHash -ne ([string]$asset.sha256).ToLowerInvariant()) {
-            throw "checksum mismatch for required model file: $($asset.relative_path)"
+            throw [System.IO.InvalidDataException]::new("checksum mismatch for required model file: $($asset.relative_path)")
         }
 
         $sizeProperty = $asset.PSObject.Properties["size_bytes"]
         if ($null -ne $sizeProperty -and $null -ne $sizeProperty.Value) {
             $downloadSize = (Get-Item -LiteralPath $assetPath).Length
             if ([int64]$downloadSize -ne [int64]$sizeProperty.Value) {
-                throw "size mismatch for required model file: $($asset.relative_path)"
+                throw [System.IO.InvalidDataException]::new("size mismatch for required model file: $($asset.relative_path)")
             }
         }
     }
@@ -443,11 +457,15 @@ function Install-LocalSttModel {
         }
 
         try {
-            Download-SourceIntoStaging -Manifest $Manifest -SourceName $sourceName -StagingDir $stagingDir
+            try {
+                Download-SourceIntoStaging -Manifest $Manifest -SourceName $sourceName -StagingDir $stagingDir
+            } catch [System.IO.InvalidDataException] {
+                $failures.Add(("{0}: {1}" -f $sourceName, $_.Exception.Message))
+                continue
+            }
             Promote-StagingInstall -StagingDir $stagingDir -InstallDir $installDir
             return
-        } catch {
-            $failures.Add(("{0}: {1}" -f $sourceName, $_.Exception.Message))
+        } finally {
             if (Test-Path -LiteralPath $stagingDir) {
                 Remove-Item -LiteralPath $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
             }

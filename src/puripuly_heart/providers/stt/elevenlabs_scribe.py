@@ -7,10 +7,11 @@ import base64
 import contextlib
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Callable, Sequence
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
@@ -24,6 +25,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTSessionProjection,
 )
+from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
@@ -79,17 +81,6 @@ def scribe_keyterms(terms: Sequence[str]) -> tuple[str, ...]:
     return tuple(normalized)
 
 
-def _scribe_verify_event_detail(data: Any) -> str:
-    if isinstance(data, dict):
-        name = str(data.get("message_type") or data.get("type") or "error")
-        extra = data.get("error") or data.get("message") or ""
-    else:
-        name = str(getattr(data, "type", "") or "error")
-        extra = str(getattr(data, "error", "") or getattr(data, "message", "") or "")
-    extra_text = str(extra).strip()
-    return name if not extra_text else f"{name}: {extra_text}"
-
-
 async def verify_scribe_realtime_connection(
     api_key: str,
     *,
@@ -121,7 +112,7 @@ async def verify_scribe_realtime_connection(
         outcomes.put_nowait("started")
 
     def _on_error(data: Any) -> None:
-        outcomes.put_nowait(("error", _scribe_verify_event_detail(data)))
+        outcomes.put_nowait(("error", data))
 
     def _on_closed() -> None:
         outcomes.put_nowait(("closed",))
@@ -147,9 +138,10 @@ async def verify_scribe_realtime_connection(
             "Scribe realtime verification timed out while connecting "
             f"after {connect_timeout_s:.0f}s"
         ) from exc
-    except Exception as exc:
-        raise Exception(f"Scribe realtime verification connection failed: {exc}") from exc
+    except Exception:
+        raise
     try:
+        primary_failure = None
         connection.on(RealtimeEvents.SESSION_STARTED, _on_started)
         connection.on(RealtimeEvents.ERROR, _on_error)
         connection.on(RealtimeEvents.CLOSE, _on_closed)
@@ -166,15 +158,70 @@ async def verify_scribe_realtime_connection(
             raise Exception(
                 "Scribe realtime verification failed: connection closed before session start"
             )
-        detail = str(outcome[1])
-        if "auth" in detail.lower():
-            raise Exception(f"unauthorized: Scribe rejected the API key ({detail})")
-        raise Exception(f"Scribe realtime verification failed ({detail})")
+        data = outcome[1]
+        event_type = (
+            data.get("message_type") or data.get("type") if isinstance(data, dict) else None
+        )
+        reason = {
+            "auth_error": "scribe_auth_error",
+            "quota_exceeded": "scribe_quota_exceeded",
+            "rate_limited": "scribe_rate_limited",
+        }.get(event_type, "scribe_error")
+        failure = RuntimeError("Scribe realtime verification failed")
+        failure.failure_diagnostics = recognition_failure_diagnostics(
+            None,
+            provider="elevenlabs_scribe",
+            channel=None,
+            operation="probe",
+            reason=reason,
+        )
+        primary_failure = failure.failure_diagnostics
+        raise failure
+    except Exception as exc:
+        primary_failure = recognition_failure_diagnostics(
+            exc,
+            provider="elevenlabs_scribe",
+            channel=None,
+            operation="probe",
+            reason="provider_not_ready",
+        )
+        primary_failure = replace(
+            primary_failure,
+            **current_diagnostic_operation(),
+            fields={
+                **primary_failure.fields,
+                "verification_scope": "key_probe",
+                "recognition_readiness": "unobserved",
+            },
+        )
+        exc.failure_diagnostics = primary_failure
+        emit_failure(logger, primary_failure, stage="probe")
+        raise
     finally:
-        with contextlib.suppress(Exception):
+        try:
             result = connection.close()
             if asyncio.iscoroutine(result):
                 await result
+        except Exception as exc:
+            diagnostics = recognition_failure_diagnostics(
+                exc,
+                provider="elevenlabs_scribe",
+                channel=None,
+                operation="cleanup",
+                reason="provider_cleanup_failed",
+            )
+            emit_failure(
+                logger,
+                replace(
+                    diagnostics,
+                    **current_diagnostic_operation(),
+                    cause_id=primary_failure.diagnostic_id if primary_failure else None,
+                    fields={**diagnostics.fields, "cleanup_confirmed": False},
+                ),
+                severity="warning",
+                disposition="degraded",
+                stage="cleanup",
+            )
 
 
 def scribe_language_code(source_language: str | None) -> str | None:
@@ -503,9 +550,19 @@ class _ElevenLabsScribeSession(STTBackendSession):
         self._commit_write_in_flight = False
         self._pending_committed = None
 
-    def _scoped_transport_failure(self, reason: str, *, orderly: bool) -> None:
+    def _scoped_transport_failure(
+        self, reason: str, *, orderly: bool, exception: BaseException | None = None
+    ) -> None:
         identity = self._event_projection.active_identity
         provider_turn_id = identity.provider_turn_id if identity is not None else None
+        diagnostics = recognition_failure_diagnostics(
+            exception,
+            provider="elevenlabs_scribe",
+            channel=self._event_projection.channel or "unknown",
+            operation="receive",
+            reason=reason,
+            identity=identity,
+        )
         if identity is not None:
             self._event_projection.terminal(
                 STTProviderTurnTerminal(
@@ -515,6 +572,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
                     failure_reason=reason,
                     epoch_disposition="retire",
                     provenance=tuple(self._scoped_provenance),
+                    failure_diagnostics=diagnostics,
                 )
             )
             self._clear_scoped_turn()
@@ -522,6 +580,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
             orderly=orderly,
             reason=reason,
             provider_turn_id=provider_turn_id,
+            failure_diagnostics=diagnostics,
         )
 
     async def _drain_connection_events(self) -> None:
@@ -551,8 +610,10 @@ class _ElevenLabsScribeSession(STTBackendSession):
                     continue
                 try:
                     await self._connection.send({"audio_base_64": ""})
-                except Exception:
-                    self._scoped_transport_failure("scribe_keepalive_failed", orderly=False)
+                except Exception as exc:
+                    self._scoped_transport_failure(
+                        "scribe_keepalive_failed", orderly=False, exception=exc
+                    )
                     self._end_connection_stream()
                     return
                 self._last_send_at = time.monotonic()
@@ -581,8 +642,8 @@ class _ElevenLabsScribeSession(STTBackendSession):
             raise RuntimeError("Scribe session is closed")
         try:
             await connection.send({"audio_base_64": base64.b64encode(pcm16le).decode("ascii")})
-        except Exception:
-            self._scoped_transport_failure("scribe_write_failed", orderly=False)
+        except Exception as exc:
+            self._scoped_transport_failure("scribe_write_failed", orderly=False, exception=exc)
             self._end_connection_stream()
             raise
         if (
@@ -612,8 +673,8 @@ class _ElevenLabsScribeSession(STTBackendSession):
         self._commit_write_in_flight = True
         try:
             await connection.commit()
-        except Exception:
-            self._scoped_transport_failure("scribe_commit_failed", orderly=False)
+        except Exception as exc:
+            self._scoped_transport_failure("scribe_commit_failed", orderly=False, exception=exc)
             self._end_connection_stream()
             raise
         if (
@@ -660,7 +721,8 @@ class _ElevenLabsScribeSession(STTBackendSession):
             await self._connection.send(
                 {"audio_base_64": base64.b64encode(pcm16le).decode("ascii")}
             )
-        except Exception:
+        except Exception as exc:
+            self._scoped_transport_failure("scribe_write_failed", orderly=False, exception=exc)
             self._end_connection_stream()
             return
         self._last_send_at = time.monotonic()
@@ -677,7 +739,8 @@ class _ElevenLabsScribeSession(STTBackendSession):
             return
         try:
             await self._connection.commit()
-        except Exception:
+        except Exception as exc:
+            self._scoped_transport_failure("scribe_commit_failed", orderly=False, exception=exc)
             self._end_connection_stream()
             return
 

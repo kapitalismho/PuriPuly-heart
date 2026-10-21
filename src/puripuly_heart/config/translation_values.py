@@ -4,6 +4,7 @@ from enum import Enum
 
 
 class TranslationModel(str, Enum):
+    INDEX_TRANSLATE_35B = "index_translate_35b"
     GEMMA4_26B_31B = "gemma4_26b_31b"
     DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
     DEEPSEEK_V4_FLASH_41 = "deepseek_v4_flash_41"
@@ -11,11 +12,16 @@ class TranslationModel(str, Enum):
     GPT_6_LUNA = "gpt_6_luna"
     QWEN_38_FLASH = "qwen38_flash"
     MANAGED_GEMMA = "managed_gemma"
+    MANAGED_GEMMA_26B = "managed_gemma_26b"
     LOCAL_LLM = "local_llm"
     CUSTOM_HTTP = "custom_http"
 
 
+MANAGED_GEMMA_MODELS = (TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_26B)
+
+
 class TranslationConnection(str, Enum):
+    PUBLIC_API = "public_api"
     MANAGED = "managed"
     MANAGED_CHINA = "managed_china"
     CHATGPT = "chatgpt"
@@ -31,6 +37,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[
     TranslationModel,
     tuple[TranslationConnection, ...],
 ] = {
+    TranslationModel.INDEX_TRANSLATE_35B: (TranslationConnection.PUBLIC_API,),
     TranslationModel.GEMMA4_26B_31B: (
         TranslationConnection.MANAGED,
         TranslationConnection.OPENROUTER,
@@ -56,6 +63,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[
         TranslationConnection.CPU,
         TranslationConnection.GPU,
     ),
+    TranslationModel.MANAGED_GEMMA_26B: (TranslationConnection.GPU,),
     TranslationModel.LOCAL_LLM: (TranslationConnection.OLLAMA,),
     TranslationModel.CUSTOM_HTTP: (TranslationConnection.CUSTOM_HTTP,),
 }
@@ -87,7 +95,9 @@ def default_translation_connection(model: TranslationModel) -> TranslationConnec
 
 
 def provider_llm_for_translation(model: str, connection: str) -> str:
-    if model == TranslationModel.MANAGED_GEMMA:
+    if model == "index_translate_35b":
+        return "index_translate"
+    if model in MANAGED_GEMMA_MODELS:
         return "managed_gemma"
     if model == "local_llm":
         return "local_llm"
@@ -107,6 +117,7 @@ def provider_llm_for_translation(model: str, connection: str) -> str:
 
 
 __all__ = [
+    "MANAGED_GEMMA_MODELS",
     "TRANSLATION_CONNECTIONS_BY_MODEL",
     "TRANSLATION_CONNECTION_PRIORITY",
     "TranslationConnection",

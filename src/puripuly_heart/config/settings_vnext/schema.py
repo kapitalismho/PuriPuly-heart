@@ -20,7 +20,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 51
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 53
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -332,6 +332,12 @@ class TranslationIntent:
     gpu_device_id: str = "auto"
 
     def __post_init__(self) -> None:
+        if self.model == "managed_gemma_26b":
+            object.__setattr__(self, "connection", "gpu")
+        history = dict(self.connection_history)
+        if "managed_gemma_26b" in history:
+            history["managed_gemma_26b"] = "gpu"
+        object.__setattr__(self, "connection_history", history)
         device_id = self.gpu_device_id if isinstance(self.gpu_device_id, str) else "auto"
         object.__setattr__(self, "gpu_device_id", device_id.strip() or "auto")
 
@@ -880,8 +886,6 @@ class ManagedConnectionState:
     active_managed_credential_ref: str | None = None
     active_managed_expires_at: str | None = None
     founder_letter_seen_credential_ref: str | None = None
-    referral_id: str | None = None
-    referral_source: str | None = None
     local_managed_claim_sources: tuple[str, ...] = ()
     pending_delivery_ack_source: str | None = None
     pending_delivery_ack_delivery_id: str | None = None
@@ -893,12 +897,6 @@ class ManagedConnectionState:
     pending_managed_operation_state: str | None = None
 
     def __post_init__(self) -> None:
-        referral_source = _normalize_optional_state_text(self.referral_source)
-        if referral_source not in {"discord", "qq"}:
-            referral_source = (
-                "discord" if _normalize_optional_state_text(self.referral_id) is not None else None
-            )
-        object.__setattr__(self, "referral_source", referral_source)
         source = _normalize_optional_state_text(self.pending_delivery_ack_source)
         if source not in MANAGED_KEY_DELIVERY_ACK_SOURCES:
             source = None

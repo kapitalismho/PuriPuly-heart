@@ -31,9 +31,9 @@ class RecordingChatbox:
     def process_due(self) -> None:
         return
 
-    def send_immediate(self, text: str) -> bool:
+    def send_immediate(self, text: str) -> tuple[bool, None]:
         _ = text
-        return True
+        return True, None
 
 
 @dataclass(slots=True)
@@ -195,7 +195,7 @@ async def test_production_projection_counts_aliased_source_once_for_legal_large_
     )
 
     await harness.start()
-    parent_id = await harness.self_owner.submit_text(source_text, source="You")
+    parent_id = (await harness.self_owner.submit_text(source_text, source="You")).turn_id
     await harness.translation_turns.wait_for_parent(parent_id)
 
     assert provider.calls == 1
@@ -222,7 +222,7 @@ async def test_production_projection_rejects_independent_equal_payload_copies_ab
     )
 
     await harness.start()
-    parent_id = await harness.self_owner.submit_text(source_text, source="You")
+    parent_id = (await harness.self_owner.submit_text(source_text, source="You")).turn_id
     await harness.translation_turns.wait_for_parent(parent_id)
 
     assert provider.calls == 1
@@ -247,7 +247,7 @@ async def test_production_projection_accepts_exact_one_mib_parent_and_close() ->
     )
 
     await harness.start()
-    parent_id = await harness.self_owner.submit_text(source_text, source="You")
+    parent_id = (await harness.self_owner.submit_text(source_text, source="You")).turn_id
     await harness.translation_turns.wait_for_parent(parent_id)
 
     assert len(chatbox.messages) == 1
@@ -271,7 +271,7 @@ async def test_caption_off_after_parent_admission_preserves_ui_chatbox_and_histo
     )
 
     await harness.start()
-    parent_id = await harness.self_owner.submit_text("caption boundary", source="You")
+    parent_id = (await harness.self_owner.submit_text("caption boundary", source="You")).turn_id
     await provider.started.wait()
     overlay_count_before_caption_off = len(overlay.events)
     await harness.output_projection.replace_overlay_sink(None)
@@ -304,7 +304,7 @@ async def test_talk_reset_preserves_inflight_manual_and_peer_state() -> None:
 
     await harness.start()
     harness.peer_runtime.remember_context("peer retained", timestamp=0)
-    manual_parent = await harness.self_owner.submit_text("manual", source="You")
+    manual_parent = (await harness.self_owner.submit_text("manual", source="You")).turn_id
     await asyncio.wait_for(provider.started.wait(), timeout=1)
 
     await asyncio.wait_for(harness.self_owner.reset_provider_channel("self"), timeout=1)
@@ -335,7 +335,7 @@ async def test_listen_reset_clears_peer_state_without_retiring_self_parent() -> 
 
     await harness.start()
     harness.peer_runtime.remember_context("peer stale", timestamp=0)
-    self_parent = await harness.self_owner.submit_text("self retained", source="You")
+    self_parent = (await harness.self_owner.submit_text("self retained", source="You")).turn_id
     await asyncio.wait_for(provider.started.wait(), timeout=1)
 
     await asyncio.wait_for(harness.peer_owner.reset_provider_channel("peer"), timeout=1)
@@ -363,7 +363,7 @@ async def test_overlay_failure_does_not_rerun_translation_or_block_other_destina
     )
 
     await harness.start()
-    parent_id = await harness.self_owner.submit_text("failure isolation", source="You")
+    parent_id = (await harness.self_owner.submit_text("failure isolation", source="You")).turn_id
     await harness.translation_turns.wait_for_parent(parent_id)
 
     assert provider.calls == 1
@@ -388,7 +388,7 @@ async def test_translation_fixture_routes_manual_peer_and_system_output_through_
     )
 
     await harness.start()
-    manual_id = await harness.self_owner.submit_text("manual self text", source="You")
+    manual_id = (await harness.self_owner.submit_text("manual self text", source="You")).turn_id
     peer_id = await harness.handle_peer_transcript_final_for_test("peer-only text")
     await harness.output_runtime.wait_for_peer_output_idle()
     harness.output_projection.publish_system_disclosure("Peer translation is on")
@@ -532,12 +532,12 @@ async def test_translation_fixture_overlay_replacement_updates_only_owner_destin
         overlay_sink=first,
     )
     await harness.start()
-    first_id = await harness.self_owner.submit_text("first", source="You")
+    first_id = (await harness.self_owner.submit_text("first", source="You")).turn_id
 
     assert harness.output_runtime.overlay_sink is first
     assert [event.utterance_id for event in first.events] == [first_id, first_id]
     await harness.output_projection.replace_overlay_sink(second)
-    second_id = await harness.self_owner.submit_text("second", source="You")
+    second_id = (await harness.self_owner.submit_text("second", source="You")).turn_id
     second_event = harness.output_projection.overlay_event_adapter.utterance_closed(
         utterance_id=second_id,
         channel="self",
@@ -586,7 +586,7 @@ async def test_translation_fixture_overlay_replacement_awaits_old_delivery_befor
     await asyncio.wait_for(old.started.wait(), timeout=0.5)
     await harness.output_projection.replace_overlay_sink(replacement)
     await old_publication
-    new_id = await harness.self_owner.submit_text("new destination", source="You")
+    new_id = (await harness.self_owner.submit_text("new destination", source="You")).turn_id
 
     assert old.cancelled.is_set()
     assert not harness.output_runtime.has_active_overlay_deliveries
@@ -616,7 +616,7 @@ async def test_translation_fixture_restart_constructs_a_fresh_output_owner() -> 
     second_chatbox = RecordingChatbox()
     second = compose_translation_test_harness(stt=None, llm=None, osc=second_chatbox)
     await second.start(auto_flush_osc=True)
-    publication_id = await second.self_owner.submit_text("restart output", source="You")
+    publication_id = (await second.self_owner.submit_text("restart output", source="You")).turn_id
 
     assert first.output_runtime.state == "closed"
     assert first.output_runtime is not second.output_runtime

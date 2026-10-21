@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.8.2-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.9.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
   <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
@@ -104,7 +104,7 @@ It works in many environments, including VRChat and Discord.
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Gemma 4 E4B (Local)** | Unlimited | Unlimited | 5,000 | 7,260 |
+| **Index-Translate 35B A3B** | Unlimited | Unlimited | 5,000 | 7,260 |
 | **Gemma 4 26B A4B + 31B** | 13,940 | 13,940 | 3,680 | 4,770 |
 | **DeepSeek V4.1 Flash** | 16,800 | 16,800 | 3,860 | 5,070 |
 | **GPT 6 Luna** | 8,680 | 8,680 | 3,170 | 3,950 |
@@ -113,6 +113,7 @@ It works in many environments, including VRChat and Discord.
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
+| **Gemma 4 E4B & 26B (Local)** | Unlimited | Unlimited | 5,000 | 7,260 |
 | **DeepSeek V4 Flash (OpenRouter)** | 17,020 | 17,020 | 3,860 | 5,090 |
 | **Gemini 3.8 Flash** | 1,160 | 1,160 | 940 | 1,000 |
 | **Qwen 3.8 Flash** | 7,460 | 7,460 | 2,990 | 3,680 |
@@ -123,7 +124,7 @@ It works in many environments, including VRChat and Discord.
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Gemma 4 E4B (Local)** | $0 | $0 | ~$0.0002 | ~$0.00014 |
+| **Index-Translate 35B A3B** | $0 | $0 | ~$0.0002 | ~$0.00014 |
 | **Gemma 4 26B A4B + 31B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.00021 |
 | **DeepSeek V4.1 Flash** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.00020 |
 | **GPT 6 Luna** | ~$0.00012 | ~$0.00012 | ~$0.0003 | ~$0.00025 |
@@ -132,6 +133,7 @@ It works in many environments, including VRChat and Discord.
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
+| **Gemma 4 E4B & 26B (Local)** | $0 | $0 | ~$0.0002 | ~$0.00014 |
 | **DeepSeek V4 Flash (OpenRouter)** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.00020 |
 | **Gemini 3.8 Flash** | ~$0.0009 | ~$0.0009 | ~$0.0011 | ~$0.0010 |
 | **Qwen 3.8 Flash** | ~$0.0001 | ~$0.0001 | ~$0.0003 | ~$0.00027 |
@@ -142,7 +144,7 @@ It works in many environments, including VRChat and Discord.
 *   *DeepSeek V4.1 Flash assumes a 70% cache hit rate; V4 Flash (OpenRouter) assumes 60%.*
 *   *GPT 6 Luna uses OpenAI API pricing with no cache discount assumed; when connected through ChatGPT, it uses your Codex limits instead of API charges.*
 *   *Qwen API costs are based on the Beijing region.*
-*   *Pricing as of September 25, 2026.*
+*   *Pricing as of October 17, 2026.*
 
 ### Free Credits
 
@@ -171,12 +173,18 @@ GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Ar
 | Qwen3-ASR 1.7B | GPU | Q6_K |
 | OpenAI-compatible API | — | — |
 
+
 **LLM**
 
 | Model | Runtime | Quantization |
 |---|---|---|
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| Gemma 4 26B A4B IT QAT | GPU only (Vulkan) | UD Q4_K_XL |
 | OpenAI-compatible API | — | — |
+
+Managed Gemma weights download only when the selected model is needed; they are not bundled with the installer. The 26B download is approximately 14.25 GB. Model selection persists across restarts. E4B supports CPU with MTP or GPU; 26B requires a working Vulkan GPU and does not silently switch to CPU or E4B after a failure. Select another model/backend explicitly if the reported device or resource problem cannot be resolved.
+
+Self and Peer can translate concurrently on one managed GPU runtime, with at most two active requests. CPU translation remains serialized. The three retained language-pair prefix slots are separate from this active-request limit. See the [managed local translation contract](docs/cli.md#managed-local-translation) for model identities and fixed profiles.
 
 ---
 
@@ -187,7 +195,7 @@ GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Ar
 1. Download the latest version from the [Download page](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
 2. Install PuriPuly.
 3. Click the **TALK** button.
-4. Click the **TRANS** button, then authenticate via Discord.
+4. Click **TRANS**. New installations use Index without an API key; complete authentication or setup if prompted.
 5. Click the **CAPTIONS** button to turn on VR subtitles.
 6. (Optional) Click the **LISTEN** button to enable translation of the other person's voice.
 
@@ -196,6 +204,10 @@ GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Ar
 7. Enable OSC in VRChat: Action menu → Settings → OSC → Enable.
 
 For bidirectional control setup and the stable parameter ABI, see [VRChat OSC controls](docs/vrchat-osc.md).
+
+SELF translations can appear in the chatbox while a speech turn is still in progress and update as more speech arrives. The app marks previews separately from completed turns. See [progressive Self chatbox translations](docs/vrchat-osc.md#progressive-self-chatbox-translations) for correction, ordering, and pagination behavior.
+
+SELF overlay captions keep one caption per speech turn. On the merged speech route, the original appears at a speech-end boundary, when a translation completes, or when the source closes—not on every stable recognition update. Resumed speech grows that caption in place, keeping its previous same-turn translation until the new one arrives. Late translations update retained captions without taking focus from newer speech; expired or displaced captions are not revived. Chatbox progression and PEER captions keep their existing policies.
 
 ### If audio capture does not work
 If audio capture does not work, open **Settings > General** and follow these steps.
@@ -433,6 +445,8 @@ uv sync --frozen --extra dev
 ```powershell
 uv run python -m puripuly_heart.main run-gui
 ```
+
+The main-card input uses the source language's font and letter spacing independently of the UI language. Languages without extra letter spacing use zero tracking; the placeholder retains the UI language's typography.
 
 ### CLI
 

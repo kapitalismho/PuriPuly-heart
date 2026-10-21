@@ -9,7 +9,8 @@ use puripuly_heart_overlay::{
     CaptionPresentation, CaptionRenderer, DamageBand, FontFallbackReason, FontLanguageBucket,
     FontResolver, FontSource, FontWeight, OverlayPlacementPolicy, OverlayPresentationBlock,
     OverlayPresentationBlockVariant, OverlayPresentationCalibration, OverlayPresentationSnapshot,
-    OverlayState, PresentationBackend, ReadinessCancellation, ReadinessOutcome,
+    OverlayRuntime, OverlayState, PresentationBackend, ReadinessCancellation, ReadinessOutcome,
+    RenderedFrame,
 };
 fn assert_close(actual: f32, expected: f32) {
     assert!(
@@ -49,6 +50,151 @@ fn long_block(id: &str) -> CaptionBlock {
                 older blocks are dropped when the fixed overlay surface overflows "
         .repeat(24);
     CaptionBlock::new(id, text)
+}
+
+fn assert_calibrated_two_slot_frames_fit(renderer: CaptionRenderer) {
+    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
+    let mut previous_frame: Option<RenderedFrame> = None;
+    for (index, scale) in [0.8, 1.0, 1.2, 1.2, 1.0, 1.0].into_iter().enumerate() {
+        runtime.apply_snapshot(OverlayPresentationSnapshot {
+            revision: index as u64 + 1,
+            calibration: OverlayPresentationCalibration {
+                text_scale: scale,
+                ..Default::default()
+            },
+            blocks: ["self", "peer"]
+                .into_iter()
+                .enumerate()
+                .map(|(index, channel)| OverlayPresentationBlock {
+                    id: channel.into(),
+                    occupant_key: channel.into(),
+                    appearance_seq: index as u64,
+                    channel: channel.into(),
+                    primary_text: "first primary line\nsecond primary line".into(),
+                    secondary_text: "원문 source 日本語 中文".into(),
+                    secondary_enabled: true,
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        });
+        renderer.set_presentation(CaptionPresentation {
+            text_scale: scale,
+            ..Default::default()
+        });
+        let frame = renderer.render_blocks(runtime.caption_blocks()).unwrap();
+        assert_eq!(frame.width(), 4096);
+        assert_eq!(frame.height(), if scale > 1.0 { 1240 } else { 1056 });
+        if let Some(previous) = previous_frame.as_ref() {
+            assert_eq!(previous.width(), frame.width());
+        }
+        assert_eq!(runtime.state().calibration().text_scale, scale);
+        assert_eq!(frame.layout().visible_blocks.len(), 2);
+        for (index, block) in frame.layout().visible_blocks.iter().enumerate() {
+            assert_close(block.bounds.top_px, 40.0 + index as f32 * (468.0 * scale + 36.0));
+            assert_close(block.bounds.bottom_px - block.bounds.top_px, 468.0 * scale);
+            assert!(block.visual_bounds.top_px >= 0.0);
+            assert!(block.visual_bounds.bottom_px <= frame.height() as f32);
+            assert_eq!(block.primary_lines.len(), 2);
+            for (line_index, line) in block.primary_lines.iter().enumerate() {
+                assert_close(line.font_size_px, 132.0 * scale);
+                assert_close(
+                    line.origin_y,
+                    block.bounds.top_px + (32.0 + line_index as f32 * 150.0) * scale,
+                );
+            }
+            let secondary = block.secondary_line.as_ref().unwrap();
+            assert_close(secondary.font_size_px, 81.84 * scale);
+            assert_close(secondary.origin_y, block.bounds.top_px + 362.0 * scale);
+            for line in block.primary_lines.iter().chain(block.secondary_line.iter()) {
+                assert!(line.origin_x - 5.0 >= 0.0);
+                assert!(line.origin_x + line.width_px + 5.0 <= frame.width() as f32);
+                assert!(line.origin_y - 5.0 >= 0.0);
+                assert!(line.origin_y + line.font_size_px * 1.5 + 5.0 <= frame.height() as f32);
+            }
+        }
+        #[cfg(windows)]
+        if let Some(texture) = frame.d3d11_texture() {
+            let mut description =
+                windows::Win32::Graphics::Direct3D11::D3D11_TEXTURE2D_DESC::default();
+            unsafe {
+                texture.GetDesc(&mut description);
+            }
+            assert_eq!((description.Width, description.Height), (frame.width(), frame.height()));
+            if let Some(previous) = previous_frame.as_ref() {
+                if previous.height() == frame.height() {
+                    assert_eq!(previous.texture_ptr(), frame.texture_ptr());
+                } else {
+                    assert_ne!(previous.texture_ptr(), frame.texture_ptr());
+                }
+            }
+        }
+        previous_frame = Some(frame);
+    }
+    let empty = renderer.render_empty_frame().unwrap();
+    assert_eq!(empty.height(), 1056);
+    assert!(empty.is_fully_transparent());
+    #[cfg(windows)]
+    if empty.d3d11_texture().is_some() {
+        assert_eq!(previous_frame.as_ref().unwrap().texture_ptr(), empty.texture_ptr());
+    }
+    renderer.set_presentation(CaptionPresentation {
+        text_scale: 1.2,
+        ..Default::default()
+    });
+    let large_empty = renderer.render_empty_frame().unwrap();
+    assert_eq!(large_empty.height(), 1240);
+    assert!(large_empty.is_fully_transparent());
+}
+
+fn assert_caption_fitting_transitions(renderer: CaptionRenderer) {
+    let long = bilingual_block("active", &"한".repeat(200), "short source", true)
+        .with_occupant("self:turn", 0)
+        .with_variant(CaptionBlockVariant::ActiveSelf)
+        .with_slot(1, 544.0);
+    let first = renderer.render_blocks(vec![long.clone()]).unwrap();
+    let first_block = &first.layout().visible_blocks[0];
+    assert_close(first_block.primary_lines[0].font_size_px, 132.0 * 0.8);
+    assert_close(first_block.secondary_line.as_ref().unwrap().font_size_px, 81.84);
+    assert!(first_block.truncated_primary);
+    assert_eq!(long.primary_text, "한".repeat(200));
+
+    let promoted = bilingual_block("finalized", "short primary", &"한".repeat(200), true)
+        .with_occupant("self:turn", 0)
+        .with_slot(1, 544.0);
+    let second = renderer.render_blocks(vec![promoted.clone()]).unwrap();
+    let second_block = &second.layout().visible_blocks[0];
+    assert_close(second_block.primary_lines[0].font_size_px, 132.0 * 0.8);
+    assert_close(second_block.secondary_line.as_ref().unwrap().font_size_px, 81.84 * 0.8);
+    assert!(second_block.truncated_secondary);
+    assert_eq!(first_block.bounds, second_block.bounds);
+    assert_close(first_block.primary_lines[0].origin_y, second_block.primary_lines[0].origin_y);
+    assert_close(
+        first_block.secondary_line.as_ref().unwrap().origin_y,
+        second_block.secondary_line.as_ref().unwrap().origin_y,
+    );
+
+    let short = bilingual_block("finalized", "short primary", "short source", true)
+        .with_occupant("self:turn", 0)
+        .with_slot(1, 544.0);
+    let continuing = renderer.render_blocks(vec![short.clone()]).unwrap();
+    let continuing_block = &continuing.layout().visible_blocks[0];
+    assert_close(continuing_block.primary_lines[0].font_size_px, 132.0 * 0.8);
+    assert_close(continuing_block.secondary_line.as_ref().unwrap().font_size_px, 81.84 * 0.8);
+
+    let replacement = renderer
+        .render_blocks(vec![short.clone().with_occupant("self:turn", 1)])
+        .unwrap();
+    let replacement_block = &replacement.layout().visible_blocks[0];
+    assert_close(replacement_block.primary_lines[0].font_size_px, 132.0);
+    assert_close(replacement_block.secondary_line.as_ref().unwrap().font_size_px, 81.84);
+
+    renderer.render_blocks(vec![promoted]).unwrap();
+    renderer.render_empty_frame().unwrap();
+    let reappeared = renderer.render_blocks(vec![short]).unwrap();
+    let reappeared_block = &reappeared.layout().visible_blocks[0];
+    assert_close(reappeared_block.primary_lines[0].font_size_px, 132.0);
+    assert_close(reappeared_block.secondary_line.as_ref().unwrap().font_size_px, 81.84);
 }
 
 #[test]
@@ -911,46 +1057,85 @@ fn renderer_secondary_reserved_block_height_remains_468px_at_default_scale() {
 }
 
 #[test]
-fn renderer_two_secondary_reserved_slots_fit_default_surface_after_typography_spacing_update() {
+fn renderer_two_slots_fit_texture_at_calibrated_scale_presets_and_height_transitions() {
+    assert_calibrated_two_slot_frames_fit(CaptionRenderer::new_for_test().unwrap());
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_graphics_two_slots_fit_texture_without_changing_calibration() {
+    assert_calibrated_two_slot_frames_fit(CaptionRenderer::new().unwrap());
+}
+
+#[test]
+fn renderer_fitting_is_shrink_only_until_occupant_replacement_or_retirement() {
+    assert_caption_fitting_transitions(CaptionRenderer::new_for_test().unwrap());
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_graphics_fitting_is_shrink_only_and_resets_for_new_occupants() {
+    assert_caption_fitting_transitions(CaptionRenderer::new().unwrap());
+}
+
+#[test]
+fn renderer_fitting_uses_independent_lanes_and_bounded_levels_with_overflow_tolerance() {
     let policy = CaptionLayoutPolicy::default();
-    let result = policy.layout_blocks(
-        vec![
-            bilingual_block(
-                "peer:translated",
-                "translated peer text with enough words to represent a normal two-line HMD row",
-                "source original 안녕하세요 hello こんにちは 你好",
+    for (primary_length, secondary_length, primary_scale, secondary_scale) in [
+        (15, 12, 1.0, 1.0),
+        (16, 1, 0.9, 1.0),
+        (18, 1, 0.8, 1.0),
+        (1, 13, 1.0, 0.9),
+        (1, 15, 1.0, 0.8),
+        (200, 200, 0.8, 0.8),
+    ] {
+        let layout = policy.layout_blocks(
+            vec![bilingual_block(
+                "caption",
+                &"한".repeat(primary_length),
+                &"한".repeat(secondary_length),
                 true,
-            )
-            .with_variant(CaptionBlockVariant::ActivePeer)
-            .with_channel(CaptionChannel::PeerChannel)
-            .with_slot(0, 40.0),
-            bilingual_block(
-                "self:translated",
-                "self transcript text",
-                "self translated secondary",
-                true,
-            )
-            .with_variant(CaptionBlockVariant::Finalized)
-            .with_channel(CaptionChannel::SelfChannel)
-            .with_slot(1, 544.0),
-        ],
+            )],
+            1100,
+            900,
+        );
+        let block = &layout.visible_blocks[0];
+        assert_close(block.primary_lines[0].font_size_px, 132.0 * primary_scale);
+        assert_close(block.secondary_line.as_ref().unwrap().font_size_px, 81.84 * secondary_scale);
+        assert_close(block.bounds.bottom_px - block.bounds.top_px, 468.0);
+    }
+}
+
+#[test]
+fn renderer_long_cjk_caption_does_not_fit_using_latin_fallback_advances() {
+    let layout = CaptionLayoutPolicy::default().layout_blocks(
+        vec![bilingual_block("caption", &"한".repeat(80), "short source", true)],
         4096,
         1056,
     );
+    assert_close(layout.visible_blocks[0].primary_lines[0].font_size_px, 132.0 * 0.8);
+    assert_close(
+        layout.visible_blocks[0].secondary_line.as_ref().unwrap().font_size_px,
+        81.84,
+    );
+}
 
-    assert_eq!(result.visible_blocks.len(), 2);
-    for block in &result.visible_blocks {
-        assert!(
-            block.bounds.top_px >= 0.0 && block.bounds.bottom_px <= 1056.0,
-            "block bounds {:?} should stay inside default surface",
-            block.bounds
-        );
-        assert!(
-            block.visual_bounds.top_px >= 0.0 && block.visual_bounds.bottom_px <= 1056.0,
-            "visual bounds {:?} should stay inside default surface",
-            block.visual_bounds
-        );
-    }
+#[test]
+fn renderer_fitting_accounts_for_explicit_newline_budget_without_expanding_regions() {
+    let policy = CaptionLayoutPolicy::default();
+    let layout = policy.layout_blocks(
+        vec![bilingual_block("caption", "one\ntwo\nthree", "source\nmore source", true)],
+        1100,
+        900,
+    );
+    let block = &layout.visible_blocks[0];
+    assert_eq!(block.primary_lines.len(), 2);
+    assert!(block.truncated_primary);
+    assert_close(block.primary_lines[0].font_size_px, 132.0 * 0.8);
+    let secondary = block.secondary_line.as_ref().unwrap();
+    assert_close(secondary.font_size_px, 81.84 * 0.8);
+    assert_eq!(secondary.text, "source...");
+    assert!(block.truncated_secondary);
 }
 
 #[test]

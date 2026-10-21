@@ -9,10 +9,6 @@ from puripuly_heart.app.services.managed_usage import (
     ManagedUsageState,
     ManagedUsageViewState,
 )
-from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterStatusRefreshResult,
-    TalkTogetherPassStatus,
-)
 from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
 
 
@@ -23,7 +19,6 @@ def _state(
     release_settings_available: bool = True,
     installation_id: str | None = "installation",
     entitlement_ref: str | None = "entitlement",
-    referral_id: str | None = "7KQ9M2",
     ingress_frozen: bool = False,
 ) -> ManagedUsageState:
     return ManagedUsageState(
@@ -32,7 +27,6 @@ def _state(
         release_settings_available=release_settings_available,
         installation_id=installation_id,
         entitlement_ref=entitlement_ref,
-        referral_id=referral_id,
         ingress_frozen=ingress_frozen,
     )
 
@@ -41,7 +35,6 @@ def _owner(
     state_box: list[ManagedUsageState],
     *,
     metadata_fetcher=None,
-    release_service_provider=None,
     pending: list[bool] | None = None,
     views: list[ManagedUsageViewState] | None = None,
     disabled: list[bool] | None = None,
@@ -58,15 +51,12 @@ def _owner(
 
     return ManagedUsageOwner(
         state_provider=lambda: state_box[0],
-        release_service_provider=release_service_provider or (lambda: None),
+        release_service_provider=lambda: None,
         metadata_fetcher=metadata_fetcher or no_metadata,
         pending_sink=pending_sink.append,
         view_sink=view_sink.append,
         disable_translation_sink=disabled_sink.append,
         auto_show_founder_letter_provider=lambda _metadata: auto_show,
-        normalize_referral_id=lambda value: (
-            str(value).strip().upper() if value is not None and str(value).strip() else None
-        ),
         warning_sink=lambda message, exception: warning_sink.append((message, exception)),
     )
 
@@ -87,28 +77,6 @@ def test_remaining_percent_is_clamped_and_handles_unavailable_metadata(
     expected: int | None,
 ) -> None:
     assert ManagedUsageOwner.remaining_percent_for(metadata) == expected
-
-
-def test_pass_status_cache_is_scoped_to_current_identity() -> None:
-    state_box = [_state(referral_id="7kq9m2")]
-    views: list[ManagedUsageViewState] = []
-    owner = _owner(state_box, views=views)
-    pass_status = TalkTogetherPassStatus(
-        pass_id="7KQ9M2",
-        invite_count=2,
-        invite_limit=3,
-    )
-
-    owner.set_view_state(
-        visible=True,
-        remaining_percent=60,
-        referral_id="7kq9m2",
-        pass_status=pass_status,
-    )
-
-    assert views[-1].pass_status == pass_status
-    state_box[0] = _state(entitlement_ref="replacement", referral_id="7KQ9M2")
-    assert owner.cached_pass_status_for("7KQ9M2") is None
 
 
 @pytest.mark.asyncio
@@ -138,7 +106,7 @@ async def test_refresh_projects_unavailable_managed_states(
 
 
 @pytest.mark.asyncio
-async def test_refresh_applies_metadata_before_exhaustion_and_status_work() -> None:
+async def test_refresh_applies_metadata_before_disabling_exhausted_translation() -> None:
     state_box = [_state()]
     events: list[str] = []
     pending: list[bool] = []
@@ -150,15 +118,9 @@ async def test_refresh_applies_metadata_before_exhaustion_and_status_work() -> N
         events.append("metadata")
         return ManagedUsageMetadataResult(key_available=True, metadata=metadata)
 
-    class ReleaseService:
-        async def refresh_managed_status(self) -> ManagedOpenRouterStatusRefreshResult:
-            events.append("status")
-            return ManagedOpenRouterStatusRefreshResult(referral_id="7KQ9M2")
-
     owner = _owner(
         state_box,
         metadata_fetcher=fetch,
-        release_service_provider=ReleaseService,
         pending=pending,
         views=views,
         disabled=disabled,
@@ -206,36 +168,6 @@ async def test_refresh_discards_metadata_after_entitlement_changes() -> None:
     assert disabled == []
     assert owner.usage_metadata is None
     assert views == []
-    await owner.close()
-
-
-@pytest.mark.asyncio
-async def test_status_refresh_preserves_cached_pass_on_failure() -> None:
-    state_box = [_state()]
-    warnings: list[tuple[str, BaseException | None]] = []
-    owner = _owner(state_box, warnings=warnings)
-    pass_status = TalkTogetherPassStatus(
-        pass_id="7KQ9M2",
-        invite_count=1,
-        invite_limit=3,
-    )
-    owner.set_view_state(
-        visible=True,
-        remaining_percent=70,
-        referral_id="7KQ9M2",
-        pass_status=pass_status,
-    )
-    error = RuntimeError("status failed")
-
-    class ReleaseService:
-        async def refresh_managed_status(self):
-            raise error
-
-    result = await owner.refresh_status_best_effort(service=ReleaseService())
-
-    assert result.succeeded is False
-    assert result.pass_status == pass_status
-    assert warnings == [("[ManagedAuth] Managed status refresh failed", error)]
     await owner.close()
 
 

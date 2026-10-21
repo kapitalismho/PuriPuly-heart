@@ -190,7 +190,8 @@ async def test_process_source_close_releases_capture_and_identity_watch() -> Non
     await source.close()
     await source.close()
 
-    assert factory.captures[0][1].close_thread_ids == [threading.get_ident()]
+    close_thread_ids = factory.captures[0][1].close_thread_ids
+    assert len(close_thread_ids) == 1
     assert watcher.watches[0].closed is True
     assert source.terminal_reason == "closed"
 

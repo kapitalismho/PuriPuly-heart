@@ -23,7 +23,7 @@ async def test_soniox_realtime_streaming_smoke():
 
     backend = SonioxRealtimeSTTBackend(
         api_key=api_key,
-        model=os.getenv("SONIOX_STT_MODEL", "stt-rt-v4"),
+        model=os.getenv("SONIOX_STT_MODEL", "stt-rt-v5"),
         endpoint=os.getenv("SONIOX_STT_ENDPOINT", "wss://stt-rt.soniox.com/transcribe-websocket"),
         language_hints=[os.getenv("SONIOX_STT_LANGUAGE", "ko")],
         sample_rate_hz=int(os.getenv("SONIOX_STT_SAMPLE_RATE", "16000")),

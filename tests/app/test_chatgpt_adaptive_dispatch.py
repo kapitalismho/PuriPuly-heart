@@ -5,7 +5,7 @@ import json
 from collections.abc import Mapping
 from uuid import uuid4
 
-from puripuly_heart.app.services.llm_connection_readiness import prepare_llm_connections
+from puripuly_heart.app.services.llm_connection_readiness import apply_llm_connection_mode
 from puripuly_heart.app.wiring.wiring_llm_factory import create_llm_provider_from_resolved_config
 from puripuly_heart.config.runtime_resolution import (
     RuntimeResolutionInput,
@@ -60,11 +60,18 @@ class _Server:
         self.requests: list[tuple[_Socket, dict[str, object]]] = []
         self.received: asyncio.Queue[tuple[_Socket, dict[str, object]]] = asyncio.Queue()
         self.sockets: list[_Socket] = []
+        self.connected: asyncio.Queue[_Socket] = asyncio.Queue()
 
     async def connect(self, url: str, headers: Mapping[str, str]) -> _Socket:
         socket = _Socket(self)
         self.sockets.append(socket)
+        self.connected.put_nowait(socket)
         return socket
+
+    async def wait_connected(self, count: int) -> None:
+        async with asyncio.timeout(1):
+            for _ in range(count):
+                await self.connected.get()
 
 
 async def _composed_provider(server: _Server):
@@ -79,7 +86,10 @@ async def _composed_provider(server: _Server):
         config, secrets=secrets, chatgpt_session=_Session()
     )
     provider.inner.primary.connector = server.connect
-    await prepare_llm_connections(provider)
+    await apply_llm_connection_mode(provider, "active")
+    primary = provider.inner.primary
+    await server.wait_connected(min(primary.prepared_connections, primary.max_connections))
+    assert server.requests == []
     return provider
 
 
@@ -201,6 +211,7 @@ async def test_switch_from_used_luna_translates_while_websocket_cleanup_drains()
         async def connect(self, url: str, headers: Mapping[str, str]) -> _Socket:
             socket = SlowClosingSocket(self)
             self.sockets.append(socket)
+            self.connected.put_nowait(socket)
             return socket
 
     class ReplacementBackend(TranslationBackend):

@@ -61,7 +61,6 @@ def _repository(
         base_settings=base,
         surface=surface,
         provider_verification_binding=binding,
-        save_failure_sink=lambda message: persistence.events.append(message),
     )
     return repository, owner, persistence
 
@@ -182,10 +181,9 @@ async def test_repository_rolls_back_and_returns_safe_diagnostics_on_save_failur
     assert result.diagnostics.fields["surface"] == "provider_secret_change"
     assert repository.committed_settings.intent.ui.locale != "ko"
     assert owner.mutation_depth == 0
-    assert persistence.events == [
-        "persist",
-        "Failed to save settings mutation",
-    ]
+    assert persistence.events == ["persist"]
+    assert result.diagnostics.fields["exception_class"] == "OSError"
+    assert result.diagnostics.fields["phase"] == "settings_save"
 
 
 def test_canonical_snapshot_values_serialize_nested_intent() -> None:

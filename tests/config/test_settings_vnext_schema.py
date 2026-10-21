@@ -72,6 +72,12 @@ def test_vnext_schema_defaults_match_current_persisted_settings_defaults() -> No
     )
 
 
+def test_ui_settings_persist_only_locale() -> None:
+    schema = _load_schema_module()
+
+    assert {field.name for field in fields(schema.UiIntent)} == {"locale"}
+
+
 def test_vnext_schema_represents_current_intent_and_state_leaves() -> None:
     schema = _load_schema_module()
 
@@ -174,7 +180,6 @@ def test_vnext_schema_represents_current_intent_and_state_leaves() -> None:
         "state.managed_connection.active_managed_expires_at",
         "state.managed_connection.founder_letter_seen_credential_ref",
         "state.managed_connection.installation_id",
-        "state.managed_connection.referral_id",
         "state.managed_connection.release_token",
         "state.managed_connection.release_token_expires_at",
         "state.managed_connection.verified_hardware_hash",

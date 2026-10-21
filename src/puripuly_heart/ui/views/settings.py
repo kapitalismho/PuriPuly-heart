@@ -16,7 +16,6 @@ from typing import Awaitable, Callable, Mapping
 
 import flet as ft
 from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretKey,
@@ -48,7 +47,6 @@ from puripuly_heart.app.ports.settings_view import (
     LocalLlmBaseUrlEdit,
     LocalLlmExtraBodyEdit,
     LocalLlmModelEdit,
-    ManagedReferralEdit,
     OpenRouterPkceTarget,
     OscConnectionSettingsIntent,
     OverlayCalibrationSettingsIntent,
@@ -112,7 +110,6 @@ from puripuly_heart.config.provider_values import (
     is_qwen_cloud_stt_provider,
     normalize_cloud_free_tier_providers,
     normalize_local_llm_base_url,
-    normalize_owned_referral_id,
     parse_openrouter_llm_model,
 )
 from puripuly_heart.config.resolved import (
@@ -122,6 +119,7 @@ from puripuly_heart.config.resolved import (
     VAD_ONSET_MIN,
 )
 from puripuly_heart.config.translation_values import (
+    MANAGED_GEMMA_MODELS,
     TranslationConnection,
     TranslationModel,
     default_translation_connection,
@@ -152,7 +150,7 @@ from puripuly_heart.ui.flet_runtime import (
     is_hover_active,
     update_control_if_mounted,
 )
-from puripuly_heart.ui.fonts import font_for_language
+from puripuly_heart.ui.fonts import TypeFace, font_for_language, locale_body_letter_spacing
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 from puripuly_heart.ui.i18n import (
     available_locales,
@@ -191,6 +189,7 @@ from puripuly_heart.ui.theme import (
     COLOR_SECONDARY,
     COLOR_WARNING,
     text_field_outline_border,
+    text_style,
 )
 
 logger = logging.getLogger(__name__)
@@ -209,7 +208,6 @@ _DRAFT_PROVIDER_FIELDS: dict[type, str] = {
     CustomSttEndpointEdit: "custom_stt_endpoint",
     CustomSttModelEdit: "custom_stt_model",
     CustomSttExtraEdit: "custom_stt_extra_json",
-    ManagedReferralEdit: "managed_referral_id",
     TranslationSelectionEdit: "translation",
 }
 _DRAFT_TRANSLATION_FIELDS: dict[type, str] = {
@@ -287,7 +285,9 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.LOCAL_QWEN: "settings.stt.section.cpu_inference",
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
+    TranslationModel.INDEX_TRANSLATE_35B: "provider.index_translate_35b",
     TranslationModel.MANAGED_GEMMA: "provider.managed_gemma",
+    TranslationModel.MANAGED_GEMMA_26B: "provider.managed_gemma_26b",
     TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
     TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "provider.deepseek_v4_flash_41",
@@ -297,7 +297,17 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.LOCAL_LLM: "provider.local_llms",
     TranslationModel.CUSTOM_HTTP: "provider.custom_http",
 }
+_LOCAL_STT_PROVIDERS = frozenset(
+    {
+        STTProviderName.LOCAL_CPU_AUTO,
+        STTProviderName.LOCAL_PARAKEET_V3,
+        STTProviderName.LOCAL_PARAKEET_JAPANESE,
+        STTProviderName.LOCAL_QWEN,
+        STTProviderName.LOCAL_QWEN_GPU,
+    }
+)
 _TRANSLATION_CONNECTION_LABEL_KEYS = {
+    TranslationConnection.PUBLIC_API: "settings.translation_connection.public_api",
     TranslationConnection.CPU: "settings.translation_connection.cpu",
     TranslationConnection.GPU: "settings.translation_connection.gpu",
     TranslationConnection.MANAGED: "settings.translation_connection.managed",
@@ -312,7 +322,9 @@ _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
     TranslationConnection.CHATGPT: "settings.translation_connection.chatgpt.description",
 }
 _TRANSLATION_MODELS = (
+    TranslationModel.INDEX_TRANSLATE_35B,
     TranslationModel.MANAGED_GEMMA,
+    TranslationModel.MANAGED_GEMMA_26B,
     TranslationModel.GEMMA4_26B_31B,
     TranslationModel.DEEPSEEK_V4_FLASH,
     TranslationModel.DEEPSEEK_V4_FLASH_41,
@@ -324,13 +336,15 @@ _TRANSLATION_MODELS = (
 )
 _TRANSLATION_MODEL_SECTION_ORDER = (
     "settings.translation_model.section.recommended_cloud",
-    "settings.translation_model.section.recommended_local",
+    "settings.translation_model.section.cpu_inference",
     "settings.translation_model.section.gpu_inference",
     "settings.translation_model.section.user_settings",
     "settings.translation_model.section.others",
 )
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
-    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.recommended_local",
+    TranslationModel.INDEX_TRANSLATE_35B: "settings.translation_model.section.recommended_cloud",
+    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.cpu_inference",
+    TranslationModel.MANAGED_GEMMA_26B: "settings.translation_model.section.gpu_inference",
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.others",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "settings.translation_model.section.recommended_cloud",
@@ -356,10 +370,7 @@ def _settings_secondary_text_button_style() -> ft.ButtonStyle:
             ft.ControlState.HOVERED: COLOR_PRIMARY,
             ft.ControlState.DEFAULT: COLOR_SECONDARY,
         },
-        text_style=ft.TextStyle(
-            size=20,
-            font_family=font_for_language(get_locale()),
-        ),
+        text_style=text_style(size=20),
         overlay_color=ft.Colors.TRANSPARENT,
         animation_duration=0,
     )
@@ -465,8 +476,9 @@ class SettingsView(ft.Column):
         self.on_desktop_overlay_recovery_action: Callable[[str], None] | None = None
         self.on_desktop_overlay_position_reset: Callable[[], None] | None = None
         self.on_view_logs: Callable[[], None] | None = None
-        self.on_start_microphone_test: Callable[[], None] | None = None
+        self.on_start_audio_test: Callable[[], None] | None = None
         self.on_gpu_discovery_requested: Callable[[], object] | None = None
+        self.on_open_model_assets: Callable[[], None] | None = None
         self.on_telemetry_enabled_change: Callable[[bool], None] | None = None
         self.on_list_loopback_capture_options: Callable[[], object] | None = None
         self.on_list_loopback_process_options: Callable[[], object] | None = None
@@ -491,12 +503,14 @@ class SettingsView(ft.Column):
         self._http_extension_snapshot = self._http_extensions.snapshot
         self._http_extension_runtime_reload_pending = False
         self._pending_alibaba_key_verification: QwenRegion | None = None
+        self._immediate_provider_apply_intent: ProviderApplyIntent | None = None
 
         # State
         self._provider_snapshot: ProviderSettingsSnapshot | None = None
         self._provider_draft: ProviderSettingsSnapshot | None = None
         self._provider_edits: dict[type, ProviderSettingsEdit] = {}
         self._general_snapshot: GeneralSettingsSnapshot | None = None
+        self._peer_auto_languages_pending: tuple[str, ...] | None = None
         self._prompt_snapshot: PromptSettingsSnapshot | None = None
         self._overlay_snapshot: OverlaySettingsSnapshot | None = None
         self._config_path: Path | None = None
@@ -515,8 +529,6 @@ class SettingsView(ft.Column):
         self._overlay_calibration_session_active = False
         self._managed_trial_usage_visible = False
         self._managed_trial_usage_remaining_percent: int | None = None
-        self._managed_key_referral_id: str | None = None
-        self._managed_key_pass_status: TalkTogetherPassStatus | None = None
         self._overlay_peer_contract: OverlayPeerConsumerContract | None = None
         self._gpu_devices: tuple[GpuDeviceOption, ...] = ()
         self._llm_gpu_devices: tuple[GpuDeviceOption, ...] = ()
@@ -565,8 +577,8 @@ class SettingsView(ft.Column):
     def gpu_llm_control(self) -> ft.Control:
         return self._gpu_llm_card
 
-    def gpu_refresh_control(self) -> ft.Control:
-        return self._gpu_refresh_card
+    def model_assets_control(self) -> ft.Control:
+        return self._model_assets_card
 
     def local_llm_connection_control(self) -> ft.Control:
         return self._local_llm_connection_card
@@ -606,9 +618,10 @@ class SettingsView(ft.Column):
         self.on_local_llm_secret_changed = provider.local_llm_secret_changed
         self.on_custom_stt_secret_changed = provider.custom_stt_secret_changed
         self.on_gpu_discovery_requested = provider.gpu_discovery_requested
+        self.on_open_model_assets = provider.open_model_assets
         self._settings_secrets = provider.settings_secrets
         self._chatgpt_intents = provider.chatgpt
-        self.on_start_microphone_test = general.start_microphone_test
+        self.on_start_audio_test = general.start_audio_test
         self.on_telemetry_enabled_change = general.telemetry_enabled_change
         self.on_list_loopback_capture_options = general.list_loopback_capture_options
         self.on_list_loopback_process_options = general.list_loopback_process_options
@@ -744,7 +757,7 @@ class SettingsView(ft.Column):
             self._osc_connection_text,
             self._clipboard_auto_translate_text,
             self._activation_notice_button,
-            self._microphone_test_text,
+            self._audio_test_text,
             self._vrc_mic_text,
             self._mic_audio_text,
             self._audio_host_api_text,
@@ -937,7 +950,7 @@ class SettingsView(ft.Column):
 
     def _get_button_style(
         self,
-        font_family: str,
+        font_family: str | None,
         *,
         size: int = 20,
         default_color: str = COLOR_SECONDARY,
@@ -953,9 +966,9 @@ class SettingsView(ft.Column):
         return ft.ButtonStyle(
             color=color,
             icon_color=color,
-            text_style=ft.TextStyle(
+            text_style=text_style(
+                TypeFace(font_family, locale_body_letter_spacing(get_locale())),
                 size=size,
-                font_family=font_family,
             ),
             overlay_color=ft.Colors.TRANSPARENT,
             animation_duration=0,
@@ -1159,10 +1172,7 @@ class SettingsView(ft.Column):
                     ft.ControlState.HOVERED: COLOR_PRIMARY,
                     ft.ControlState.DEFAULT: COLOR_SECONDARY,
                 },
-                text_style=ft.TextStyle(
-                    size=20,
-                    font_family=font_for_language(get_locale()),
-                ),
+                text_style=text_style(size=20),
                 overlay_color=ft.Colors.TRANSPARENT,
                 animation_duration=0,
             ),
@@ -1298,63 +1308,12 @@ class SettingsView(ft.Column):
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        self._managed_key_referral_id_label = ft.Text(
-            t("settings.managed_key.referral_id.label"),
-            size=16,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_ON_BACKGROUND,
-        )
-        self._managed_key_referral_id_value = ft.Text(
-            t("settings.managed_key.referral_id.empty"),
-            size=22,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_ON_BACKGROUND,
-            selectable=True,
-        )
-        self._managed_key_invite_progress_label = ft.Text(
-            t("settings.managed_key.invite_progress.label"),
-            size=16,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_ON_BACKGROUND,
-        )
-        self._managed_key_invite_progress_value = ft.Text(
-            "",
-            size=20,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_ON_BACKGROUND,
-        )
-        self._managed_key_invite_progress_row = ft.Row(
-            [
-                self._managed_key_invite_progress_label,
-                ft.Container(expand=True),
-                self._managed_key_invite_progress_value,
-            ],
-            spacing=8,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            visible=False,
-        )
         self._managed_key_card = self._wrap_card(
             ft.Column(
                 [
                     self._managed_key_title,
                     ft.Container(height=4),
                     self._managed_trial_usage_bar,
-                    ft.Container(height=8),
-                    ft.Column(
-                        [
-                            ft.Row(
-                                [
-                                    self._managed_key_referral_id_label,
-                                    ft.Container(expand=True),
-                                    self._managed_key_referral_id_value,
-                                ],
-                                spacing=8,
-                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                            ),
-                            self._managed_key_invite_progress_row,
-                        ],
-                        spacing=4,
-                    ),
                 ],
                 spacing=0,
             ),
@@ -1496,10 +1455,7 @@ class SettingsView(ft.Column):
                     ft.ControlState.HOVERED: COLOR_PRIMARY,
                     ft.ControlState.DEFAULT: COLOR_SECONDARY,
                 },
-                text_style=ft.TextStyle(
-                    size=20,
-                    font_family=font_for_language(get_locale()),
-                ),
+                text_style=text_style(size=20),
                 overlay_color=ft.Colors.TRANSPARENT,
                 animation_duration=0,
             ),
@@ -1639,19 +1595,19 @@ class SettingsView(ft.Column):
             value=self._vrc_mic_text,
         )
 
-        self._microphone_test_text = self._build_clickable_text(
-            t("settings.microphone_test.action"),
-            self._on_microphone_test_click,
+        self._audio_test_text = self._build_clickable_text(
+            t("settings.audio_test.action"),
+            self._on_audio_test_click,
         )
-        self._microphone_test_title = ft.Text(
-            t("settings.microphone_test"),
+        self._audio_test_title = ft.Text(
+            t("settings.audio_test"),
             size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        microphone_test_card = self._wrap_unit_card(
-            title=self._microphone_test_title,
-            value=self._microphone_test_text,
+        audio_test_card = self._wrap_unit_card(
+            title=self._audio_test_title,
+            value=self._audio_test_text,
         )
 
         self._general_ui_card = ui_card
@@ -1758,7 +1714,7 @@ class SettingsView(ft.Column):
                 audio_host_api=self._general_host_api_card,
                 microphone=self._general_mic_audio_card,
                 loopback=self._general_loopback_audio_card,
-                microphone_test=microphone_test_card,
+                audio_test=audio_test_card,
                 self_vad=self._self_vad_card,
                 peer_vad=self._peer_vad_card,
                 clipboard_auto_translate=clipboard_auto_translate_card,
@@ -1821,26 +1777,19 @@ class SettingsView(ft.Column):
             title=self._gpu_llm_title,
             value=self._gpu_llm_text,
         )
-        self._gpu_refresh_title = ft.Text(
-            t("settings.gpu_device.refresh"),
+        self._model_assets_title = ft.Text(
+            t("settings.model_assets"),
             size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        self._gpu_refresh_icon = ft.Container(
-            content=ft.Icon(
-                ft.Icons.REFRESH_ROUNDED,
-                size=44,
-                color=COLOR_ON_BACKGROUND,
-            ),
-            alignment=_CENTER_ALIGNMENT,
-            expand=True,
-            on_click=self._on_gpu_refresh_click,
-            on_hover=self._on_text_hover,
+        self._model_assets_text = self._build_clickable_text(
+            t("settings.model_assets.action"),
+            self._on_model_assets_click,
         )
-        self._gpu_refresh_card = self._wrap_unit_card(
-            title=self._gpu_refresh_title,
-            value=self._gpu_refresh_icon,
+        self._model_assets_card = self._wrap_unit_card(
+            title=self._model_assets_title,
+            value=self._model_assets_text,
         )
 
         self._overlay_translation_title = ft.Text(
@@ -2639,24 +2588,22 @@ class SettingsView(ft.Column):
         )
         self.controls = [self._settings_subtab_shell]
 
-    def _gpu_asr_selected(self, settings: ProviderSettingsSnapshot) -> bool:
-        return (
-            settings.stt_provider == STTProviderName.LOCAL_QWEN_GPU
-            or settings.peer_stt_provider == STTProviderName.LOCAL_QWEN_GPU
-        )
-
     def _gpu_llm_selected(self, settings: ProviderSettingsSnapshot) -> bool:
         model = settings.translation.model
         return (
-            model == TranslationModel.MANAGED_GEMMA
+            model in MANAGED_GEMMA_MODELS
             and settings.translation.connection == TranslationConnection.GPU
         )
 
-    def _gpu_selected(self, settings: ProviderSettingsSnapshot | None = None) -> bool:
+    def _local_model_selected(self, settings: ProviderSettingsSnapshot | None = None) -> bool:
         current = settings or self._build_settings_with_provider_draft()
         return bool(
             current is not None
-            and (self._gpu_asr_selected(current) or self._gpu_llm_selected(current))
+            and (
+                current.stt_provider in _LOCAL_STT_PROVIDERS
+                or current.peer_stt_provider in _LOCAL_STT_PROVIDERS
+                or current.translation.model in MANAGED_GEMMA_MODELS
+            )
         )
 
     def _gpu_column_label(
@@ -2684,7 +2631,7 @@ class SettingsView(ft.Column):
         llm_label = self._gpu_column_label(llm_selected, getattr(self, "_llm_gpu_devices", ()))
         self._set_unit_card_value_text(self._gpu_device_text, asr_label)
         self._set_unit_card_value_text(self._gpu_llm_text, llm_label)
-        visible = self._gpu_selected(settings)
+        visible = self._local_model_selected(settings)
         self._gpu_device_row.visible = visible
         _update_control_if_mounted(self._gpu_device_row)
 
@@ -2777,9 +2724,9 @@ class SettingsView(ft.Column):
             on_select=self._on_llm_gpu_device_selected,
         )
 
-    def _on_gpu_refresh_click(self, _event) -> None:
-        if self.on_gpu_discovery_requested is not None:
-            self.on_gpu_discovery_requested()
+    def _on_model_assets_click(self, _event) -> None:
+        if self.on_open_model_assets is not None:
+            self.on_open_model_assets()
 
     def _on_gpu_device_selected(self, value: str) -> None:
         if self._provider_snapshot is None:
@@ -2845,11 +2792,6 @@ class SettingsView(ft.Column):
                     or ""
                     for secret in extension.secrets
                 }
-            if result.read_error is not None:
-                self._emit_runtime_basic(
-                    f"Failed to load HTTP extension secrets: {result.read_error}",
-                    level=logging.WARNING,
-                )
         controls: list[ft.Control] = []
         if extension is not None:
             for secret in extension.secrets:
@@ -3166,6 +3108,8 @@ class SettingsView(ft.Column):
     ) -> str:
         if settings is None:
             return "gemini"
+        if settings.llm_provider == LLMProviderName.INDEX_TRANSLATE:
+            return "index_translate"
         if settings.llm_provider == LLMProviderName.GEMINI:
             return "gemini"
         if settings.llm_provider == LLMProviderName.OPENROUTER:
@@ -3218,14 +3162,24 @@ class SettingsView(ft.Column):
                     with contextlib.suppress(Exception):
                         control.update()
 
-    def _sync_custom_vocabulary_editor_from_settings(self) -> None:
+    def _sync_custom_vocabulary_editor_from_settings(self, *, preserve_input: bool = False) -> None:
         if self._prompt_snapshot is None:
             self._custom_vocab_tag_editor.set_terms([])
             self._custom_vocab_tag_editor.clear_input()
             return
 
         self._custom_vocab_tag_editor.set_terms(list(self._prompt_snapshot.custom_vocabulary_terms))
-        self._custom_vocab_tag_editor.clear_input()
+        if not preserve_input:
+            self._custom_vocab_tag_editor.clear_input()
+
+    def bind_recent_language_queue(self, dashboard: object) -> None:
+        """Point the hint editor at the dashboard's shared recent-language queue."""
+        codes = getattr(dashboard, "recent_language_codes", None)
+        remember = getattr(dashboard, "remember_recent_language", None)
+        editor = getattr(self, "_peer_auto_languages_editor", None)
+        if editor is None or not callable(codes) or not callable(remember):
+            return
+        editor.bind_recent_languages(codes=codes, remember=remember)
 
     def _sync_peer_auto_languages_editor(
         self,
@@ -3234,23 +3188,38 @@ class SettingsView(ft.Column):
         if not hasattr(self, "_peer_auto_languages_editor"):
             return
         settings = settings or self._general_snapshot
-        languages = () if settings is None else settings.peer_expected_languages
+        languages = () if settings is None else tuple(settings.peer_expected_languages)
+        pending = self._peer_auto_languages_pending
+        if pending is not None and languages != pending:
+            if (
+                self._general_snapshot is not None
+                and self._general_snapshot.peer_expected_languages != pending
+            ):
+                self._general_snapshot = replace(
+                    self._general_snapshot,
+                    peer_expected_languages=pending,
+                )
+            self._peer_auto_languages_editor.set_terms(list(pending))
+            return
+        self._peer_auto_languages_pending = None
         self._peer_auto_languages_editor.set_terms(list(languages))
 
     def _set_peer_auto_languages(self, languages: list[str]) -> None:
         if self._general_snapshot is None:
             return
-        normalized = list(
+        normalized = tuple(
             dict.fromkeys(language.strip() for language in languages if language.strip())
         )
-        if self._general_snapshot.peer_expected_languages == tuple(normalized):
+        if self._general_snapshot.peer_expected_languages == normalized:
             return
+        self._peer_auto_languages_pending = normalized
         self._general_snapshot = replace(
             self._general_snapshot,
-            peer_expected_languages=tuple(normalized),
+            peer_expected_languages=normalized,
         )
-        self._sync_peer_auto_languages_editor()
-        self._emit_settings_changed(PeerExpectedLanguagesIntent(tuple(normalized)))
+        self._peer_auto_languages_editor.set_terms(list(normalized))
+        recent_languages = self._peer_auto_languages_editor.recent_language_codes()
+        self._emit_settings_changed(PeerExpectedLanguagesIntent(normalized, recent_languages))
 
     def _on_peer_auto_languages_add(self, language: str) -> None:
         if self._general_snapshot is None:
@@ -3301,78 +3270,6 @@ class SettingsView(ft.Column):
     ) -> bool:
         return self._is_managed_translation_connection_selected(settings)
 
-    def _sync_managed_key_referral_row_value(self, referral_id: str | None) -> None:
-        referral_id = normalize_owned_referral_id(referral_id)
-        self._managed_key_referral_id = referral_id
-
-        self._managed_key_referral_id_value.value = referral_id or t(
-            "settings.managed_key.referral_id.empty"
-        )
-
-    def _remember_managed_key_referral_id(self, referral_id: str | None) -> str | None:
-        referral_id = normalize_owned_referral_id(referral_id)
-        if referral_id is None:
-            return None
-
-        referral_changed = (
-            self._provider_snapshot is not None
-            and self._provider_snapshot.managed_referral_id != referral_id
-        )
-        if self._provider_snapshot is not None:
-            self._provider_snapshot = replace(
-                self._provider_snapshot,
-                managed_referral_id=referral_id,
-            )
-        if self._provider_draft is not None:
-            self._provider_draft = replace(
-                self._provider_draft,
-                managed_referral_id=referral_id,
-            )
-        if referral_changed:
-            self._record_provider_edit(ManagedReferralEdit(referral_id))
-            self.has_provider_changes = True
-        return referral_id
-
-    def _sync_managed_key_invite_progress_row(
-        self,
-        referral_id: str | None,
-        pass_status: TalkTogetherPassStatus | None,
-    ) -> None:
-        normalized_referral_id = normalize_owned_referral_id(referral_id)
-        if (
-            normalized_referral_id is None
-            or pass_status is None
-            or pass_status.pass_id != normalized_referral_id
-            or pass_status.invite_limit <= 0
-            or pass_status.invite_count < 0
-        ):
-            self._managed_key_pass_status = None
-            self._managed_key_invite_progress_label.value = t(
-                "settings.managed_key.invite_progress.label"
-            )
-            self._managed_key_invite_progress_row.visible = normalized_referral_id is not None
-            self._managed_key_invite_progress_value.value = "- / -"
-            return
-
-        self._managed_key_pass_status = pass_status
-        displayed_count = min(pass_status.invite_count, pass_status.invite_limit)
-        self._managed_key_invite_progress_label.value = t(
-            "settings.managed_key.invite_progress.label"
-        )
-        self._managed_key_invite_progress_value.value = (
-            f"{displayed_count} / {pass_status.invite_limit}"
-        )
-        self._managed_key_invite_progress_row.visible = True
-
-    def _sync_managed_key_referral_row(
-        self,
-        settings: ProviderSettingsSnapshot | None,
-    ) -> None:
-        referral_id = (
-            None if settings is None else normalize_owned_referral_id(settings.managed_referral_id)
-        )
-        self._sync_managed_key_referral_row_value(referral_id)
-
     def _sync_managed_key_card(
         self,
         settings: ProviderSettingsSnapshot | None = None,
@@ -3381,11 +3278,6 @@ class SettingsView(ft.Column):
             settings = self._build_settings_with_provider_draft()
         visible = self._managed_key_card_visible_for(settings)
         self._managed_key_card.visible = visible
-        self._sync_managed_key_referral_row(settings)
-        self._sync_managed_key_invite_progress_row(
-            self._managed_key_referral_id,
-            self._managed_key_pass_status if visible else None,
-        )
         self._sync_managed_trial_usage_bar(settings)
 
     def _repaint_managed_key_card(self) -> None:
@@ -3406,14 +3298,7 @@ class SettingsView(ft.Column):
                 control = getattr(self._managed_trial_usage_bar, control_name, None)
                 if control is not None:
                     _update_control_if_mounted(control)
-        for control in (
-            self._managed_trial_usage_bar,
-            self._managed_key_referral_id_value,
-            self._managed_key_invite_progress_label,
-            self._managed_key_invite_progress_value,
-            self._managed_key_invite_progress_row,
-        ):
-            _update_control_if_mounted(control)
+        _update_control_if_mounted(self._managed_trial_usage_bar)
 
     def set_managed_trial_usage_state(
         self, *, visible: bool, remaining_percent: int | None = None
@@ -3433,15 +3318,7 @@ class SettingsView(ft.Column):
         *,
         visible: bool,
         remaining_percent: int | None = None,
-        referral_id: str | None = None,
-        pass_status: TalkTogetherPassStatus | None = None,
-        remember_referral_id: bool = True,
     ) -> None:
-        referral_id = (
-            self._remember_managed_key_referral_id(referral_id)
-            if remember_referral_id
-            else normalize_owned_referral_id(referral_id)
-        )
         usage_visible = bool(visible)
         card_visible = self._managed_key_card_visible_for(
             self._build_settings_with_provider_draft()
@@ -3456,11 +3333,6 @@ class SettingsView(ft.Column):
         self._managed_trial_usage_bar.visible = card_visible
         self._managed_trial_usage_bar.set_percent(
             self._managed_trial_usage_remaining_percent if card_visible else None
-        )
-        self._sync_managed_key_referral_row_value(referral_id)
-        self._sync_managed_key_invite_progress_row(
-            referral_id,
-            pass_status if card_visible else None,
         )
         self._repaint_managed_key_card()
 
@@ -3744,6 +3616,11 @@ class SettingsView(ft.Column):
             return None
         return ProviderApplyIntent(tuple(self._provider_edits.values()))
 
+    def consume_immediate_provider_apply_settings(self) -> ProviderApplyIntent | None:
+        intent = self._immediate_provider_apply_intent
+        self._immediate_provider_apply_intent = None
+        return intent
+
     def build_provider_apply_settings(self) -> ProviderApplyIntent | None:
         return self._build_provider_apply_intent()
 
@@ -3839,6 +3716,28 @@ class SettingsView(ft.Column):
         preserve_custom_vocab_draft: bool = False,
     ) -> None:
         """Load current settings into the UI."""
+        previous = self._build_settings_with_provider_draft()
+        selection_changed = (
+            self._provider_snapshot is not None
+            and self._provider_snapshot.translation != provider.translation
+        )
+        raw_drafts = []
+        if selection_changed and previous is not None:
+            for control, field_name in (
+                (self._local_llm_base_url, "local_llm_base_url"),
+                (self._local_llm_model, "local_llm_model"),
+                (self._local_llm_extra_body, "local_llm_extra_body_json"),
+                (self._custom_stt_endpoint, "custom_stt_endpoint"),
+                (self._custom_stt_model, "custom_stt_model"),
+                (self._custom_stt_extra, "custom_stt_extra_json"),
+            ):
+                if control.value != getattr(previous, field_name):
+                    raw_drafts.append((control, control.value, control.error))
+        preserve_vocabulary_input = (
+            selection_changed
+            and self._prompt_snapshot is not None
+            and self._prompt_snapshot.source_language == prompt.source_language
+        )
         self._rebase_provider_draft(provider)
         draft = self._provider_draft
         prompt_draft = self._prompt_editor.value if self.has_pending_prompt_changes else None
@@ -3938,7 +3837,7 @@ class SettingsView(ft.Column):
             self._prompt_snapshot = replace(prompt, system_prompt=self._prompt_editor.value)
 
         _ = preserve_custom_vocab_draft
-        self._sync_custom_vocabulary_editor_from_settings()
+        self._sync_custom_vocabulary_editor_from_settings(preserve_input=preserve_vocabulary_input)
         self._sync_peer_auto_languages_editor()
         self._sync_prompt_tab_copy()
         self._overlay_peer_contract = None
@@ -3956,6 +3855,9 @@ class SettingsView(ft.Column):
 
         # Load secrets
         self._load_secrets(provider, config_path)
+        for control, value, error in raw_drafts:
+            control.value = value
+            control.error = error
 
         if is_control_mounted(self):
             self.update()
@@ -4013,8 +3915,6 @@ class SettingsView(ft.Column):
                     self._openrouter_key.value = snapshot.openrouter_api_key
                 if snapshot.deepseek_api_key is not None:
                     self._deepseek_key.value = snapshot.deepseek_api_key
-            if result.read_error is not None:
-                raise result.read_error
             if snapshot is not None:
                 self._restore_api_key_icons(provider)
 
@@ -4222,9 +4122,6 @@ class SettingsView(ft.Column):
             self._alibaba_key_beijing.value = snapshot.alibaba_api_key_beijing
             self._alibaba_key_singapore.value = snapshot.alibaba_api_key_singapore
 
-        if result.read_error is not None:
-            raise result.read_error
-
         # Restore verification status icons from saved settings
         self._restore_api_key_icons(settings)
 
@@ -4399,9 +4296,7 @@ class SettingsView(ft.Column):
         self._openai_verification_notice.visible = self._openai_key.visible
         self._deepseek_key.visible = bool(not is_custom_http and llm == LLMProviderName.DEEPSEEK)
         self._sync_openrouter_pkce_button_state(settings)
-        self._translation_connection_row.visible = (
-            not is_custom_http and settings.translation.model != TranslationModel.MANAGED_GEMMA
-        )
+        self._translation_connection_row.visible = not is_custom_http
         self._local_llm_connection_card.visible = (
             not is_custom_http and llm == LLMProviderName.LOCAL_LLM
         )
@@ -4800,7 +4695,7 @@ class SettingsView(ft.Column):
         for section_key in _TRANSLATION_MODEL_SECTION_ORDER:
             for model in _TRANSLATION_MODELS:
                 if model == TranslationModel.MANAGED_GEMMA:
-                    if section_key == "settings.translation_model.section.recommended_local":
+                    if section_key == "settings.translation_model.section.cpu_inference":
                         options.append(
                             OptionItem(
                                 value="managed_gemma_cpu",
@@ -4851,7 +4746,7 @@ class SettingsView(ft.Column):
             self._on_llm_selected,
             show_description=True,
             two_column=True,
-            left_column_sections=2,
+            left_column_sections=1,
         )
         modal.open(current)
 
@@ -4886,7 +4781,11 @@ class SettingsView(ft.Column):
         openrouter_model = settings.openrouter_llm_model
         openrouter_source = settings.openrouter_selected_source
         openrouter_alias = settings.openrouter_selection_alias
-        if model == TranslationModel.GPT_6_LUNA:
+        if model == TranslationModel.INDEX_TRANSLATE_35B:
+            llm_provider = LLMProviderName.INDEX_TRANSLATE
+            openrouter_source = OpenRouterCredentialSource.NONE
+            openrouter_alias = None
+        elif model == TranslationModel.GPT_6_LUNA:
             if connection == TranslationConnection.OFFICIAL_BYOK:
                 llm_provider = LLMProviderName.OPENAI
                 openrouter_source = OpenRouterCredentialSource.NONE
@@ -4958,7 +4857,7 @@ class SettingsView(ft.Column):
                 openrouter_alias = OpenRouterSelectionAlias.GEMINI_FLASH_BYOK
         elif model == TranslationModel.QWEN_38_FLASH:
             llm_provider = LLMProviderName.QWEN
-        elif model == TranslationModel.MANAGED_GEMMA:
+        elif model in MANAGED_GEMMA_MODELS:
             llm_provider = LLMProviderName.MANAGED_GEMMA
         elif model == TranslationModel.LOCAL_LLM:
             llm_provider = LLMProviderName.LOCAL_LLM
@@ -5028,10 +4927,19 @@ class SettingsView(ft.Column):
         self._sync_gpu_device_card()
 
         if (
-            connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
-            or model == TranslationModel.MANAGED_GEMMA
-            or old_model == TranslationModel.MANAGED_GEMMA
+            model == TranslationModel.INDEX_TRANSLATE_35B
+            or old_model == TranslationModel.INDEX_TRANSLATE_35B
+            or connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
+            or model in MANAGED_GEMMA_MODELS
+            or old_model in MANAGED_GEMMA_MODELS
         ) and getattr(self, "on_providers_changed", None) is not None:
+            if (
+                model == TranslationModel.INDEX_TRANSLATE_35B
+                or old_model == TranslationModel.INDEX_TRANSLATE_35B
+            ):
+                self._immediate_provider_apply_intent = ProviderApplyIntent(
+                    (self._translation_selection_edit(selection),)
+                )
             self.on_providers_changed()
 
         display_settings = self._build_settings_with_provider_draft()
@@ -5099,7 +5007,7 @@ class SettingsView(ft.Column):
             if display_settings is not None
             else TranslationModel.GEMMA4_26B_31B
         )
-        if model == TranslationModel.MANAGED_GEMMA:
+        if model in MANAGED_GEMMA_MODELS:
             return
         connections = supported_translation_connections(model)
         options = [
@@ -6484,34 +6392,45 @@ class SettingsView(ft.Column):
         _update_control_if_mounted(self._vad_slider)
 
     def _handle_vad_change(self, e) -> None:
-        if self._general_snapshot is None:
-            return
-
-        new_vad = float(e.control.value)
-
-        self._general_snapshot = replace(
-            self._general_snapshot,
-            self_vad_speech_threshold=new_vad,
-        )
-        self._emit_settings_changed(SelfVadSettingsIntent(new_vad))
+        self.apply_vad_threshold("self", float(e.control.value))
 
     def _handle_peer_vad_visual_change(self, e) -> None:
         self._peer_vad_slider.label = f"{float(e.control.value):.2f}"
         _update_control_if_mounted(self._peer_vad_slider)
 
     def _handle_peer_vad_change(self, e) -> None:
+        self.apply_vad_threshold("peer", float(e.control.value))
+
+    def vad_thresholds(self) -> dict[str, float] | None:
+        if self._general_snapshot is None:
+            return None
+        return {
+            "self": self._general_snapshot.self_vad_speech_threshold,
+            "peer": self._general_snapshot.peer_vad_speech_threshold,
+        }
+
+    def apply_vad_threshold(self, channel: str, value: float) -> None:
         if self._general_snapshot is None:
             return
-
-        new_vad = float(e.control.value)
-
-        self._general_snapshot = replace(
-            self._general_snapshot,
-            peer_vad_speech_threshold=new_vad,
-        )
-        self._peer_vad_slider.label = f"{new_vad:.2f}"
-        _update_control_if_mounted(self._peer_vad_slider)
-        self._emit_settings_changed(PeerVadSpeechThresholdIntent(new_vad))
+        new_vad = float(value)
+        if channel == "peer":
+            self._general_snapshot = replace(
+                self._general_snapshot,
+                peer_vad_speech_threshold=new_vad,
+            )
+            slider = self._peer_vad_slider
+            intent = PeerVadSpeechThresholdIntent(new_vad)
+        else:
+            self._general_snapshot = replace(
+                self._general_snapshot,
+                self_vad_speech_threshold=new_vad,
+            )
+            slider = self._vad_slider
+            intent = SelfVadSettingsIntent(new_vad)
+        slider.value = new_vad
+        slider.label = f"{new_vad:.2f}"
+        _update_control_if_mounted(slider)
+        self._emit_settings_changed(intent)
 
     def _on_vrc_mic_click(self, e) -> None:
         """Toggle VRC mic intercept immediately from the unit card."""
@@ -6520,11 +6439,11 @@ class SettingsView(ft.Column):
         next_value = "off" if self._general_snapshot.vrc_mic_intercept else "on"
         self._on_vrc_mic_selected(next_value)
 
-    def _on_microphone_test_click(self, e) -> None:
-        """Request the app/controller-owned microphone-test lifecycle."""
+    def _on_audio_test_click(self, e) -> None:
+        """Request the app/controller-owned audio-test lifecycle."""
         _ = e
-        if self.on_start_microphone_test is not None:
-            self.on_start_microphone_test()
+        if self.on_start_audio_test is not None:
+            self.on_start_audio_test()
 
     def _on_vrc_mic_selected(self, value: str) -> None:
         """处理选项卡的选择结果
@@ -6817,17 +6736,13 @@ class SettingsView(ft.Column):
         self._trans_title.value = t("settings.section.translation")
         self._api_title.value = t("settings.section.api_keys")
         self._managed_key_title.value = t("settings.managed_key.title")
-        self._managed_key_referral_id_label.value = t("settings.managed_key.referral_id.label")
-        self._managed_key_invite_progress_label.value = t(
-            "settings.managed_key.invite_progress.label"
-        )
         self._ui_title.value = t("settings.section.ui")
         self._audio_host_api_title.value = t("settings.audio_host_api")
         self._mic_audio_title.value = t("settings.section.microphone_audio")
         self._loopback_audio_title.value = t("settings.section.loopback_audio")
         self._self_vad_title.value = t("settings.section.self_vad_sensitivity")
         self._peer_vad_title.value = t("settings.section.peer_vad_sensitivity")
-        self._microphone_test_title.value = t("settings.microphone_test")
+        self._audio_test_title.value = t("settings.audio_test")
         self._translation_connection_title.value = t("settings.translation_connection")
         self._cloud_free_tier_title.value = t("settings.cloud_free_tier")
         self._soniox_speaker_diarization_title.value = t("settings.soniox_speaker_diarization")
@@ -6875,7 +6790,11 @@ class SettingsView(ft.Column):
         self._peer_provider_title.value = t("settings.section.peer_stt")
         self._gpu_device_title.value = t("settings.gpu_device.asr")
         self._gpu_llm_title.value = t("settings.gpu_device.llm")
-        self._gpu_refresh_title.value = t("settings.gpu_device.refresh")
+        self._model_assets_title.value = t("settings.model_assets")
+        self._set_unit_card_value_text(
+            self._model_assets_text,
+            t("settings.model_assets.action"),
+        )
         self._overlay_target_title.value = t("settings.overlay.caption_location")
         self._overlay_translation_title.value = t("settings.overlay.show_translation")
         self._overlay_peer_original_title.value = t("settings.overlay.show_peer_original")
@@ -6956,10 +6875,6 @@ class SettingsView(ft.Column):
             self._sync_translation_connection_title(display_settings)
             self._sync_http_extension_card(display_settings, force_credentials=True)
             self._sync_managed_key_card(display_settings)
-            self._sync_managed_key_invite_progress_row(
-                self._managed_key_referral_id,
-                self._managed_key_pass_status,
-            )
             if self._general_snapshot is not None:
                 self._ui_text.content.value = locale_label(self._general_snapshot.locale)
             self._vrc_mic_text.content.value = t(
@@ -6984,8 +6899,8 @@ class SettingsView(ft.Column):
             if self._general_snapshot is not None:
                 self._sync_telemetry_enabled_card(self._general_snapshot)
             self._set_unit_card_value_text(
-                self._microphone_test_text,
-                t("settings.microphone_test.action"),
+                self._audio_test_text,
+                t("settings.audio_test.action"),
             )
             self._sync_overlay_controls()
             self._sync_overlay_calibration_controls()

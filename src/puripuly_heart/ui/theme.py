@@ -1,5 +1,6 @@
 import flet as ft
 
+from puripuly_heart.ui.fonts import TypeFace, typeface_for_language
 from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
 
 # Light Theme - Material Design 3 (Seed: #FF6B6B)
@@ -57,16 +58,53 @@ def text_field_outline_border(
     }
 
 
+def text_style(
+    face: TypeFace | None = None,
+    *,
+    size: int | float | None = None,
+    weight: ft.FontWeight | None = None,
+    color: str | None = None,
+    italic: bool | None = None,
+) -> ft.TextStyle:
+    if face is None:
+        from puripuly_heart.ui.i18n import get_locale
+
+        face = typeface_for_language(get_locale())
+    fields: dict[str, object] = {}
+    if face.font_family is not None:
+        fields["font_family"] = face.font_family
+    if face.letter_spacing is not None:
+        fields["letter_spacing"] = face.letter_spacing
+    if size is not None:
+        fields["size"] = size
+    if weight is not None:
+        fields["weight"] = weight
+    if color is not None:
+        fields["color"] = color
+    if italic is not None:
+        fields["italic"] = italic
+    return ft.TextStyle(**fields)
+
+
 def get_app_theme(
     font_family: str | None = None,
     body_letter_spacing: float | None = None,
+    *,
+    face: TypeFace | None = None,
 ) -> ft.Theme:
+    chosen = face if face is not None else TypeFace(font_family, body_letter_spacing)
     clickable = _clickable_button_style()
     text_theme = (
-        ft.TextTheme(body_medium=ft.TextStyle(letter_spacing=body_letter_spacing))
-        if body_letter_spacing is not None
+        ft.TextTheme(
+            body_medium=ft.TextStyle(
+                font_family=chosen.font_family,
+                letter_spacing=chosen.letter_spacing,
+            )
+        )
+        if chosen.letter_spacing is not None
         else None
     )
+    font_family = chosen.font_family
     return ft.Theme(
         color_scheme=ft.ColorScheme(
             surface=COLOR_SURFACE,

@@ -53,9 +53,9 @@ class RecordingChatbox:
     def process_due(self) -> None:
         return
 
-    def send_immediate(self, text: str) -> bool:
+    def send_immediate(self, text: str) -> tuple[bool, None]:
         _ = text
-        return True
+        return True, None
 
 
 class CaptureOwner:

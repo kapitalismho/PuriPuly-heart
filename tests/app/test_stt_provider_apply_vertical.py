@@ -42,6 +42,7 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
     build_peer_capture_session_config_from_vnext,
     build_peer_stt_provider_request,
     build_self_capture_session_config_from_vnext,
+    build_self_stt_provider_request_from_config,
     build_self_stt_provider_request_from_vnext,
 )
 from puripuly_heart.config.provider_values import STTProviderName
@@ -239,6 +240,7 @@ class _ChannelReset:
 
 
 class _Peer:
+    runtime = None
     last_provider_signature = None
     last_runtime_signature = None
     last_intent_enabled = False
@@ -247,10 +249,13 @@ class _Peer:
     def effective_enabled(self) -> bool:
         return False
 
+    def desired_active(self, _state) -> bool:
+        return False
+
     def activation_requested(self, *, intent_enabled: bool, eula_accepted: bool) -> bool:
         return bool(intent_enabled and eula_accepted)
 
-    def capture_runtime_convergence(self, _config) -> None:
+    def capture_runtime_convergence(self, _config, _state=None) -> None:
         return None
 
 
@@ -421,8 +426,10 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings_owner = compose_settings_owner(tmp_path / "settings.json")
+    settings_owner.persistence.persist(
+        settings_owner.path, _settings(STTProviderName.ROLLING_FREE.value)
+    )
     settings_owner.start()
-    settings_owner.canonical = _settings(STTProviderName.ROLLING_FREE.value)
     harness_factory = _RuntimeFactory()
     harness = compose_translation_test_harness(
         stt=None,
@@ -444,10 +451,8 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
     async def run_audio_loop(**_kwargs):
         await asyncio.Event().wait()
 
-    def request_factory(config, _warmup):
-        current = settings_owner.canonical
-        assert current is not None
-        return build_self_stt_provider_request_from_vnext(current)
+    def request_factory(config, warmup):
+        return build_self_stt_provider_request_from_config(config, warmup=warmup)
 
     config_a = build_self_capture_session_config_from_vnext(settings_owner.canonical)
     capture_owner = SelfCaptureSessionOwner(
@@ -460,8 +465,10 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         vad_sink=harness.self_owner,
     )
 
-    async def replace_self_stt(smooth: bool) -> None:
-        await self_application.replace_provider(smooth_local=smooth)
+    async def replace_self_stt(settings: AppSettingsVNext, smooth: bool) -> None:
+        await self_application.replace_provider_with_config(
+            build_self_capture_session_config_from_vnext(settings), smooth_local=smooth
+        )
 
     self_application = SelfCaptureApplicationOwner(
         settings_provider=lambda: SelfCaptureApplicationSettings(
@@ -506,7 +513,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         self_capture_provider=lambda: capture_owner,
         self_capture_owner=lambda: capture_owner,
         peer=lambda: peer,
-        peer_desired=lambda _settings: False,
+        peer_state=lambda _settings: None,
         canonical_settings=lambda value: value,
         clear_local_pending=lambda: None,
         sync_local_notice=lambda: None,
@@ -515,7 +522,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         dashboard_managed_pending_sink=lambda _value: None,
         sync_effective_flags=lambda: None,
         refresh_overlay=lambda: None,
-        refresh_peer_runtime=_noop,
+        refresh_peer_runtime=lambda _settings: _noop(),
         replace_self_stt=replace_self_stt,
         self_state_sink=lambda _snapshot: None,
         self_availability=lambda snapshot: snapshot.provider_status.value == "ready",
@@ -529,7 +536,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         success_sink=lambda _message: None,
         additional_signature_sink=lambda _settings: None,
     )
-    components.sync_signatures(settings_owner.canonical)
+    components.sync_stt_signatures(settings_owner.canonical)
 
     results = SettingsTransactionResultOwner()
     provider_application = ProviderApplicationOwner(
@@ -542,11 +549,10 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         apply_order24=lambda _value: _false(),
         remember_order22=lambda _value: None,
         mutation_service_provider=lambda: None,
-        save_failure_sink=lambda _message: None,
         results=results,
         sync_memory=lambda _value: None,
         capture_runtime_signatures=components.capture_signatures_before_canonical_mutation,
-        sync_signatures=components.sync_signatures,
+        sync_stt_signatures=components.sync_stt_signatures,
         consume_superseded_settings=lambda _value: False,
         active_local_asr_change=lambda _base, _next: False,
         compensate_local_asr=lambda **_kwargs: _noop(),
@@ -575,7 +581,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         peer_capture=SimpleNamespace(),
         settings=ui_settings,
         provider=ui_provider,
-        microphone=SimpleNamespace(),
+        audio_test=SimpleNamespace(),
         overlay=SimpleNamespace(),
         managed=SimpleNamespace(),
         engagement=SimpleNamespace(),
@@ -619,7 +625,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
 
     original_refresh_self_stt = components.runtime.refresh_self_stt
     original_self_runtime_convergence = components.runtime.self_runtime_convergence
-    components.runtime.refresh_self_stt = _noop
+    components.runtime.refresh_self_stt = lambda _settings: _noop()
     components.runtime.self_runtime_convergence = lambda _settings: False
     await boundary.apply_provider_intent(soniox_intent)
     stale_result = results.current
@@ -708,12 +714,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
             ),
         ),
     )
-    unrelated_plan = components.runtime.build_plan(
-        unrelated_settings,
-        force_rebuild_llm=False,
-    )
-    assert unrelated_plan.should_refresh_self_stt is False
-    await components.runtime.apply(unrelated_settings, unrelated_plan)
+    await provider_application.apply(unrelated_settings, persist_settings=False)
     assert len(harness_factory.provider_factory.providers) == provider_count_before_disable
     assert runtime.snapshot.channel_for("self").provider_id == detached_channel.provider_id
     assert capture_owner.snapshot.desired_active is False

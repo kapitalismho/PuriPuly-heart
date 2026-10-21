@@ -50,15 +50,15 @@ def test_provider_failure_report_maps_category_and_omits_raw_exception_text() ->
     assert isinstance(report, messages.UserErrorReport)
     assert report.message.key == "provider.failure"
     assert report.message.params == {
-        "category": messages.DIAGNOSTIC_CATEGORY_QUOTA,
+        "category": messages.DIAGNOSTIC_CATEGORY_UNKNOWN,
         "operation": "translate",
         "provider": "openrouter",
     }
-    assert report.diagnostics.category == messages.DIAGNOSTIC_CATEGORY_QUOTA
-    assert report.diagnostics.code == "provider.quota"
-    assert report.diagnostics.status_code == 429
+    assert report.diagnostics.category == messages.DIAGNOSTIC_CATEGORY_UNKNOWN
+    assert report.diagnostics.code == "provider.unknown"
+    assert report.diagnostics.status_code is None
     assert report.diagnostics.content_policy == messages.CONTENT_POLICY_METADATA_ONLY
-    assert report.diagnostics.fields["exception_type"] == "RuntimeError"
+    assert report.diagnostics.fields["exception_class"] == "RuntimeError"
     assert "raw_exception" not in report.diagnostics.fields
     assert "exception_text" not in report.diagnostics.fields
     _assert_raw_detail_absent(report, RAW_PROVIDER_DETAIL)
@@ -237,7 +237,9 @@ def test_format_error_report_for_log_falls_back_when_diagnostics_are_unsafe() ->
 
     rendered = error_messages.format_error_report_for_log(report)
 
-    assert rendered == "category=unknown code=diagnostics.rejected diagnostic_status=rejected"
+    assert "code=provider.unknown" in rendered
+    assert "diagnostic_status=rejected" in rendered
+    assert "rejected_fields=2" in rendered
     assert raw_detail not in rendered
     assert "formatter-secret-123" not in rendered
     assert "managed_code" not in rendered

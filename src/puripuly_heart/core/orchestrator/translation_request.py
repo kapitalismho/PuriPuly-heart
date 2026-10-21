@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Protocol, cast
@@ -13,11 +14,14 @@ from puripuly_heart.config.prompts import (
     warm_prompt_cache,
 )
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.language import get_llm_language_name, map_detected_language_for_llm
 from puripuly_heart.core.llm.latency import observe_request
+from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterUserFacingError
 from puripuly_heart.core.messages import (
     SEVERITY_ERROR,
+    ErrorDiagnostics,
     SafeMessageParam,
     UserErrorReport,
     UserMessageRef,
@@ -37,6 +41,7 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
 )
 from puripuly_heart.core.orchestrator.translation_output_projection import TranslationUiMessage
 from puripuly_heart.core.orchestrator.translation_turn import (
+    TerminalTranslationFailure,
     TranslationOutputSubmission,
     TranslationTurnKind,
     TranslationTurnOutcome,
@@ -159,6 +164,19 @@ class TranslationRequestPort(Protocol):
         requests: tuple[TranslationProcessRequest, ...],
     ) -> Mapping[UUID, PreparedTranslationRequest]: ...
 
+    def capture_terminal_failure(
+        self,
+        exception: Exception,
+        *,
+        provider_generation: int,
+        utterance_id: UUID,
+        text: str,
+        channel: ChannelId,
+        source_language: str,
+        target_language: str,
+        configuration: TranslationRuntimeConfig,
+    ) -> TerminalTranslationFailure | None: ...
+
     async def translate(self, request: DirectTranslationRequest) -> Translation: ...
 
     async def process(
@@ -221,6 +239,11 @@ class TranslationProcessRequest:
     parent_output_count: int = 1
     expected_provider_generation: int | None = None
     prestarted: bool = False
+    operation_id: str | None = None
+    request_id: str | None = None
+    terminal_failure: TerminalTranslationFailure | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         if (self.turn_generation is None) != (self.turn_order is None):
@@ -291,6 +314,7 @@ class TranslationRequestOwner:
     presentation: TranslationRequestPresentationPort = field(repr=False)
     clock: Clock
     scene_provider: SceneSnapshotProvider | None = None
+    settled_failure_sink: Callable[[BaseException], None] | None = None
 
     def __post_init__(self) -> None:
         warm_prompt_cache()
@@ -311,6 +335,40 @@ class TranslationRequestOwner:
     @property
     def provider_generation(self) -> int:
         return self.provider_runtime.current_provider_generation()[1]
+
+    def capture_terminal_failure(
+        self,
+        exception: Exception,
+        *,
+        provider_generation: int,
+        utterance_id: UUID,
+        text: str,
+        channel: ChannelId,
+        source_language: str,
+        target_language: str,
+        configuration: TranslationRuntimeConfig,
+    ) -> TerminalTranslationFailure | None:
+        provider_request = self._capture_provider_request()
+        if provider_request is None:
+            return None
+        backend, generation = provider_request
+        if (
+            generation == provider_generation
+            and isinstance(backend, LlmTranslationBackend)
+            and isinstance(backend.provider, SemaphoreLLMProvider)
+            and backend.provider.provider_name == "index_translate"
+        ):
+            return TerminalTranslationFailure(
+                exception,
+                generation,
+                utterance_id,
+                text,
+                channel,
+                source_language,
+                target_language,
+                configuration,
+            )
+        return None
 
     def runtime_for_channel(self, channel: ChannelId) -> ChannelRuntime:
         return self.peer_runtime if channel == "peer" else self.self_runtime
@@ -578,8 +636,10 @@ class TranslationRequestOwner:
                             ),
                         )
                     )
-                except Exception:
+                except Exception as exc:
                     self._raise_if_stale_provider_request(backend, generation)
+                    if request.record_latency and self.settled_failure_sink is not None:
+                        self.settled_failure_sink(exc)
                     raise
                 self._raise_if_stale_provider_request(backend, generation)
                 if request.record_latency:
@@ -632,6 +692,7 @@ class TranslationRequestOwner:
                 "stale_provider_completion",
                 source_language=request.detected_language,
                 context_texts=prepared_context_texts,
+                failure_diagnostics=self._record_stale_provider_completion(request),
             )
         request_source = self._request_source_language(
             request.channel,
@@ -655,6 +716,17 @@ class TranslationRequestOwner:
                 context_texts=prepared_context_texts,
             )
         source_language, _ = request_source
+        terminal_failure = request.terminal_failure
+        if terminal_failure is not None and (
+            terminal_failure.provider_generation != generation
+            or terminal_failure.utterance_id != request.utterance_id
+            or terminal_failure.text != request.text
+            or terminal_failure.channel != request.channel
+            or terminal_failure.source_language != source_language
+            or terminal_failure.target_language != request.target_language
+            or terminal_failure.configuration != configuration
+        ):
+            terminal_failure = None
         applied_mode: ContextMode | None = None
         context_texts: tuple[str, ...] | None = None
         try:
@@ -708,6 +780,8 @@ class TranslationRequestOwner:
             ) as observation:
                 try:
                     try:
+                        if terminal_failure is not None:
+                            raise terminal_failure.exception
                         raw_translation = await backend.translate(
                             TranslationBackendRequest(
                                 utterance_id=request.utterance_id,
@@ -757,17 +831,39 @@ class TranslationRequestOwner:
                 "stale_provider_completion",
                 source_language=source_language,
                 context_texts=context_texts,
+                failure_diagnostics=self._record_stale_provider_completion(request),
             )
         except Exception as exc:
             report = self._record_failure(request, exc)
+            terminal_failure = self.capture_terminal_failure(
+                exc,
+                provider_generation=generation,
+                utterance_id=request.utterance_id,
+                text=request.text,
+                channel=request.channel,
+                source_language=source_language,
+                target_language=request.target_language,
+                configuration=configuration,
+            )
             if not request.prestarted:
                 await self._publish_failure(request, self._translation_error_payload(exc, report))
+            if (
+                self.settled_failure_sink is not None
+                and (not request.prestarted or terminal_failure is None)
+                and self.provider_runtime.is_current_provider_generation(
+                    provider=backend, generation=generation
+                )
+                and not (cancellation_requested is not None and cancellation_requested())
+            ):
+                self.settled_failure_sink(exc)
             return self._result(
                 request,
                 "failed",
                 "provider_error",
+                failure_diagnostics=report.diagnostics,
                 source_language=source_language,
                 context_texts=context_texts,
+                terminal_failure=terminal_failure if request.prestarted else None,
             )
         return TranslationTurnProcessResult(
             "translated",
@@ -792,8 +888,41 @@ class TranslationRequestOwner:
                 turn_kind=request.turn_kind,
                 parent_output_count=request.parent_output_count,
                 context_texts=context_texts,
+                operation_id=request.operation_id,
+                request_id=request.request_id,
             ),
         )
+
+    @staticmethod
+    def _record_stale_provider_completion(request: TranslationProcessRequest) -> ErrorDiagnostics:
+        diagnostics = ErrorDiagnostics(
+            component="translation.turn",
+            operation="provider_generation",
+            code="translation.stale_provider_completion",
+            category="lifecycle",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            channel=request.channel,
+            turn_id=str(request.utterance_id),
+            generation=request.turn_generation,
+            operation_id=request.operation_id,
+            request_id=request.request_id,
+            fields={
+                "parent_utterance_id": str(request.parent_utterance_id),
+                "target_index": request.target_index,
+                "outcome": "failed",
+            },
+        )
+        emit_failure(
+            logging.getLogger(__name__),
+            diagnostics,
+            severity="info",
+            disposition="superseded",
+            stage="provider_generation",
+        )
+        return diagnostics
 
     def _capture_provider_request(self) -> tuple[TranslationBackend, int] | None:
         backend, generation = self.provider_runtime.current_provider_generation()
@@ -911,6 +1040,10 @@ class TranslationRequestOwner:
                 parent_utterance_id=request.parent_utterance_id,
                 target_index=request.target_index,
                 target_language=request.target_language,
+                utterance_id=request.utterance_id,
+                turn_generation=request.turn_generation,
+                operation_id=request.operation_id,
+                request_id=request.request_id,
             )
         )
 
@@ -941,6 +1074,8 @@ class TranslationRequestOwner:
         *,
         source_language: str | None = None,
         context_texts: tuple[str, ...] | None = None,
+        failure_diagnostics: ErrorDiagnostics | None = None,
+        terminal_failure: TerminalTranslationFailure | None = None,
     ) -> TranslationTurnProcessResult:
         return TranslationTurnProcessResult(
             outcome,
@@ -964,7 +1099,12 @@ class TranslationRequestOwner:
                 turn_kind=request.turn_kind,
                 parent_output_count=request.parent_output_count,
                 context_texts=context_texts,
+                operation_id=request.operation_id,
+                request_id=request.request_id,
+                failure_diagnostics=failure_diagnostics,
             ),
+            failure_diagnostics=failure_diagnostics,
+            terminal_failure=terminal_failure,
         )
 
     @staticmethod

@@ -15,6 +15,8 @@ import httpx
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
+from puripuly_heart.core.messages import ErrorDiagnostics
+
 CHATGPT_ISSUER: Final = "https://auth.openai.com"
 CHATGPT_AUTHORIZE_URL: Final = f"{CHATGPT_ISSUER}/api/accounts/authorize"
 CHATGPT_TOKEN_URL: Final = f"{CHATGPT_ISSUER}/api/accounts/oauth/token"
@@ -50,10 +52,23 @@ _TERMINAL_REFRESH_ERRORS: Final = frozenset(
 class ChatGptAuthError(RuntimeError):
     diagnostic_provider = "chatgpt"
 
-    def __init__(self, code: str, *, status_code: int | None = None) -> None:
+    def __init__(
+        self,
+        code: str,
+        *,
+        status_code: int | None = None,
+        diagnostics: ErrorDiagnostics | None = None,
+        secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
+        secondary_omitted_count: int = 0,
+    ) -> None:
         super().__init__(f"ChatGPT authorization failed ({code})")
         self.code = code
         self.status_code = status_code
+        self.diagnostics = diagnostics
+        self.secondary_diagnostics = secondary_diagnostics[:4]
+        self.secondary_omitted_count = secondary_omitted_count + max(
+            0, len(secondary_diagnostics) - 4
+        )
 
 
 class ChatGptReauthRequired(ChatGptAuthError):
@@ -179,12 +194,17 @@ def _oauth_error_code(response: httpx.Response) -> str | None:
     if not isinstance(payload, dict):
         return None
     error = payload.get("error")
-    if isinstance(error, str):
-        return error
     if isinstance(error, dict):
-        code = error.get("code") or error.get("type")
-        return code if isinstance(code, str) else None
-    return None
+        error = error.get("code") or error.get("type")
+    allowed = _TERMINAL_REFRESH_ERRORS | {
+        "access_denied",
+        "invalid_request",
+        "invalid_scope",
+        "unauthorized_client",
+        "server_error",
+        "temporarily_unavailable",
+    }
+    return error if isinstance(error, str) and error in allowed else None
 
 
 async def exchange_authorization_code(
@@ -243,12 +263,18 @@ async def refresh_access_token(
     raise ChatGptAuthError(code, status_code=response.status_code)
 
 
+@dataclass(frozen=True, slots=True)
+class ChatGptRevocationResult:
+    revoked: bool
+    status_code: int
+
+
 async def revoke_refresh_token(
     http: httpx.AsyncClient,
     *,
     client_id: str,
     refresh_token: str,
-) -> bool:
+) -> ChatGptRevocationResult:
     response = await http.post(
         CHATGPT_REVOKE_URL,
         data={
@@ -257,7 +283,7 @@ async def revoke_refresh_token(
             "client_id": client_id,
         },
     )
-    return response.status_code == 200
+    return ChatGptRevocationResult(response.status_code == 200, response.status_code)
 
 
 def _decode_jwt(token: str) -> tuple[dict[str, object], dict[str, object], bytes, bytes]:

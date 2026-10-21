@@ -56,9 +56,14 @@ async def _read(reader: asyncio.StreamReader) -> dict[str, Any]:
 
 class ControlServer:
     def __init__(self, control: Any, *, instance_id: str, token: str):
-        from puripuly_heart.app.services.application_control import UnknownOperationError
+        from puripuly_heart.app.services.application_control import (
+            InvalidArgumentsError,
+            UnknownOperationError,
+        )
+        from puripuly_heart.core.diagnostics import DiagnosticQueryArgumentsError
 
         self._unknown_operation_error = UnknownOperationError
+        self._argument_errors = (InvalidArgumentsError, DiagnosticQueryArgumentsError)
         self.control = control
         self.instance_id = instance_id
         self._token = token
@@ -191,12 +196,24 @@ class ControlServer:
                         "malformed_request",
                         "Subscription cursor must be a nonnegative sequence number",
                     )
+                cursor_instance_id = arguments.get("cursor_instance_id")
+                if cursor_instance_id is not None and (
+                    not isinstance(cursor_instance_id, str) or len(cursor_instance_id) > 64
+                ):
+                    raise ControlTransportError(
+                        "malformed_request", "Invalid cursor instance identity"
+                    )
                 subscription: AsyncIterator[dict[str, Any]] = self.control.subscribe(
                     topics=topics,
                     channel=channel,
                     include_transcripts=arguments.get("include_transcripts", False),
                     include_translations=arguments.get("include_translations", False),
                     after=arguments.get("after"),
+                    **(
+                        {"cursor_instance_id": cursor_instance_id}
+                        if cursor_instance_id is not None
+                        else {}
+                    ),
                 )
                 await self._send(
                     writer,
@@ -209,18 +226,45 @@ class ControlServer:
                 )
                 self._finish_dispatch()
                 dispatching = False
+                disconnected = asyncio.create_task(
+                    reader.read(1), name="control:subscriber-disconnect"
+                )
+                pending_event = None
                 async with aclosing(subscription):
-                    async for event in subscription:
-                        if self._closing:
-                            break
-                        await self._send(
-                            writer,
-                            {
-                                "protocol": PROTOCOL_VERSION,
-                                "instance_id": self.instance_id,
-                                "request_id": request_id,
-                                "event": event,
-                            },
+                    try:
+                        while not self._closing:
+                            pending_event = asyncio.create_task(
+                                anext(subscription), name="control:subscriber-event"
+                            )
+                            completed, _ = await asyncio.wait(
+                                (pending_event, disconnected),
+                                return_when=asyncio.FIRST_COMPLETED,
+                            )
+                            if disconnected in completed:
+                                pending_event.cancel()
+                                await asyncio.gather(pending_event, return_exceptions=True)
+                                break
+                            try:
+                                event = pending_event.result()
+                            except StopAsyncIteration:
+                                break
+                            await self._send(
+                                writer,
+                                {
+                                    "protocol": PROTOCOL_VERSION,
+                                    "instance_id": self.instance_id,
+                                    "request_id": request_id,
+                                    "event": event,
+                                },
+                            )
+                    finally:
+                        disconnected.cancel()
+                        if pending_event is not None:
+                            pending_event.cancel()
+                        await asyncio.gather(
+                            disconnected,
+                            *([pending_event] if pending_event is not None else []),
+                            return_exceptions=True,
                         )
                 return
             else:
@@ -251,6 +295,10 @@ class ControlServer:
                 request_id,
                 "unknown_or_expired_operation",
                 "Operation identity is unknown or expired in this application instance",
+            )
+        except self._argument_errors:
+            await self._send_error(
+                writer, request_id, "invalid_arguments", "Control arguments are invalid"
             )
         except Exception:
             await self._send_error(

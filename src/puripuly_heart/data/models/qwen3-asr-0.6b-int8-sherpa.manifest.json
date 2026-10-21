@@ -11,14 +11,14 @@
     "huggingface": {
       "name": "huggingface",
       "repo_id": "csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
-      "revision": "2cc50d1abfe4d4f2df8d71f536d108bb40f943d2",
-      "download_url_template": "https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/2cc50d1abfe4d4f2df8d71f536d108bb40f943d2/{path}"
+      "revision": "68818b2313fe77bd06f6a7c5068ff3ef59d02b8a",
+      "download_url_template": "https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/68818b2313fe77bd06f6a7c5068ff3ef59d02b8a/{path}"
     },
     "modelscope": {
       "name": "modelscope",
       "repo_id": "zengshuishui/Qwen3-ASR-onnx",
-      "revision": "c69fb1666ccb59a82c09840c511a6c894e6a2482",
-      "download_url_template": "https://www.modelscope.cn/api/v1/models/zengshuishui/Qwen3-ASR-onnx/repo?Revision=c69fb1666ccb59a82c09840c511a6c894e6a2482&FilePath={path}"
+      "revision": "de9e449eb376dcb472c1ce8141fbae8d524fabbd",
+      "download_url_template": "https://www.modelscope.cn/api/v1/models/zengshuishui/Qwen3-ASR-onnx/repo?Revision=de9e449eb376dcb472c1ce8141fbae8d524fabbd&FilePath={path}"
     }
   },
   "files": [
@@ -32,8 +32,8 @@
     },
     {
       "relative_path": "decoder.int8.onnx",
-      "sha256": "61e5f8249f9e7c82d5e01e1938c79fb3f5b3135f91664928033029e42451bd18",
-      "size_bytes": 756563239,
+      "sha256": "4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771",
+      "size_bytes": 755914231,
       "source_path_overrides": {
         "modelscope": "model_0.6B/decoder.int8.onnx"
       }

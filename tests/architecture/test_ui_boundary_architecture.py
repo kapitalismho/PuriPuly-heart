@@ -66,7 +66,7 @@ def test_ui_application_contract_covers_every_translator_app_boundary_access() -
         "peer_capture",
         "settings",
         "provider",
-        "microphone",
+        "audio_test",
         "overlay",
         "managed",
         "engagement",

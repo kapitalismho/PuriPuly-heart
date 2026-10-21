@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from dataclasses import field as dataclass_field
 
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
 from puripuly_heart.app.ports.settings_runtime_effects import SettingsRuntimeState
+from puripuly_heart.core.diagnostics import safe_exception_fields
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_LIFECYCLE,
@@ -48,11 +50,14 @@ class ProviderRuntimeState:
     peer_stt_available: bool
     self_stt_desired: bool
     peer_stt_desired: bool
+    self_failure_diagnostics: ErrorDiagnostics | None = None
+    peer_failure_diagnostics: ErrorDiagnostics | None = None
 
 
 ProviderRuntimeStateProvider = Callable[[object], ProviderRuntimeState]
 ProviderRuntimeCommonEffect = Callable[[object], None]
 ProviderRuntimeAsyncEffect = Callable[[], Awaitable[None]]
+ProviderRuntimeSettingsEffect = Callable[[object], Awaitable[None]]
 ProviderRuntimeGpuEffect = Callable[
     [object, ProviderRuntimeApplyPlan],
     Awaitable[None],
@@ -87,6 +92,19 @@ def _unknown_peer_runtime_convergence(_settings: object) -> bool | None:
 class ProviderRuntimeConvergenceError(RuntimeError):
     code = "stt_runtime_apply_not_converged"
 
+    def __init__(
+        self, message: str, *, failure_diagnostics: ErrorDiagnostics | None = None
+    ) -> None:
+        self.failure_diagnostics = failure_diagnostics
+        super().__init__(message)
+
+
+class _ProviderRuntimeApplyFailures(RuntimeError):
+    def __init__(self, primary: Exception, secondary: Exception) -> None:
+        self.primary = primary
+        self.secondary = secondary
+        super().__init__("Independent provider runtime applications failed")
+
 
 @dataclass(frozen=True, slots=True)
 class LlmProviderRebuildContext:
@@ -104,21 +122,47 @@ class LlmProviderRebuildOwner:
     usage_refresh: ProviderRuntimeAsyncEffect
     failure_sink: LlmProviderMessageSink
     success_sink: LlmProviderMessageSink
+    signature_sink: ProviderRuntimeSignatureSink
+    retry_sink: ProviderRuntimeRetrySink
     runtime: ProviderRuntimeRebuildService = dataclass_field(
         default_factory=ProviderRuntimeRebuildService,
     )
 
-    async def rebuild(self) -> bool:
-        context = self.context_provider()
+    async def rebuild(self, *, propagate_failure: bool = False) -> bool:
+        return await self.rebuild_with_context(
+            self.context_provider(), propagate_failure=propagate_failure
+        )
+
+    async def rebuild_with_context(
+        self,
+        context: LlmProviderRebuildContext | None,
+        *,
+        propagate_failure: bool = False,
+    ) -> bool:
         if context is None:
             return False
-        outcome = await self.runtime.rebuild_llm_provider(
-            replace_provider=context.replace_provider,
-            create_provider=lambda: self.provider_factory(context.settings),
-        )
+        try:
+            outcome = await self.runtime.rebuild_llm_provider(
+                replace_provider=context.replace_provider,
+                create_provider=lambda: self.provider_factory(context.settings),
+            )
+        except BaseException:
+            self.retry_sink()
+            raise
         provider = outcome.provider
+        if provider is None:
+            self.retry_sink()
+        else:
+            self.signature_sink(context.settings)
         self.availability_sink(provider is None and context.requires_secret)
-        await self.usage_refresh()
+        try:
+            await self.usage_refresh()
+        except Exception:
+            if propagate_failure and outcome.error is not None:
+                raise outcome.error
+            raise
+        if propagate_failure and outcome.error is not None:
+            raise outcome.error
         if provider is None:
             self.failure_sink(f"{context.resource_label} not available")
             return False
@@ -130,12 +174,11 @@ class LlmProviderRebuildOwner:
 class ProviderRuntimeOwner:
     state_provider: ProviderRuntimeStateProvider
     common_effect: ProviderRuntimeCommonEffect
-    rebuild_llm: ProviderRuntimeAsyncEffect
+    rebuild_llm: ProviderRuntimeSettingsEffect
     recover_gpu: ProviderRuntimeGpuEffect
-    refresh_peer: ProviderRuntimeAsyncEffect
-    refresh_self_stt: ProviderRuntimeAsyncEffect
+    refresh_peer: ProviderRuntimeSettingsEffect
+    refresh_self_stt: ProviderRuntimeSettingsEffect
     signature_sink: ProviderRuntimeSignatureSink
-    llm_retry_sink: ProviderRuntimeRetrySink
     current_settings_provider: ProviderRuntimeSettingsProvider
     signature_cache_provider: ProviderRuntimeSignatureCacheProvider
     self_signature_builder: ProviderRuntimeSignatureBuilder
@@ -198,34 +241,42 @@ class ProviderRuntimeOwner:
         self,
         settings: object,
         plan: ProviderRuntimeApplyPlan,
-    ) -> None:
+    ) -> object:
         self.common_effect(settings)
+        llm_error: Exception | None = None
         if plan.should_rebuild_llm:
-            await self.rebuild_llm()
-        if plan.coordinated_gpu_restart:
-            await self.recover_gpu(settings, plan)
+            try:
+                await self.rebuild_llm(settings)
+            except Exception as exc:
+                llm_error = exc
+        try:
+            if plan.coordinated_gpu_restart:
+                await self.recover_gpu(settings, plan)
+            else:
+                if plan.should_refresh_peer:
+                    await self.refresh_peer(settings)
+                if plan.should_refresh_self_stt:
+                    await self.refresh_self_stt(settings)
             self._require_stt_runtime_convergence(settings)
             self.signature_sink(settings)
-            if plan.should_rebuild_llm and not self.state_provider(settings).llm_available:
-                self.llm_retry_sink()
-            return
-        if plan.should_refresh_peer:
-            await self.refresh_peer()
-        if plan.should_refresh_self_stt:
-            await self.refresh_self_stt()
-        self._require_stt_runtime_convergence(settings)
-        self.signature_sink(settings)
-        if plan.should_rebuild_llm and not self.state_provider(settings).llm_available:
-            self.llm_retry_sink()
+        except Exception as exc:
+            if llm_error is not None:
+                raise _ProviderRuntimeApplyFailures(llm_error, exc) from llm_error
+            raise
+        if llm_error is not None:
+            raise llm_error
+        return settings
 
     def _require_stt_runtime_convergence(self, settings: object) -> None:
         if self.self_runtime_convergence(settings) is False:
             raise ProviderRuntimeConvergenceError(
                 "Self STT runtime did not converge to requested settings",
+                failure_diagnostics=self.state_provider(settings).self_failure_diagnostics,
             )
         if self.peer_runtime_convergence(settings) is False:
             raise ProviderRuntimeConvergenceError(
                 "Peer STT runtime did not converge to requested settings",
+                failure_diagnostics=self.state_provider(settings).peer_failure_diagnostics,
             )
 
     def unavailable_result(
@@ -271,7 +322,20 @@ def _settings_mutation_diagnostics(
     code: str,
     category=DIAGNOSTIC_CATEGORY_TRANSACTION,
     surface: str = "translation_provider",
+    exception: BaseException | None = None,
 ) -> ErrorDiagnostics:
+    if isinstance(exception, _ProviderRuntimeApplyFailures):
+        exception = exception.primary
+    current = exception
+    for _ in range(4):
+        if current is None:
+            break
+        diagnostics = getattr(current, "failure_diagnostics", None)
+        if not isinstance(diagnostics, ErrorDiagnostics):
+            diagnostics = getattr(current, "diagnostics", None)
+        if isinstance(diagnostics, ErrorDiagnostics):
+            return replace(diagnostics, fields={**diagnostics.fields, "surface": surface})
+        current = current.__cause__
     return ErrorDiagnostics(
         component=component,
         operation=operation,
@@ -281,29 +345,66 @@ def _settings_mutation_diagnostics(
         content_policy=CONTENT_POLICY_METADATA_ONLY,
         status_code=None,
         retry_after_ms=None,
-        fields={"surface": surface},
+        fields={
+            "surface": surface,
+            "phase": (
+                "settings_save"
+                if code == "settings_save_failed"
+                else (
+                    operation
+                    if operation
+                    in {
+                        "rollback",
+                        "commit_notification",
+                        "failure_notification",
+                        "compensate_local_asr",
+                        "resync_committed_runtime",
+                        "restore_memory",
+                    }
+                    else "runtime_apply"
+                )
+            ),
+            **(safe_exception_fields(exception) if exception is not None else {}),
+        },
     )
 
 
 def _exception_code(exc: BaseException, fallback: str) -> str:
-    code = getattr(exc, "code", None)
-    return code if isinstance(code, str) and code else fallback
+    from puripuly_heart.app.services.capture.self_capture_application import (
+        SelfCaptureRuntimeApplyError,
+    )
+
+    if isinstance(exc, ProviderRuntimeConvergenceError):
+        return ProviderRuntimeConvergenceError.code
+    if isinstance(exc, SelfCaptureRuntimeApplyError):
+        return SelfCaptureRuntimeApplyError.code
+    return fallback
 
 
-def _log_runtime_apply_exception(
-    sink: Callable[[str], None] | None,
+def _settings_mutation_secondary_diagnostics(
     *,
+    primary: ErrorDiagnostics,
+    component: str,
     operation: str,
-    surface: str,
-    exc: BaseException,
-) -> None:
-    if sink is None:
-        return
-    sink(
-        "[Settings] runtime_apply_failed "
-        f"surface={surface} operation={operation} "
-        f"exception_type={type(exc).__name__} "
-        f"exception_code={_exception_code(exc, 'none')}"
+    code: str,
+    category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+    surface: str = "translation_provider",
+    exception: BaseException | None = None,
+) -> tuple[ErrorDiagnostics, ...]:
+    if not isinstance(exception, _ProviderRuntimeApplyFailures):
+        return ()
+    return (
+        replace(
+            _settings_mutation_diagnostics(
+                component=component,
+                operation=operation,
+                code=_exception_code(exception.secondary, code),
+                category=category,
+                surface=surface,
+                exception=exception.secondary,
+            ),
+            cause_id=primary.diagnostic_id,
+        ),
     )
 
 
@@ -312,6 +413,7 @@ def _runtime_apply_failed_result(
     operation: str,
     code: str,
     surface: str,
+    exception: BaseException | None = None,
 ) -> RuntimeApplyResult:
     return RuntimeApplyResult(
         status=RUNTIME_APPLY_STATUS_FAILED,
@@ -321,11 +423,12 @@ def _runtime_apply_failed_result(
             severity=SEVERITY_WARNING,
         ),
         diagnostics=_settings_mutation_diagnostics(
-            component="gui_controller",
+            component="settings_application",
             operation=operation,
             code=code,
             category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
             surface=surface,
+            exception=exception,
         ),
     )
 
@@ -337,6 +440,8 @@ def _runtime_apply_result_as_degraded_transaction(
         status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
         message=runtime_result.message,
         diagnostics=runtime_result.diagnostics,
+        secondary_diagnostics=runtime_result.secondary_diagnostics,
+        secondary_omitted_count=runtime_result.secondary_omitted_count,
     )
 
 
@@ -386,18 +491,21 @@ def _stt_language_audio_runtime_unavailable_result(
 
 
 def _stt_language_audio_runtime_degraded_transaction_result(
-    *, code: str | None = None
+    *, code: str | None = None, exception: BaseException | None = None
 ) -> TransactionResult:
     return _runtime_apply_result_as_degraded_transaction(
         _runtime_apply_failed_result(
             operation="apply_stt_language_audio_runtime",
             code=code or "stt_language_audio_runtime_apply_exception",
             surface="stt_language_audio",
+            exception=exception,
         )
     )
 
 
-def _translation_provider_save_failed_transaction_result(*, operation: str) -> TransactionResult:
+def _translation_provider_save_failed_transaction_result(
+    *, operation: str, exception: BaseException | None = None
+) -> TransactionResult:
     return TransactionResult(
         status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
         message=UserMessageRef(
@@ -406,16 +514,19 @@ def _translation_provider_save_failed_transaction_result(*, operation: str) -> T
             severity=SEVERITY_WARNING,
         ),
         diagnostics=_settings_mutation_diagnostics(
-            component="gui_controller",
+            component="settings_application",
             operation=operation,
             code="settings_save_failed",
             category=DIAGNOSTIC_CATEGORY_TRANSACTION,
             surface="translation_provider",
+            exception=exception,
         ),
     )
 
 
-def _stt_language_audio_save_failed_transaction_result(*, operation: str) -> TransactionResult:
+def _stt_language_audio_save_failed_transaction_result(
+    *, operation: str, exception: BaseException | None = None
+) -> TransactionResult:
     return TransactionResult(
         status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
         message=UserMessageRef(
@@ -424,28 +535,32 @@ def _stt_language_audio_save_failed_transaction_result(*, operation: str) -> Tra
             severity=SEVERITY_WARNING,
         ),
         diagnostics=_settings_mutation_diagnostics(
-            component="gui_controller",
+            component="settings_application",
             operation=operation,
             code="settings_save_failed",
             category=DIAGNOSTIC_CATEGORY_TRANSACTION,
             surface="stt_language_audio",
+            exception=exception,
         ),
     )
 
 
 def _overlay_osc_output_runtime_degraded_transaction_result(
-    *, code: str | None = None
+    *, code: str | None = None, exception: BaseException | None = None
 ) -> TransactionResult:
     return _runtime_apply_result_as_degraded_transaction(
         _runtime_apply_failed_result(
             operation="apply_overlay_osc_output_runtime",
             code=code or "overlay_osc_output_runtime_apply_exception",
             surface="overlay_osc_output",
+            exception=exception,
         )
     )
 
 
-def _overlay_osc_output_save_failed_transaction_result(*, operation: str) -> TransactionResult:
+def _overlay_osc_output_save_failed_transaction_result(
+    *, operation: str, exception: BaseException | None = None
+) -> TransactionResult:
     return TransactionResult(
         status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
         message=UserMessageRef(
@@ -454,29 +569,31 @@ def _overlay_osc_output_save_failed_transaction_result(*, operation: str) -> Tra
             severity=SEVERITY_WARNING,
         ),
         diagnostics=_settings_mutation_diagnostics(
-            component="gui_controller",
+            component="settings_application",
             operation=operation,
             code="settings_save_failed",
             category=DIAGNOSTIC_CATEGORY_TRANSACTION,
             surface="overlay_osc_output",
+            exception=exception,
         ),
     )
 
 
 def _ui_prompt_clipboard_state_runtime_degraded_transaction_result(
-    *, code: str | None = None
+    *, code: str | None = None, exception: BaseException | None = None
 ) -> TransactionResult:
     return _runtime_apply_result_as_degraded_transaction(
         _runtime_apply_failed_result(
             operation="apply_ui_prompt_clipboard_state_runtime",
             code=code or "ui_prompt_clipboard_state_runtime_apply_exception",
             surface="ui_prompt_clipboard_state",
+            exception=exception,
         )
     )
 
 
 def _ui_prompt_clipboard_state_save_failed_transaction_result(
-    *, operation: str
+    *, operation: str, exception: BaseException | None = None
 ) -> TransactionResult:
     return TransactionResult(
         status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
@@ -486,11 +603,12 @@ def _ui_prompt_clipboard_state_save_failed_transaction_result(
             severity=SEVERITY_WARNING,
         ),
         diagnostics=_settings_mutation_diagnostics(
-            component="gui_controller",
+            component="settings_application",
             operation=operation,
             code="settings_save_failed",
             category=DIAGNOSTIC_CATEGORY_TRANSACTION,
             surface="ui_prompt_clipboard_state",
+            exception=exception,
         ),
     )
 
@@ -498,23 +616,39 @@ def _ui_prompt_clipboard_state_save_failed_transaction_result(
 @dataclass(slots=True)
 class ProviderRuntimeApplyAdapter:
     owner: ProviderRuntimeOwner
-    settings: object
+    settings_provider: ProviderRuntimeSettingsProvider
     plan: ProviderRuntimeApplyPlan
     surface: str = "translation_provider"
     operation: str = "apply_provider_runtime"
+    authority_guard: Callable[[], bool] | None = None
 
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
+        if self.authority_guard is not None and not self.authority_guard():
+            raise asyncio.CancelledError
         try:
-            await self.owner.apply(self.settings, self.plan)
+            current = self.settings_provider()
+            if current is None:
+                raise RuntimeError("provider runtime has no admitted settings")
+            settings = await self.owner.apply(current, self.plan)
         except Exception as exc:
-            logger.log(
-                logging.WARNING,
-                "[Settings] provider_apply_failed operation=%s exception_type=%s cause=%s",
-                self.operation,
-                type(exc).__name__,
-                _exception_code(exc, "provider_runtime_apply_exception"),
-                extra={LIVE_AUDIENCE_RECORD_ATTRIBUTE: LIVE_AUDIENCE_BASIC},
+            primary = exc.primary if isinstance(exc, _ProviderRuntimeApplyFailures) else exc
+            diagnostics = _settings_mutation_diagnostics(
+                component="provider_application",
+                operation=self.operation,
+                code=_exception_code(primary, "provider_runtime_apply_exception"),
+                category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
+                surface=self.surface,
+                exception=primary,
+            )
+            secondary = _settings_mutation_secondary_diagnostics(
+                primary=diagnostics,
+                component="provider_application",
+                operation=self.operation,
+                code="provider_runtime_apply_exception",
+                category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
+                surface=self.surface,
+                exception=exc,
             )
             return RuntimeApplyResult(
                 status=RUNTIME_APPLY_STATUS_FAILED,
@@ -523,33 +657,17 @@ class ProviderRuntimeApplyAdapter:
                     params={"phase": "runtime_apply"},
                     severity=SEVERITY_WARNING,
                 ),
-                diagnostics=_settings_mutation_diagnostics(
-                    component="gui_controller",
-                    operation=self.operation,
-                    code=_exception_code(exc, "provider_runtime_apply_exception"),
-                    category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
-                    surface=self.surface,
-                ),
+                diagnostics=diagnostics,
+                secondary_diagnostics=secondary,
             )
         unavailable_result = _provider_runtime_apply_unavailable_result(
             owner=self.owner,
-            settings=self.settings,
+            settings=settings,
             plan=self.plan,
             operation=self.operation,
             surface=self.surface,
         )
         if unavailable_result is not None:
-            logger.log(
-                logging.WARNING,
-                "[Settings] provider_apply_failed operation=%s cause=%s",
-                self.operation,
-                (
-                    unavailable_result.diagnostics.code
-                    if unavailable_result.diagnostics is not None
-                    else "provider_runtime_apply_unavailable"
-                ),
-                extra={LIVE_AUDIENCE_RECORD_ATTRIBUTE: LIVE_AUDIENCE_BASIC},
-            )
             return unavailable_result
         logger.log(
             logging.INFO,
@@ -572,7 +690,6 @@ class SttLanguageAudioRuntimeApplyAdapter:
     state_provider: SettingsRuntimeStateProvider
     settings: object
     reload_settings_view: bool = True
-    failure_sink: Callable[[str], None] | None = None
 
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
@@ -582,12 +699,6 @@ class SttLanguageAudioRuntimeApplyAdapter:
                 self.reload_settings_view,
             )
         except Exception as exc:
-            _log_runtime_apply_exception(
-                self.failure_sink,
-                operation="apply_stt_language_audio_runtime",
-                surface="stt_language_audio",
-                exc=exc,
-            )
             return RuntimeApplyResult(
                 status=RUNTIME_APPLY_STATUS_FAILED,
                 message=UserMessageRef(
@@ -596,7 +707,7 @@ class SttLanguageAudioRuntimeApplyAdapter:
                     severity=SEVERITY_WARNING,
                 ),
                 diagnostics=_settings_mutation_diagnostics(
-                    component="gui_controller",
+                    component="settings_application",
                     operation="apply_stt_language_audio_runtime",
                     code=_exception_code(
                         exc,
@@ -604,6 +715,7 @@ class SttLanguageAudioRuntimeApplyAdapter:
                     ),
                     category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
                     surface="stt_language_audio",
+                    exception=exc,
                 ),
             )
         unavailable_result = _stt_language_audio_runtime_unavailable_result(
@@ -623,7 +735,6 @@ class SttLanguageAudioRuntimeApplyAdapter:
 class OverlayOscOutputRuntimeApplyAdapter:
     apply_settings: SettingsRuntimeApplyEffect
     settings: object
-    failure_sink: Callable[[str], None] | None = None
 
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
@@ -633,16 +744,11 @@ class OverlayOscOutputRuntimeApplyAdapter:
                 True,
             )
         except Exception as exc:
-            _log_runtime_apply_exception(
-                self.failure_sink,
-                operation="apply_overlay_osc_output_runtime",
-                surface="overlay_osc_output",
-                exc=exc,
-            )
             return _runtime_apply_failed_result(
                 operation="apply_overlay_osc_output_runtime",
                 code=_exception_code(exc, "overlay_osc_output_runtime_apply_exception"),
                 surface="overlay_osc_output",
+                exception=exc,
             )
         return RuntimeApplyResult(
             status=RUNTIME_APPLY_STATUS_APPLIED,
@@ -655,7 +761,6 @@ class OverlayOscOutputRuntimeApplyAdapter:
 class UiPromptClipboardStateRuntimeApplyAdapter:
     apply_settings: SettingsRuntimeApplyEffect
     settings: object
-    failure_sink: Callable[[str], None] | None = None
 
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
@@ -665,12 +770,6 @@ class UiPromptClipboardStateRuntimeApplyAdapter:
                 True,
             )
         except Exception as exc:
-            _log_runtime_apply_exception(
-                self.failure_sink,
-                operation="apply_ui_prompt_clipboard_state_runtime",
-                surface="ui_prompt_clipboard_state",
-                exc=exc,
-            )
             return _runtime_apply_failed_result(
                 operation="apply_ui_prompt_clipboard_state_runtime",
                 code=_exception_code(
@@ -678,6 +777,7 @@ class UiPromptClipboardStateRuntimeApplyAdapter:
                     "ui_prompt_clipboard_state_runtime_apply_exception",
                 ),
                 surface="ui_prompt_clipboard_state",
+                exception=exc,
             )
         return RuntimeApplyResult(
             status=RUNTIME_APPLY_STATUS_APPLIED,

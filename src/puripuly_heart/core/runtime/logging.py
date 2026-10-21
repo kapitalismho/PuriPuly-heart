@@ -7,7 +7,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Literal, Protocol
 
-from puripuly_heart.core.messages import DiagnosticFieldValue
+from puripuly_heart.core.messages import DiagnosticFieldValue, ErrorDiagnostics
 from puripuly_heart.core.observability import ConversationRecordChannel, RealtimeLogSink
 
 LIVE_AUDIENCE_RECORD_ATTRIBUTE = "_puripuly_heart_live_audience"
@@ -73,6 +73,22 @@ def _deliver_record(logger: logging.Logger, record: logging.LogRecord) -> bool:
 
 class RuntimeLoggingAdapterPort(Protocol):
     log_file: Path
+
+    def configure_diagnostics(self, *, instance_id: str | None = None, event_sink=None) -> None: ...
+
+    def diagnostic_history(self, arguments: dict) -> dict: ...
+
+    def diagnostic_health(self) -> dict: ...
+
+    def emit_failure(
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
+        exception: BaseException | None = None,
+    ) -> dict: ...
 
     def attach_realtime_sink(self, sink: RealtimeLogSink) -> None: ...
 
@@ -141,7 +157,7 @@ class RuntimeLoggingService:
         "live log sink",
         "queue listener",
         "file handlers",
-        "persisted diagnostics",
+        "retained diagnostic metadata",
     )
     stop_ingress = "stop after producers have stopped"
     shutdown_policy = "flush final shutdown summary, then close handlers"
@@ -193,6 +209,38 @@ class RuntimeLoggingService:
             return
         self._session.detach_realtime_sink()
 
+    def configure_diagnostics(self, *, instance_id: str | None = None, event_sink=None) -> None:
+        self._session.configure_diagnostics(instance_id=instance_id, event_sink=event_sink)
+
+    def diagnostic_history(self, arguments: dict) -> dict:
+        return self._session.diagnostic_history(arguments)
+
+    def diagnostic_health(self) -> dict:
+        return self._session.diagnostic_health()
+
+    def emit_failure(
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
+        exception: BaseException | None = None,
+    ) -> dict:
+        return self._session.emit_failure(
+            diagnostics,
+            severity=severity,
+            disposition=disposition,
+            stage=stage,
+            exception=exception,
+        )
+
+    def record_output_routing_decision(self, decision) -> None:
+        self._session.record_output_routing_decision(decision)
+
+    def observe_provider_operation(self, **kwargs) -> None:
+        self._session.observe_provider_operation(**kwargs)
+
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
         if self._closed:
             self._emit_fallback(message, level=level)
@@ -233,11 +281,28 @@ class RuntimeLoggingService:
             return rendered
 
         if self._closed:
-            return self._emit_fallback(render(), level=level)
+            return False
         try:
             return self._session.emit_diagnostic_lazy(render, level=level)
-        except Exception:
-            return self._emit_delivery_fallback(render(), level=level, live=False)
+        except Exception as exc:
+            if rendered is None:
+                self._session.emit_failure(
+                    ErrorDiagnostics(
+                        component="runtime_logging",
+                        operation="emit",
+                        code="diagnostic_builder_failed",
+                        category="lifecycle",
+                        visibility="diagnostic_only",
+                        content_policy="metadata_only",
+                        status_code=None,
+                        retry_after_ms=None,
+                        fields={},
+                    ),
+                    stage="diagnostic",
+                    exception=exc,
+                )
+                return False
+            return self._emit_delivery_fallback(rendered, level=level, live=False)
 
     def emit_persisted(self, message: str, *, level: int = logging.INFO) -> None:
         if self._closed:

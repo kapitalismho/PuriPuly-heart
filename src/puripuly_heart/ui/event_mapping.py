@@ -3,10 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from puripuly_heart.domain.events import STTSessionState, UIEvent, UIEventType
+from puripuly_heart.domain.events import (
+    SelfTurnPresentation,
+    STTSessionState,
+    UIEvent,
+    UIEventType,
+)
 from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 
-MappedEventKind = Literal["status", "transcript", "translation", "osc", "error"]
+MappedEventKind = Literal["status", "transcript", "translation", "self_turn", "osc", "error"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +32,10 @@ def map_ui_event(event: UIEvent) -> MappedEvent | None:
             source=event.source,
             status=_status_for_session_state(event.payload),
         )
+    if event.type == UIEventType.SELF_TURN_UPDATED:
+        if not isinstance(event.payload, SelfTurnPresentation):
+            return None
+        return MappedEvent(kind="self_turn", payload=event.payload, source=event.source)
     if event.type in (UIEventType.TRANSCRIPT_PARTIAL, UIEventType.TRANSCRIPT_FINAL):
         if not isinstance(event.payload, Transcript):
             return None

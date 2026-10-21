@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Literal
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
@@ -43,6 +44,7 @@ from puripuly_heart.app.services.managed_gemma_translation import (
     ManagedGemmaTranslationOwner,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
+from puripuly_heart.app.services.model_assets import ModelAssetsApplication
 from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
@@ -69,8 +71,8 @@ from puripuly_heart.app.services.settings_projection import (
     SettingsProjectionOwner,
 )
 from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
+from puripuly_heart.app.wiring_audio_test import AudioTestRuntime
 from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
-from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
 from puripuly_heart.config.alibaba_connection import AlibabaEndpointMode, AlibabaRegion
@@ -81,6 +83,7 @@ from puripuly_heart.core.http_extensions import (
     http_extension_secret_key_prefix,
 )
 from puripuly_heart.core.local_translation.devices import list_llama_vulkan_devices
+from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
 from puripuly_heart.core.telemetry import (
     AppActiveDayTelemetryResult,
     AppActiveDayTelemetryService,
@@ -107,10 +110,10 @@ class UiInputRuntimeAdapter:
     self_capture: SelfCaptureApplicationOwner
     connection_readiness: LlmConnectionReadinessOwner | None = None
 
-    async def submit_text(self, text: str) -> None:
+    async def submit_text(self, text: str) -> TextSubmissionAdmission | None:
         owner = self.pipeline.self_translation_channel
         submit = None if owner is None else lambda: owner.submit_text(text, source="You")
-        await self.manual_typing.submit(submit)
+        return await self.manual_typing.submit(submit)
 
     def set_manual_input_activity(self, has_text: bool) -> None:
         self.manual_typing.set_input_activity(has_text)
@@ -172,28 +175,23 @@ class UiPeerCaptureRuntimeAdapter:
 
 
 @dataclass(slots=True)
-class UiMicrophoneRuntimeAdapter:
-    microphone: MicrophoneTestRuntime
-    level_log_interval_seconds: float
+class UiAudioTestRuntimeAdapter:
+    audio_test: AudioTestRuntime
 
-    async def start_microphone_test(
-        self,
-        *,
-        meter_callback=None,
-    ) -> bool:
-        return await self.microphone.start(
-            meter_callback=meter_callback,
-            level_log_interval_s=self.level_log_interval_seconds,
-        )
+    async def start_audio_test(self, *, observation_callback=None) -> bool:
+        return await self.audio_test.start(observation_callback=observation_callback)
 
-    def microphone_test_snapshot(self) -> dict[str, object]:
-        return self.microphone.snapshot
+    def audio_test_snapshot(self) -> dict[str, object]:
+        return self.audio_test.snapshot
 
-    async def wait_microphone_test_ready(self) -> bool:
-        return await self.microphone.wait_ready()
+    async def wait_audio_test_ready(self) -> bool:
+        return await self.audio_test.wait_ready()
 
-    async def stop_microphone_test(self) -> None:
-        await self.microphone.stop()
+    async def stop_audio_test(self) -> None:
+        await self.audio_test.stop()
+
+    def release_audio_test_capture_restore(self, channel: str) -> None:
+        self.audio_test.release_capture_restore(channel)
 
 
 @dataclass(slots=True)
@@ -251,20 +249,15 @@ class UiManagedRuntimeAdapter:
         return await self.managed.auth.start_qq(
             qq_identity=str(kwargs.get("qq_identity", "")),
             credential=str(kwargs.get("credential", "")),
-            referral_id=(
-                str(kwargs["referral_id"]) if kwargs.get("referral_id") is not None else None
-            ),
         )
 
     async def start_discord_managed_auth_from_dialog(self, **kwargs: object) -> object:
         callback = kwargs.get("on_callback_received")
         recovery_hook = kwargs.get("on_recovery_started")
-        referral_id = kwargs.get("referral_id")
         url_sink = kwargs.get("authorization_url_sink")
         return await self.managed.auth.start_discord(
             on_callback_received=callback if callable(callback) else None,
             on_recovery_started=recovery_hook if callable(recovery_hook) else None,
-            referral_id=str(referral_id) if referral_id is not None else None,
             authorization_url_sink=url_sink if callable(url_sink) else None,
             open_browser=kwargs.get("open_browser", True) is True,
         )
@@ -275,6 +268,9 @@ class UiManagedRuntimeAdapter:
     def managed_auth_last_failure_kind(self) -> str:
         kind = getattr(self.managed.auth, "last_failure_kind", "failed")
         return kind if isinstance(kind, str) else "failed"
+
+    def managed_auth_last_message_key(self) -> str | None:
+        return self.managed.auth.last_message_key
 
     def clear_managed_auth_pending_state(self) -> None:
         self.managed.auth.clear_pending()
@@ -343,8 +339,13 @@ class UiSettingsRuntimeAdapter:
     ) -> AppSettingsVNext:
         return self.merge_provider_settings(settings)
 
-    async def apply_settings(self, settings: AppSettingsVNext) -> object:
-        return await self.application.apply(settings)
+    async def apply_settings(
+        self,
+        settings: AppSettingsVNext,
+        *,
+        provider_requested: bool = False,
+    ) -> object:
+        return await self.application.apply(settings, provider_requested=provider_requested)
 
     async def apply_telemetry_enabled(self, enabled: bool) -> object | None:
         settings = self.settings.canonical
@@ -400,6 +401,8 @@ class UiProviderRuntimeAdapter:
     managed_gemma: ManagedGemmaTranslationOwner | None = None
     llm_devices_sink: Callable[[tuple[GpuDeviceOption, ...]], None] | None = None
     chatgpt: ChatGptAccountOwner | None = None
+    connection_readiness: LlmConnectionReadinessOwner | None = None
+    model_assets: ModelAssetsApplication | None = None
     _alibaba_workspace: AlibabaWorkspaceOwner | None = field(default=None, init=False)
 
     def alibaba_workspace(self) -> AlibabaWorkspaceOwner:
@@ -541,10 +544,17 @@ class UiProviderRuntimeAdapter:
     async def sign_out_chatgpt(self) -> ChatGptSignOutResult:
         if self.chatgpt is None:
             return ChatGptSignOutResult(remote_revoked=False)
-        result = await self.chatgpt.sign_out()
-        if self.chatgpt_route_active():
-            await self.apply_providers(force_rebuild_llm=True, persist_settings=False)
-        return result
+        readiness = self.connection_readiness if self.chatgpt_route_active() else None
+        if readiness is not None:
+            await readiness.suspend()
+        try:
+            result = await self.chatgpt.sign_out()
+            if self.chatgpt_route_active():
+                await self.apply_providers(force_rebuild_llm=True, persist_settings=False)
+            return result
+        finally:
+            if readiness is not None:
+                readiness.resume()
 
     def cancel_chatgpt_sign_in(self) -> None:
         if self.chatgpt is not None:
@@ -610,6 +620,26 @@ class UiProviderRuntimeAdapter:
         if succeeded and key in {"alibaba_api_key_beijing", "alibaba_api_key_singapore"}:
             await self.apply_providers(persist_settings=False)
         current = self.settings.canonical
+        if succeeded and current is not None:
+            translation = current.intent.translation
+            active_secret = None
+            if translation.connection == "official_byok":
+                active_secret = {
+                    "gemini": "google_api_key",
+                    "openai": "openai_api_key",
+                    "deepseek": "deepseek_api_key",
+                }.get(provider_llm_for_translation(translation.model, translation.connection))
+            elif (
+                translation.connection == "openrouter"
+                and translation.openrouter_selected_source == "byok"
+            ):
+                active_secret = "openrouter_api_key"
+            if key == active_secret:
+                await self.apply_providers(
+                    force_rebuild_llm=True,
+                    persist_settings=False,
+                )
+                return succeeded
         http_extension_id = (
             None if current is None else current.intent.translation.http_extension_id
         )
@@ -640,6 +670,31 @@ class UiProviderRuntimeAdapter:
         if action == "cancel":
             return False if self.managed_gemma is None else self.managed_gemma.cancel()
         raise ValueError(f"unsupported managed Gemma notice action: {action}")
+
+    def model_asset_entries(self) -> tuple[object, ...]:
+        return self.model_assets.entries() if self.model_assets is not None else ()
+
+    async def refresh_model_assets(self) -> tuple[object, ...]:
+        if self.model_assets is None:
+            return ()
+        return await self.model_assets.refresh()
+
+    async def download_model_asset(self, model_id: str, *, source: str | None = None) -> object:
+        return await self._require_model_assets().download(model_id, source=source)
+
+    async def import_model_asset(self, model_id: str, directory: Path) -> object:
+        return await self._require_model_assets().import_directory(model_id, directory)
+
+    async def cancel_model_asset(self, model_id: str) -> bool:
+        return await self._require_model_assets().cancel(model_id)
+
+    async def delete_model_asset(self, model_id: str) -> object:
+        return await self._require_model_assets().delete(model_id)
+
+    def _require_model_assets(self) -> ModelAssetsApplication:
+        if self.model_assets is None:
+            raise RuntimeError("Model assets are unavailable")
+        return self.model_assets
 
 
 @dataclass(slots=True)

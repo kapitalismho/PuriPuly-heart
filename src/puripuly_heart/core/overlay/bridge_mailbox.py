@@ -8,7 +8,15 @@ from typing import Any
 
 from puripuly_heart.core.clock import Clock
 
-from .protocol import NativeFreshRenderTargets, NativeQuietTailEpisodes, OverlayPresentationSnapshot
+from .presenter_projection import NativeRetryIntentProjection
+from .protocol import (
+    NATIVE_SELF_SCENE_TARGET,
+    NativeFreshRenderGenerations,
+    NativeFreshRenderTargets,
+    NativeQuietTailEpisode,
+    NativeQuietTailEpisodes,
+    OverlayPresentationSnapshot,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,7 +144,14 @@ class OverlayBridgeMailbox:
             startup_runtime_controls=startup_runtime_controls,
         )
         if len(envelope.message.encode("utf-8")) > self._scene_byte_limit:
-            safety_snapshot = replace(snapshot, blocks=[], speaker_divider=False)
+            safety_snapshot = replace(
+                snapshot,
+                blocks=[],
+                speaker_divider=False,
+                native_fresh_render_generations=None,
+                native_fresh_render_targets=None,
+                native_quiet_tail_episodes=None,
+            )
             envelope = self.make_scene(
                 safety_snapshot,
                 {},
@@ -253,20 +268,61 @@ class OverlayBridgeMailbox:
         if len(valid_blocks) == len(envelope.snapshot.blocks):
             return envelope.message
         visible = {block.id for block in valid_blocks}
+        scene_drawable = any(
+            NativeRetryIntentProjection._scene_drawable(block) for block in valid_blocks
+        )
         targets = envelope.snapshot.native_fresh_render_targets
-        self_target = targets.self if targets is not None and targets.self in visible else None
+        self_target = (
+            targets.self
+            if targets is not None
+            and (
+                targets.self in visible
+                or (targets.self == NATIVE_SELF_SCENE_TARGET and scene_drawable)
+            )
+            else None
+        )
         peer_target = targets.peer if targets is not None and targets.peer in visible else None
         episodes = envelope.snapshot.native_quiet_tail_episodes
+        generations = envelope.snapshot.native_fresh_render_generations
+        self_episode = episodes.self if episodes is not None and self_target is not None else None
+        self_generation = generations.self if generations is not None else None
+        removed_self = any(
+            block.channel == "self" and block.id not in visible
+            for block in envelope.snapshot.blocks
+        )
+        rearm_self = bool(scene_drawable and removed_self and self_generation is not None)
+        if rearm_self:
+            self_target = NATIVE_SELF_SCENE_TARGET
+            self_generation = NativeRetryIntentProjection.next_generation(self_generation)
+            self_episode = NativeQuietTailEpisode(
+                phase=NativeRetryIntentProjection.self_scene_phase(valid_blocks),
+                generation=NativeRetryIntentProjection.next_generation(
+                    episodes.self.generation if episodes is not None and episodes.self else None
+                ),
+            )
+        self.record_delivery(
+            outcome="send_time_pruned",
+            scene_revision=envelope.snapshot.revision,
+            cause="expired_self_scene_rearmed" if rearm_self else "expired_blocks",
+        )
         snapshot = replace(
             envelope.snapshot,
             blocks=valid_blocks,
             speaker_divider=False,
+            native_fresh_render_generations=NativeFreshRenderGenerations(
+                self=self_generation if self_target is not None else None,
+                peer=(
+                    generations.peer
+                    if generations is not None and peer_target is not None
+                    else None
+                ),
+            ),
             native_fresh_render_targets=NativeFreshRenderTargets(
                 self=self_target,
                 peer=peer_target,
             ),
             native_quiet_tail_episodes=NativeQuietTailEpisodes(
-                self=(episodes.self if episodes is not None and self_target is not None else None),
+                self=self_episode,
                 peer=(episodes.peer if episodes is not None and peer_target is not None else None),
             ),
         )

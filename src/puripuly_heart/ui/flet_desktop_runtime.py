@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import ctypes
+import logging
 import os
 import subprocess
 import time
@@ -11,7 +12,16 @@ from ctypes import wintypes
 from pathlib import Path
 from typing import Protocol
 
+from puripuly_heart.core.diagnostics import (
+    current_diagnostic_operation,
+    emit_failure,
+    safe_exception_fields,
+)
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.windows_process_ownership import WindowsKillOnCloseProcessJob
+
+logger = logging.getLogger(__name__)
+
 
 REQUIRED_FLET_DESKTOP_HOOKS = (
     "__locate_and_unpack_flet_view",
@@ -21,6 +31,13 @@ REQUIRED_FLET_DESKTOP_HOOKS = (
 
 class UnsupportedFletDesktopRuntimeError(RuntimeError):
     pass
+
+
+class FletDesktopCleanupError(RuntimeError):
+    def __init__(self, message: str, diagnostics: ErrorDiagnostics) -> None:
+        super().__init__(message)
+        self.failure_diagnostics = diagnostics
+        self.cleanup_complete = False
 
 
 class FletDesktopViewProcess(Protocol):
@@ -168,7 +185,14 @@ class FletDesktopViewProcessOwner:
         self._in_flight_launches = 0
         self._in_flight_drained = asyncio.Event()
         self._in_flight_drained.set()
-        self._launch_failures: list[str] = []
+        self._rejected_cleanup_debt: list[tuple[FletDesktopViewProcess, str | None]] = []
+        self._primary_cleanup_exception: BaseException | None = None
+        self._primary_cleanup_diagnostics: ErrorDiagnostics | None = None
+        self._terminal_cleanup_diagnostics: ErrorDiagnostics | None = None
+        self._observer_failure_count = 0
+        self._observer_failure_diagnostics: ErrorDiagnostics | None = None
+        self._close_operation: dict[str, str] = {}
+        self._reap_lock = asyncio.Lock()
         self._trace_started_at = time.monotonic()
 
     @property
@@ -186,6 +210,38 @@ class FletDesktopViewProcessOwner:
             return None
         return int(process.pid), self._pid_file
 
+    @property
+    def cleanup_snapshot(self) -> dict[str, object]:
+        return {
+            "pending_startups": self._in_flight_launches,
+            "pending_processes": int(self._process is not None) + len(self._rejected_cleanup_debt),
+            "cleanup_complete": (
+                self._close_task is not None
+                and self._close_task.done()
+                and not self._close_task.cancelled()
+                and self._close_task.exception() is None
+                and self._process is None
+                and not self._rejected_cleanup_debt
+                and self._in_flight_launches == 0
+            ),
+            "diagnostic_id": (
+                self._terminal_cleanup_diagnostics.diagnostic_id
+                if self._terminal_cleanup_diagnostics is not None
+                else None
+            ),
+            "observer_failure_count": self._observer_failure_count,
+            "observer_failure_diagnostic_id": (
+                self._observer_failure_diagnostics.diagnostic_id
+                if self._observer_failure_diagnostics is not None
+                else None
+            ),
+        }
+
+    def retains_process_cleanup(self, process: FletDesktopViewProcess) -> bool:
+        return self._process is process or any(
+            owned is process for owned, _ in self._rejected_cleanup_debt
+        )
+
     async def begin_launch(self) -> bool:
         async with self._lock:
             if not self._accepting:
@@ -195,12 +251,10 @@ class FletDesktopViewProcessOwner:
                 self._in_flight_drained.clear()
             return True
 
-    async def end_launch(self, *, failed: str | None = None) -> None:
+    async def end_launch(self) -> None:
         async with self._lock:
             if self._in_flight_launches > 0:
                 self._in_flight_launches -= 1
-            if failed is not None:
-                self._launch_failures.append(failed)
             if self._in_flight_launches == 0:
                 self._in_flight_drained.set()
 
@@ -223,7 +277,8 @@ class FletDesktopViewProcessOwner:
                     try:
                         job_assigned = self._process_job.assign(int(process.pid))
                     except Exception as exc:
-                        job_failure_reason = f"job_assignment_exception:{type(exc).__name__}"
+                        job_failure_reason = "job_assignment_failed"
+                        self._failure("job_assignment_failed", "startup", exc)
                     else:
                         if not job_assigned:
                             job_failure_reason = getattr(
@@ -237,7 +292,6 @@ class FletDesktopViewProcessOwner:
                     "process_started",
                     generation=self._generation,
                     pid=process.pid,
-                    endpoint_identity=endpoint_identity,
                     kill_on_job_close=job_assigned,
                     job_failure_reason=job_failure_reason,
                 )
@@ -249,7 +303,7 @@ class FletDesktopViewProcessOwner:
                         reason=job_failure_reason,
                     )
                 return True
-        await self._reap_rejected_process(process, pid_file)
+        await self.reap_rejected_process(process, pid_file)
         return False
 
     async def close(self) -> None:
@@ -257,8 +311,16 @@ class FletDesktopViewProcessOwner:
             self._accepting = False
             if self._close_task is None or (
                 self._close_task.done()
-                and (self._process is not None or self._pid_file is not None)
+                and (
+                    self._process is not None
+                    or self._pid_file is not None
+                    or self._in_flight_launches
+                    or self._rejected_cleanup_debt
+                    or self._close_task.cancelled()
+                    or self._close_task.exception() is not None
+                )
             ):
+                self._close_operation = current_diagnostic_operation()
                 self._close_task = asyncio.create_task(self._close_once())
             task = self._close_task
         try:
@@ -279,98 +341,134 @@ class FletDesktopViewProcessOwner:
                 if not exit_confirmed:
                     self._request_graceful_close(generation, process)
                     exit_confirmed = await self._wait_for_process_exit(
-                        process,
-                        self._graceful_timeout_s,
-                        generation,
+                        process, self._graceful_timeout_s, generation
                     )
                 if not exit_confirmed:
                     self._emit(
-                        "graceful_close_timeout",
-                        generation=generation,
-                        pid=self._pid(process),
+                        "graceful_close_timeout", generation=generation, pid=self._pid(process)
                     )
-                    self._emit(
-                        "terminate_requested",
-                        generation=generation,
-                        pid=self._pid(process),
-                    )
-                    terminate_failed = False
+                    self._emit("terminate_requested", generation=generation, pid=self._pid(process))
                     try:
                         process.terminate()
                     except ProcessLookupError:
                         pass
                     except Exception as exc:
-                        terminate_failed = True
+                        self._failure("terminate_failed", "process_terminate", exc)
                         self._emit(
                             "terminate_failed",
                             generation=generation,
                             pid=self._pid(process),
-                            exception_type=type(exc).__name__,
+                            **safe_exception_fields(exc),
                         )
-                    if not terminate_failed:
-                        exit_confirmed = await self._wait_for_process_exit(
-                            process,
-                            self._terminate_timeout_s,
-                            generation,
-                        )
-                if not exit_confirmed:
-                    self._emit(
-                        "kill_requested",
-                        generation=generation,
-                        pid=self._pid(process),
+                    exit_confirmed = await self._wait_for_process_exit(
+                        process, self._terminate_timeout_s, generation
                     )
+                if not exit_confirmed:
+                    self._emit("kill_requested", generation=generation, pid=self._pid(process))
                     try:
                         process.kill()
                     except ProcessLookupError:
                         pass
                     except Exception as exc:
+                        self._failure("kill_failed", "process_terminate", exc)
                         self._emit(
                             "kill_failed",
                             generation=generation,
                             pid=self._pid(process),
-                            exception_type=type(exc).__name__,
+                            **safe_exception_fields(exc),
                         )
-                    self._process_job.close()
-                    exit_confirmed = await self._wait_for_process_exit(process, None, generation)
-                if not exit_confirmed:
-                    raise RuntimeError("Flet desktop view process did not exit")
-                self._emit(
-                    "process_exited",
-                    generation=generation,
-                    pid=self._pid(process),
-                    returncode=process.returncode,
-                )
+                    try:
+                        self._process_job.close()
+                    except Exception as exc:
+                        self._failure("job_close_failed", "process_terminate", exc)
+                    exit_confirmed = await self._wait_for_process_exit(
+                        process,
+                        max(0.1, self._terminate_timeout_s),
+                        generation,
+                    )
+                if exit_confirmed:
+                    self._emit(
+                        "process_exited",
+                        generation=generation,
+                        pid=self._pid(process),
+                        returncode=process.returncode,
+                    )
         finally:
-            if self._in_flight_launches > 0:
+            if self._in_flight_launches:
                 try:
-                    await self._in_flight_drained.wait()
-                except asyncio.CancelledError:
-                    await self._in_flight_drained.wait()
-                    raise
-            async with self._lock:
-                launch_failures = tuple(self._launch_failures)
+                    await asyncio.wait_for(
+                        self._in_flight_drained.wait(),
+                        timeout=max(0.1, self._graceful_timeout_s + self._terminate_timeout_s),
+                    )
+                except TimeoutError as exc:
+                    self._failure("launch_cleanup_pending", "startup", exc)
+            for rejected_process, rejected_pid_file in tuple(self._rejected_cleanup_debt):
+                try:
+                    await self.reap_rejected_process(rejected_process, rejected_pid_file)
+                except FletDesktopCleanupError:
+                    pass
             if exit_confirmed:
                 pid_file_removed = self._remove_pid_file(pid_file, generation)
-            self._process_job.close()
+            try:
+                self._process_job.close()
+            except Exception as exc:
+                self._failure("job_close_failed", "process_terminate", exc)
+                exit_confirmed = False
             async with self._lock:
                 if exit_confirmed and pid_file_removed and self._process is process:
                     self._process = None
                     self._pid_file = None
                     self._endpoint_identity = None
-                    self._trace_sink = None
-            if not exit_confirmed or not pid_file_removed or launch_failures:
+            incomplete = (
+                not exit_confirmed
+                or not pid_file_removed
+                or bool(self._in_flight_launches or self._rejected_cleanup_debt)
+            )
+            if incomplete:
                 self._emit(
                     "cleanup_incomplete",
                     generation=generation,
                     pid=self._pid(process),
                     process_exited=exit_confirmed,
                     pid_file_retained=not pid_file_removed,
-                    launch_cleanup_failed=bool(launch_failures),
+                    launch_cleanup_failed=bool(
+                        self._in_flight_launches or self._rejected_cleanup_debt
+                    ),
                 )
-        if launch_failures:
-            raise RuntimeError("Flet desktop view launch cleanup failed")
-        if not pid_file_removed:
-            raise RuntimeError("Flet desktop view PID file cleanup failed")
+        if incomplete:
+            message = (
+                "Flet desktop view process did not exit"
+                if not exit_confirmed
+                else (
+                    "Flet desktop view PID file cleanup failed"
+                    if not pid_file_removed
+                    else "Flet desktop view launch cleanup failed"
+                )
+            )
+            self._terminal_cleanup_diagnostics = self._failure(
+                "cleanup_failed",
+                "cleanup",
+                self._primary_cleanup_exception,
+                severity="error",
+                disposition="failed",
+                fields={
+                    "cleanup_complete": False,
+                    "pending_startups": self._in_flight_launches,
+                    "count": len(self._rejected_cleanup_debt),
+                },
+            )
+            raise FletDesktopCleanupError(
+                message, self._terminal_cleanup_diagnostics
+            ) from self._primary_cleanup_exception
+        if self._terminal_cleanup_diagnostics is not None:
+            self._failure(
+                "cleanup_recovered",
+                "cleanup",
+                severity="info",
+                disposition="recovered",
+                cause=self._terminal_cleanup_diagnostics,
+                fields={"cleanup_complete": True},
+            )
 
     def _request_graceful_close(
         self,
@@ -394,11 +492,12 @@ class FletDesktopViewProcessOwner:
         try:
             requested = self._close_requester.request_close(pid)
         except Exception as exc:
+            self._failure("graceful_close_failed", "process_terminate", exc)
             self._emit(
                 "graceful_close_failed",
                 generation=generation,
                 pid=pid,
-                exception_type=type(exc).__name__,
+                **safe_exception_fields(exc),
             )
             return
         if not requested:
@@ -409,62 +508,68 @@ class FletDesktopViewProcessOwner:
                 reason=getattr(self._close_requester, "failure_reason", None),
             )
 
-    async def _reap_rejected_process(
+    async def reap_rejected_process(
         self,
         process: FletDesktopViewProcess,
         pid_file: str | None,
     ) -> None:
+        async with self._reap_lock:
+            await self._reap_rejected_process_once(process, pid_file)
+
+    async def _reap_rejected_process_once(
+        self,
+        process: FletDesktopViewProcess,
+        pid_file: str | None,
+    ) -> None:
+        if not any(owned is process for owned, _ in self._rejected_cleanup_debt):
+            self._rejected_cleanup_debt.append((process, pid_file))
         generation = self._generation
-        self._emit(
-            "process_rejected",
-            generation=generation,
-            pid=self._pid(process),
-        )
-        exited = await self._wait_for_process_exit(process, 0.0, generation)
-        if not exited:
-            terminate_failed = False
+        self._emit("process_rejected", generation=generation, pid=self._pid(process))
+        exited = process.returncode is not None
+        for action in (process.terminate, process.kill):
+            if exited:
+                break
             try:
-                process.terminate()
+                action()
             except ProcessLookupError:
                 pass
-            except Exception:
-                terminate_failed = True
-            if not terminate_failed:
-                exited = await self._wait_for_process_exit(
-                    process,
-                    self._terminate_timeout_s,
-                    generation,
-                )
-            if not exited:
-                with contextlib.suppress(ProcessLookupError):
-                    process.kill()
-                exited = await self._wait_for_process_exit(process, None, generation)
-        if not exited:
-            self._emit(
-                "cleanup_incomplete",
-                generation=generation,
-                pid=self._pid(process),
-                process_exited=False,
-                pid_file_retained=pid_file is not None,
+            except Exception as exc:
+                self._failure("rejected_cleanup_failed", "process_terminate", exc)
+            exited = await self._wait_for_process_exit(
+                process,
+                max(0.1, self._terminate_timeout_s),
+                generation,
             )
-            raise RuntimeError("Rejected Flet desktop view process did not exit")
-        if not self._remove_pid_file(pid_file, generation):
-            raise RuntimeError("Rejected Flet desktop view PID file cleanup failed")
+        if exited and self._remove_pid_file(pid_file, generation):
+            self._rejected_cleanup_debt = [
+                item for item in self._rejected_cleanup_debt if item[0] is not process
+            ]
+            return
+        self._accepting = False
+        self._terminal_cleanup_diagnostics = self._failure(
+            "rejected_cleanup_failed",
+            "cleanup",
+            self._primary_cleanup_exception,
+            severity="error",
+            disposition="failed",
+            fields={"cleanup_complete": False, "count": len(self._rejected_cleanup_debt)},
+        )
+        raise FletDesktopCleanupError(
+            "Rejected Flet desktop view cleanup incomplete",
+            self._terminal_cleanup_diagnostics,
+        ) from self._primary_cleanup_exception
 
     async def _wait_for_process_exit(
         self,
         process: FletDesktopViewProcess,
-        timeout_s: float | None,
+        timeout_s: float,
         generation: int,
     ) -> bool:
         if process.returncode is not None:
             return True
         task = asyncio.create_task(process.wait())
         try:
-            if timeout_s is None:
-                await task
-            else:
-                await asyncio.wait_for(asyncio.shield(task), timeout=timeout_s)
+            await asyncio.wait_for(asyncio.shield(task), timeout=timeout_s)
         except TimeoutError:
             return False
         except asyncio.CancelledError:
@@ -478,11 +583,12 @@ class FletDesktopViewProcessOwner:
                 exception_type="CancelledError",
             )
         except Exception as exc:
+            self._failure("process_wait_failed", "process_wait", exc)
             self._emit(
                 "process_wait_failed",
                 generation=generation,
                 pid=self._pid(process),
-                exception_type=type(exc).__name__,
+                **safe_exception_fields(exc),
             )
         finally:
             if not task.done():
@@ -496,14 +602,14 @@ class FletDesktopViewProcessOwner:
         try:
             Path(pid_file).unlink(missing_ok=True)
         except OSError as exc:
+            self._failure("pid_file_remove_failed", "temp_cleanup", exc)
             self._emit(
                 "pid_file_remove_failed",
                 generation=generation,
-                pid_file=Path(pid_file).name,
-                exception_type=type(exc).__name__,
+                **safe_exception_fields(exc),
             )
             return False
-        self._emit("pid_file_removed", generation=generation, pid_file=Path(pid_file).name)
+        self._emit("pid_file_removed", generation=generation, pid_file_present=False)
         return True
 
     @staticmethod
@@ -518,7 +624,73 @@ class FletDesktopViewProcessOwner:
             return
         fields.setdefault("parent_pid", os.getpid())
         fields["monotonic_ms"] = round((time.monotonic() - self._trace_started_at) * 1000, 3)
-        sink(event, fields)
+        try:
+            sink(event, fields)
+        except Exception as exc:
+            self._observer_failure_count += 1
+            if self._observer_failure_diagnostics is None:
+                self._observer_failure_diagnostics = ErrorDiagnostics(
+                    component="overlay_process",
+                    operation="observe",
+                    code="output_observer_failed",
+                    category="lifecycle",
+                    visibility="diagnostic_only",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={"count": self._observer_failure_count},
+                )
+                emit_failure(
+                    logger,
+                    self._observer_failure_diagnostics,
+                    severity="warning",
+                    disposition="degraded",
+                    stage="routing_observer",
+                    exception=exc,
+                )
+
+    def _failure(
+        self,
+        event: str,
+        stage: str,
+        exception: BaseException | None = None,
+        *,
+        severity: str = "warning",
+        disposition: str = "degraded",
+        fields: dict[str, object] | None = None,
+        cause: ErrorDiagnostics | None = None,
+    ) -> ErrorDiagnostics:
+        diagnostics = ErrorDiagnostics(
+            component="overlay_process",
+            operation="process_lifecycle",
+            code=f"desktop_view_{event}",
+            category="lifecycle",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields=fields or {},
+            cause_id=(
+                (cause or self._primary_cleanup_diagnostics).diagnostic_id
+                if cause or self._primary_cleanup_diagnostics
+                else None
+            ),
+            generation=self._generation,
+            operation_id=self._close_operation.get("operation_id"),
+            request_id=self._close_operation.get("request_id"),
+        )
+        if self._primary_cleanup_diagnostics is None and disposition != "recovered":
+            self._primary_cleanup_diagnostics = diagnostics
+            self._primary_cleanup_exception = exception
+        emit_failure(
+            logger,
+            diagnostics,
+            severity=severity,
+            disposition=disposition,
+            stage=stage,
+            exception=exception,
+        )
+        return diagnostics
 
 
 def _installed_flet_desktop_version() -> str:
@@ -591,7 +763,6 @@ def patch_hidden_view_launcher(
         process: asyncio.subprocess.Process | None = None
         pid_file: str | None = None
         attached = False
-        launch_failed: str | None = None
         spawn_task = asyncio.create_task(open_hidden_view(page_url, assets_dir, hidden))
         try:
             try:
@@ -600,23 +771,17 @@ def patch_hidden_view_launcher(
                 try:
                     process, pid_file = await asyncio.shield(spawn_task)
                 except asyncio.CancelledError:
-                    launch_failed = "launch_cancelled"
                     if not spawn_task.done():
                         spawn_task.cancel()
                         with contextlib.suppress(BaseException):
                             await spawn_task
                     raise
-                launch_failed = "launch_cancelled"
                 raise
-            try:
-                attached = await process_owner.attach(
-                    process,
-                    pid_file,
-                    endpoint_identity=page_url,
-                )
-            except BaseException:
-                launch_failed = "rejected_reap_failed"
-                raise
+            attached = await process_owner.attach(
+                process,
+                pid_file,
+                endpoint_identity=page_url,
+            )
             if attached and on_process_started is not None and process.pid is not None:
                 on_process_started(int(process.pid), pid_file)
             result = (process, pid_file)
@@ -624,35 +789,18 @@ def patch_hidden_view_launcher(
             pid_file = None
             return result
         except BaseException:
-            if process is not None and not attached:
-                cleanup_ok = True
+            if (
+                process is not None
+                and not attached
+                and not process_owner.retains_process_cleanup(process)
+            ):
                 try:
-                    process.terminate()
-                except Exception:
-                    cleanup_ok = False
-                try:
-                    await process.wait()
-                except Exception:
-                    cleanup_ok = False
-                else:
-                    if getattr(process, "returncode", None) is None:
-                        cleanup_ok = False
-                if pid_file:
-                    try:
-                        Path(pid_file).unlink(missing_ok=True)
-                    except OSError:
-                        cleanup_ok = False
-                    else:
-                        try:
-                            if Path(pid_file).exists():
-                                cleanup_ok = False
-                        except OSError:
-                            cleanup_ok = False
-                if not cleanup_ok and launch_failed is None:
-                    launch_failed = "launch_cleanup_failed"
+                    await process_owner.reap_rejected_process(process, pid_file)
+                except FletDesktopCleanupError:
+                    pass
             raise
         finally:
-            await process_owner.end_launch(failed=launch_failed)
+            await process_owner.end_launch()
 
     original = flet_desktop.open_flet_view_async
     flet_desktop.open_flet_view_async = launch

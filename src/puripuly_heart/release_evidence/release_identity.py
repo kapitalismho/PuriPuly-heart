@@ -30,7 +30,7 @@ PACKAGED_LICENSE_PATHS = (
     "onnxruntime/ThirdPartyNotices.txt",
     "aiohttp-3.13.2.dist-info/licenses/LICENSE.txt",
     "aiohttp-3.13.2.dist-info/licenses/vendor/llhttp/LICENSE",
-    "sherpa_onnx-1.13.4.dist-info/licenses/LICENSE",
+    "sherpa_onnx-1.13.8.dist-info/licenses/LICENSE",
     "sounddevice-0.5.5.dist-info/licenses/LICENSE",
     "charset_normalizer-3.4.4.dist-info/licenses/LICENSE",
     "cffi-2.0.0.dist-info/licenses/AUTHORS",

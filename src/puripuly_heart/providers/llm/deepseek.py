@@ -9,35 +9,13 @@ from uuid import UUID
 import httpx
 
 from puripuly_heart.core import network_clients
-from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
-from puripuly_heart.providers.llm.error_details import extract_provider_error_detail
+from puripuly_heart.providers.llm.error_details import LLMResponseError, record_probe_failure
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
-
-
-def _log_basic_request_failure(
-    *,
-    runtime_logging: ProviderObservationPort | None,
-    operation: str,
-    status: int,
-) -> None:
-    report = provider_failure_report(
-        RuntimeError(f"status={status}"),
-        provider="deepseek",
-        operation=operation,
-    )
-    rendered = "[Basic][LLM] DeepSeek request failed [%s]: %s" % (
-        operation,
-        format_error_report_for_log(report),
-    )
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(rendered, level=logging.ERROR)
-        return
-    logger.error(rendered)
 
 
 def _build_system_prompt(
@@ -69,7 +47,9 @@ def _extract_message_content(content: object) -> str:
         result = content.strip()
         if result:
             return result
-        raise RuntimeError("DeepSeek response contained empty message content")
+        raise LLMResponseError(
+            "DeepSeek response contained empty message content", provider="deepseek"
+        )
 
     if isinstance(content, list):
         parts: list[str] = []
@@ -81,7 +61,7 @@ def _extract_message_content(content: object) -> str:
         if parts:
             return "\n".join(parts)
 
-    raise RuntimeError("DeepSeek response did not contain message content")
+    raise LLMResponseError("DeepSeek response did not contain message content", provider="deepseek")
 
 
 def _has_length_finish_reason(data: object) -> bool:
@@ -190,8 +170,13 @@ class DeepSeekLLMProvider:
                         "max_tokens": 1,
                     },
                 )
+                if response.status_code != 200:
+                    record_probe_failure(
+                        None, provider="deepseek", status_code=response.status_code
+                    )
                 return response.status_code == 200
-        except Exception:
+        except Exception as exc:
+            record_probe_failure(exc, provider="deepseek")
             return False
 
 
@@ -286,26 +271,34 @@ class HttpxDeepSeekClient:
             json=request_body,
         )
         if response.status_code != 200:
-            detail = extract_provider_error_detail(response, sensitive_values=(self.api_key,))
-            _log_basic_request_failure(
-                runtime_logging=self.runtime_logging,
-                operation="translate",
-                status=response.status_code,
-            )
-            raise RuntimeError(
-                f"DeepSeek request failed (status={response.status_code} message={detail})"
+
+            raise LLMResponseError(
+                "DeepSeek request failed", provider="deepseek", status_code=response.status_code
             )
 
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise LLMResponseError(
+                "DeepSeek response was not valid JSON", provider="deepseek"
+            ) from exc
+        if not isinstance(data, dict):
+            raise LLMResponseError("DeepSeek response was not an object", provider="deepseek")
         if observation is not None:
             observation.record_openai_response(data)
         choices = data.get("choices", [])
-        if not choices:
-            raise RuntimeError("DeepSeek response did not contain choices")
+        if not isinstance(choices, list) or not choices:
+            raise LLMResponseError("DeepSeek response did not contain choices", provider="deepseek")
         if _has_length_finish_reason(data):
-            raise RuntimeError("DeepSeek response was truncated by max_tokens limit")
+            raise LLMResponseError(
+                "DeepSeek response was truncated by max_tokens limit", provider="deepseek"
+            )
 
+        if not isinstance(choices[0], dict):
+            raise LLMResponseError("DeepSeek response choice was malformed", provider="deepseek")
         message = choices[0].get("message", {})
+        if not isinstance(message, dict):
+            raise LLMResponseError("DeepSeek response message was malformed", provider="deepseek")
         result = _extract_message_content(message.get("content"))
 
         return result

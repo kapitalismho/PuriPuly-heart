@@ -66,7 +66,7 @@ DECODE_CASES = (
         source_url=(
             "https://huggingface.co/csukuangfj2/"
             "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/"
-            "2cc50d1abfe4d4f2df8d71f536d108bb40f943d2/test_wavs/de.wav"
+            "68818b2313fe77bd06f6a7c5068ff3ef59d02b8a/test_wavs/de.wav"
         ),
     ),
 )

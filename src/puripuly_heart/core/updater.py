@@ -13,7 +13,8 @@ from typing import Any
 import httpx
 
 from puripuly_heart import GITHUB_REPO, __version__
-from puripuly_heart.core import network_clients
+from puripuly_heart.core import external_network, network_clients
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,12 @@ async def check_for_update() -> UpdateInfo | None:
     Network errors are silently ignored (returns None).
     """
     try:
-        async with network_clients.external_async_client(timeout=5.0) as client:
+        tls, policy = await run_owned_thread_call(
+            lambda: (external_network.select_tls(), external_network.ProxyPolicy())
+        )
+        async with network_clients.external_async_client(
+            tls=tls, policy=policy, timeout=5.0
+        ) as client:
             resp = await client.get(
                 GITHUB_API_URL,
                 headers={"Accept": "application/vnd.github.v3+json"},

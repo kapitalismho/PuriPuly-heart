@@ -36,6 +36,8 @@ class ManagedGemmaDashboardNotice:
     backend: str | None = None
     progress_percent: int | None = None
     action: ManagedGemmaNoticeAction | None = None
+    gpu_only: bool = False
+    failure_phase: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

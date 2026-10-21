@@ -14,12 +14,10 @@ import pytest
 pytest.importorskip("flet")
 
 from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 from puripuly_heart.app.ports.chatgpt_account import ChatGptAccountSnapshot
 from puripuly_heart.app.ports.settings_view import (
     CustomSttEndpointEdit,
-    ManagedReferralEdit,
     PeerSttProviderEdit,
     SelfSttProviderEdit,
     SystemPromptEdit,
@@ -361,7 +359,6 @@ def _vnext(
     local_llm: LocalLLMIntent | None = None,
     connection_history: dict[str, str] | None = None,
     managed_credential_ref: str | None = None,
-    referral_id: str | None = None,
     verified_hardware_hash: str | None = None,
     verified_hardware_hash_salt_version: int | None = None,
     verified_providers: tuple[str, ...] | None = None,
@@ -516,7 +513,6 @@ def _vnext(
     managed = state.managed_connection
     if (
         managed_credential_ref is not None
-        or referral_id is not None
         or verified_hardware_hash is not None
         or verified_hardware_hash_salt_version is not None
     ):
@@ -527,7 +523,6 @@ def _vnext(
                 if managed_credential_ref is None
                 else managed_credential_ref
             ),
-            referral_id=managed.referral_id if referral_id is None else referral_id,
             verified_hardware_hash=(
                 managed.verified_hardware_hash
                 if verified_hardware_hash is None
@@ -646,13 +641,6 @@ def _make_llm_selection_view(
     view._managed_key_card = SimpleNamespace(visible=False, update=lambda: None)
     view._managed_key_title = SimpleNamespace(value="")
     view._managed_key_free_usage_label = SimpleNamespace(value="")
-    view._managed_key_referral_id = None
-    view._managed_key_referral_id_label = SimpleNamespace(value="")
-    view._managed_key_referral_id_value = SimpleNamespace(value="")
-    view._managed_key_pass_status = None
-    view._managed_key_invite_progress_label = SimpleNamespace(value="", update=lambda: None)
-    view._managed_key_invite_progress_value = SimpleNamespace(value="", update=lambda: None)
-    view._managed_key_invite_progress_row = SimpleNamespace(visible=False, update=lambda: None)
     view._qwen_region_btn = SimpleNamespace(visible=False, update=lambda: None)
     view._api_keys_column = SimpleNamespace(update=lambda: None)
     view._deepgram_key = SimpleNamespace(visible=False)
@@ -1023,7 +1011,8 @@ def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch) -> Non
     assert view._google_key.value == ""
     assert view._deepgram_key.value == ""
     assert view._soniox_key.value == ""
-    assert basic_messages == ["Failed to load secrets: boom"]
+    assert len(basic_messages) == 1
+    assert "boom" not in repr(basic_messages)
 
 
 def test_load_secrets_projects_the_same_prefix_before_read_failure(
@@ -1043,8 +1032,7 @@ def test_load_secrets_projects_the_same_prefix_before_read_failure(
     view._soniox_key.value = "unchanged-soniox"
 
     provider, _general, _prompt, _overlay = settings_view_surface_snapshots(_vnext(settings))
-    with pytest.raises(OSError, match="unavailable"):
-        view._load_secrets(provider, Path("settings.json"))
+    view._load_secrets(provider, Path("settings.json"))
 
     assert view._google_key.value == "google-secret"
     assert view._openrouter_key.value == "openrouter-secret"
@@ -1190,10 +1178,6 @@ def test_load_from_settings_places_managed_key_card_above_provider_fields(
     assert view._managed_trial_usage_bar not in view._api_keys_column.controls
     assert _card_title(view._managed_key_card) == t("settings.managed_key.title")
 
-    labels = _control_labels(view._managed_key_card)
-    assert t("settings.managed_key.referral_id.label") in labels
-    assert "무료 사용량" not in labels
-    assert "Free usage" not in labels
     assert _tree_contains_control(view._managed_key_card, view._managed_trial_usage_bar)
 
 
@@ -1203,7 +1187,6 @@ def test_load_from_settings_places_managed_key_card_above_provider_fields(
         "connection",
         "selected_source",
         "active_ref",
-        "referral_id",
         "expected_visible",
     ),
     [
@@ -1212,14 +1195,12 @@ def test_load_from_settings_places_managed_key_card_above_provider_fields(
             TranslationConnection.MANAGED,
             OpenRouterCredentialSource.MANAGED,
             None,
-            None,
             True,
         ),
         (
             TranslationModel.DEEPSEEK_V4_FLASH,
             TranslationConnection.MANAGED_CHINA,
             OpenRouterCredentialSource.MANAGED,
-            None,
             None,
             True,
         ),
@@ -1228,15 +1209,6 @@ def test_load_from_settings_places_managed_key_card_above_provider_fields(
             TranslationConnection.OPENROUTER,
             OpenRouterCredentialSource.BYOK,
             "managed-ref",
-            None,
-            False,
-        ),
-        (
-            TranslationModel.GEMMA4_26B_31B,
-            TranslationConnection.OPENROUTER,
-            OpenRouterCredentialSource.BYOK,
-            None,
-            "7KQ9M2",
             False,
         ),
     ],
@@ -1247,7 +1219,6 @@ def test_managed_key_card_visibility_follows_translation_connection(
     connection: TranslationConnection,
     selected_source: OpenRouterCredentialSource,
     active_ref: str | None,
-    referral_id: str | None,
     expected_visible: bool,
 ) -> None:
     settings = _vnext(
@@ -1257,43 +1228,12 @@ def test_managed_key_card_visibility_follows_translation_connection(
         openrouter_source=_enum_value(selected_source),
         connection_history={_enum_value(model): _enum_value(connection)},
         managed_credential_ref=active_ref,
-        referral_id=referral_id,
     )
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert view._managed_key_card.visible is expected_visible
-
-
-def test_managed_key_referral_row_shows_empty_state_without_copy_button(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert view._managed_key_referral_id_value.value == t("settings.managed_key.referral_id.empty")
-    referral_row = _wrapped_card_column(view._managed_key_card).controls[4].controls[0]
-    assert view._managed_key_referral_id_value in referral_row.controls
-    assert not any(isinstance(control, ft.IconButton) for control in referral_row.controls)
-
-
-def test_managed_key_referral_row_shows_owned_id_without_copy_button(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-    settings = _vnext(settings, referral_id="7kq9m2")
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert view._managed_key_card.visible is True
-    assert view._managed_key_referral_id_value.value == "7KQ9M2"
-    referral_row = _wrapped_card_column(view._managed_key_card).controls[4].controls[0]
-    assert view._managed_key_referral_id_value in referral_row.controls
-    assert not any(isinstance(control, ft.IconButton) for control in referral_row.controls)
 
 
 def test_set_managed_trial_usage_state_tracks_visible_and_remaining_percent(
@@ -1345,16 +1285,11 @@ def test_set_managed_key_state_updates_card_controls_and_api_section_repaint(
     view.set_managed_key_state(
         visible=True,
         remaining_percent=64,
-        referral_id="7kq9m2",
     )
 
     assert view._managed_key_card.visible is True
     assert view._managed_trial_usage_bar.visible is True
     assert view._managed_trial_usage_bar.percent == 64
-    assert view._managed_key_referral_id == "7KQ9M2"
-    assert view._managed_key_referral_id_value.value == "7KQ9M2"
-    assert view._provider_edits[ManagedReferralEdit] == ManagedReferralEdit("7KQ9M2")
-    assert view.has_provider_changes is True
     assert "api_keys_column" in updates
 
 
@@ -1379,13 +1314,11 @@ def test_set_managed_key_state_hides_card_for_openrouter_connection(
     view.set_managed_key_state(
         visible=True,
         remaining_percent=64,
-        referral_id="7kq9m2",
     )
 
     assert view._managed_key_card.visible is False
     assert view._managed_trial_usage_bar.visible is False
     assert view._managed_trial_usage_bar.percent is None
-    assert view._managed_key_referral_id == "7KQ9M2"
 
 
 def test_set_managed_key_state_keeps_card_visible_for_managed_connection_when_usage_hidden(
@@ -1408,13 +1341,11 @@ def test_set_managed_key_state_keeps_card_visible_for_managed_connection_when_us
     view.set_managed_key_state(
         visible=False,
         remaining_percent=64,
-        referral_id="7kq9m2",
     )
 
     assert view._managed_key_card.visible is True
     assert view._managed_trial_usage_bar.visible is True
     assert view._managed_trial_usage_bar.percent is None
-    assert view._managed_key_referral_id == "7KQ9M2"
 
 
 @pytest.mark.parametrize(
@@ -1485,253 +1416,6 @@ def test_translation_connection_selected_repaints_managed_key_card_immediately(
     assert view._managed_key_card.visible is expected_visible
     assert "managed_key_card" in updates
     assert "api_body" in updates
-
-
-def test_set_managed_key_state_empty_referral_disables_copy_and_repaints_parent(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    attach_dummy_page(monkeypatch, view)
-    updates: list[str] = []
-    mounted_page = object()
-    view._managed_key_card = SimpleNamespace(
-        visible=True,
-        page=mounted_page,
-        update=lambda: updates.append("managed_key_card"),
-    )
-    view._api_keys_column = SimpleNamespace(
-        page=mounted_page,
-        update=lambda: updates.append("api_keys_column"),
-    )
-
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=None,
-        referral_id=None,
-    )
-
-    assert view._managed_key_card.visible is True
-    assert view._managed_trial_usage_bar.visible is True
-    assert view._managed_trial_usage_bar.percent is None
-    assert view._managed_key_referral_id is None
-    assert view._managed_key_referral_id_value.value == t("settings.managed_key.referral_id.empty")
-    assert "api_keys_column" in updates
-
-
-def test_set_managed_key_state_shows_talk_together_pass_invite_progress(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=64,
-        referral_id="7KQ9M2",
-        pass_status=TalkTogetherPassStatus(
-            pass_id="7KQ9M2",
-            invite_count=1,
-            invite_limit=3,
-            bonus_translations_per_friend=200,
-        ),
-    )
-
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_label.value == t(
-        "settings.managed_key.invite_progress.label"
-    )
-    assert view._managed_key_invite_progress_value.value == "1 / 3"
-
-
-def test_set_managed_key_state_repaints_mounted_pass_id_usage_and_invite_controls(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-    view = _make_llm_selection_view(monkeypatch, settings)
-    updates: list[str] = []
-    mounted_page = object()
-
-    view._managed_trial_usage_bar.page = mounted_page
-    view._managed_trial_usage_bar.update = lambda: updates.append("usage_bar")
-    view._managed_trial_usage_bar._remaining_text.page = mounted_page  # noqa: SLF001
-    view._managed_trial_usage_bar._remaining_text.update = lambda: updates.append(  # noqa: SLF001
-        "usage_remaining_text"
-    )
-    view._managed_trial_usage_bar._fill_segments.page = mounted_page  # noqa: SLF001
-    view._managed_trial_usage_bar._fill_segments.update = lambda: updates.append(  # noqa: SLF001
-        "usage_fill_segments"
-    )
-    view._managed_key_referral_id_value.page = mounted_page
-    view._managed_key_referral_id_value.update = lambda: updates.append("referral_value")
-    view._managed_key_invite_progress_label.page = mounted_page
-    view._managed_key_invite_progress_label.update = lambda: updates.append("invite_label")
-    view._managed_key_invite_progress_value.page = mounted_page
-    view._managed_key_invite_progress_value.update = lambda: updates.append("invite_value")
-    view._managed_key_invite_progress_row.page = mounted_page
-    view._managed_key_invite_progress_row.update = lambda: updates.append("invite_row")
-
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=64,
-        referral_id="7KQ9M2",
-        pass_status=TalkTogetherPassStatus(
-            pass_id="7KQ9M2",
-            invite_count=1,
-            invite_limit=3,
-            bonus_translations_per_friend=200,
-        ),
-    )
-
-    assert view._managed_trial_usage_bar.percent == 64
-    assert view._managed_key_referral_id_value.value == "7KQ9M2"
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 3"
-    assert {
-        "usage_bar",
-        "usage_remaining_text",
-        "usage_fill_segments",
-        "referral_value",
-        "invite_label",
-        "invite_value",
-        "invite_row",
-    }.issubset(updates)
-
-
-def test_managed_key_invite_progress_survives_managed_china_round_trip_before_settings_save(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(
-        llm="openrouter",
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.MANAGED,
-        openrouter_source=OpenRouterCredentialSource.MANAGED,
-        connection_history={
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED,
-            TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED,
-        },
-    )
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=64,
-        referral_id="7KQ9M2",
-        pass_status=TalkTogetherPassStatus(
-            pass_id="7KQ9M2",
-            invite_count=1,
-            invite_limit=3,
-            bonus_translations_per_friend=200,
-        ),
-    )
-
-    view._on_translation_connection_selected(TranslationConnection.MANAGED_CHINA.value)
-    assert view._managed_key_referral_id == "7KQ9M2"
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 3"
-
-    view._on_translation_connection_selected(TranslationConnection.MANAGED.value)
-    assert view._managed_key_referral_id == "7KQ9M2"
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 3"
-
-    view._on_llm_selected(TranslationModel.GEMMA4_26B_31B.value)
-    assert view._managed_key_referral_id == "7KQ9M2"
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 3"
-
-
-def test_set_managed_key_state_can_display_preview_referral_without_remembering(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=100,
-        referral_id="7KQ9M2",
-        pass_status=TalkTogetherPassStatus(
-            pass_id="7KQ9M2",
-            invite_count=1,
-            invite_limit=3,
-            bonus_translations_per_friend=200,
-        ),
-        remember_referral_id=False,
-    )
-
-    assert settings.state.managed_connection.referral_id is None
-    assert view._managed_key_referral_id == "7KQ9M2"
-    assert view._managed_key_referral_id_value.value == "7KQ9M2"
-    assert view._managed_key_invite_progress_row.visible is True
-    assert ManagedReferralEdit not in view._provider_edits
-
-
-def test_managed_key_invite_progress_row_appears_below_talk_together_pass_id(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-
-    managed_key_content = _wrapped_card_column(view._managed_key_card)
-    details_column = managed_key_content.controls[4]
-    referral_id_row = details_column.controls[0]
-
-    assert view._managed_key_referral_id_label in referral_id_row.controls
-    assert details_column.controls[1] is view._managed_key_invite_progress_row
-    assert len(details_column.controls) == 2
-
-
-def test_set_managed_key_state_shows_invite_progress_placeholder_when_absent(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=None,
-        referral_id="7KQ9M2",
-        pass_status=TalkTogetherPassStatus(
-            pass_id="7KQ9M2",
-            invite_count=1,
-            invite_limit=3,
-            bonus_translations_per_friend=200,
-        ),
-    )
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 3"
-
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=None,
-        referral_id="7KQ9M2",
-        pass_status=None,
-    )
-
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_pass_status is None
-    assert view._managed_key_invite_progress_value.value == "- / -"
-
-
-def test_set_managed_key_state_clamps_over_limit_invite_progress(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-
-    view.set_managed_key_state(
-        visible=True,
-        referral_id="7KQ9M2",
-        pass_status=TalkTogetherPassStatus(
-            pass_id="7KQ9M2",
-            invite_count=7,
-            invite_limit=3,
-            bonus_translations_per_friend=200,
-        ),
-    )
-
-    assert view._managed_key_invite_progress_value.value == "3 / 3"
 
 
 def test_update_api_visibility_treats_peer_local_qwen_as_local_provider(
@@ -1832,7 +1516,7 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
     assert pending.intent.translation.connection == TranslationConnection.CPU.value
     assert _llm(pending) == LLMProviderName.MANAGED_GEMMA.value
     assert applies == [True]
-    assert view._translation_connection_row.visible is False
+    assert view._translation_connection_row.visible is True
     assert view._translation_connection_title.value == t("settings.translation_connection")
     assert view._get_llm_display_label(view._provider_draft or view._provider_snapshot) == t(
         "provider.managed_gemma_cpu"
@@ -1854,6 +1538,44 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
     pending = view.build_provider_apply_settings()
     assert pending is not None
     assert pending.intent.translation.connection == TranslationConnection.GPU.value
+    assert applies == [True, True]
+
+
+def test_gemma_26b_selection_applies_gpu_only_and_preserves_e4b_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _vnext(model="managed_gemma", connection="cpu")
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    applies: list[bool] = []
+    discoveries: list[bool] = []
+    view.on_providers_changed = lambda: applies.append(True)
+    view.on_gpu_discovery_requested = lambda: discoveries.append(True)
+
+    view._on_llm_selected("managed_gemma_26b")
+
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    assert pending.intent.translation.model == "managed_gemma_26b"
+    assert pending.intent.translation.connection == "gpu"
+    assert _llm(pending) == LLMProviderName.MANAGED_GEMMA.value
+    assert view._translation_connection_row.visible is True
+    assert view._gpu_device_row.visible is True
+    assert view._get_llm_modal_value(view._provider_draft) == "managed_gemma_26b"
+    assert view._llm_text.content.value == t("provider.managed_gemma_26b")
+    assert applies == [True]
+    assert discoveries == [True]
+
+    view._on_translation_connection_selected("cpu")
+    pending = view.build_provider_apply_settings()
+    assert pending.intent.translation.model == "managed_gemma_26b"
+    assert pending.intent.translation.connection == "gpu"
+    assert applies == [True]
+
+    view._on_llm_selected("managed_gemma_cpu")
+    pending = view.build_provider_apply_settings()
+    assert pending.intent.translation.model == "managed_gemma"
+    assert pending.intent.translation.connection == "cpu"
+    assert pending.intent.translation.connection_history["managed_gemma_26b"] == "gpu"
     assert applies == [True, True]
 
 
@@ -2592,15 +2314,16 @@ def test_gpu_card_is_standard_one_by_one_and_contains_only_device_selection(
     assert view._gpu_device_row.content.controls == [
         view._gpu_device_card,
         view._gpu_llm_card,
-        view._gpu_refresh_card,
+        view._model_assets_card,
     ]
 
 
-def test_gpu_row_repaints_and_collapses_immediately_with_provider_selection(
+def test_local_model_row_repaints_for_cpu_and_gpu_local_models_and_collapses_for_cloud(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
+    settings = _vnext(settings, stt_provider=STTProviderName.DEEPGRAM)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
     view, _ = _make_settings_view(monkeypatch)
     repainted: list[ft.Control] = []
     monkeypatch.setattr(settings_view, "_update_control_if_mounted", repainted.append)
@@ -2609,18 +2332,34 @@ def test_gpu_row_repaints_and_collapses_immediately_with_provider_selection(
     assert view._gpu_device_row.visible is False
     assert view._http_extension_host.visible is False
 
-    repainted.clear()
-    view._on_stt_selected(STTProviderName.LOCAL_QWEN_GPU.value)
+    for provider in (STTProviderName.LOCAL_QWEN, STTProviderName.LOCAL_QWEN_GPU):
+        repainted.clear()
+        view._on_stt_selected(provider.value)
 
-    assert view._gpu_device_row.visible is True
-    assert view._http_extension_host.visible is False
-    assert view._gpu_device_row in repainted
+        assert view._gpu_device_row.visible is True
+        assert view._http_extension_host.visible is False
+        assert view._gpu_device_row in repainted
 
     repainted.clear()
-    view._on_stt_selected(STTProviderName.LOCAL_QWEN.value)
+    view._on_stt_selected(STTProviderName.DEEPGRAM.value)
 
     assert view._gpu_device_row.visible is False
     assert view._gpu_device_row in repainted
+
+
+def test_cpu_gemma_shows_the_local_model_row_and_keeps_the_diarization_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettingsVNext()
+    settings = _vnext(settings, stt_provider=STTProviderName.DEEPGRAM)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    view._on_llm_selected("managed_gemma_cpu")
+
+    assert view._gpu_device_row.visible is True
+    assert view._translation_connection_row.visible is True
 
 
 def test_gpu_card_shows_split_labels_when_asr_and_gemma_use_different_devices(
@@ -2674,11 +2413,12 @@ def test_gpu_card_click_opens_column_modal_and_refresh_requests_discovery(
             opened.append(current)
 
     monkeypatch.setattr(settings_view, "SettingsModal", CapturingModal)
+    view.on_open_model_assets = lambda: requests.append("model_assets")
     view._on_gpu_device_click(None)
     view._on_llm_gpu_device_click(None)
-    view._on_gpu_refresh_click(None)
+    view._on_model_assets_click(None)
 
-    assert requests == ["discover", "discover", "discover"]
+    assert requests == ["discover", "discover", "model_assets"]
     assert opened[0][0] == t("settings.gpu_device.asr")
     assert opened[0][1] == "auto"
     assert opened[1] == "auto"
@@ -2690,6 +2430,8 @@ def test_selecting_gemma_gpu_requests_discovery_and_shows_card(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
+    settings = _vnext(settings, stt_provider=STTProviderName.DEEPGRAM)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
     requests: list[str] = []
@@ -3837,6 +3579,26 @@ def test_peer_vad_slider_change_updates_state_and_emits_intent(
     assert changed[0].intent.desktop_audio.vad_speech_threshold == 0.77
 
 
+def test_audio_test_threshold_changes_share_the_settings_sliders_and_intents(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettingsVNext()
+    changed: list[AppSettingsVNext] = []
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    monkeypatch.setattr(type(view._vad_slider), "update", lambda self: None)
+
+    view.apply_vad_threshold("self", 0.65)
+    view.apply_vad_threshold("peer", 0.35)
+
+    assert view.vad_thresholds() == {"self": 0.65, "peer": 0.35}
+    assert (view._vad_slider.value, view._vad_slider.label) == (0.65, "0.65")
+    assert (view._peer_vad_slider.value, view._peer_vad_slider.label) == (0.35, "0.35")
+    assert changed[-1].intent.stt.vad_speech_threshold == 0.65
+    assert changed[-1].intent.desktop_audio.vad_speech_threshold == 0.35
+
+
 def test_audio_change_messages_use_basic_runtime_log(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -4067,6 +3829,87 @@ def test_peer_auto_detection_languages_card_loads_saved_hints(
 
     assert view._peer_auto_languages_card.visible is True
     assert view._peer_auto_languages_editor._terms == ["ja", "zh-TW"]
+
+
+def test_hint_language_add_keeps_the_selected_language_when_settings_reload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettingsVNext()
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    view._on_peer_auto_languages_add("ja")
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    assert view._peer_auto_languages_editor._terms == ["ja"]
+    assert view._general_snapshot.peer_expected_languages == ("ja",)
+
+    view._on_peer_auto_languages_add("ar")
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    assert view._peer_auto_languages_editor._terms == ["ja", "ar"]
+
+    view._on_peer_auto_languages_add("en")
+    view.load_from_settings(
+        _vnext(settings, peer_expected_languages=["ja"]),
+        config_path=Path("settings.json"),
+    )
+
+    assert view._peer_auto_languages_editor._terms == ["ja", "ar", "en"]
+
+    view.load_from_settings(
+        _vnext(settings, peer_expected_languages=["ja", "ar", "en"]),
+        config_path=Path("settings.json"),
+    )
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    assert view._peer_auto_languages_editor._terms == []
+
+
+def test_hint_language_add_saves_hints_without_a_language_selection_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettingsVNext()
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    recent: list[str] = ["zh-CN", "ca", "ja"]
+
+    class Dashboard:
+        def recent_language_codes(self) -> list[str]:
+            return list(recent)
+
+        def remember_recent_language(self, code: str) -> None:
+            if code in recent:
+                recent.remove(code)
+            recent.insert(0, code)
+            del recent[3:]
+
+    view.bind_recent_language_queue(Dashboard())
+    emitted: list[AppSettingsVNext] = []
+    view.on_settings_changed = emitted.append
+    editor = view._peer_auto_languages_editor
+
+    editor._handle_select("ja")
+    editor._handle_select("ar")
+    editor._handle_select("en")
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    assert editor._terms == ["ja", "ar", "en"]
+    assert [item.intent.languages.peer_expected_languages for item in emitted] == [
+        ["ja"],
+        ["ja", "ar"],
+        ["ja", "ar", "en"],
+    ]
+    assert [item.intent.languages.recent_source_languages for item in emitted] == [
+        ["ja", "zh-CN", "ca"],
+        ["ar", "ja", "zh-CN"],
+        ["en", "ar", "ja"],
+    ]
+    assert [item.intent.languages.recent_target_languages for item in emitted] == [
+        ["ja", "zh-CN", "ca"],
+        ["ar", "ja", "zh-CN"],
+        ["en", "ar", "ja"],
+    ]
 
 
 def test_peer_auto_languages_add_button_uses_region_tone(
@@ -4940,12 +4783,12 @@ def test_general_osc_card_is_locale_independent(
         i18n_module.set_locale(old_locale)
 
 
-def test_microphone_test_card_click_invokes_start_callback_without_modal(
+def test_audio_test_card_click_invokes_start_callback_without_modal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     view, _ = _make_settings_view(monkeypatch)
     calls: list[str] = []
-    view.on_start_microphone_test = lambda: calls.append("start")
+    view.on_start_audio_test = lambda: calls.append("start")
     modal_calls: list[str] = []
 
     class DummyModal:
@@ -4954,29 +4797,29 @@ def test_microphone_test_card_click_invokes_start_callback_without_modal(
 
     monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
 
-    view._on_microphone_test_click(None)
+    view._on_audio_test_click(None)
 
     assert calls == ["start"]
     assert modal_calls == []
 
 
-def test_microphone_test_card_clicks_always_request_start_without_inline_state(
+def test_audio_test_card_clicks_always_request_start_without_inline_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     view, _ = _make_settings_view(monkeypatch)
-    card = _general_tab_card(view, t("settings.microphone_test"))
+    card = _general_tab_card(view, t("settings.audio_test"))
     calls: list[str] = []
-    view.on_start_microphone_test = lambda: calls.append("start")
+    view.on_start_audio_test = lambda: calls.append("start")
 
     assert not any(isinstance(node, ft.Slider) for node in _iter_control_tree(card))
-    assert view._microphone_test_text.content.value == t("settings.microphone_test.action")
+    assert view._audio_test_text.content.value == t("settings.audio_test.action")
 
-    view._on_microphone_test_click(None)
+    view._on_audio_test_click(None)
     assert calls == ["start"]
 
-    view._on_microphone_test_click(None)
+    view._on_audio_test_click(None)
     assert calls == ["start", "start"]
-    assert view._microphone_test_text.content.value == t("settings.microphone_test.action")
+    assert view._audio_test_text.content.value == t("settings.audio_test.action")
 
 
 def test_api_tab_places_independent_managed_key_card_above_api_keys(
@@ -5007,7 +4850,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     assert _row_card_titles(api_controls[3]) == [
         t("settings.gpu_device.asr"),
         t("settings.gpu_device.llm"),
-        t("settings.gpu_device.refresh"),
+        t("settings.model_assets"),
     ]
     assert view._gpu_device_row.visible is False
     assert _row_card_titles(api_controls[4]) == [t("settings.local_llm.connection")]
@@ -6950,7 +6793,12 @@ class PromptApplyBackend:
         self.apply_started = asyncio.Event()
         self.release_apply = asyncio.Event()
 
-    async def apply_settings(self, settings: AppSettingsVNext) -> bool:
+    async def apply_settings(
+        self,
+        settings: AppSettingsVNext,
+        *,
+        provider_requested: bool = False,
+    ) -> bool:
         self.apply_started.set()
         await self.release_apply.wait()
         if self.succeed:

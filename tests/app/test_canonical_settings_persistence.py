@@ -77,14 +77,14 @@ def _with_locale(settings: AppSettingsVNext, locale: str) -> AppSettingsVNext:
     )
 
 
-def _with_referral(settings: AppSettingsVNext, referral_id: str) -> AppSettingsVNext:
+def _with_managed_ref(settings: AppSettingsVNext, credential_ref: str) -> AppSettingsVNext:
     return replace(
         settings,
         state=replace(
             settings.state,
             managed_connection=replace(
                 settings.state.managed_connection,
-                referral_id=referral_id,
+                active_managed_credential_ref=credential_ref,
             ),
         ),
     )
@@ -225,15 +225,18 @@ def test_canonical_settings_persistence_port_covers_load_save_and_rollback(
     owner.remember_projection(active_settings)
     owner.persist_current()
 
-    persist_managed_identity(_with_referral(stale_settings, "234567"))
+    persist_managed_identity(_with_managed_ref(stale_settings, "managed-ref-234567"))
 
     assert owner.require_canonical().intent.ui.locale == "ru"
-    assert owner.require_canonical().state.managed_connection.referral_id == "234567"
+    assert (
+        owner.require_canonical().state.managed_connection.active_managed_credential_ref
+        == "managed-ref-234567"
+    )
 
     active_before_failure = copy.deepcopy(owner.require_canonical())
     monkeypatch.setattr(adapter_module, "save_vnext_settings", fail_save)
     with pytest.raises(OSError, match="injected save failure"):
-        persist_managed_identity(_with_referral(stale_settings, "345678"))
+        persist_managed_identity(_with_managed_ref(stale_settings, "managed-ref-345678"))
     assert owner.canonical == active_before_failure
 
 
@@ -830,3 +833,37 @@ def test_old_official_deepseek_primary_materializes_as_41_direct() -> None:
     assert result.model == "deepseek_v4_flash_41"
     assert result.connection == "official_byok"
     assert result.deepseek.llm_model == "deepseek-flash"
+
+
+@pytest.mark.parametrize("connection", ["gpu", "cpu", "managed", "invalid"])
+def test_26b_canonical_selection_normalizes_gpu_and_survives_reload(
+    tmp_path: Path, connection: str
+) -> None:
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model="managed_gemma_26b",
+                connection=connection,
+                connection_history={"managed_gemma": "cpu", "managed_gemma_26b": connection},
+            ),
+        ),
+    )
+    owner = SettingsOwner(
+        path=tmp_path / "settings.json",
+        persistence=SettingsVNextCanonicalPersistenceAdapter(),
+        canonical=materialize_canonical_translation_settings(settings),
+        authoritative=True,
+    )
+    owner.persist()
+    result = load_vnext_settings(owner.path)
+    assert result.ok
+    assert result.settings is not None
+    translation = result.settings.intent.translation
+    assert translation.model == "managed_gemma_26b"
+    assert translation.connection == "gpu"
+    assert translation.connection_history == {"managed_gemma": "cpu", "managed_gemma_26b": "gpu"}
+    assert settings.intent.translation.openrouter_model == translation.openrouter_model

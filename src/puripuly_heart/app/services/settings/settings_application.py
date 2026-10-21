@@ -5,8 +5,11 @@ import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
 
-from puripuly_heart.app.language_selection import LanguageSelectionChange
-from puripuly_heart.app.ports.runtime_apply import RuntimeApplyPort
+from puripuly_heart.app.language_selection import (
+    LanguageSelectionChange,
+    unify_recent_language_codes,
+)
+from puripuly_heart.app.ports.runtime_apply import RuntimeApplyPort, RuntimeApplyRequest
 from puripuly_heart.app.ports.settings_runtime_effects import SettingsRuntimeEffectsPort
 from puripuly_heart.app.ports.settings_view import (
     ActivationNoticeSettingsIntent,
@@ -31,7 +34,6 @@ from puripuly_heart.app.ports.settings_view import (
     LocalLlmBaseUrlEdit,
     LocalLlmExtraBodyEdit,
     LocalLlmModelEdit,
-    ManagedReferralEdit,
     OscConnectionSettingsIntent,
     OverlayCalibrationSettingsIntent,
     OverlayCalibrationSnapshot,
@@ -75,13 +77,16 @@ from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState
 from puripuly_heart.app.services.provider_runtime_apply import (
     NoopRuntimeApply,
     OverlayOscOutputRuntimeApplyAdapter,
+    ProviderRuntimeApplyAdapter,
+    ProviderRuntimeApplyPlan,
+    ProviderRuntimeOwner,
     SttLanguageAudioRuntimeApplyAdapter,
     UiPromptClipboardStateRuntimeApplyAdapter,
     _exception_code,
-    _log_runtime_apply_exception,
     _overlay_osc_output_runtime_degraded_transaction_result,
     _overlay_osc_output_save_failed_transaction_result,
     _runtime_apply_result_as_degraded_transaction,
+    _settings_mutation_diagnostics,
     _stt_language_audio_runtime_degraded_transaction_result,
     _stt_language_audio_runtime_unavailable_result,
     _stt_language_audio_save_failed_transaction_result,
@@ -119,15 +124,18 @@ from puripuly_heart.config.translation_values import (
     provider_llm_for_translation,
 )
 from puripuly_heart.core.messages import (
+    RUNTIME_APPLY_STATUS_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED,
+    ErrorDiagnostics,
     TransactionResult,
 )
 
 from .settings_mutation import (
     OverlayOscOutputSettingsMutation,
     SettingsMutationCommand,
+    SettingsMutationInterrupted,
     SettingsMutationService,
     SttLanguageAudioSettingsMutation,
     UiPromptClipboardStateSettingsMutation,
@@ -144,12 +152,13 @@ from .settings_transaction_result import (
 
 
 class StrictSettingsSaveFailed(Exception):
-    pass
+    def __init__(self, diagnostics: ErrorDiagnostics) -> None:
+        self.diagnostics = diagnostics
+        super().__init__("Settings persistence failed")
 
 
 SettingsMutationServiceProvider = Callable[[], SettingsMutationService | None]
 SettingsPredicate = Callable[[AppSettingsVNext, AppSettingsVNext], bool]
-SettingsFailureSink = Callable[[str], None]
 SettingsAsyncEffect = Callable[[], Awaitable[None]]
 SettingsFallbackSink = Callable[[tuple[str, ...], bool], None]
 SettingsFallbackLogSink = Callable[
@@ -177,7 +186,15 @@ def _active_prompt_key(settings: AppSettingsVNext) -> str:
     )
     if provider == "chatgpt":
         return "openai"
-    if provider in {"gemini", "openrouter", "openai", "deepseek", "local_llm", "managed_gemma"}:
+    if provider in {
+        "gemini",
+        "openrouter",
+        "openai",
+        "deepseek",
+        "local_llm",
+        "managed_gemma",
+        "index_translate",
+    }:
         return provider
     return "qwen"
 
@@ -292,7 +309,6 @@ def settings_view_surface_snapshots(
             alibaba_beijing=_verified(verification.alibaba_beijing),
             alibaba_singapore=_verified(verification.alibaba_singapore),
         ),
-        managed_referral_id=settings.state.managed_connection.referral_id,
         qwen_api_host_beijing=_dedicated_api_host(translation.qwen.beijing),
         qwen_api_host_singapore=_dedicated_api_host(translation.qwen.singapore),
     )
@@ -549,13 +565,18 @@ def materialize_immediate_settings_intent(
             clipboard=replace(updated.intent.clipboard, auto_translate_enabled=intent.enabled),
         )
     elif isinstance(intent, PeerExpectedLanguagesIntent):
-        updated = _with_intent(
-            updated,
-            languages=replace(
-                updated.intent.languages,
-                peer_expected_languages=list(intent.languages),
-            ),
+        languages = replace(
+            updated.intent.languages,
+            peer_expected_languages=list(intent.languages),
         )
+        if intent.recent_languages:
+            recent_languages = unify_recent_language_codes(intent.recent_languages)
+            languages = replace(
+                languages,
+                recent_source_languages=list(recent_languages),
+                recent_target_languages=list(recent_languages),
+            )
+        updated = _with_intent(updated, languages=languages)
     elif isinstance(intent, CustomVocabularySettingsIntent):
         custom_terms = dict(updated.intent.stt.custom_terms)
         custom_terms[intent.source_language] = list(intent.terms)
@@ -810,17 +831,6 @@ def materialize_provider_apply_intent(
                     ),
                 ),
             )
-        elif isinstance(edit, ManagedReferralEdit):
-            updated = replace(
-                updated,
-                state=replace(
-                    updated.state,
-                    managed_connection=replace(
-                        updated.state.managed_connection,
-                        referral_id=edit.referral_id,
-                    ),
-                ),
-            )
         elif isinstance(edit, SystemPromptEdit):
             updated = _with_intent(
                 updated,
@@ -832,10 +842,29 @@ def materialize_provider_apply_intent(
     return updated
 
 
+def language_selection_reloads_settings_view(
+    current: AppSettingsVNext,
+    change: LanguageSelectionChange,
+) -> bool:
+    languages = current.intent.languages
+    return (
+        change.source_code != languages.source_language
+        or change.target_code != languages.target_language
+        or change.secondary_target_code != languages.secondary_target_language
+        or change.peer_source_code != languages.peer_source_language
+        or change.peer_target_code != languages.peer_target_language
+        or change.peer_source_mode != languages.peer_source_mode
+    )
+
+
 def materialize_language_selection(
     current: AppSettingsVNext,
     change: LanguageSelectionChange,
 ) -> AppSettingsVNext:
+    recent_languages = unify_recent_language_codes(
+        change.recent_source_codes,
+        change.recent_target_codes,
+    )
     return _with_intent(
         current,
         languages=replace(
@@ -846,8 +875,8 @@ def materialize_language_selection(
             peer_source_mode=change.peer_source_mode,
             peer_source_language=change.peer_source_code,
             peer_target_language=change.peer_target_code,
-            recent_source_languages=list(change.recent_source_codes),
-            recent_target_languages=list(change.recent_target_codes),
+            recent_source_languages=list(recent_languages),
+            recent_target_languages=list(recent_languages),
         ),
     )
 
@@ -866,15 +895,16 @@ class SettingsApplicationOwner:
     mutation_service_provider: SettingsMutationServiceProvider
     consume_superseded_settings: Callable[[AppSettingsVNext], bool]
     active_local_asr_change: SettingsPredicate
-    failure_sink: SettingsFailureSink
     results: SettingsTransactionResultOwner = field(default_factory=SettingsTransactionResultOwner)
     success_sink: Callable[[str], object] = lambda _message: None
+    provider_runtime: ProviderRuntimeOwner | None = None
 
     async def apply(
         self,
         next_settings: AppSettingsVNext,
         *,
         reload_settings_view: bool = True,
+        provider_requested: bool = False,
     ) -> bool:
         current = self.settings.canonical
         if current is not None:
@@ -930,22 +960,49 @@ class SettingsApplicationOwner:
                     ),
                 )
             installation_fallback = bool(fallback_plan.installation_fallback and fallback_channels)
-        if next_settings is not self.settings.canonical:
+        provider_plan = None
+        if (
+            self.provider_runtime is not None
+            and current is not None
+            and (
+                provider_requested
+                or settings_view_surface_snapshots(current)[0]
+                != settings_view_surface_snapshots(next_settings)[0]
+                or self.provider_runtime.llm_signature_builder(current)
+                != self.provider_runtime.llm_signature_builder(next_settings)
+            )
+        ):
+            provider_plan = self.provider_runtime.build_plan(
+                next_settings,
+                force_rebuild_llm=False,
+                canonical_settings=self.settings.project_canonical_delta(current, next_settings),
+            )
+        if provider_plan is None and next_settings is not self.settings.canonical:
             if await self._route(
                 next_settings,
                 reload_settings_view=reload_settings_view,
             ):
                 self.fallback_sink(fallback_channels, installation_fallback)
                 self._emit_apply_result()
-                return True
+                return (
+                    self.results.current is not None
+                    and self.results.current.status
+                    == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+                )
         applied = await self.apply_direct(
             next_settings,
             reload_settings_view=reload_settings_view,
+            provider_plan=provider_plan,
         )
         self.fallback_sink(fallback_channels, installation_fallback)
         if applied:
             self._emit_apply_result()
-        return True
+        return (
+            applied
+            and self.results.current is not None
+            and self.results.current.status
+            == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+        )
 
     async def _route(
         self,
@@ -970,26 +1027,36 @@ class SettingsApplicationOwner:
     def _emit_apply_result(self) -> None:
         result = self.results.current
         if result is None:
-            self.failure_sink(
-                "[Settings] apply_result outcome=failed "
-                "status=unclassified cause=settings_apply_result_missing"
+            self._set_result(
+                TransactionResult(
+                    status="settings_commit_failed",
+                    message=None,
+                    diagnostics=_settings_mutation_diagnostics(
+                        component="settings_application",
+                        operation="runtime_apply",
+                        code="settings_apply_result_missing",
+                    ),
+                )
             )
             return
-        diagnostics = result.diagnostics
-        cause = diagnostics.code if diagnostics is not None else "unclassified"
         if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-            self.success_sink("[Settings] apply_result outcome=committed effective=current")
-            return
-        if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED:
-            self.failure_sink(
-                "[Settings] apply_result outcome=committed effective=degraded "
-                f"status={result.status} cause={cause}"
-            )
-            return
-        self.failure_sink(
-            "[Settings] apply_result outcome=failed effective=previous "
-            f"status={result.status} cause={cause}"
-        )
+            try:
+                self.success_sink("[Settings] apply_result outcome=committed effective=current")
+            except Exception as exc:
+                self._set_result(
+                    replace(
+                        result,
+                        secondary_diagnostics=(
+                            *result.secondary_diagnostics,
+                            _settings_mutation_diagnostics(
+                                component="settings_application",
+                                operation="commit_notification",
+                                code="settings_commit_notification_failed",
+                                exception=exc,
+                            ),
+                        ),
+                    )
+                )
 
     def notify_fallback(
         self,
@@ -1012,11 +1079,21 @@ class SettingsApplicationOwner:
         if not plan.changed:
             return True
         normalized = self.manual_fallback.apply(previous, plan)
-        self.settings.canonical = normalized
-        if not self.settings.save_current(
-            failure_sink=lambda exc: self.failure_sink(f"Failed to save settings: {exc}")
-        ):
-            self.settings.canonical = previous
+        try:
+            normalized = self.settings.commit_delta(previous, normalized)
+        except Exception:
+            self._set_result(
+                TransactionResult(
+                    status="settings_commit_failed",
+                    message=None,
+                    diagnostics=self.settings.last_failure,
+                    secondary_diagnostics=(
+                        *self.settings.persistence_secondary_diagnostics,
+                        *self.settings.notification_diagnostics,
+                    ),
+                    secondary_omitted_count=self.settings.persistence_secondary_omitted_count,
+                )
+            )
             return False
         self.sync_ui()
         self.fallback_sink(
@@ -1038,78 +1115,119 @@ class SettingsApplicationOwner:
         strict_runtime_errors: bool = False,
         strict_persistence_errors: bool = False,
         reload_settings_view: bool = True,
+        provider_plan: ProviderRuntimeApplyPlan | None = None,
     ) -> bool:
-        next_settings = await self.runtime_effects.preserve_before_replace(next_settings)
-        if persist:
-            baseline = self.settings.projection_snapshot or self.settings.canonical
-            self.settings.begin(snapshot=baseline)
+        baseline = self.settings.projection_snapshot or self.settings.canonical
+        runtime_flags = (
+            self.settings.overlay_enabled(),
+            self.settings.peer_translation_enabled(),
+            self.settings.overlay_desktop_locked(),
+        )
         committed = not persist
         try:
+            next_settings = await self.runtime_effects.preserve_before_replace(next_settings)
             if persist:
                 self.runtime_effects.capture_runtime_signatures()
-                self.settings.apply_canonical_delta(baseline, next_settings)
             transition = await self.runtime_effects.prepare(
                 self.settings.canonical,
                 next_settings,
             )
-            self.settings.canonical = transition.settings
             self.runtime_effects.activate_before_persist(transition)
             if persist:
-                if strict_persistence_errors:
-                    try:
-                        self.settings.persist()
-                    except Exception:
-                        raise StrictSettingsSaveFailed from None
-                    self.results.mark_settings_committed()
-                    self.settings.remember_projection(transition.settings)
-                elif not self.settings.save_current(
-                    failure_sink=lambda exc: self.failure_sink(
-                        "[Settings] apply_result outcome=failed effective=previous "
-                        "status=settings_commit_failed cause=settings_persist_failed "
-                        f"exception_type={type(exc).__name__}"
-                    )
-                ):
+                try:
+                    committed_settings = self.settings.commit_delta(baseline, transition.settings)
+                except Exception as exc:
+                    if strict_persistence_errors:
+                        raise StrictSettingsSaveFailed(
+                            self.settings.last_failure
+                            or _settings_mutation_diagnostics(
+                                component="settings_repository",
+                                operation="save",
+                                code="settings_save_failed",
+                                exception=exc,
+                            )
+                        ) from exc
                     self._set_result(
                         TransactionResult(
                             status="settings_commit_failed",
                             message=None,
-                            diagnostics=None,
+                            diagnostics=self.settings.last_failure,
                         )
                     )
                     return False
+                transition = replace(transition, settings=committed_settings)
                 self.results.mark_settings_committed()
                 committed = True
+            runtime_failure = None
             try:
                 await self.runtime_effects.apply_after_persist(
                     transition,
                     strict_runtime_errors=strict_runtime_errors,
                     reload_settings_view=reload_settings_view,
+                    rebuild_managed_gemma=not (
+                        provider_plan is not None and provider_plan.should_rebuild_llm
+                    ),
                 )
             except Exception as exc:
                 if strict_runtime_errors:
                     raise
-                self._set_result(
-                    _stt_language_audio_runtime_degraded_transaction_result(
-                        code=_exception_code(exc, "settings_runtime_apply_exception"),
+                runtime_failure = _stt_language_audio_runtime_degraded_transaction_result(
+                    code=_exception_code(exc, "settings_runtime_apply_exception"),
+                    exception=exc,
+                )
+                self._set_result(runtime_failure)
+            if provider_plan is not None and self.provider_runtime is not None:
+                runtime_result = await ProviderRuntimeApplyAdapter(
+                    owner=self.provider_runtime,
+                    settings_provider=(
+                        self.settings.require_committed if persist else lambda: transition.settings
+                    ),
+                    plan=provider_plan,
+                ).apply_runtime(
+                    RuntimeApplyRequest(
+                        settings_values=self.settings.snapshot_values(transition.settings),
+                        reason="settings_provider_apply",
+                        correlation_id=None,
                     )
                 )
-            else:
-                if persist:
-                    self._set_result(
-                        TransactionResult(
-                            status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
-                            message=None,
-                            diagnostics=None,
+                if runtime_result.status != RUNTIME_APPLY_STATUS_APPLIED:
+                    provider_failure = _runtime_apply_result_as_degraded_transaction(runtime_result)
+                    if runtime_failure is not None:
+                        primary = runtime_failure.diagnostics
+                        secondary = provider_failure.secondary_diagnostics
+                        if provider_failure.diagnostics is not None:
+                            secondary = (
+                                replace(
+                                    provider_failure.diagnostics,
+                                    cause_id=primary.diagnostic_id if primary else None,
+                                ),
+                                *secondary,
+                            )
+                        runtime_failure = replace(
+                            runtime_failure,
+                            secondary_diagnostics=(
+                                *runtime_failure.secondary_diagnostics,
+                                *secondary,
+                            ),
                         )
+                    else:
+                        runtime_failure = provider_failure
+                    self._set_result(runtime_failure)
+            if persist and runtime_failure is None:
+                self._set_result(
+                    TransactionResult(
+                        status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+                        message=None,
+                        diagnostics=None,
                     )
+                )
             self.projection.remember_all(self.settings.canonical)
             return True
         finally:
-            if persist:
-                if committed:
-                    self.settings.complete()
-                else:
-                    self.settings.rollback()
+            if not committed:
+                self.settings.set_overlay_enabled(runtime_flags[0])
+                self.settings.set_peer_translation_enabled(runtime_flags[1])
+                self.settings.set_overlay_desktop_locked(runtime_flags[2])
 
     async def _apply_runtime_effect(
         self,
@@ -1143,8 +1261,9 @@ class SettingsApplicationOwner:
         if current is None:
             return
         updated = materialize_language_selection(current, change)
+        reload_settings_view = language_selection_reloads_settings_view(current, change)
         await self.apply(updated)
-        if self.settings.canonical is not None:
+        if reload_settings_view and self.settings.canonical is not None:
             self.projection.render(
                 self.settings.canonical,
                 preserve_custom_vocab_draft=True,
@@ -1157,28 +1276,13 @@ class SettingsApplicationOwner:
         committed_settings: AppSettingsVNext,
         reload_settings_view: bool = True,
     ) -> None:
-        self.settings.begin(snapshot=committed_settings)
-        committed = False
-        try:
-            self.settings.apply_canonical_delta(
-                committed_settings,
-                base_settings,
-            )
-            await self.settings.persist_async()
-            self.settings.remember_projection(base_settings)
-            committed = True
-        finally:
-            if committed:
-                self.settings.complete()
-            else:
-                self.settings.rollback()
+        restored = await self.settings.commit_delta_async(committed_settings, base_settings)
         await self.apply_direct(
-            copy.deepcopy(base_settings),
+            restored,
             persist=False,
             strict_runtime_errors=False,
             reload_settings_view=reload_settings_view,
         )
-        self.settings.canonical = copy.deepcopy(base_settings)
         if reload_settings_view:
             self.projection.render(
                 self.settings.canonical,
@@ -1260,31 +1364,27 @@ class SettingsApplicationOwner:
                     strict_persistence_errors=True,
                     reload_settings_view=reload_settings_view,
                 )
-            except StrictSettingsSaveFailed:
+            except StrictSettingsSaveFailed as exc:
+                failure_result = _ui_prompt_clipboard_state_save_failed_transaction_result(
+                    operation="apply_order22_order23_order24_full_draft_save",
+                    exception=exc,
+                )
                 if committed_before_full_draft is not None:
                     await self._resync_committed_runtime(
                         base_settings=committed_before_full_draft,
                         committed_settings=committed_before_full_draft,
-                        failure_message="Failed to resync committed order24 settings runtime",
+                        failure_result=failure_result,
                     )
-                self._set_result(
-                    _ui_prompt_clipboard_state_save_failed_transaction_result(
-                        operation="apply_order22_order23_order24_full_draft_save"
-                    )
-                )
+                else:
+                    self._set_result(failure_result)
             except Exception as exc:
-                _log_runtime_apply_exception(
-                    self.failure_sink,
-                    operation="apply_order22_order23_order24_full_draft_save",
-                    surface="ui_prompt_clipboard_state",
-                    exc=exc,
-                )
                 self._set_result(
                     _ui_prompt_clipboard_state_runtime_degraded_transaction_result(
                         code=_exception_code(
                             exc,
                             "ui_prompt_clipboard_state_runtime_apply_exception",
-                        )
+                        ),
+                        exception=exc,
                     )
                 )
 
@@ -1334,7 +1434,6 @@ class SettingsApplicationOwner:
                 state_provider=self.runtime_effects.state,
                 settings=committed_settings,
                 reload_settings_view=reload_settings_view,
-                failure_sink=self.failure_sink,
             )
         )
         result = await self._mutate(
@@ -1345,7 +1444,6 @@ class SettingsApplicationOwner:
             runtime_apply=runtime_apply,
         )
         if not _settings_mutation_committed(result):
-            self.settings.canonical = copy.deepcopy(base_settings)
             self.projection.remember_order22(self.settings.canonical)
             return True
         if self.consume_superseded_settings(committed_settings):
@@ -1365,8 +1463,28 @@ class SettingsApplicationOwner:
                     committed_settings=committed_settings,
                     reload_settings_view=reload_settings_view,
                 )
-            except Exception:
-                self.failure_sink("Failed to compensate local ASR settings apply")
+            except Exception as exc:
+                secondary = _settings_mutation_diagnostics(
+                    component="settings_application",
+                    operation="compensate_local_asr",
+                    code="settings_compensation_failed",
+                    surface="stt_language_audio",
+                    exception=exc,
+                )
+                self._set_result(
+                    replace(
+                        result,
+                        secondary_diagnostics=(
+                            *result.secondary_diagnostics,
+                            replace(
+                                secondary,
+                                cause_id=(
+                                    result.diagnostics.diagnostic_id if result.diagnostics else None
+                                ),
+                            ),
+                        ),
+                    )
+                )
             self.projection.remember_order22(self.settings.canonical)
             return True
         if has_out_of_scope_draft:
@@ -1377,30 +1495,23 @@ class SettingsApplicationOwner:
                     strict_persistence_errors=True,
                     reload_settings_view=reload_settings_view,
                 )
-            except StrictSettingsSaveFailed:
+            except StrictSettingsSaveFailed as exc:
                 await self._resync_committed_runtime(
                     base_settings=base_settings,
                     committed_settings=committed_settings,
-                    failure_message="Failed to resync committed order22 settings runtime",
-                )
-                self._set_result(
-                    _stt_language_audio_save_failed_transaction_result(
-                        operation="apply_stt_language_audio_full_draft_save"
-                    )
+                    failure_result=_stt_language_audio_save_failed_transaction_result(
+                        operation="apply_stt_language_audio_full_draft_save",
+                        exception=exc,
+                    ),
                 )
             except Exception as exc:
-                _log_runtime_apply_exception(
-                    self.failure_sink,
-                    operation="apply_stt_language_audio_full_draft_save",
-                    surface="stt_language_audio",
-                    exc=exc,
-                )
                 self._set_result(
                     _stt_language_audio_runtime_degraded_transaction_result(
                         code=_exception_code(
                             exc,
                             "stt_language_audio_runtime_apply_exception",
-                        )
+                        ),
+                        exception=exc,
                     )
                 )
             else:
@@ -1411,9 +1522,8 @@ class SettingsApplicationOwner:
                 if unavailable is not None:
                     self._set_result(_runtime_apply_result_as_degraded_transaction(unavailable))
         else:
-            self.settings.canonical = committed_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                self.runtime_effects.sync_signatures(committed_settings)
+                self.runtime_effects.sync_stt_signatures(self.settings.require_committed())
         self.projection.remember_order22(self.settings.canonical)
         return True
 
@@ -1441,10 +1551,10 @@ class SettingsApplicationOwner:
         ) != self.settings.snapshot_values(next_settings)
 
         async def apply_notice(_settings: object, reload_settings_view: bool) -> None:
-            self.runtime_effects.apply_activation_notice(committed_settings)
-            self.settings.canonical = committed_settings
+            current = self.settings.require_committed()
+            self.runtime_effects.apply_activation_notice(current)
             if reload_settings_view:
-                self.projection.render(committed_settings, preserve_custom_vocab_draft=True)
+                self.projection.render(current, preserve_custom_vocab_draft=True)
             self.sync_ui()
 
         runtime_apply = (
@@ -1453,7 +1563,6 @@ class SettingsApplicationOwner:
             else OverlayOscOutputRuntimeApplyAdapter(
                 apply_settings=apply_notice if notice_only else self._apply_runtime_effect,
                 settings=committed_settings,
-                failure_sink=self.failure_sink,
             )
         )
         result = await self._mutate(
@@ -1464,7 +1573,6 @@ class SettingsApplicationOwner:
             runtime_apply=runtime_apply,
         )
         if not _settings_mutation_committed(result):
-            self.settings.canonical = copy.deepcopy(base_settings)
             self.projection.remember_order23(self.settings.canonical)
             if notice_only:
                 self.projection.render(
@@ -1480,34 +1588,25 @@ class SettingsApplicationOwner:
                     strict_runtime_errors=True,
                     strict_persistence_errors=True,
                 )
-            except StrictSettingsSaveFailed:
+            except StrictSettingsSaveFailed as exc:
                 await self._resync_committed_runtime(
                     base_settings=base_settings,
                     committed_settings=committed_settings,
-                    failure_message="Failed to resync committed order23 settings runtime",
-                )
-                self._set_result(
-                    _overlay_osc_output_save_failed_transaction_result(
-                        operation="apply_overlay_osc_output_full_draft_save"
-                    )
+                    failure_result=_overlay_osc_output_save_failed_transaction_result(
+                        operation="apply_overlay_osc_output_full_draft_save",
+                        exception=exc,
+                    ),
                 )
             except Exception as exc:
-                _log_runtime_apply_exception(
-                    self.failure_sink,
-                    operation="apply_overlay_osc_output_full_draft_save",
-                    surface="overlay_osc_output",
-                    exc=exc,
-                )
                 self._set_result(
                     _overlay_osc_output_runtime_degraded_transaction_result(
                         code=_exception_code(
                             exc,
                             "overlay_osc_output_runtime_apply_exception",
-                        )
+                        ),
+                        exception=exc,
                     )
                 )
-        elif self.settings.canonical is None or self.settings.canonical is base_settings:
-            self.settings.canonical = committed_settings
         self.projection.remember_order23(self.settings.canonical)
         return True
 
@@ -1532,18 +1631,16 @@ class SettingsApplicationOwner:
             else UiPromptClipboardStateRuntimeApplyAdapter(
                 apply_settings=self._apply_runtime_effect,
                 settings=runtime_settings,
-                failure_sink=self.failure_sink,
             )
         )
         result = await self._mutate(
             command=UiPromptClipboardStateSettingsMutation(values=patch_values),
-            base_settings=self.settings.canonical or committed_settings,
+            base_settings=base_settings,
             committed_settings=committed_settings,
             surface="ui_prompt_clipboard_state",
             runtime_apply=runtime_apply,
         )
         if not _settings_mutation_committed(result):
-            self.settings.canonical = copy.deepcopy(base_settings)
             self.projection.remember_order24(self.settings.canonical)
             return True
         if has_out_of_scope_draft:
@@ -1553,36 +1650,28 @@ class SettingsApplicationOwner:
                     strict_runtime_errors=True,
                     strict_persistence_errors=True,
                 )
-            except StrictSettingsSaveFailed:
+            except StrictSettingsSaveFailed as exc:
                 await self._resync_committed_runtime(
                     base_settings=base_settings,
                     committed_settings=committed_settings,
-                    failure_message="Failed to resync committed order24 settings runtime",
-                )
-                self._set_result(
-                    _ui_prompt_clipboard_state_save_failed_transaction_result(
-                        operation="apply_ui_prompt_clipboard_state_full_draft_save"
-                    )
+                    failure_result=_ui_prompt_clipboard_state_save_failed_transaction_result(
+                        operation="apply_ui_prompt_clipboard_state_full_draft_save",
+                        exception=exc,
+                    ),
                 )
             except Exception as exc:
-                _log_runtime_apply_exception(
-                    self.failure_sink,
-                    operation="apply_ui_prompt_clipboard_state_full_draft_save",
-                    surface="ui_prompt_clipboard_state",
-                    exc=exc,
-                )
                 self._set_result(
                     _ui_prompt_clipboard_state_runtime_degraded_transaction_result(
                         code=_exception_code(
                             exc,
                             "ui_prompt_clipboard_state_runtime_apply_exception",
-                        )
+                        ),
+                        exception=exc,
                     )
                 )
         else:
-            self.settings.canonical = runtime_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                self.runtime_effects.sync_signatures(runtime_settings)
+                self.runtime_effects.sync_stt_signatures(self.settings.require_committed())
         self.projection.remember_order24(self.settings.canonical)
         return True
 
@@ -1599,7 +1688,6 @@ class SettingsApplicationOwner:
             base_settings=base_settings,
             committed_settings=committed_settings,
             surface=surface,
-            save_failure_sink=self.failure_sink,
             commit_sink=self.results.mark_settings_committed,
         )
         service = self.mutation_service_provider() or SettingsMutationService(
@@ -1615,13 +1703,10 @@ class SettingsApplicationOwner:
                     correlation_id=None,
                 )
             )
-        finally:
-            if getattr(repository, "commit_succeeded", False) or (
-                result is not None and _settings_mutation_committed(result)
-            ):
-                self.settings.complete()
-            else:
-                self.settings.rollback()
+        except SettingsMutationInterrupted as exc:
+            result = exc.transaction_result
+            self._set_result(result)
+            raise
         if result is None:
             raise RuntimeError("settings mutation completed without a result")
         self._set_result(result)
@@ -1632,18 +1717,54 @@ class SettingsApplicationOwner:
         *,
         base_settings: AppSettingsVNext,
         committed_settings: AppSettingsVNext,
-        failure_message: str,
+        failure_result: TransactionResult,
     ) -> None:
-        self.runtime_effects.restore_memory(base_settings)
+        phase = "restore_memory"
         try:
+            current = self.settings.require_committed()
+            self.runtime_effects.restore_memory(current)
+            phase = "resync_committed_runtime"
             await self.apply_direct(
-                copy.deepcopy(committed_settings),
+                copy.deepcopy(current),
                 persist=False,
                 strict_runtime_errors=True,
             )
-        except Exception:
-            self.failure_sink(failure_message)
-            self.runtime_effects.restore_memory(committed_settings)
+        except Exception as exc:
+            secondary = _settings_mutation_diagnostics(
+                component="settings_application",
+                operation=phase,
+                code="settings_runtime_resync_failed",
+                exception=exc,
+            )
+            restoration_failure = None
+            try:
+                self.runtime_effects.restore_memory(self.settings.require_committed())
+            except Exception as restore_exc:
+                restoration_failure = replace(
+                    _settings_mutation_diagnostics(
+                        component="settings_application",
+                        operation="restore_memory",
+                        code="settings_memory_restore_failed",
+                        exception=restore_exc,
+                    ),
+                    cause_id=secondary.diagnostic_id,
+                )
+            failure_result = replace(
+                failure_result,
+                secondary_diagnostics=(
+                    *failure_result.secondary_diagnostics,
+                    replace(
+                        secondary,
+                        cause_id=(
+                            failure_result.diagnostics.diagnostic_id
+                            if failure_result.diagnostics is not None
+                            else None
+                        ),
+                    ),
+                    *((restoration_failure,) if restoration_failure is not None else ()),
+                ),
+            )
+        self._set_result(failure_result)
 
     def _set_result(self, result: TransactionResult) -> None:
         self.results.set(result)

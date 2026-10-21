@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from uuid import uuid4
 
 import pytest
 from puripuly_heart.app.wiring_composition import create_manual_typing_owner
+
+from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
 
 
 class RecordingSelfTypingOutput:
@@ -28,15 +31,15 @@ async def test_composed_manual_typing_owner_uses_injected_self_output_and_comple
     output = RecordingSelfTypingOutput()
     release = asyncio.Event()
     completion = asyncio.create_task(release.wait())
+    admission = TextSubmissionAdmission("admitted", uuid4(), ())
     detailed: list[str] = []
     errors: list[str] = []
     owner = create_manual_typing_owner(
         output_provider=lambda: output,
         completion_provider=lambda utterance_id: (
-            completion if utterance_id == "utterance" else None
+            completion if utterance_id == admission.turn_id else None
         ),
         log_diagnostic=detailed.append,
-        log_error=errors.append,
         idle_timeout_seconds=0.01,
         submit_timeout_seconds=0.1,
     )
@@ -44,15 +47,15 @@ async def test_composed_manual_typing_owner_uses_injected_self_output_and_comple
     owner.set_input_activity(True)
     assert output.reasons == {"manual_input"}
 
-    async def submit() -> str:
-        return "utterance"
+    async def submit() -> TextSubmissionAdmission:
+        return admission
 
     submit_task = asyncio.create_task(owner.submit(submit))
     await asyncio.sleep(0)
 
     assert output.reasons == {"manual_submit:1"}
     release.set()
-    await submit_task
+    assert await submit_task is admission
     assert output.reasons == set()
 
     owner.set_input_activity(True)

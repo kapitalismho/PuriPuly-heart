@@ -31,6 +31,7 @@ from puripuly_heart.core.audio.smart_turn import (
     SmartTurnInferenceOwner,
 )
 from puripuly_heart.core.clock import FakeClock, SystemClock
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
@@ -3028,7 +3029,7 @@ async def test_dispatch_failure_faults_active_capture_and_releases_queue(
         diagnostics=diagnostics,
         state_changes=state_changes,
     )
-    caplog.set_level(logging.ERROR, logger="puripuly_heart.core.runtime.peer_channel")
+    caplog.set_level(logging.WARNING, logger="puripuly_heart.core.runtime.peer_channel")
     try:
         active = await owner.apply_intent(
             make_config(provider_id="gemini_transcribe"), enabled=True
@@ -3084,23 +3085,18 @@ async def test_dispatch_failure_faults_active_capture_and_releases_queue(
         assert len(failures) == 1
         assert failures[0].generation == generation
         evidence = [
-            record.getMessage()
+            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
             for record in caplog.records
-            if record.name == "puripuly_heart.core.runtime.peer_channel"
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
         ]
-        assert (
-            f"[PeerRuntime] runtime_failed channel=peer generation={generation} "
-            "exception_class=ValueError"
-        ) in evidence
+        primary = failures[0].failure_diagnostics
+        assert primary is not None
+        assert primary.channel == "peer"
+        assert primary.generation == generation
+        assert primary.fields["exception_class"] == "ValueError"
         if cleanup_failure:
-            assert (
-                f"[PeerRuntime] cleanup_failed channel=peer generation={generation} "
-                "exception_class=RuntimeError"
-            ) in evidence
-            assert any(message.startswith("[PeerRuntime] loop_failed ") for message in evidence)
-        else:
-            assert not any(message.startswith("[PeerRuntime] loop_failed ") for message in evidence)
-        assert all("private" not in message for message in evidence)
+            assert any(item.cause_id == primary.diagnostic_id for item in evidence)
+        assert all("private" not in str(item) for item in evidence)
     finally:
         begin.set()
         fail_dispatch.set()
@@ -3146,7 +3142,7 @@ async def test_cancellation_after_dispatch_failure_remains_cancellation(
     owner, _admission, _resolver, provider, sources, *_ = make_owner(
         run_audio_loop=run_loop, sink=FailingSink(), diagnostics=diagnostics
     )
-    caplog.set_level(logging.ERROR, logger="puripuly_heart.core.runtime.peer_channel")
+    caplog.set_level(logging.WARNING, logger="puripuly_heart.core.runtime.peer_channel")
     config = make_config(provider_id="gemini_transcribe")
     try:
         await owner.apply_intent(config, enabled=True)
@@ -3173,15 +3169,19 @@ async def test_cancellation_after_dispatch_failure_remains_cancellation(
         assert guard.retention_budget.used_bytes == 0
         assert not guard._queue
         assert not any(item.event.value == "failure" for item in diagnostics)
-        evidence = [record.getMessage() for record in caplog.records]
+        evidence = [
+            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+        ]
         assert any(
-            message.startswith("[PeerRuntime] cleanup_failed ")
-            and message.endswith("exception_class=ValueError")
-            for message in evidence
+            item.code == "capture.peer.cleanup_failed"
+            and item.fields["exception_class"] == "ValueError"
+            and disposition == "degraded"
+            for item, _severity, disposition, _stage, _exception in evidence
         )
-        assert not any(message.startswith("[PeerRuntime] runtime_failed ") for message in evidence)
-        assert not any(message.startswith("[PeerRuntime] loop_failed ") for message in evidence)
-        assert all("private" not in message for message in evidence)
+        assert all(severity != "error" for _item, severity, *_ in evidence)
+        assert all("private" not in str(item) for item, *_ in evidence)
     finally:
         begin.set()
         fail_dispatch.set()
@@ -3193,7 +3193,6 @@ async def test_runtime_exception_class_is_bounded_metadata(
     exception_name: str,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    from puripuly_heart.core.runtime_logging import _is_metadata_only_text
 
     fail_loop = asyncio.Event()
     failure_type = type(exception_name, (RuntimeError,), {})
@@ -3220,11 +3219,11 @@ async def test_runtime_exception_class_is_bounded_metadata(
             if record.name == "puripuly_heart.core.runtime.peer_channel"
         ]
         assert len(records) == 1
-        assert records[0].getMessage() == (
-            f"[PeerRuntime] runtime_failed channel=peer generation={active.generation} "
-            "exception_class=UnknownError"
-        )
-        assert _is_metadata_only_text(records[0].getMessage())
+        native = getattr(records[0], DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+        assert native.channel == "peer"
+        assert native.generation == active.generation
+        assert native.fields["exception_class"] == "unclassified"
+        assert "private" not in str(native)
         assert records[0].exc_info is None
     finally:
         fail_loop.set()
@@ -3249,19 +3248,16 @@ async def test_unexpected_loop_completion_cleanup_failure_is_observable(
     owner, _admission, _resolver, _provider, sources, *_ = make_owner(
         run_audio_loop=run_loop, provider=provider
     )
-    caplog.set_level(logging.ERROR, logger="puripuly_heart.core.runtime.peer_channel")
+    caplog.set_level(logging.WARNING, logger="puripuly_heart.core.runtime.peer_channel")
     try:
-        active = await owner.apply_intent(make_config(), enabled=True)
+        await owner.apply_intent(make_config(), enabled=True)
         loop_task = owner.loop_task
         assert loop_task is not None
         finish_loop.set()
         with pytest.raises(OSError):
             await asyncio.wait_for(asyncio.shield(loop_task), timeout=1.0)
         await wait_until(
-            lambda: any(
-                record.getMessage().startswith("[PeerRuntime] loop_failed ")
-                for record in caplog.records
-            )
+            lambda: any(hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE) for record in caplog.records)
         )
         assert owner.snapshot.state is PeerCaptureSessionState.STOPPED
         assert owner.snapshot.desired_active is False
@@ -3270,10 +3266,13 @@ async def test_unexpected_loop_completion_cleanup_failure_is_observable(
         assert owner.snapshot.has_loop_task is False
         assert sources[0].close_calls == 1
         assert provider.releases[-1] == ("drain", None)
-        assert (
-            f"[PeerRuntime] loop_failed channel=peer generation={active.generation} "
-            "exception_class=OSError"
-        ) in [record.getMessage() for record in caplog.records]
+        evidence = [
+            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+        ]
+        assert any(item.fields["exception_class"] == "OSError" for item in evidence)
+        assert any(item.code == "capture.peer.cleanup_failed" for item in evidence)
         assert all("private" not in record.getMessage() for record in caplog.records)
     finally:
         finish_loop.set()

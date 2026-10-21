@@ -6,9 +6,30 @@ import uuid
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE, normalize_diagnostic
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.domain.models import OSCMessage
 from tests.helpers.fakes import FakeSender
+
+
+def _failures(caplog: pytest.LogCaptureFixture) -> list[dict[str, object]]:
+    failures = []
+    for record in caplog.records:
+        failure = getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE, None)
+        if failure is None:
+            continue
+        diagnostics, severity, disposition, stage, exception = failure
+        failures.append(
+            normalize_diagnostic(
+                diagnostics,
+                instance_id=None,
+                severity=severity,
+                disposition=disposition,
+                stage=stage,
+                exception=exception,
+            )
+        )
+    return failures
 
 
 class FakeRuntimeLogging:
@@ -242,7 +263,9 @@ def test_queued_messages_do_not_expire_behind_long_pagination() -> None:
     assert sender.sent == ["ab", "cd", "ef", "gh", "ij", "ok"]
 
 
-def test_failed_page_is_dropped_without_retrying_or_blocking_later_pages() -> None:
+def test_failed_page_is_dropped_without_retrying_or_blocking_later_pages(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     clock = FakeClock()
     sender = SelectivelyFailingSender(fail_texts={"fghij"})
     runtime_logging = FakeRuntimeLogging()
@@ -280,13 +303,17 @@ def test_failed_page_is_dropped_without_retrying_or_blocking_later_pages() -> No
 
     assert sender.attempted == ["abcde", "fghij", "klmno", "p"]
     assert sender.sent == ["abcde", "klmno", "p"]
-    assert (
-        logging.WARNING,
-        "[Basic][OSC] send failed mode=queued cause=OSError",
-    ) in runtime_logging.basic
+    failure = _failures(caplog)[0]
+    assert failure["code"] == "osc_local_send_failed"
+    assert failure["fields"]["destination"] == "self_chatbox"
+    assert failure["fields"]["remote_delivery"] == "unacknowledged"
+    assert failure["fields"]["publication_id"] is not None
+    assert failure["severity"] == "warning"
 
 
-def test_send_immediate_failure_returns_false_and_logs_basic_warning() -> None:
+def test_send_immediate_failure_returns_false_and_logs_basic_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     clock = FakeClock()
     sender = FailingSender()
     runtime_logging = FakeRuntimeLogging()
@@ -296,15 +323,25 @@ def test_send_immediate_failure_returns_false_and_logs_basic_warning() -> None:
         runtime_logging=runtime_logging,
     )
 
-    sent = paginator.send_immediate("promo")
+    sent, diagnostics = paginator.send_immediate("promo")
 
     assert sent is False
-    assert runtime_logging.basic == [
-        (logging.WARNING, "[Basic][OSC] send failed mode=immediate cause=OSError")
-    ]
+    assert diagnostics is not None
+    failure = normalize_diagnostic(
+        diagnostics,
+        instance_id=None,
+        severity="warning",
+        disposition="degraded",
+        stage="chatbox_page",
+    )
+    assert failure["code"] == "osc_local_send_failed"
+    assert failure["fields"]["exception_class"] == "OSError"
+    assert failure["severity"] == "warning"
 
 
-def test_typing_indicator_is_forwarded_and_failure_is_basic_log() -> None:
+def test_typing_indicator_is_forwarded_and_failure_is_basic_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     clock = FakeClock()
     sender = FakeSender()
     paginator = ChatboxPaginator(sender=sender, clock=clock)
@@ -322,9 +359,10 @@ def test_typing_indicator_is_forwarded_and_failure_is_basic_log() -> None:
     )
     failing_paginator.send_typing(False)
 
-    assert runtime_logging.basic == [
-        (logging.WARNING, "[Basic][OSC] typing status=failed error=boom")
-    ]
+    failure = _failures(caplog)[0]
+    assert failure["code"] == "osc_local_send_failed"
+    assert failure["stage"] == "typing_state"
+    assert "boom" not in repr(failure)
 
 
 def test_typing_reasons_keep_indicator_visible_until_all_reasons_clear() -> None:
@@ -379,7 +417,7 @@ def test_send_immediate_trims_and_does_not_delay_pagination() -> None:
 
     paginator.enqueue(_message("abcdefghijkl", clock))
     clock.advance(1.0)
-    sent = paginator.send_immediate(" promo ")
+    sent, diagnostics = paginator.send_immediate(" promo ")
     clock.advance(1.9)
     paginator.process_due()
     assert sender.sent == ["abcde", "promo"]
@@ -388,6 +426,7 @@ def test_send_immediate_trims_and_does_not_delay_pagination() -> None:
     paginator.process_due()
 
     assert sent is True
+    assert diagnostics is None
     assert sender.sent == ["abcde", "promo", "fghij"]
 
 
@@ -401,11 +440,12 @@ def test_send_immediate_sends_long_text_as_one_packet() -> None:
         page_interval_s=3.0,
     )
 
-    sent = paginator.send_immediate("abcdefghij")
+    sent, diagnostics = paginator.send_immediate("abcdefghij")
     clock.advance(3.0)
     paginator.process_due()
 
     assert sent is True
+    assert diagnostics is None
     assert sender.sent == ["abcdefghij"]
 
 
@@ -541,6 +581,10 @@ def test_newer_pending_revision_replaces_in_place_behind_system_message() -> Non
     )
 
     paginator.enqueue(_message("system!!", clock))
+    receipts: list[tuple[int, str]] = []
+    paginator.bind_delivery_observer(
+        lambda message, status: receipts.append((message.presentation_revision, status))
+    )
     paginator.enqueue(
         _message(
             "old",
@@ -561,10 +605,27 @@ def test_newer_pending_revision_replaces_in_place_behind_system_message() -> Non
             presentation_revision=2,
         )
     )
+    assert receipts == [(1, "output_superseded")]
+    paginator.enqueue(
+        _message(
+            "stale",
+            clock,
+            utterance_id=parent_id,
+            turn_generation=0,
+            turn_order=1,
+            presentation_revision=0,
+        )
+    )
+    assert receipts == [(1, "output_superseded"), (0, "output_superseded")]
     clock.advance(3.0)
     paginator.process_due()
 
     assert sender.sent == ["syst", "em!!", "new"]
+    assert receipts == [
+        (1, "output_superseded"),
+        (0, "output_superseded"),
+        (2, "first_page_sent"),
+    ]
 
 
 def test_newer_turn_prunes_active_pages_and_preserves_system_disclosure() -> None:

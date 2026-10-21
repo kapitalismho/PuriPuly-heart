@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from collections import deque
 from collections.abc import Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from typing import Protocol, cast
 
 from puripuly_heart.core.audio.ownership import (
@@ -12,6 +14,8 @@ from puripuly_heart.core.audio.ownership import (
     OwnedStreamInput,
     OwnedVadEvent,
 )
+from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimeSnapshot,
@@ -34,8 +38,11 @@ from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     ProviderRuntimeTerminalFailureSink,
 )
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnostic
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
+from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 
 ProviderRuntimeStateChanged = Callable[
@@ -54,6 +61,7 @@ ProviderGpuRuntimeFactory = Callable[
 _CHANNELS: tuple[ProviderRuntimeChannel, ...] = ("self", "peer")
 _GPU_PROVIDER_ID = "local_qwen_gpu"
 _COMPLETED_NO_GPU_FAILURE_CODES = frozenset({"unsupported_capability"})
+logger = logging.getLogger(__name__)
 
 
 class _ScopedRecognitionProvider(Protocol):
@@ -85,6 +93,7 @@ class LocalASRProviderRuntimeOwner:
         "_gpu_recovery_lock",
         "_gpu_discovery_task",
         "_operation_tasks",
+        "_provider_build_tasks",
         "_callback_tasks",
         "_scope",
         "pending provider handoffs",
@@ -148,6 +157,7 @@ class LocalASRProviderRuntimeOwner:
         self._pending_candidates: dict[ProviderRuntimeChannel, object] = {}
         self._pending_requests: dict[ProviderRuntimeChannel, ProviderRuntimeBuildRequest] = {}
         self._operation_tasks: dict[asyncio.Task[object], int] = {}
+        self._provider_build_tasks: dict[ProviderRuntimeChannel, set[asyncio.Task[object]]] = {}
         self._callback_tasks: set[asyncio.Task[object]] = set()
         self._scope = LifecycleScope("local-asr-provider-runtime")
         self._gpu_generation = 0
@@ -207,6 +217,7 @@ class LocalASRProviderRuntimeOwner:
                 model_resident=bool(worker_pid is not None and runtime_state == "ready"),
                 retry_required=bool(runtime_state == "failed" or self._gpu_phase == "failed"),
                 failure_code=failure_code,
+                startup_cleanup=self._gpu_runtime.startup_cleanup_snapshot,
             ),
             revision=self._revision,
             closed=self._closed,
@@ -391,9 +402,11 @@ class LocalASRProviderRuntimeOwner:
                 )
             channel = request.channel
             previous_provider_id = self._provider_ids[channel]
-            provider, failure_code, failure_type, failure_stage = await self._build_provider(
-                request,
-                on_terminal_failure=on_terminal_failure,
+            provider, failure_code, failure_type, failure_stage, failure_diagnostics = (
+                await self._build_provider(
+                    request,
+                    on_terminal_failure=on_terminal_failure,
+                )
             )
             if provider is None:
                 return self._failed_result(
@@ -402,6 +415,7 @@ class LocalASRProviderRuntimeOwner:
                     failure_code=failure_code or "unclassified",
                     failure_stage=failure_stage or "provider_build",
                     failure_type=failure_type,
+                    failure_diagnostics=failure_diagnostics,
                 )
             handle = self._handles[channel]
             previous_phase = self._channel_phases[channel]
@@ -420,7 +434,7 @@ class LocalASRProviderRuntimeOwner:
                 else:
                     self._channel_phases[channel] = previous_phase
                     await _close_provider_for_discard(provider)
-                await self._emit_provider_failure(
+                failure_diagnostics = await self._emit_provider_failure(
                     event="provider_replace",
                     request=request,
                     exc=exc,
@@ -432,6 +446,7 @@ class LocalASRProviderRuntimeOwner:
                     failure_code=_optional_string(getattr(exc, "code", None)) or "unclassified",
                     failure_stage="provider_replace",
                     failure_type=type(exc).__name__,
+                    failure_diagnostics=failure_diagnostics,
                 )
             self._provider_ids[channel] = request.provider_id
             self._model_ids[channel] = request.model_id
@@ -496,12 +511,17 @@ class LocalASRProviderRuntimeOwner:
                     provider,
                     start=start,
                 )
-            except asyncio.CancelledError:
-                await self._handles[channel].cancel_pending_handoff(provider)
-                await self._discard_pending_candidate(channel, provider)
+            except asyncio.CancelledError as exc:
+                primary = self._record_interrupted_operation(channel, exc, "provider_handoff")
+                try:
+                    await self._handles[channel].cancel_pending_handoff(provider)
+                except Exception as cleanup_exc:
+                    self._record_cleanup_failure(channel, cleanup_exc, primary_failure=primary)
+                await self._discard_pending_candidate(channel, provider, primary_failure=primary)
                 raise
-            except Exception:
-                await self._discard_pending_candidate(channel, provider)
+            except Exception as exc:
+                primary = self._record_interrupted_operation(channel, exc, "provider_handoff")
+                await self._discard_pending_candidate(channel, provider, primary_failure=primary)
                 raise
             self._pending_candidates.pop(channel, None)
             self._provider_ids[channel] = _prebuilt_provider_id(provider)
@@ -529,9 +549,11 @@ class LocalASRProviderRuntimeOwner:
                 )
             channel = request.channel
             previous_provider_id = self._provider_ids[channel]
-            provider, failure_code, failure_type, failure_stage = await self._build_provider(
-                request,
-                on_terminal_failure=on_terminal_failure,
+            provider, failure_code, failure_type, failure_stage, failure_diagnostics = (
+                await self._build_provider(
+                    request,
+                    on_terminal_failure=on_terminal_failure,
+                )
             )
             if provider is None:
                 return self._failed_result(
@@ -540,6 +562,7 @@ class LocalASRProviderRuntimeOwner:
                     failure_code=failure_code or "unclassified",
                     failure_stage=failure_stage or "provider_build",
                     failure_type=failure_type,
+                    failure_diagnostics=failure_diagnostics,
                 )
             self._pending_candidates[channel] = provider
             self._pending_requests[channel] = request
@@ -548,16 +571,28 @@ class LocalASRProviderRuntimeOwner:
                     provider,
                     start=start,
                 )
-            except asyncio.CancelledError:
-                await self._handles[channel].cancel_pending_handoff(provider)
-                await self._discard_pending_candidate(channel, provider)
+                if (
+                    request.provider_id == "qwen_audio"
+                    and self._handles[channel].provider is not provider
+                ):
+                    await self._handles[channel].reclaim_qwen_resources()
+                    raise RuntimeError("provider_handoff_not_admitted")
+            except asyncio.CancelledError as exc:
+                primary = self._record_interrupted_operation(channel, exc, "provider_handoff")
+                try:
+                    await self._handles[channel].cancel_pending_handoff(provider)
+                except Exception as cleanup_exc:
+                    self._record_cleanup_failure(channel, cleanup_exc, primary_failure=primary)
+                await self._discard_pending_candidate(channel, provider, primary_failure=primary)
                 raise
             except Exception as exc:
-                await self._discard_pending_candidate(channel, provider)
-                await self._emit_provider_failure(
+                failure_diagnostics = await self._emit_provider_failure(
                     event="provider_handoff",
                     request=request,
                     exc=exc,
+                )
+                await self._discard_pending_candidate(
+                    channel, provider, primary_failure=failure_diagnostics
                 )
                 await self._publish_state()
                 return self._failed_result(
@@ -566,6 +601,7 @@ class LocalASRProviderRuntimeOwner:
                     failure_code=_optional_string(getattr(exc, "code", None)) or "unclassified",
                     failure_stage="provider_handoff",
                     failure_type=type(exc).__name__,
+                    failure_diagnostics=failure_diagnostics,
                 )
             self._pending_candidates.pop(channel, None)
             self._pending_requests.pop(channel, None)
@@ -597,8 +633,11 @@ class LocalASRProviderRuntimeOwner:
         self._require_open("commit provider handoff")
         self._validate_channel(channel)
         request = self._pending_requests.get(channel)
+        candidate = self._pending_candidates.get(channel)
         await self._handles[channel].commit_pending_handoff()
-        if request is not None:
+        if request is not None and (
+            request.provider_id != "qwen_audio" or self._handles[channel].provider is candidate
+        ):
             self._provider_ids[channel] = request.provider_id
             self._model_ids[channel] = request.model_id
         await self._publish_state()
@@ -625,6 +664,17 @@ class LocalASRProviderRuntimeOwner:
         self._require_open("release provider channel")
         self._validate_channel(channel)
         async with self._operation():
+            if mode == "abort":
+                current = asyncio.current_task()
+                builds = tuple(
+                    task
+                    for task in self._provider_build_tasks.get(channel, ())
+                    if task is not current and not task.done()
+                )
+                for task in builds:
+                    task.cancel()
+                if builds:
+                    await asyncio.gather(*builds, return_exceptions=True)
             handle = self._handles[channel]
             if mode == "drain":
                 await handle.drain_for_toggle_off(
@@ -665,7 +715,13 @@ class LocalASRProviderRuntimeOwner:
             self._channel_phases[channel] = "running"
         await self._publish_state()
 
-    async def warmup_channel(self, channel: ProviderRuntimeChannel) -> None:
+    async def warmup_channel(
+        self,
+        channel: ProviderRuntimeChannel,
+        *,
+        operation_id: str | None = None,
+        request_id: str | None = None,
+    ) -> None:
         self._require_open("warm provider channel")
         self._validate_channel(channel)
         async with self._operation():
@@ -676,22 +732,58 @@ class LocalASRProviderRuntimeOwner:
             self._channel_phases[channel] = "building"
             await self._publish_state()
             try:
-                await _call_async_method(provider, "warmup")
+                if isinstance(provider, ScopedRecognitionEngine):
+                    await provider.warmup(operation_id=operation_id, request_id=request_id)
+                else:
+                    await _call_async_method(provider, "warmup")
             except Exception as exc:
-                self._channel_phases[channel] = "failed"
+                current = self._handles[channel].is_current_provider_generation(
+                    provider=provider, generation=generation
+                )
+                if current:
+                    self._channel_phases[channel] = previous_phase
+                diagnostics = replace(
+                    recognition_failure_diagnostics(
+                        exc,
+                        provider=self._provider_ids[channel] or "stt",
+                        channel=channel,
+                        operation="provider_warmup",
+                        reason="provider_not_ready",
+                    ),
+                    generation=generation,
+                    operation_id=operation_id,
+                    request_id=request_id,
+                )
+                diagnostics = replace(
+                    diagnostics,
+                    fields={
+                        **diagnostics.fields,
+                        "warmup_usable": True if current else None,
+                        "observed_state": previous_phase,
+                    },
+                )
+                emit_failure(
+                    logger,
+                    diagnostics,
+                    severity="warning" if current else "info",
+                    disposition="degraded" if current else "superseded",
+                    stage="provider_warmup",
+                )
                 await self._emit_diagnostic(
                     ProviderRuntimeDiagnostic(
                         event="provider_warmup",
-                        outcome="failed",
+                        outcome="degraded" if current else "superseded",
                         channel=channel,
                         provider_id=self._provider_ids[channel],
                         model_id=self._model_ids[channel],
-                        phase="failed",
+                        phase=self._channel_phases[channel],
                         failure_code=_optional_string(getattr(exc, "code", None)),
                         failure_type=type(exc).__name__,
+                        failure_diagnostics=diagnostics,
                     )
                 )
                 await self._publish_state()
+                exc.failure_diagnostics = diagnostics
                 raise
             if self._handles[channel].is_current_provider_generation(
                 provider=provider,
@@ -842,12 +934,12 @@ class LocalASRProviderRuntimeOwner:
         settings: AudioSegmentSettingsSnapshot,
     ) -> _ScopedRecognitionProvider:
         handle = self._handles[channel]
-        current, _generation = handle.current_provider_generation()
         scope = (
             settings.provider_id,
             settings.provider_signature,
             settings.runtime_signature,
         )
+        current, _generation = handle.current_provider_generation()
         target = next(
             (
                 provider
@@ -864,6 +956,8 @@ class LocalASRProviderRuntimeOwner:
                 target = current
         if target is None:
             raise RuntimeError(f"no {channel} provider accepts the segment configuration scope")
+        if settings.provider_id == "qwen_audio":
+            await handle.reclaim_qwen_resources(settings_scope=scope, admitted_provider=target)
         return cast(_ScopedRecognitionProvider, target)
 
     async def recover_gpu(
@@ -1171,14 +1265,27 @@ class LocalASRProviderRuntimeOwner:
         request: ProviderRuntimeBuildRequest,
         *,
         on_terminal_failure: ProviderRuntimeTerminalFailureSink | None,
-    ) -> tuple[object | None, str | None, str | None, str | None]:
+    ) -> tuple[object | None, str | None, str | None, str | None, ErrorDiagnostics | None]:
         channel = request.channel
         previous_phase = self._channel_phases[channel]
         self._channel_phases[channel] = "building"
-        await self._publish_state()
+        task = asyncio.current_task()
+        if task is not None and request.provider_id == _GPU_PROVIDER_ID:
+            self._provider_build_tasks.setdefault(channel, set()).add(task)
         provider: object | None = None
         failure_stage = "provider_build"
         try:
+            await self._publish_state()
+            if request.provider_id == "qwen_audio":
+                failure_stage = "provider_reclaim"
+                await self._handles[channel].reclaim_qwen_resources(
+                    settings_scope=(
+                        request.provider_id,
+                        request.provider_signature,
+                        request.runtime_signature,
+                    )
+                )
+            failure_stage = "provider_build"
             result = self._provider_factory.create(
                 request,
                 gpu_runtime=self._gpu_runtime,
@@ -1189,45 +1296,123 @@ class LocalASRProviderRuntimeOwner:
                 raise RuntimeError("provider factory returned no provider")
             if request.warmup:
                 failure_stage = "provider_warmup"
-                await _call_async_method(provider, "warmup")
-            return provider, None, None, None
-        except asyncio.CancelledError:
+                if isinstance(provider, ScopedRecognitionEngine):
+                    await provider.warmup(
+                        operation_id=request.operation_id, request_id=request.request_id
+                    )
+                else:
+                    await _call_async_method(provider, "warmup")
+            return provider, None, None, None, None
+        except asyncio.CancelledError as exc:
             if provider is not None:
-                await _close_provider_for_discard(provider)
-            raise
-        except Exception as exc:
-            if provider is not None:
+                primary = self._record_interrupted_operation(channel, exc, failure_stage)
                 try:
                     await _close_provider_for_discard(provider)
-                except Exception:
-                    pass
+                except Exception as cleanup_exc:
+                    self._pending_candidates[channel] = provider
+                    self._pending_requests[channel] = request
+                    self._record_cleanup_failure(channel, cleanup_exc, primary_failure=primary)
+            raise
+        except Exception as exc:
             self._channel_phases[channel] = (
                 previous_phase if self._handles[channel].provider is not None else "failed"
             )
-            await self._emit_provider_failure(
+            failure_diagnostics = await self._emit_provider_failure(
                 event=failure_stage,
                 request=request,
                 exc=exc,
             )
+            if provider is not None:
+                try:
+                    await _close_provider_for_discard(provider)
+                except Exception as cleanup_exc:
+                    self._pending_candidates[channel] = provider
+                    self._pending_requests[channel] = request
+                    self._record_cleanup_failure(
+                        channel, cleanup_exc, primary_failure=failure_diagnostics
+                    )
             await self._publish_state()
             return (
                 None,
                 _optional_string(getattr(exc, "code", None)) or "unclassified",
                 type(exc).__name__,
                 failure_stage,
+                failure_diagnostics,
             )
+        finally:
+            builds = self._provider_build_tasks.get(channel)
+            if builds is not None and task is not None:
+                builds.discard(task)
+                if not builds:
+                    self._provider_build_tasks.pop(channel)
 
     async def _discard_pending_candidate(
         self,
         channel: ProviderRuntimeChannel,
         provider: object,
+        primary_failure: ErrorDiagnostics | None = None,
     ) -> None:
         if self._pending_candidates.get(channel) is not provider:
             return
-        await _close_provider_for_discard(provider)
+        try:
+            await _close_provider_for_discard(provider)
+        except Exception as exc:
+            self._record_cleanup_failure(channel, exc, primary_failure=primary_failure)
+            if primary_failure is None:
+                raise
+            return
         if self._pending_candidates.get(channel) is provider:
             self._pending_candidates.pop(channel, None)
             self._pending_requests.pop(channel, None)
+
+    def _record_interrupted_operation(
+        self, channel: ProviderRuntimeChannel, exception: BaseException, stage: str
+    ) -> ErrorDiagnostics:
+        cancelled = isinstance(exception, asyncio.CancelledError)
+        diagnostics = recognition_failure_diagnostics(
+            exception,
+            provider=self._provider_ids[channel] or "stt",
+            channel=channel,
+            operation=stage,
+            reason="cancelled" if cancelled else "provider_not_ready",
+        )
+        diagnostics = replace(diagnostics, generation=self._handles[channel].generation)
+        emit_failure(
+            logger,
+            diagnostics,
+            stage=stage,
+            severity="info" if cancelled else "error",
+            disposition="cancelled" if cancelled else "failed",
+        )
+        return diagnostics
+
+    def _record_cleanup_failure(
+        self,
+        channel: ProviderRuntimeChannel,
+        exception: BaseException,
+        *,
+        primary_failure: ErrorDiagnostics | None = None,
+    ) -> None:
+        native = stt_failure_report(
+            exception,
+            provider=self._provider_ids[channel] or "stt",
+            channel=channel,
+            operation="cleanup",
+        ).diagnostics
+        diagnostics = replace(
+            native,
+            generation=self._handles[channel].generation,
+            cause_id=primary_failure.diagnostic_id if primary_failure is not None else None,
+            fields={**native.fields, "cleanup_confirmed": False},
+        )
+        emit_failure(
+            logger,
+            diagnostics,
+            severity="warning",
+            disposition="degraded",
+            stage="cleanup",
+            exception=exception,
+        )
 
     async def _on_gpu_diagnostic(
         self,
@@ -1246,6 +1431,9 @@ class LocalASRProviderRuntimeOwner:
             self._gpu_phase = "discovery_pending"
         elif diagnostic.kind == "activation_ready":
             self._gpu_phase = "ready"
+            self._gpu_failure_code = None
+        elif diagnostic.kind == "worker_stopped":
+            self._gpu_phase = "inactive"
             self._gpu_failure_code = None
         elif diagnostic.kind in {"activation_failed", "worker_failed"}:
             self._gpu_phase = "failed"
@@ -1307,6 +1495,7 @@ class LocalASRProviderRuntimeOwner:
         failure_stage: str,
         previous_provider_id: str | None = None,
         failure_type: str | None = None,
+        failure_diagnostics: ErrorDiagnostics | None = None,
     ) -> ProviderRuntimeMutationResult:
         if previous_provider_id is None:
             previous_provider_id = self._provider_ids[request.channel]
@@ -1318,6 +1507,7 @@ class LocalASRProviderRuntimeOwner:
             failure_type=failure_type,
             failure_code=failure_code,
             failure_stage=failure_stage,
+            failure_diagnostics=failure_diagnostics,
         )
 
     async def _emit_provider_failure(
@@ -1326,7 +1516,20 @@ class LocalASRProviderRuntimeOwner:
         event: str,
         request: ProviderRuntimeBuildRequest,
         exc: Exception,
-    ) -> None:
+    ) -> ErrorDiagnostics:
+        diagnostics = replace(
+            recognition_failure_diagnostics(
+                exc,
+                provider=request.provider_id,
+                channel=request.channel,
+                operation=event,
+                reason="provider_not_ready",
+            ),
+            generation=self._handles[request.channel].generation,
+            operation_id=request.operation_id,
+            request_id=request.request_id,
+        )
+        emit_failure(logger, diagnostics, stage=event)
         await self._emit_diagnostic(
             ProviderRuntimeDiagnostic(
                 event=event,
@@ -1336,8 +1539,10 @@ class LocalASRProviderRuntimeOwner:
                 phase=self._channel_phases[request.channel],
                 failure_code=_optional_string(getattr(exc, "code", None)),
                 failure_type=type(exc).__name__,
+                failure_diagnostics=diagnostics,
             )
         )
+        return diagnostics
 
     async def _emit_diagnostic(self, diagnostic: ProviderRuntimeDiagnostic) -> None:
         self._diagnostics.append(diagnostic)
@@ -1348,6 +1553,26 @@ class LocalASRProviderRuntimeOwner:
             if inspect.isawaitable(result):
                 await result
         except Exception as exc:
+            diagnostics = replace(
+                stt_failure_report(
+                    exc,
+                    provider=diagnostic.provider_id or "stt",
+                    channel=diagnostic.channel,
+                    operation="diagnostic_delivery",
+                ).diagnostics,
+                cause_id=(
+                    diagnostic.failure_diagnostics.diagnostic_id
+                    if diagnostic.failure_diagnostics is not None
+                    else None
+                ),
+            )
+            emit_failure(
+                logger,
+                diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="diagnostic_delivery",
+            )
             self._diagnostics.append(
                 ProviderRuntimeDiagnostic(
                     event="diagnostic_sink",

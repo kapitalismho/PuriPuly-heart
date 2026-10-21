@@ -290,7 +290,7 @@ async def test_output_snapshot_separates_local_bind_and_discovery_from_remote_de
     await fallback.wait_automatic_query_start()
     degraded = fallback.output_snapshot()
     assert degraded["query_service_started"] is False
-    assert degraded["query_failure"] == "OSError"
+    assert degraded["query_failure"] == "oscquery_unavailable"
     assert degraded["local_availability"] == "available"
     assert degraded["effective_send_port"] == 9000
     assert degraded["remote_delivery"] == "unacknowledged"
@@ -471,9 +471,7 @@ async def test_gemma_osc_inputs_restore_connection_and_publish_canonical_after_r
     assert current[0].intent.translation.connection == "openrouter"
     assert current[0].intent.translation.connection_history["gpt_6_luna"] == "official_byok"
     assert current[0].intent.translation.connection_history["gemma4_26b_31b"] == "openrouter"
-    assert (address, 0) in sender.messages
-    if model_id in (1, 2):
-        assert (address, 0) in sender.messages[15:]
+    assert sender.messages[15:] == ([(address, 0)] if model_id in (1, 2) else [])
     assert saved and saved[-1]["intent"]["translation"]["model"] == "gemma4_26b_31b"
     await owner.close()
 
@@ -1270,7 +1268,7 @@ async def test_invalid_control_republishes_full_canonical_state() -> None:
 
 
 @pytest.mark.asyncio
-async def test_rejected_dashboard_command_republishes_actual_full_canonical_state() -> None:
+async def test_rejected_dashboard_command_corrects_only_actual_canonical_divergence() -> None:
     settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
@@ -1297,7 +1295,7 @@ async def test_rejected_dashboard_command_republishes_actual_full_canonical_stat
 
     assert result.applied is False
     assert result.error == "application_rejected"
-    assert len(sender.messages) == 15
+    assert sender.messages == [("/avatar/parameters/PuriPuly_Talk", False)]
     await integration.close()
 
 
@@ -1348,6 +1346,96 @@ async def test_off_transition_drains_an_admitted_dashboard_command() -> None:
     assert result.error == "router_disabled"
     assert application.completed is True
     assert integration.connection_mode == "off"
-    assert len(sender.messages) == 16
-    assert sender.messages[-1] == ("/avatar/parameters/PuriPuly_Talk", True)
+    assert len(sender.messages) == 15
+    assert ("/avatar/parameters/PuriPuly_Talk", True) not in sender.messages
+    await integration.configure_connection(mode="manual", send_port=9020, receive_port=9021)
+    assert ("/avatar/parameters/PuriPuly_Talk", True) in sender.messages[15:]
     await integration.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("loopback", [False, True])
+async def test_failed_cached_full_resync_requires_observed_obligation_completion(
+    caplog: pytest.LogCaptureFixture,
+    loopback: bool,
+) -> None:
+    import logging
+    import socket
+
+    from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+    from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
+
+    endpoint = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) if loopback else None
+    if endpoint is not None:
+        endpoint.bind(("127.0.0.1", 0))
+        endpoint.settimeout(1.0)
+    send_port = endpoint.getsockname()[1] if endpoint is not None else 9050
+    udp_sender = VrchatOscUdpSender(host="127.0.0.1", port=send_port) if loopback else None
+
+    class ResyncSender(FakeSender):
+        failed_parameter: str | None = None
+
+        def send_message(self, address: str, *values: object) -> None:
+            if address.endswith("/PuriPuly_Translator") and self.failed_parameter is not None:
+                self.failed_parameter = None
+                raise OSError(13, "private OSC resync credential body")
+            if udp_sender is not None:
+                udp_sender.send_message(address, *values)
+            super().send_message(address, *values)
+
+    state = OscCanonicalState()
+    sender = ResyncSender()
+    integration = _integration(
+        AppSettingsVNext(),
+        FakeReceiverOwner(),
+        sender,
+        FakeService(None),
+        state_provider=lambda: state,
+    )
+    caplog.set_level(logging.INFO, logger=control_runtime_module.__name__)
+    try:
+        await integration.configure_connection(
+            mode="manual", send_port=send_port, receive_port=9051
+        )
+        sender.failed_parameter = "PuriPuly_Translator"
+        integration._publish_full()
+        failure = integration.output_snapshot()["state_publication"]
+        assert failure is not None
+        sent_after_failure = len(sender.messages)
+
+        integration.publish_delta()
+        assert len(sender.messages) == sent_after_failure
+        assert integration.output_snapshot()["state_publication"] == failure
+
+        state = replace(state, self_capture=True)
+        integration.publish_delta()
+        assert len(sender.messages) == sent_after_failure + 1
+        assert integration.output_snapshot()["state_publication"] == failure
+        assert not any(
+            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0].code == "osc_state_send_recovered"
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+        )
+
+        integration._publish_full()
+        assert integration.output_snapshot()["state_publication"] is None
+        recovery = next(
+            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            and getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0].code == "osc_state_send_recovered"
+        )
+        assert recovery.cause_id == failure["diagnostic_id"]
+        assert recovery.fields["local_send_completed"] == 15
+        assert recovery.fields["remote_delivery"] == "unacknowledged"
+        if endpoint is not None:
+            assert len(sender.messages) == 45
+            for _ in sender.messages:
+                packet, _source = endpoint.recvfrom(65535)
+                assert packet.startswith(b"/avatar/parameters/PuriPuly")
+    finally:
+        await integration.close()
+        if udp_sender is not None:
+            udp_sender.close()
+        if endpoint is not None:
+            endpoint.close()

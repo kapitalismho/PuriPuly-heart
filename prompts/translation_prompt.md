@@ -5,8 +5,9 @@ Interpret <input> naturally in the configured target language, preserving the sp
 * `<context>` contains prior multilingual turns, oldest first.
 * `[self]` is the local-user channel; `[peer]` is the peer-audio channel.
 * `<scene>` is VRChat metadata. `People` counts current participants, including the local user.
+* With `People: 2`, `[peer]` turns likely come from the same partner; earlier turns may help follow the conversation, and the partner's way of speaking may suggest a fitting register.
 * `<input>` is the current turn on the configured Channel; `<context>` labels earlier turns.
-* Ground translation in `<input>`; use `<context>` only to clarify it.
+* Ground translation in `<input>`; use `<context>` to clarify it when helpful.
 * When unsure whether context applies, translate `<input>` standalone.
 
 ### Context Use Cases

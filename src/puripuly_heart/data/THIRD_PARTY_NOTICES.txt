@@ -57,9 +57,12 @@ For package-managed dependencies, the authoritative license texts are distribute
 
 llama.cpp CPU and Vulkan runtime
 Source: https://github.com/ggml-org/llama.cpp
-Pinned release: https://github.com/ggml-org/llama.cpp/releases/tag/b10423
-Pinned commit: a94d563ed801d1da1b8c2432946de07d0231bb3d
+Pinned release: https://github.com/ggml-org/llama.cpp/releases/tag/b11537
+Pinned commit: 8e2d31e0eb658d0382d3106a61369dff81f0c080
 License: MIT
+
+Bundled LLVM OpenMP runtime (libomp.dll): Apache-2.0 WITH LLVM-exception.
+The complete upstream LICENSE-LLVM-OpenMP, including its additional legacy notices, is installed alongside libomp.dll in each llama.cpp backend directory.
 
 Windows releases contain the pinned llama.cpp server runtime required for managed local translation. The application installer does not contain Gemma model weights. The complete llama.cpp license is installed at third_party/llama.cpp/LICENSE.
 
@@ -67,7 +70,7 @@ Windows releases contain the pinned llama.cpp server runtime required for manage
 
 Gemma 4 E4B local translation model assets
 Upstream model source: https://huggingface.co/google/gemma-4-E4B-it
-Manifest mirror source used by the app: https://huggingface.co/unsloth/gemma-4-E4B-it-qat-GGUF
+Manifest distribution sources used by the app: https://huggingface.co/unsloth/gemma-4-E4B-it-qat-GGUF , https://www.modelscope.cn/models/unsloth/gemma-4-E4B-it-qat-GGUF
 License: Apache-2.0
 
 Gemma 4 models are released by Google under the Apache License 2.0
@@ -76,13 +79,15 @@ https://ai.google.dev/gemma/apache_2).
 
 The managed local translation runtime downloads the pinned quantization of the
 Gemma 4 E4B instruction-tuned model on demand from the pinned Hugging Face
-repository revision listed below. The application installer does not contain
-model weights. Files are verified against the pinned size and SHA-256 before
-installation; the installed-manifest records the model identity, pinned
-revision, and license fields.
+revision or its byte-identical ModelScope distribution listed below. The
+application installer does not contain model weights. Files are verified against
+the pinned size and SHA-256 before installation; the installed-manifest retains
+the canonical model identity, Hugging Face revision, and license fields regardless
+of which download source succeeds.
 
 - Manifest mirror repo: unsloth/gemma-4-E4B-it-qat-GGUF
 - Pinned revision: 8c5a9e4fd5482e2be20fe0bf013b4c262a8f4265
+- ModelScope distribution revision: b6fb3d3c190d41c1b92d6e9f1e03f34c5b49a134
 - Target model: gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf
   - size: 4,215,695,776 bytes
   - sha256: df0fd4ee07072c607c29a0a1cb4f98918426cca12f45a2776bdd6ee6d09a4de3
@@ -115,18 +120,21 @@ License: Apache-2.0
 Provenance chain verified 2026-08-20 (all links Apache-2.0):
 Qwen3-ASR official (Qwen/Qwen3-ASR-0.6B, Apache-2.0)
   -> sherpa-onnx ONNX conversion (Wasser1462/Qwen3-ASR-onnx, Apache-2.0)
-  -> ModelScope source (zengshuishui/Qwen3-ASR-onnx, Apache-2.0)
-  -> HF mirror used by the app (csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25, pinned revision 2cc50d1abfe4d4f2df8d71f536d108bb40f943d2)
+  -> ModelScope source (zengshuishui/Qwen3-ASR-onnx, Apache-2.0, pinned revision de9e449eb376dcb472c1ce8141fbae8d524fabbd)
+  -> HF mirror used by the app (csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25, pinned revision 68818b2313fe77bd06f6a7c5068ff3ef59d02b8a)
   -> PuriPuly manifest (exact SHA-256 pins)
   -> local execution
 
 The mirror's own README states the files are downloaded from the ModelScope source above, and the conversion uses the official sherpa-onnx export scripts (https://github.com/Wasser1462/Qwen3-ASR-onnx, https://k2-fsa.github.io/sherpa/onnx/qwen3-asr/export.html). The local Qwen3-ASR-0.6B model is a default local CPU STT model; the app manifest identifies pinned downloadable ONNX/tokenizer assets for local ASR setup.
+
+The pinned decoder is the April 7, 2026 correction for abnormal x64 recognition output (https://github.com/k2-fsa/sherpa-onnx/issues/3473). Its SHA-256 is 4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771; the encoder, convolution frontend, and tokenizer files are unchanged.
 
 ----
 
 Qwen3-ASR-1.7B GGUF model asset (optional GPU download)
 Official upstream source: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
 Manifest mirror source used by the app: https://huggingface.co/handy-computer/Qwen3-ASR-1.7B-gguf
+Additional HTTPS distribution mirror: https://hf-mirror.net/handy-computer/Qwen3-ASR-1.7B-gguf/resolve/92282af1610a2db19d66f2bef1e260f5deca782d/Qwen3-ASR-1.7B-Q6_K.gguf
 License: Apache-2.0
 
 The local GPU Qwen ASR GGUF model is not committed directly to this repository. The app manifest identifies the pinned downloadable GGUF asset for GPU-based local ASR setup. The GGUF mirror is the official transcribe.cpp port of Qwen3-ASR-1.7B and its model card inherits Apache-2.0 from the upstream Qwen model (see https://github.com/handy-computer/transcribe.cpp/blob/main/docs/models/qwen3-asr-1.7b.md).
@@ -136,6 +144,7 @@ The local GPU Qwen ASR GGUF model is not committed directly to this repository. 
 NVIDIA Parakeet TDT model assets
 Official upstream sources: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3 , https://huggingface.co/nvidia/parakeet-tdt_ctc-0.6b-ja
 Manifest mirror sources used by the app: https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8 , https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8
+Additional HTTPS distribution mirror: https://hf-mirror.net/ . The application and Setup use the original pinned repository revisions and unchanged file size/SHA-256 contracts through this endpoint. Mirror downloads use direct HTTPS rather than the Hugging Face SDK.
 License: CC-BY-4.0
 
 The local Parakeet models are the default local CPU STT models. The app manifests identify pinned downloadable ONNX assets for local ASR setup. NVIDIA Parakeet model assets are governed by the Creative Commons Attribution 4.0 International license. The mirror or converted assets referenced by the manifests may not expose complete license metadata, so pinned mirror provenance and license metadata must be verified before release.
@@ -267,7 +276,7 @@ NOTICE, and AUTHORS payloads at the original `.dist-info` paths:
 - psutil 7.2.2.
 - PyAudioWPatch 0.2.12.8.
 - PyYAML 6.0.3.
-- sherpa-onnx 1.13.4 and sherpa-onnx-core 1.13.4. The core wheel contains no
+- sherpa-onnx 1.13.8 and sherpa-onnx-core 1.13.8. The core wheel contains no
   license-file member; both same-version wheels are from the sherpa-onnx
   project, and the complete LICENSE supplied by the sherpa-onnx wheel is
   retained together with both distributions' metadata.

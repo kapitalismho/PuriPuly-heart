@@ -11,7 +11,7 @@ import { handleScheduled } from '../src/scheduled';
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
 
 describe('managed operation smoke', () => {
-  it('serves the operation lifecycle over HTTP and converges the scheduled worker', async () => {
+  it('rejects legacy unbound authority over HTTP and keeps scheduled processing available', async () => {
   const env = createTestBrokerEnv();
   const operationId = buildManagedOperationId();
   const resumeToken = buildManagedOperationResumeToken();
@@ -39,7 +39,7 @@ describe('managed operation smoke', () => {
   });
   expect(status.status).toBe(200);
   const statusBody = (await status.json()) as Record<string, unknown>;
-  expect(statusBody).toMatchObject({ ok: true, state: 'AUTHENTICATED', client_action: 'wait' });
+  expect(statusBody).toMatchObject({ ok: true, state: 'FAILED', client_action: 'action_required' });
 
   const resume = await post('/v1/providers/openrouter/managed-operation/resume', {
     operation_id: operationId,

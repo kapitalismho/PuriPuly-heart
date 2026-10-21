@@ -57,9 +57,11 @@ class HttpAppActiveDayTelemetryClient:
         base_url: str,
     ) -> bool:
         normalized_base_url = _normalize_base_url(base_url)
-        async with network_clients.external_async_client(base_url=normalized_base_url,
-        timeout=self.timeout,
-        transport=self.transport,) as client:
+        async with network_clients.external_async_client(
+            base_url=normalized_base_url,
+            timeout=self.timeout,
+            transport=self.transport,
+        ) as client:
             response = await client.post(
                 "/v1/telemetry/app-active-day",
                 json={

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 
-from puripuly_heart.core.messages import DiagnosticFieldValue
+from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
+from puripuly_heart.core.messages import DiagnosticFieldValue, ErrorDiagnostics
 from puripuly_heart.core.output.chatbox import (
     SelfChatboxOutputPort,
     SelfUtterancePublication,
@@ -42,6 +44,7 @@ _Publisher = Callable[[], Awaitable[None]]
 _DESTINATION_PUBLISH_FAILED_REASON = "destination_publish_failed"
 _DESTINATION_UNCONFIGURED_REASON = "destination_unconfigured"
 _PEER_CHATBOX_DENIED_REASON = "peer_chatbox_denied"
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -51,6 +54,7 @@ class OutputRouter:
     dashboard: DashboardOutputPort | None = None
     conversation_feed: ConversationFeedPort | None = None
     observers: Sequence[OutputRoutingObserverPort] = field(default_factory=tuple)
+    observer_failure_count: int = field(init=False, default=0)
 
     def __post_init__(self) -> None:
         self.observers = tuple(self.observers)
@@ -181,7 +185,11 @@ class OutputRouter:
                 publication_id=publication_id,
                 publication_kind=publication_kind,
                 reason=_DESTINATION_PUBLISH_FAILED_REASON,
-                metadata={**metadata, "error_type": type(exc).__name__},
+                metadata={
+                    **metadata,
+                    "error_type": safe_exception_fields(exc)["exception_class"],
+                    **safe_exception_fields(exc),
+                },
             )
         return await self._record_decision(
             status=OUTPUT_ROUTING_DECISION_PUBLISHED,
@@ -202,6 +210,41 @@ class OutputRouter:
         reason: str | None,
         metadata: _DecisionMetadata,
     ) -> OutputRoutingDecision:
+        diagnostics = None
+        if reason == _DESTINATION_PUBLISH_FAILED_REASON:
+            diagnostics = ErrorDiagnostics(
+                component="output_runtime",
+                operation="publish",
+                code=reason,
+                category="lifecycle",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={
+                    "destination": route,
+                    "publication_id": publication_id,
+                    "publication_kind": publication_kind,
+                    **{
+                        key: value
+                        for key, value in metadata.items()
+                        if key
+                        in {
+                            "exception_class",
+                            "errno",
+                            "winerror",
+                            "cause_class_1",
+                            "cause_class_2",
+                            "cause_class_3",
+                            "cause_class_4",
+                        }
+                    },
+                },
+                channel=(
+                    metadata.get("channel") if metadata.get("channel") in {"self", "peer"} else None
+                ),
+            )
+            emit_failure(logger, diagnostics, disposition="degraded", stage="destination_delivery")
         decision = OutputRoutingDecision(
             decision=status,
             route=route,
@@ -209,11 +252,33 @@ class OutputRouter:
             publication_kind=publication_kind,
             reason=reason,
             metadata=metadata,
+            diagnostics=diagnostics,
         )
         for observer in self.observers:
             try:
                 await observer.observe_output_routing(decision)
-            except Exception:
+            except Exception as exc:
+                self.observer_failure_count += 1
+                if self.observer_failure_count == 1:
+                    emit_failure(
+                        logger,
+                        ErrorDiagnostics(
+                            component="output_runtime",
+                            operation="observe",
+                            code="output_observer_failed",
+                            category="lifecycle",
+                            visibility="diagnostic_only",
+                            content_policy="metadata_only",
+                            status_code=None,
+                            retry_after_ms=None,
+                            fields={"destination": route, "publication_id": publication_id},
+                            cause_id=diagnostics.diagnostic_id if diagnostics else None,
+                        ),
+                        severity="warning",
+                        disposition="degraded",
+                        stage="routing_observer",
+                        exception=exc,
+                    )
                 continue
         return decision
 

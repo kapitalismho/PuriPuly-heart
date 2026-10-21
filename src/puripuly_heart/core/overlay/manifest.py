@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-OVERLAY_CONTRACT_VERSION = 15
+OVERLAY_CONTRACT_VERSION = 16
 OVERLAY_EXECUTION_CONTRACT = {"version": 1, "revision": "r2"}
-OVERLAY_NATIVE_RETRY_CONTRACT = {"version": 1, "ownership": "exclusive"}
+OVERLAY_NATIVE_RETRY_CONTRACT = {"version": 2, "ownership": "exclusive"}
 OVERLAY_SPEAKER_IDENTITY_CONTRACT = {
     "version": 2,
     "policy": "immutable_first_readable_style",

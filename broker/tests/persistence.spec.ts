@@ -34,19 +34,12 @@ describe('broker persistent state model', () => {
       fingerprintSalt: 'fingerprint_salt',
       abuseControls: 'abuse_controls',
       abuseRuntimeState: 'abuse_runtime_state',
-      qqTalkTogetherPass: 'qq_talk_together_pass',
       networkIdentityMigration: 'network_identity_migration',
     });
     expect(contract).toHaveProperty('BROKER_RUNTIME_CONFIG_SCHEMA', {
       fingerprint_salt: ['current', 'previous', 'rotated_at'],
       abuse_controls: TEST_DEFAULT_ABUSE_CONTROLS,
       abuse_runtime_state: TEST_DEFAULT_ABUSE_RUNTIME_STATE,
-      qq_talk_together_pass: {
-        enabled: false,
-        rewards_enabled: false,
-        daily_warning_count: 30,
-        daily_max_count: 50,
-      },
       network_identity_migration: ['dual_write', 'keyed_only'],
     });
     expect(contract).toHaveProperty('BROKER_PUBLIC_INPUT_BOUNDS', {
@@ -85,7 +78,6 @@ describe('broker persistent state model', () => {
             'fingerprint_salt',
             'abuse_controls',
             'abuse_runtime_state',
-            'qq_talk_together_pass',
             'network_identity_migration',
           ],
           constraints: {
@@ -96,7 +88,6 @@ describe('broker persistent state model', () => {
             'fingerprint_salt',
             'abuse_controls',
             'abuse_runtime_state',
-            'qq_talk_together_pass',
           ],
         },
         installations: {
@@ -250,7 +241,6 @@ describe('broker persistent state model', () => {
             'expires_at',
             'processing_started_at',
             'consumed_at',
-            'referral_id',
           ],
           storedStatuses: [
             'pending',
@@ -262,105 +252,7 @@ describe('broker persistent state model', () => {
           ],
           retention:
             'expires_at cleanup only; durable entitlement and identity evidence is separate',
-          indexed: ['installation_id + status + created_at', 'expires_at', 'referral_id'],
-        },
-        referralCodes: {
-          name: 'referral_codes',
-          purpose: 'stable owned global Referral ID per managed source subject',
-          primaryKey: 'referral_id',
-          columns: [
-            'referral_id',
-            'owner_source',
-            'owner_subject_ref',
-            'owner_installation_id',
-            'status',
-            'created_at',
-            'updated_at',
-            'disabled_reason',
-            'disabled_by',
-            'disabled_at',
-          ],
-          referralIdFormat:
-            'six uppercase approved-alphabet characters excluding 0/O/1/I/L',
-          storedStatuses: ['active', 'disabled'],
-          ownerSources: ['discord', 'qq'],
-          unique: ['owner_source + owner_subject_ref'],
-          indexed: [
-            'owner_source + owner_subject_ref',
-            'owner_installation_id',
-            'status + referral_id',
-          ],
-          deletionBehavior:
-            'installation aging must not cascade-delete referral code history',
-        },
-        referralRewards: {
-          name: 'referral_rewards',
-          purpose: 'global append-only source-aware referral attempt and reward ledger',
-          primaryKey: 'id',
-          columns: [
-            'id',
-            'referral_id',
-            'referrer_source',
-            'referrer_subject_ref',
-            'referrer_installation_id',
-            'referred_source',
-            'referred_subject_ref',
-            'referred_installation_id',
-            'referred_hardware_hash',
-            'referred_hardware_hash_salt_version',
-            'referred_bonus_status',
-            'referrer_bonus_status',
-            'skip_reason',
-            'failure_reason',
-            'referred_managed_credential_ref',
-            'referrer_managed_credential_ref',
-            'created_at',
-            'updated_at',
-            'credited_at',
-            'attempt_ip_digest',
-            'attempt_ip_key_version',
-            'attempt_ip_epoch',
-            'operation_id',
-          ],
-          networkIdentity:
-            'server-secret HMAC-SHA-256 digests with explicit key version and bounded epoch; no raw IPs or unkeyed hashes',
-          operationBinding:
-            'at most one referral reward per managed operation; retries reuse the reservation',
-          referralIdFormat:
-            'six uppercase approved-alphabet characters excluding 0/O/1/I/L',
-          subjectSources: ['discord', 'qq'],
-          referredBonusStatuses: ['reserved', 'credited', 'skipped', 'failed'],
-          referrerBonusStatuses: ['pending', 'applying', 'credited', 'skipped', 'failed'],
-          reasonBounds: {
-            skip_reason: '1-64 chars when present',
-            failure_reason: '1-64 chars when present',
-          },
-          indexed: [
-            'referral_id',
-            'referrer_source + referrer_subject_ref + referred_bonus_status',
-            'referred_source + referred_subject_ref + created_at',
-            'referred_installation_id + created_at',
-            'attempt_ip_digest + created_at',
-            'referral_id + created_at',
-            'referrer_source + referrer_subject_ref + created_at',
-          ],
-          partialUniqueIndexes: [
-            {
-              name: 'idx_referral_rewards_counted_referred_subject',
-              columns: ['referred_source', 'referred_subject_ref'],
-              predicate: "referred_bonus_status IN ('reserved', 'credited')",
-            },
-            {
-              name: 'idx_referral_rewards_counted_referred_installation',
-              columns: ['referred_installation_id'],
-              predicate:
-                "referred_installation_id IS NOT NULL AND referred_bonus_status IN ('reserved', 'credited')",
-            },
-          ],
-          sourceShape:
-            'Discord referred rows require installation and hardware evidence; QQ referred rows prohibit Discord hardware fields',
-          deletionBehavior:
-            'installation aging must not cascade-delete referral reward ledger history',
+          indexed: ['installation_id + status + created_at', 'expires_at'],
         },
         discordIdentities: {
           name: 'discord_identities',
@@ -472,9 +364,6 @@ describe('broker persistent state model', () => {
             'auth_expires_at',
             'failure_reason',
             'client_action',
-            'referral_reward_id',
-            'referral_status',
-            'settlement_status',
             'hardware_hash',
             'hardware_hash_salt_version',
             'app_version',
@@ -507,6 +396,12 @@ describe('broker persistent state model', () => {
             'outcome',
             'created_at',
             'updated_at',
+            'cleanup_token',
+            'cleanup_started_at',
+            'scan_offset',
+            'create_in_flight',
+            'legacy_cleanup_state',
+            'legacy_cleanup_checked_at',
           ],
           unique: ['operation_id + attempt_index', 'provider_key_name'],
           rawOpenRouterKeyStorage: false,
@@ -546,42 +441,6 @@ describe('broker persistent state model', () => {
           rawOpenRouterKeyStorage: false,
           stalePendingCleanup:
             'expired rows are claimed exclusively; abandoned claims recover only after the scheduled invocation limit, and terminal owner/ledger transitions are atomic',
-        },
-        managedReferralSettlementJobs: {
-          name: 'managed_referral_settlement_jobs',
-          purpose:
-            'durable fenced source-agnostic invitee/referrer reward settlement work keyed by referral reward and acknowledged delivery',
-          primaryKey: 'id',
-          sources: ['discord', 'qq'],
-          columns: [
-            'id',
-            'source',
-            'referral_reward_id',
-            'delivery_id',
-            'operation_id',
-            'phase',
-            'attempt_count',
-            'last_attempt_at',
-            'next_attempt_at',
-            'fencing_token',
-            'lease_expires_at',
-            'last_error_code',
-            'created_at',
-            'updated_at',
-            'completed_at',
-          ],
-          phases: ['invitee_pending', 'referrer_pending', 'completed'],
-          unique: [
-            'referral_reward_id',
-            'delivery_id',
-            'operation_id when bound',
-            'fencing_token when claimed',
-          ],
-          indexed: ['source + phase + next_attempt_at + lease_expires_at'],
-          noRetention: true,
-          noCascade: true,
-          fencing:
-            'every claim, transition, release, and completion mutation requires the exact fencing_token',
         },
         brokerRequestEvents: {
           name: 'broker_request_events',
@@ -788,6 +647,8 @@ describe('broker persistent state model', () => {
       '0023_backfill_operation_route_rate_limits.sql',
       '0024_allow_unattributed_request_events.sql',
       '0025_drop_legacy_translation_telemetry.sql',
+      '0026_managed_attempt_cleanup_ownership.sql',
+      '0027_remove_managed_referrals.sql',
     ]);
     expect(existsSync(FIRST_BROKER_MIGRATION)).toBe(true);
     expect(existsSync(LATEST_BROKER_MIGRATION)).toBe(true);

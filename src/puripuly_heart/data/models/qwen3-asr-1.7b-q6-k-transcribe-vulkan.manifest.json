@@ -13,6 +13,12 @@
       "revision": "92282af1610a2db19d66f2bef1e260f5deca782d",
       "repo_id": "handy-computer/Qwen3-ASR-1.7B-gguf",
       "download_url_template": "https://huggingface.co/handy-computer/Qwen3-ASR-1.7B-gguf/resolve/92282af1610a2db19d66f2bef1e260f5deca782d/{path}"
+    },
+    "hf_mirror": {
+      "name": "hf_mirror",
+      "revision": "92282af1610a2db19d66f2bef1e260f5deca782d",
+      "repo_id": "handy-computer/Qwen3-ASR-1.7B-gguf",
+      "download_url_template": "https://hf-mirror.net/handy-computer/Qwen3-ASR-1.7B-gguf/resolve/92282af1610a2db19d66f2bef1e260f5deca782d/{path}"
     }
   },
   "files": [

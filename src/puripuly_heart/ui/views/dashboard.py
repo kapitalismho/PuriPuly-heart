@@ -3,13 +3,18 @@ from typing import Callable
 
 import flet as ft
 
-from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.language_selection import (
+    LanguageSelectionChange,
+    unify_recent_language_codes,
+)
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
+    ManagedGemmaNoticeAction,
     OscControlPresentationState,
 )
 from puripuly_heart.config.runtime_resolution import stt_supports_peer_auto_detection
 from puripuly_heart.core.language import get_all_language_options
+from puripuly_heart.domain.events import SelfTurnPresentation
 from puripuly_heart.ui.components.display_card import DisplayCard
 from puripuly_heart.ui.components.language_card import LanguageCard
 from puripuly_heart.ui.components.language_modal import LanguageModal
@@ -41,7 +46,7 @@ from puripuly_heart.ui.dashboard.renderer import (
     compose_dashboard_surface,
 )
 from puripuly_heart.ui.flet_runtime import control_page
-from puripuly_heart.ui.fonts import font_for_language
+from puripuly_heart.ui.fonts import TypeFace, font_for_language, locale_body_letter_spacing
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice, GpuNoticeAction
 from puripuly_heart.ui.i18n import get_locale, language_name, t
 from puripuly_heart.ui.overlay_peer_contract import OverlayPeerConsumerContract
@@ -120,9 +125,8 @@ class DashboardView(ft.Column):
         self._peer_auto_detect_available = True
         self._message_input_focused = False
 
-        # Recent languages (max 3 each)
-        self._recent_source_langs: list[str] = []
-        self._recent_target_langs: list[str] = []
+        # One recent-language queue shared by every language modal.
+        self._recent_langs: list[str] = []
 
         # Callbacks (assigned by App)
         self.on_send_message = None
@@ -132,6 +136,9 @@ class DashboardView(ft.Column):
         self.on_toggle_peer_translation = None
         self.on_retry_peer_process_capture = None
         self.on_gpu_notice_action: Callable[[GpuNoticeAction], object] | None = None
+        self.on_managed_gemma_notice_action: Callable[[ManagedGemmaNoticeAction], object] | None = (
+            None
+        )
         self.on_language_change: Callable[[LanguageSelectionChange], None] | None = None
         self.on_message_input_activity = None
 
@@ -229,6 +236,7 @@ class DashboardView(ft.Column):
         self.on_toggle_overlay = capture.toggle_overlay
         self.on_retry_peer_process_capture = capture.retry_peer_process_capture
         self.on_gpu_notice_action = capture.run_gpu_notice_action
+        self.on_managed_gemma_notice_action = capture.run_managed_gemma_notice_action
 
     def _toggle_overlay(self) -> None:
         enabled = True
@@ -323,8 +331,9 @@ class DashboardView(ft.Column):
             self.on_toggle_stt(self.is_stt_on)
 
     def _toggle_translation(self):
-        if self.is_translation_on:
+        if self._translation_is_starting or self.is_translation_on:
             self.is_translation_on = False
+            self._translation_is_starting = False
             self._translation_showing_warning = False
         elif self._translation_showing_warning:
             self._translation_showing_warning = False
@@ -368,7 +377,7 @@ class DashboardView(ft.Column):
             languages=self._LANG_OPTIONS,
             on_select=self._on_source_select,
         )
-        modal.open(current=self._source_lang_code, recent=self._recent_source_langs)
+        modal.open(current=self._source_lang_code, recent=self._recent_langs)
 
     def _open_target_dialog(self):
         modal = LanguageModal(
@@ -376,7 +385,7 @@ class DashboardView(ft.Column):
             languages=self._LANG_OPTIONS,
             on_select=self._on_target_select,
         )
-        modal.open(current=self._target_lang_code, recent=self._recent_target_langs)
+        modal.open(current=self._target_lang_code, recent=self._recent_langs)
 
     def _open_secondary_target_dialog(self):
         modal = LanguageModal(
@@ -392,7 +401,7 @@ class DashboardView(ft.Column):
         )
         modal.open(
             current=self._secondary_target_lang_code or SECONDARY_TARGET_NONE,
-            recent=self._recent_target_langs,
+            recent=self._recent_langs,
         )
 
     def _open_peer_source_dialog(self):
@@ -418,7 +427,7 @@ class DashboardView(ft.Column):
                 if self._peer_source_mode == PEER_SOURCE_MODE_AUTO
                 else self._effective_peer_source_lang_code()
             ),
-            recent=self._recent_source_langs,
+            recent=self._recent_langs,
         )
 
     def _open_peer_target_dialog(self):
@@ -427,14 +436,12 @@ class DashboardView(ft.Column):
             languages=self._LANG_OPTIONS,
             on_select=self._on_peer_target_select,
         )
-        modal.open(
-            current=self._effective_peer_target_lang_code(), recent=self._recent_target_langs
-        )
+        modal.open(current=self._effective_peer_target_lang_code(), recent=self._recent_langs)
 
     def _on_source_select(self, lang_code: str):
         """Handle source language selection."""
         self._source_lang_code = lang_code
-        self._add_to_recent(lang_code, is_source=True)
+        self._add_to_recent(lang_code)
         self._update_input_font()
         self._refresh_language_card()
         self._notify_language_change()
@@ -444,7 +451,7 @@ class DashboardView(ft.Column):
         self._target_lang_code = lang_code
         if self._secondary_target_lang_code == lang_code:
             self._secondary_target_lang_code = ""
-        self._add_to_recent(lang_code, is_source=False)
+        self._add_to_recent(lang_code)
         self._refresh_language_card()
         self._notify_language_change()
 
@@ -456,7 +463,7 @@ class DashboardView(ft.Column):
             self._notify_language_change()
             return
         self._secondary_target_lang_code = lang_code
-        self._add_to_recent(lang_code, is_source=False)
+        self._add_to_recent(lang_code)
         self._refresh_language_card()
         self._notify_language_change()
 
@@ -468,13 +475,13 @@ class DashboardView(ft.Column):
             return
         self._peer_source_mode = "manual"
         self._peer_source_lang_code = "" if lang_code == self._source_lang_code else lang_code
-        self._add_to_recent(lang_code, is_source=True)
+        self._add_to_recent(lang_code)
         self._refresh_language_card()
         self._notify_language_change()
 
     def _on_peer_target_select(self, lang_code: str):
         self._peer_target_lang_code = "" if lang_code == self._target_lang_code else lang_code
-        self._add_to_recent(lang_code, is_source=False)
+        self._add_to_recent(lang_code)
         self._refresh_language_card()
         self._notify_language_change()
 
@@ -505,14 +512,17 @@ class DashboardView(ft.Column):
         self._refresh_language_card()
         self._notify_language_change()
 
-    def _add_to_recent(self, lang_code: str, is_source: bool) -> None:
-        """Add language to recent list, maintaining max 6 unique entries."""
-        recent = self._recent_source_langs if is_source else self._recent_target_langs
-        if lang_code in recent:
-            recent.remove(lang_code)
-        recent.insert(0, lang_code)
-        if len(recent) > 6:
-            recent.pop()
+    def recent_language_codes(self) -> list[str]:
+        """Return a copy of the shared recent-language queue."""
+        return list(self._recent_langs)
+
+    def remember_recent_language(self, lang_code: str) -> None:
+        """Record a language in the shared queue."""
+        self._add_to_recent(lang_code)
+
+    def _add_to_recent(self, lang_code: str) -> None:
+        """Add a language to the shared queue, keeping at most three entries."""
+        self._recent_langs = unify_recent_language_codes([lang_code, *self._recent_langs])
 
     def _notify_language_change(self):
         if self.on_language_change:
@@ -524,8 +534,8 @@ class DashboardView(ft.Column):
                     peer_source_code=self._peer_source_lang_code,
                     peer_target_code=self._peer_target_lang_code,
                     peer_source_mode=self._peer_source_mode,
-                    recent_source_codes=tuple(self._recent_source_langs),
-                    recent_target_codes=tuple(self._recent_target_langs),
+                    recent_source_codes=tuple(self._recent_langs),
+                    recent_target_codes=tuple(self._recent_langs),
                 )
             )
 
@@ -559,7 +569,12 @@ class DashboardView(ft.Column):
         self.is_connected = status == "connected"
         self._primary_display_revision += 1
         self._current_display_text = None
-        self.display_card.set_status(status, font_family=self._ui_font())
+        status_face = self._typeface(None)
+        self.display_card.set_status(
+            status,
+            font_family=status_face.font_family,
+            letter_spacing=status_face.letter_spacing,
+        )
 
     def set_languages_from_codes(
         self,
@@ -727,11 +742,12 @@ class DashboardView(ft.Column):
         """Update the display card primary line with new text."""
         self._primary_display_revision += 1
         self._current_display_text = text
-        font_family = font_for_language(language_code) if language_code else self._ui_font()
+        face = self._typeface(language_code)
         self.display_card.set_display(
             text,
             is_error=is_error,
-            font_family=font_family,
+            font_family=face.font_family,
+            letter_spacing=face.letter_spacing,
             debug_prefix=debug_prefix,
             as_translation=as_translation,
         )
@@ -744,11 +760,44 @@ class DashboardView(ft.Column):
         debug_prefix: str | None = None,
     ) -> None:
         """Update the display card translation line."""
-        font_family = font_for_language(language_code) if language_code else self._ui_font()
+        face = self._typeface(language_code)
         self.display_card.set_display_translation(
             text,
-            font_family=font_family,
+            font_family=face.font_family,
+            letter_spacing=face.letter_spacing,
             debug_prefix=debug_prefix,
+        )
+
+    def set_self_turn(self, snapshot: SelfTurnPresentation) -> None:
+        previous = getattr(self, "_self_turn_snapshot", None)
+        if previous is not None:
+            order = (snapshot.turn_generation, snapshot.turn_order)
+            previous_order = (previous.turn_generation, previous.turn_order)
+            if order < previous_order or (
+                snapshot.utterance_id == previous.utterance_id
+                and snapshot.revision <= previous.revision
+            ):
+                return
+        self._self_turn_snapshot = snapshot
+        self._primary_display_revision += 1
+        self._current_display_text = snapshot.source_text
+        primary = snapshot.targets[0] if snapshot.targets else None
+        translation = (
+            primary.translation
+            if primary is not None
+            and primary.status == "ready"
+            and primary.source_revision == snapshot.source_revision
+            and snapshot.status not in ("cancelled", "expired")
+            else None
+        )
+        self.display_card.set_turn(
+            snapshot.source_text,
+            translation.text if translation is not None else None,
+            source_face=self._typeface(snapshot.source_language),
+            translation_face=self._typeface(
+                primary.target_language if translation is not None else snapshot.source_language
+            ),
+            new_turn=previous is None or previous.utterance_id != snapshot.utterance_id,
         )
 
     def set_managed_auth_pending(self, pending: bool) -> None:
@@ -855,7 +904,7 @@ class DashboardView(ft.Column):
             candidates["managed_gemma"] = (
                 managed_gemma_notice.text,
                 managed_gemma_notice.tone,
-                self._managed_gemma_notice.action,
+                None,
             )
         if self._overlay_session_fallback_notice_active:
             candidates["overlay_fallback"] = (
@@ -903,7 +952,7 @@ class DashboardView(ft.Column):
         if selected is None:
             self.display_card.set_notice(None, None)
             return
-        text, tone, _action = candidates[selected]
+        text, tone, _ = candidates[selected]
         gpu_action = None if self._gpu_notice is None else self._gpu_notice.action
         action_label = gpu_capture_action_label(gpu_action if selected == "gpu" else None)
         on_action = (
@@ -911,7 +960,9 @@ class DashboardView(ft.Column):
             if selected != "gpu" or gpu_action is None
             else lambda: self._run_gpu_notice_action(gpu_action)
         )
-        yields_to_content = selected in OVERLAY_YIELDING_NOTICE_SOURCES
+        yields_to_content = (
+            selected in OVERLAY_YIELDING_NOTICE_SOURCES or selected == download_source
+        )
         try:
             self.display_card.set_notice(
                 text,
@@ -929,9 +980,13 @@ class DashboardView(ft.Column):
         self._sync_stt_button_state()
         self._sync_translation_button_state()
         self._sync_overlay_peer_buttons()
+        ui_face = self._typeface(None)
+        input_face = self._typeface(self._source_lang_code)
         self.display_card.apply_locale(
-            display_font_family=self._ui_font(),
-            input_font_family=font_for_language(self._source_lang_code),
+            display_font_family=ui_face.font_family,
+            input_font_family=input_face.font_family,
+            display_letter_spacing=ui_face.letter_spacing,
+            input_letter_spacing=input_face.letter_spacing,
         )
         self._refresh_language_card()
         if not self._process_capture_warning_active and self._stt_showing_warning:
@@ -942,14 +997,23 @@ class DashboardView(ft.Column):
             self.set_display_text(t("dashboard.warn_llm_key"), as_translation=True)
 
     def set_recent_languages(self, source: list[str], target: list[str]) -> None:
-        """Set recent languages from settings (for persistence)."""
-        self._recent_source_langs = list(source)
-        self._recent_target_langs = list(target)
-        self._recent_source_langs = self._recent_source_langs[:6]
-        self._recent_target_langs = self._recent_target_langs[:6]
+        """Load the shared recent queue from the stored source and target lists."""
+        self._recent_langs = unify_recent_language_codes(source, target)
 
     def _update_input_font(self) -> None:
-        self.display_card.set_input_font(font_for_language(self._source_lang_code))
+        face = self._typeface(self._source_lang_code)
+        self.display_card.set_input_font(
+            face.font_family,
+            letter_spacing=face.letter_spacing,
+        )
 
     def _ui_font(self) -> str | None:
         return font_for_language(get_locale())
+
+    def _typeface(self, language_code: str | None) -> TypeFace:
+        if language_code:
+            return TypeFace(
+                font_for_language(language_code),
+                locale_body_letter_spacing(language_code),
+            )
+        return TypeFace(self._ui_font(), locale_body_letter_spacing(get_locale()))

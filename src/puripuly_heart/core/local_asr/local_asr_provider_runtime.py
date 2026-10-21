@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
@@ -14,6 +14,7 @@ from puripuly_heart.core.gpu_worker import (
     GpuWorkerDevice,
     GpuWorkerTranscription,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.stt.backend import STTProviderTurnEvent
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
@@ -51,7 +52,7 @@ ProviderRuntimeReleaseMode = Literal["drain", "dormant", "abort"]
 ProviderRuntimeEventHandler = Callable[[object], Awaitable[None]]
 ProviderRuntimePeerEventHandler = Callable[[STTProviderTurnEvent], Awaitable[None]]
 ProviderRuntimeExceptionHandler = Callable[[Exception], Awaitable[None] | None]
-ProviderRuntimeTerminalFailureSink = Callable[[Exception], Awaitable[None]]
+ProviderRuntimeTerminalFailureSink = Callable[[Exception | ErrorDiagnostics], Awaitable[None]]
 ProviderRuntimeRecoveryQuiesce = Callable[
     [tuple[ProviderRuntimeChannel, ...]],
     Awaitable[None],
@@ -77,6 +78,8 @@ class ProviderRuntimeBuildRequest:
     provider_signature: tuple[object, ...] | None = None
     runtime_signature: tuple[object, ...] | None = None
     recognition_projection: Literal["auto", "legacy", "scoped"] = "auto"
+    operation_id: str | None = None
+    request_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.config.channel not in {"self", "peer"}:
@@ -150,6 +153,7 @@ class ProviderRuntimeGpuSnapshot:
     model_resident: bool
     retry_required: bool
     failure_code: str | None
+    startup_cleanup: Mapping[str, object] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,6 +186,7 @@ class ProviderRuntimeDiagnostic:
     rtf: float | None = None
     queue_wait_seconds: float | None = None
     worker_exit_code: int | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,6 +198,7 @@ class ProviderRuntimeMutationResult:
     failure_type: str | None = None
     failure_code: str | None = None
     failure_stage: str | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 class ProviderGpuRuntimePort(Protocol):
@@ -217,6 +223,9 @@ class ProviderGpuRuntimePort(Protocol):
     @property
     def configured_device_id(self) -> str | None: ...
 
+    @property
+    def startup_cleanup_snapshot(self) -> Mapping[str, object]: ...
+
     async def discover_devices(self) -> tuple[GpuWorkerDevice, ...]: ...
 
     async def activate_channel(
@@ -227,6 +236,8 @@ class ProviderGpuRuntimePort(Protocol):
         model_path: Path,
         model_id: str,
         device_id: str,
+        operation_id: str | None = None,
+        request_id: str | None = None,
     ) -> GpuWorkerActivation: ...
 
     async def retry(self) -> GpuWorkerActivation: ...
@@ -305,7 +316,13 @@ class LocalASRProviderRuntimePort(Protocol):
 
     async def start_channel(self, channel: ProviderRuntimeChannel) -> None: ...
 
-    async def warmup_channel(self, channel: ProviderRuntimeChannel) -> None: ...
+    async def warmup_channel(
+        self,
+        channel: ProviderRuntimeChannel,
+        *,
+        operation_id: str | None = None,
+        request_id: str | None = None,
+    ) -> None: ...
 
     async def handle_vad_event(
         self,

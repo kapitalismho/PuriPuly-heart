@@ -1,26 +1,21 @@
 """Tests for RotatingFileHandler file logging."""
 
 import io
+import json
 import logging
-from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
 from types import SimpleNamespace
 from uuid import uuid4
 
 from puripuly_heart.app.services.application_runtime_logging import ApplicationRuntimeLoggingOwner
 from puripuly_heart.core.llm.latency import observe_attempt, observe_request
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
 from puripuly_heart.core.runtime_logging import (
+    RuntimeLoggingSinks,
     SessionRuntimeLoggingService,
     configure_main_logging,
 )
-
-
-@dataclass
-class _SharedSinkBundle:
-    stream_handler: logging.Handler
-    file_handler: logging.Handler
-    log_file: object
 
 
 class _RealtimeSink:
@@ -60,7 +55,7 @@ def test_session_runtime_logging_service_routes_root_and_session_lines_to_shared
     service = SessionRuntimeLoggingService(
         root_logger=root_logger,
         session_logger=session_logger,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=stream_handler,
             file_handler=file_handler,
             log_file=log_file,
@@ -73,16 +68,37 @@ def test_session_runtime_logging_service_routes_root_and_session_lines_to_shared
 
     root_logger.info("root arbitrary prose")
     service.emit_basic("basic line")
-    service.emit_diagnostic("[Provider] first_diagnostic cause=test")
-    service.emit_diagnostic("[Provider] second_diagnostic cause=test")
+    diagnostics = [
+        ErrorDiagnostics(
+            component="provider.llm",
+            operation="translate",
+            code=code,
+            category="network",
+            visibility="diagnostic_only",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={},
+        )
+        for code in ("provider.network", "provider.timeout")
+    ]
+    for diagnostic in diagnostics:
+        service.emit_failure(diagnostic)
     service.close()
 
     content = log_file.read_text(encoding="utf-8")
     assert "root arbitrary prose" not in content
     assert "untrusted_record_redacted" in content
     assert "basic line" in content
-    assert "first_diagnostic" in content
-    assert "second_diagnostic" in content
+    records = [
+        json.loads(line.partition("[Failure] ")[2])
+        for line in content.splitlines()
+        if line.startswith("[Failure] {")
+    ]
+    assert [record["diagnostic_id"] for record in records] == [
+        diagnostic.diagnostic_id for diagnostic in diagnostics
+    ]
+    assert [record["code"] for record in records] == ["provider.network", "provider.timeout"]
     assert sink.lines == ["basic line"]
 
 
@@ -136,7 +152,7 @@ def test_default_session_runtime_logging_services_do_not_share_session_logger(tm
 
     service_one = SessionRuntimeLoggingService(
         root_logger=root_logger_one,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=logging.StreamHandler(io.StringIO()),
             file_handler=file_handler_one,
             log_file=log_file_one,
@@ -144,7 +160,7 @@ def test_default_session_runtime_logging_services_do_not_share_session_logger(tm
     )
     service_two = SessionRuntimeLoggingService(
         root_logger=root_logger_two,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=logging.StreamHandler(io.StringIO()),
             file_handler=file_handler_two,
             log_file=log_file_two,
@@ -192,7 +208,7 @@ def test_closing_runtime_logging_service_detaches_session_handlers(tmp_path):
     first_service = SessionRuntimeLoggingService(
         root_logger=root_logger_one,
         session_logger=session_logger,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=logging.StreamHandler(io.StringIO()),
             file_handler=file_handler_one,
             log_file=log_file_one,
@@ -204,7 +220,7 @@ def test_closing_runtime_logging_service_detaches_session_handlers(tmp_path):
     second_service = SessionRuntimeLoggingService(
         root_logger=root_logger_two,
         session_logger=session_logger,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=logging.StreamHandler(io.StringIO()),
             file_handler=file_handler_two,
             log_file=log_file_two,
@@ -236,7 +252,7 @@ def test_session_runtime_logging_service_persists_file_only_events_in_basic_mode
     service = SessionRuntimeLoggingService(
         root_logger=root_logger,
         session_logger=session_logger,
-        sinks=_SharedSinkBundle(
+        sinks=RuntimeLoggingSinks(
             stream_handler=stream_handler,
             file_handler=file_handler,
             log_file=log_file,

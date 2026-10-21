@@ -58,13 +58,18 @@ class RecordingRuntime:
         self.snapshot = _snapshot()
         self.calls: list[tuple[object, ...]] = []
         self.replace_result = SimpleNamespace(
-            status="applied", failure_code=None, failure_type=None, failure_stage=None
+            status="applied",
+            failure_code=None,
+            failure_type=None,
+            failure_stage=None,
+            failure_diagnostics=None,
         )
         self.handoff_result = SimpleNamespace(
             status="failed",
             failure_code="worker_process_exited",
             failure_type="GpuWorkerClosedError",
             failure_stage="provider_warmup",
+            failure_diagnostics=None,
         )
 
     async def reset_provider_channel(self, channel):
@@ -85,7 +90,7 @@ class RecordingRuntime:
     async def start_channel(self, channel):
         self.calls.append(("start", channel))
 
-    async def warmup_channel(self, channel):
+    async def warmup_channel(self, channel, *, operation_id=None, request_id=None):
         self.calls.append(("warmup", channel))
 
     async def reconfigure_channel(self, channel, options):

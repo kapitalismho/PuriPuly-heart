@@ -41,7 +41,12 @@ class _Control:
 
     async def submit(self, name, arguments, *, request_id, expected_revision=None):
         self.calls += 1
-        return {"instance_id": "correct-instance", "operation_id": request_id, "status": "accepted"}
+        return {
+            "instance_id": "correct-instance",
+            "operation_id": request_id,
+            "status": "accepted",
+            "terminal": False,
+        }
 
 
 async def _raw(port: int, message: bytes):
@@ -123,36 +128,48 @@ async def test_client_timeout_does_not_cancel_accepted_server_execution():
         def __init__(self):
             super().__init__()
             self.completed = asyncio.Event()
+            self.entered = asyncio.Event()
+            self.release = asyncio.Event()
 
         async def submit(self, name, arguments, *, request_id, expected_revision=None):
             self.calls += 1
-            await asyncio.sleep(0.15)
+            self.entered.set()
+            await self.release.wait()
             self.completed.set()
             return {
                 "instance_id": "correct-instance",
                 "operation_id": request_id,
                 "status": "accepted",
+                "terminal": False,
             }
 
     control = SlowControl()
     server = ControlServer(control, instance_id="correct-instance", token="local-secret-token")
     port = await server.start()
+    client = asyncio.create_task(
+        request(
+            _Record(port),
+            "submit",
+            {
+                "name": "capture.set",
+                "values": {"channel": "self", "enabled": False},
+                "request_id": "do-not-replay",
+            },
+            timeout=0.1,
+        )
+    )
     try:
+        await asyncio.wait_for(control.entered.wait(), 1)
         with pytest.raises(ControlTransportError) as error:
-            await request(
-                _Record(port),
-                "submit",
-                {
-                    "name": "capture.set",
-                    "values": {"channel": "self", "enabled": False},
-                    "request_id": "do-not-replay",
-                },
-                timeout=0.02,
-            )
+            await client
         assert error.value.code == "unknown_execution"
+        assert not control.completed.is_set()
+        control.release.set()
         await asyncio.wait_for(control.completed.wait(), 1)
         assert control.calls == 1
     finally:
+        control.release.set()
+        await asyncio.gather(client, return_exceptions=True)
         await server.close()
 
 
@@ -169,6 +186,7 @@ async def test_shutdown_waits_until_stop_receipt_is_consumed():
                 "instance_id": "correct-instance",
                 "operation_id": request_id,
                 "status": "accepted",
+                "terminal": False,
             }
 
     control = StopControl()
@@ -292,13 +310,12 @@ async def test_ui_event_subscriptions_project_only_explicit_content_over_loopbac
         masked = await receive()
         assert masked[0]["state"] == STTSessionState.STREAMING.value
         assert "state" not in masked[1]
-        assert masked[2] == {
-            "sequence": 3,
-            "topic": "osc_sent",
-            "channel": "peer",
-            "source": "offline",
-            "utterance_id": str(utterance_id),
-        }
+        assert masked[2]["sequence"] == 3
+        assert masked[2]["topic"] == "osc_sent"
+        assert masked[2]["channel"] == "peer"
+        assert masked[2]["utterance_id"] == str(utterance_id)
+        assert masked[2]["source"] == "unknown"
+        assert masked[2]["instance_id"] is None
         assert "OFFLINE_" not in json.dumps(masked)
 
         transcripts = await receive(include_transcripts=True, include_translations=False)

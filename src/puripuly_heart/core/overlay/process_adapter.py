@@ -9,6 +9,9 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
+from puripuly_heart.core.diagnostics import safe_exception_fields
+
+from .child_diagnostics import project_child_failure, project_child_owner_status
 from .diagnostics import OverlayDiagnosticsRecorder
 
 logger = logging.getLogger("puripuly_heart.core.overlay.process")
@@ -39,6 +42,13 @@ _KNOWN_PROCESS_EVENT_TYPES = (
     | _REVERSE_DIAGNOSTIC_CONTROL_TYPES
     | frozenset({"overlay_event", "shutdown_ack"})
 )
+
+
+class OverlayReaderCleanupError(RuntimeError):
+    def __init__(self, *, unresolved_count: int, failures: tuple[dict[str, object], ...]) -> None:
+        super().__init__("overlay child reader cleanup failed")
+        self.unresolved_count = unresolved_count
+        self.failures = failures
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +89,21 @@ class _BoundedProcessEventQueue:
                 "terminal_failure" if event_type in _REVERSE_TERMINAL_CONTROL_TYPES else event_type
             )
             if key == "terminal_failure" and key in self._lifecycle_controls:
+                existing = self._lifecycle_controls[key]
+                if existing.get("overlay_instance_id") in (None, event.get("overlay_instance_id")):
+                    for field_name in ("primary_failure_reason", "cleanup_failure_reason"):
+                        if existing.get(field_name) is None and event.get(field_name) is not None:
+                            existing[field_name] = event[field_name]
+                    for field_name in (
+                        "diagnostic_dropped",
+                        "reliable_delivery_failures",
+                        "rejected_records",
+                    ):
+                        value = event.get(field_name)
+                        if type(value) is int:
+                            existing[field_name] = max(value, existing.get(field_name, 0))
+                    if event.get("evidence_state") == "incomplete":
+                        existing["evidence_state"] = "incomplete"
                 self._available.set()
                 return
             self._lifecycle_controls.pop(key, None)
@@ -279,11 +304,24 @@ class _AsyncioOverlayProcess:
                             "reverse_diagnostic_overflow",
                             count=self._events.dropped_diagnostics - dropped_before,
                         )
+                    if self._events.dropped_diagnostics > dropped_before:
+                        sink = self._lifecycle_sink
+                        if sink is not None:
+                            sink(
+                                "native_diagnostic_loss",
+                                {"diagnostic_dropped": self._events.dropped_diagnostics},
+                            )
                     if not accepted:
                         payload = event.get("payload")
                         payload_event = (
                             str(payload.get("event", "")) if isinstance(payload, dict) else ""
                         )
+                        if payload_event not in {
+                            "window_bounds_changed",
+                            "interaction_mode_changed",
+                            "reset_to_bottom_center_requested",
+                        }:
+                            payload_event = "unclassified"
                         sink = self._lifecycle_sink
                         if sink is not None:
                             sink(
@@ -331,6 +369,30 @@ class _AsyncioOverlayProcess:
             and isinstance(payload.get("type"), str)
             and payload["type"] in _KNOWN_PROCESS_EVENT_TYPES
         ):
+            if payload["type"] in {
+                "startup_error",
+                "runtime_error",
+                "owner_status",
+                "shutdown_complete",
+                "shutdown_ack",
+            }:
+                wire_instance = payload.get("overlay_instance_id")
+                wire_generation = payload.get("runtime_generation")
+                if (
+                    self.overlay_instance_id is not None
+                    and wire_instance is not None
+                    and wire_instance != self.overlay_instance_id
+                    or wire_generation is not None
+                    and (type(wire_generation) is not int or wire_generation != 1)
+                ):
+                    self._events.rejected_controls += 1
+                    if self._diagnostics is not None:
+                        self._diagnostics.note_input_rejected("stale_child_control")
+                    return None
+            if payload["type"] in {"startup_error", "runtime_error"}:
+                return project_child_failure(payload)
+            if payload["type"] == "owner_status":
+                return project_child_owner_status(payload)
             return payload
         return None
 
@@ -401,13 +463,22 @@ class _AsyncioOverlayProcess:
                     "process_reader_cleanup_failed",
                     {
                         "unresolved_count": len(unresolved),
+                        "cleanup_stage": "reader_cleanup",
+                        "failures": [safe_exception_fields(failure) for failure in failures],
                         "failure_count": len(failures),
                     },
                 )
-            raise RuntimeError("overlay child reader cleanup failed")
+            raise OverlayReaderCleanupError(
+                unresolved_count=len(unresolved),
+                failures=tuple(safe_exception_fields(failure) for failure in failures),
+            ) from (failures[0] if failures else None)
         sink = self._lifecycle_sink
         if sink is not None:
             sink(
                 "process_readers_finished",
-                {"cancelled_count": cancelled_count},
+                {
+                    "cancelled_count": cancelled_count,
+                    "diagnostic_dropped": self._events.dropped_diagnostics,
+                    "rejected_records": self._events.rejected_controls,
+                },
             )

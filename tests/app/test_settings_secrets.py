@@ -82,7 +82,9 @@ def test_settings_secret_load_reports_backend_construction_failure() -> None:
     result = SettingsSecretsOwner(secret_store_factory=fail).load()
 
     assert result.snapshot is None
-    assert result.error_message == "Failed to load secrets: boom"
+    assert result.error_message == "Secret storage is unavailable."
+    assert result.diagnostics.fields["exception_class"] == "RuntimeError"
+    assert "boom" not in repr(result)
 
 
 def test_openrouter_pkce_load_reads_only_its_previous_secret_surface() -> None:
@@ -98,7 +100,7 @@ def test_openrouter_pkce_load_reads_only_its_previous_secret_surface() -> None:
 
     result = SettingsSecretsOwner(secret_store_factory=lambda: store).load_openrouter_pkce()
 
-    assert result.read_error is None
+    assert result.diagnostics is None
     assert result.snapshot is not None
     assert result.snapshot.openrouter_api_key == "openrouter-secret"
     assert result.snapshot.deepseek_api_key == "deepseek-secret"
@@ -134,7 +136,8 @@ def test_settings_secret_load_returns_the_sequential_prefix_on_read_failure() ->
     assert result.snapshot.deepseek_api_key == "deepseek-secret"
     assert result.snapshot.deepgram_api_key is None
     assert result.snapshot.soniox_api_key is None
-    assert result.read_error is failure
+    assert result.diagnostics.fields["exception_class"] == "OSError"
+    assert result.diagnostics.operation == "secret_read"
 
 
 def test_openrouter_pkce_load_returns_its_sequential_prefix_on_read_failure() -> None:
@@ -148,7 +151,8 @@ def test_openrouter_pkce_load_returns_its_sequential_prefix_on_read_failure() ->
     assert result.snapshot is not None
     assert result.snapshot.openrouter_api_key == "openrouter-secret"
     assert result.snapshot.deepseek_api_key is None
-    assert result.read_error is failure
+    assert result.diagnostics.fields["exception_class"] == "OSError"
+    assert result.diagnostics.operation == "secret_read"
 
 
 def test_settings_secret_mutation_owns_set_delete_and_failure_results() -> None:

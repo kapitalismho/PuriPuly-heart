@@ -1809,7 +1809,9 @@ def test_post_replace_validation_and_restoration_failure_returns_safe_error(
     assert result.status == compat.SettingsPersistenceStatus.SAVE_FAILED
     assert result.settings is None
     assert result.error is not None
-    assert result.error.message == "save_failed:RuntimeError"
+    assert result.error.diagnostics.fields["exception_class"] == "ValueError"
+    assert result.error.secondary_diagnostics[0].fields["exception_class"] == "OSError"
+    assert result.error.secondary_diagnostics[0].cause_id == result.error.diagnostics.diagnostic_id
     assert validation_sentinel not in result.error.message
     assert restoration_sentinel not in result.error.message
     assert result.backup_path is not None
@@ -2170,6 +2172,65 @@ def test_load_writes_system_prompt_backup_and_resets_prompt(tmp_path: Path) -> N
     assert result.backup_path.read_bytes() == original_bytes
 
 
+def test_load_backs_up_custom_prompt_override_and_resets_it(tmp_path: Path) -> None:
+    compat = _compat()
+    serialization = _serialization()
+    fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
+    path = tmp_path / "settings.json"
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 51
+    raw["intent"]["prompts"] = {"system_prompt_override": "keep this custom override"}
+    original_bytes = _write_json_bytes(path, raw)
+
+    result = compat.load_vnext_settings(path, now=fixed_now)
+
+    assert result.status == compat.SettingsPersistenceStatus.SUCCESS
+    assert result.settings is not None
+    assert result.settings.intent.prompts.system_prompt_override is None
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    assert persisted["settings_version"] == VNEXT_SETTINGS_SCHEMA_VERSION
+    assert persisted["intent"]["prompts"] == {"system_prompt_override": None}
+    prompt_backup = tmp_path / "system_prompt.pre-v51.20260609T010203Z.txt"
+    assert prompt_backup.read_text(encoding="utf-8") == "keep this custom override"
+    assert result.backup_path is not None
+    assert result.backup_path.read_bytes() == original_bytes
+
+
+def test_load_skips_system_prompt_backup_without_prompt_override(tmp_path: Path) -> None:
+    compat = _compat()
+    serialization = _serialization()
+    fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
+    path = tmp_path / "settings.json"
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 51
+    raw["intent"]["prompts"] = {"system_prompt_override": None}
+    _write_json_bytes(path, raw)
+
+    result = compat.load_vnext_settings(path, now=fixed_now)
+
+    assert result.status == compat.SettingsPersistenceStatus.SUCCESS
+    assert result.migrated is True
+    assert result.settings is not None
+    assert result.settings.intent.prompts.system_prompt_override is None
+    assert not list(tmp_path.glob("system_prompt*.txt"))
+
+
+def test_load_keeps_custom_prompt_override_on_current_version(tmp_path: Path) -> None:
+    compat = _compat()
+    serialization = _serialization()
+    path = tmp_path / "settings.json"
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["prompts"] = {"system_prompt_override": "keep this custom override"}
+    _write_json_bytes(path, raw)
+
+    result = compat.load_vnext_settings(path)
+
+    assert result.status == compat.SettingsPersistenceStatus.SUCCESS
+    assert result.settings is not None
+    assert result.settings.intent.prompts.system_prompt_override == "keep this custom override"
+    assert not list(tmp_path.glob("system_prompt*.txt"))
+
+
 def test_load_skips_system_prompt_backup_when_already_default(tmp_path: Path) -> None:
     from puripuly_heart.config.prompts import load_prompt_for_provider
 
@@ -2292,3 +2353,47 @@ def test_managed_operation_identity_normalizes_all_or_nothing() -> None:
     assert partial.pending_managed_operation_state is None
     fresh = ManagedConnectionState(installation_id="install-1")
     assert fresh.pending_managed_operation_id is None
+
+
+@pytest.mark.parametrize(
+    ("path", "invalid"),
+    [
+        (("intent", "osc", "send_port"), "9000"),
+        (("intent", "audio"), []),
+        (("intent", "translation", "connection_history"), {"model": 3}),
+        (("intent", "stt", "custom_terms"), {"en": [1]}),
+        (("state", "telemetry", "anonymous_id"), 42),
+    ],
+)
+def test_repeated_schema_loading_revalidates_wrong_and_nested_types(
+    path: tuple[str, ...], invalid: object
+) -> None:
+    serialization = _serialization()
+    for locale in ("en", "ko"):
+        valid = serialization.to_dict(AppSettingsVNext())
+        valid["intent"]["ui"]["locale"] = locale
+        assert serialization.from_dict(valid).intent.ui.locale == locale
+        malformed = serialization.to_dict(serialization.from_dict(valid))
+        target = malformed
+        for member in path[:-1]:
+            target = target[member]
+        target[path[-1]] = invalid
+        with pytest.raises(ValueError, match=r"settings\."):
+            serialization.from_dict(malformed)
+        assert serialization.from_dict(valid).intent.ui.locale == locale
+
+
+def test_repeated_schema_loading_preserves_independent_mutable_settings() -> None:
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["local_llm"]["extra_body"] = {"options": {"labels": ["alpha"]}}
+    first = serialization.from_dict(raw)
+    second = serialization.from_dict(raw)
+
+    first.intent.local_llm.extra_body["options"]["labels"].append("beta")
+    first.intent.translation.connection_history["synthetic-model"] = "byok"
+
+    assert second.intent.local_llm.extra_body == {"options": {"labels": ["alpha"]}}
+    assert raw["intent"]["local_llm"]["extra_body"] == {"options": {"labels": ["alpha"]}}
+    assert "synthetic-model" not in second.intent.translation.connection_history
+    assert "synthetic-model" not in raw["intent"]["translation"]["connection_history"]

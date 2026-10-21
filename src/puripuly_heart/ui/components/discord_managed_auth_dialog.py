@@ -79,7 +79,7 @@ class DiscordManagedAuthDialog:
                 ),
                 WarmDocumentDialogAction(
                     label=t("discord_auth.continue"),
-                    on_select=self._on_continue,
+                    on_select=self._submit,
                     close_before_action=False,
                 ),
             ],
@@ -131,13 +131,34 @@ class DiscordManagedAuthDialog:
         self._update_page_if_possible()
 
     def set_action_required(self) -> None:
-        if not self._is_open or not self._is_waiting:
+        self.set_error("discord_auth.action_required_body")
+
+    def set_error(
+        self, message_key: str = "discord_auth.error.retry", *, resume: bool = False
+    ) -> None:
+        if not self._is_open:
             return
+        self._is_waiting = False
+        if self._dialog is not None:
+            self._dialog.modal = False
         if self._dialog_result is None or self._body_text is None:
             return
-        self._body_text.value = join_body_paragraphs(
-            split_body_paragraphs(t("discord_auth.action_required_body"))
+        self._body_text.value = join_body_paragraphs(split_body_paragraphs(t(message_key)))
+        self._close_button, self._continue_button = self._dialog_result.set_actions(
+            [
+                WarmDocumentDialogAction(
+                    label=t("discord_auth.close"),
+                    on_select=lambda: self._close_then(self._on_close),
+                    close_before_action=False,
+                ),
+                WarmDocumentDialogAction(
+                    label=t("discord_auth.resume" if resume else "discord_auth.retry"),
+                    on_select=self._submit,
+                    close_before_action=False,
+                ),
+            ]
         )
+        self._cancel_button = None
         self._update_page_if_possible()
 
     def close(self) -> None:
@@ -145,6 +166,7 @@ class DiscordManagedAuthDialog:
             return
         self._page.pop_dialog()
         self._is_open = False
+        self._is_waiting = False
 
     def _build_waiting_actions(self) -> list[WarmDocumentDialogAction]:
         actions: list[WarmDocumentDialogAction] = []
@@ -156,6 +178,10 @@ class DiscordManagedAuthDialog:
             )
         )
         return actions
+
+    def _submit(self) -> None:
+        if self._is_open and not self._is_waiting:
+            self._on_continue()
 
     def _handle_dismiss(self) -> None:
         if not self._is_open or self._is_waiting:

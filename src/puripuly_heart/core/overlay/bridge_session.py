@@ -7,6 +7,8 @@ from typing import Any
 
 from puripuly_heart.core.clock import Clock
 
+from .child_diagnostics import project_child_owner_status
+
 
 @dataclass(frozen=True, slots=True)
 class HealthChallenge:
@@ -76,7 +78,8 @@ class AuthenticatedSessionHealth:
         ):
             return False
         return (
-            payload.get("contract_version") == contract_version
+            type(payload.get("runtime_generation")) is int
+            and payload.get("contract_version") == contract_version
             and payload.get("overlay_instance_id") == self.overlay_instance_id
             and payload.get("runtime_generation") == self.runtime_generation
         )
@@ -129,6 +132,7 @@ class AuthenticatedSessionHealth:
     def handle_owner_status(self, message: Mapping[str, Any]) -> dict[str, Any]:
         if (
             message.get("overlay_instance_id") != self.overlay_instance_id
+            or type(message.get("runtime_generation")) is not int
             or message.get("runtime_generation") != self.runtime_generation
         ):
             raise ValueError("invalid owner status identity")
@@ -154,7 +158,7 @@ class AuthenticatedSessionHealth:
         ):
             self.native_acceptance_revision = None
             self.native_acceptance_deadline = None
-        forwarded = dict(message)
+        forwarded = project_child_owner_status(message)
         forwarded["health_challenge_validated"] = valid_response
         forwarded["health_challenge_issued_at"] = issued_at if valid_response else None
         return forwarded

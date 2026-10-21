@@ -11,7 +11,11 @@ pytest.importorskip("flet")
 import flet as ft
 
 from puripuly_heart.ui.components import language_modal as modal_module
-from puripuly_heart.ui.components.language_modal import LanguageModal
+from puripuly_heart.ui.components.language_modal import (
+    RECENT_CHIP_HEIGHT,
+    RECENT_CHIP_WIDTH,
+    LanguageModal,
+)
 
 
 def test_language_modal_open_builds_dialog_and_recent_grid() -> None:
@@ -19,18 +23,23 @@ def test_language_modal_open_builds_dialog_and_recent_grid() -> None:
     selected: list[str] = []
     modal = LanguageModal(
         page=page,
-        languages=[("ko", "Korean"), ("en", "English"), ("ja", "Japanese")],
+        languages=[("ko", "Korean"), ("en", "English"), ("ja", "Japanese"), ("fr", "French")],
         on_select=lambda code: selected.append(code),
+        label_for_code=lambda code: code,
     )
 
-    modal.open(current="ko", recent=["ko", "en", "ja"])
+    modal.open(current="ko", recent=["ko", "en", "ja", "fr"])
 
     assert len(page.opened) == 1
     assert modal._dialog is not None
+    assert modal._dialog.content.height == 700
 
-    grid = modal._build_recent_grid(["ko", "en", "ja"], current="ko")
+    grid = modal._build_recent_grid(["ko", "en", "ja", "fr"], current="ko")
     assert isinstance(grid, ft.Row)
-    assert len(grid.controls) == 3
+    assert [chip.content.value for chip in grid.controls] == ["ko", "en", "ja"]
+    assert [chip.width for chip in grid.controls] == [RECENT_CHIP_WIDTH] * 3
+    assert [chip.height for chip in grid.controls] == [RECENT_CHIP_HEIGHT] * 3
+    assert modal._build_recent_grid(["ko"], current="ko").controls[0].content.value == "ko"
     assert modal._build_recent_grid([], current="ko") is None
 
 

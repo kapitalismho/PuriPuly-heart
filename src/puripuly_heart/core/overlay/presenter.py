@@ -450,6 +450,24 @@ class OverlayPresenter(OverlaySink):
         return False
 
     def _apply_self_active_update(self, event: SelfActiveUpdate, *, now: float) -> bool:
+        if event.caption_source_closed is not None:
+            changed = self._finish_reduction_result(
+                self._presentation_state.apply_self_caption_update(
+                    event,
+                    now=now,
+                    show_translation=self.show_translation,
+                    show_peer_original=self.show_peer_original,
+                    translation_enabled=self.translation_enabled,
+                    visible_window_target_blocks=self.visible_window_target_blocks,
+                    next_appearance_seq=self._next_appearance_seq,
+                    terminal_update_reason=self._terminal_update_reason,
+                )
+            )
+            key = self._entry_key(event.channel, event.utterance_id)
+            entry = self._entries.get(key)
+            if entry is not None:
+                self._schedule_expiration(key, entry)
+            return changed
         result = self._presentation_state.apply_self_active_update(
             event,
             now=now,
@@ -644,6 +662,14 @@ class OverlayPresenter(OverlaySink):
     ) -> None:
         now = self.clock.now()
         self._expire_closed_entries(now=now)
+        self._presentation_state.promote_staged_self(
+            now=now,
+            show_translation=self.show_translation,
+            show_peer_original=self.show_peer_original,
+            translation_enabled=self.translation_enabled,
+            capacity=self.visible_window_target_blocks,
+        )
+        self._drain_presentation_state_removals()
         previous_snapshot = self.snapshot()
         previous_occupants = {block.id for block in previous_snapshot.blocks}
         selection = self._presentation_state.visible_block_selection(
@@ -669,12 +695,15 @@ class OverlayPresenter(OverlaySink):
         rendered_entries = self._apply_speaker_presentation(rendered_entries)
         speaker_divider = self._speaker_divider(rendered_entries)
         next_blocks = [block for _, block in rendered_entries]
+        self_scene_changed = (
+            self.native_retry_enabled
+            and self._retry_projection.reconcile_self_scene(previous_snapshot.blocks, next_blocks)
+        )
         next_calibration = _calibration_from_overlay(self.calibration)
         fresh_render_channel = self._eligible_fresh_render_channel(
             fresh_render_event,
             event_changed=event_changed,
             rendered_entries=rendered_entries,
-            previous_snapshot=previous_snapshot,
         )
         previous_rendered_signature = self._presentation_state.rendered_blocks_signature(
             previous_snapshot.blocks
@@ -690,12 +719,13 @@ class OverlayPresenter(OverlaySink):
             and speaker_divider == previous_snapshot.speaker_divider
             and next_calibration == previous_snapshot.calibration
             and fresh_render_channel is None
+            and not self_scene_changed
             and not force_protocol_publish
         ):
             self._signal_peer_admission_change()
             return
 
-        if fresh_render_channel is not None and self.native_retry_enabled:
+        if fresh_render_channel == "peer" and self.native_retry_enabled:
             self._retry_projection.advance(fresh_render_channel, fresh_render_event)
         self._retry_projection.prune(next_blocks)
         self._revision += 1
@@ -1056,80 +1086,27 @@ class OverlayPresenter(OverlaySink):
         *,
         event_changed: bool,
         rendered_entries: list[tuple[tuple[str, UUID], OverlayPresentationBlock]],
-        previous_snapshot: OverlayPresentationSnapshot,
     ) -> str | None:
-        if event is None or event.utterance_id is None:
+        if (
+            event is None
+            or event.channel != "peer"
+            or event.utterance_id is None
+            or not event_changed
+            or not isinstance(
+                event,
+                (PeerActiveUpdate, PeerTranscriptFinal, TranslationStreamUpdate, TranslationFinal),
+            )
+        ):
             return None
         key = (event.channel, event.utterance_id)
-        if event.channel == "self":
-            if not event_changed or not isinstance(
-                event,
-                (SelfActiveUpdate, SelfTranscriptFinal, TranslationFinal),
-            ):
-                return None
-        elif event.channel == "peer":
-            if not event_changed or not isinstance(
-                event,
-                (
-                    PeerActiveUpdate,
-                    PeerTranscriptFinal,
-                    TranslationStreamUpdate,
-                    TranslationFinal,
-                ),
-            ):
-                return None
-        else:
-            return None
-        for rendered_key, block in rendered_entries:
-            if rendered_key != key:
-                continue
-            if block.primary_text.strip():
-                if isinstance(event, SelfActiveUpdate):
-                    previous_block = next(
-                        (
-                            previous
-                            for previous in previous_snapshot.blocks
-                            if previous.id == block.id
-                        ),
-                        None,
-                    )
-                    if previous_block is not None and (
-                        self._presentation_state.visible_block_content_signature(previous_block)
-                        == self._presentation_state.visible_block_content_signature(block)
-                    ):
-                        return None
-                if event.channel == "self" and block.block_variant == "finalized":
-                    previous_block = self._visible_finalized_self_block_in_snapshot(
-                        previous_snapshot,
-                        key,
-                    )
-                    previous_signature = (
-                        self._presentation_state.visible_block_content_signature(previous_block)
-                        if previous_block is not None
-                        else None
-                    )
-                    current_signature = self._presentation_state.visible_block_content_signature(
-                        block
-                    )
-                    if previous_signature == current_signature:
-                        return None
-                return event.channel
-        return None
-
-    def _visible_finalized_self_block_in_snapshot(
-        self,
-        snapshot: OverlayPresentationSnapshot,
-        key: tuple[str, UUID],
-    ) -> OverlayPresentationBlock | None:
-        if key[0] != "self":
-            return None
-        block_id = f"self:{key[1]}"
-        for block in snapshot.blocks:
-            if block.channel != "self" or block.id != block_id:
-                continue
-            if block.block_variant == "finalized" and block.primary_text.strip():
-                return block
-        return None
+        return next(
+            (
+                "peer"
+                for rendered_key, block in rendered_entries
+                if rendered_key == key and block.primary_text.strip()
+            ),
+            None,
+        )
 
     def _current_task(self) -> asyncio.Task[None] | None:
         try:

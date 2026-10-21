@@ -311,8 +311,10 @@ async def test_verify_api_key_uses_models_metadata_endpoint(
         seen_urls.append(str(request.url))
         assert request.headers["x-goog-api-key"] == "secret"
         return httpx.Response(200)
+
     monkeypatch.setattr(
-        network_clients, "external_client",
+        network_clients,
+        "external_client",
         lambda **kwargs: httpx.Client(transport=httpx.MockTransport(respond)),
     )
 
@@ -324,8 +326,11 @@ async def test_verify_api_key_uses_models_metadata_endpoint(
 @pytest.mark.asyncio
 async def test_verify_api_key_raises_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        network_clients, "external_client",
-        lambda **kwargs: httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(401))),
+        network_clients,
+        "external_client",
+        lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(lambda request: httpx.Response(401))
+        ),
     )
 
     with pytest.raises(httpx.HTTPStatusError) as caught:

@@ -21,6 +21,7 @@ from puripuly_heart.app.services.operational_state_payloads import (
     ProviderVerificationEvidence,
     provider_verification_state_values,
 )
+from puripuly_heart.core.diagnostics import safe_exception_fields, sanitize_diagnostics
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_TRANSACTION,
@@ -131,11 +132,12 @@ class SecretSettingsTransaction:
     async def set_provider_secret(self, request: SecretSetRequest) -> TransactionResult:
         try:
             snapshot = await self.secret_store.snapshot_secret(request.secret_key)
-        except Exception:
+        except Exception as exc:
             return _secret_write_failed_result(
                 secret_key=request.secret_key,
                 action="set",
                 operation="snapshot_secret",
+                exception=exc,
             )
 
         try:
@@ -143,11 +145,12 @@ class SecretSettingsTransaction:
                 request.secret_key,
                 request.secret_value,
             )
-        except Exception:
+        except Exception as exc:
             return _secret_write_failed_result(
                 secret_key=request.secret_key,
                 action="set",
                 operation="set_secret",
+                exception=exc,
             )
 
         if not write_result.succeeded:
@@ -155,6 +158,7 @@ class SecretSettingsTransaction:
                 secret_key=request.secret_key,
                 action="set",
                 operation="set_secret",
+                diagnostics=write_result.diagnostics,
             )
 
         return await self._commit_settings_or_restore_secret(
@@ -166,20 +170,22 @@ class SecretSettingsTransaction:
     async def clear_provider_secret(self, request: SecretClearRequest) -> TransactionResult:
         try:
             snapshot = await self.secret_store.snapshot_secret(request.secret_key)
-        except Exception:
+        except Exception as exc:
             return _secret_write_failed_result(
                 secret_key=request.secret_key,
                 action="clear",
                 operation="snapshot_secret",
+                exception=exc,
             )
 
         try:
             write_result = await self.secret_store.clear_secret(request.secret_key)
-        except Exception:
+        except Exception as exc:
             return _secret_write_failed_result(
                 secret_key=request.secret_key,
                 action="clear",
                 operation="clear_secret",
+                exception=exc,
             )
 
         if not write_result.succeeded:
@@ -187,6 +193,7 @@ class SecretSettingsTransaction:
                 secret_key=request.secret_key,
                 action="clear",
                 operation="clear_secret",
+                diagnostics=write_result.diagnostics,
             )
 
         return await self._commit_settings_or_restore_secret(
@@ -224,12 +231,13 @@ class SecretSettingsTransaction:
                     context=request.verifier_context,
                 )
             )
-        except Exception:
+        except Exception as exc:
             return _provider_verification_failed_result(
                 provider=request.provider,
                 secret_key=request.secret_key,
                 code="provider_verifier_exception",
                 phase="verify_provider_secret",
+                exception=exc,
             )
 
         if (
@@ -266,18 +274,23 @@ class SecretSettingsTransaction:
                     reason=request.reason,
                 )
             )
-        except Exception:
+        except Exception as exc:
             return _settings_commit_failed_result(
                 provider=request.provider,
                 secret_key=request.secret_key,
                 message=None,
+                exception=exc,
             )
 
         if not commit_result.succeeded or commit_result.snapshot is None:
             return TransactionResult(
                 status=TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED,
                 message=commit_result.message,
-                diagnostics=commit_result.diagnostics
+                diagnostics=(
+                    sanitize_diagnostics(commit_result.diagnostics)
+                    if commit_result.diagnostics
+                    else None
+                )
                 or _settings_commit_failed_diagnostics(
                     provider=request.provider,
                     secret_key=request.secret_key,
@@ -291,13 +304,14 @@ class SecretSettingsTransaction:
                 diagnostics=commit_result.diagnostics,
             )
 
-        return _provider_verification_failed_result(
-            provider=request.provider,
-            secret_key=request.secret_key,
-            code="provider_verification_failed",
-            phase="verify_provider_secret",
-            verifier_status=verification_result.status,
+        return TransactionResult(
+            status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
             message=verification_result.message or commit_result.message,
+            diagnostics=(
+                sanitize_diagnostics(verification_result.diagnostics)
+                if verification_result.diagnostics is not None
+                else None
+            ),
         )
 
     async def _commit_settings_or_restore_secret(
@@ -315,15 +329,18 @@ class SecretSettingsTransaction:
                     reason=request.reason,
                 )
             )
-        except Exception:
+        except Exception as exc:
             return await self._restore_after_settings_commit_failure(
                 snapshot=snapshot,
                 action=action,
                 commit_message=None,
+                primary=_settings_commit_failed_diagnostics(
+                    provider="unknown", secret_key=request.secret_key, exception=exc
+                ),
             )
 
         if commit_result.succeeded and commit_result.snapshot is not None:
-            await self._publish_dashboard_needs_key_snapshot(
+            notification = await self._publish_dashboard_needs_key_snapshot(
                 request.dashboard_needs_key,
                 settings_revision=commit_result.snapshot.revision,
                 correlation_id=request.correlation_id,
@@ -332,12 +349,25 @@ class SecretSettingsTransaction:
                 status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
                 message=commit_result.message,
                 diagnostics=commit_result.diagnostics,
+                secondary_diagnostics=(
+                    *getattr(self.settings_repository, "secondary_diagnostics", ()),
+                    *((notification,) if notification is not None else ()),
+                ),
+                secondary_omitted_count=getattr(
+                    self.settings_repository, "secondary_omitted_count", 0
+                ),
             )
 
         return await self._restore_after_settings_commit_failure(
             snapshot=snapshot,
             action=action,
             commit_message=commit_result.message,
+            primary=commit_result.diagnostics
+            or _settings_commit_failed_diagnostics(
+                provider="unknown", secret_key=request.secret_key
+            ),
+            upstream_secondaries=getattr(self.settings_repository, "secondary_diagnostics", ()),
+            upstream_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
         )
 
     async def _restore_after_settings_commit_failure(
@@ -346,36 +376,57 @@ class SecretSettingsTransaction:
         snapshot: SecretSnapshot,
         action: str,
         commit_message: UserMessageRef | None,
+        primary: ErrorDiagnostics,
+        upstream_secondaries: tuple[ErrorDiagnostics, ...] = (),
+        upstream_omitted_count: int = 0,
     ) -> TransactionResult:
+        primary = sanitize_diagnostics(primary)
+        restore_cause = None
         try:
             restore_result = await self.secret_store.restore_secret(snapshot)
             restore_succeeded = restore_result.succeeded
-        except Exception:
-            restore_succeeded = False
-
-        if restore_succeeded:
-            return TransactionResult(
-                status=TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED_SECRET_RESTORED,
-                message=commit_message,
-                diagnostics=_compensation_diagnostics(
-                    code="settings_commit_failed_secret_restored",
-                    secret_key=snapshot.key,
-                    action=action,
-                    previous_secret_existed=snapshot.existed,
-                    secret_restore_succeeded=True,
-                ),
+            restore_cause = (
+                sanitize_diagnostics(restore_result.diagnostics)
+                if restore_result.diagnostics
+                else None
             )
-
-        return TransactionResult(
-            status=TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED_SECRET_RESTORE_FAILED,
-            message=commit_message,
-            diagnostics=_compensation_diagnostics(
-                code="settings_commit_failed_secret_restore_failed",
-                secret_key=snapshot.key,
-                action=action,
-                previous_secret_existed=snapshot.existed,
-                secret_restore_succeeded=False,
+        except Exception as exc:
+            restore_succeeded = False
+            restore_cause = ErrorDiagnostics(
+                component="secret_settings_transaction",
+                operation="restore_secret",
+                code="secret_restore_failed",
+                category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+                visibility=DIAGNOSTIC_VISIBILITY_BASIC,
+                content_policy=CONTENT_POLICY_METADATA_ONLY,
+                status_code=None,
+                retry_after_ms=None,
+                fields={"phase": "restore_secret", **safe_exception_fields(exc)},
+            )
+        outcome = _compensation_diagnostics(
+            code=(
+                "settings_commit_failed_secret_restored"
+                if restore_succeeded
+                else "settings_commit_failed_secret_restore_failed"
             ),
+            secret_key=snapshot.key,
+            action=action,
+            previous_secret_existed=snapshot.existed,
+            secret_restore_succeeded=restore_succeeded,
+        )
+        secondary = [*upstream_secondaries, replace(outcome, cause_id=primary.diagnostic_id)]
+        if restore_cause is not None:
+            secondary.append(replace(restore_cause, cause_id=primary.diagnostic_id))
+        return TransactionResult(
+            status=(
+                TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED_SECRET_RESTORED
+                if restore_succeeded
+                else TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED_SECRET_RESTORE_FAILED
+            ),
+            message=commit_message,
+            diagnostics=primary,
+            secondary_diagnostics=tuple(secondary),
+            secondary_omitted_count=upstream_omitted_count,
         )
 
     async def _publish_dashboard_needs_key_snapshot(
@@ -384,7 +435,7 @@ class SecretSettingsTransaction:
         *,
         settings_revision: str | None,
         correlation_id: str | None,
-    ) -> None:
+    ) -> ErrorDiagnostics | None:
         if snapshot is None or self.dashboard_needs_key_publisher is None:
             return
         try:
@@ -392,8 +443,19 @@ class SecretSettingsTransaction:
                 replace(snapshot, settings_revision=settings_revision),
                 correlation_id=correlation_id,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            return ErrorDiagnostics(
+                component="secret_settings_transaction",
+                operation="dashboard_notification",
+                code="dashboard_notification_failed",
+                category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+                visibility=DIAGNOSTIC_VISIBILITY_BASIC,
+                content_policy=CONTENT_POLICY_METADATA_ONLY,
+                status_code=None,
+                retry_after_ms=None,
+                fields={"phase": "dashboard_notification", **safe_exception_fields(exc)},
+            )
+        return None
 
 
 def _secret_write_failed_result(
@@ -401,7 +463,10 @@ def _secret_write_failed_result(
     secret_key: str,
     action: str,
     operation: str,
+    exception: BaseException | None = None,
+    diagnostics: ErrorDiagnostics | None = None,
 ) -> TransactionResult:
+    cause = sanitize_diagnostics(diagnostics) if diagnostics is not None else None
     return TransactionResult(
         status=TRANSACTION_STATUS_SECRET_WRITE_FAILED,
         message=None,
@@ -412,14 +477,19 @@ def _secret_write_failed_result(
             category=DIAGNOSTIC_CATEGORY_TRANSACTION,
             visibility=DIAGNOSTIC_VISIBILITY_BASIC,
             content_policy=CONTENT_POLICY_METADATA_ONLY,
-            status_code=None,
-            retry_after_ms=None,
+            status_code=cause.status_code if cause else None,
+            retry_after_ms=cause.retry_after_ms if cause else None,
             fields={
+                **(cause.fields if cause else {}),
                 "secret_key": secret_key,
                 "action": action,
+                "phase": operation,
+                **(safe_exception_fields(exception) if exception is not None else {}),
                 "secret_write_succeeded": False,
             },
+            cause_id=cause.diagnostic_id if cause else None,
         ),
+        secondary_diagnostics=(cause,) if cause else (),
     )
 
 
@@ -472,6 +542,8 @@ def _provider_verification_failed_result(
     phase: str,
     verifier_status: str | None = None,
     message: UserMessageRef | None = None,
+    exception: BaseException | None = None,
+    diagnostics: ErrorDiagnostics | None = None,
 ) -> TransactionResult:
     fields: dict[str, DiagnosticFieldValue] = {
         "provider": provider,
@@ -481,19 +553,24 @@ def _provider_verification_failed_result(
     }
     if verifier_status is not None:
         fields["verifier_status"] = verifier_status
+    fields.update(safe_exception_fields(exception) if exception is not None else {})
     return TransactionResult(
         status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
         message=message,
-        diagnostics=ErrorDiagnostics(
-            component="secret_settings_transaction",
-            operation="verify_provider_secret",
-            code=code,
-            category=DIAGNOSTIC_CATEGORY_TRANSACTION,
-            visibility=DIAGNOSTIC_VISIBILITY_BASIC,
-            content_policy=CONTENT_POLICY_METADATA_ONLY,
-            status_code=None,
-            retry_after_ms=None,
-            fields=fields,
+        diagnostics=(
+            sanitize_diagnostics(diagnostics)
+            if diagnostics is not None
+            else ErrorDiagnostics(
+                component="secret_settings_transaction",
+                operation="verify_provider_secret",
+                code=code,
+                category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+                visibility=DIAGNOSTIC_VISIBILITY_BASIC,
+                content_policy=CONTENT_POLICY_METADATA_ONLY,
+                status_code=None,
+                retry_after_ms=None,
+                fields=fields,
+            )
         ),
     )
 
@@ -503,6 +580,7 @@ def _settings_commit_failed_result(
     provider: str,
     secret_key: str,
     message: UserMessageRef | None,
+    exception: BaseException | None = None,
 ) -> TransactionResult:
     return TransactionResult(
         status=TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED,
@@ -510,6 +588,7 @@ def _settings_commit_failed_result(
         diagnostics=_settings_commit_failed_diagnostics(
             provider=provider,
             secret_key=secret_key,
+            exception=exception,
         ),
     )
 
@@ -518,6 +597,7 @@ def _settings_commit_failed_diagnostics(
     *,
     provider: str,
     secret_key: str,
+    exception: BaseException | None = None,
 ) -> ErrorDiagnostics:
     return ErrorDiagnostics(
         component="secret_settings_transaction",
@@ -532,6 +612,8 @@ def _settings_commit_failed_diagnostics(
             "provider": provider,
             "secret_key": secret_key,
             "settings_commit_succeeded": False,
+            "phase": "settings_save",
+            **(safe_exception_fields(exception) if exception is not None else {}),
         },
     )
 

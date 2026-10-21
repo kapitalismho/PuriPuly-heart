@@ -7,11 +7,11 @@ use super::font_resolver::{
 };
 use super::font_resolver::{FontResolver, TextStyleKey};
 use super::types::{
-    BlockBounds, CaptionBlock, CaptionBlockVariant, CaptionLayoutResult, CaptionPresentation,
-    LayoutCacheKey, LineRole, ResolvedBlockLayout, ResolvedFrameLayout, ResolvedLineLayout,
-    SpeakerDividerBand, TextStyleDescriptor, VisualBounds, DEFAULT_AVERAGE_GLYPH_ADVANCE_PX,
-    DEFAULT_BLOCK_SPACING_PX, DEFAULT_FONT_SIZE_PX, DEFAULT_HORIZONTAL_PADDING_PX,
-    DEFAULT_PRIMARY_LINE_HEIGHT_PX, DEFAULT_SECONDARY_LINE_HEIGHT_PX,
+    BlockBounds, CaptionBlock, CaptionBlockVariant, CaptionFitScales, CaptionLayoutResult,
+    CaptionPresentation, LayoutCacheKey, LineRole, ResolvedBlockLayout, ResolvedFrameLayout,
+    ResolvedLineLayout, SpeakerDividerBand, TextStyleDescriptor, VisualBounds,
+    DEFAULT_AVERAGE_GLYPH_ADVANCE_PX, DEFAULT_BLOCK_SPACING_PX, DEFAULT_FONT_SIZE_PX,
+    DEFAULT_HORIZONTAL_PADDING_PX, DEFAULT_PRIMARY_LINE_HEIGHT_PX, DEFAULT_SECONDARY_LINE_HEIGHT_PX,
     DEFAULT_STRIP_HORIZONTAL_PADDING_PX, DEFAULT_STRIP_VERTICAL_PADDING_PX,
     DEFAULT_SURFACE_HEIGHT_PX, DEFAULT_SURFACE_WIDTH_PX, DEFAULT_VERTICAL_PADDING_PX,
     PRIMARY_SECONDARY_GAP_PX, SECONDARY_FONT_SCALE, TEXT_OUTLINE_OVERHANG_PX,
@@ -109,6 +109,48 @@ impl CaptionLayoutPolicy {
         (DEFAULT_SURFACE_WIDTH_PX, DEFAULT_SURFACE_HEIGHT_PX)
     }
 
+    pub(crate) fn surface_size_for_presentation(
+        &self,
+        presentation: &CaptionPresentation,
+    ) -> (u32, u32) {
+        let slots = self.visible_window_target_blocks as u32;
+        let height_px = self.vertical_padding_px as f32 * 2.0
+            + slots as f32 * self.stable_block_height_px(true, presentation.text_scale)
+            + slots.saturating_sub(1) as f32 * self.block_spacing_px as f32;
+        (
+            DEFAULT_SURFACE_WIDTH_PX,
+            DEFAULT_SURFACE_HEIGHT_PX.max(height_px.ceil() as u32),
+        )
+    }
+
+    pub(crate) fn fit_scales_for_block(
+        &self,
+        block: &CaptionBlock,
+        surface_width_px: u32,
+        presentation: &CaptionPresentation,
+    ) -> CaptionFitScales {
+        let width_px = self.content_width_px(surface_width_px);
+        let advance_px = DEFAULT_FONT_SIZE_PX * presentation.text_scale.max(0.1);
+        CaptionFitScales {
+            primary: caption_fit_scale(
+                &block.primary_text,
+                width_px,
+                self.primary_line_budget(block),
+                advance_px,
+            ),
+            secondary: if block.secondary_enabled {
+                caption_fit_scale(
+                    &block.secondary_text,
+                    width_px,
+                    1,
+                    advance_px * SECONDARY_FONT_SCALE,
+                )
+            } else {
+                1.0
+            },
+        }
+    }
+
     #[cfg_attr(not(windows), allow(dead_code))]
     pub(crate) fn strip_horizontal_padding_px(&self) -> u32 {
         self.strip_horizontal_padding_px
@@ -168,6 +210,9 @@ impl CaptionLayoutPolicy {
             presentation.text_scale.max(0.1),
             primary_style.style_key,
             secondary_style.style_key,
+            block.fit_scales.unwrap_or_else(|| {
+                self.fit_scales_for_block(block, surface_width_px, presentation)
+            }),
         )
     }
 
@@ -192,6 +237,9 @@ impl CaptionLayoutPolicy {
             presentation.text_scale.max(0.1),
             primary_style_key,
             secondary_style_key,
+            block.fit_scales.unwrap_or_else(|| {
+                self.fit_scales_for_block(block, surface_width_px, presentation)
+            }),
         )
     }
 
@@ -225,7 +273,11 @@ impl CaptionLayoutPolicy {
         let speaker_divider = self.speaker_divider_band(&blocks, surface_width_px, presentation);
         let resolver = FontResolver::default();
 
-        for block in blocks {
+        for mut block in blocks {
+            if block.fit_scales.is_none() {
+                block.fit_scales =
+                    Some(self.fit_scales_for_block(&block, surface_width_px, presentation));
+            }
             let primary_style = style_descriptor_for_text(
                 &resolver,
                 block.primary_language.as_deref(),
@@ -242,6 +294,7 @@ impl CaptionLayoutPolicy {
                 text_scale,
                 primary_style.style_key,
                 secondary_style.style_key,
+                block.fit_scales.expect("caption fitting resolved"),
             );
             let template = self.build_fallback_block_template(
                 &block,
@@ -354,8 +407,23 @@ impl CaptionLayoutPolicy {
         let content_width_px = content_width_px.max(1.0);
         let secondary_row_reserved = self.reserves_secondary_row(block);
         let primary_budget = self.primary_line_budget(block);
-        let primary_font_size_px = DEFAULT_FONT_SIZE_PX * text_scale;
-        let secondary_font_size_px = primary_font_size_px * SECONDARY_FONT_SCALE;
+        let fit_scales = block.fit_scales.unwrap_or_else(|| CaptionFitScales {
+            primary: caption_fit_scale(
+                &block.primary_text,
+                content_width_px,
+                primary_budget,
+                DEFAULT_FONT_SIZE_PX * text_scale,
+            ),
+            secondary: caption_fit_scale(
+                &block.secondary_text,
+                content_width_px,
+                1,
+                DEFAULT_FONT_SIZE_PX * text_scale * SECONDARY_FONT_SCALE,
+            ),
+        });
+        let primary_font_size_px = DEFAULT_FONT_SIZE_PX * text_scale * fit_scales.primary;
+        let secondary_font_size_px =
+            DEFAULT_FONT_SIZE_PX * text_scale * SECONDARY_FONT_SCALE * fit_scales.secondary;
         let primary_line_height_px = self.primary_line_height_px as f32 * text_scale;
         let vertical_padding_px = self.strip_vertical_padding_px as f32 * text_scale;
         let primary_secondary_gap_px = if secondary_row_reserved {
@@ -366,7 +434,11 @@ impl CaptionLayoutPolicy {
         let strip_width_px = content_width_px + self.strip_horizontal_padding_px as f32 * 2.0;
         let block_height_px = self.stable_block_height_px(secondary_row_reserved, text_scale);
         let local_bounds = BlockBounds::new(0.0, 0.0, strip_width_px, block_height_px);
-        let primary_advance_px = self.average_glyph_advance_px as f32 * text_scale;
+        let primary_advance_px =
+            self.average_glyph_advance_px as f32 * text_scale * fit_scales.primary;
+        let secondary_advance_px =
+            self.average_glyph_advance_px as f32 * text_scale * SECONDARY_FONT_SCALE
+                * fit_scales.secondary;
         let wrapped_primary = wrap_text(&block.primary_text, content_width_px, primary_advance_px);
         let truncated_primary = wrapped_primary.len() > primary_budget;
         let primary_lines = wrapped_primary
@@ -396,13 +468,13 @@ impl CaptionLayoutPolicy {
             ellipsize_text(
                 &block.secondary_text,
                 content_width_px,
-                primary_advance_px * SECONDARY_FONT_SCALE,
+                secondary_advance_px,
             )
         } else {
             (None, false)
         };
         let secondary_line = secondary_text.map(|text| {
-            let width_px = measure_text_width(&text, primary_advance_px * SECONDARY_FONT_SCALE);
+            let width_px = measure_text_width(&text, secondary_advance_px);
             let origin_x = self.strip_horizontal_padding_px as f32
                 + ((content_width_px - width_px).max(0.0) * 0.5);
             let origin_y = vertical_padding_px
@@ -451,8 +523,10 @@ impl CaptionLayoutPolicy {
     ) -> Result<CachedBlockLayoutTemplate, windows::core::Error> {
         let secondary_row_reserved = self.reserves_secondary_row(block);
         let primary_budget = self.primary_line_budget(block);
-        let primary_font_size_px = DEFAULT_FONT_SIZE_PX * text_scale;
-        let secondary_font_size_px = primary_font_size_px * SECONDARY_FONT_SCALE;
+        let fit_scales = block.fit_scales.expect("caption fitting resolved");
+        let primary_font_size_px = DEFAULT_FONT_SIZE_PX * text_scale * fit_scales.primary;
+        let secondary_font_size_px =
+            DEFAULT_FONT_SIZE_PX * text_scale * SECONDARY_FONT_SCALE * fit_scales.secondary;
         let primary_line_height_px = self.primary_line_height_px as f32 * text_scale;
         let vertical_padding_px = self.strip_vertical_padding_px as f32 * text_scale;
         let primary_secondary_gap_px = if secondary_row_reserved {
@@ -577,7 +651,11 @@ impl CaptionLayoutPolicy {
         let mut resolved_blocks = Vec::with_capacity(blocks.len());
         let speaker_divider = self.speaker_divider_band(&blocks, surface_width_px, presentation);
 
-        for block in blocks {
+        for mut block in blocks {
+            if block.fit_scales.is_none() {
+                block.fit_scales =
+                    Some(self.fit_scales_for_block(&block, surface_width_px, presentation));
+            }
             let primary_style = engine.resolve_text_style(
                 self,
                 block.primary_language.as_deref(),
@@ -596,6 +674,7 @@ impl CaptionLayoutPolicy {
                 text_scale,
                 primary_style_key,
                 secondary_style_key,
+                block.fit_scales.expect("caption fitting resolved"),
             );
             let template = if let Some(cache) = layout_cache.as_deref_mut() {
                 if let Some(cached) = cache.get(&layout_cache_key) {
@@ -777,24 +856,35 @@ impl DirectWriteLayoutEngine {
         budget: usize,
     ) -> Result<(Vec<String>, bool), windows::core::Error> {
         let mut lines = Vec::new();
-        let mut remaining = text.trim();
-        if remaining.is_empty() {
-            return Ok((vec![String::new()], false));
-        }
-
-        while !remaining.is_empty() && lines.len() < budget {
-            let line =
-                self.longest_fitting_prefix(policy, style, remaining, max_width_px, font_size_px)?;
-            if line.is_empty() {
+        let mut truncated = false;
+        for paragraph in text.trim().lines() {
+            let mut remaining = paragraph.trim();
+            if lines.len() == budget {
+                truncated = true;
                 break;
             }
-            let trimmed_line = line.trim().to_string();
-            lines.push(trimmed_line.clone());
-            remaining = remaining[line.len()..].trim_start();
+            if remaining.is_empty() {
+                lines.push(String::new());
+            }
+            while !remaining.is_empty() && lines.len() < budget {
+                let line =
+                    self.longest_fitting_prefix(policy, style, remaining, max_width_px, font_size_px)?;
+                if line.is_empty() {
+                    break;
+                }
+                lines.push(line.trim().to_string());
+                remaining = remaining[line.len()..].trim_start();
+            }
+            if !remaining.is_empty() {
+                truncated = true;
+                break;
+            }
+        }
+        if lines.is_empty() {
+            lines.push(String::new());
         }
 
-        // Primary rows clip once the reserved line budget is exhausted.
-        Ok((lines, !remaining.is_empty()))
+        Ok((lines, truncated))
     }
 
     fn ellipsize_secondary_text(
@@ -809,21 +899,23 @@ impl DirectWriteLayoutEngine {
         if trimmed.is_empty() {
             return Ok((None, false));
         }
-        if self
-            .measure_centered_line_for_resolved_style(
-                policy,
-                style,
-                trimmed,
-                max_width_px,
-                font_size_px,
-            )?
-            .width_px
-            <= max_width_px
+        let first_line = trimmed.lines().next().unwrap_or("");
+        if first_line.len() == trimmed.len()
+            && self
+                .measure_centered_line_for_resolved_style(
+                    policy,
+                    style,
+                    first_line,
+                    max_width_px,
+                    font_size_px,
+                )?
+                .width_px
+                <= max_width_px
         {
             return Ok((Some(trimmed.to_string()), false));
         }
         Ok((
-            Some(self.ellipsize_text(policy, style, trimmed, max_width_px, font_size_px)?),
+            Some(self.ellipsize_text(policy, style, first_line, max_width_px, font_size_px)?),
             true,
         ))
     }
@@ -1003,10 +1095,10 @@ impl DirectWriteLayoutEngine {
             width_px: metrics.width,
             origin_x_px: metrics.left,
             visual_bounds: VisualBounds::new(
-                metrics.left - overhang.left,
-                -overhang.top,
-                metrics.left + metrics.width + overhang.right,
-                metrics.height + overhang.bottom,
+                metrics.left - overhang.left - TEXT_OUTLINE_OVERHANG_PX,
+                -overhang.top - TEXT_OUTLINE_OVERHANG_PX,
+                metrics.left + metrics.width + overhang.right + TEXT_OUTLINE_OVERHANG_PX,
+                metrics.height + overhang.bottom + TEXT_OUTLINE_OVERHANG_PX,
             ),
         })
     }
@@ -1220,6 +1312,7 @@ fn layout_cache_key_for_block(
     text_scale: f32,
     primary_style_key: TextStyleKey,
     secondary_style_key: TextStyleKey,
+    fit_scales: CaptionFitScales,
 ) -> LayoutCacheKey {
     LayoutCacheKey {
         primary_text: block.primary_text.clone(),
@@ -1231,9 +1324,9 @@ fn layout_cache_key_for_block(
         block_variant: block.block_variant,
         secondary_enabled: block.secondary_enabled,
         secondary_reserved: block_reserves_secondary_row(block),
-        primary_font_size_key: scalar_key(DEFAULT_FONT_SIZE_PX * text_scale),
+        primary_font_size_key: scalar_key(DEFAULT_FONT_SIZE_PX * text_scale * fit_scales.primary),
         secondary_font_size_key: scalar_key(
-            DEFAULT_FONT_SIZE_PX * text_scale * SECONDARY_FONT_SCALE,
+            DEFAULT_FONT_SIZE_PX * text_scale * SECONDARY_FONT_SCALE * fit_scales.secondary,
         ),
         content_width_key: content_width_px.round() as u32,
         text_scale_key: scalar_key(text_scale),
@@ -1435,7 +1528,10 @@ fn ellipsize_text(
     if trimmed.is_empty() {
         return (None, false);
     }
-    if measure_text_width(trimmed, average_glyph_advance_px) <= max_width_px {
+    let first_line = trimmed.lines().next().unwrap_or("");
+    if first_line.len() == trimmed.len()
+        && measure_text_width(first_line, average_glyph_advance_px) <= max_width_px
+    {
         return (Some(trimmed.to_string()), false);
     }
 
@@ -1446,7 +1542,7 @@ fn ellipsize_text(
     }
 
     let mut out = String::new();
-    for ch in trimmed.chars() {
+    for ch in first_line.chars() {
         let candidate = format!("{out}{ch}");
         if measure_text_width(&candidate, average_glyph_advance_px) + ellipsis_width > max_width_px
         {
@@ -1509,10 +1605,39 @@ fn measure_text_width(text: &str, average_glyph_advance_px: f32) -> f32 {
             'a'..='z' => average_glyph_advance_px * 0.62,
             '.' | ',' | ':' | ';' | '\'' | '"' | '!' | '?' | '(' | ')' | '[' | ']' | '{' | '}'
             | '-' | '_' | '/' => average_glyph_advance_px * 0.55,
-            _ if super::types::contains_cjk(&ch.to_string()) => average_glyph_advance_px,
+            _ if matches!(
+                ch as u32,
+                0x3040..=0x30ff
+                    | 0x3400..=0x4dbf
+                    | 0x4e00..=0x9fff
+                    | 0xac00..=0xd7af
+                    | 0xf900..=0xfaff
+            ) => average_glyph_advance_px,
             _ => average_glyph_advance_px * 0.72,
         })
         .sum()
+}
+
+fn caption_fit_scale(
+    text: &str,
+    width_px: f32,
+    line_budget: usize,
+    average_glyph_advance_px: f32,
+) -> f32 {
+    let levels = [1.0, 0.9, 0.8];
+    let mut estimated_widths = [0.0; 3];
+    for paragraph in text.trim().lines() {
+        let estimated_width = measure_text_width(paragraph, average_glyph_advance_px);
+        for (estimate, scale) in estimated_widths.iter_mut().zip(levels) {
+            *estimate += (estimated_width * scale).max(width_px);
+        }
+    }
+    let capacity_px = width_px * line_budget as f32 * 1.10;
+    levels
+        .into_iter()
+        .zip(estimated_widths)
+        .find_map(|(scale, estimate)| (estimate <= capacity_px).then_some(scale))
+        .unwrap_or(0.8)
 }
 
 #[cfg(windows)]

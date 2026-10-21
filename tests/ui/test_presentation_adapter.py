@@ -234,8 +234,6 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     adapter.set_settings_managed_key_state(
         visible=True,
         remaining_percent=50,
-        referral_id="ABC123",
-        pass_status=None,
     )
 
     assert adapter.dashboard_translation_enabled() is False
@@ -268,7 +266,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     ) in events
     assert (
         "managed-key",
-        {"visible": True, "remaining_percent": 50, "referral_id": "ABC123", "pass_status": None},
+        {"visible": True, "remaining_percent": 50},
     ) in events
 
 

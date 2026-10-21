@@ -7,6 +7,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.runtime_logging import (
     RealtimeLogHandler,
     SessionRuntimeLoggingService,
@@ -17,7 +18,7 @@ from puripuly_heart.providers.llm.deepseek import (
     DeepSeekLLMProvider,
     HttpxDeepSeekClient,
 )
-from puripuly_heart.providers.llm.error_details import PROVIDER_ERROR_DETAIL_MAX_LENGTH
+from puripuly_heart.providers.llm.error_details import LLMResponseError
 
 
 @dataclass
@@ -253,13 +254,16 @@ async def test_httpx_deepseek_failure_excludes_arbitrary_body_from_session_sinks
     client._client = httpx.AsyncClient(transport=transport)
 
     try:
-        with pytest.raises(RuntimeError, match=sentinel):
+        with pytest.raises(LLMResponseError) as exc_info:
             await client.translate(
                 text="hello",
                 system_prompt="SYSTEM",
                 source_language="ko",
                 target_language="en",
             )
+        assert exc_info.value.status_code == 502
+        assert sentinel not in str(exc_info.value)
+        runtime_logging.emit_failure(exc_info.value.failure_diagnostics)
         await client.close()
         runtime_logging.close()
         sinks.close()
@@ -273,9 +277,8 @@ async def test_httpx_deepseek_failure_excludes_arbitrary_body_from_session_sinks
             ("file", persisted),
         ):
             assert sentinel not in rendered, target
-            assert "DeepSeek request failed" in rendered, target
-            assert "status=502" in rendered, target
-            assert "code=provider.service_unavailable" in rendered, target
+            assert "provider.llm" in rendered, target
+            assert "provider.service_unavailable" in rendered, target
     finally:
         await client.close()
         runtime_logging.close()
@@ -297,13 +300,20 @@ async def test_httpx_deepseek_client_logs_safe_request_failure(
     client = HttpxDeepSeekClient(api_key="k", model="m", base_url="https://example")
 
     with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.deepseek"):
-        with pytest.raises(RuntimeError, match="status=503 message=upstream unavailable"):
+        with pytest.raises(LLMResponseError) as exc_info:
             await client.translate(
                 text="hello",
                 system_prompt="SYSTEM",
                 source_language="ko",
                 target_language="en",
             )
+    assert exc_info.value.status_code == 503
+    assert (
+        provider_failure_report(
+            exc_info.value, provider="deepseek", operation="translate"
+        ).diagnostics.category
+        == "service_unavailable"
+    )
 
     rendered_logs = "\n".join(caplog.messages)
     assert raw_detail not in rendered_logs
@@ -313,20 +323,19 @@ async def test_httpx_deepseek_client_logs_safe_request_failure(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("response_data", "response_text", "expected"),
+    ("response_data", "response_text"),
     [
-        ({"message": "top level detail"}, "ignored text", "top level detail"),
-        ({"error": {"message": "nested detail"}}, "ignored text", "nested detail"),
-        ({"error": "string detail"}, "ignored text", "string detail"),
-        ({"detail": "not used"}, "plain text preview", "plain text preview"),
-        ({}, "", "unknown error"),
+        ({"message": "top level detail"}, "ignored text"),
+        ({"error": {"message": "nested detail"}}, "ignored text"),
+        ({"error": "string detail"}, "ignored text"),
+        ({"detail": "not used"}, "plain text preview"),
+        ({}, ""),
     ],
 )
-async def test_httpx_deepseek_client_non_200_extracts_safe_detail_order(
+async def test_httpx_deepseek_client_non_200_keeps_status_without_body(
     monkeypatch,
     response_data: dict,
     response_text: str,
-    expected: str,
 ) -> None:
     fake_client = FakeAsyncClient(
         response_status=400,
@@ -337,35 +346,40 @@ async def test_httpx_deepseek_client_non_200_extracts_safe_detail_order(
 
     client = HttpxDeepSeekClient(api_key="test-key", model="m", base_url="https://example")
 
-    with pytest.raises(RuntimeError) as exc_info:
+    with pytest.raises(LLMResponseError) as exc_info:
         await client.translate(
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
     rendered_error = str(exc_info.value)
-    assert rendered_error == f"DeepSeek request failed (status=400 message={expected})"
-    assert "ignored text" not in rendered_error
+    assert exc_info.value.status_code == 400
+    assert (
+        provider_failure_report(
+            exc_info.value, provider="deepseek", operation="translate"
+        ).diagnostics.category
+        == "invalid_response"
+    )
+    assert response_text not in rendered_error or not response_text
+    assert "top level detail" not in rendered_error
+    assert "nested detail" not in rendered_error
+    assert "string detail" not in rendered_error
 
 
 @pytest.mark.asyncio
-async def test_httpx_deepseek_client_non_200_detail_is_bounded_and_redacted(
+async def test_httpx_deepseek_client_non_200_body_is_not_collected(
     monkeypatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     secret = "deepseek-api-key-123"
     full_payload_tail = "TAIL_SHOULD_NOT_APPEAR"
-    raw_text = (
-        f"response body token={secret} Bearer {secret} "
-        + "x" * (PROVIDER_ERROR_DETAIL_MAX_LENGTH + 40)
-        + full_payload_tail
-    )
+    raw_text = f"response body token={secret} Bearer {secret} " + "x" * 300 + full_payload_tail
     fake_client = FakeAsyncClient(response_status=502, response_data={}, response_text=raw_text)
     monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
 
     client = HttpxDeepSeekClient(api_key=secret, model="m", base_url="https://example")
 
     with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.deepseek"):
-        with pytest.raises(RuntimeError) as exc_info:
+        with pytest.raises(LLMResponseError) as exc_info:
             await client.translate(
                 text="request body text",
                 system_prompt="SYSTEM",
@@ -376,11 +390,16 @@ async def test_httpx_deepseek_client_non_200_detail_is_bounded_and_redacted(
     rendered = str(exc_info.value) + "\n" + "\n".join(caplog.messages)
     assert secret not in rendered
     assert f"Bearer {secret}" not in rendered
-    assert "token=[redacted]" in rendered
+    assert raw_text not in rendered
     assert "request body text" not in rendered
     assert full_payload_tail not in rendered
-    detail = str(exc_info.value).split("message=", 1)[1].removesuffix(")")
-    assert len(detail) <= PROVIDER_ERROR_DETAIL_MAX_LENGTH
+    assert exc_info.value.status_code == 502
+    assert (
+        provider_failure_report(
+            exc_info.value, provider="deepseek", operation="translate"
+        ).diagnostics.category
+        == "service_unavailable"
+    )
 
 
 @pytest.mark.asyncio

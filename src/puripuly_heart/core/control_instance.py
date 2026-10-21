@@ -11,7 +11,7 @@ import uuid
 from ctypes import wintypes
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, TextIO
 
 
 class InstanceAlreadyRunning(RuntimeError):
@@ -37,6 +37,12 @@ _FILE_ALL_ACCESS = 0x1F01FF
 _LOCKFILE_FAIL_IMMEDIATELY = 1
 _LOCKFILE_EXCLUSIVE_LOCK = 2
 _ERROR_LOCK_VIOLATION = 33
+_GENERIC_READ = 0x80000000
+_FILE_SHARE_READ = 1
+_FILE_SHARE_WRITE = 2
+_FILE_SHARE_DELETE = 4
+_OPEN_EXISTING = 3
+_FILE_ATTRIBUTE_NORMAL = 0x80
 _local_leases: set[str] = set()
 _local_leases_lock = threading.Lock()
 
@@ -78,6 +84,16 @@ class _WindowsSecurity:
         self.kernel.GetCurrentProcess.restype = ctypes.c_void_p
         self.kernel.LocalFree.argtypes = [ctypes.c_void_p]
         self.kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+        self.kernel.CreateFileW.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            ctypes.c_void_p,
+        ]
+        self.kernel.CreateFileW.restype = ctypes.c_void_p
         self.kernel.LockFileEx.argtypes = [
             ctypes.c_void_p,
             wintypes.DWORD,
@@ -183,6 +199,29 @@ class _WindowsSecurity:
 
     def close(self) -> None:
         self.kernel.LocalFree(self.descriptor)
+
+    def open_record(self, path: Path) -> TextIO:
+        handle = self.kernel.CreateFileW(
+            str(path),
+            _GENERIC_READ,
+            _FILE_SHARE_READ | _FILE_SHARE_WRITE | _FILE_SHARE_DELETE,
+            None,
+            _OPEN_EXISTING,
+            _FILE_ATTRIBUTE_NORMAL,
+            None,
+        )
+        if handle in (None, ctypes.c_void_p(-1).value):
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            descriptor = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_NOINHERIT)
+        except BaseException:
+            self.kernel.CloseHandle(handle)
+            raise
+        try:
+            return os.fdopen(descriptor, "r", encoding="utf-8")
+        except BaseException:
+            os.close(descriptor)
+            raise
 
     def protect(self, path: Path) -> None:
         if not self.advapi.SetFileSecurityW(
@@ -325,7 +364,8 @@ def _record(path: Path, security: _WindowsSecurity, *, temporary: bool = False) 
     if not path.is_file() or path.stat().st_size > 4096:
         raise InstanceSecurityError("Instance record is not a bounded regular file")
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        with security.open_record(path) as reader:
+            data = json.load(reader)
     except (UnicodeError, ValueError) as exc:
         raise InstanceSecurityError("Instance record is invalid") from exc
     if not isinstance(data, dict) or set(data) != {"port", "token", "instance_id", "settings_path"}:
@@ -505,7 +545,8 @@ def discover_instances() -> list[dict[str, str | int]]:
         for path in root.glob("*.json"):
             try:
                 record = _record(path, security)
-                settings_path = json.loads(path.read_text(encoding="utf-8"))["settings_path"]
+                with security.open_record(path) as reader:
+                    settings_path = json.load(reader)["settings_path"]
                 if discover(Path(settings_path)) != record:
                     continue
             except OSError, ValueError, InstanceSecurityError, KeyError:

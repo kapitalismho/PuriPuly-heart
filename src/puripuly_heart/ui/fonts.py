@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -86,6 +87,23 @@ _LOCALE_LETTER_SPACING_PX = {
 def locale_body_letter_spacing(locale: str | None) -> float | None:
     base = (locale or "").split("-")[0].lower()
     return _LOCALE_LETTER_SPACING_PX.get(base)
+
+
+@dataclass(frozen=True)
+class TypeFace:
+    font_family: str | None
+    letter_spacing: float | None
+
+
+LOG_TYPEFACE = TypeFace("Consolas", 0)
+
+
+def typeface_for_language(code: str | None) -> TypeFace:
+    return TypeFace(font_for_language(code), locale_body_letter_spacing(code))
+
+
+def metrics_strut_typeface() -> TypeFace:
+    return TypeFace(default_font_family(), 0)
 
 
 def font_for_language(code: str | None) -> str | None:

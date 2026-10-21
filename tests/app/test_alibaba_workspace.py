@@ -197,7 +197,6 @@ async def test_apply_switches_regions_and_can_explicitly_return_to_shared() -> N
     assert len(applied) == 2
 
 
-
 @pytest.mark.asyncio
 async def test_runtime_plan_replaces_only_affected_qwen_clients() -> None:
     initial = AppSettingsVNext()
@@ -237,12 +236,11 @@ async def test_runtime_plan_replaces_only_affected_qwen_clients() -> None:
     owner = ProviderRuntimeOwner(
         state_provider=lambda _: ProviderRuntimeState(True, True, True, True, True, True),
         common_effect=lambda _: events.append("settings"),
-        rebuild_llm=lambda: record("llm"),
+        rebuild_llm=lambda _settings: record("llm"),
         recover_gpu=lambda _settings, _plan: record("gpu"),
-        refresh_peer=lambda: record("peer"),
-        refresh_self_stt=lambda: record("self"),
+        refresh_peer=lambda _settings: record("peer"),
+        refresh_self_stt=lambda _settings: record("self"),
         signature_sink=lambda _: events.append("signatures"),
-        llm_retry_sink=lambda: events.append("retry"),
         current_settings_provider=lambda: previous,
         signature_cache_provider=lambda: (
             self_signature(previous),

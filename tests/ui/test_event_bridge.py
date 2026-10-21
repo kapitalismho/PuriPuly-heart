@@ -20,6 +20,7 @@ from puripuly_heart.core.managed_openrouter_release import (
 from puripuly_heart.core import messages
 from puripuly_heart.core.runtime_logging import (
     RealtimeLogHandler,
+    RuntimeLoggingSinks,
     SessionRuntimeLoggingService,
 )
 from puripuly_heart.domain.events import STTSessionState, UIEvent, UIEventType
@@ -260,7 +261,9 @@ async def test_event_bridge_reports_started_only_after_run_loop_entry() -> None:
 
 
 @pytest.mark.asyncio
-async def test_event_bridge_failure_log_identifies_event_without_payload() -> None:
+async def test_event_bridge_failure_log_identifies_event_without_payload(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     app = DummyApp()
     queue: asyncio.Queue[UIEvent] = asyncio.Queue()
     runtime_logging = RuntimeLoggingCapture()
@@ -283,15 +286,26 @@ async def test_event_bridge_failure_log_identifies_event_without_payload() -> No
     task.cancel()
     await asyncio.gather(task, return_exceptions=True)
 
-    assert runtime_logging.basic_messages == [
-        (
-            logging.ERROR,
-            "A user interface event failed · Event TRANSCRIPT_FINAL · Cause AttributeError",
-        )
-    ]
-    message = runtime_logging.basic_messages[0][1]
-    assert "secret" not in message
-    assert "private transcript text" not in message
+    from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE, normalize_diagnostic
+
+    failures = [getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE, None) for record in caplog.records]
+    diagnostics, severity, disposition, stage, exception = next(
+        value for value in failures if value is not None
+    )
+    projection = normalize_diagnostic(
+        diagnostics,
+        instance_id=None,
+        severity=severity,
+        disposition=disposition,
+        stage=stage,
+        exception=exception,
+    )
+    assert projection["code"] == "destination_publish_failed"
+    assert projection["fields"]["destination"] == "dashboard"
+    assert projection["fields"]["exception_class"] == "AttributeError"
+    assert projection["disposition"] == "degraded"
+    assert "secret" not in repr(projection)
+    assert "private transcript text" not in repr(projection)
 
 
 def test_event_mapping_is_testable_without_view_mutation() -> None:
@@ -1121,12 +1135,12 @@ async def test_event_bridge_does_not_log_dashboard_translation_applied_when_sett
     )
     translation = Translation(utterance_id=uuid4(), text="translated", channel="self")
 
-    with pytest.raises(RuntimeError, match="dashboard setter failed"):
-        await bridge._handle_event(
-            UIEvent(type=UIEventType.TRANSLATION_DONE, payload=translation, source="Mic")
-        )
+    await bridge._handle_event(
+        UIEvent(type=UIEventType.TRANSLATION_DONE, payload=translation, source="Mic")
+    )
 
-    assert app.history == []
+    assert app.history
+    assert app.history[0][1] == translation.text
     assert runtime_logging.detailed_calls == []
     assert runtime_logging.basic_messages == []
 
@@ -1148,7 +1162,7 @@ async def test_event_bridge_handles_error_and_soniox_shutdown_suppression(tmp_pa
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=root_logger,
         session_logger=session_logger,
-        sinks=SimpleNamespace(
+        sinks=RuntimeLoggingSinks(
             stream_handler=stream_handler,
             file_handler=file_handler,
             log_file=log_file,
@@ -1202,7 +1216,7 @@ async def test_event_bridge_skips_duplicate_runtime_log_for_already_logged_error
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=root_logger,
         session_logger=session_logger,
-        sinks=SimpleNamespace(
+        sinks=RuntimeLoggingSinks(
             stream_handler=stream_handler,
             file_handler=file_handler,
             log_file=log_file,

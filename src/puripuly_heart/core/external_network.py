@@ -11,6 +11,18 @@ from typing import Mapping
 from urllib.parse import urlsplit
 
 
+class NetworkConfigurationError(OSError):
+    def __init__(self, code: str, *, fields: Mapping[str, str] | None = None) -> None:
+        super().__init__(code)
+        self.code = code
+        self.diagnostic_transport_fields = {
+            "configuration_error": code,
+            "stage": "client_configuration",
+            "dispatch_certainty": "not_dispatched",
+            **(fields or {}),
+        }
+
+
 @dataclass(frozen=True)
 class TLSSelection:
     context: ssl.SSLContext
@@ -18,7 +30,9 @@ class TLSSelection:
     backend: str
 
 
-def select_tls(*, requests: bool = False, environment: Mapping[str, str] | None = None) -> TLSSelection:
+def select_tls(
+    *, requests: bool = False, environment: Mapping[str, str] | None = None
+) -> TLSSelection:
     environment = os.environ if environment is None else environment
     choices = (
         (("REQUESTS_CA_BUNDLE", "requests_bundle"), ("CURL_CA_BUNDLE", "curl_bundle"))
@@ -29,14 +43,20 @@ def select_tls(*, requests: bool = False, environment: Mapping[str, str] | None 
         value = environment.get(name)
         if not value:
             continue
-        path = Path(value)
-        directory = source == "explicit_directory" or (requests and path.is_dir())
-        if directory:
-            if not path.is_dir():
-                raise FileNotFoundError(value)
-            context = ssl.create_default_context(capath=value)
-        else:
-            context = ssl.create_default_context(cafile=value)
+        try:
+            path = Path(value)
+            directory = source == "explicit_directory" or (requests and path.is_dir())
+            if directory:
+                if not path.is_dir():
+                    raise FileNotFoundError
+                context = ssl.create_default_context(capath=value)
+            else:
+                context = ssl.create_default_context(cafile=value)
+        except (OSError, ValueError) as exc:
+            raise NetworkConfigurationError(
+                "invalid_tls_configuration",
+                fields={"tls_source": source, "tls_backend": "openssl"},
+            ) from exc
         return TLSSelection(context, source, "openssl")
     if sys.platform == "win32":
         import truststore
@@ -134,12 +154,48 @@ class ProxyPolicy:
         return ProxyRoute(None, "direct")
 
 
-def annotate_connection_error(exc: Exception, *, url: str, tls: TLSSelection, route: ProxyRoute) -> None:
+def validate_http_proxy(route: ProxyRoute) -> None:
+    if route.url is None:
+        return
+    try:
+        proxy = urlsplit(route.url)
+        if proxy.scheme.lower() not in {"http", "https", "socks5", "socks5h"}:
+            raise NetworkConfigurationError("unsupported_proxy_configuration")
+        if not proxy.hostname or proxy.port is None and proxy.netloc.endswith(":"):
+            raise ValueError
+    except ValueError as exc:
+        raise NetworkConfigurationError("invalid_proxy_configuration") from exc
+
+
+def connection_diagnostic_fields(
+    *, url: str, tls: TLSSelection, route: ProxyRoute
+) -> dict[str, str]:
     scheme = urlsplit(url).scheme.lower()
-    secure = scheme in ("https", "wss") or bool(route.url and urlsplit(route.url).scheme == "https")
-    exc.connection_diagnostics = {
+    secure = scheme in ("https", "wss") or bool(
+        route.url and route.url.lower().startswith("https:")
+    )
+    return {
         "transport": scheme if scheme in ("http", "https", "ws", "wss") else "unknown",
         "tls_source": tls.source if secure else "none",
         "tls_backend": tls.backend if secure else "none",
         "proxy_source": route.source,
     }
+
+
+def annotate_connection_error(
+    exc: Exception,
+    *,
+    url: str,
+    tls: TLSSelection,
+    route: ProxyRoute,
+    stage: str = "request_send",
+    dispatch_certainty: str = "possible",
+    http_status: int | None = None,
+) -> None:
+    exc.connection_diagnostics = connection_diagnostic_fields(url=url, tls=tls, route=route)
+    fields = dict(getattr(exc, "diagnostic_transport_fields", {}))
+    fields.setdefault("stage", stage)
+    fields.setdefault("dispatch_certainty", dispatch_certainty)
+    if http_status is not None:
+        fields["http_status"] = http_status
+    exc.diagnostic_transport_fields = fields

@@ -26,7 +26,9 @@ from puripuly_heart.app.ports.gpu_worker import (
     GpuWorkerRequestError,
     GpuWorkerTranscription,
 )
+from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.runtime_layout import current_runtime_layout
 
 GPU_WORKER_CONTRACT_VERSION = 2
@@ -35,6 +37,17 @@ _MAX_FRAME_BYTES = 4 * 1024 * 1024
 _STDERR_FAILURE_FLUSH_SECONDS = 0.05
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(slots=True)
+class _StartupCleanupDebt:
+    server: asyncio.AbstractServer | None
+    temporary_directory: tempfile.TemporaryDirectory[str]
+    process: asyncio.subprocess.Process | None = None
+    server_closed: bool = False
+    temporary_directory_closed: bool = False
+    failures: tuple[dict[str, object], ...] = ()
+    primary_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(slots=True)
@@ -47,11 +60,108 @@ class DefaultGpuWorkerProcessFactory(GpuWorkerProcessFactoryPort):
     heartbeat_timeout_s: float = 3.0
     cooperative_shutdown_s: float = 2.0
     terminate_grace_s: float = 1.0
+    _startup_cleanup_debt: list[_StartupCleanupDebt] = field(default_factory=list, repr=False)
+    _startup_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
-    async def start(self, *, mode: GpuWorkerMode) -> GpuWorkerClientPort:
+    def startup_cleanup_snapshot(self) -> dict[str, object]:
+        return {
+            "pending_startups": len(self._startup_cleanup_debt),
+            "close_complete": not self._startup_cleanup_debt,
+            "cleanup_failures": [
+                dict(failure) for debt in self._startup_cleanup_debt for failure in debt.failures
+            ],
+        }
+
+    async def close_pending_startups(self) -> None:
+        failures: list[dict[str, object]] = []
+        for debt in tuple(self._startup_cleanup_debt):
+            await self._cleanup_startup(debt)
+            failures.extend(debt.failures)
+            if (
+                debt.server_closed
+                and debt.temporary_directory_closed
+                and (debt.process is None or debt.process.returncode is not None)
+            ):
+                self._startup_cleanup_debt.remove(debt)
+        if self._startup_cleanup_debt:
+            raise GpuWorkerClosedError(
+                "worker startup cleanup incomplete",
+                code="startup_cleanup_failed",
+                cleanup_failures=tuple(failures),
+                cleanup_complete=False,
+            )
+
+    async def _cleanup_startup(self, debt: _StartupCleanupDebt) -> None:
+        failures: list[dict[str, object]] = []
+        if not debt.server_closed:
+            try:
+                if debt.server is not None:
+                    debt.server.close()
+                    await debt.server.wait_closed()
+                debt.server_closed = True
+            except Exception as exc:
+                failures.append(
+                    _gpu_cleanup_failure("server_close", exc, cause=debt.primary_diagnostics)
+                )
+        if debt.process is not None and debt.process.returncode is None:
+            try:
+                await _terminate_process(debt.process, terminate_grace_s=self.terminate_grace_s)
+            except Exception as exc:
+                failures.append(
+                    _gpu_cleanup_failure("process_terminate", exc, cause=debt.primary_diagnostics)
+                )
+        if debt.process is None or debt.process.returncode is not None:
+            try:
+                debt.temporary_directory.cleanup()
+                debt.temporary_directory_closed = True
+            except Exception as exc:
+                failures.append(
+                    _gpu_cleanup_failure("temp_cleanup", exc, cause=debt.primary_diagnostics)
+                )
+        debt.failures = tuple(failures)
+
+    async def start(
+        self,
+        *,
+        mode: GpuWorkerMode,
+        operation_id: str | None = None,
+        request_id: str | None = None,
+    ) -> GpuWorkerClientPort:
+        async with self._startup_lock:
+            return await self._start_owned(
+                mode=mode,
+                operation_id=operation_id,
+                request_id=request_id,
+            )
+
+    async def _start_owned(
+        self,
+        *,
+        mode: GpuWorkerMode,
+        operation_id: str | None,
+        request_id: str | None,
+    ) -> GpuWorkerClientPort:
+        if self._startup_cleanup_debt:
+            raise GpuWorkerClosedError(
+                "worker startup cleanup incomplete",
+                code="startup_cleanup_failed",
+                cleanup_complete=False,
+            )
         executable = self.executable_path or self.resolve_default_executable()
         if not executable.is_file():
-            raise FileNotFoundError(executable)
+            error = GpuWorkerClosedError(
+                "worker executable unavailable", code="worker_executable_missing"
+            )
+            missing = FileNotFoundError(executable)
+            error.__cause__ = missing
+            error.failure_diagnostics = _emit_gpu_failure(
+                error.code,
+                stage="startup",
+                exception=error,
+                operation_id=operation_id,
+                request_id=request_id,
+            )
+            raise error from missing
         session_id = uuid4().hex
         auth_token = secrets.token_hex(32)
         temporary_directory = tempfile.TemporaryDirectory(prefix="puripuly-gpu-worker-")
@@ -66,35 +176,37 @@ class DefaultGpuWorkerProcessFactory(GpuWorkerProcessFactoryPort):
         ) -> None:
             connection_queue.put_nowait((reader, writer))
 
-        server = await asyncio.start_server(
-            accept_connection,
-            host="127.0.0.1",
-            port=0,
-            limit=_MAX_FRAME_BYTES + 1,
-        )
-        socket = server.sockets[0] if server.sockets else None
-        if socket is None:
-            server.close()
-            await server.wait_closed()
-            temporary_directory.cleanup()
-            raise GpuWorkerClosedError("worker listener did not bind")
-        port = int(socket.getsockname()[1])
-        manifest = {
-            "contract_version": GPU_WORKER_CONTRACT_VERSION,
-            "session_id": session_id,
-            "auth_token": auth_token,
-            "connect_host": "127.0.0.1",
-            "connect_port": port,
-            "heartbeat_interval_ms": self.heartbeat_interval_ms,
-            "mode": mode,
-        }
-        manifest_path.write_text(
-            json.dumps(manifest, ensure_ascii=True, separators=(",", ":")),
-            encoding="utf-8",
-        )
-        os.chmod(manifest_path, 0o600)
+        debt = _StartupCleanupDebt(None, temporary_directory)
+        self._startup_cleanup_debt.append(debt)
         process: asyncio.subprocess.Process | None = None
         try:
+            server = await asyncio.start_server(
+                accept_connection,
+                host="127.0.0.1",
+                port=0,
+                limit=_MAX_FRAME_BYTES + 1,
+            )
+            debt.server = server
+            socket = server.sockets[0] if server.sockets else None
+            if socket is None:
+                raise GpuWorkerClosedError(
+                    "worker listener did not bind", code="listener_bind_failed"
+                )
+            port = int(socket.getsockname()[1])
+            manifest = {
+                "contract_version": GPU_WORKER_CONTRACT_VERSION,
+                "session_id": session_id,
+                "auth_token": auth_token,
+                "connect_host": "127.0.0.1",
+                "connect_port": port,
+                "heartbeat_interval_ms": self.heartbeat_interval_ms,
+                "mode": mode,
+            }
+            manifest_path.write_text(
+                json.dumps(manifest, ensure_ascii=True, separators=(",", ":")),
+                encoding="utf-8",
+            )
+            os.chmod(manifest_path, 0o600)
             process = await asyncio.create_subprocess_exec(
                 *self.command_prefix,
                 str(executable),
@@ -104,23 +216,59 @@ class DefaultGpuWorkerProcessFactory(GpuWorkerProcessFactoryPort):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
+            debt.process = process
             reader, writer = await self._accept_authenticated_connection(
                 connection_queue,
                 session_id=session_id,
                 auth_token=auth_token,
                 process=process,
             )
-        except BaseException:
-            server.close()
-            await server.wait_closed()
-            if process is not None:
-                await _terminate_process(
-                    process,
-                    terminate_grace_s=self.terminate_grace_s,
+        except BaseException as primary:
+            debt.primary_diagnostics = _emit_gpu_failure(
+                (
+                    primary.code
+                    if isinstance(primary, GpuWorkerClosedError)
+                    else (
+                        "worker_startup_cancelled"
+                        if isinstance(primary, asyncio.CancelledError)
+                        else "worker_startup_failed"
+                    )
+                ),
+                stage="startup",
+                exception=primary,
+                fields={
+                    "worker_session_id": session_id,
+                    **({"exit_code": process.returncode} if process else {}),
+                },
+                severity="info" if isinstance(primary, asyncio.CancelledError) else "error",
+                disposition=(
+                    "cancelled" if isinstance(primary, asyncio.CancelledError) else "failed"
+                ),
+                operation_id=operation_id,
+                request_id=request_id,
+            )
+            await self._cleanup_startup(debt)
+            complete = (
+                debt.server_closed
+                and debt.temporary_directory_closed
+                and (process is None or process.returncode is not None)
+            )
+            if complete:
+                self._startup_cleanup_debt.remove(debt)
+            if isinstance(primary, GpuWorkerClosedError):
+                primary.cleanup_failures = debt.failures
+                primary.cleanup_complete = complete
+                primary.failure_diagnostics = debt.primary_diagnostics
+            if not complete:
+                _emit_gpu_failure(
+                    "startup_cleanup_failed",
+                    stage="cleanup",
+                    fields={"close_complete": False, "evidence_state": "incomplete"},
+                    cause=debt.primary_diagnostics,
                 )
-            temporary_directory.cleanup()
             raise
         server.close()
+        self._startup_cleanup_debt.remove(debt)
         return _DefaultGpuWorkerClient(
             process=process,
             server=server,
@@ -151,7 +299,9 @@ class DefaultGpuWorkerProcessFactory(GpuWorkerProcessFactoryPort):
             while True:
                 remaining = deadline - loop.time()
                 if remaining <= 0:
-                    raise GpuWorkerClosedError("worker authentication timed out")
+                    raise GpuWorkerClosedError(
+                        "worker authentication timed out", code="authentication_timeout"
+                    )
                 attempt += 1
                 connection_wait = start_lifecycle_task(
                     scope,
@@ -165,10 +315,14 @@ class DefaultGpuWorkerProcessFactory(GpuWorkerProcessFactoryPort):
                 )
                 if process_wait in done:
                     raise GpuWorkerClosedError(
-                        f"worker exited before authentication with code {process_wait.result()}"
+                        f"worker exited before authentication with code {process_wait.result()}",
+                        code="worker_process_exited",
+                        exit_code=process_wait.result(),
                     )
                 if connection_wait not in done:
-                    raise GpuWorkerClosedError("worker authentication timed out")
+                    raise GpuWorkerClosedError(
+                        "worker authentication timed out", code="authentication_timeout"
+                    )
                 reader, writer = connection_wait.result()
                 remaining = deadline - loop.time()
                 if remaining <= 0:
@@ -273,6 +427,14 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
     _stderr_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _closed: bool = field(init=False, default=False, repr=False)
     _closing: bool = field(init=False, default=False, repr=False)
+    _writer_closed: bool = field(init=False, default=False, repr=False)
+    _server_closed: bool = field(init=False, default=False, repr=False)
+    _tasks_closed: bool = field(init=False, default=False, repr=False)
+    _temporary_directory_closed: bool = field(init=False, default=False, repr=False)
+    _cleanup_failures: tuple[dict[str, object], ...] = field(init=False, default=())
+    _terminal_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
+    _close_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _writer_close_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
         self._scope = LifecycleScope(f"gpu-worker-client-{self.session_id}")
@@ -304,7 +466,7 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
 
     @property
     def is_closed(self) -> bool:
-        return self._closed
+        return self._close_complete.is_set()
 
     @property
     def temporary_directory_path(self) -> Path:
@@ -391,65 +553,166 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
     async def close(self) -> None:
         if self._close_complete.is_set():
             return
+        if self._close_task is None or self._close_task.done():
+            self._close_task = asyncio.create_task(self._close_once(), name="gpu-worker-close")
         try:
-            await asyncio.shield(self._close_once())
+            await asyncio.shield(self._close_task)
         except asyncio.CancelledError:
-            await self._close_once()
+            await asyncio.shield(self._close_task)
             raise
 
     async def force_close(self) -> None:
-        self._closing = True
-        self._closed = True
-        self._fail_pending(GpuWorkerClosedError("worker client force-closed"))
-        if self.process.returncode is None:
-            await _terminate_process(
-                self.process,
-                terminate_grace_s=self.terminate_grace_s,
-            )
-        await _close_writer(self.writer)
-        self.server.close()
-        await self.server.wait_closed()
-        await self._scope.close()
-        self.temporary_directory.cleanup()
-        self._closing = False
-        self._close_complete.set()
+        close_task = self._close_task
+        if close_task is not None and not close_task.done():
+            close_task.cancel()
+            await asyncio.gather(close_task, return_exceptions=True)
+        await self._close_once(force=True)
 
-    async def _close_once(self) -> None:
+    def lifecycle_receipt(self) -> dict[str, object]:
+        return {
+            "session_id": self.session_id,
+            "ingress_closed": self._closed,
+            "close_complete": self._close_complete.is_set(),
+            "exit_code": self.process.returncode,
+            "primary_code": self._terminal_error.code if self._terminal_error else None,
+            "cleanup_failures": [dict(failure) for failure in self._cleanup_failures],
+            "writer_closed": self._writer_closed,
+            "server_closed": self._server_closed,
+            "tasks_closed": self._tasks_closed,
+            "temporary_directory_closed": self._temporary_directory_closed,
+        }
+
+    async def _close_once(self, *, force: bool = False) -> None:
         async with self._close_lock:
             if self._close_complete.is_set():
                 return
             self._closing = True
+            if self._terminal_diagnostics is None and self._terminal_error is not None:
+                self._terminal_diagnostics = _emit_gpu_failure(
+                    self._terminal_error.code,
+                    stage="runtime",
+                    fields={
+                        "worker_session_id": self.session_id,
+                        "exit_code": self._terminal_error.exit_code,
+                    },
+                    exception=self._terminal_error,
+                )
             self._closed = True
+            failures: list[dict[str, object]] = []
             try:
-                self._fail_pending(GpuWorkerClosedError("worker client closed"))
+                self._fail_pending(
+                    self._terminal_error or GpuWorkerClosedError("worker client closed")
+                )
                 if self.process.returncode is None:
                     try:
-                        await self._send(
-                            {
-                                "type": "shutdown",
-                                "request_id": uuid4().hex,
-                            },
-                            allow_closing=True,
+                        if force:
+                            await _terminate_process(
+                                self.process, terminate_grace_s=self.terminate_grace_s
+                            )
+                        else:
+                            try:
+                                await self._send(
+                                    {"type": "shutdown", "request_id": uuid4().hex},
+                                    allow_closing=True,
+                                )
+                            except GpuWorkerClosedError:
+                                pass
+                            try:
+                                await asyncio.wait_for(
+                                    self.process.wait(), timeout=self.cooperative_shutdown_s
+                                )
+                            except TimeoutError:
+                                await _terminate_process(
+                                    self.process, terminate_grace_s=self.terminate_grace_s
+                                )
+                    except Exception as exc:
+                        failures.append(
+                            _gpu_cleanup_failure(
+                                "process_terminate" if force else "process_wait",
+                                exc,
+                                cause=self._terminal_diagnostics,
+                            )
                         )
-                    except GpuWorkerClosedError:
-                        pass
+                for stage, closed, close in (
+                    ("writer_close", self._writer_closed, self._close_writer_resource),
+                    ("server_close", self._server_closed, self._close_server_resource),
+                    ("task_close", self._tasks_closed, self._close_task_resources),
+                ):
+                    if closed:
+                        continue
                     try:
-                        await asyncio.wait_for(
-                            self.process.wait(),
-                            timeout=self.cooperative_shutdown_s,
+                        await close()
+                    except Exception as exc:
+                        failures.append(
+                            _gpu_cleanup_failure(stage, exc, cause=self._terminal_diagnostics)
                         )
-                    except TimeoutError:
-                        await _terminate_process(
-                            self.process,
-                            terminate_grace_s=self.terminate_grace_s,
+                if self.process.returncode is not None and not self._temporary_directory_closed:
+                    try:
+                        self.temporary_directory.cleanup()
+                        self._temporary_directory_closed = True
+                    except Exception as exc:
+                        failures.append(
+                            _gpu_cleanup_failure(
+                                "temp_cleanup", exc, cause=self._terminal_diagnostics
+                            )
                         )
-                await _close_writer(self.writer)
-                await self.server.wait_closed()
-                await self._scope.close()
+                self._cleanup_failures = tuple(failures)
+                complete = (
+                    self.process.returncode is not None
+                    and self._writer_closed
+                    and self._server_closed
+                    and self._tasks_closed
+                    and self._temporary_directory_closed
+                )
+                if complete:
+                    self._close_complete.set()
+                if failures or not complete:
+                    raise GpuWorkerClosedError(
+                        "worker cleanup incomplete",
+                        code="worker_cleanup_failed",
+                        exit_code=self.process.returncode,
+                        cleanup_failures=tuple(failures),
+                        cleanup_complete=complete,
+                    ) from self._terminal_error
             finally:
-                self.temporary_directory.cleanup()
                 self._closing = False
-                self._close_complete.set()
+
+    async def _close_writer_resource(self) -> None:
+        socket_resource = self.writer.get_extra_info("socket")
+        self.writer.close()
+        task = self._writer_close_task
+        if task is None:
+            task = asyncio.create_task(self.writer.wait_closed(), name="gpu-worker-writer-close")
+            task.add_done_callback(_retrieve_writer_close_exception)
+            self._writer_close_task = task
+        try:
+            await asyncio.wait_for(
+                asyncio.shield(task),
+                timeout=max(0.1, self.terminate_grace_s),
+            )
+        except OSError as exc:
+            if socket_resource is None or socket_resource.fileno() != -1:
+                raise
+            _emit_gpu_failure(
+                "worker_transport_closed_with_error",
+                stage="writer_close",
+                fields={"worker_session_id": self.session_id},
+                exception=exc,
+                cause=self._terminal_diagnostics,
+                severity="warning",
+                disposition="degraded",
+            )
+        self._writer_closed = True
+        self._writer_close_task = None
+
+    async def _close_server_resource(self) -> None:
+        self.server.close()
+        await self.server.wait_closed()
+        self._server_closed = True
+
+    async def _close_task_resources(self) -> None:
+        await self._scope.close()
+        self._tasks_closed = True
 
     async def _request(
         self,
@@ -512,6 +775,7 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
                             code="event_stream_closed",
                             exit_code=self.process.returncode,
                         )
+                        self._record_terminal_failure(self._terminal_error)
                         await asyncio.sleep(_STDERR_FAILURE_FLUSH_SECONDS)
                         self._log_failure_stderr(
                             failure_code="event_stream_closed",
@@ -537,13 +801,16 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
         except BaseException as exc:
             if isinstance(exc, (KeyboardInterrupt, SystemExit)):
                 raise
+            if self._closing and isinstance(exc, (ConnectionError, OSError)):
+                return
             error = GpuWorkerClosedError(
                 "worker frame reader failed",
                 code="frame_reader_failed",
-                failure_type=type(exc).__name__,
+                failure_type=safe_exception_fields(exc)["exception_class"],
             )
             self._log_failure_stderr(failure_code="frame_reader_failed")
-            self._terminal_error = error
+            error.__cause__ = exc
+            self._record_terminal_failure(error)
             self._fail_pending(error)
         finally:
             await self._events.put(None)
@@ -603,7 +870,7 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
         await self.process.wait()
         if not self._closing:
             if self._stderr_task is not None:
-                await asyncio.gather(self._stderr_task, return_exceptions=True)
+                await asyncio.wait({self._stderr_task}, timeout=_STDERR_FAILURE_FLUSH_SECONDS)
             error = GpuWorkerClosedError(
                 "worker process exited",
                 code="worker_process_exited",
@@ -613,7 +880,7 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
                 failure_code="worker_process_exited",
                 exit_code=self.process.returncode,
             )
-            self._terminal_error = error
+            self._record_terminal_failure(error)
             self._fail_pending(error)
 
     async def _monitor_heartbeat(self) -> None:
@@ -627,10 +894,13 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
                 code="heartbeat_timeout",
             )
             self._log_failure_stderr(failure_code="heartbeat_timeout")
-            self._terminal_error = error
+            self._record_terminal_failure(error)
             self._fail_pending(error)
             if self.process.returncode is None:
-                self.process.terminate()
+                try:
+                    self.process.terminate()
+                except Exception as exc:
+                    _gpu_cleanup_failure("process_terminate", exc, cause=self._terminal_diagnostics)
             return
 
     async def _drain_stream(self, stream: asyncio.StreamReader) -> None:
@@ -641,6 +911,23 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
         while raw_line := await stream.readline():
             if raw_line.strip():
                 self._stderr_line_count += 1
+
+    def _record_terminal_failure(self, error: GpuWorkerClosedError) -> None:
+        previous = self._terminal_diagnostics
+        diagnostics = _emit_gpu_failure(
+            error.code,
+            stage="runtime",
+            fields={
+                "worker_session_id": self.session_id,
+                **({"exit_code": error.exit_code} if error.exit_code is not None else {}),
+            },
+            exception=error,
+            cause=previous,
+        )
+        error.failure_diagnostics = diagnostics
+        if previous is None:
+            self._terminal_diagnostics = diagnostics
+            self._terminal_error = error
 
     def _log_failure_stderr(
         self,
@@ -663,6 +950,51 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
         for future in tuple(self._pending.values()):
             if not future.done():
                 future.set_exception(error)
+
+
+def _emit_gpu_failure(
+    code: str,
+    *,
+    stage: str,
+    fields: dict[str, object] | None = None,
+    exception: BaseException | None = None,
+    cause: ErrorDiagnostics | None = None,
+    severity: str = "error",
+    disposition: str = "failed",
+    operation_id: str | None = None,
+    request_id: str | None = None,
+) -> ErrorDiagnostics:
+    diagnostics = ErrorDiagnostics(
+        component="gpu_worker",
+        operation="process_lifecycle",
+        code=code,
+        category="lifecycle",
+        visibility="basic",
+        content_policy="metadata_only",
+        status_code=None,
+        retry_after_ms=None,
+        fields={key: value for key, value in (fields or {}).items() if value is not None},
+        cause_id=cause.diagnostic_id if cause else None,
+        operation_id=cause.operation_id if cause is not None else operation_id,
+        request_id=cause.request_id if cause is not None else request_id,
+    )
+    emit_failure(
+        logger,
+        diagnostics,
+        stage=stage,
+        exception=exception,
+        severity=severity,
+        disposition=disposition,
+    )
+    return diagnostics
+
+
+def _gpu_cleanup_failure(
+    stage: str, exception: Exception, *, cause: ErrorDiagnostics | None = None
+) -> dict[str, object]:
+    fields = {"cleanup_stage": stage, **safe_exception_fields(exception)}
+    _emit_gpu_failure("worker_cleanup_failed", stage=stage, fields=fields, cause=cause)
+    return fields
 
 
 def _decode_frame(raw: bytes) -> dict[str, object]:
@@ -736,8 +1068,8 @@ async def _close_writer(writer: asyncio.StreamWriter) -> None:
     writer.close()
     try:
         await writer.wait_closed()
-    except ConnectionError, OSError:
-        pass
+    except (ConnectionError, OSError) as exc:
+        _gpu_cleanup_failure("writer_close", exc)
 
 
 async def _terminate_process(
@@ -758,7 +1090,7 @@ async def _terminate_process(
                 process.kill()
             except ProcessLookupError:
                 pass
-        await process.wait()
+        await asyncio.wait_for(process.wait(), timeout=max(0.1, terminate_grace_s))
 
 
 __all__ = [
@@ -766,3 +1098,8 @@ __all__ = [
     "GPU_WORKER_CONTRACT_VERSION",
     "GPU_WORKER_EXECUTABLE_NAME",
 ]
+
+
+def _retrieve_writer_close_exception(task: asyncio.Task[None]) -> None:
+    if not task.cancelled():
+        task.exception()

@@ -7,6 +7,8 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
+from puripuly_heart.providers.llm.error_details import LLMResponseError
 from puripuly_heart.providers.llm.local_openai import (
     HttpxLocalOpenAIClient,
     LocalOpenAIClient,
@@ -14,6 +16,17 @@ from puripuly_heart.providers.llm.local_openai import (
     LocalOpenAIReservedExtraBodyKeyError,
     LocalOpenAISensitiveExtraBodyKeyError,
 )
+
+
+def _native_error_text(error: BaseException) -> str:
+    report = provider_failure_report(error, provider="local_llm", operation="translate")
+    assert report.diagnostics.content_policy == "metadata_only"
+    assert report.diagnostics.diagnostic_id
+    if isinstance(error, LLMResponseError):
+        assert report.diagnostics.diagnostic_id == error.failure_diagnostics.diagnostic_id
+        assert report.diagnostics.status_code == error.status_code
+    return format_error_report_for_log(report)
+
 
 APP_RESERVED_KEYS = (
     "model",
@@ -294,9 +307,9 @@ async def test_local_translate_redacts_trimmed_configured_api_key(monkeypatch) -
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert "local-secret" not in message
-    assert "[redacted]" in message
+    assert "[redacted]" not in message
 
 
 def test_httpx_local_client_disables_env_proxy_and_redirects(monkeypatch) -> None:
@@ -364,10 +377,11 @@ async def test_local_translate_raises_on_non_200(monkeypatch) -> None:
     monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
     client = HttpxLocalOpenAIClient(base_url="http://localhost:11434/v1", model="missing")
 
-    with pytest.raises(RuntimeError, match="model not found"):
+    with pytest.raises(LLMResponseError) as exc_info:
         await client.translate(
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
+    assert exc_info.value.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -387,10 +401,10 @@ async def test_local_translate_sanitizes_server_error_text(monkeypatch) -> None:
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert "secret" not in message
     assert "127.0.0.1" not in message
-    assert "Bearer [redacted]" in message
+    assert "Bearer [redacted]" not in message
 
 
 @pytest.mark.asyncio
@@ -417,13 +431,13 @@ async def test_local_translate_sanitizes_echoed_request_body_fragments(monkeypat
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert "body=" not in message
     assert "json=" not in message
     assert "messages=" not in message
     assert '"think"' not in message
     assert "hello" not in message
-    assert "[request-body-redacted]" in message
+    assert "[request-body-redacted]" not in message
 
 
 @pytest.mark.asyncio
@@ -447,12 +461,12 @@ async def test_local_translate_sanitizes_colon_form_request_body_fragments(monke
             text=source_text, system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert "body:" not in message
     assert "messages" not in message
     assert '"think"' not in message
     assert source_text not in message
-    assert "[request-body-redacted]" in message
+    assert "[request-body-redacted]" not in message
 
 
 @pytest.mark.asyncio
@@ -476,11 +490,11 @@ async def test_local_translate_sanitizes_raw_json_request_body_fragments(monkeyp
             text=source_text, system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert "messages" not in message
     assert '"think"' not in message
     assert source_text not in message
-    assert "[request-body-redacted]" in message
+    assert "[request-body-redacted]" not in message
 
 
 @pytest.mark.asyncio
@@ -498,9 +512,9 @@ async def test_local_translate_sanitizes_plain_source_text_echo(monkeypatch) -> 
             text=source_text, system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert source_text not in message
-    assert "[source-text-redacted]" in message
+    assert "[source-text-redacted]" not in message
 
 
 @pytest.mark.asyncio
@@ -518,9 +532,9 @@ async def test_local_translate_redacts_plain_standalone_configured_model(monkeyp
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert model_name not in message
-    assert "server could not load [model-redacted] for chat" in message
+    assert "server could not load [model-redacted] for chat" not in message
 
 
 @pytest.mark.asyncio
@@ -538,9 +552,9 @@ async def test_local_translate_redacts_configured_model_followed_by_period(monke
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert model_name not in message
-    assert "server could not load [model-redacted]." in message
+    assert "server could not load [model-redacted]." not in message
 
 
 @pytest.mark.asyncio
@@ -560,9 +574,9 @@ async def test_local_translate_redacts_configured_model_followed_by_trailing_col
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert model_name not in message
-    assert "server could not load [model-redacted]: not found" in message
+    assert "server could not load [model-redacted]: not found" not in message
 
 
 @pytest.mark.asyncio
@@ -581,10 +595,10 @@ async def test_local_translate_redacts_short_standalone_model_without_corrupting
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert "backend m failed" not in message
-    assert "backend [model-redacted] failed" in message
-    assert "temporary mismatch" in message
+    assert "backend [model-redacted] failed" not in message
+    assert "temporary mismatch" not in message
 
 
 @pytest.mark.asyncio
@@ -609,10 +623,10 @@ async def test_local_translate_redacts_multikey_formatted_extra_body_json(monkey
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert '"seed" : 42' not in message
     assert '"think" : false' not in message
-    assert "[extra-body-redacted]" in message
+    assert "[extra-body-redacted]" not in message
 
 
 @pytest.mark.asyncio
@@ -635,11 +649,11 @@ async def test_local_translate_redacts_extra_body_key_value_fragments(monkeypatc
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert "think: false" not in message
     assert "seed=42" not in message
     assert "num_ctx = 2048" not in message
-    assert "[extra-body-redacted]" in message
+    assert "[extra-body-redacted]" not in message
 
 
 @pytest.mark.asyncio
@@ -666,9 +680,9 @@ async def test_local_translate_redacts_nested_extra_body_jsonish_key_value_fragm
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert 'thinking: { "type" : "disabled" }' not in message
-    assert "[extra-body-redacted]" in message
+    assert "[extra-body-redacted]" not in message
 
 
 @pytest.mark.asyncio
@@ -693,9 +707,9 @@ async def test_local_translate_redacts_nested_extra_body_python_repr_key_value_f
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert "thinking={'type': 'disabled'}" not in message
-    assert "[extra-body-redacted]" in message
+    assert "[extra-body-redacted]" not in message
 
 
 @pytest.mark.asyncio
@@ -714,10 +728,10 @@ async def test_local_translate_redacts_short_model_without_corrupting_ordinary_w
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert "model m" not in message
-    assert "[model-redacted]" in message
-    assert "temporary mismatch" in message
+    assert "[model-redacted]" not in message
+    assert "temporary mismatch" not in message
 
 
 @pytest.mark.asyncio
@@ -743,8 +757,8 @@ async def test_local_translate_does_not_partially_redact_short_model_inside_long
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
-    assert visible_fragment in message
+    message = _native_error_text(exc_info.value)
+    assert visible_fragment not in message
     assert "[model-redacted]" not in message
 
 
@@ -773,9 +787,9 @@ async def test_local_translate_redacts_short_model_at_safe_boundaries(
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert server_message not in message
-    assert expected_fragment in message
+    assert expected_fragment not in message
 
 
 @pytest.mark.asyncio
@@ -795,11 +809,11 @@ async def test_local_translate_redacts_short_model_before_colon(
             text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
         )
 
-    message = str(exc_info.value)
+    message = _native_error_text(exc_info.value)
     assert "model m:" not in message
     assert 'model "m":' not in message
-    assert "[model-redacted]" in message
-    assert "not found" in message
+    assert "[model-redacted]" not in message
+    assert "not found" not in message
 
 
 @pytest.mark.asyncio

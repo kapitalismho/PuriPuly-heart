@@ -1,94 +1,107 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import asyncio
+import threading
+from pathlib import Path
 
 import pytest
 
 from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
 from puripuly_heart.app.ports.secret_store import SecretSnapshot
-from puripuly_heart.app.wiring import create_sync_secret_store_adapter
+from puripuly_heart.core.storage.secrets import EncryptedFileSecretStore
 
 
-@dataclass
-class MemorySyncSecretStore:
-    values: dict[str, str] = field(default_factory=dict)
-
-    def get(self, key: str) -> str | None:
-        return self.values.get(key)
-
-    def set(self, key: str, value: str) -> None:
-        self.values[key] = value
-
-    def delete(self, key: str) -> None:
-        self.values.pop(key, None)
-
-
-@pytest.mark.asyncio
-async def test_adapter_maps_sync_secret_store_to_async_port_contract() -> None:
-    store = MemorySyncSecretStore({"provider": "old"})
+async def test_adapter_roundtrip_snapshot_and_restore(tmp_path: Path) -> None:
+    store = EncryptedFileSecretStore(tmp_path / "secrets.json", passphrase="synthetic")
     adapter = SyncSecretStoreAdapter(store)
-
-    read = await adapter.get_secret("provider")
-    snapshot = await adapter.snapshot_secret("provider")
-    write = await adapter.set_secret("provider", "new")
-    clear = await adapter.clear_secret("provider")
-
-    assert read.value == "old"
-    assert read.key == "provider"
-    assert snapshot == SecretSnapshot(
-        key="provider",
-        value="old",
-        revision=None,
-        existed=True,
-    )
-    assert write.succeeded is True
-    assert clear.succeeded is True
-    assert store.values == {}
+    absent = await adapter.snapshot_secret("managed")
+    assert absent.existed is False
+    assert (await adapter.set_secret("managed", "first")).succeeded is True
+    saved = await adapter.snapshot_secret("managed")
+    assert saved.existed is True
+    assert (await adapter.set_secret("managed", "replacement")).succeeded is True
+    assert (await adapter.restore_secret(saved)).succeeded is True
+    assert (await adapter.get_secret("managed")).value == "first"
+    assert (await adapter.clear_secret("managed")).succeeded is True
+    assert (await adapter.get_secret("managed")).value is None
+    await adapter.set_secret("managed", "replacement")
+    assert (await adapter.restore_secret(absent)).succeeded is True
+    assert (await adapter.get_secret("managed")).value is None
 
 
-@pytest.mark.asyncio
-async def test_adapter_restores_existing_and_absent_secret_snapshots() -> None:
-    store = MemorySyncSecretStore({"existing": "changed", "absent": "temporary"})
+@pytest.mark.parametrize("method", ["get_secret", "snapshot_secret"])
+async def test_adapter_preserves_failed_observation_instead_of_absence(
+    tmp_path: Path, method: str
+) -> None:
+    path = tmp_path / "secrets.json"
+    store = EncryptedFileSecretStore(path, passphrase="synthetic")
+    store.set("managed", "keep")
     adapter = SyncSecretStoreAdapter(store)
-
-    existing = await adapter.restore_secret(
-        SecretSnapshot(
-            key="existing",
-            value="original",
-            revision=None,
-            existed=True,
-        )
-    )
-    absent = await adapter.restore_secret(
-        SecretSnapshot(
-            key="absent",
-            value=None,
-            revision=None,
-            existed=False,
-        )
-    )
-
-    assert existing.succeeded is True
-    assert absent.succeeded is True
-    assert store.values == {"existing": "original"}
+    path.write_text("not-json", encoding="utf-8")
+    with pytest.raises(ValueError):
+        await getattr(adapter, method)("managed")
+    assert path.read_text(encoding="utf-8") == "not-json"
 
 
-@pytest.mark.asyncio
-async def test_adapter_propagates_sync_store_failure() -> None:
-    class FailingStore(MemorySyncSecretStore):
+@pytest.mark.parametrize("operation", ["set", "clear", "restore_present", "restore_absent"])
+async def test_cancelled_adapter_mutation_settles_before_task_finishes(
+    tmp_path: Path, operation: str
+) -> None:
+    path = tmp_path / "secrets.json"
+    store = EncryptedFileSecretStore(path, passphrase="synthetic")
+    store.set("managed", "old")
+    store.set("unrelated", "keep")
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    release = threading.Event()
+    finished = threading.Event()
+
+    class BlockedStore:
+        def get(self, key: str) -> str | None:
+            return store.get(key)
+
         def set(self, key: str, value: str) -> None:
-            raise OSError(f"{key}:{value}")
+            loop.call_soon_threadsafe(entered.set)
+            assert release.wait(10)
+            try:
+                store.set(key, value)
+            finally:
+                finished.set()
 
-    adapter = SyncSecretStoreAdapter(FailingStore())
+        def delete(self, key: str) -> None:
+            loop.call_soon_threadsafe(entered.set)
+            assert release.wait(10)
+            try:
+                store.delete(key)
+            finally:
+                finished.set()
 
-    with pytest.raises(OSError, match="provider:secret"):
-        await adapter.set_secret("provider", "secret")
-
-
-def test_wiring_factory_exposes_secret_store_port_without_ui_dependency() -> None:
-    store = MemorySyncSecretStore()
-
-    adapter = create_sync_secret_store_adapter(store)
-
-    assert isinstance(adapter, SyncSecretStoreAdapter)
-    assert adapter.store is store
+    adapter = SyncSecretStoreAdapter(BlockedStore())
+    if operation == "set":
+        work = adapter.set_secret("managed", "new")
+    elif operation == "clear":
+        work = adapter.clear_secret("managed")
+    else:
+        present = operation == "restore_present"
+        work = adapter.restore_secret(
+            SecretSnapshot("managed", "restored" if present else None, None, present)
+        )
+    task = asyncio.create_task(work)
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=10)
+        task.cancel()
+        await asyncio.sleep(0)
+        task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+        assert not finished.is_set()
+        assert EncryptedFileSecretStore(path, passphrase="synthetic").get("managed") == "old"
+    finally:
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    assert finished.is_set()
+    expected = {"set": "new", "clear": None, "restore_present": "restored", "restore_absent": None}
+    fresh = EncryptedFileSecretStore(path, passphrase="synthetic")
+    assert fresh.get("managed") == expected[operation]
+    assert fresh.get("unrelated") == "keep"

@@ -22,6 +22,7 @@ from puripuly_heart.config.resolved import (
     ResolvedOverlayConfig,
 )
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.diagnostics import current_diagnostic_operation
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
@@ -511,7 +512,10 @@ class OverlayApplicationOwner:
         )
 
     def new_runtime(self) -> OverlayRuntimeHandle:
-        runtime = OverlayRuntimeHandle(shutdown_grace_s=OVERLAY_SHUTDOWN_GRACE_S)
+        runtime = OverlayRuntimeHandle(
+            shutdown_grace_s=OVERLAY_SHUTDOWN_GRACE_S,
+            **current_diagnostic_operation(),
+        )
         self._runtime = runtime
         return runtime
 

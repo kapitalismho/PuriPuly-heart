@@ -4,18 +4,22 @@ import json
 import ntpath
 import subprocess
 import sys
+from dataclasses import asdict
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.core.peer_capture import PeerCaptureFailureReason
+from puripuly_heart.release_evidence import windows_process_isolation as isolation
 from puripuly_heart.release_evidence.windows_process_isolation import (
     CHANNELS,
     CONTROL_FREQUENCY_HZ,
     EVIDENCE_SCHEMA,
     GUI_PROCESS_RETRY_ACTION,
+    PROTOCOL_VERSION,
     SAMPLE_RATE_HZ,
     TARGET_FREQUENCY_HZ,
     WORKER_MODULE,
@@ -53,7 +57,7 @@ def _stereo_tones(*, target_amplitude: float, control_amplitude: float) -> np.nd
     return np.repeat(mono[:, None], CHANNELS, axis=1).astype(np.float32)
 
 
-def test_fixture_protocol_round_trips_deterministically_and_rejects_unknown_fields() -> None:
+def test_fixture_protocol_round_trips_schema_without_requiring_json_key_order() -> None:
     message = FixtureMessage(
         event="ready",
         role="target_root",
@@ -65,14 +69,33 @@ def test_fixture_protocol_round_trips_deterministically_and_rejects_unknown_fiel
 
     encoded = message.to_json()
 
-    assert encoded == (
-        '{"child_pid":42,"child_role":"target_child","classification":null,'
-        '"event":"ready","pid":41,'
-        '"protocol_version":1,"role":"target_root"}'
-    )
+    payload = json.loads(encoded)
+    assert payload == {
+        "event": "ready",
+        "role": "target_root",
+        "pid": 41,
+        "child_pid": 42,
+        "child_role": "target_child",
+        "classification": None,
+        "protocol_version": PROTOCOL_VERSION,
+    }
     assert FixtureMessage.from_json(encoded) == message
-    with pytest.raises(ValueError, match="fields"):
-        FixtureMessage.from_json(encoded[:-1] + ',"token":"secret"}')
+    reordered = dict(reversed(tuple(payload.items())))
+    assert FixtureMessage.from_json(json.dumps(reordered, indent=2)) == message
+
+
+@pytest.mark.parametrize("mutation", ["unknown_field", "missing_field", "wrong_version"])
+def test_fixture_protocol_rejects_invalid_fields_and_versions(mutation: str) -> None:
+    payload = json.loads(FixtureMessage(event="ready", role="control", pid=41).to_json())
+    if mutation == "unknown_field":
+        payload["token"] = "secret"
+    elif mutation == "missing_field":
+        del payload["classification"]
+    else:
+        payload["protocol_version"] = PROTOCOL_VERSION + 1
+
+    with pytest.raises(ValueError, match="values" if mutation == "wrong_version" else "fields"):
+        FixtureMessage.from_json(json.dumps(payload))
 
 
 def test_worker_command_uses_stable_module_name_in_nested_root_process() -> None:
@@ -185,6 +208,8 @@ def test_lifecycle_contract_requires_ordered_teardown_fresh_pid_and_gui_retry() 
     assert lifecycle_passes(**{**facts, "events": ["typed_warning", "source_closed"]}) is False
     assert lifecycle_passes(**{**facts, "retry_pid": 101}) is False
     assert lifecycle_passes(**{**facts, "no_automatic_reconnect": False}) is False
+    assert lifecycle_passes(**{**facts, "gui_retry_succeeded": False}) is False
+    assert lifecycle_passes(**{**facts, "gui_warning_cleared": False}) is False
 
 
 def test_latest_peer_failure_reason_ignores_later_nonfailure_diagnostics() -> None:
@@ -223,14 +248,6 @@ async def test_fixture_invokes_the_committed_gui_retry_action_contract() -> None
     assert GUI_PROCESS_RETRY_ACTION is PeerApplicationOwner.retry_process_capture
     assert await invoke_gui_process_retry(action) is True
     assert warning[0] is None
-    source = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "puripuly_heart"
-        / "release_evidence"
-        / "windows_process_isolation.py"
-    ).read_text(encoding="utf-8")
-    assert '"retry_action": "PeerApplicationOwner.retry_process_capture"' in source
 
 
 def test_fixture_builds_the_committed_resolved_process_target_contract() -> None:
@@ -382,3 +399,177 @@ def test_capture_timeout_classification_preserves_attributable_stage(
     from puripuly_heart.release_evidence.windows_process_isolation import classify_fixture_failure
 
     assert classify_fixture_failure(RuntimeError(code)) == classification
+
+
+@pytest.fixture
+def synthetic_native_capture(monkeypatch) -> SimpleNamespace:
+    import psutil
+
+    from puripuly_heart.config.process_capture_platform import (
+        ProcessCapturePlatformAvailability,
+    )
+    from puripuly_heart.core.audio import process_identity, process_source
+
+    state = SimpleNamespace(
+        samples=_stereo_tones(target_amplitude=0.18, control_amplitude=0.001),
+        emitters=[],
+        captures=[],
+        watches=[],
+        processes={},
+    )
+
+    class Emitter:
+        def __init__(self, role: str) -> None:
+            self.stopped = False
+            if role == "control":
+                pid = 901
+            else:
+                root_count = sum(emitter.ready.role == "target_root" for emitter in state.emitters)
+                pid = 101 + 100 * root_count
+            child_pid = pid + 1 if role == "target_root" else None
+            self.ready = FixtureMessage(
+                event="ready",
+                role=role,
+                pid=pid,
+                child_pid=child_pid,
+                child_role="target_child" if child_pid is not None else None,
+            )
+            self.ready_monotonic_s = isolation.time.monotonic()
+            self.process = SimpleNamespace(poll=lambda: 0 if self.stopped else None)
+            children = []
+            if child_pid is not None:
+                child = SimpleNamespace(pid=child_pid, ppid=lambda: pid)
+                children.append(child)
+                state.processes[child_pid] = child
+            state.processes[pid] = SimpleNamespace(
+                pid=pid,
+                create_time=lambda: 1.0,
+                children=lambda **_kwargs: children,
+            )
+            state.emitters.append(self)
+
+        def stop(self) -> None:
+            if self.stopped:
+                return
+            self.stopped = True
+            for watch in state.watches:
+                if watch.pid == self.ready.pid and not watch.closed:
+                    watch.on_terminal()
+
+    class Capture:
+        def __init__(self, pid: int, on_data) -> None:
+            self.pid = pid
+            self.on_data = on_data
+            self.close_count = 0
+            self.started = False
+
+        def start(self) -> None:
+            self.started = True
+            values = (
+                _stereo_tones(target_amplitude=0.18, control_amplitude=0.0)
+                if self.pid == 102
+                else state.samples
+            )
+            values = np.tile(values, (3, 1))
+            self.on_data(values.tobytes(), values.shape[0])
+
+        def close(self) -> None:
+            self.close_count += 1
+
+    class CaptureFactory:
+        def create(self, *, pid: int, on_data) -> Capture:
+            capture = Capture(pid, on_data)
+            state.captures.append(capture)
+            return capture
+
+    class Watch:
+        identity_verified = True
+
+        def __init__(self, pid: int, on_terminal) -> None:
+            self.pid = pid
+            self.on_terminal = on_terminal
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    class Watcher:
+        def watch(self, identity, on_terminal) -> Watch:
+            watch = Watch(identity.pid, on_terminal)
+            state.watches.append(watch)
+            return watch
+
+    source_type = process_source.ProcessAudioCaptureSource
+    monkeypatch.setattr(
+        process_source,
+        "ProcessAudioCaptureSource",
+        lambda **kwargs: source_type(
+            **kwargs,
+            platform_availability=lambda: ProcessCapturePlatformAvailability(True, None),
+        ),
+    )
+    monkeypatch.setattr(process_source, "ProcTapProcessAudioCaptureFactory", CaptureFactory)
+    monkeypatch.setattr(process_source, "verify_proctap_process_specific", lambda _capture: True)
+    monkeypatch.setattr(process_identity, "PsutilProcessIdentityWatcher", Watcher)
+    monkeypatch.setattr(psutil, "Process", lambda pid: state.processes[pid])
+    monkeypatch.setattr(isolation, "_start_emitter", lambda role, _directory: Emitter(role))
+    monkeypatch.setattr(isolation, "classify_native_capability", lambda: None)
+    return state
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scenario", ["passing", "no_signal", "control_leak", "retry_rejected"])
+async def test_native_runner_writes_observed_retry_and_measurement_outcomes(
+    tmp_path: Path,
+    monkeypatch,
+    synthetic_native_capture: SimpleNamespace,
+    scenario: str,
+) -> None:
+    state = synthetic_native_capture
+    retry_attempts: list[object] = []
+    if scenario == "no_signal":
+        state.samples = _stereo_tones(target_amplitude=0.0, control_amplitude=0.0)
+    elif scenario == "control_leak":
+        state.samples = _stereo_tones(target_amplitude=0.18, control_amplitude=0.04)
+    retry = isolation.invoke_gui_process_retry
+
+    async def observed_retry(action: object) -> bool:
+        retry_attempts.append(action)
+        return False if scenario == "retry_rejected" else await retry(action)
+
+    monkeypatch.setattr(isolation, "invoke_gui_process_retry", observed_retry)
+    thresholds_path = tmp_path / "thresholds.json"
+    thresholds_path.write_text(json.dumps(asdict(THRESHOLDS)), encoding="utf-8")
+    report_path = tmp_path / "report.json"
+
+    exit_code = await isolation.run(report_path, thresholds_path)
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert len(retry_attempts) == 1
+    assert all(capture.started and capture.close_count == 1 for capture in state.captures)
+    assert all(watch.closed for watch in state.watches)
+    assert len(state.emitters) == 3
+    assert all(emitter.stopped for emitter in state.emitters)
+    assert report["schema"] == EVIDENCE_SCHEMA
+    assert report["lifecycle"]["retry_action"] == "PeerApplicationOwner.retry_process_capture"
+    assert report["lifecycle"]["retry_succeeded"] is (scenario != "retry_rejected")
+    assert report["lifecycle"]["fresh_pid"] is True
+    assert report["capture_construction"]["device_loopback_sources"] == 0
+    assert report["capture_construction"]["process_sources"] == (
+        2 if scenario == "retry_rejected" else 3
+    )
+    if scenario == "passing":
+        assert exit_code == 0
+        assert report["status"] == "passed"
+        assert report["classification"] is None
+        assert report["lifecycle"]["warning_after_provider_source_task_teardown"] is True
+    else:
+        assert exit_code == 1
+        assert report["status"] == "failed"
+        assert report["classification"] == "measured_contract_failed"
+        if scenario == "no_signal":
+            assert report["fixture"]["selected_tree_child_included"] is False
+        elif scenario == "control_leak":
+            assert report["fixture"]["unrelated_control_excluded"] is False
+        else:
+            assert report["lifecycle"]["warning_after_provider_source_task_teardown"] is False

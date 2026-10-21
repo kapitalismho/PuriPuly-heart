@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.8.2-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.9.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
   <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
@@ -104,7 +104,7 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 
 | LLM \ ASR | 本地 ASR | 云免费档 | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Gemma 4 E4B (本地)** | 无限制 | 无限制 | 5,000 次 | 7,260 次 |
+| **Index-Translate 35B A3B** | 无限制 | 无限制 | 5,000 次 | 7,260 次 |
 | **Gemma 4 26B A4B + 31B** | 13,940 次 | 13,940 次 | 3,680 次 | 4,770 次 |
 | **DeepSeek V4.1 Flash** | 16,800 次 | 16,800 次 | 3,860 次 | 5,070 次 |
 | **GPT 6 Luna** | 8,680 次 | 8,680 次 | 3,170 次 | 3,950 次 |
@@ -113,6 +113,7 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 
 | LLM \ ASR | 本地 ASR | 云免费档 | Soniox | Qwen Audio |
 |---|---|---|---|---|
+| **Gemma 4 E4B & 26B (本地)** | 无限制 | 无限制 | 5,000 次 | 7,260 次 |
 | **DeepSeek V4 Flash (OpenRouter)** | 17,020 次 | 17,020 次 | 3,860 次 | 5,090 次 |
 | **Gemini 3.8 Flash** | 1,160 次 | 1,160 次 | 940 次 | 1,000 次 |
 | **Qwen 3.8 Flash** | 7,460 次 | 7,460 次 | 2,990 次 | 3,680 次 |
@@ -123,7 +124,7 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 
 | LLM \ ASR | 本地 ASR | 云免费档 | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Gemma 4 E4B (本地)** | 0 元 | 0 元 | ~0.001 元 | ~0.001 元 |
+| **Index-Translate 35B A3B** | 0 元 | 0 元 | ~0.001 元 | ~0.001 元 |
 | **Gemma 4 26B A4B + 31B** | ~0.0005 元 | ~0.0005 元 | ~0.002 元 | ~0.0015 元 |
 | **DeepSeek V4.1 Flash** | ~0.0004 元 | ~0.0004 元 | ~0.002 元 | ~0.0014 元 |
 | **GPT 6 Luna** | ~0.0008 元 | ~0.0008 元 | ~0.002 元 | ~0.0018 元 |
@@ -132,6 +133,7 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 
 | LLM \ ASR | 本地 ASR | 云免费档 | Soniox | Qwen Audio |
 |---|---|---|---|---|
+| **Gemma 4 E4B & 26B (本地)** | 0 元 | 0 元 | ~0.001 元 | ~0.001 元 |
 | **DeepSeek V4 Flash (OpenRouter)** | ~0.0004 元 | ~0.0004 元 | ~0.002 元 | ~0.0014 元 |
 | **Gemini 3.8 Flash** | ~0.006 元 | ~0.006 元 | ~0.008 元 | ~0.007 元 |
 | **Qwen 3.8 Flash** | ~0.001 元 | ~0.001 元 | ~0.002 元 | ~0.002 元 |
@@ -142,7 +144,7 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 *   *DeepSeek V4.1 Flash 假设缓存命中率为 70%，V4 Flash（OpenRouter）为 60%*
 *   *GPT 6 Luna 按 OpenAI API 价格计算，假设无缓存折扣；通过 ChatGPT 连接时不产生 API 费用，而是使用 Codex 额度*
 *   *Qwen API 计费以北京区域为准*
-*   *资费标准截至：2026 年 9 月 25 日*
+*   *资费标准截至：2026 年 10 月 17 日*
 *   *1 美元 ≈ 7.2 元人民币*
 
 ### 免费额度
@@ -177,7 +179,10 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 | 模型 | 运行环境 | 量化 |
 |---|---|---|
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| Gemma 4 26B A4B IT QAT | 仅 GPU (Vulkan) | UD Q4_K_XL |
 | OpenAI 兼容 API | — | — |
+
+模型权重不随安装程序打包，仅在需要所选模型时下载。26B 下载大小约为 14.25 GB，模型选择在重启后保留。26B 仅支持 Vulkan GPU；初始化失败时不会自动切换到 CPU 或 E4B。GPU 在同一个运行时中最多同时处理两个 Self/Peer 请求，CPU 仍按顺序处理。参见[固定配置与托管本地翻译契约](../cli.md#managed-local-translation)。
 
 ---
 
@@ -188,7 +193,7 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 1. 从[下载页面](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)下载最新版本
 2. 安装 PuriPuly
 3. 点击 **TALK** 按钮
-4. 点击 **TRANS** 按钮后通过 Discord 验证
+4. 点击 **TRANS**。新安装默认使用无需 API 密钥的 Index；如有提示，请完成认证或设置。
 5. 点击 **CAPTIONS** 按钮开启 VR 字幕
 6. （可选）点击 **LISTEN** 按钮开启对方语音翻译
 

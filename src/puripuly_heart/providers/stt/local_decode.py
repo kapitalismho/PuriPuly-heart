@@ -5,11 +5,13 @@ import logging
 import time
 from collections import deque
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TypeVar
 
 import numpy as np
 
+from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.owned_thread import run_owned_thread_call as _run_owned_thread_call
 
@@ -312,10 +314,21 @@ class LocalDecodeCoordinator:
         except asyncio.CancelledError:
             raise
         except Exception as callback_exc:
-            logger.exception(
-                "%s decode failure callback failed: callback_exception=%s",
-                self.owner_name,
-                type(callback_exc).__name__,
+            primary = stt_failure_report(
+                failure.error, provider="local_asr", channel="unknown", operation="decode"
+            ).diagnostics
+            emit_failure(logger, primary, stage="decode")
+            secondary = stt_failure_report(
+                callback_exc, provider="local_asr", channel="unknown", operation="decode"
+            ).diagnostics
+            emit_failure(
+                logger,
+                replace(
+                    secondary, code="stt.decode_callback_failed", cause_id=primary.diagnostic_id
+                ),
+                severity="warning",
+                disposition="degraded",
+                stage="decode",
             )
 
     def _update_backlog_warning(self) -> None:
@@ -337,8 +350,12 @@ class LocalDecodeCoordinator:
                 )
             )
         except Exception as exc:
-            logger.exception(
-                "%s decode backlog callback failed: callback_exception=%s",
-                self.owner_name,
-                type(exc).__name__,
+            emit_failure(
+                logger,
+                stt_failure_report(
+                    exc, provider="local_asr", channel="unknown", operation="decode"
+                ).diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="decode",
             )
