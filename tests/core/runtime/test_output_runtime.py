@@ -225,6 +225,27 @@ class BlockingOverlaySink(RecordingOverlaySink):
             raise
 
 
+class AppliedOnCancelOverlaySink(BlockingOverlaySink):
+    def __init__(self) -> None:
+        super().__init__()
+        self.receipts: dict[str, OverlayApplicationReceipt] = {}
+
+    async def emit(self, event: OverlayEventUnion) -> None:
+        try:
+            await super().emit(event)
+        except asyncio.CancelledError:
+            self.receipts[event.event_id] = OverlayApplicationReceipt(
+                stage="application_accepted",
+                outcome="applied",
+                publication_id=event.event_id,
+                scene_revision=1,
+            )
+            raise
+
+    def application_receipt(self, publication_id: str) -> OverlayApplicationReceipt | None:
+        return self.receipts.get(publication_id)
+
+
 class PacedOverlaySink(RecordingOverlaySink):
     def __init__(self) -> None:
         super().__init__()
@@ -926,6 +947,135 @@ async def test_output_runtime_close_cancels_active_overlay_delivery() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("release_before_close", [False, True])
+@pytest.mark.parametrize("applied_on_cancel", [False, True])
+async def test_output_runtime_close_settles_blocked_self_caption_and_waiting_patch(
+    release_before_close: bool, applied_on_cancel: bool
+) -> None:
+    OutputRuntime = _output_runtime_class()
+    overlay = AppliedOnCancelOverlaySink() if applied_on_cancel else BlockingOverlaySink()
+    chatbox = RecordingChatbox()
+    owner = OutputRuntime(chatbox=chatbox, overlay_sink=overlay, clock=FakeClock(_now=10.0))
+    adapter = OverlayEventAdapter(clock=owner.clock)
+    caption_id = uuid4()
+    original = adapter.self_active_update(
+        text="Closed source.",
+        utterance_id=caption_id,
+        occupant_key=f"self:{caption_id}",
+        caption_source_closed=True,
+        turn_generation=1,
+        turn_order=0,
+    )
+    patch = adapter.self_active_update(
+        text="Closed source.",
+        secondary_text="Translated source.",
+        utterance_id=caption_id,
+        occupant_key=f"self:{caption_id}",
+        caption_source_closed=True,
+        caption_complete=True,
+        retained_only=True,
+        caption_revision=1,
+        turn_generation=1,
+        turn_order=0,
+    )
+
+    await asyncio.wait_for(owner.submit_self_overlay_event(original), timeout=1.0)
+    await asyncio.wait_for(overlay.started.wait(), timeout=1.0)
+    await asyncio.wait_for(owner.submit_self_overlay_event(patch), timeout=1.0)
+    assert owner.overlay_admission_snapshot()["active"] == 1
+    assert owner.overlay_admission_snapshot()["unsent"] == 1
+    chatbox_result = await owner.publish_chatbox(
+        publication_id=caption_id,
+        channel="self",
+        transcript_text="Closed source.",
+        translation_text="Translated source.",
+        include_source=False,
+    )
+    assert chatbox_result.decision.decision == "published"
+    assert [message.text for message in chatbox.messages] == ["Translated source."]
+
+    if release_before_close:
+        overlay.release.set()
+    async with asyncio.timeout(1.0):
+        await owner.close()
+
+    assert overlay.cancelled.is_set()
+    assert overlay.events == [original]
+    assert owner.state == "closed"
+    assert not owner.has_active_overlay_deliveries
+    assert not owner.has_resources
+    assert owner.overlay_admission_snapshot()["batches"] == 0
+    assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
+    assert chatbox.drop_pending_calls == 1
+    original_result = next(
+        decision
+        for decision in owner.routing_decisions
+        if decision.publication_id == original.event_id
+    )
+    assert original_result.decision == ("published" if applied_on_cancel else "skipped")
+    assert original_result.reason == (None if applied_on_cancel else "output_runtime_closing")
+
+    overlay.release.set()
+    async with asyncio.timeout(1.0):
+        late = await owner.publish_overlay_event(patch)
+        await owner.close()
+    assert late.decision.reason == "output_runtime_closed"
+    assert overlay.events == [original]
+    assert [message.text for message in chatbox.messages] == ["Translated source."]
+    assert chatbox.drop_pending_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_cancelled_self_caption_waiter_releases_only_its_live_batch() -> None:
+    OutputRuntime = _output_runtime_class()
+    overlay = BlockingOverlaySink()
+    owner = OutputRuntime(chatbox=RecordingChatbox(), overlay_sink=overlay)
+    adapter = OverlayEventAdapter(clock=owner.clock)
+    caption_id = uuid4()
+    original = adapter.self_active_update(
+        text="Original.",
+        utterance_id=caption_id,
+        occupant_key=f"self:{caption_id}",
+        caption_source_closed=True,
+        turn_generation=1,
+        turn_order=0,
+    )
+    patch = adapter.self_active_update(
+        text="Original.",
+        secondary_text="Translation.",
+        utterance_id=caption_id,
+        occupant_key=f"self:{caption_id}",
+        caption_source_closed=True,
+        retained_only=True,
+        caption_revision=1,
+        turn_generation=1,
+        turn_order=0,
+    )
+    active = asyncio.create_task(owner.publish_overlay_event(original))
+    await asyncio.wait_for(overlay.started.wait(), timeout=1.0)
+    waiting = asyncio.create_task(owner.publish_overlay_event(patch))
+    async with asyncio.timeout(1.0):
+        while owner.overlay_admission_snapshot()["unsent"] != 1:
+            await asyncio.sleep(0)
+        waiting.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await waiting
+
+    assert not active.done()
+    assert owner.overlay_admission_snapshot()["active"] == 1
+    assert owner.overlay_admission_snapshot()["unsent"] == 0
+    assert owner.overlay_admission_snapshot()["batches"] == 1
+    assert owner.overlay_admission_snapshot()["reserved_bytes"] > 0
+    overlay.release.set()
+    result = await asyncio.wait_for(active, timeout=1.0)
+    assert result.decision.decision == "published"
+    assert overlay.events == [original]
+    assert owner.overlay_admission_snapshot()["batches"] == 0
+    assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
+    await asyncio.wait_for(owner.close(), timeout=1.0)
+
+
+@pytest.mark.asyncio
 async def test_output_runtime_shutdown_isolates_racing_overlay_failure() -> None:
     OutputRuntime = _output_runtime_class()
     overlay = CloseRaceFailingOverlaySink()
@@ -1040,6 +1190,127 @@ async def test_output_runtime_replacement_cancels_old_overlay_delivery_before_cu
     assert old_overlay.events == [old_event]
     assert replacement.events == [replacement_event]
     assert replacement_result.decision.decision == "published"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("applied_on_cancel", [False, True])
+async def test_output_runtime_replacement_settles_waiting_self_patch_without_reviving_generation(
+    applied_on_cancel: bool,
+) -> None:
+    OutputRuntime = _output_runtime_class()
+    old_overlay = AppliedOnCancelOverlaySink() if applied_on_cancel else BlockingOverlaySink()
+    replacement = RecordingOverlaySink()
+    chatbox = RecordingChatbox()
+    owner = OutputRuntime(chatbox=chatbox, overlay_sink=old_overlay)
+    adapter = OverlayEventAdapter(clock=owner.clock)
+    caption_id = uuid4()
+    original = adapter.self_active_update(
+        text="Old source.",
+        utterance_id=caption_id,
+        occupant_key=f"self:{caption_id}",
+        caption_source_closed=True,
+        turn_generation=1,
+        turn_order=0,
+    )
+    patch = adapter.self_active_update(
+        text="Old source.",
+        secondary_text="Old translation.",
+        utterance_id=caption_id,
+        occupant_key=f"self:{caption_id}",
+        caption_source_closed=True,
+        retained_only=True,
+        caption_revision=1,
+        turn_generation=1,
+        turn_order=0,
+    )
+    parent_id = str(uuid4())
+    assert await owner.admit_translation_parent(
+        parent_id=parent_id,
+        channel="self",
+        origin="manual",
+        turn_generation=1,
+        turn_order=1,
+        retained_payloads=("manual source",),
+        destination_targets={
+            "overlay": frozenset({0}),
+            "ui": frozenset({0}),
+            "chatbox": frozenset({0}),
+        },
+    ) == frozenset({"overlay", "ui", "chatbox"})
+    await asyncio.wait_for(owner.submit_self_overlay_event(original), timeout=1.0)
+    await asyncio.wait_for(old_overlay.started.wait(), timeout=1.0)
+    await asyncio.wait_for(owner.submit_self_overlay_event(patch), timeout=1.0)
+
+    async with asyncio.timeout(1.0):
+        assert await owner.replace_overlay_sink(replacement)
+        assert await owner.await_translation_parent(
+            parent_id=parent_id, origin="manual"
+        ) == frozenset({"ui", "chatbox"})
+        assert await owner.resize_translation_parent_output(
+            parent_id=parent_id,
+            origin="manual",
+            retained_payloads=("manual source", "manual translation"),
+            destination_indexes={"overlay": 0, "ui": 0, "chatbox": 0},
+        ) == frozenset({"ui", "chatbox"})
+        await owner.complete_translation_parent_target(
+            parent_id=parent_id,
+            origin="manual",
+            destination_indexes={"overlay": 0, "ui": 0, "chatbox": 0},
+        )
+
+    assert old_overlay.cancelled.is_set()
+    assert old_overlay.events == [original]
+    assert replacement.events == []
+    assert not owner.has_active_overlay_deliveries
+    assert not owner._replacement_cancelled_delivery_tasks
+    assert owner.overlay_admission_snapshot()["batches"] == 0
+    if applied_on_cancel:
+        duplicate = await asyncio.wait_for(owner.publish_overlay_event(original), timeout=1.0)
+        assert duplicate.decision.reason == "duplicate_publication"
+
+    owner.retire_turn_generation("self", 2)
+    stale = adapter.self_active_update(
+        text="Old source.",
+        secondary_text="Late old translation.",
+        utterance_id=caption_id,
+        occupant_key=f"self:{caption_id}",
+        caption_source_closed=True,
+        retained_only=True,
+        caption_revision=2,
+        turn_generation=1,
+        turn_order=0,
+    )
+    stale_result = await asyncio.wait_for(owner.publish_overlay_event(stale), timeout=1.0)
+    assert stale_result.decision.reason == "stale_retired"
+    new_caption_id = uuid4()
+    fresh = adapter.self_active_update(
+        text="New source.",
+        secondary_text="New translation.",
+        utterance_id=new_caption_id,
+        occupant_key=f"self:{new_caption_id}",
+        caption_source_closed=True,
+        caption_complete=True,
+        turn_generation=2,
+        turn_order=0,
+    )
+    fresh_result = await asyncio.wait_for(owner.publish_overlay_event(fresh), timeout=1.0)
+    chatbox_result = await owner.publish_chatbox(
+        publication_id=new_caption_id,
+        channel="self",
+        transcript_text="New source.",
+        translation_text="New translation.",
+        include_source=False,
+    )
+    old_overlay.release.set()
+    await asyncio.sleep(0)
+    assert fresh_result.decision.decision == "published"
+    assert chatbox_result.decision.decision == "published"
+    assert replacement.events == [fresh]
+    assert old_overlay.events == [original]
+    assert [message.text for message in chatbox.messages] == ["New translation."]
+    assert owner.overlay_admission_snapshot()["batches"] == 0
+    assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
+    await asyncio.wait_for(owner.close(), timeout=1.0)
 
 
 @pytest.mark.asyncio

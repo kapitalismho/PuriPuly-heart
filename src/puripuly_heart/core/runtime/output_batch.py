@@ -44,6 +44,7 @@ class DestinationBatch:
     disposition: str | None = None
     caption_id: str | None = None
     caption_admission_seq: int | None = None
+    caption_translated: bool = False
 
 
 @dataclass(slots=True)
@@ -65,6 +66,8 @@ class DestinationBatchAdmission:
     retired_turn_generations: dict[ChannelId, int] = field(
         default_factory=lambda: {"self": -1, "peer": -1}
     )
+    admitted_self_captions: OrderedDict[tuple[int, str], None] = field(default_factory=OrderedDict)
+    retired_self_captions: OrderedDict[tuple[int, str], None] = field(default_factory=OrderedDict)
 
     @staticmethod
     def scope_for(origin: str, destination: OutputDestination) -> str:
@@ -239,6 +242,8 @@ class DestinationBatchAdmission:
                 return None, "unauthorized_parent"
             if event.turn_generation <= self.retired_turn_generations.get("self", -1):
                 return None, "stale_retired"
+            if (event.turn_generation, str(event.utterance_id)) in self.retired_self_captions:
+                return None, "stale_retired"
         managed_fields = (
             event.parent_utterance_id,
             event.turn_kind,
@@ -285,7 +290,14 @@ class DestinationBatchAdmission:
             return None, "output_payload_exhausted"
         waiting = self.waiting.setdefault(scope, deque())
         waiting_index = None
-        caption_admission_seq = event.seq if assembled_caption and not event.retained_only else None
+        caption_identity = (event.turn_generation, str(event.utterance_id))
+        caption_admission_seq = (
+            event.seq
+            if assembled_caption
+            and not event.retained_only
+            and caption_identity not in self.admitted_self_captions
+            else None
+        )
         if scope == "preview:self" and scope in self.active:
             for superseded_key in tuple(waiting):
                 superseded = self.batches.get(superseded_key)
@@ -327,9 +339,36 @@ class DestinationBatchAdmission:
             expected_targets=frozenset({0}),
             caption_id=str(event.utterance_id) if assembled_caption else None,
             caption_admission_seq=caption_admission_seq,
+            caption_translated=assembled_caption and bool(event.secondary_text.strip()),
         )
         self._insert(batch, waiting_index=waiting_index)
+        if assembled_caption:
+            self._coalesce_self_caption_admissions(scope)
         return batch, None
+
+    def _coalesce_self_caption_admissions(self, scope: str) -> None:
+        active = self.batches.get(self.active.get(scope, ("", "")))
+        candidates = [
+            batch
+            for key in self.waiting.get(scope, ())
+            if (batch := self.batches.get(key)) is not None
+            and batch.caption_id is not None
+            and batch.caption_admission_seq is not None
+            and (batch.turn_generation, batch.caption_id) not in self.admitted_self_captions
+            and (active is None or active.caption_id != batch.caption_id)
+        ]
+        candidates.sort(key=lambda batch: (batch.turn_generation, batch.turn_order))
+        useful = [batch for batch in candidates if batch.caption_translated][-2:]
+        pending = [batch for batch in candidates if not batch.caption_translated][-1:]
+        for batch in candidates:
+            if any(batch is retained for retained in (*useful, *pending)):
+                continue
+            assert batch.turn_generation is not None and batch.caption_id is not None
+            identity = (batch.turn_generation, batch.caption_id)
+            self.retired_self_captions[identity] = None
+            while len(self.retired_self_captions) > COMPLETED_BATCH_LIMIT:
+                self.retired_self_captions.popitem(last=False)
+            self.release(batch, "preview_superseded")
 
     def cancel_waiting(self, batch: DestinationBatch) -> None:
         if batch.active or batch.disposition is not None:
@@ -345,6 +384,12 @@ class DestinationBatchAdmission:
         key = (batch.scope, batch.parent_id)
         if self.batches.get(key) is not batch:
             return
+        if disposition == "applied" and batch.caption_id is not None:
+            assert batch.turn_generation is not None
+            identity = (batch.turn_generation, batch.caption_id)
+            self.admitted_self_captions[identity] = None
+            while len(self.admitted_self_captions) > COMPLETED_BATCH_LIMIT:
+                self.admitted_self_captions.popitem(last=False)
         self.batches.pop(key, None)
         remaining = max(0, self.reserved_bytes.get(batch.scope, 0) - batch.reserved_bytes)
         if remaining:

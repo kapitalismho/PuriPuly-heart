@@ -282,8 +282,7 @@ Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/tran
 - `TranslationTurnLifecycleOwner` owns draft-to-final translation work and preserves compatible running requests when source closes.
 - Freed speculative capacity resumes only the current open draft; sealed turns retain normal bounded admission.
 - Speculative context is not accepted history. Canonical source is admitted once; logical cancellation does not release occupied provider capacity.
-- `SelfTurnPresentation` carries authoritative turn identity, revisions, source closure, speech-end boundary coverage, and per-target status independently of overlay display state.
-- The source owner publishes a mini-turn boundary whenever existing post-end grace starts or restarts. Republishing that boundary does not create a source revision or translation request.
+- `SelfTurnPresentation` carries authoritative turn identity, source/target revisions, source closure, and per-target status independently of overlay display state. Grace restarts do not publish display boundaries or duplicate destination work.
 
 Implementation: `core/orchestrator/self_translation_channel.py`, `core/orchestrator/translation_turn.py`, `domain/events.py`. Behavior: `tests/core/test_self_stream_233.py`.
 
@@ -343,10 +342,10 @@ Implementation: `app/services/chatgpt_account.py`, `providers/llm/chatgpt_plan.p
   - Earlier required corrections retain a sending opportunity without blocking successor translation. Manual bypass and normal pagination supersession remain.
   - Identical successfully sent compatible previews are promoted to final without resending or restarting pagination.
 - **Self caption assembly**
-  - A bounded projection subordinate to `TranslationOutputProjectionOwner` advances merged SELF captions only at published speech-end boundaries, completed displayed-target translations, or source closure. It does not interpret recognition or VAD events.
-  - Source growth retains only the same turn's compatible target translation. Closed source is frozen; terminal failure or unavailability removes an unmatched retained translation.
-  - Admission and retained-caption patches are distinct. Assembly runs before current-dashboard authority can discard a predecessor result; destination admission and presenter retirement still determine whether it can be displayed.
-  - Assembled overlay updates coalesce per caption within the existing bounded shared preview scope. Overlay eligibility and boundary-only publication do not gate or duplicate UI/chatbox progression.
+  - A bounded projection subordinate to `TranslationOutputProjectionOwner` selects closed source or an opportunistic sentence-complete cumulative source milestone. A speculative result alone does not authorize visible advancement. Translation and its covered source advance together; intermediate source growth cannot attach an earlier translation to newer source.
+  - Open-source sentence publication requires a matching result still valid under the translation lifecycle. It does not preserve cancelled requests or create overlay-only translation work. Punctuation-free continuous speech can wait for source closure.
+  - Admission and retained-caption patches are distinct. Overlay authority is independent of current-dashboard authority; late results may patch retained units without reordering, refocusing, or reviving retired identities.
+  - Assembled overlay updates coalesce per caption within the existing bounded shared preview scope. Blocked delivery retains the latest useful SELF admissions and a latest pending-source fallback instead of replaying a queue of obsolete captions; required patches retain their admitted identity. Overlay eligibility does not gate or duplicate recognition, translation, UI, or chatbox progression.
 - **Application turn presentation**
   - Views update turns by identity, revision, and target status. Older results may update their history without replacing the current dashboard turn.
   - Preview rendering is separate from final-only accepted logging and context admission.
@@ -377,7 +376,8 @@ Implementation: `core/runtime/output.py`, `core/orchestrator/translation_output_
 - **Caption ownership**
   - `OverlayPresenter` owns caption admission and lifetime independently of providers.
   - Python owns logical caption state. Native rendering must not redefine that lifetime.
-  - Source closure persists a merged SELF caption without ending current-active protection while its translation is pending. A successor can demote that caption in place; late patches cannot restore a displaced or expired identity, reorder captions, or take focus.
+  - Closed SELF source persists while translation is pending. The presenter stages source-only successors only when admission would displace a visible translated SELF unit from the shared window. Staging does not reserve a visible slot or change PEER selection; ready translation can progress immediately, while available capacity or predecessor expiry admits the latest source fallback. Staged source uses existing retention bounds and expiry, not a playback queue or added dwell.
+  - Successors demote retained captions in place. Late patches cannot restore a displaced or expired identity, reorder captions, or take focus. Ready short turns still share finite display capacity; retention is not a guaranteed reading interval under arbitrary input rates.
   - Independent recognition units, manual input, and PEER keep their existing publication policies.
 - **Fresh-render ownership**
   - Effective visible SELF scene changes renew bounded protection under the single native retry owner. Scene coverage survives caption-target retirement and SELF removal while a nonempty PEER scene remains; it does not change PEER selection or content.

@@ -372,7 +372,6 @@ class _TranslationTurnParent:
     failure_diagnostics: ErrorDiagnostics | None = None
     source_closed: bool = True
     source_revision: int = 0
-    boundary_source_revision: int = 0
     presentation_revision: int = 0
     draft_request: TranslationTurnRequest | None = None
     source_closed_event: asyncio.Event = field(default_factory=asyncio.Event)
@@ -629,18 +628,6 @@ class TranslationTurnLifecycleOwner:
         await self._publish_draft(parent)
         self._start_current_draft()
 
-    async def publish_draft_boundary(self, parent_id: UUID) -> None:
-        parent = self._parents.get(parent_id)
-        if (
-            parent is None
-            or parent.source_closed
-            or parent.turn_generation != self._channel_turn_generations["self"]
-            or self._parent_cancellation_requested(parent)
-        ):
-            return
-        parent.boundary_source_revision = parent.source_revision
-        await self._publish_draft(parent)
-
     async def republish_draft(self, parent_id: UUID) -> None:
         parent = self._parents.get(parent_id)
         if (
@@ -842,7 +829,6 @@ class TranslationTurnLifecycleOwner:
                 status,
                 tuple(targets),
                 request.transcript.created_at,
-                parent.boundary_source_revision,
             ),
             request,
         )

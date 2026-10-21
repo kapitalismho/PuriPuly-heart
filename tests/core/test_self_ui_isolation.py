@@ -110,26 +110,13 @@ async def test_real_self_owners_start_provider_and_apply_source_before_ui_releas
         if route != "independent":
             assert not overlay.snapshot().blocks
             source_revision = snapshots[-1].source_revision
-            assert snapshots[-1].boundary_source_revision == 0
             assert not snapshots[-1].source_closed
             await asyncio.wait_for(
                 harness.self_owner.handle_vad_event(SpeechEnd(identity.segment.segment_id)),
                 1.0,
             )
             assert snapshots[-1].source_revision == source_revision
-            assert snapshots[-1].boundary_source_revision == source_revision
             assert not snapshots[-1].source_closed
-        else:
-            assert harness.self_owner.merge_buffer is None
-        blocks = overlay.snapshot().blocks
-        assert [block.primary_text for block in blocks] == ["source"]
-        assert [block.secondary_text for block in blocks] == [""]
-        assert len(llm.calls) == 1
-        assert harness.ui_events.full()
-        assert not ui_release.is_set()
-        print(
-            f"OWNER_SMOKE route={route} source_application=true provider_calls=1 ui_released=false"
-        )
         if route != "independent":
             terminal = STTProviderTurnTerminal(
                 identity,
@@ -155,17 +142,16 @@ async def test_real_self_owners_start_provider_and_apply_source_before_ui_releas
             assert all(target.status == "pending" for target in closed[-1].targets)
             assert harness.translation_turns.is_parent_active(buffer.merge_id)
             assert not llm.release.is_set()
-            current = overlay.snapshot().blocks[0]
-            assert (current.id, current.occupant_key, current.appearance_seq) == (
-                blocks[0].id,
-                blocks[0].occupant_key,
-                blocks[0].appearance_seq,
-            )
-            assert current.primary_text == "source"
-            assert current.secondary_text == ""
-            assert harness.ui_events.full()
-            assert not ui_release.is_set()
-            assert len(llm.calls) == 1
+        assert harness.self_owner.merge_buffer is None
+        blocks = overlay.snapshot().blocks
+        assert [block.primary_text for block in blocks] == ["source"]
+        assert [block.secondary_text for block in blocks] == [""]
+        assert len(llm.calls) == 1
+        assert harness.ui_events.full()
+        assert not ui_release.is_set()
+        print(
+            f"OWNER_SMOKE route={route} source_application=true provider_calls=1 ui_released=false"
+        )
         llm.release.set()
 
         async def wait_for_translation_application() -> None:
@@ -263,6 +249,9 @@ async def test_real_self_translation_completes_while_bridge_transport_is_blocked
                 harness.self_owner.handle_vad_event(SpeechEnd(identity.segment.segment_id)),
                 1.0,
             )
+            assert not overlay.snapshot().blocks
+            await _wait_until(lambda: harness.self_owner.merge_buffer is None)
+            await _wait_until(lambda: bool(overlay.snapshot().blocks))
         else:
             assert harness.self_owner.merge_buffer is None
         source = overlay.snapshot()
