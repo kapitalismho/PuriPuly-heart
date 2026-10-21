@@ -194,6 +194,7 @@ async def test_open_sentence_coverage_advances_atomically_without_duplicate_pref
     try:
         await source(harness, uid, first)
         await eventually(lambda: (first, "en") in provider.responses)
+        assert visible(presenter) == []
         provider.finish(first, "first readable unit")
         await eventually(lambda: visible(presenter) == [(first, "first readable unit")])
         original = presenter.snapshot().blocks[0]
@@ -333,6 +334,63 @@ async def test_resumed_speech_keeps_exact_previous_sentence_coverage_until_new_u
 
 
 @pytest.mark.asyncio
+async def test_pending_punctuated_successor_waits_for_translation_or_source_closure():
+    provider, osc = HeldTranslations(), RecordingOscQueue()
+    presenter = OverlayPresenter(calibration=OverlayCalibration())
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=osc,
+        overlay_sink=presenter,
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+    )
+    first, successor = uuid4(), uuid4()
+    try:
+        await source(harness, first, "retained source")
+        await eventually(lambda: ("retained source", "en") in provider.responses)
+        provider.finish("retained source", "retained translation")
+        await eventually(lambda: any("retained translation" in m.text for m in osc.messages))
+        await harness.self_owner.handle_vad_event(SpeechEnd(first))
+        await harness.translation_turns.wait_for_idle()
+        retained = presenter.snapshot().blocks[0]
+        assert visible(presenter) == [("retained source", "retained translation")]
+
+        await source(harness, successor, "Pending successor.")
+        await eventually(lambda: ("Pending successor.", "en") in provider.responses)
+        assert not provider.responses[("Pending successor.", "en")].done()
+        assert presenter.snapshot().blocks == [retained]
+
+        await harness.self_owner.handle_vad_event(SpeechEnd(successor))
+        assert harness.self_owner.merge_buffer is None
+        assert not provider.responses[("Pending successor.", "en")].done()
+        assert visible(presenter) == [
+            ("retained source", "retained translation"),
+            ("Pending successor.", ""),
+        ]
+        fallback = presenter.snapshot().blocks[1]
+        assert presenter.snapshot().blocks[0] == retained
+        provider.finish("Pending successor.", "matching successor")
+        await harness.translation_turns.wait_for_idle()
+        assert visible(presenter) == [
+            ("retained source", "retained translation"),
+            ("Pending successor.", "matching successor"),
+        ]
+        translated = presenter.snapshot().blocks[1]
+        assert presenter.snapshot().blocks[0] == retained
+        assert (translated.id, translated.occupant_key, translated.appearance_seq) == (
+            fallback.id,
+            fallback.occupant_key,
+            fallback.appearance_seq,
+        )
+        assert provider.calls == [("retained source", "en"), ("Pending successor.", "en")]
+        assert any("matching successor" in message.text for message in osc.messages)
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
 async def test_successive_ready_turns_keep_previous_translation_until_next_useful_successor():
     provider, clock = HeldTranslations(), FakeClock()
     presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
@@ -416,9 +474,9 @@ async def test_staged_successor_first_translation_survives_newer_dashboard_sourc
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("outcome", ["disabled", "unavailable", "failed"])
+@pytest.mark.parametrize("outcome", ["disabled", "unavailable", "failed_open", "failed_closed"])
 async def test_closed_source_fallback_progresses_without_successful_translation(outcome):
-    provider = HeldTranslations() if outcome == "failed" else None
+    provider = HeldTranslations() if outcome.startswith("failed") else None
     presenter = OverlayPresenter(calibration=OverlayCalibration())
     harness = compose_translation_test_harness(
         stt=None,
@@ -432,20 +490,34 @@ async def test_closed_source_fallback_progresses_without_successful_translation(
     )
     try:
         uid = uuid4()
-        await source(harness, uid, "source fallback")
+        text = "source fallback."
+        await source(harness, uid, text)
         if provider is not None:
-            await eventually(lambda: ("source fallback", "en") in provider.responses)
+            await eventually(lambda: (text, "en") in provider.responses)
+        assert visible(presenter) == []
+        if outcome == "failed_open":
+            provider.responses[(text, "en")].set_exception(
+                RuntimeError("synthetic speculative failure")
+            )
+            async with asyncio.timeout(2):
+                while True:
+                    event = await harness.ui_events.get()
+                    if any(
+                        target.status == "failed"
+                        for target in getattr(event.payload, "targets", ())
+                    ):
+                        break
+            assert visible(presenter) == []
         await harness.self_owner.handle_vad_event(SpeechEnd(uid))
         if provider is not None:
-            provider.responses[("source fallback", "en")].set_exception(
-                RuntimeError("synthetic failure")
-            )
+            if outcome == "failed_closed":
+                provider.responses[(text, "en")].set_exception(RuntimeError("synthetic failure"))
             await eventually(lambda: len(provider.calls) == 2)
-            provider.responses[("source fallback", "en")].set_exception(
-                RuntimeError("synthetic final failure")
-            )
+            provider.responses[(text, "en")].set_exception(RuntimeError("synthetic final failure"))
         await harness.translation_turns.wait_for_idle()
-        assert visible(presenter) == [("source fallback", "")]
+        assert visible(presenter) == [(text, "")]
+        assert presenter.snapshot().blocks[0].block_variant == "finalized"
+        assert any(message.text == text for message in harness.osc.messages)
     finally:
         await harness.stop()
         await presenter.close()

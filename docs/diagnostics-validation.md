@@ -721,10 +721,12 @@ This is a task-specific disposition, not reuse of #265's closure amendment.
 ### Implemented display unit and preserved boundaries
 
 SELF overlay publication selects closed source or an opportunistic complete
-sentence within an open cumulative source. Source and matching translation
-advance together. A new speculative result or grace restart alone is no longer
-a display boundary. The obsolete source-boundary publication machinery was
-removed; shared source closure remains independent of translation completion.
+sentence within an open cumulative source. An open sentence requires a valid
+matching translation before admission; source and translation advance together.
+Closed source can still publish its usable source-only fallback. A new
+speculative result or grace restart alone is no longer a display boundary.
+The obsolete source-boundary publication machinery was removed; shared source
+closure remains independent of translation completion.
 
 A pending source-only successor does not displace a visible translated SELF
 unit merely to fill the shared window. Available space still permits source
@@ -1001,3 +1003,50 @@ All 120 completed rows among 292 retry rows carried matching fresh-render,
 producer-ready and submit-success witnesses. Native file hashes remained
 unchanged, so earlier release/startup and real offscreen GPU evidence remains
 applicable. This continuation does not add OpenVR or physical HMD evidence.
+
+### Automatic-review repair: pending open-sentence admission
+
+[PR #280's automatic review](https://github.com/kapitalismho/PuriPuly-heart/pull/280#discussion_r4332424604)
+found that the first open punctuated source could appear before its matching
+translation. Existing translated coverage was protected, so this was not a
+stale-target attachment defect. It did contradict the maintained open-sentence
+contract. The Director accepted a bounded correction: eligibility is now closed
+source, or sentence-complete source with a valid matching ready translation.
+Canonical closure and closed-source fallback remain independent of the LLM.
+
+The same ten behavioral cases failed before the correction and passed after it.
+They cover first admission in four languages, pending successor retention,
+matching-result progression, disabled/unavailable translation, failure before
+and after closure, and producer progress while translated overlay delivery is
+blocked. The complete affected selection passed 393 tests; six additional
+UI/bridge isolation cases passed with controlled boundaries and real production
+owners. Global Ruff, Black and offline test-selection checks passed.
+
+Two fresh production desktop-child sessions exercised the corrected projection
+hash `f56bc8d54ba7680469005f195f763402aa8ce48bbecf20af2608a7f9b010d1dd`.
+All ten guarded checkpoints passed and their captured images were viewed.
+The initial pending punctuated sentence showed no caption, only ordinary Lock
+chrome. Its matching result then admitted the complete source/translation pair.
+Newer pending cumulative coverage preserved that exact pair until its matching
+result was ready.
+
+| Enabled-session unit | Matching result ready | Capture showing coherent pair |
+| --- | --- | --- |
+| First sentence | 0.751380 s | 0.781276–0.816827 s |
+| Cumulative successor | 1.957235 s | 1.962104–2.002093 s |
+
+These are controlled observations, not a universal latency bound. Closing a
+later source admitted usable source-only fallback beside the retained
+translation; deliberate provider failure preserved that truthful fallback.
+The separate disabled session showed no open-source caption, then displayed
+closed source at 1.181447–1.217599 s with zero LLM calls. Both desktop children
+and independent observers exited successfully, without capture or cleanup
+failures.
+
+Earlier timing/comparison records describe the candidate before this bounded
+repair. Any earlier open-source-only admission observation is superseded, not
+relabelled as final-candidate evidence. Translated-unit grouping, canonical
+closure, destination isolation, mixed-scene selection and unchanged native
+protection evidence are retained only where their exercised behavior is
+unaffected. The new desktop observations cover the changed first-admission
+path; they add no physical HMD or sustained-session evidence.

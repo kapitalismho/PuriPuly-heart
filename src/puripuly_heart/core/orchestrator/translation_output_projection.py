@@ -1429,7 +1429,8 @@ class TranslationOutputProjectionOwner:
         )
         cancelled = snapshot.status in {"cancelled", "expired"}
         eligible = not cancelled and (
-            snapshot.source_closed or _self_sentence_complete(snapshot.source_text)
+            snapshot.source_closed
+            or (ready is not None and _self_sentence_complete(snapshot.source_text))
         )
         if (
             len(snapshot.source_text.encode("utf-8"))

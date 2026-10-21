@@ -915,7 +915,7 @@ async def test_handle_vad_event_speech_end_tracks_timing_and_forwards_to_stt() -
 
 
 @pytest.mark.asyncio
-async def test_blocked_source_overlay_does_not_block_stt_or_translation() -> None:
+async def test_blocked_translated_sentence_overlay_does_not_block_stt_or_translation() -> None:
     stt = StubSTT()
     llm = StubLLM()
     sink = BlockingOverlaySink()
@@ -939,7 +939,8 @@ async def test_blocked_source_overlay_does_not_block_stt_or_translation() -> Non
     try:
         await asyncio.wait_for(sink.started.wait(), timeout=1.0)
         assert sink.events[0].text == "hello live."
-        assert sink.events[0].secondary_text == ""
+        assert sink.events[0].secondary_text == "T:hello live."
+        assert not sink.events[0].caption_source_closed
         chunk = SpeechChunk(uuid4(), chunk=np.zeros((1,), dtype=np.float32))
         await asyncio.wait_for(harness.self_owner.handle_vad_event(chunk), timeout=1.0)
         assert stt.handled == [chunk]
