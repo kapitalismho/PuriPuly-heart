@@ -195,6 +195,7 @@ class _StreamRecovery:
     source_frontier: int
     pending: bool = True
     require_speech: bool = False
+    resume_pre_roll: bool = False
 
 
 @dataclass(slots=True)
@@ -398,6 +399,10 @@ class ScopedRecognitionEngine:
         await self._event_drained.wait()
 
     async def handle_stream_input(self, owned: OwnedStreamInput) -> None:
+        if await self._handle_stream_input(owned):
+            await self._handle_stream_input(owned)
+
+    async def _handle_stream_input(self, owned: OwnedStreamInput) -> bool | None:
         if (
             owned.settings.provider_id == "qwen_audio"
             and owned.event.boundary_reason == "source_discontinuity"
@@ -420,6 +425,7 @@ class ScopedRecognitionEngine:
                 await self.abort(reason=owned.event.boundary_reason)
                 return
             recovery = self._stream_recovery
+            resume_pre_roll = False
             if recovery is not None:
                 if recovery.pending and not self._recovery_matches(recovery, owned):
                     await self.abort(reason="stream_input_ownership_changed")
@@ -436,6 +442,7 @@ class ScopedRecognitionEngine:
                         for span in owned.event.capture
                     ):
                         return
+                    resume_pre_roll = recovery.resume_pre_roll
                     recovery.pending = False
                     watchdogs = self.watchdog_resolver(owned.settings)
                     try:
@@ -524,37 +531,29 @@ class ScopedRecognitionEngine:
                 or any(span.capture_epoch != stream.capture_epoch for span in owned.event.capture)
             ):
                 return
-            samples, ranges = self._after_stream_failure(owned.event.chunk, owned.event.capture)
-            if getattr(samples, "size", 0) and not session.recognition_source_covers(ranges):
-                budget = owned.retention.budget if owned.retention is not None else None
-                allocation = object()
-                count = int(getattr(samples, "size", 0))
-                if budget is not None and not budget.try_reserve(
-                    allocation, count * 2, sample_equivalents=count
-                ):
-                    await self.abort(reason="stream_input_capacity_exhausted")
-                    return
-                candidate = _StreamRecovery(
-                    stream,
-                    owned.settings,
-                    authority_generation,
-                    max(span.normalized_end_sample or 0 for span in ranges),
+            if (
+                resume_pre_roll
+                and owned.event.pre_roll is not None
+                and owned.event.pre_roll_capture
+                and all(
+                    span.capture_epoch == stream.capture_epoch
+                    for span in owned.event.pre_roll_capture
                 )
-                try:
-                    written = await self._run_stream_write(
-                        session,
-                        session.send_stream_audio(
-                            float32_to_pcm16le_bytes(samples), source_ranges=ranges
-                        ),
-                        watchdogs.write_timeout_s,
-                        recovery=candidate,
-                    )
-                    if written:
-                        self._episode_failures = 0
-                        self._terminal_failure_notified = False
-                finally:
-                    if budget is not None:
-                        budget.release(allocation)
+            ):
+                if not await self._send_stream_payload(
+                    owned,
+                    session,
+                    stream,
+                    watchdogs,
+                    owned.event.pre_roll,
+                    owned.event.pre_roll_capture,
+                ):
+                    recovery = self._stream_recovery
+                    return recovery is not None and recovery.pending
+            if not await self._send_stream_payload(
+                owned, session, stream, watchdogs, owned.event.chunk, owned.event.capture
+            ):
+                return
             if owned.event.boundary_reason is not None and session is self._session:
                 self._stream_recovery = None
                 await self._run_stream_write(
@@ -563,6 +562,47 @@ class ScopedRecognitionEngine:
                     watchdogs.write_timeout_s + watchdogs.drain_timeout_s,
                 )
                 await self._await_event_drain(self.event_drain_timeout_s)
+
+    async def _send_stream_payload(
+        self,
+        owned: OwnedStreamInput,
+        session: STTIndependentRecognitionSession,
+        stream: RecognitionStreamIdentity,
+        watchdogs: STTRecognitionWatchdogs,
+        samples: np.ndarray,
+        ranges: tuple[AudioCaptureSpan, ...],
+    ) -> bool:
+        samples, ranges = self._after_stream_failure(samples, ranges)
+        if not samples.size or session.recognition_source_covers(ranges):
+            return True
+        budget = owned.retention.budget if owned.retention is not None else None
+        allocation = object()
+        count = int(samples.size)
+        if budget is not None and not budget.try_reserve(
+            allocation, count * 2, sample_equivalents=count
+        ):
+            await self.abort(reason="stream_input_capacity_exhausted")
+            return False
+        candidate = _StreamRecovery(
+            stream,
+            owned.settings,
+            self._authority_generation,
+            max(span.normalized_end_sample or 0 for span in ranges),
+        )
+        try:
+            written = await self._run_stream_write(
+                session,
+                session.send_stream_audio(float32_to_pcm16le_bytes(samples), source_ranges=ranges),
+                watchdogs.write_timeout_s,
+                recovery=candidate,
+            )
+            if written:
+                self._episode_failures = 0
+                self._terminal_failure_notified = False
+            return written
+        finally:
+            if budget is not None:
+                budget.release(allocation)
 
     def _recovery_matches(self, recovery: _StreamRecovery, owned: OwnedStreamInput) -> bool:
         return (
@@ -694,6 +734,7 @@ class ScopedRecognitionEngine:
                 recovery.authority_generation = self._authority_generation
                 recovery.pending = True
                 recovery.require_speech = False
+                recovery.resume_pre_roll = False
                 self._stream_recovery = recovery
                 self._recovery_backoff_pending = True
             else:
@@ -2436,6 +2477,9 @@ class ScopedRecognitionEngine:
         ):
             recovery.pending = True
             recovery.require_speech = require_speech
+            recovery.resume_pre_roll = (
+                reason == "provider_idle_timeout" and require_speech and not failed
+            )
             if failed:
                 self._episode_failures += 1
                 self._recovery_backoff_pending = True

@@ -209,7 +209,7 @@ class _GenerationGuardedVadSink:
                     for receipt in retired:
                         await cast(_VadSink, self.sink).handle_source_segment_retired(receipt)
             return
-        samples = int(event.chunk.size)
+        samples = self._event_retained_sample_equivalents(event)
         if samples and self._stream_drop_pending:
             return
         if samples:
@@ -217,7 +217,7 @@ class _GenerationGuardedVadSink:
                 self._retained_samples + samples > self.max_retained_samples
                 or not self.retention_budget.try_reserve(
                     owned.retention.dispatcher_owner,
-                    int(event.chunk.nbytes),
+                    self._event_retained_bytes(event),
                     sample_equivalents=samples,
                 )
             ):

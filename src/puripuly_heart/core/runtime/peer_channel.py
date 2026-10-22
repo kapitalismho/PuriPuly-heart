@@ -384,8 +384,10 @@ class _GenerationGuardedVadSink:
                 raise RuntimeError("peer stream audio requires owned retention")
             if not binding.budget.try_reserve(
                 binding.dispatcher_owner,
-                int(event.event.chunk.nbytes),
-                sample_equivalents=int(event.event.chunk.size),
+                int(event.event.chunk.nbytes) + int(getattr(event.event.pre_roll, "nbytes", 0)),
+                sample_equivalents=(
+                    int(event.event.chunk.size) + int(getattr(event.event.pre_roll, "size", 0))
+                ),
             ):
                 self._stream_drop_pending = True
                 await self._submit(
@@ -627,13 +629,14 @@ class _GenerationGuardedVadSink:
     def _describe_event(event: object) -> _QueuedVadEvent:
         if isinstance(event, OwnedStreamInput):
             samples = int(event.event.chunk.size)
+            context_samples = int(getattr(event.event.pre_roll, "size", 0))
             return _QueuedVadEvent(
                 event=event,
-                pcm_samples=samples,
+                pcm_samples=samples + context_samples,
                 segment_id=None,
                 segment_order=None,
                 content_pcm_samples=samples,
-                context_pcm_samples=0,
+                context_pcm_samples=context_samples,
                 opens_segment=False,
                 closes_segment=False,
                 sealed_at_dispatch_s=None,

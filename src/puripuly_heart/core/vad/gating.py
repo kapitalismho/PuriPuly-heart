@@ -92,6 +92,7 @@ class VadGating:
     _hard_rollover_pre_roll_samples: int
     _hard_rollover_pre_roll: np.ndarray | None
     _hard_rollover_pre_roll_capture: tuple[AudioCaptureSpan, ...]
+    _onset_pre_roll: tuple[np.ndarray, tuple[AudioCaptureSpan, ...]] | None
 
     def __init__(
         self,
@@ -166,6 +167,7 @@ class VadGating:
         self._pending_segment_settings = None
         self._hard_rollover_pre_roll = None
         self._hard_rollover_pre_roll_capture = ()
+        self._onset_pre_roll = None
 
     @property
     def in_speech(self) -> bool:
@@ -178,6 +180,10 @@ class VadGating:
     @property
     def last_observation_was_speech(self) -> bool:
         return self._last_observation_was_speech
+
+    @property
+    def onset_pre_roll(self) -> tuple[np.ndarray, tuple[AudioCaptureSpan, ...]] | None:
+        return self._onset_pre_roll
 
     @property
     def last_probability(self) -> float | None:
@@ -218,6 +224,7 @@ class VadGating:
         self._rollover_silence_run = 0
         self._clear_hard_rollover_pre_roll()
         self._drop_pending_start()
+        self._onset_pre_roll = None
         self._last_observation_was_speech = False
         self._last_probability = None
         self._last_applied_threshold = None
@@ -279,6 +286,7 @@ class VadGating:
         chunk = np.asarray(chunk, dtype=np.float32).reshape(-1)
         if chunk.size != self.chunk_samples:
             raise ValueError(f"chunk must have {self.chunk_samples} samples")
+        self._onset_pre_roll = None
 
         prob = self.engine.speech_probability(chunk, sample_rate_hz=self.sample_rate_hz)
         observation_threshold = (
@@ -371,6 +379,10 @@ class VadGating:
             self._pending_start_pre_roll = self._ring.get_last_samples(self._ring.capacity_samples)
             self._pending_start_pre_roll_capture = self._capture_suffix(
                 len(self._pending_start_pre_roll)
+            )
+            self._onset_pre_roll = (
+                self._pending_start_pre_roll,
+                self._pending_start_pre_roll_capture,
             )
             self._pending_start_prob = prob
             self._pending_start_chunks = [chunk.copy()]
