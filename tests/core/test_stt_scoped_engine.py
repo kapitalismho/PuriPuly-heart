@@ -4818,3 +4818,114 @@ async def test_capture_dispatch_accounts_for_context_and_releases_it(
     finally:
         release.set()
         await guard.abort()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize("invalidation", ["none", "capture_epoch", "settings", "activation"])
+async def test_successful_resume_context_does_not_admit_newly_stale_onset(
+    channel: str, invalidation: str
+) -> None:
+    from types import SimpleNamespace
+
+    from puripuly_heart.core.audio.format import float32_to_pcm16le_bytes
+    from puripuly_heart.core.runtime import peer_channel, self_capture
+
+    ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
+    clock = ControlledMonotonicClock(value=100)
+    sessions: list[ControlledStreamSession] = []
+
+    async def factory(_settings, _epoch):
+        session = ControlledStreamSession()
+        if sessions:
+            session.send_gate.clear()
+        sessions.append(session)
+        return session
+
+    engine = ScopedRecognitionEngine(
+        factory,
+        channel=channel,
+        watchdog_resolver=lambda _: watchdogs(write_timeout_s=1.0),
+        monotonic_clock=clock.now,
+        sleep=clock.sleep,
+    )
+    runtime = SimpleNamespace(
+        segment_ledger=ledger,
+        _current_stream_capture_epoch=None,
+        is_current_generation=lambda generation: generation == 3,
+    )
+
+    class NativeCaptureBoundary:
+        async def handle_stream_input(self, event: OwnedStreamInput) -> None:
+            await engine.handle_stream_input(event)
+
+    if channel == "self":
+        guard = self_capture._GenerationGuardedVadSink(
+            sink=NativeCaptureBoundary(),
+            owner=runtime,
+            capture_generation=self_capture._CaptureGeneration(3),
+            ledger=ledger,
+            retention_budget=AudioRetentionBudget(
+                capacity_bytes=4096, capacity_sample_equivalents=1024
+            ),
+        )
+    else:
+        ready = asyncio.Event()
+        ready.set()
+        guard = peer_channel._GenerationGuardedVadSink(
+            sink=engine,
+            runtime=runtime,
+            capture_generation=peer_channel._CaptureGeneration(3),
+            provider_ingress_ready=ready,
+        )
+    context = np.full(10, 0.1, dtype=np.float32)
+    onset = np.full(4, 0.4, dtype=np.float32)
+    try:
+        for event in segment_events(ledger, start_sample=0, now=100):
+            await engine.handle_owned_vad_event(event)
+        await clock.advance_to(161)
+        await wait_until(lambda: ("close",) in sessions[0].calls)
+        await guard.handle_stream_input(
+            CaptureStreamInput(
+                onset,
+                (span(20, 20, 24),),
+                speech_observed=True,
+                pre_roll=context,
+                pre_roll_capture=(span(10, 10, 20),),
+            )
+        )
+        await wait_until(lambda: len(sessions) == 2)
+        resumed = sessions[1]
+        await asyncio.wait_for(resumed.write_entered.wait(), timeout=1.0)
+        if invalidation == "capture_epoch":
+            await guard.handle_stream_input(
+                CaptureStreamInput(
+                    np.empty(0, dtype=np.float32), (), boundary_reason="source_discontinuity"
+                )
+            )
+            await guard.handle_stream_input(
+                CaptureStreamInput(
+                    np.full(4, 0.5, dtype=np.float32),
+                    (replace(span(24, 24, 28), capture_epoch=2),),
+                )
+            )
+        elif invalidation == "settings":
+            ledger.rebind(
+                activation_generation=3,
+                settings=settings("gemini_transcribe", signature="successor"),
+            )
+        elif invalidation == "activation":
+            ledger.rebind(activation_generation=4, settings=ledger.settings)
+        resumed.send_gate.set()
+        await asyncio.wait_for(guard.finish(), timeout=1.0)
+        expected = [(float32_to_pcm16le_bytes(context), (span(10, 10, 20),))]
+        if invalidation == "none":
+            expected.append((float32_to_pcm16le_bytes(onset), (span(20, 20, 24),)))
+        assert resumed.audio == expected
+        assert guard.retention_budget.used_bytes == 0
+        assert guard.retention_budget.used_sample_equivalents == 0
+    finally:
+        for session in sessions:
+            session.send_gate.set()
+        await guard.abort()
+        await engine.close()

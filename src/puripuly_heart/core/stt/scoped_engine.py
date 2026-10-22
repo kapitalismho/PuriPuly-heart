@@ -550,6 +550,16 @@ class ScopedRecognitionEngine:
                 ):
                     recovery = self._stream_recovery
                     return recovery is not None and recovery.pending
+                if (
+                    self._closed
+                    or authority_generation != self._authority_generation
+                    or session is not self._session
+                    or stream != self._recognition_stream
+                    or owned.ledger.activation_generation != owned.activation_generation
+                    or owned.ledger.settings != owned.settings
+                    or (owned.is_current is not None and not owned.is_current())
+                ):
+                    return
             if not await self._send_stream_payload(
                 owned, session, stream, watchdogs, owned.event.chunk, owned.event.capture
             ):
