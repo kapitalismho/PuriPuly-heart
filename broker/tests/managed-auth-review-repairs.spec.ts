@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildManagedOperationId, buildManagedOperationResumeToken, createManagedOperation,
   getManagedOperation, hashManagedOperationResumeToken, listManagedOperationAttempts,
-  sweepStaleManagedOperations,
+  reconcileUnknownAttempt, sweepStaleManagedOperations,
 } from '../src/managed-operation';
 import { readBrokerMigrationSql } from './test-support/migrations';
 import { ACK_PATH, RESUME_PATH, controlledProvider, seedRecoverableOperation, workerPost } from './test-support/managed-recovery';
@@ -68,7 +68,7 @@ describe.each(['discord', 'qq'] as const)('%s outstanding create responsibility'
       expect(await (await delayed).json()).not.toHaveProperty('openrouter_api_key');
       expect(provider.keys.has('controlled-key-1')).toBe(true);
       expect((await listManagedOperationAttempts(env.BROKER_DB, seeded.operationId))[1]).toMatchObject({ create_in_flight: 0, managed_credential_ref: 'controlled-key-1' });
-      await sweepStaleManagedOperations(env, sixMinutesLater);
+      await reconcileUnknownAttempt(env.BROKER_DB, env.OPENROUTER_MANAGEMENT_API_KEY, (await getManagedOperation(env.BROKER_DB, seeded.operationId))!, sixMinutesLater);
       expect(provider.keys.has('controlled-key-1')).toBe(false);
       const delivered = await (await workerPost(env, RESUME_PATH, seeded.authority)).json() as Record<string, string>;
       expect(delivered.openrouter_api_key).toBe('sk-controlled-2');
@@ -103,7 +103,7 @@ describe.each(['discord', 'qq'] as const)('%s outstanding create responsibility'
     expect((await listManagedOperationAttempts(env.BROKER_DB, seeded.operationId))[1]).toMatchObject({ create_in_flight: 1, outcome: 'unknown' });
     await (lateCreate as unknown as () => Promise<Response>)();
     expect(provider.keys.has('controlled-key-1')).toBe(true);
-    await sweepStaleManagedOperations(env, sixMinutesLater);
+    await reconcileUnknownAttempt(env.BROKER_DB, env.OPENROUTER_MANAGEMENT_API_KEY, (await getManagedOperation(env.BROKER_DB, seeded.operationId))!, sixMinutesLater);
     expect(provider.keys.has('controlled-key-1')).toBe(false);
     const delivered = await (await workerPost(env, RESUME_PATH, seeded.authority)).json() as Record<string, string>;
     expect(delivered.openrouter_api_key).toBe('sk-controlled-2');
