@@ -9,6 +9,7 @@ import { createManagedKeyDelivery } from '../src/managed-key-delivery';
 import { reconcileStaleManagedKeyDeliveries } from '../src/scheduled';
 import { createTestBrokerEnv, seedRequestEvent } from './test-support/sqlite-d1';
 import { ACK_PATH, RESUME_PATH, STATUS_PATH, controlledProvider, deferred, seedRecoverableOperation, workerPost } from './test-support/managed-recovery';
+import { MANAGED_CLEANUP_RETRY_MS } from '../src/managed-cleanup';
 
 const now = new Date('2026-10-17T10:00:00.000Z');
 
@@ -26,7 +27,7 @@ describe.each(['discord', 'qq'] as const)('%s managed recovery safety', (source)
         }
       },
       afterAll: async ({ sql }) => {
-        if (armed && consumer === 'cron' && sql.includes('SELECT operation.* FROM managed_operations')) {
+        if (armed && consumer === 'cron' && sql.includes('FROM managed_operation_attempts attempt')) {
           armed = false; entered.resolve(); await gate.promise;
         }
       },
@@ -93,11 +94,48 @@ describe.each(['discord', 'qq'] as const)('%s managed recovery safety', (source)
     expect(provider.keys.has(seeded.hash)).toBe(true);
     expect((await listManagedOperationAttempts(env.BROKER_DB, seeded.operationId))[0]?.outcome).not.toBe('cleaned');
     provider.failCleanup = false;
-    await sweepStaleManagedOperations(env, new Date(now.getTime() + 62 * 60_000), provider.fetchImpl);
+    await sweepStaleManagedOperations(env, new Date(now.getTime() + 61 * 60_000 + MANAGED_CLEANUP_RETRY_MS), provider.fetchImpl);
     expect(provider.keys.has(seeded.hash)).toBe(false);
     expect((await listManagedOperationAttempts(env.BROKER_DB, seeded.operationId))[0]?.outcome).toBe('cleaned');
     expect(await getManagedOperation(env.BROKER_DB, seeded.operationId)).toMatchObject({ state: 'FAILED', failure_reason: reason, client_action: 'action_required' });
     expect(provider.creates).toBe(0);
+  });
+
+  it('durably defers unattended retries while authenticated same-operation recovery stays usable', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(now);
+    const env = createTestBrokerEnv(); const provider = controlledProvider(); vi.stubGlobal('fetch', provider.fetchImpl);
+    const seeded = await seedRecoverableOperation(env, source, now);
+    env.__db.prepare(`UPDATE managed_operation_attempts SET managed_credential_ref = NULL, create_in_flight = 1 WHERE operation_id = ?`).run(seeded.operationId);
+    await sweepStaleManagedOperations(env, now, provider.fetchImpl);
+    const attempts = await listManagedOperationAttempts(env.BROKER_DB, seeded.operationId);
+    const operation = await getManagedOperation(env.BROKER_DB, seeded.operationId);
+    const changes = env.__db.prepare('SELECT total_changes() AS count').get()!.count;
+    const calls = provider.calls.length;
+    for (const minute of [1, 2, 3]) await sweepStaleManagedOperations(env, new Date(now.getTime() + minute * 60_000), provider.fetchImpl);
+    expect(await listManagedOperationAttempts(env.BROKER_DB, seeded.operationId)).toEqual(attempts);
+    expect(await getManagedOperation(env.BROKER_DB, seeded.operationId)).toEqual(operation);
+    expect(env.__db.prepare('SELECT total_changes() AS count').get()!.count).toBe(changes);
+    expect(provider.calls).toHaveLength(calls);
+    expect(operation).toMatchObject({ state: 'CLEANUP_REQUIRED' });
+    provider.keys.set(seeded.hash, { hash: seeded.hash, name: seeded.keyName, limit: 0.07, disabled: false });
+    const delivered = await (await workerPost(env, RESUME_PATH, seeded.authority)).json() as Record<string, string>;
+    expect(delivered.openrouter_api_key).toBe('sk-controlled-1');
+    expect(provider.keys.has(seeded.hash)).toBe(false);
+    expect((await workerPost(env, ACK_PATH, { delivery_id: delivered.delivery_id, managed_credential_ref: delivered.managed_credential_ref, delivery_ack_token: delivered.delivery_ack_token })).status).toBe(200);
+    expect(await getManagedOperation(env.BROKER_DB, seeded.operationId)).toMatchObject({ state: 'ACTIVE', current_attempt_index: 2 });
+    expect(provider.keys.has(delivered.managed_credential_ref!)).toBe(true);
+  });
+
+  it('reclaims an abandoned exact-attempt cleanup at sixteen minutes rather than waiting six hours', async () => {
+    const env = createTestBrokerEnv(); const provider = controlledProvider();
+    const seeded = await seedRecoverableOperation(env, source, now);
+    provider.keys.set(seeded.hash, { hash: seeded.hash, name: seeded.keyName, limit: 0.07, disabled: false });
+    env.__db.prepare(`UPDATE managed_operation_attempts SET cleanup_token = 'abandoned', cleanup_started_at = ?, legacy_cleanup_checked_at = ? WHERE operation_id = ?`).run(now.toISOString(), now.toISOString(), seeded.operationId);
+    await sweepStaleManagedOperations(env, new Date(now.getTime() + 16 * 60_000 - 1), provider.fetchImpl);
+    expect(provider.calls).toHaveLength(0);
+    await sweepStaleManagedOperations(env, new Date(now.getTime() + 16 * 60_000), provider.fetchImpl);
+    expect(provider.keys.has(seeded.hash)).toBe(false);
+    expect((await listManagedOperationAttempts(env.BROKER_DB, seeded.operationId))[0]).toMatchObject({ outcome: 'cleaned', cleanup_token: null });
   });
 
   it('keeps cleanup eligible through repeated failures, auth expiry and persisted cleanup-required delivery', async () => {
@@ -109,17 +147,16 @@ describe.each(['discord', 'qq'] as const)('%s managed recovery safety', (source)
     expect(issued.status).toBe(200);
     provider.failCleanup = true;
     for (let index = 0; index < 6; index++) {
-      const later = new Date(now.getTime() + (16 + index) * 60_000);
+      const later = new Date(now.getTime() + 16 * 60_000 + index * MANAGED_CLEANUP_RETRY_MS);
       vi.setSystemTime(later);
-      if (index === 0) await reconcileStaleManagedKeyDeliveries(env, later);
-      else await sweepStaleManagedOperations(env, later, provider.fetchImpl);
+      await sweepStaleManagedOperations(env, later, provider.fetchImpl);
     }
     expect(provider.keys.has(delivered.managed_credential_ref!)).toBe(true);
-    expect(await getManagedOperation(env.BROKER_DB, seeded.operationId)).toMatchObject({ state: 'CLEANUP_REQUIRED', cleanup_attempts: 6 });
+    expect(await getManagedOperation(env.BROKER_DB, seeded.operationId)).toMatchObject({ state: 'FAILED', cleanup_attempts: 6 });
     await expireManagedOperation(env.BROKER_DB, (await getManagedOperation(env.BROKER_DB, seeded.operationId))!, new Date(now.getTime() + 61 * 60_000));
     env.__db.prepare("UPDATE managed_key_deliveries SET status = 'cleanup_required', failure_reason = 'managed_child_key_cleanup_failed' WHERE delivery_id = ?").run(delivered.delivery_id);
     provider.failCleanup = false;
-    await reconcileStaleManagedKeyDeliveries(env, new Date(now.getTime() + 62 * 60_000));
+    await sweepStaleManagedOperations(env, new Date(now.getTime() + 16 * 60_000 + 6 * MANAGED_CLEANUP_RETRY_MS), provider.fetchImpl);
     expect(provider.keys.has(delivered.managed_credential_ref!)).toBe(false);
     expect(await getManagedOperation(env.BROKER_DB, seeded.operationId)).toMatchObject({ state: 'FAILED', failure_reason: 'authorization_expired' });
     expect(env.__db.prepare('SELECT status, failure_reason FROM managed_key_deliveries WHERE delivery_id = ?').get(delivered.delivery_id)).toMatchObject({ status: 'expired', failure_reason: 'ack_expired_child_key_cleaned' });
@@ -284,4 +321,25 @@ describe('source-specific resume policy', () => {
     expect(provider.creates).toBe(0);
     expect(await getManagedOperation(env.BROKER_DB, seeded.operationId)).toMatchObject({ attempt_count: 2 });
   });
+});
+
+it('shares scheduled enumeration pages and resumes the oldest due attempt without abandoning the next', async () => {
+  const env = createTestBrokerEnv(); const provider = controlledProvider();
+  const first = await seedRecoverableOperation(env, 'qq', now, 'page-first');
+  const second = await seedRecoverableOperation(env, 'qq', now, 'page-second');
+  env.__db.exec(`UPDATE managed_operation_attempts SET managed_credential_ref = NULL, create_in_flight = 1`);
+  env.__db.exec(`UPDATE managed_operations SET state = 'FAILED', failure_reason = 'authorization_expired', client_action = 'action_required'`);
+  for (let index = 0; index < 700; index++) provider.keys.set(`other-${index}`, { hash: `other-${index}`, name: `other-${index}`, limit: 0.07, disabled: false });
+  await sweepStaleManagedOperations(env, now, provider.fetchImpl);
+  expect(provider.calls).toHaveLength(6);
+  expect((await listManagedOperationAttempts(env.BROKER_DB, first.operationId))[0]).toMatchObject({ scan_offset: 600, outcome: 'unknown' });
+  await sweepStaleManagedOperations(env, new Date(now.getTime() + 60_000), provider.fetchImpl);
+  expect(provider.calls).toHaveLength(12);
+  expect((await listManagedOperationAttempts(env.BROKER_DB, second.operationId))[0]).toMatchObject({ scan_offset: 600, outcome: 'unknown' });
+  provider.keys.set(first.hash, { hash: first.hash, name: first.keyName, limit: 0.07, disabled: false });
+  await sweepStaleManagedOperations(env, new Date(now.getTime() + MANAGED_CLEANUP_RETRY_MS), provider.fetchImpl);
+  expect(provider.calls.slice(12).filter(call => new URL(call.url).pathname === '/api/v1/keys')).toHaveLength(2);
+  expect(provider.keys.has(first.hash)).toBe(false);
+  expect((await listManagedOperationAttempts(env.BROKER_DB, first.operationId))[0]).toMatchObject({ outcome: 'cleaned', scan_offset: 0 });
+  expect((await listManagedOperationAttempts(env.BROKER_DB, second.operationId))[0]).toMatchObject({ outcome: 'unknown', create_in_flight: 1, scan_offset: 600 });
 });
