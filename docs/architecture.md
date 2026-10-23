@@ -96,7 +96,6 @@ Peer:   loopback / process audio → capture / segmentation → recognition
 - Segmentation does not depend on provider readiness.
 - Self and Peer share audio contracts. Each channel retains its own endpoint policies.
 - Capture authority determines which audio may enter recognition.
-- Stream-onset context reuses capture's bounded real pre-roll before local onset commitment. Capture fences it at permission, capture, and settings boundaries; Self and Peer include it in their existing audio-retention budgets.
 - Source completion drains admitted input. Stop or discontinuity invalidates affected work.
 - The application boundary owns audio-test admission and restoration. VAD-only tests exclude normal capture; stopping revokes pending starts and drains owned inputs before restoring authorized capture.
 
@@ -242,7 +241,6 @@ Implementation: `core/storage/secrets.py`, `app/adapters/sync_secret_store.py`, 
   - Local audio completion and transcript delivery are distinct.
   - Capture scope and provider lifetime authorize recognition results.
   - Provider recovery stays inside the recognition boundary.
-  - Normally source-idle Gemini streams resume with eligible unsent capture context before the current onset frame, without waiting for local onset commitment. This context does not authorize replay of sent or delivery-ambiguous audio; failure recovery must still preserve definitely-unsent current input.
   - Direct Qwen Audio owns two logical recognition slots per Self/Peer channel, targeting two reusable connections while tracking bounded replacement overlap and retiring transports through confirmed cleanup; source order, bounded unsent audio, and each channel's endpoint/publication policies remain independent.
 - **Failure identity**
   - Typed turn/input/epoch results and provider-mutation results retain the original safe cause before reduction to a terminal reason.
