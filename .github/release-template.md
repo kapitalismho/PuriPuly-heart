@@ -10,10 +10,10 @@ Download `{{INSTALLER_EXE}}` from the Assets section below, then run it.
 
 
 ## Change logs
-- Luna on the ChatGPT connection preconnects one standby socket while translation is off and reuses it when translation is enabled.
-
-- Soniox speech recognition and API-key verification now authenticate when opening the WebSocket connection. Update before **January 15, 2027**, when Soniox will reject older builds that authenticate only in the first configuration message. Existing API keys continue to work; no key reissuance or settings change is required.
-- Soniox's concurrent-connection limit now uses the existing bounded recovery policy.
+- The window stays responsive during startup, including the first Windows process scan. Closing the window during startup also drains pending preparation safely.
+- Gemini speech recognition preserves eligible pre-roll when resuming a stream after an idle period.
+- From the second launch, the message input shows a randomly selected prompt or usage tip. Changing the interface language keeps the selected tip.
+- Local translation models now share one Local section in the model picker. The GPT 6 Luna description also clarifies that it can use a ChatGPT plan.
 
 ---
 **If PuriPuly has made your world a bit wider,
