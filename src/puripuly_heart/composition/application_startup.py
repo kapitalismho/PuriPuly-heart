@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from puripuly_heart.app.ports.application_startup import ApplicationStartupState
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
@@ -109,12 +109,29 @@ class ApplicationStartupAdapter:
         settings = self.settings.canonical
         if settings is None:
             raise RuntimeError("Application settings were not retained")
+        main_input_first_launch = not settings.state.main_input_hint.first_launch_completed
+        if main_input_first_launch:
+            self.settings.canonical = replace(
+                settings,
+                state=replace(
+                    settings.state,
+                    main_input_hint=replace(
+                        settings.state.main_input_hint,
+                        first_launch_completed=True,
+                    ),
+                ),
+            )
+            if self.settings.save_current():
+                settings = self.settings.canonical
+            else:
+                self.settings.canonical = settings
         self.settings.set_overlay_enabled(False)
         self.settings.set_peer_translation_enabled(False)
         return ApplicationStartupState(
             settings=settings,
             fallback_channels=fallback_channels,
             installation_fallback=installation_fallback,
+            main_input_first_launch=main_input_first_launch,
         )
 
     def apply_startup_presentation(self, state: ApplicationStartupState) -> None:
@@ -122,6 +139,9 @@ class ApplicationStartupAdapter:
         self.calibration.sync_from_settings(settings)
         self.calibration.replace_draft(None)
         self.presentation.set_locale(settings.intent.ui.locale)
+        self.presentation.set_dashboard_launch_input_hint(
+            first_launch=state.main_input_first_launch
+        )
         self.sync_presentation()
         self.notify_fallback(
             state.fallback_channels,

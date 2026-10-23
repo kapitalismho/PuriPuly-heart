@@ -31,29 +31,37 @@ class _FailingPersistOwner:
         return None
 
 
-@pytest.mark.asyncio
-async def test_startup_restores_pre_fallback_canonical_when_persist_fails() -> None:
-    original = replace(
-        AppSettingsVNext(),
-        intent=replace(
-            AppSettingsVNext().intent,
-            stt=replace(AppSettingsVNext().intent.stt, provider="local_parakeet_v3"),
-            peer_stt=replace(AppSettingsVNext().intent.peer_stt, provider="local_parakeet_ja"),
-        ),
-    )
-    owner = _FailingPersistOwner(original)
+class _RecordingPersistOwner(_FailingPersistOwner):
+    def __init__(self, settings: AppSettingsVNext, *, save_succeeds: bool = True) -> None:
+        super().__init__(settings)
+        self.save_succeeds = save_succeeds
+        self.saved: list[AppSettingsVNext] = []
+
+    def save_current(self, failure_sink=None) -> bool:
+        if not self.save_succeeds:
+            return super().save_current(failure_sink)
+        self.saved.append(self.canonical)
+        return True
+
+
+def _startup_adapter(
+    owner: _FailingPersistOwner,
+    settings: AppSettingsVNext,
+    *,
+    presentation: object | None = None,
+) -> ApplicationStartupAdapter:
     provisioning = Mock()
     provisioning.snapshot = SimpleNamespace(cpu_auto_available=True)
     provisioning.inspect_cpu = AsyncMock()
     provisioning.inspect_gpu = AsyncMock()
-    adapter = ApplicationStartupAdapter(
+    return ApplicationStartupAdapter(
         settings=owner,
-        settings_loader=lambda: original,
+        settings_loader=lambda: settings,
         provisioning=provisioning,
         gpu_state=lambda: SimpleNamespace(selected_provider_requires_model=False),
         manual_fallback=ManualLocalASRFallbackOwner(),
         calibration=Mock(),
-        presentation=Mock(),
+        presentation=presentation if presentation is not None else Mock(),
         sync_presentation=lambda: None,
         notify_fallback=lambda *_args: None,
         runtime_logging=Mock(),
@@ -72,8 +80,78 @@ async def test_startup_restores_pre_fallback_canonical_when_persist_fails() -> N
         sync_clipboard=AsyncMock(),
     )
 
+
+def _with_main_input_first_launch_completed(settings: AppSettingsVNext) -> AppSettingsVNext:
+    return replace(
+        settings,
+        state=replace(
+            settings.state,
+            main_input_hint=replace(settings.state.main_input_hint, first_launch_completed=True),
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_startup_restores_pre_fallback_canonical_when_persist_fails() -> None:
+    original = replace(
+        AppSettingsVNext(),
+        intent=replace(
+            AppSettingsVNext().intent,
+            stt=replace(AppSettingsVNext().intent.stt, provider="local_parakeet_v3"),
+            peer_stt=replace(AppSettingsVNext().intent.peer_stt, provider="local_parakeet_ja"),
+        ),
+    )
+    owner = _FailingPersistOwner(original)
+    adapter = _startup_adapter(owner, original)
+
     state = await adapter.prepare_startup_settings()
 
     assert state.settings is original
     assert state.settings.intent.stt.provider == "local_parakeet_v3"
     assert state.fallback_channels == ()
+
+
+@pytest.mark.asyncio
+async def test_first_launch_is_marked_during_startup_and_shown_with_the_locale() -> None:
+    loaded = AppSettingsVNext()
+    owner = _RecordingPersistOwner(loaded)
+    presentation = Mock()
+    adapter = _startup_adapter(owner, loaded, presentation=presentation)
+
+    state = await adapter.prepare_startup_settings()
+    adapter.apply_startup_presentation(state)
+
+    assert state.main_input_first_launch is True
+    assert [saved.state.main_input_hint.first_launch_completed for saved in owner.saved] == [True]
+    assert owner.canonical.state.main_input_hint.first_launch_completed is True
+    presentation.set_dashboard_launch_input_hint.assert_called_once_with(first_launch=True)
+    call_names = [call[0] for call in presentation.method_calls]
+    assert call_names.index("set_dashboard_launch_input_hint") < call_names.index("apply_locale")
+
+
+@pytest.mark.asyncio
+async def test_later_launch_skips_the_startup_save_and_requests_a_random_hint() -> None:
+    loaded = _with_main_input_first_launch_completed(AppSettingsVNext())
+    owner = _RecordingPersistOwner(loaded)
+    presentation = Mock()
+    adapter = _startup_adapter(owner, loaded, presentation=presentation)
+
+    state = await adapter.prepare_startup_settings()
+    adapter.apply_startup_presentation(state)
+
+    assert state.main_input_first_launch is False
+    assert owner.saved == []
+    presentation.set_dashboard_launch_input_hint.assert_called_once_with(first_launch=False)
+
+
+@pytest.mark.asyncio
+async def test_unsaved_first_launch_mark_is_retried_on_the_next_launch() -> None:
+    loaded = AppSettingsVNext()
+    owner = _RecordingPersistOwner(loaded, save_succeeds=False)
+    adapter = _startup_adapter(owner, loaded)
+
+    state = await adapter.prepare_startup_settings()
+
+    assert state.main_input_first_launch is True
+    assert state.settings is loaded
+    assert owner.canonical.state.main_input_hint.first_launch_completed is False

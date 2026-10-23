@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.9.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.9.1-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
   <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
@@ -447,6 +447,7 @@ uv run python -m puripuly_heart.main run-gui
 ```
 
 The main-card input uses the source language's font and letter spacing independently of the UI language. Languages without extra letter spacing use zero tracking; the placeholder retains the UI language's typography.
+The placeholder shows the default prompt on the first launch. From the second launch on, one of four placeholders (the default prompt or a tip) is picked at random once per launch.
 
 ### CLI
 

@@ -1,3 +1,4 @@
+import random
 from typing import Callable
 
 import flet as ft
@@ -33,6 +34,20 @@ DISPLAY_TEXT_HEIGHT = 210
 DISPLAY_LINE_HEIGHT_RATIO = 1.4
 DISPLAY_WEIGHTED_UNIT_WIDTH_RATIO = 0.55
 DISPLAY_SIZE_CANDIDATES: tuple[int, ...] = (48, 44, 40, 36, 32, 28, 24, 20, 16)
+
+DISPLAY_INPUT_HINT_KEY = "display.input_hint"
+DISPLAY_INPUT_HINT_KEYS: tuple[str, ...] = (
+    DISPLAY_INPUT_HINT_KEY,
+    "display.input_hint_tip.cloud_stt",
+    "display.input_hint_tip.tab_swap",
+    "display.input_hint_tip.earmuffs",
+)
+
+
+def choose_input_hint_key(*, first_launch: bool, rng: random.Random | None = None) -> str:
+    if first_launch:
+        return DISPLAY_INPUT_HINT_KEY
+    return (rng or random).choice(DISPLAY_INPUT_HINT_KEYS)
 
 
 def _weighted_len(text: str) -> int:
@@ -113,6 +128,7 @@ class DisplayCard(ft.Container):
         self._source_as_message = False
         self._translation_is_visible = False
         self.input_is_focused = False
+        self._input_hint_key = DISPLAY_INPUT_HINT_KEY
 
         initial_size, initial_max_lines = _display_layout_for_length(
             _weighted_len(self._source_value)
@@ -136,7 +152,7 @@ class DisplayCard(ft.Container):
         )
 
         self._input_field = ft.TextField(
-            hint_text=t("display.input_hint"),
+            hint_text=t(self._input_hint_key),
             border={
                 state: ft.NoInputBorder()
                 for state in (
@@ -238,6 +254,11 @@ class DisplayCard(ft.Container):
     def _emit_input_activity(self, has_text: bool) -> None:
         if self._on_input_activity is not None:
             self._on_input_activity(bool(has_text))
+
+    def set_input_hint_key(self, key: str) -> None:
+        self._input_hint_key = key
+        self._input_field.hint_text = t(key)
+        update_control_if_mounted(self._input_field)
 
     def focus_input(self) -> None:
         run_control_method(self._input_field, "focus")
@@ -373,7 +394,7 @@ class DisplayCard(ft.Container):
         display_letter_spacing: float | None = None,
         input_letter_spacing: float | None = None,
     ) -> None:
-        self._input_field.hint_text = t("display.input_hint")
+        self._input_field.hint_text = t(self._input_hint_key)
         # Explicitly set hint font to UI font (Display font)
         self._input_field.hint_style = text_style(
             _content_face(display_font_family, display_letter_spacing),

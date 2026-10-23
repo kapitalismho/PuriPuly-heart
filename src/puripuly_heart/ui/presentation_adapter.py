@@ -167,6 +167,12 @@ class FletUiPresentationAdapter:
         elif dashboard is not None:
             dashboard.peer_needs_key = needs_key
 
+    def set_dashboard_launch_input_hint(self, *, first_launch: bool) -> None:
+        dashboard = getattr(self._app, "view_dashboard", None)
+        apply_hint = getattr(dashboard, "apply_launch_input_hint", None)
+        if callable(apply_hint):
+            apply_hint(first_launch=first_launch)
+
     def dashboard_translation_enabled(self) -> bool:
         dashboard = getattr(self._app, "view_dashboard", None)
         return bool(getattr(dashboard, "is_translation_on", True))
