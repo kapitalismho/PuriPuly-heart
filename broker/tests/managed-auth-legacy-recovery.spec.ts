@@ -106,7 +106,12 @@ describe.each(['discord', 'qq'] as const)('%s original persisted late-create fai
       expect(retained(env, seeded)).toEqual(before);
     }
     const oldHash = await createOld(provider, seeded);
-    await sweepAt(env, 63);
+    const calls = provider.calls.length;
+    const changes = env.__db.prepare('SELECT total_changes() AS count').get()!.count;
+    for (const minutes of [63, 64, 365]) await sweepAt(env, minutes);
+    expect(provider.calls).toHaveLength(calls);
+    expect(env.__db.prepare('SELECT total_changes() AS count').get()!.count).toBe(changes);
+    await sweepAt(env, 366);
     expect(provider.keys.has(oldHash)).toBe(false); expect(provider.keys.has(seeded.currentHash)).toBe(true);
     expect(retained(env, seeded)).toEqual(before);
   });
@@ -133,12 +138,12 @@ describe.each(['discord', 'qq'] as const)('%s original persisted late-create fai
     const seeded = await seedOriginalFailure(env, provider, source); const oldHash = await createOld(provider, seeded); migrate(env); const before = retained(env, seeded);
     provider.malformedList = true; await sweepAt(env, 6);
     expect(provider.keys.has(oldHash)).toBe(true);
-    provider.malformedList = false; provider.failCleanup = true; await sweepAt(env, 62);
+    provider.malformedList = false; provider.failCleanup = true; await sweepAt(env, 366);
     expect(provider.keys.has(oldHash)).toBe(true);
     provider.failCleanup = false; const gate = provider.gateCleanup();
-    const cleaning = sweepAt(env, 63); await gate.entered;
+    const cleaning = sweepAt(env, 726); await gate.entered;
     const callsBefore = provider.calls.length;
-    await sweepStaleManagedOperations(env, new Date(now.getTime() + 63 * 60_000));
+    await sweepStaleManagedOperations(env, new Date(now.getTime() + 726 * 60_000));
     expect(provider.calls).toHaveLength(callsBefore);
     gate.release(); await cleaning;
     expect(provider.keys.has(oldHash)).toBe(false); expect(provider.keys.get(seeded.currentHash)).toMatchObject({ disabled: false, limit: seeded.limit });
@@ -156,7 +161,7 @@ describe.each(['discord', 'qq'] as const)('%s original persisted late-create fai
     expect(provider.keys.get(seeded.currentHash)).toMatchObject({ disabled: false, limit: seeded.limit });
     expect(env.__db.prepare('SELECT legacy_cleanup_state FROM managed_operation_attempts WHERE operation_id=? AND attempt_index=2').get(seeded.operationId)).toEqual({ legacy_cleanup_state: 'pending' });
     provider.keys.get(seeded.currentHash)!.name = seeded.currentName;
-    const oldHash = await createOld(provider, seeded); await sweepAt(env, 62);
+    const oldHash = await createOld(provider, seeded); await sweepAt(env, 366);
     expect(provider.keys.has(oldHash)).toBe(false); expect(provider.keys.has(seeded.currentHash)).toBe(true); expect(retained(env, seeded)).toEqual(before);
   });
 
@@ -198,7 +203,7 @@ describe.each(['discord', 'qq'] as const)('%s original persisted late-create fai
     for (const [name, row] of rows) env.__db.prepare(`INSERT INTO ${name} (${Object.keys(row).join(',')}) VALUES (${Object.keys(row).map(() => '?').join(',')})`).run(...Object.values(row) as Array<string | number | null>);
     const before = retained(env, seeded); const oldHash = await createOld(provider, seeded);
     (before[1] as Record<string, unknown>).legacy_cleanup_state = 'resolved';
-    await sweepAt(env, 7);
+    await sweepAt(env, 366);
     expect(provider.keys.has(oldHash)).toBe(false); expect(provider.keys.has(seeded.currentHash)).toBe(true);
     expect(retained(env, seeded)).toEqual(before);
   });
@@ -209,11 +214,11 @@ it('rotates a bounded legacy-debt cohort so absent old resources cannot starve a
   const env = createTestBrokerEnv({ throughMigration: '0025_drop_legacy_translation_telemetry.sql' });
   const provider = controlledProvider(); vi.stubGlobal('fetch', provider.fetchImpl);
   const cohort = [];
-  for (let index = 0; index < 26; index++) cohort.push(await seedOriginalFailure(env, provider, 'qq'));
-  const last = cohort[25]!; const oldHash = await createOld(provider, last); migrate(env);
+  for (let index = 0; index < 7; index++) cohort.push(await seedOriginalFailure(env, provider, 'qq'));
+  const last = cohort[6]!; const oldHash = await createOld(provider, last); migrate(env);
   const before = cohort.map(item => retained(env, item)); const calls = provider.calls.length;
   await sweepAt(env, 6);
-  expect(provider.calls.slice(calls).filter(call => call.method === 'GET' && new URL(call.url).pathname === '/api/v1/keys')).toHaveLength(25);
+  expect(provider.calls.slice(calls).filter(call => call.method === 'GET' && new URL(call.url).pathname === '/api/v1/keys')).toHaveLength(6);
   expect(provider.keys.has(oldHash)).toBe(true);
   await sweepAt(env, 7);
   expect(provider.keys.has(oldHash)).toBe(false);

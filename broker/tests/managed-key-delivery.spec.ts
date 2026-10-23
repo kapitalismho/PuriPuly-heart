@@ -942,11 +942,19 @@ describe('managed key delivery ACK foundation', () => {
       createdAt: new Date('2026-07-05T00:00:00.000Z'),
       expiresAt: new Date('2026-07-05T00:15:00.000Z'),
     });
-    vi.mocked(cleanupManagedChildKey)
-      .mockResolvedValueOnce({ ok: true })
-      .mockResolvedValueOnce({ ok: false, reason: cleanupFailureReason() });
+    vi.mocked(cleanupManagedChildKey).mockImplementation(async ({ keyHash }) => {
+      if (keyHash === 'hash_discord_stale_ok') {
+        return { ok: true };
+      }
+      if (keyHash === 'hash_discord_stale_fail') {
+        return { ok: false, reason: cleanupFailureReason() };
+      }
+      throw new Error(`unexpected stale cleanup target: ${keyHash}`);
+    });
 
-    await reconcileStaleManagedKeyDeliveries(env, new Date('2026-07-05T00:16:00.000Z'));
+    await expect(
+      reconcileStaleManagedKeyDeliveries(env, new Date('2026-07-05T00:16:00.000Z')),
+    ).resolves.toEqual({ expired: 1, cleanupRequired: 1 });
 
     expect(selectDiscordEntitlement(env, 'hash_discord_stale_ok')).toBeNull();
     expect(selectDiscordIdentityStatus(env, 'ph-discord-user-v1_stale_ok', 'discord-install-stale-ok')).toBeNull();

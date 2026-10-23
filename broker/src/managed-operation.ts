@@ -3,6 +3,13 @@ import type { Context } from 'hono';
 import { instrumentPublicPostRoute } from './abuse-controls';
 import type { BrokerBindings, BrokerEnv } from './contract';
 import {
+  createManagedCleanupBudget,
+  MANAGED_CLEANUP_CLAIM_TTL_MS,
+  MANAGED_CLEANUP_RETRY_MS,
+  SCHEDULED_MANAGED_CLEANUP_LIMIT,
+  type ManagedCleanupBudget,
+} from './managed-cleanup';
+import {
   cleanupManagedChildKey,
   createManagedChildKey,
   OpenRouterManagementError,
@@ -419,7 +426,7 @@ export async function startManagedOperationAttempt(
   try {
     const batchResult = await db.batch([
       db
-        .prepare(`UPDATE managed_operations SET state = ?, client_action = ?, attempt_count = ?, current_attempt_index = ?, updated_at = ? WHERE operation_id = ? AND state IN ('AUTHENTICATED', 'ISSUE_READY', 'RETRY_READY') AND attempt_count = ? AND auth_expires_at > ? AND NOT EXISTS (SELECT 1 FROM managed_operation_attempts WHERE operation_id = managed_operations.operation_id AND (outcome <> 'cleaned' OR cleanup_token IS NOT NULL OR create_in_flight = 1 OR legacy_cleanup_state = 'pending')) AND NOT EXISTS (SELECT 1 FROM managed_key_deliveries WHERE operation_id = managed_operations.operation_id AND status IN ('pending', 'acknowledged', 'cleanup_required')) AND NOT EXISTS (SELECT 1 FROM managed_operations other JOIN managed_operation_attempts attempt ON attempt.operation_id = other.operation_id WHERE other.operation_id <> managed_operations.operation_id AND other.issue_source = managed_operations.issue_source AND other.subject_ref = managed_operations.subject_ref AND (attempt.outcome <> 'cleaned' OR attempt.cleanup_token IS NOT NULL OR attempt.create_in_flight = 1 OR attempt.legacy_cleanup_state = 'pending'))`)
+        .prepare(`UPDATE managed_operations SET state = ?, client_action = ?, attempt_count = ?, current_attempt_index = ?, updated_at = ? WHERE operation_id = ? AND state IN ('AUTHENTICATED', 'ISSUE_READY', 'RETRY_READY') AND attempt_count = ? AND auth_expires_at > ? AND NOT EXISTS (SELECT 1 FROM managed_operation_attempts WHERE operation_id = managed_operations.operation_id AND (outcome <> 'cleaned' OR cleanup_token IS NOT NULL OR create_in_flight = 1 OR legacy_cleanup_state <> 'resolved')) AND NOT EXISTS (SELECT 1 FROM managed_key_deliveries WHERE operation_id = managed_operations.operation_id AND status IN ('pending', 'acknowledged', 'cleanup_required')) AND NOT EXISTS (SELECT 1 FROM managed_operations other JOIN managed_operation_attempts attempt ON attempt.operation_id = other.operation_id WHERE other.operation_id <> managed_operations.operation_id AND other.issue_source = managed_operations.issue_source AND other.subject_ref = managed_operations.subject_ref AND (attempt.outcome <> 'cleaned' OR attempt.cleanup_token IS NOT NULL OR attempt.create_in_flight = 1 OR attempt.legacy_cleanup_state <> 'resolved'))`)
         .bind(nextState, clientActionForState(nextState), nextIndex, nextIndex, nowIso, operation.operation_id, operation.attempt_count, nowIso),
       db
         .prepare(
@@ -565,6 +572,7 @@ export async function reconcileUnknownAttempt(
   operation: ManagedOperationRecord,
   now: Date,
   fetchImpl?: typeof fetch,
+  budget?: ManagedCleanupBudget,
 ): Promise<ManagedOperationRecord | null> {
   const operationId = operation.operation_id;
   const attemptIndex = operation.current_attempt_index;
@@ -573,7 +581,8 @@ export async function reconcileUnknownAttempt(
   }
   const nowIso = now.toISOString();
   const token = crypto.randomUUID();
-  const abandonedBefore = new Date(now.getTime() - 16 * 60_000).toISOString();
+  const abandonedBefore = new Date(now.getTime() - MANAGED_CLEANUP_CLAIM_TTL_MS).toISOString();
+  const retryBefore = new Date(now.getTime() - MANAGED_CLEANUP_RETRY_MS).toISOString();
   const providerName = providerKeyNameForOperationAttempt(operationId, operation.issue_source, attemptIndex);
   await db.prepare(
     `INSERT OR IGNORE INTO managed_operation_attempts
@@ -584,9 +593,10 @@ export async function reconcileUnknownAttempt(
   ).bind(providerName, nowIso, nowIso, operationId, attemptIndex).run();
   const claimed = await db.batch([
     db.prepare(
-      `UPDATE managed_operation_attempts SET cleanup_token = ?, cleanup_started_at = ?, updated_at = ?
+      `UPDATE managed_operation_attempts SET cleanup_token = ?, cleanup_started_at = ?, legacy_cleanup_checked_at = ?, updated_at = ?
         WHERE operation_id = ? AND attempt_index = ? AND outcome <> 'cleaned'
-          AND (cleanup_token IS NULL OR cleanup_started_at <= ?)
+          AND ((cleanup_token IS NOT NULL AND cleanup_started_at <= ?)
+            OR (cleanup_token IS NULL AND (? = 0 OR legacy_cleanup_checked_at IS NULL OR legacy_cleanup_checked_at <= ?)))
           AND EXISTS (
             SELECT 1 FROM managed_operations operation
              WHERE operation.operation_id = managed_operation_attempts.operation_id
@@ -597,7 +607,7 @@ export async function reconcileUnknownAttempt(
             SELECT 1 FROM managed_key_deliveries delivery
              WHERE delivery.operation_id = managed_operation_attempts.operation_id
                AND delivery.attempt_index = managed_operation_attempts.attempt_index
-               AND (delivery.status = 'acknowledged' OR (delivery.status = 'pending' AND delivery.expires_at > ?))
+               AND (delivery.status = 'acknowledged' OR (delivery.status = 'pending' AND delivery.expires_at >= ?))
           )
           AND NOT EXISTS (
             SELECT 1 FROM openrouter_entitlements entitlement
@@ -609,7 +619,7 @@ export async function reconcileUnknownAttempt(
              WHERE entitlement.managed_credential_ref = managed_operation_attempts.managed_credential_ref
                AND entitlement.status = 'active' AND entitlement.delivered_at IS NOT NULL
           )`,
-    ).bind(token, nowIso, nowIso, operationId, attemptIndex, abandonedBefore, nowIso),
+    ).bind(token, nowIso, nowIso, nowIso, operationId, attemptIndex, abandonedBefore, budget ? 1 : 0, retryBefore, nowIso),
     db.prepare(
       `UPDATE managed_key_deliveries SET status = 'expired', failed_at = ?, failure_reason = 'operation_cleanup_claimed'
         WHERE operation_id = ? AND attempt_index = ? AND status IN ('pending', 'cleanup_required', 'expired')
@@ -640,7 +650,7 @@ export async function reconcileUnknownAttempt(
   try {
     if (!credentialRef) {
       const found = await findManagedChildKeyByName({
-        managementApiKey, keyName: target.provider_key_name, offset: target.scan_offset, fetchImpl,
+        managementApiKey, keyName: target.provider_key_name, offset: target.scan_offset, pageBudget: budget, fetchImpl,
       });
       if (found.found) {
         credentialRef = found.keyHash;
@@ -745,107 +755,99 @@ async function classifyLegacyManagedAttempts(db: D1Database): Promise<void> {
                     AND operation.current_attempt_index > managed_operation_attempts.attempt_index
                 )) THEN 'pending'
               ELSE 'resolved' END
-      WHERE legacy_cleanup_state = 'unclassified'
-        OR (legacy_cleanup_state = 'resolved' AND create_in_flight = 1
-          AND (outcome = 'cleaned' OR EXISTS (
-            SELECT 1 FROM managed_operations operation
-            WHERE operation.operation_id = managed_operation_attempts.operation_id
-              AND operation.current_attempt_index > managed_operation_attempts.attempt_index
-          )))`,
-  ).run();
+      WHERE id IN (
+        SELECT id FROM managed_operation_attempts
+        WHERE legacy_cleanup_state = 'unclassified'
+          OR (legacy_cleanup_state = 'resolved' AND create_in_flight = 1
+            AND (outcome = 'cleaned' OR EXISTS (
+              SELECT 1 FROM managed_operations operation
+              WHERE operation.operation_id = managed_operation_attempts.operation_id
+                AND operation.current_attempt_index > managed_operation_attempts.attempt_index
+            )))
+        ORDER BY id LIMIT ?
+      )`,
+  ).bind(SCHEDULED_MANAGED_CLEANUP_LIMIT).run();
 }
 
-async function sweepLegacyManagedAttempts(
+async function cleanLegacyManagedAttempt(
   env: Pick<BrokerBindings, 'BROKER_DB' | 'OPENROUTER_MANAGEMENT_API_KEY'>,
   now: Date,
+  target: ManagedOperationAttemptRecord & { issue_source: 'discord' | 'qq' },
+  budget: ManagedCleanupBudget,
   fetchImpl?: typeof fetch,
 ): Promise<void> {
   const db = env.BROKER_DB;
   const nowIso = now.toISOString();
-  const abandonedBefore = new Date(now.getTime() - 16 * 60_000).toISOString();
-  const candidates = await db.prepare(
-    `SELECT attempt.*, operation.issue_source
-       FROM managed_operation_attempts attempt
-       JOIN managed_operations operation ON operation.operation_id = attempt.operation_id
-      WHERE attempt.legacy_cleanup_state = 'pending'
-        AND operation.current_attempt_index >= attempt.attempt_index
-        AND (attempt.cleanup_token IS NULL OR attempt.cleanup_started_at <= ?)
-        AND NOT EXISTS (
-          SELECT 1 FROM managed_key_deliveries delivery
-          WHERE delivery.operation_id = attempt.operation_id AND delivery.attempt_index = attempt.attempt_index
-            AND (delivery.status = 'acknowledged' OR (delivery.status = 'pending' AND delivery.expires_at > ?))
-        )
-      ORDER BY attempt.legacy_cleanup_checked_at, attempt.id LIMIT 25`,
-  ).bind(abandonedBefore, nowIso).all<ManagedOperationAttemptRecord & { issue_source: 'discord' | 'qq' }>();
-  for (const target of candidates.results ?? []) {
-    const token = crypto.randomUUID();
-    const claimed = await db.prepare(
-      `UPDATE managed_operation_attempts SET cleanup_token = ?, cleanup_started_at = ?, legacy_cleanup_checked_at = ?
-        WHERE id = ? AND legacy_cleanup_state = 'pending'
-          AND (cleanup_token IS NULL OR cleanup_started_at <= ?)
-          AND EXISTS (SELECT 1 FROM managed_operations operation
-            WHERE operation.operation_id = managed_operation_attempts.operation_id
-              AND operation.current_attempt_index >= managed_operation_attempts.attempt_index)
-          AND NOT EXISTS (SELECT 1 FROM managed_key_deliveries delivery
-            WHERE delivery.operation_id = managed_operation_attempts.operation_id
-              AND delivery.attempt_index = managed_operation_attempts.attempt_index
-              AND (delivery.status = 'acknowledged' OR (delivery.status = 'pending' AND delivery.expires_at > ?)))`,
-    ).bind(token, nowIso, nowIso, target.id, abandonedBefore, nowIso).run();
-    if (Number(claimed.meta.changes ?? 0) !== 1) continue;
-    let nextOffset = target.scan_offset;
-    try {
-      if (target.provider_key_name !== providerKeyNameForOperationAttempt(target.operation_id, target.issue_source, target.attempt_index)) continue;
-      let hash = target.managed_credential_ref;
-      if (!hash) {
-        const found = await findManagedChildKeyByName({
-          managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY,
-          keyName: target.provider_key_name, offset: target.scan_offset, fetchImpl,
-        });
-        if (!found.found) {
-          nextOffset = found.complete ? 0 : found.nextOffset;
-          continue;
-        }
-        hash = found.keyHash;
+  const abandonedBefore = new Date(now.getTime() - MANAGED_CLEANUP_CLAIM_TTL_MS).toISOString();
+  const retryBefore = new Date(now.getTime() - MANAGED_CLEANUP_RETRY_MS).toISOString();
+  const token = crypto.randomUUID();
+  const claimed = await db.prepare(
+    `UPDATE managed_operation_attempts SET cleanup_token = ?, cleanup_started_at = ?, legacy_cleanup_checked_at = ?
+      WHERE id = ? AND legacy_cleanup_state = 'pending'
+        AND ((cleanup_token IS NOT NULL AND cleanup_started_at <= ?)
+          OR (cleanup_token IS NULL AND (legacy_cleanup_checked_at IS NULL OR legacy_cleanup_checked_at <= ?)))
+        AND EXISTS (SELECT 1 FROM managed_operations operation
+          WHERE operation.operation_id = managed_operation_attempts.operation_id
+            AND operation.current_attempt_index >= managed_operation_attempts.attempt_index)
+        AND NOT EXISTS (SELECT 1 FROM managed_key_deliveries delivery
+          WHERE delivery.operation_id = managed_operation_attempts.operation_id
+            AND delivery.attempt_index = managed_operation_attempts.attempt_index
+            AND (delivery.status = 'acknowledged' OR (delivery.status = 'pending' AND delivery.expires_at >= ?)))`,
+  ).bind(token, nowIso, nowIso, target.id, abandonedBefore, retryBefore, nowIso).run();
+  if (Number(claimed.meta.changes ?? 0) !== 1) return;
+  let nextOffset = target.scan_offset;
+  try {
+    if (target.provider_key_name !== providerKeyNameForOperationAttempt(target.operation_id, target.issue_source, target.attempt_index)) return;
+    let hash = target.managed_credential_ref;
+    if (!hash) {
+      const found = await findManagedChildKeyByName({
+        managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY,
+        keyName: target.provider_key_name, offset: target.scan_offset, pageBudget: budget, fetchImpl,
+      });
+      if (!found.found) {
+        nextOffset = found.complete ? 0 : found.nextOffset;
+        return;
       }
-      const pinned = await db.prepare(
-        `UPDATE managed_operation_attempts SET managed_credential_ref = ?, create_in_flight = 0
-          WHERE id = ? AND cleanup_token = ? AND legacy_cleanup_state = 'pending'
-            AND NOT EXISTS (SELECT 1 FROM managed_key_deliveries delivery
-              WHERE delivery.managed_credential_ref = ?
-                AND (delivery.status = 'acknowledged' OR (delivery.status = 'pending' AND delivery.expires_at > ?)))
-            AND NOT EXISTS (SELECT 1 FROM openrouter_entitlements entitlement
-              WHERE entitlement.managed_credential_ref = ? AND (entitlement.status = 'active' OR entitlement.discord_issue_delivered_at IS NOT NULL))
-            AND NOT EXISTS (SELECT 1 FROM qq_managed_entitlements entitlement
-              WHERE entitlement.managed_credential_ref = ? AND (entitlement.status = 'active' OR entitlement.delivered_at IS NOT NULL))
-            AND NOT EXISTS (
-              SELECT 1 FROM managed_operation_attempts other
-              JOIN managed_operations operation ON operation.operation_id = other.operation_id
-              WHERE other.managed_credential_ref = ? AND operation.current_attempt_index = other.attempt_index
-                AND other.id <> managed_operation_attempts.id
-            )`,
-      ).bind(hash, target.id, token, hash, nowIso, hash, hash, hash).run();
-      if (Number(pinned.meta.changes ?? 0) !== 1) continue;
-      const cleanup = await cleanupManagedChildKey({ managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY, keyHash: hash, fetchImpl });
-      if (!cleanup.ok || !(await verifyManagedChildKeyAbsent({ managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY, keyHash: hash, fetchImpl }))) continue;
-      await db.batch([
-        db.prepare(
-          `UPDATE managed_key_deliveries SET status = 'expired', failed_at = ?, failure_reason = 'legacy_attempt_child_key_cleaned'
-            WHERE operation_id = ? AND attempt_index = ? AND status <> 'acknowledged'
-              AND EXISTS (SELECT 1 FROM managed_operation_attempts WHERE id = ? AND cleanup_token = ?)`,
-        ).bind(nowIso, target.operation_id, target.attempt_index, target.id, token),
-        db.prepare(
-          `UPDATE managed_operation_attempts
-              SET outcome = 'cleaned', create_in_flight = 0, legacy_cleanup_state = 'resolved',
-                  cleanup_token = NULL, cleanup_started_at = NULL, scan_offset = 0, updated_at = ?
-            WHERE id = ? AND cleanup_token = ?`,
-        ).bind(nowIso, target.id, token),
-      ]);
-    } finally {
-      await db.prepare(
-        `UPDATE managed_operation_attempts SET cleanup_token = NULL, cleanup_started_at = NULL, scan_offset = ?
-          WHERE id = ? AND cleanup_token = ?`,
-      ).bind(nextOffset, target.id, token).run();
+      hash = found.keyHash;
     }
+    const pinned = await db.prepare(
+      `UPDATE managed_operation_attempts SET managed_credential_ref = ?, create_in_flight = 0
+        WHERE id = ? AND cleanup_token = ? AND legacy_cleanup_state = 'pending'
+          AND NOT EXISTS (SELECT 1 FROM managed_key_deliveries delivery
+            WHERE delivery.managed_credential_ref = ?
+              AND (delivery.status = 'acknowledged' OR (delivery.status = 'pending' AND delivery.expires_at >= ?)))
+          AND NOT EXISTS (SELECT 1 FROM openrouter_entitlements entitlement
+            WHERE entitlement.managed_credential_ref = ? AND (entitlement.status = 'active' OR entitlement.discord_issue_delivered_at IS NOT NULL))
+          AND NOT EXISTS (SELECT 1 FROM qq_managed_entitlements entitlement
+            WHERE entitlement.managed_credential_ref = ? AND (entitlement.status = 'active' OR entitlement.delivered_at IS NOT NULL))
+          AND NOT EXISTS (
+            SELECT 1 FROM managed_operation_attempts other
+            JOIN managed_operations operation ON operation.operation_id = other.operation_id
+            WHERE other.managed_credential_ref = ? AND operation.current_attempt_index = other.attempt_index
+              AND other.id <> managed_operation_attempts.id
+          )`,
+    ).bind(hash, target.id, token, hash, nowIso, hash, hash, hash).run();
+    if (Number(pinned.meta.changes ?? 0) !== 1) return;
+    const cleanup = await cleanupManagedChildKey({ managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY, keyHash: hash, fetchImpl });
+    if (!cleanup.ok || !(await verifyManagedChildKeyAbsent({ managementApiKey: env.OPENROUTER_MANAGEMENT_API_KEY, keyHash: hash, fetchImpl }))) return;
+    await db.batch([
+      db.prepare(
+        `UPDATE managed_key_deliveries SET status = 'expired', failed_at = ?, failure_reason = 'legacy_attempt_child_key_cleaned'
+          WHERE operation_id = ? AND attempt_index = ? AND status <> 'acknowledged'
+            AND EXISTS (SELECT 1 FROM managed_operation_attempts WHERE id = ? AND cleanup_token = ?)`,
+      ).bind(nowIso, target.operation_id, target.attempt_index, target.id, token),
+      db.prepare(
+        `UPDATE managed_operation_attempts
+            SET outcome = 'cleaned', create_in_flight = 0, legacy_cleanup_state = 'resolved',
+                cleanup_token = NULL, cleanup_started_at = NULL, scan_offset = 0, updated_at = ?
+          WHERE id = ? AND cleanup_token = ?`,
+      ).bind(nowIso, target.id, token),
+    ]);
+  } finally {
+    await db.prepare(
+      `UPDATE managed_operation_attempts SET cleanup_token = NULL, cleanup_started_at = NULL, scan_offset = ?
+        WHERE id = ? AND cleanup_token = ?`,
+    ).bind(nextOffset, target.id, token).run();
   }
 }
 
@@ -853,10 +855,10 @@ export async function sweepStaleManagedOperations(
   env: Pick<BrokerBindings, 'BROKER_DB' | 'OPENROUTER_MANAGEMENT_API_KEY'>,
   now: Date,
   fetchImpl?: typeof fetch,
+  budget: ManagedCleanupBudget = createManagedCleanupBudget(),
 ): Promise<{ expired: number; reconciled: number; retryReady: number }> {
   const db = env.BROKER_DB;
   await classifyLegacyManagedAttempts(db);
-  await sweepLegacyManagedAttempts(env, now, fetchImpl);
   let expired = 0;
   let reconciled = 0;
   let retryReady = 0;
@@ -878,33 +880,52 @@ export async function sweepStaleManagedOperations(
     await transitionManagedOperation(db, operation.operation_id, 'CREATE_UNKNOWN', now, { from: ['CREATING'], attemptIndex: operation.current_attempt_index });
     reconciled += 1;
   }
-  const unknown = await db
-    .prepare(
-      `SELECT operation.* FROM managed_operations operation
-        WHERE operation.state IN ('CREATE_UNKNOWN', 'RECONCILING', 'CLEANUP_REQUIRED', 'CLEAN', 'FAILED', 'DELIVERY_PENDING')
-          AND operation.current_attempt_index > 0
-          AND NOT EXISTS (
-            SELECT 1 FROM managed_operation_attempts attempt WHERE attempt.operation_id = operation.operation_id
-              AND attempt.attempt_index = operation.current_attempt_index AND attempt.outcome = 'cleaned'
-          )
-        ORDER BY COALESCE(operation.last_reconciled_at, operation.created_at), operation.operation_id LIMIT 25`,
-    )
-    .all<ManagedOperationRecord>();
-  for (const operation of unknown.results ?? []) {
-    const acknowledged = await db.prepare(
-      `SELECT delivery_id FROM managed_key_deliveries WHERE operation_id = ? AND attempt_index = ? AND status = 'acknowledged' LIMIT 1`,
-    ).bind(operation.operation_id, operation.current_attempt_index).first<{ delivery_id: string }>();
-    if (acknowledged) {
-      if (await markOperationActiveOnAck(db, acknowledged.delivery_id, now)) reconciled += 1;
+  const due = await db.prepare(
+    `SELECT operation.*, attempt.id AS cleanup_attempt_id, attempt.legacy_cleanup_state AS cleanup_state,
+            COALESCE(attempt.legacy_cleanup_checked_at, attempt.created_at) AS cleanup_checked_at
+       FROM managed_operation_attempts attempt
+       JOIN managed_operations operation ON operation.operation_id = attempt.operation_id
+      WHERE (
+        (attempt.legacy_cleanup_state = 'pending' AND operation.current_attempt_index >= attempt.attempt_index)
+        OR (attempt.legacy_cleanup_state = 'resolved' AND attempt.attempt_index = operation.current_attempt_index
+          AND attempt.outcome <> 'cleaned'
+          AND operation.state IN ('CREATE_UNKNOWN', 'RECONCILING', 'CLEANUP_REQUIRED', 'CLEAN', 'FAILED', 'DELIVERY_PENDING'))
+      )
+        AND ((attempt.cleanup_token IS NOT NULL AND attempt.cleanup_started_at <= ?)
+          OR (attempt.cleanup_token IS NULL AND (attempt.legacy_cleanup_checked_at IS NULL OR attempt.legacy_cleanup_checked_at <= ?)))
+        AND NOT EXISTS (
+          SELECT 1 FROM managed_key_deliveries delivery
+          WHERE delivery.operation_id = attempt.operation_id AND delivery.attempt_index = attempt.attempt_index
+            AND (delivery.status = 'acknowledged' OR (delivery.status = 'pending' AND delivery.expires_at >= ?))
+        )
+      UNION ALL
+     SELECT operation.*, NULL AS cleanup_attempt_id, NULL AS cleanup_state,
+            COALESCE(operation.last_reconciled_at, operation.created_at) AS cleanup_checked_at
+       FROM managed_operations operation
+      WHERE operation.current_attempt_index > 0
+        AND operation.state IN ('CREATE_UNKNOWN', 'RECONCILING', 'CLEANUP_REQUIRED', 'CLEAN', 'FAILED', 'DELIVERY_PENDING')
+        AND NOT EXISTS (
+          SELECT 1 FROM managed_operation_attempts attempt WHERE attempt.operation_id = operation.operation_id
+            AND attempt.attempt_index = operation.current_attempt_index
+        )
+      ORDER BY cleanup_checked_at, cleanup_attempt_id, operation_id LIMIT ?`,
+  ).bind(
+    new Date(now.getTime() - MANAGED_CLEANUP_CLAIM_TTL_MS).toISOString(),
+    new Date(now.getTime() - MANAGED_CLEANUP_RETRY_MS).toISOString(),
+    now.toISOString(), budget.remainingCandidates,
+  ).all<ManagedOperationRecord & { cleanup_attempt_id: number | null; cleanup_state: string | null }>();
+  for (const operation of due.results ?? []) {
+    if (budget.remainingCandidates === 0 || budget.remainingProviderPages === 0) break;
+    budget.remainingCandidates -= 1;
+    if (operation.cleanup_state === 'pending') {
+      const attempt = await db.prepare(`SELECT * FROM managed_operation_attempts WHERE id = ?`)
+        .bind(operation.cleanup_attempt_id).first<ManagedOperationAttemptRecord>();
+      if (attempt) await cleanLegacyManagedAttempt(env, now, { ...attempt, issue_source: operation.issue_source }, budget, fetchImpl);
       continue;
     }
-    const after = await reconcileUnknownAttempt(db, env.OPENROUTER_MANAGEMENT_API_KEY, operation, now, fetchImpl);
-    if (after && after.state !== operation.state) {
-      reconciled += 1;
-    }
-    if (after?.state === 'RETRY_READY') {
-      retryReady += 1;
-    }
+    const after = await reconcileUnknownAttempt(db, env.OPENROUTER_MANAGEMENT_API_KEY, operation, now, fetchImpl, budget);
+    if (after && after.state !== operation.state) reconciled += 1;
+    if (after?.state === 'RETRY_READY') retryReady += 1;
   }
   if (expired || reconciled || retryReady) {
     logManagedOperationEvent('managed_operation_sweep_completed', {
