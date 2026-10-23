@@ -192,6 +192,8 @@ class CaptureStreamInput:
     capture: tuple[AudioCaptureSpan, ...]
     boundary_reason: str | None = None
     speech_observed: bool = False
+    pre_roll: np.ndarray | None = None
+    pre_roll_capture: tuple[AudioCaptureSpan, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
