@@ -369,18 +369,21 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(
     assert managed["managed_gemma_gpu"].description == t(
         "settings.translation_model.managed_gemma_gpu.description"
     )
-    assert managed["managed_gemma_cpu"].section == t(
-        "settings.translation_model.section.cpu_inference"
-    )
-    assert managed["managed_gemma_gpu"].section == t(
-        "settings.translation_model.section.gpu_inference"
-    )
+    local_section = t("settings.translation_model.section.local")
+    assert managed["managed_gemma_cpu"].section == local_section
+    assert managed["managed_gemma_gpu"].section == local_section
     gemma_26b = managed["managed_gemma_26b"]
     assert gemma_26b.label == t("provider.managed_gemma_26b")
     assert gemma_26b.label != managed["managed_gemma_gpu"].label
     assert gemma_26b.description == t("settings.translation_model.managed_gemma_26b.description")
     assert gemma_26b.description
-    assert gemma_26b.section == t("settings.translation_model.section.gpu_inference")
+    assert gemma_26b.section == local_section
+    local_values = [option.value for option in options if option.section == local_section]
+    assert local_values == [
+        "managed_gemma_cpu",
+        "managed_gemma_gpu",
+        "managed_gemma_26b",
+    ]
     assert not gemma_26b.disabled
 
     cloud_gemma = next(
@@ -397,8 +400,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(
             sections.append(option.section)
     assert sections == [
         t("settings.translation_model.section.recommended_cloud"),
-        t("settings.translation_model.section.cpu_inference"),
-        t("settings.translation_model.section.gpu_inference"),
+        t("settings.translation_model.section.local"),
         t("settings.translation_model.section.user_settings"),
         t("settings.translation_model.section.others"),
     ]

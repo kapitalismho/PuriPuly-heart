@@ -336,15 +336,14 @@ _TRANSLATION_MODELS = (
 )
 _TRANSLATION_MODEL_SECTION_ORDER = (
     "settings.translation_model.section.recommended_cloud",
-    "settings.translation_model.section.cpu_inference",
-    "settings.translation_model.section.gpu_inference",
+    "settings.translation_model.section.local",
     "settings.translation_model.section.user_settings",
     "settings.translation_model.section.others",
 )
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.INDEX_TRANSLATE_35B: "settings.translation_model.section.recommended_cloud",
-    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.cpu_inference",
-    TranslationModel.MANAGED_GEMMA_26B: "settings.translation_model.section.gpu_inference",
+    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.local",
+    TranslationModel.MANAGED_GEMMA_26B: "settings.translation_model.section.local",
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.others",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "settings.translation_model.section.recommended_cloud",
@@ -4695,29 +4694,28 @@ class SettingsView(ft.Column):
         for section_key in _TRANSLATION_MODEL_SECTION_ORDER:
             for model in _TRANSLATION_MODELS:
                 if model == TranslationModel.MANAGED_GEMMA:
-                    if section_key == "settings.translation_model.section.cpu_inference":
-                        options.append(
-                            OptionItem(
-                                value="managed_gemma_cpu",
-                                label=t("provider.managed_gemma_cpu"),
-                                description=t(
-                                    "settings.translation_model.managed_gemma_cpu.description",
-                                    default="",
+                    if section_key == "settings.translation_model.section.local":
+                        options.extend(
+                            [
+                                OptionItem(
+                                    value="managed_gemma_cpu",
+                                    label=t("provider.managed_gemma_cpu"),
+                                    description=t(
+                                        "settings.translation_model.managed_gemma_cpu.description",
+                                        default="",
+                                    ),
+                                    section=t(section_key),
                                 ),
-                                section=t(section_key),
-                            )
-                        )
-                    elif section_key == "settings.translation_model.section.gpu_inference":
-                        options.append(
-                            OptionItem(
-                                value="managed_gemma_gpu",
-                                label=t("provider.managed_gemma_gpu"),
-                                description=t(
-                                    "settings.translation_model.managed_gemma_gpu.description",
-                                    default="",
+                                OptionItem(
+                                    value="managed_gemma_gpu",
+                                    label=t("provider.managed_gemma_gpu"),
+                                    description=t(
+                                        "settings.translation_model.managed_gemma_gpu.description",
+                                        default="",
+                                    ),
+                                    section=t(section_key),
                                 ),
-                                section=t(section_key),
-                            )
+                            ]
                         )
                     continue
                 if _TRANSLATION_MODEL_SECTION_BY_MODEL.get(model) != section_key:
