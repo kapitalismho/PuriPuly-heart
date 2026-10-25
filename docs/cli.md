@@ -242,22 +242,6 @@ Exact schemas, bounds, and projections live in [diagnostics](../src/puripuly_hea
 
 An exit code does not replace the JSON receipt or owner-state observation.
 
-## Desktop Overlay Visibility Smoke
-
-For intermittent desktop-overlay occlusion, run the short synthetic scenario on an interactive Windows desktop:
-
-```powershell
-uv run --with pillow python -m puripuly_heart.ui.desktop_overlay_smoke --output-dir .artifacts/desktop-overlay-smoke
-```
-
-Use an empty output directory. The runner needs Tk and screen capture access. It starts the actual desktop renderer through local authenticated ingress with a fixed caption and an owned overlapping window; it does not start speech, providers, SteamVR, or VRChat, or use the user's settings. Leave the desktop available for its automated mouse interactions.
-
-The scenario raises an already-visible peer to topmost without activation, lets production restore the caption, then checks locked click-through, unlocked dragging, relocking, placement, and foreground preservation. Production recovery is event-driven while locked: relevant native window events trigger a relative Z-order/overlap check, not periodic topmost writes or foreground activation.
-
-Inspect `result.json` and the cropped captures. Compare `peer-raised-before-recovery.png` with `after-peer.png` for occlusion and restored caption pixels; `before-peer.png` establishes initial rendering. `unlocked-moved.png` and `relocked.png` check captions through the interaction cycle. If a first capture lacks caption pixels, the runner retains it and takes one bounded `*-subsequent.png` observation without forcing a redraw. The baseline/result pair captures the same caption and bounds before the owner loop handles the peer raise and after production recovery; it is not a run of an older executable. The runner owns teardown on success and failure. A successful exit or topmost bit alone is not proof of visible text; inspect the images.
-
-This checks the demonstrated topmost-peer failure class, not the reporter's exact VRChat/GPU cause or universal game compatibility. A headless or noninteractive run cannot supply a visible-output pass. The separate `run-desktop-overlay-repro` artifact-certification workflow is not required for this short diagnosis.
-
 ## Source Map
 
 | Question | Read |
