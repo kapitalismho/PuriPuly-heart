@@ -354,6 +354,9 @@ async def test_renderer_envelope_feeds_manager_eligibility() -> None:
         async def reassert_topmost_after_click_through(self) -> object:
             raise AssertionError("not part of this path")
 
+        def stop_topmost_watch(self) -> None:
+            return None
+
         def close(self) -> None:
             return None
 

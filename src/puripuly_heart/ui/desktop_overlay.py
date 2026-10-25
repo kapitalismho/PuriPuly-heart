@@ -1024,6 +1024,10 @@ class FletDesktopRendererWindow:
         async with self._interaction_mode_lock:
             self._interaction_generation += 1
             try:
+                self._window_z_order_port.stop_topmost_watch()
+            except Exception as exc:
+                failures.append(exc)
+            try:
                 await self._cancel_window_z_order_task()
             except Exception as exc:
                 failures.append(exc)
@@ -2171,6 +2175,7 @@ class FletDesktopRendererWindow:
             self._interaction_mode = mode
             self._interaction_generation += 1
             generation = self._interaction_generation
+            self._window_z_order_port.stop_topmost_watch()
             await self._cancel_window_z_order_task()
             if self._closed.is_set():
                 return
