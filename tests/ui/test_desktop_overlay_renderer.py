@@ -4956,9 +4956,62 @@ async def test_desktop_overlay_snapshot_batching_is_fifo_latest_only_and_reports
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("render_fails", [False, True])
+async def test_desktop_overlay_disabled_diagnostics_skip_eager_work_without_skipping_dispatch(
+    monkeypatch: pytest.MonkeyPatch,
+    render_fails: bool,
+) -> None:
+    window = FailingBatchingRendererWindow() if render_fails else BatchingRendererWindow()
+
+    def unexpected_diagnostic_work(*_args: object, **_kwargs: object) -> None:
+        pytest.fail(
+            "disabled diagnostics must not construct visual state, records, or acknowledgements"
+        )
+
+    monkeypatch.setattr(window, "renderer_visual_state", unexpected_diagnostic_work)
+    monkeypatch.setattr(window, "renderer_visual_state_for_snapshot", unexpected_diagnostic_work)
+    monkeypatch.setattr(
+        desktop_overlay, "validate_desktop_renderer_event", unexpected_diagnostic_work
+    )
+    monkeypatch.setattr(
+        desktop_overlay, "RendererCommitAcknowledgement", unexpected_diagnostic_work
+    )
+    renderer = desktop_overlay.DesktopOverlayRenderer(
+        _manifest(),
+        window=window,
+        lifecycle_sink=RecordingLifecycleSink(),
+        parent_monitor=FakeParentMonitor(),
+    )
+    first = _scheduled_snapshot(10, "first")
+    second = _scheduled_snapshot(11, "second")
+    current = _scheduled_snapshot(12, "current")
+    await renderer.enqueue_snapshot(_scheduled_snapshot(9, "stale"))
+    await renderer.enqueue_snapshot(second)
+    await renderer.enqueue_snapshot(current)
+    await renderer.enqueue_snapshot(_scheduled_snapshot(12, "duplicate"))
+    control = {"command": "set_interaction_mode", "mode": "edit"}
+    await renderer.enqueue_runtime_control(control)
+
+    if render_fails:
+        with pytest.raises(RuntimeError, match="must not enter persisted diagnostics"):
+            await renderer._dispatch_pending_snapshot_batch(first)
+    else:
+        assert await renderer._dispatch_pending_snapshot_batch(first) == (
+            "runtime_control",
+            control,
+        )
+        assert window.snapshots == [current]
+    assert window.history_snapshots == [first, second]
+    assert renderer._last_accepted_snapshot_revision == 12
+    assert renderer._ui_queue.empty()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("retire_between_updates", [False, True])
+@pytest.mark.parametrize("diagnostics_enabled", [False, True])
 async def test_desktop_overlay_snapshot_batching_matches_sequential_fitting_reference(
     retire_between_updates: bool,
+    diagnostics_enabled: bool,
 ) -> None:
     short = _scheduled_snapshot(2, "응")
     long = _scheduled_snapshot(3, "가" * 80)
@@ -5015,6 +5068,7 @@ async def test_desktop_overlay_snapshot_batching_matches_sequential_fitting_refe
         window=window,
         lifecycle_sink=RecordingLifecycleSink(),
         parent_monitor=FakeParentMonitor(),
+        diagnostic_port=RecordingRendererDiagnosticPort() if diagnostics_enabled else None,
     )
     try:
         await renderer.enqueue_runtime_control(

@@ -762,6 +762,7 @@ struct WindowsOpenVrOverlay {
     compositor_api: Option<*mut openvr_sys::VR_IVRCompositor_FnTable>,
     overlay_handle: openvr_sys::VROverlayHandle_t,
     placement_policy: OverlayPlacementPolicy,
+    applied_placement_policy: Option<OverlayPlacementPolicy>,
     visible: bool,
     output_adapter: OpenVrOutputAdapter,
 }
@@ -783,12 +784,13 @@ impl WindowsOpenVrOverlay {
         };
         let overlay_handle = create_overlay_handle(overlay_api, overlay_instance_id)?;
 
-        let instance = Self {
+        let mut instance = Self {
             overlay_api,
             system_api,
             compositor_api,
             overlay_handle,
             placement_policy: OverlayPlacementPolicy::default(),
+            applied_placement_policy: None,
             visible: false,
             output_adapter,
         };
@@ -800,7 +802,7 @@ impl WindowsOpenVrOverlay {
         submit_texture(self, frame)
     }
 
-    fn configure_overlay(&self) -> Result<(), OpenVrError> {
+    fn configure_overlay(&mut self) -> Result<(), OpenVrError> {
         let set_overlay_rendering_pid = self
             .overlay_api()
             .SetOverlayRenderingPid
@@ -820,9 +822,7 @@ impl WindowsOpenVrOverlay {
             )
         };
         map_overlay_init_error(self.overlay_api(), "SetOverlayFlag", error)?;
-        self.placement_policy
-            .apply(self.overlay_api(), self.overlay_handle)?;
-        Ok(())
+        self.apply_placement()
     }
 
     fn show_overlay(&self) -> Result<(), OpenVrError> {
@@ -853,8 +853,18 @@ impl WindowsOpenVrOverlay {
 
     fn apply_calibration(&mut self, calibration: &OverlayCalibration) -> Result<(), OpenVrError> {
         self.placement_policy = OverlayPlacementPolicy::from_calibration(calibration)?;
+        self.apply_placement()
+    }
+
+    fn apply_placement(&mut self) -> Result<(), OpenVrError> {
+        if self.applied_placement_policy.as_ref() == Some(&self.placement_policy) {
+            return Ok(());
+        }
+        self.applied_placement_policy = None;
         self.placement_policy
-            .apply(self.overlay_api(), self.overlay_handle)
+            .apply(self.overlay_api(), self.overlay_handle)?;
+        self.applied_placement_policy = Some(self.placement_policy.clone());
+        Ok(())
     }
 
     fn reanchor_spatial_locked(&mut self) -> Result<SpatialReanchorOutcome, OpenVrError> {
@@ -2036,3 +2046,7 @@ mod tests {
         assert_eq!(rest[5], OpenVrRuntimeEvent::Quit);
     }
 }
+
+#[cfg(all(test, windows))]
+#[path = "openvr_placement_tests.rs"]
+mod placement_owner_tests;

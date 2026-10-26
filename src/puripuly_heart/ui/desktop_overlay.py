@@ -3291,12 +3291,13 @@ class DesktopOverlayRenderer:
                 )
 
         if committed_snapshot is not None:
-            await self._emit_renderer_diagnostic(
-                event_type="render_start",
-                snapshot=committed_snapshot,
-                disposition="committed",
-                visual_state=self._renderer_visual_state_for_snapshot(committed_snapshot),
-            )
+            if not isinstance(self.diagnostic_port, DisabledRendererDiagnosticPort):
+                await self._emit_renderer_diagnostic(
+                    event_type="render_start",
+                    snapshot=committed_snapshot,
+                    disposition="committed",
+                    visual_state=self._renderer_visual_state_for_snapshot(committed_snapshot),
+                )
             try:
                 await self.window.dispatch_snapshot(committed_snapshot)
             except Exception:
@@ -3306,6 +3307,8 @@ class DesktopOverlayRenderer:
                     disposition="failed",
                 )
                 raise
+            if isinstance(self.diagnostic_port, DisabledRendererDiagnosticPort):
+                return barrier
             acknowledgement = RendererCommitAcknowledgement(committed_snapshot.revision)
             await self._emit_renderer_diagnostic(
                 event_type="render_commit",
@@ -3355,6 +3358,8 @@ class DesktopOverlayRenderer:
         acknowledgement: RendererCommitAcknowledgement | None = None,
         render_commit_acknowledged: bool = False,
     ) -> None:
+        if isinstance(self.diagnostic_port, DisabledRendererDiagnosticPort):
+            return
         safe_visual_state = dict(visual_state or self._renderer_visual_state_for_snapshot(snapshot))
         record = validate_desktop_renderer_event(
             {
