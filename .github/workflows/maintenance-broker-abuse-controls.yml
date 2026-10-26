@@ -83,10 +83,20 @@ jobs:
 
       - name: Render production Wrangler config
         working-directory: broker
-        run: >-
-          node scripts/render-production-wrangler-config.mjs
-          --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION"
-          --out wrangler.production.jsonc
+        shell: bash
+        env:
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}
+        run: |
+          network_identity_version_args=(--network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION")
+          if [[ -n "${NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
+            network_identity_version_args+=(--network-identity-hmac-key-version-previous "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION")
+          fi
+
+          node scripts/render-production-wrangler-config.mjs \
+            --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION" \
+            "${network_identity_version_args[@]}" \
+            --out wrangler.production.jsonc
 
       - name: Inspect current daily auth cap
         working-directory: broker

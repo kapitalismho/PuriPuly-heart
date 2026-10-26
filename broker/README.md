@@ -41,6 +41,8 @@ The manual [direct-deploy workflow](../.github/workflows/deploy-broker-direct.ym
 - Health success is not issuance or model-routing success. Account-level OpenRouter settings can narrow effective routing; review the production smoke before connecting app/public traffic. A failed post-deploy check does not imply rollback.
 - Ordinary deployment excludes both `0025` telemetry deletion and `0027` referral-schema retirement. Migration files and local checks are not evidence that production data was removed.
 
+The manual [daily-auth-cap maintenance workflow](../.github/workflows/maintenance-broker-abuse-controls.yml) requires explicit confirmation, updates only the daily auth cap, and verifies it by readback. Config preparation uses `BROKER_D1_DATABASE_ID_PRODUCTION`, the required `NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION` variable, and optional `NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION` overlap, as in deployment. Missing or invalid required configuration stops the workflow before D1 access; no key-version default is substituted.
+
 ### Separately Authorized Retirement
 
 - **Legacy translation telemetry (`0025`):** inspect production aggregate counts/date ranges and external or operator-created dependencies, then obtain explicit deletion approval. Use the workflow's dedicated deletion controls; dispatch confirmation does not prove that review or approval occurred. Deletion uses the run's backup and applies only the held migration after health and production smoke checks.
@@ -60,6 +62,8 @@ pnpm exec vitest run broker/tests --exclude "broker/tests/deploy-smoke/**"
 ```
 
 `verify:config` checks the pinned Wrangler binding contract without cloud credentials. Use isolated synthetic state and controlled provider responses for local behavior checks. The [Broker CI job](../.github/workflows/pr-ci.yml) defines automated checks; production smoke is a separate, explicitly authorized live operation.
+
+For focused offline maintenance coverage, run `pnpm exec vitest run broker/tests/deploy-automation.spec.ts`. It executes the maintained guard, renderer, cap update, and readback with synthetic configuration and local SQLite; it does not verify live D1 access or authorize a production dispatch.
 
 ## Source Map
 
