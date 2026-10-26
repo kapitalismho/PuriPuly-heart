@@ -172,6 +172,14 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/ovt
         run: cargo test --locked --manifest-path native/overlay/Cargo.toml -- --skip windows_graphics_
 
+      - name: Assemble graphics test font resources
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/ovt
+        run: |
+          $fontDir = Join-Path $env:CARGO_TARGET_DIR 'debug/deps/puripuly_heart/data/fonts'
+          New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
+          Copy-Item -LiteralPath 'src/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc' -Destination $fontDir -Force
+
       - name: Cargo test graphics
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/ovt

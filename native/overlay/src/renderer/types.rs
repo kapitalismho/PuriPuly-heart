@@ -500,8 +500,25 @@ pub struct ResolvedBlockLayout {
 impl ResolvedBlockLayout {
     pub fn block_cache_key(&self) -> BlockCacheKey {
         BlockCacheKey {
-            id: self.id.clone(),
-            layout: self.layout_cache_key.clone(),
+            lines: self
+                .primary_lines
+                .iter()
+                .chain(self.secondary_line.iter())
+                .map(|line| {
+                    (
+                        line.text.clone(),
+                        line.role,
+                        line.style_key,
+                        line.font_size_px.to_bits(),
+                    )
+                })
+                .collect(),
+            channel: self.channel,
+            speaker_style: self.speaker_style,
+            block_variant: self.block_variant,
+            content_width_bits: self.content_width_px.to_bits(),
+            text_scale_key: self.layout_cache_key.text_scale_key,
+            secondary_reserved: self.secondary_reserved,
         }
     }
 }
@@ -593,8 +610,13 @@ pub struct LineCacheKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BlockCacheKey {
-    pub id: String,
-    pub layout: LayoutCacheKey,
+    pub lines: Vec<(String, LineRole, TextStyleKey, u32)>,
+    pub channel: Option<CaptionChannel>,
+    pub speaker_style: SpeakerStyle,
+    pub block_variant: CaptionBlockVariant,
+    pub content_width_bits: u32,
+    pub text_scale_key: u32,
+    pub secondary_reserved: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

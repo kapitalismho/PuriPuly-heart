@@ -169,7 +169,6 @@ class OverlayVisibleBlockSelection:
     candidate_keys: list[OverlayEntryKey]
     selected_keys: list[OverlayEntryKey]
     protected_keys: list[OverlayEntryKey]
-    retained_hidden: list[OverlayEntryKey] = field(default_factory=list)
 
 
 @dataclass
@@ -1200,7 +1199,6 @@ class OverlayPresentationState:
                 continue
             rendered_entries.append((protected_key, block))
         rendered_entries.sort(key=lambda item: (item[1].appearance_seq, item[1].occupant_key))
-        retained_hidden = [key for key, entry in entries.items() if entry.retained_hidden]
         return OverlayVisibleBlockSelection(
             rendered_entries=rendered_entries,
             active_self_present=active_self_present,
@@ -1208,7 +1206,6 @@ class OverlayPresentationState:
             candidate_keys=candidate_keys,
             selected_keys=visible_entry_keys,
             protected_keys=protected_keys,
-            retained_hidden=retained_hidden,
         )
 
     def entry_is_publishable(

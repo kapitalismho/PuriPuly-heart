@@ -207,9 +207,9 @@ mod tests {
         LAYOUT_CACHE_CAP, LINE_CACHE_CAP,
     };
     use crate::renderer::{
-        BlockBounds, BlockCacheKey, BundledFaceId, CaptionBlockVariant, FontLanguageBucket,
-        FontResolver, FontSource, LayoutCacheKey, LineCacheKey, LineRole, TextStyleDescriptor,
-        TextStyleKey, VisualBounds,
+        BlockBounds, BundledFaceId, CaptionBlockVariant, FontLanguageBucket, FontResolver,
+        FontSource, LayoutCacheKey, LineCacheKey, LineRole, TextStyleDescriptor, TextStyleKey,
+        VisualBounds,
     };
 
     fn style_key(language: &str) -> TextStyleKey {
@@ -362,7 +362,7 @@ mod tests {
     }
 
     #[test]
-    fn layout_and_block_cache_keys_include_primary_and_secondary_style_identity() {
+    fn layout_cache_keys_include_primary_and_secondary_style_identity() {
         let base = layout_key(7);
         let changed_primary = LayoutCacheKey {
             primary_style_key: style_key("zh-Hans"),
@@ -375,16 +375,6 @@ mod tests {
 
         assert_ne!(base, changed_primary);
         assert_ne!(base, changed_secondary);
-        assert_ne!(
-            (BlockCacheKey {
-                id: "same-block".into(),
-                layout: base.clone(),
-            }),
-            (BlockCacheKey {
-                id: "same-block".into(),
-                layout: changed_secondary,
-            })
-        );
     }
 
     #[test]

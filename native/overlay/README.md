@@ -147,6 +147,48 @@ height when the selected calibration requires more room for two complete slots.
 Slot anchors, reserved regions, and spacing continue to use the unshrunk
 calibration size; a long caption does not move neighboring captions.
 
+## Rendering Reuse
+
+Each Windows layout engine owns a bounded cache of 16 measurement text formats.
+Reuse requires the same effective style, exact font size, and wrapping mode.
+Font collections, locale routing, and fallback dependencies belong to that
+engine; replacing it starts with empty caches. Formats with a trimming object
+bypass this cache, and failed format creation is not cached.
+
+Wrapping first measures the complete remaining input with DirectWrite. When it
+does not fit, the engine can reuse an exact previously measured prefix through
+the first overflowing boundary, with matching effective style, size, and width.
+Otherwise it performs the existing sequential shaped-prefix measurements.
+This cache retains at most 16 entries, each with at most 4096 UTF-8 bytes.
+It neither adds independent character widths nor reuses glyph runs, and it does
+not assume translated prefixes remain stable.
+
+Finalized block reuse follows resolved visible lines, their order, roles,
+effective styles and sizes, speaker color, and reserved geometry rather than
+the original full source string or caption identity. Hidden suffixes still
+participate in fitting and layout before that decision. Current-frame placement
+and opacity remain outside the reusable local composition.
+
+Visual caches do not own caption lifetime or publication authority. Cache hits
+still draw the current frame, preserve damage removal, and execute the existing
+producer-readiness and native retry path; they do not authorize resubmission of
+an old texture.
+
+Each Windows OpenVR overlay owner also remembers its last completely successful
+effective placement policy. Unchanged applications on that handle omit redundant
+width and HMD-relative transform setters. First application, changed settings,
+and recreation still apply placement. A failed or partially applied attempt
+invalidates the successful state, including when restoring an earlier policy.
+Spatial reanchoring and pose-unavailable recovery remain independent; this reuse
+does not change native drawing, readiness, submission, or retry ownership.
+
+The separate Desktop renderer skips diagnostic-only visual projection and
+validation only for its explicit disabled diagnostic port. Enabled ports retain
+event ordering, validation, and acknowledgement behavior. Superseded accepted
+snapshots still advance fitting history in order; current rendering and page
+updates are unchanged. Position-only Desktop bounds controls retain the existing
+rendering, resizing, and feedback path.
+
 Run commands from the repository root. On Windows, use a short `--target-dir`
 path if the checkout is deep enough to exceed MSBuild's tracking-file path limit.
 
@@ -157,9 +199,17 @@ snapshots through the actual Python Presenter before exercising native reducer
 and retry ownership. Install `uv` and the locked Python test environment before
 running the Rust suite.
 
+Graphics tests use the production executable-relative bundled-font path.
+Assemble the committed TTC beside the test executables before running them;
+use `release/deps` instead of `debug/deps` when testing with `--release`.
+
 ```powershell
-cargo test --locked --manifest-path native/overlay/Cargo.toml
-cargo test --locked --manifest-path native/overlay/Cargo.toml windows_graphics_style_changes_repaint_both_rows_and_replay_identically -- --nocapture
+$testTarget = Join-Path $env:TEMP 'puripuly-overlay-tests'
+$fontDir = Join-Path $testTarget 'debug/deps/puripuly_heart/data/fonts'
+New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
+Copy-Item -LiteralPath 'src/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc' -Destination $fontDir -Force
+cargo test --locked --manifest-path native/overlay/Cargo.toml --target-dir $testTarget
+cargo test --locked --manifest-path native/overlay/Cargo.toml --target-dir $testTarget windows_graphics_style_changes_repaint_both_rows_and_replay_identically -- --nocapture
 cargo build --manifest-path native/overlay/Cargo.toml --locked --release --bin PuriPulyHeartOverlay --target-dir target
 
 New-Item -ItemType Directory -Force -Path build/overlay | Out-Null
