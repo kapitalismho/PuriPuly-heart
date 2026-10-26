@@ -89,7 +89,7 @@ It works in many environments, including VRChat and Discord.
 ## Translation Comparison
 ![Mean error penalty per sentence for the full speech recognition and translation pipeline. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are combinations available in PuriPuly: Gemini Transcribe → Luna (0.676), Soniox STT → Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). Orange bars are external baselines: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). Judge model: Gemini 3.7 Flash.](docs/images/performance/1.png)
 
-![Mean error penalty per sentence. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are models available in PuriPuly: GPT 6 Luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). Orange bars are external baselines: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Only results with a character error rate (CER) of 5% or less were selected for Qwen 3.8, Gemini 3.5, and Soniox. Judge model: Gemini 3.7 Flash.](docs/images/performance/2.png)
+![Mean error penalty per sentence. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are models available in PuriPuly: GPT-6 luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). Orange bars are external baselines: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Only results with a character error rate (CER) of 5% or less were selected for Qwen 3.8, Gemini 3.5, and Soniox. Judge model: Gemini 3.7 Flash.](docs/images/performance/2.png)
 
 - The blue bars are the models available in PuriPuly.
 - We ran the experiment using Microsoft's Gemba MQM framework.
@@ -107,7 +107,7 @@ It works in many environments, including VRChat and Discord.
 | **Index-Translate 35B A3B** | Unlimited | Unlimited | 5,000 | 7,260 |
 | **Gemma 4 26B A4B + 31B** | 13,940 | 13,940 | 3,680 | 4,770 |
 | **DeepSeek V4.1 Flash** | 16,800 | 16,800 | 3,860 | 5,070 |
-| **GPT 6 Luna** | 8,680 | 8,680 | 3,170 | 3,950 |
+| **GPT-6 luna** | 8,680 | 8,680 | 3,170 | 3,950 |
 
 #### Other Models
 
@@ -127,7 +127,7 @@ It works in many environments, including VRChat and Discord.
 | **Index-Translate 35B A3B** | $0 | $0 | ~$0.0002 | ~$0.00014 |
 | **Gemma 4 26B A4B + 31B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.00021 |
 | **DeepSeek V4.1 Flash** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.00020 |
-| **GPT 6 Luna** | ~$0.00012 | ~$0.00012 | ~$0.0003 | ~$0.00025 |
+| **GPT-6 luna** | ~$0.00012 | ~$0.00012 | ~$0.0003 | ~$0.00025 |
 
 #### Other Models
 
@@ -142,7 +142,7 @@ It works in many environments, including VRChat and Discord.
 *   *Uses per Dollar is derived from the un-rounded values in the Cost per Utterance table.*
 *   *All costs and usage counts are approximate.*
 *   *DeepSeek V4.1 Flash assumes a 70% cache hit rate; V4 Flash (OpenRouter) assumes 60%.*
-*   *GPT 6 Luna uses OpenAI API pricing with no cache discount assumed; when connected through ChatGPT, it uses your Codex limits instead of API charges.*
+*   *GPT-6 luna uses OpenAI API pricing with no cache discount assumed; when connected through ChatGPT, it uses your Codex limits instead of API charges.*
 *   *Qwen API costs are based on the Beijing region.*
 *   *Pricing as of October 17, 2026.*
 

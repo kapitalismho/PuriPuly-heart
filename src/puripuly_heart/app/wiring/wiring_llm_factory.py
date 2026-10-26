@@ -822,7 +822,7 @@ def _provider_from_resolved_target(
 
     if target.provider == PROVIDER_OPENAI:
         if target.model != OPENAI_MODEL_GPT_6_LUNA:
-            raise ValueError("OpenAI supports only GPT 6 Luna")
+            raise ValueError("OpenAI supports only GPT-6 luna")
         if (
             target.credential.source != CREDENTIAL_SOURCE_SECRET_STORE
             or target.credential.reference != CREDENTIAL_REF_OPENAI_BYOK

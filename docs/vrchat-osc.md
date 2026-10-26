@@ -114,7 +114,7 @@
 | 10 | Gemma 4 E4B CPU |
 | 11 | Gemma 4 E4B GPU |
 | 13 | DeepSeek V4.1 Flash |
-| 14 | GPT 6 Luna |
+| 14 | GPT-6 luna |
 | 15 | Gemma 4 26B A4B GPU |
 | 16 | Index-Translate 35B |
 
