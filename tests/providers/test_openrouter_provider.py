@@ -507,7 +507,7 @@ async def test_httpx_openrouter_client_deepseek_41_routing_is_strict(
 
     client = HttpxOpenRouterClient(
         api_key="test-key",
-        model="deepseek/deepseek-v4.1-flash",
+        model="deepseek/deepseek-v4.1-flash-1017",
         base_url="https://example",
         routing_mode=OpenRouterRoutingMode.LATENCY,
         provider_routing=provider_routing,
@@ -521,7 +521,7 @@ async def test_httpx_openrouter_client_deepseek_41_routing_is_strict(
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "only": ["deepseek", "wafer"],
+        "only": ["wafer", "inference-net", "deepseek"],
         "allow_fallbacks": False,
     }
 
@@ -535,7 +535,7 @@ async def test_httpx_openrouter_client_deepseek_41_model_overrides_stale_route(
 
     client = HttpxOpenRouterClient(
         api_key="test-key",
-        model="deepseek/deepseek-v4.1-flash",
+        model="deepseek/deepseek-v4.1-flash-1017",
         base_url="https://example",
         provider_routing=OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY,
     )
@@ -548,7 +548,7 @@ async def test_httpx_openrouter_client_deepseek_41_model_overrides_stale_route(
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "only": ["deepseek", "wafer"],
+        "only": ["wafer", "inference-net", "deepseek"],
         "allow_fallbacks": False,
     }
 
@@ -633,7 +633,7 @@ async def test_httpx_openrouter_client_deepseek_40_china_pins_baidu(
             "managed_china",
             "deepseek_v4_flash_41_strict",
             {
-                "only": ["deepseek", "wafer"],
+                "only": ["wafer", "inference-net", "deepseek"],
                 "allow_fallbacks": False,
             },
         ),

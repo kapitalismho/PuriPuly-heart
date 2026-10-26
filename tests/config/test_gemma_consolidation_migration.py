@@ -72,8 +72,8 @@ def test_v48_consolidates_active_pair_without_trusting_stale_alias(
         assert translation["model"] == "deepseek_v4_flash_41"
         assert translation["connection_history"]["deepseek_v4_flash_41"] == "managed"
         assert "deepseek_v4_flash" not in translation["connection_history"]
-        assert target.model == "deepseek/deepseek-v4.1-flash"
-        assert translation["openrouter_model"] == "deepseek/deepseek-v4.1-flash"
+        assert target.model == "deepseek/deepseek-v4.1-flash-1017"
+        assert translation["openrouter_model"] == "deepseek/deepseek-v4.1-flash-1017"
         assert translation["openrouter_selection_alias"] == "deepseek_v4_flash_41_managed"
         assert translation["openrouter_selected_source"] == "managed"
         assert translation["openrouter_provider_routing"] == "deepseek_v4_flash_41_strict"

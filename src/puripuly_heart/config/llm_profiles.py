@@ -14,7 +14,7 @@ OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT = "google/gemma-4-26b-a4b-it"
 OPENROUTER_MODEL_GEMMA_4_31B_IT = "google/gemma-4-31b-it"
 OPENROUTER_MODEL_QWEN_35_FLASH_02_23 = "qwen/qwen3.5-flash-02-23"
 OPENROUTER_MODEL_DEEPSEEK_V4_FLASH = "deepseek/deepseek-v4-flash-0731"
-OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41 = "deepseek/deepseek-v4.1-flash"
+OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41 = "deepseek/deepseek-v4.1-flash-1017"
 LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH = "deepseek/deepseek-v4-flash"
 LEGACY_OPENROUTER_MODEL_GEMINI_31_FLASH_LITE = "google/gemini-3.1-flash-lite"
 OPENROUTER_MODEL_GEMINI_FLASH = "google/gemini-3.8-flash"
@@ -272,6 +272,7 @@ def get_openrouter_selection_alias_for_model_and_source(
 LEGACY_OPENROUTER_MODEL_BY_VALUE: dict[str, str] = {
     LEGACY_OPENROUTER_MODEL_DEEPSEEK_V4_FLASH: OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     "deepseek/deepseek-v4-flash-0423": OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+    "deepseek/deepseek-v4.1-flash": OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
     "google/gemini-3-flash-preview": OPENROUTER_MODEL_GEMINI_FLASH,
     "google/gemini-3.7-flash": OPENROUTER_MODEL_GEMINI_FLASH,
     LEGACY_OPENROUTER_MODEL_GEMINI_31_FLASH_LITE: OPENROUTER_MODEL_GEMINI_FLASH,

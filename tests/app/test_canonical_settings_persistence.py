@@ -765,7 +765,7 @@ def test_deepseek_v4_managed_materialization_migrates_to_41(connection: str) -> 
     assert result.connection == connection
     assert result.connection_history["deepseek_v4_flash_41"] == connection
     assert "deepseek_v4_flash" not in result.connection_history
-    assert result.openrouter_model == "deepseek/deepseek-v4.1-flash"
+    assert result.openrouter_model == "deepseek/deepseek-v4.1-flash-1017"
     assert result.openrouter_provider_routing == "deepseek_v4_flash_41_strict"
     assert result.openrouter_selection_alias == "deepseek_v4_flash_41_managed"
     assert result.openrouter_selected_source == "managed"
@@ -799,7 +799,7 @@ def test_deepseek_41_materialization_persists_distinct_identity(connection: str)
         canonical.intent.translation,
         model="deepseek_v4_flash_41",
         connection=connection,
-        openrouter_model="deepseek/deepseek-v4-flash-0731",
+        openrouter_model="deepseek/deepseek-v4.1-flash",
         openrouter_provider_routing="deepseek_v4_flash_latency",
     )
 
@@ -808,7 +808,8 @@ def test_deepseek_41_materialization_persists_distinct_identity(connection: str)
     ).intent.translation
 
     assert result.model == "deepseek_v4_flash_41"
-    assert result.openrouter_model == "deepseek/deepseek-v4.1-flash"
+    assert result.connection == connection
+    assert result.openrouter_model == "deepseek/deepseek-v4.1-flash-1017"
     assert result.openrouter_provider_routing == "deepseek_v4_flash_41_strict"
     expected_alias = (
         "deepseek_v4_flash_41_byok"
@@ -816,6 +817,9 @@ def test_deepseek_41_materialization_persists_distinct_identity(connection: str)
         else "deepseek_v4_flash_41_managed"
     )
     assert result.openrouter_selection_alias == expected_alias
+    assert result.openrouter_selected_source == (
+        "byok" if connection == "openrouter" else "managed"
+    )
 
 
 def test_old_official_deepseek_primary_materializes_as_41_direct() -> None:
@@ -833,6 +837,7 @@ def test_old_official_deepseek_primary_materializes_as_41_direct() -> None:
     assert result.model == "deepseek_v4_flash_41"
     assert result.connection == "official_byok"
     assert result.deepseek.llm_model == "deepseek-flash"
+    assert result.openrouter_model == "deepseek/deepseek-v4.1-flash-1017"
 
 
 @pytest.mark.parametrize("connection", ["gpu", "cpu", "managed", "invalid"])

@@ -308,6 +308,22 @@ def test_parse_openrouter_llm_model_accepts_legacy_deepseek_flash() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "model",
+    [
+        "deepseek/deepseek-v4.1-flash",
+        "  deepseek/deepseek-v4.1-flash  ",
+        "deepseek/deepseek-v4.1-flash-1017",
+        OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41,
+    ],
+)
+def test_parse_openrouter_llm_model_upgrades_deepseek_41_snapshot(model: str) -> None:
+    parsed = parse_openrouter_llm_model(model)
+
+    assert parsed == OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41
+    assert parsed.value == "deepseek/deepseek-v4.1-flash-1017"
+
+
 def test_parse_openrouter_llm_model_accepts_legacy_gemini_flash() -> None:
     assert (
         parse_openrouter_llm_model("google/gemini-3-flash-preview")

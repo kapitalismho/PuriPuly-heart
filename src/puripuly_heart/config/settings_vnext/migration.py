@@ -6,7 +6,10 @@ from collections.abc import Mapping
 from datetime import date
 from typing import Any
 
-from puripuly_heart.config.llm_profiles import normalize_legacy_openrouter_model
+from puripuly_heart.config.llm_profiles import (
+    OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
+    normalize_legacy_openrouter_model,
+)
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.schema import (
     VNEXT_SETTINGS_SCHEMA_VERSION,
@@ -680,7 +683,7 @@ def _migrate_deepseek_translation(
     if translation.get("model") == "deepseek_v4_flash" and should_upgrade_primary:
         translation["model"] = "deepseek_v4_flash_41"
         if primary_connection in {"managed", "managed_china"}:
-            translation["openrouter_model"] = "deepseek/deepseek-v4.1-flash"
+            translation["openrouter_model"] = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
             translation["openrouter_selection_alias"] = "deepseek_v4_flash_41_managed"
             translation["openrouter_provider_routing"] = "deepseek_v4_flash_41_strict"
     if translation.get("model") == "deepseek_v4_flash" and primary_connection == "openrouter":
@@ -689,7 +692,7 @@ def _migrate_deepseek_translation(
         translation["openrouter_provider_routing"] = "deepseek_v4_flash_latency"
         translation["openrouter_selected_source"] = "byok"
     if translation.get("model") == "deepseek_v4_flash_41" and primary_connection == "official_byok":
-        translation["openrouter_model"] = "deepseek/deepseek-v4.1-flash"
+        translation["openrouter_model"] = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
         translation["openrouter_provider_routing"] = "default"
         deepseek = translation.get("deepseek")
         if isinstance(deepseek, dict):
@@ -729,7 +732,7 @@ def _migrate_retired_deepseek_v4_managed_path(translation: dict[str, Any]) -> No
     retired_history = False
     if retired_primary:
         translation["model"] = "deepseek_v4_flash_41"
-        translation["openrouter_model"] = "deepseek/deepseek-v4.1-flash"
+        translation["openrouter_model"] = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
         translation["openrouter_selected_source"] = "managed"
         translation["openrouter_selection_alias"] = "deepseek_v4_flash_41_managed"
         translation["openrouter_provider_routing"] = "deepseek_v4_flash_41_strict"

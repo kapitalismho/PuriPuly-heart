@@ -483,7 +483,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "managed",
             "managed",
             "openrouter",
-            "deepseek/deepseek-v4.1-flash",
+            "deepseek/deepseek-v4.1-flash-1017",
             "managed",
             "openrouter:managed",
             None,
@@ -494,7 +494,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "managed_china",
             "managed",
             "openrouter",
-            "deepseek/deepseek-v4.1-flash",
+            "deepseek/deepseek-v4.1-flash-1017",
             "managed",
             "openrouter:managed_qq",
             None,
@@ -505,7 +505,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "openrouter",
             "byok",
             "openrouter",
-            "deepseek/deepseek-v4.1-flash",
+            "deepseek/deepseek-v4.1-flash-1017",
             "secret_store",
             "openrouter:byok",
             None,
@@ -917,20 +917,28 @@ def test_standard_managed_resolves_standard_managed_credential_reference() -> No
     )
 
 
-def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_with_identity_hedge() -> None:
+@pytest.mark.parametrize(
+    "model",
+    ["deepseek/deepseek-v4.1-flash", "deepseek/deepseek-v4.1-flash-1017"],
+)
+def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_with_identity_hedge(
+    model: str,
+) -> None:
     runtime_resolution = _runtime_resolution_module()
     resolved = _resolved_module()
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
         provider_llm="openrouter",
-        model="deepseek/deepseek-v4.1-flash",
+        model=model,
         selected_source="byok",
         routing_mode="parasail_first",
         provider_routing="deepseek_only",
         broker_base_url="https://broker.fixture.test/v1",
     )
+    assert openrouter_intent.model == "deepseek/deepseek-v4.1-flash-1017"
+    assert openrouter_intent.selection_alias == "deepseek_v4_flash_41_byok"
     translation_intent = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
         provider_llm="openrouter",
-        openrouter_model=openrouter_intent.model,
+        openrouter_model=model,
         openrouter_selected_source=openrouter_intent.selected_source,
         openrouter_provider_routing=openrouter_intent.provider_routing,
         concurrency_limit=8,
@@ -946,7 +954,7 @@ def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_with_identity_
     assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41
     assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER
     assert config.provider == "openrouter"
-    assert config.model == "deepseek/deepseek-v4.1-flash"
+    assert config.model == "deepseek/deepseek-v4.1-flash-1017"
     assert config.credential == resolved.ResolvedCredentialRequirement(
         source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
         required=True,

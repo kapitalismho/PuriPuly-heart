@@ -310,15 +310,24 @@ def test_vnext_dict_preserves_selectable_deepseek_40_openrouter_model() -> None:
     assert result["openrouter_selection_alias"] == "deepseek_v4_flash_byok"
 
 
-def test_serialization_from_dict_normalizes_legacy_deepseek_openrouter_model() -> None:
+@pytest.mark.parametrize(
+    ("saved_model", "expected_model"),
+    [
+        ("deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-flash-0731"),
+        ("deepseek/deepseek-v4.1-flash", "deepseek/deepseek-v4.1-flash-1017"),
+    ],
+)
+def test_serialization_from_dict_normalizes_legacy_deepseek_openrouter_model(
+    saved_model: str, expected_model: str
+) -> None:
     from puripuly_heart.config.settings_vnext import serialization
 
     canonical = serialization.to_dict(AppSettingsVNext())
-    canonical["intent"]["translation"]["openrouter_model"] = "deepseek/deepseek-v4-flash"
+    canonical["intent"]["translation"]["openrouter_model"] = saved_model
 
     loaded = serialization.from_dict(canonical)
 
-    assert loaded.intent.translation.openrouter_model == "deepseek/deepseek-v4-flash-0731"
+    assert loaded.intent.translation.openrouter_model == expected_model
 
 
 def test_serialization_from_dict_preserves_deepseek_40_openrouter_model() -> None:
@@ -355,10 +364,87 @@ def test_compat_load_upgrades_direct_deepseek_metadata(tmp_path: Path) -> None:
     assert loaded["deepseek"]["llm_model"] == "deepseek-flash"
     assert loaded["model"] == "deepseek_v4_flash_41"
     assert loaded["connection"] == "official_byok"
-    assert loaded["openrouter_model"] == "deepseek/deepseek-v4.1-flash"
+    assert loaded["openrouter_model"] == "deepseek/deepseek-v4.1-flash-1017"
     persisted_text = path.read_text(encoding="utf-8")
     assert '"llm_model": "deepseek-flash"' in persisted_text
-    assert "deepseek/deepseek-v4.1-flash" in persisted_text
+    assert "deepseek/deepseek-v4.1-flash-1017" in persisted_text
+
+
+@pytest.mark.parametrize("version", [41, VNEXT_SETTINGS_SCHEMA_VERSION])
+@pytest.mark.parametrize("connection", ["managed", "managed_china", "openrouter", "official_byok"])
+def test_saved_deepseek_41_snapshot_upgrade_persists_across_restart(
+    tmp_path: Path, version: int, connection: str
+) -> None:
+    from puripuly_heart.app.wiring.wiring_llm_factory import runtime_resolution_input_from_vnext
+    from puripuly_heart.config.runtime_resolution import resolve_llm_config
+
+    compat = _compat()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = version
+    source = "managed" if connection in {"managed", "managed_china"} else "byok"
+    translation = raw["intent"]["translation"]
+    translation.update(
+        model="deepseek_v4_flash_41",
+        connection=connection,
+        previous_llm_model="deepseek_v4_flash_41",
+        connection_history={
+            "deepseek_v4_flash_41": connection,
+            "gemini_flash": "official_byok",
+        },
+        openrouter_model="deepseek/deepseek-v4.1-flash",
+        openrouter_selected_source=source,
+        openrouter_selection_alias=f"deepseek_v4_flash_41_{source}",
+        openrouter_provider_routing=(
+            "default" if connection == "official_byok" else "deepseek_v4_flash_41_strict"
+        ),
+    )
+    path = tmp_path / "settings.json"
+    original = _write_json_bytes(path, raw)
+
+    result = compat.load_vnext_settings(path)
+
+    assert result.ok
+    assert result.migrated is True
+    assert result.settings is not None
+    assert result.backup_path is not None
+    assert result.backup_path.read_bytes() == original
+    expected = {**translation, "openrouter_model": "deepseek/deepseek-v4.1-flash-1017"}
+    assert serialization.to_dict(result.settings)["intent"]["translation"] == expected
+    persisted = path.read_bytes()
+    assert json.loads(persisted)["intent"]["translation"] == expected
+
+    restarted = compat.load_vnext_settings(path)
+
+    assert restarted.ok
+    assert restarted.migrated is False
+    assert restarted.settings is not None
+    assert restarted.settings == result.settings
+    assert path.read_bytes() == persisted
+    config = resolve_llm_config(runtime_resolution_input_from_vnext(restarted.settings))
+    expected_runtime_model = (
+        "deepseek-flash" if connection == "official_byok" else "deepseek/deepseek-v4.1-flash-1017"
+    )
+    assert config.primary.provider == (
+        "deepseek" if connection == "official_byok" else "openrouter"
+    )
+    assert config.primary.model == expected_runtime_model
+    assert config.primary.models == (expected_runtime_model,)
+    assert (
+        config.primary.credential.reference
+        == {
+            "managed": "openrouter:managed",
+            "managed_china": "openrouter:managed_qq",
+            "openrouter": "openrouter:byok",
+            "official_byok": "deepseek:byok",
+        }[connection]
+    )
+    assert config.fallback is not None
+    assert config.fallback.target == config.primary
+    assert tuple(attempt.target for attempt in config.attempts[:2]) == (
+        config.primary,
+        config.primary,
+    )
 
 
 def test_restart_roundtrip_preserves_gemma_main_model_with_stale_openrouter_url() -> None:
@@ -504,7 +590,7 @@ def test_v40_deepseek_official_upgrades_41_metadata() -> None:
 
     assert translated.model == "deepseek_v4_flash_41"
     assert translated.connection == "official_byok"
-    assert translated.openrouter_model == "deepseek/deepseek-v4.1-flash"
+    assert translated.openrouter_model == "deepseek/deepseek-v4.1-flash-1017"
     assert translated.openrouter_provider_routing == "default"
 
 
@@ -529,7 +615,7 @@ def test_current_deepseek_v4_managed_choice_migrates_to_41(connection: str) -> N
     assert translated.model == "deepseek_v4_flash_41"
     assert translated.connection == connection
     assert translated.connection_history == {"deepseek_v4_flash_41": connection}
-    assert translated.openrouter_model == "deepseek/deepseek-v4.1-flash"
+    assert translated.openrouter_model == "deepseek/deepseek-v4.1-flash-1017"
     assert translated.openrouter_selected_source == "managed"
     assert translated.openrouter_selection_alias == "deepseek_v4_flash_41_managed"
     assert translated.openrouter_provider_routing == "deepseek_v4_flash_41_strict"
@@ -585,7 +671,7 @@ def test_v40_hidden_managed_openrouter_alias_upgrades_using_original_source() ->
     assert translated.connection == "managed_china"
     assert translated.openrouter_selected_source == "managed"
     assert translated.openrouter_selection_alias == "deepseek_v4_flash_41_managed"
-    assert translated.openrouter_model == "deepseek/deepseek-v4.1-flash"
+    assert translated.openrouter_model == "deepseek/deepseek-v4.1-flash-1017"
 
 
 def test_current_version_deepseek_v4_flash_api_model_normalizes_to_deepseek_flash() -> None:

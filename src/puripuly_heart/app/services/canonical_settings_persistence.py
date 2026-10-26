@@ -971,6 +971,7 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
     elif model == "deepseek_v4_flash_41":
         if connection == "official_byok":
             updates = {
+                "openrouter_model": OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
                 "openrouter_provider_routing": "default",
                 "deepseek": replace(translation.deepseek, llm_model="deepseek-flash"),
             }
