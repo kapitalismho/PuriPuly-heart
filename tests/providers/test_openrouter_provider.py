@@ -521,7 +521,7 @@ async def test_httpx_openrouter_client_deepseek_41_routing_is_strict(
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "only": ["wafer", "inference-net", "deepseek"],
+        "only": ["inference-net", "deepseek"],
         "allow_fallbacks": False,
     }
 
@@ -548,7 +548,7 @@ async def test_httpx_openrouter_client_deepseek_41_model_overrides_stale_route(
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "only": ["wafer", "inference-net", "deepseek"],
+        "only": ["inference-net", "deepseek"],
         "allow_fallbacks": False,
     }
 
@@ -633,7 +633,7 @@ async def test_httpx_openrouter_client_deepseek_40_china_pins_baidu(
             "managed_china",
             "deepseek_v4_flash_41_strict",
             {
-                "only": ["wafer", "inference-net", "deepseek"],
+                "only": ["inference-net", "deepseek"],
                 "allow_fallbacks": False,
             },
         ),

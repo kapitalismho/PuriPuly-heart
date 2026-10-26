@@ -193,7 +193,7 @@ def _build_provider_preferences(
         }
     if model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41:
         return {
-            "only": ["wafer", "inference-net", "deepseek"],
+            "only": ["inference-net", "deepseek"],
             "allow_fallbacks": False,
         }
     if model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH:
@@ -241,7 +241,7 @@ def _build_provider_preferences(
         }
     if provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT:
         return {
-            "only": ["wafer", "inference-net", "deepseek"],
+            "only": ["inference-net", "deepseek"],
             "allow_fallbacks": False,
         }
     if provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY:
