@@ -1525,6 +1525,7 @@ class RecordingWindowZOrderPort:
         self.bound_pids: list[int] = []
         self.reassert_calls = 0
         self.close_calls = 0
+        self.watch_stop_calls = 0
 
     def bind_process(self, pid: int) -> None:
         self.bound_pids.append(pid)
@@ -1570,6 +1571,9 @@ class RecordingWindowZOrderPort:
         if self.error is not None:
             raise self.error
         return self.result
+
+    def stop_topmost_watch(self) -> None:
+        self.watch_stop_calls += 1
 
     def close(self) -> None:
         self.close_calls += 1
@@ -3443,10 +3447,12 @@ async def test_desktop_overlay_reasserts_topmost_after_locked_render_update() ->
             )
         ]
         assert port.reassert_calls == 1
+        assert port.watch_stop_calls == 2
     finally:
         await window.close()
 
     assert port.close_calls == 1
+    assert port.watch_stop_calls == 3
 
 
 @pytest.mark.asyncio
