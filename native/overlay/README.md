@@ -199,9 +199,17 @@ snapshots through the actual Python Presenter before exercising native reducer
 and retry ownership. Install `uv` and the locked Python test environment before
 running the Rust suite.
 
+Graphics tests use the production executable-relative bundled-font path.
+Assemble the committed TTC beside the test executables before running them;
+use `release/deps` instead of `debug/deps` when testing with `--release`.
+
 ```powershell
-cargo test --locked --manifest-path native/overlay/Cargo.toml
-cargo test --locked --manifest-path native/overlay/Cargo.toml windows_graphics_style_changes_repaint_both_rows_and_replay_identically -- --nocapture
+$testTarget = Join-Path $env:TEMP 'puripuly-overlay-tests'
+$fontDir = Join-Path $testTarget 'debug/deps/puripuly_heart/data/fonts'
+New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
+Copy-Item -LiteralPath 'src/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc' -Destination $fontDir -Force
+cargo test --locked --manifest-path native/overlay/Cargo.toml --target-dir $testTarget
+cargo test --locked --manifest-path native/overlay/Cargo.toml --target-dir $testTarget windows_graphics_style_changes_repaint_both_rows_and_replay_identically -- --nocapture
 cargo build --manifest-path native/overlay/Cargo.toml --locked --release --bin PuriPulyHeartOverlay --target-dir target
 
 New-Item -ItemType Directory -Force -Path build/overlay | Out-Null
