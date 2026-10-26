@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import inspect
+from collections.abc import Callable
 
 import pytest
 
@@ -42,6 +43,10 @@ class FakeWin32WindowApi:
         self.placement_calls: list[tuple[int, int, int, int, int]] = []
         self.set_calls: list[int] = []
         self.pid = 4321
+        self.peer_ahead = False
+        self.watch_callback: Callable[[int, int], None] | None = None
+        self.watch_close_calls = 0
+        self.order_queries = 0
 
     def all_top_level_windows_for_process(
         self, pid: int
@@ -110,6 +115,23 @@ class FakeWin32WindowApi:
         if self.set_result[0]:
             self.current_style |= desktop_window_zorder._WS_EX_TOPMOST
         return self.set_result
+
+    def topmost_peers_ahead(self, hwnd: int) -> tuple[int, ...]:
+        assert hwnd in self.windows
+        self.order_queries += 1
+        return (202,) if self.peer_ahead else ()
+
+    def watch_z_order(
+        self, callback: Callable[[int, int], None]
+    ) -> desktop_window_zorder.WindowZOrderWatch:
+        self.watch_callback = callback
+        api = self
+
+        class Watch:
+            def close(self) -> None:
+                api.watch_close_calls += 1
+
+        return Watch()
 
 
 @pytest.mark.asyncio
@@ -785,3 +807,131 @@ async def test_confirm_visible_stale_binding_never_fires_callback() -> None:
     assert result.confirmed is False
     assert result.reason == "binding_changed"
     assert fired == []
+
+
+@pytest.mark.asyncio
+async def test_topmost_watch_recovers_only_after_peer_event_and_coalesces_callbacks() -> None:
+    api = FakeWin32WindowApi(visible=True)
+    port = desktop_window_zorder.WindowsWindowZOrderPort(api=api)
+    port.bind_process(4321)
+    await port.reassert_topmost_after_click_through()
+    await asyncio.sleep(0)
+    assert api.set_calls == [101]
+    assert api.watch_callback is not None
+    api.peer_ahead = True
+    queries = api.order_queries
+
+    for _ in range(20):
+        api.watch_callback(0x8004, 202)
+    await asyncio.sleep(0)
+
+    assert api.order_queries == queries + 1
+    assert api.set_calls == [101, 101]
+    api.peer_ahead = False
+    api.watch_callback(0x8004, 101)
+    await asyncio.sleep(0)
+    assert api.set_calls == [101, 101]
+    port.close()
+    assert api.watch_close_calls == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("retirement", ["unlock", "rebind", "close", "reuse", "hidden"])
+async def test_topmost_watch_rejects_queued_and_late_retired_events(retirement: str) -> None:
+    api = FakeWin32WindowApi(visible=True)
+    port = desktop_window_zorder.WindowsWindowZOrderPort(api=api)
+    port.bind_process(4321)
+    await port.reassert_topmost_after_click_through()
+    await asyncio.sleep(0)
+    callback = api.watch_callback
+    assert callback is not None
+    api.peer_ahead = True
+    callback(0x8004, 202)
+
+    if retirement == "unlock":
+        port.stop_topmost_watch()
+    elif retirement == "rebind":
+        port.bind_process(5678)
+    elif retirement == "close":
+        port.close()
+    elif retirement == "reuse":
+        api.pid = 9999
+    else:
+        api.visible = False
+    callback(0x8004, 202)
+    await asyncio.sleep(0)
+
+    assert api.set_calls == [101]
+    port.close()
+
+
+@pytest.mark.parametrize(
+    ("visible", "topmost", "bounds", "ahead", "expected"),
+    [
+        (True, True, (20, 20, 100, 100), True, True),
+        (False, True, (20, 20, 100, 100), True, False),
+        (True, False, (20, 20, 100, 100), True, False),
+        (True, True, (800, 0, 100, 100), True, False),
+        (True, True, (20, 20, 100, 100), False, False),
+    ],
+)
+def test_native_peer_gating_requires_visible_topmost_overlap_ahead(
+    visible: bool,
+    topmost: bool,
+    bounds: tuple[int, int, int, int],
+    ahead: bool,
+    expected: bool,
+) -> None:
+    class User32:
+        def GetWindow(self, hwnd: int, command: int) -> int:
+            assert command == 3
+            return 202 if hwnd == 101 and ahead else 0
+
+        def IsIconic(self, hwnd: int) -> bool:
+            return False
+
+    api = desktop_window_zorder._CtypesWin32WindowApi.__new__(
+        desktop_window_zorder._CtypesWin32WindowApi
+    )
+    api._user32 = User32()
+    api.window_bounds = lambda hwnd: (0, 0, 800, 600) if hwnd == 101 else bounds
+    api.is_window_visible = lambda hwnd: visible
+    api.extended_style = lambda hwnd: 8 if topmost else 0
+
+    assert bool(api.topmost_peers_ahead(101)) is expected
+
+
+@pytest.mark.asyncio
+async def test_topmost_watch_settles_with_protected_peers_and_recovers_later_transition() -> None:
+    class ProtectedPeerApi(FakeWin32WindowApi):
+        peers = (301,)
+
+        def topmost_peers_ahead(self, hwnd: int) -> tuple[int, ...]:
+            return self.peers
+
+    api = ProtectedPeerApi(visible=True)
+    port = desktop_window_zorder.WindowsWindowZOrderPort(api=api)
+    port.bind_process(4321)
+    await port.reassert_topmost_after_click_through()
+    await asyncio.sleep(0)
+    callback = api.watch_callback
+    assert callback is not None
+    assert api.set_calls == [101]
+
+    api.peers = (202, 301)
+    callback(0x8004, 202)
+    await asyncio.sleep(0)
+    assert api.set_calls == [101, 101]
+    api.peers = (301,)
+    callback(0x8004, 101)
+    await asyncio.sleep(0)
+    for _ in range(5):
+        callback(0x8004, 301)
+        await asyncio.sleep(0)
+    assert api.set_calls == [101, 101]
+
+    api.peers = (202, 301)
+    callback(0x8004, 202)
+    await asyncio.sleep(0)
+    assert api.set_calls == [101, 101, 101]
+    port.close()
