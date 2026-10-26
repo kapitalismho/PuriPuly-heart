@@ -655,30 +655,145 @@ describe('broker direct deploy automation', () => {
     }
   }, 15000);
 
-  it('ships a manual production workflow that updates only the broker daily auth cap runtime config', () => {
+  it('keeps daily-cap maintenance manually authorized in production with configured identity versions', () => {
     const workflow = readFileSync(abuseControlsWorkflow, 'utf8');
 
     expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toContain('\npush:');
+    expect(workflow).not.toMatch(/^\s*(push|schedule|pull_request):/mu);
     expect(workflow).toContain('environment: production');
-    expect(workflow).toContain('max_count');
-    expect(workflow).toContain('default: "1000"');
-    expect(workflow).toContain('confirm_update');
-    expect(workflow).toContain('update broker daily auth cap');
-    expect(workflow).toContain('CLOUDFLARE_API_TOKEN');
-    expect(workflow).toContain('CLOUDFLARE_ACCOUNT_ID');
-    expect(workflow).toContain('BROKER_D1_DATABASE_ID_PRODUCTION');
-    expect(workflow).toContain('render-production-wrangler-config.mjs');
-    expect(workflow).toContain('wrangler.production.jsonc');
-    expect(workflow).toContain('wrangler d1 execute');
-    expect(workflow).toContain('puripuly-heart-broker --remote --config');
-    expect(workflow).toContain("json_set(value, '$.newActiveEntitlementsPerDay.maxCount'");
-    expect(workflow).toContain("json_extract(value, '$.newActiveEntitlementsPerDay.maxCount')");
-    expect(workflow).toContain('Daily auth cap verification failed');
-    expect(workflow).not.toContain('wrangler deploy');
-    expect(workflow).not.toContain('wrangler d1 migrations apply');
-    expect(workflow).not.toContain('wrangler secret put');
+    for (const name of [
+      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION',
+      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION',
+    ]) {
+      expect(workflow).toContain(`${name}: \${{ vars.${name} }}`);
+    }
+    expect(workflow).not.toMatch(/wrangler (deploy|secret|d1 migrations)/u);
   });
+
+  it.skipIf(!bashAvailable)('renders configured daily-cap maintenance and changes only the cap before reading it back', () => {
+    const script = dailyCapWorkflowScript();
+    for (const [current, previous, cap] of [
+      ['7', undefined, '1'],
+      ['12', '11', '100000'],
+      ['9', ' \t ', '450'],
+    ]) {
+      const scenario = createDailyCapScenario({
+        NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: current,
+        NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: previous,
+        TARGET_MAX_COUNT: cap,
+      });
+      const result = runBashScript(script, scenario.tempDir, scenario.env);
+      expect(result.status, result.stderr).toBe(0);
+      const config = readFileSync(join(scenario.tempDir, 'wrangler.production.jsonc'), 'utf8');
+      expect(config).toContain('"name": "puripuly-heart-broker"');
+      expect(config).toContain('"binding": "BROKER_DB"');
+      expect(config).toContain('"database_name": "puripuly-heart-broker"');
+      expect(config).toContain('"database_id": "daily-cap-synthetic-database"');
+      expect(config).not.toContain('REQUIRED_AT_DEPLOY_TIME');
+      expect(config).toContain(`"NETWORK_IDENTITY_HMAC_KEY_VERSION": "${current}"`);
+      if (previous?.trim()) {
+        expect(config).toContain(`"NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS": "${previous}"`);
+      } else {
+        expect(config).not.toContain('"NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS"');
+      }
+
+      const db = new DatabaseSync(scenario.databasePath);
+      try {
+        const rows = db.prepare('SELECT key, value, updated_at FROM broker_config ORDER BY key').all();
+        expect(rows).toHaveLength(2);
+        expect(rows[0].key).toBe('abuse_controls');
+        expect(JSON.parse(String(rows[0].value))).toEqual({
+          newActiveEntitlementsPerDay: { maxCount: Number(cap), windowDays: 1 },
+          preserved: { enabled: true },
+        });
+        expect(rows[0].updated_at).not.toBe('2000-01-01 00:00:00');
+        expect(rows[1]).toEqual({
+          key: 'fingerprint_salt',
+          value: '{"preserved":"salt"}',
+          updated_at: '2000-01-01 00:00:00',
+        });
+        expect(db.prepare('SELECT value FROM maintenance_sentinel').all()).toEqual([{ value: 'untouched' }]);
+      } finally {
+        db.close();
+      }
+      const calls = readFileSync(scenario.callLogPath, 'utf8').trim().split('\n').map(
+        (line) => JSON.parse(line) as { args: string[]; results: unknown[] },
+      );
+      expect(calls).toHaveLength(3);
+      expect(calls[0].args).toContain('--command');
+      expect(calls[0].results).toEqual([
+        { max_count: 333, window_days: 1, updated_at: '2000-01-01 00:00:00' },
+      ]);
+      expect(calls[1].args).toContain('--file');
+      expect(calls[2].args).toContain('--command');
+      expect(calls[2].results).toEqual([
+        expect.objectContaining({ max_count: Number(cap), window_days: 1 }),
+      ]);
+    }
+  }, 15000);
+
+  it.skipIf(!bashAvailable)('rejects unauthorized or invalid daily-cap inputs before rendering or D1 access', () => {
+    const script = dailyCapWorkflowScript();
+    const rejections: Array<Record<string, string | undefined>> = [
+      { CONFIRM_UPDATE: undefined },
+      { CONFIRM_UPDATE: 'update broker daily auth cap ' },
+      ...[undefined, '', '0', '-1', '100001', '18446744073709551617', '9'.repeat(1000), '1.5', 'abc', '01'].map(
+        (TARGET_MAX_COUNT) => ({ TARGET_MAX_COUNT }),
+      ),
+      ...['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'BROKER_D1_DATABASE_ID_PRODUCTION'].flatMap(
+        (name) => [{ [name]: undefined }, { [name]: ' \t ' }],
+      ),
+    ];
+    for (const overrides of rejections) {
+      const scenario = createDailyCapScenario(overrides);
+      const result = runBashScript(script, scenario.tempDir, scenario.env);
+      expect(result.status, JSON.stringify(overrides)).toBe(1);
+      expect(existsSync(join(scenario.tempDir, 'wrangler.production.jsonc'))).toBe(false);
+      expect(existsSync(scenario.callLogPath)).toBe(false);
+    }
+  }, 15000);
+
+  it.skipIf(!bashAvailable)('rejects missing or invalid configured identity versions before daily-cap D1 access', () => {
+    const script = dailyCapWorkflowScript();
+    const rejections: Array<Record<string, string | undefined>> = [
+      ...[undefined, '', ' ', '0', 'v7', '9007199254740992'].map(
+        (NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION) => ({ NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }),
+      ),
+      ...['0', 'v6', '7'].map(
+        (NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION) => ({ NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }),
+      ),
+    ];
+    for (const overrides of rejections) {
+      const scenario = createDailyCapScenario(overrides);
+      const result = runBashScript(script, scenario.tempDir, scenario.env);
+      expect(result.status, JSON.stringify(overrides)).toBe(1);
+      expect(existsSync(join(scenario.tempDir, 'wrangler.production.jsonc'))).toBe(false);
+      expect(existsSync(scenario.callLogPath)).toBe(false);
+    }
+  }, 15000);
+
+  it.skipIf(!bashAvailable)('rejects a missing row, mismatched cap, or wrong daily window in the actual maintenance readback', () => {
+    const workflow = readFileSync(abuseControlsWorkflow, 'utf8');
+    const render = extractWorkflowRunBlock(workflow, 'Render production Wrangler config');
+    const verify = extractWorkflowRunBlock(workflow, 'Verify daily auth cap runtime config');
+    for (const sql of [
+      "DELETE FROM broker_config WHERE key = 'abuse_controls'",
+      "UPDATE broker_config SET value = json_set(value, '$.newActiveEntitlementsPerDay.maxCount', 444) WHERE key = 'abuse_controls'",
+      "UPDATE broker_config SET value = json_set(value, '$.newActiveEntitlementsPerDay.windowDays', 2) WHERE key = 'abuse_controls'",
+    ]) {
+      const scenario = createDailyCapScenario({ TARGET_MAX_COUNT: '333' });
+      const db = new DatabaseSync(scenario.databasePath);
+      try {
+        db.exec(sql);
+      } finally {
+        db.close();
+      }
+      expect(runBashScript(render, scenario.tempDir, scenario.env).status).toBe(0);
+      const result = runBashScript(verify, scenario.tempDir, scenario.env);
+      expect(result.status, sql).toBe(1);
+      expect(readFileSync(scenario.callLogPath, 'utf8').trim().split('\n')).toHaveLength(1);
+    }
+  }, 15000);
 });
 
 const bashAvailable = (() => {
@@ -693,12 +808,12 @@ function extractWorkflowRunBlock(workflow: string, stepName: string): string {
   const stepIndex = workflow.indexOf(`- name: ${stepName}`);
   expect(stepIndex).toBeGreaterThanOrEqual(0);
 
-  const runMarker = '\n        run: |\n';
-  const runIndex = workflow.indexOf(runMarker, stepIndex);
-  expect(runIndex).toBeGreaterThanOrEqual(0);
+  const runMatch = workflow.slice(stepIndex).match(/\n        run: (\||>-)\n/u);
+  expect(runMatch).not.toBeNull();
+  const runIndex = stepIndex + runMatch!.index! + runMatch![0].length;
 
   const body: string[] = [];
-  for (const line of workflow.slice(runIndex + runMarker.length).split('\n')) {
+  for (const line of workflow.slice(runIndex).split('\n')) {
     if (line !== '' && !line.startsWith('          ')) {
       break;
     }
@@ -707,7 +822,93 @@ function extractWorkflowRunBlock(workflow: string, stepName: string): string {
   while (body.length > 0 && body[body.length - 1] === '') {
     body.pop();
   }
-  return `${body.join('\n')}\n`;
+  return `${body.join(runMatch![1] === '>-' ? ' ' : '\n')}\n`;
+}
+
+function dailyCapWorkflowScript(): string {
+  const workflow = readFileSync(abuseControlsWorkflow, 'utf8');
+  let previousIndex = -1;
+  return [
+    'Guard production runtime-config update inputs',
+    'Render production Wrangler config',
+    'Inspect current daily auth cap',
+    'Update daily auth cap runtime config',
+    'Verify daily auth cap runtime config',
+  ].map((name) => {
+    const index = workflow.indexOf(`- name: ${name}`);
+    expect(index).toBeGreaterThan(previousIndex);
+    previousIndex = index;
+    return extractWorkflowRunBlock(workflow, name);
+  }).join('\n');
+}
+
+function createDailyCapScenario(overrides: Record<string, string | undefined>) {
+  const tempDir = createRepoTempDir();
+  mkdirSync(join(tempDir, 'scripts'));
+  writeFileSync(
+    join(tempDir, 'scripts', 'render-production-wrangler-config.mjs'),
+    readFileSync(renderWranglerConfigScript),
+  );
+  writeFileSync(join(tempDir, 'wrangler.jsonc'), readFileSync(checkedInWranglerConfig));
+  const databasePath = join(tempDir, 'synthetic-d1.sqlite');
+  const callLogPath = join(tempDir, 'd1-calls.jsonl');
+  const db = new DatabaseSync(databasePath);
+  try {
+    db.exec(`
+      CREATE TABLE broker_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
+      INSERT INTO broker_config VALUES
+        ('abuse_controls', '{"newActiveEntitlementsPerDay":{"maxCount":333,"windowDays":1},"preserved":{"enabled":true}}', '2000-01-01 00:00:00'),
+        ('fingerprint_salt', '{"preserved":"salt"}', '2000-01-01 00:00:00');
+      CREATE TABLE maintenance_sentinel (value TEXT NOT NULL);
+      INSERT INTO maintenance_sentinel VALUES ('untouched');
+    `);
+  } finally {
+    db.close();
+  }
+  writeFileSync(join(tempDir, 'bash-env.sh'), 'pnpm() { node ./synthetic-d1.mjs "$@"; }\n');
+  writeFileSync(join(tempDir, 'synthetic-d1.mjs'), `
+import assert from 'node:assert/strict';
+import { appendFileSync, readFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
+const args = process.argv.slice(2);
+assert.deepEqual(args.slice(0, 5), ['exec', 'wrangler', 'd1', 'execute', 'puripuly-heart-broker']);
+assert(args.includes('--remote'));
+assert(args.includes('--json'));
+assert.equal(args[args.indexOf('--config') + 1], 'wrangler.production.jsonc');
+const config = readFileSync('wrangler.production.jsonc', 'utf8');
+assert(config.includes('"database_id": "daily-cap-synthetic-database"'));
+const db = new DatabaseSync('synthetic-d1.sqlite');
+let results = [];
+try {
+  if (args.includes('--file')) {
+    assert(args.includes('--yes'));
+    db.exec(readFileSync(args[args.indexOf('--file') + 1], 'utf8'));
+  } else {
+    assert(args.includes('--command'));
+    results = db.prepare(args[args.indexOf('--command') + 1]).all();
+  }
+} finally {
+  db.close();
+}
+appendFileSync('d1-calls.jsonl', JSON.stringify({ args, results }) + '\\n');
+process.stdout.write(JSON.stringify([{ success: true, results }]));
+`);
+  return {
+    tempDir,
+    databasePath,
+    callLogPath,
+    env: {
+      BASH_ENV: './bash-env.sh',
+      CONFIRM_UPDATE: 'update broker daily auth cap',
+      TARGET_MAX_COUNT: '450',
+      CLOUDFLARE_API_TOKEN: 'daily-cap-synthetic-token',
+      CLOUDFLARE_ACCOUNT_ID: 'daily-cap-synthetic-account',
+      BROKER_D1_DATABASE_ID_PRODUCTION: 'daily-cap-synthetic-database',
+      NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '7',
+      NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: undefined,
+      ...overrides,
+    },
+  };
 }
 function guardScenarioEnv(overrides: Record<string, string | undefined>): Record<string, string> {
   const env: Record<string, string> = {
