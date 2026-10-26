@@ -1644,12 +1644,14 @@ def compose_application_runtime(
             diagnostics_sink=telemetry_diagnostic,
         )
 
-    def vrchat_probe_port() -> int:
-        value = current_settings()
-        if value is None:
-            return 9000
-        port = getattr(value.intent.osc, "port", 9000)
-        return port if isinstance(port, int) and 0 < port <= 65535 else 9000
+    def vrchat_probe_port() -> int | None:
+        if vrc_mic_sync is None:
+            return None
+        connection = vrc_mic_sync.output_snapshot()
+        if connection["effective_mode"] == "off" or connection["local_availability"] == "starting":
+            return None
+        port = connection["effective_send_port"]
+        return port if isinstance(port, int) else None
 
     def require_vrchat_presence() -> VrchatOscPresenceProbeOwner:
         nonlocal vrchat_presence

@@ -281,7 +281,7 @@ def create_local_asr_readiness_owner(
 def create_vrchat_osc_presence_probe_owner(
     *,
     presence_provider: Callable[[], VrchatOscPresencePort | None],
-    port_provider: Callable[[], int],
+    port_provider: Callable[[], int | None],
     publish_notice: Callable[[bool], None],
     diagnostics_sink: VrchatOscProbeDiagnosticsSink | None = None,
 ) -> VrchatOscPresenceProbeOwner:

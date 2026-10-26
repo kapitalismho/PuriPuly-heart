@@ -30,7 +30,7 @@ def _create_vrchat_osc_probe_task(
 @dataclass(slots=True)
 class VrchatOscPresenceProbeOwner:
     presence_provider: Callable[[], VrchatOscPresencePort | None]
-    port_provider: Callable[[], int]
+    port_provider: Callable[[], int | None]
     publish_notice: Callable[[bool], None]
     task_factory: VrchatOscProbeTaskFactory = _create_vrchat_osc_probe_task
     diagnostics_sink: VrchatOscProbeDiagnosticsSink | None = None
@@ -110,10 +110,11 @@ class VrchatOscPresenceProbeOwner:
         while generation == self._generation:
             try:
                 presence = self.presence_provider()
+                port = self.port_provider()
                 should_prompt = (
                     None
-                    if presence is None
-                    else await presence.should_prompt_enable_osc(port=self.port_provider())
+                    if presence is None or port is None
+                    else await presence.should_prompt_enable_osc(port=port)
                 )
             except asyncio.CancelledError:
                 raise
