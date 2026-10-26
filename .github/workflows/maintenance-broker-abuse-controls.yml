@@ -42,7 +42,7 @@ jobs:
             exit 1
           fi
 
-          if (( TARGET_MAX_COUNT > 100000 )); then
+          if (( ${#TARGET_MAX_COUNT} > 6 )) || (( TARGET_MAX_COUNT > 100000 )); then
             echo 'max_count must be 100000 or lower for this manual maintenance workflow.' >&2
             exit 1
           fi

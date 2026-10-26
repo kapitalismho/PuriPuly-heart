@@ -737,7 +737,7 @@ describe('broker direct deploy automation', () => {
     const rejections: Array<Record<string, string | undefined>> = [
       { CONFIRM_UPDATE: undefined },
       { CONFIRM_UPDATE: 'update broker daily auth cap ' },
-      ...[undefined, '', '0', '-1', '100001', '1.5', 'abc', '01'].map(
+      ...[undefined, '', '0', '-1', '100001', '18446744073709551617', '9'.repeat(1000), '1.5', 'abc', '01'].map(
         (TARGET_MAX_COUNT) => ({ TARGET_MAX_COUNT }),
       ),
       ...['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'BROKER_D1_DATABASE_ID_PRODUCTION'].flatMap(
