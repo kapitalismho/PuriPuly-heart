@@ -1260,8 +1260,9 @@ def _validate_packaged_resources(target_root: Path, repo_root: Path) -> dict[str
         data = source.read_bytes()
         if not data.strip() or packaged.read_bytes() != data:
             raise ValueError(f"native Noto CJK provenance mismatch: {name}")
-        if name == "SHA256SUMS.txt" and data.decode("utf-8") != (
-            f"{_NOTO_CJK_SHA256}  {_NOTO_CJK_FILENAME}\n"
+        if name == "SHA256SUMS.txt" and data.decode("utf-8") not in (
+            f"{_NOTO_CJK_SHA256}  {_NOTO_CJK_FILENAME}\n",
+            f"{_NOTO_CJK_SHA256}  {_NOTO_CJK_FILENAME}\r\n",
         ):
             raise ValueError("Noto CJK provenance does not record the pinned font")
         provenance[name] = _sha256(packaged)
