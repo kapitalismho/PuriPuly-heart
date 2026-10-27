@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import pytest
 
 from puripuly_heart.app import wiring as wiring_module
@@ -39,7 +41,6 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
     resolve_self_stt_runtime_config_from_vnext,
     self_stt_runtime_intent_from_vnext,
 )
-from puripuly_heart.config.llm_profiles import get_openrouter_llm_profile
 from puripuly_heart.config.provider_values import (
     DeepSeekLLMModel,
     GeminiLLMModel,
@@ -66,6 +67,7 @@ from puripuly_heart.config.settings_vnext.schema import (
     DesktopFletOverlayPositionIntent,
     DesktopFletOverlayVisualIntent,
 )
+from puripuly_heart.core import network_clients
 from puripuly_heart.core.language import get_deepgram_language
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
@@ -144,30 +146,6 @@ _LLM_DEFAULTS: dict[str, tuple[str, str]] = {
     "openrouter": ("gemma4_26b_31b", "openrouter"),
     "managed_gemma": ("managed_gemma", "cpu"),
 }
-_OPENROUTER_ALIAS_DEFAULTS: dict[str, tuple[str, str]] = {
-    OpenRouterSelectionAlias.QWEN35_FLASH_BYOK.value: (
-        "openrouter_qwen35_flash",
-        "openrouter",
-    ),
-    OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED.value: (
-        "openrouter_qwen35_flash",
-        "managed",
-    ),
-    OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value: ("gemma4_26b_31b", "openrouter"),
-    OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value: ("gemma4_26b_31b", "managed"),
-    OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value: (
-        "deepseek_v4_flash",
-        "openrouter",
-    ),
-    OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value: (
-        "deepseek_v4_flash",
-        "managed",
-    ),
-    OpenRouterSelectionAlias.GEMINI_FLASH_BYOK.value: (
-        "gemini_flash",
-        "openrouter",
-    ),
-}
 
 
 def _vnext(
@@ -208,19 +186,6 @@ def _vnext(
 ) -> AppSettingsVNext:
     settings = AppSettingsVNext()
     translation = settings.intent.translation
-    if openrouter_alias is not None:
-        mapped = _OPENROUTER_ALIAS_DEFAULTS.get(openrouter_alias)
-        if mapped is not None:
-            model = model or mapped[0]
-            connection = connection or mapped[1]
-            if openrouter_model is None:
-                profile = get_openrouter_llm_profile(openrouter_alias)
-                if profile is not None and profile.openrouter_model is not None:
-                    openrouter_model = profile.openrouter_model
-    if openrouter_source == "managed" and connection is None:
-        connection = "managed"
-    elif openrouter_source == "byok" and connection is None:
-        connection = "openrouter"
     if llm is not None:
         default_model, default_connection = _LLM_DEFAULTS[llm]
         translation = replace(
@@ -378,8 +343,6 @@ def create_llm_provider(
     **kwargs: object,
 ) -> LLMProvider:
     extras = kwargs.pop("extras", None)
-    if settings.intent.translation.openrouter_selected_source == "none":
-        raise ValueError("OpenRouter selected source must not be `none` for execution")
     runtime_input = runtime_resolution_input_from_vnext(settings)
     return create_llm_provider_from_runtime_input(
         runtime_input,
@@ -860,9 +823,12 @@ def test_create_llm_provider_openrouter_byok_still_uses_user_owned_secret_after_
     assert provider.inner.primary.api_key == "pkce-user-key"
 
 
-def test_create_llm_provider_openrouter_qwen_byok_alias_uses_resolved_qwen_model() -> None:
+def test_create_llm_provider_canonical_qwen_byok_uses_selected_model() -> None:
     settings = _vnext(
         llm="openrouter",
+        model="openrouter_qwen35_flash",
+        connection="openrouter",
+        openrouter_model="qwen/qwen3.5-flash-02-23",
         openrouter_source="byok",
         openrouter_alias=OpenRouterSelectionAlias.QWEN35_FLASH_BYOK.value,
         openrouter_routing_mode="latency",
@@ -883,6 +849,9 @@ def test_create_llm_provider_openrouter_qwen_byok_alias_uses_resolved_qwen_model
 def test_create_llm_provider_openrouter_qwen_byok_deepseek_only_keeps_identity_hedge() -> None:
     settings = _vnext(
         llm="openrouter",
+        model="openrouter_qwen35_flash",
+        connection="openrouter",
+        openrouter_model="qwen/qwen3.5-flash-02-23",
         openrouter_source="byok",
         openrouter_alias=OpenRouterSelectionAlias.QWEN35_FLASH_BYOK.value,
         openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
@@ -931,10 +900,7 @@ def test_create_llm_provider_openrouter_uses_env_fallback(monkeypatch: pytest.Mo
 
 
 def test_create_llm_provider_openrouter_uses_selected_managed_key() -> None:
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_source="managed",
-    )
+    settings = _vnext(llm="openrouter", connection="managed", openrouter_source="managed")
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "byok-key")
     secrets.set("openrouter_managed_api_key", "managed-key")
@@ -984,6 +950,8 @@ def test_create_llm_provider_openrouter_deepseek_only_keeps_identity_hedge() -> 
 def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_keeps_identity_hedge() -> None:
     settings = _vnext(
         llm="openrouter",
+        model="deepseek_v4_flash",
+        connection="openrouter",
         openrouter_model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value,
         openrouter_source="byok",
         openrouter_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value,
@@ -1068,10 +1036,7 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
 def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_user_identifier(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_source="managed",
-    )
+    settings = _vnext(llm="openrouter", connection="managed", openrouter_source="managed")
     secrets = InMemorySecretStore()
     secrets.set("openrouter_managed_api_key", "managed-key")
     calls: list[OpenRouterCredentialSource] = []
@@ -1106,10 +1071,7 @@ def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_use
 
 
 def test_create_llm_provider_openrouter_requires_release_service_for_managed_mode() -> None:
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_source="managed",
-    )
+    settings = _vnext(llm="openrouter", connection="managed", openrouter_source="managed")
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "byok-key")
     secrets.set("openrouter_managed_api_key", "managed-key")
@@ -1121,10 +1083,7 @@ def test_create_llm_provider_openrouter_requires_release_service_for_managed_mod
 def test_create_llm_provider_openrouter_uses_managed_wrapper_when_release_service_is_available() -> (
     None
 ):
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_source="managed",
-    )
+    settings = _vnext(llm="openrouter", connection="managed", openrouter_source="managed")
     secrets = InMemorySecretStore()
     managed_release_service = object()
     runtime_logging = object()
@@ -1149,10 +1108,7 @@ def test_create_llm_provider_openrouter_uses_managed_wrapper_when_release_servic
 def test_create_llm_provider_openrouter_managed_delegate_factory_loads_user_identifier_lazily(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_source="managed",
-    )
+    settings = _vnext(llm="openrouter", connection="managed", openrouter_source="managed")
     secrets = InMemorySecretStore()
     current_user_identifier: str | None = None
     load_calls = 0
@@ -1234,17 +1190,71 @@ def test_create_llm_provider_openrouter_byok_paths_omit_managed_user_identifier(
     assert hedge_delegate.user_identifier is None
 
 
-def test_create_llm_provider_openrouter_rejects_none_selected_source_even_with_keys() -> None:
+@pytest.mark.asyncio
+@pytest.mark.parametrize("has_byok", [True, False], ids=["byok-progress", "no-managed-fallback"])
+async def test_canonical_openrouter_connection_owns_credential_despite_stale_source_hint(
+    monkeypatch: pytest.MonkeyPatch, has_byok: bool
+) -> None:
     settings = _vnext(
-        llm="openrouter",
+        model="gemini_flash",
+        connection="openrouter",
         openrouter_source="none",
     )
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     secrets = InMemorySecretStore()
-    secrets.set("openrouter_api_key", "byok-key")
-    secrets.set("openrouter_managed_api_key", "managed-key")
+    if has_byok:
+        secrets.set("openrouter_api_key", "synthetic-byok-key")
+    secrets.set("openrouter_managed_api_key", "synthetic-managed-key")
+    requests = []
 
-    with pytest.raises(ValueError, match="selected source"):
-        create_llm_provider(settings, secrets=secrets)
+    def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(
+            (
+                request.method,
+                str(request.url),
+                request.headers["authorization"],
+                json.loads(request.content),
+            )
+        )
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": "synthetic translated result"}}]}
+        )
+
+    monkeypatch.setattr(
+        network_clients,
+        "external_async_client",
+        lambda **kwargs: httpx.AsyncClient(
+            **kwargs, transport=httpx.MockTransport(respond), trust_env=False
+        ),
+    )
+    if not has_byok:
+        with pytest.raises(ValueError, match="openrouter_api_key"):
+            create_llm_provider(settings, secrets=secrets)
+        assert requests == []
+        return
+
+    provider = create_llm_provider(settings, secrets=secrets)
+    try:
+        result = await provider.translate(
+            utterance_id=uuid.uuid4(),
+            text="synthetic source",
+            system_prompt="Translate {source_language} to {target_language}",
+            source_language="en",
+            target_language="ja",
+        )
+        assert result.text == "synthetic translated result"
+        assert len(requests) == 1
+        method, url, authorization, body = requests[0]
+        assert (method, url) == ("POST", "https://openrouter.ai/api/v1/chat/completions")
+        assert authorization == "Bearer synthetic-byok-key"
+        assert body["model"] == "google/gemini-3.8-flash"
+        assert body["messages"] == [
+            {"role": "system", "content": "Translate en to ja"},
+            {"role": "user", "content": "<input>\nsynthetic source\n</input>"},
+        ]
+        assert "user" not in body
+    finally:
+        await provider.close()
 
 
 def test_create_llm_provider_requires_secret(monkeypatch: pytest.MonkeyPatch) -> None:

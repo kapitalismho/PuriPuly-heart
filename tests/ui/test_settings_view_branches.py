@@ -18,6 +18,7 @@ from puripuly_heart.app.services.settings_application import settings_view_surfa
 from puripuly_heart.app.ports.chatgpt_account import ChatGptAccountSnapshot
 from puripuly_heart.app.ports.settings_view import (
     CustomSttEndpointEdit,
+    OverlayTranslationSettingsIntent,
     PeerSttProviderEdit,
     SelfSttProviderEdit,
     SystemPromptEdit,
@@ -67,6 +68,7 @@ from puripuly_heart.ui.theme import COLOR_NEUTRAL_DARK
 from puripuly_heart.ui.views import settings as settings_view
 from tests.helpers.flet_page import attach_dummy_page
 from tests.helpers.osc_presentation import osc_control_presentation_state
+from tests.helpers.settings_view import apply_provider_intent
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 
@@ -100,6 +102,7 @@ class DummySecretStore:
 
 def _make_settings_view(
     monkeypatch: pytest.MonkeyPatch,
+    settings_events,
     store: DummySecretStore | None = None,
     settings: AppSettingsVNext | None = None,
 ):
@@ -110,16 +113,16 @@ def _make_settings_view(
     view = settings_view.SettingsView()
     view._settings_secrets = SettingsSecretsOwner(secret_store_factory=lambda: store)
     if settings is not None:
-        view._settings = settings
+        settings_events.load(view, settings, config_path=Path("settings.json"))
     return view, store
 
 
 def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     baseline = AppSettingsVNext()
-    view, _store = _make_settings_view(monkeypatch)
-    view.load_from_settings(baseline, config_path=Path("settings.json"))
+    view, _store = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, baseline, config_path=Path("settings.json"))
     api_visibility_updates: list[None] = []
     monkeypatch.setattr(
         view,
@@ -267,9 +270,9 @@ def test_settings_rejects_malformed_osc_ports_without_mutating_snapshot() -> Non
 
 
 def test_cpu_auto_option_is_disabled_until_all_models_are_available(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _store = _make_settings_view(monkeypatch)
+    view, _store = _make_settings_view(monkeypatch, settings_events)
 
     unavailable = view._stt_option_item(STTProviderName.LOCAL_CPU_AUTO)
     assert unavailable.disabled is True
@@ -282,13 +285,15 @@ def test_cpu_auto_option_is_disabled_until_all_models_are_available(
     assert view._peer_stt_option_item(STTProviderName.LOCAL_CPU_AUTO).disabled is False
 
 
-def test_telemetry_card_loads_state_and_toggles_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    view, _store = _make_settings_view(monkeypatch)
+def test_telemetry_card_loads_state_and_toggles_enabled(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    view, _store = _make_settings_view(monkeypatch, settings_events)
     attach_dummy_page(monkeypatch, view)
     settings = _vnext(telemetry_last_sent="2026-07-03")
     calls: list[bool] = []
     view.on_telemetry_enabled_change = calls.append
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._telemetry_enabled_text.content.value == t("settings.telemetry.state.on")
     view._on_telemetry_enabled_click(None)
@@ -302,10 +307,12 @@ def test_telemetry_card_loads_state_and_toggles_enabled(monkeypatch: pytest.Monk
     assert view._general_snapshot.telemetry_enabled is True
 
 
-def test_telemetry_card_uses_callback_instead_of_send(monkeypatch: pytest.MonkeyPatch) -> None:
-    view, _store = _make_settings_view(monkeypatch)
+def test_telemetry_card_uses_callback_instead_of_send(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    view, _store = _make_settings_view(monkeypatch, settings_events)
     attach_dummy_page(monkeypatch, view)
-    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+    settings_events.load(view, AppSettingsVNext(), config_path=Path("settings.json"))
     calls: list[bool] = []
     view.on_telemetry_enabled_change = calls.append
 
@@ -577,107 +584,11 @@ def _vnext(
 
 def _make_llm_selection_view(
     monkeypatch: pytest.MonkeyPatch,
+    settings_events,
     settings: AppSettingsVNext,
 ) -> settings_view.SettingsView:
-    monkeypatch.setattr(settings_view.SettingsView, "page", property(lambda self: None))
-    view = settings_view.SettingsView.__new__(settings_view.SettingsView)
-    view._settings = settings
-    view._provider_settings_draft = None
-    view._config_path = Path("settings.json")
-    view.has_provider_changes = False
-    view.has_pending_prompt_changes = False
-    view._managed_trial_usage_visible = False
-    view._managed_trial_usage_remaining_percent = None
-    view._llm_text = SimpleNamespace(content=SimpleNamespace(value=""), update=lambda: None)
-    view._translation_connection_text = SimpleNamespace(
-        content=SimpleNamespace(value="", size=None),
-        update=lambda: None,
-    )
-    view._translation_connection_row = SimpleNamespace(visible=False, update=lambda: None)
-    view._openrouter_routing_row = view._translation_connection_row
-    view._local_llm_base_url = SimpleNamespace(
-        value=settings.intent.local_llm.base_url,
-        label="",
-        error_text=None,
-        update=lambda: None,
-    )
-    view._local_llm_model = SimpleNamespace(
-        value=settings.intent.local_llm.model,
-        label="",
-        error_text=None,
-        update=lambda: None,
-    )
-    view._local_llm_api_key = SimpleNamespace(
-        value="",
-        visible=True,
-        apply_locale=lambda: None,
-        update=lambda: None,
-    )
-    view._local_llm_api_key_helper = SimpleNamespace(value="", update=lambda: None)
-    view._local_llm_extra_body = SimpleNamespace(
-        value=json.dumps(settings.intent.local_llm.extra_body, ensure_ascii=False),
-        label="",
-        error_text=None,
-        update=lambda: None,
-    )
-    view._local_llm_extra_body_helper = SimpleNamespace(value="", update=lambda: None)
-    view._local_llm_extra_body_error = SimpleNamespace(
-        value="",
-        visible=False,
-        update=lambda: None,
-    )
-    view._local_llm_connection_card = SimpleNamespace(visible=False, update=lambda: None)
-    view._custom_stt_connection_card = SimpleNamespace(visible=False, update=lambda: None)
-    view._managed_trial_usage_bar = SimpleNamespace(
-        visible=False,
-        percent=None,
-        update=lambda: None,
-        _remaining_text=SimpleNamespace(update=lambda: None),
-        _fill_segments=SimpleNamespace(update=lambda: None),
-    )
-    view._managed_trial_usage_bar.set_percent = lambda percent: setattr(
-        view._managed_trial_usage_bar, "percent", percent
-    )
-    view._managed_key_card = SimpleNamespace(visible=False, update=lambda: None)
-    view._managed_key_title = SimpleNamespace(value="")
-    view._managed_key_free_usage_label = SimpleNamespace(value="")
-    view._qwen_region_btn = SimpleNamespace(visible=False, update=lambda: None)
-    view._api_keys_column = SimpleNamespace(update=lambda: None)
-    view._deepgram_key = SimpleNamespace(visible=False)
-    view._soniox_key = SimpleNamespace(visible=False)
-    view._google_key = SimpleNamespace(visible=False)
-    view._openrouter_key = SimpleNamespace(visible=False)
-    view._openai_key = SimpleNamespace(visible=False)
-    view._openai_verification_notice = SimpleNamespace(visible=False)
-    view._deepseek_key = SimpleNamespace(visible=False)
-    view._openrouter_pkce_button_row = SimpleNamespace(visible=False, update=lambda: None)
-    view._openrouter_pkce_button = SimpleNamespace(text="", style=None, update=lambda: None)
-    view._alibaba_key_beijing = SimpleNamespace(visible=False)
-    view._alibaba_key_singapore = SimpleNamespace(visible=False)
-    view._prompt_editor = SimpleNamespace(
-        value=settings.intent.prompts.system_prompt_override,
-        provider=None,
-    )
-    view._prompt_for_text = SimpleNamespace(value="")
-    view._custom_vocab_description_text = SimpleNamespace(value="", update=lambda: None)
-    view._custom_vocab_tag_editor = SimpleNamespace(
-        set_placeholder=lambda _text: None,
-        set_add_label=lambda _text: None,
-        set_empty_text=lambda _text: None,
-        set_remove_label_template=lambda _template: None,
-    )
-    view.on_request_openrouter_pkce = None
-    view._prompt_editor.set_provider = lambda provider: setattr(
-        view._prompt_editor, "provider", provider
-    )
-    view._prompt_editor.load_default_prompt = lambda emit_change=False: setattr(
-        view._prompt_editor,
-        "value",
-        "DEFAULT PROMPT",
-    )
-    view._update_peer_provider_visibility = lambda: None
-    view._sync_cloud_free_tier_card = lambda settings=None: None
-    view._sync_soniox_speaker_diarization_card = lambda settings=None: None
+    monkeypatch.setattr(ft.Control, "update", lambda self: None)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     return view
 
 
@@ -723,12 +634,6 @@ def _wrapped_card_column(card: ft.Control) -> ft.Control:
         for control in content.controls:
             if isinstance(control, ft.TransparentPointer):
                 return control.content
-    return content
-
-
-def _wrapped_card_stack(card: ft.Control) -> ft.Stack:
-    content = card.content.content
-    assert isinstance(content, ft.Stack)
     return content
 
 
@@ -886,9 +791,9 @@ def _container_text_size(control: ft.Container) -> int | None:
 
 
 def test_peer_language_card_removed_from_general_tab(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     general_titles = _general_tab_card_titles(view)
     api_titles = _api_tab_card_titles(view)
     general_labels: list[str] = []
@@ -908,12 +813,12 @@ def test_peer_language_card_removed_from_general_tab(
 
 
 def test_load_from_settings_peer_stt_card_has_no_peer_subsetting_controls(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(peer_stt_provider="qwen_audio")
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     peer_card = _api_tab_card(view, t("settings.section.peer_stt"))
     labels = _control_labels(peer_card)
 
@@ -926,17 +831,17 @@ def test_load_from_settings_peer_stt_card_has_no_peer_subsetting_controls(
 
 
 def test_clipboard_auto_translate_selection_updates_settings_and_emits_change(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _store = _make_settings_view(monkeypatch)
+    view, _store = _make_settings_view(monkeypatch, settings_events)
     settings = AppSettingsVNext()
     emitted: list[AppSettingsVNext] = []
-    view.on_settings_changed = emitted.append
+    settings_events.on_change = emitted.append
 
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._on_clipboard_auto_translate_selected("on")
 
-    assert view._settings.intent.clipboard.auto_translate_enabled is True
+    assert settings_events.settings.intent.clipboard.auto_translate_enabled is True
     assert view._clipboard_auto_translate_text.content.value == t(
         "settings.clipboard_auto_translate.on"
     )
@@ -944,17 +849,17 @@ def test_clipboard_auto_translate_selection_updates_settings_and_emits_change(
 
 
 def test_clipboard_auto_translate_click_toggles_immediately_without_modal(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _store = _make_settings_view(monkeypatch)
+    view, _store = _make_settings_view(monkeypatch, settings_events)
     settings = AppSettingsVNext()
     emitted: list[AppSettingsVNext] = []
-    view.on_settings_changed = emitted.append
+    settings_events.on_change = emitted.append
 
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._on_clipboard_auto_translate_click(None)
 
-    assert view._settings.intent.clipboard.auto_translate_enabled is True
+    assert settings_events.settings.intent.clipboard.auto_translate_enabled is True
     assert view._clipboard_auto_translate_text.content.value == t(
         "settings.clipboard_auto_translate.on"
     )
@@ -962,7 +867,7 @@ def test_clipboard_auto_translate_click_toggles_immediately_without_modal(
 
     view._on_clipboard_auto_translate_click(None)
 
-    assert view._settings.intent.clipboard.auto_translate_enabled is False
+    assert settings_events.settings.intent.clipboard.auto_translate_enabled is False
     assert view._clipboard_auto_translate_text.content.value == t(
         "settings.clipboard_auto_translate.off"
     )
@@ -970,29 +875,29 @@ def test_clipboard_auto_translate_click_toggles_immediately_without_modal(
 
 
 def test_load_from_settings_uses_system_prompt_when_provider_prompt_missing(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="gemini", system_prompt="LEGACY PROMPT")
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._prompt_editor.value == "LEGACY PROMPT"
 
 
 def test_load_from_settings_uses_default_prompt_when_all_empty(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="qwen", system_prompt="")
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert bool(view._prompt_editor.value.strip())
-    assert view._settings.intent.prompts.system_prompt_override is None
+    assert settings_events.settings.intent.prompts.system_prompt_override is None
 
 
-def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch, settings_events) -> None:
     settings = AppSettingsVNext()
     basic_messages: list[str] = []
 
@@ -1006,7 +911,7 @@ def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch) -> Non
     view = settings_view.SettingsView()
     view._settings_secrets = SettingsSecretsOwner(secret_store_factory=raise_store)
     view.runtime_log_basic = lambda message, *, level=logging.INFO: basic_messages.append(message)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._google_key.value == ""
     assert view._deepgram_key.value == ""
@@ -1016,7 +921,7 @@ def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_load_secrets_projects_the_same_prefix_before_read_failure(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     store = DummySecretStore(
@@ -1027,7 +932,7 @@ def test_load_secrets_projects_the_same_prefix_before_read_failure(
         }
     )
     store.get_failure_key = "deepgram_api_key"
-    view, _ = _make_settings_view(monkeypatch, store)
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
     view._deepgram_key.value = "unchanged-deepgram"
     view._soniox_key.value = "unchanged-soniox"
 
@@ -1041,10 +946,12 @@ def test_load_secrets_projects_the_same_prefix_before_read_failure(
     assert view._soniox_key.value == "unchanged-soniox"
 
 
-def test_restore_api_key_icons_sets_idle_success_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_restore_api_key_icons_sets_idle_success_error(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     settings = _vnext(verified_providers=("deepgram",))
 
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     view._deepgram_key.value = "deepgram-secret"
     view._google_key.value = "google-secret"
     view._soniox_key.value = ""
@@ -1060,14 +967,16 @@ def test_restore_api_key_icons_sets_idle_success_error(monkeypatch: pytest.Monke
     assert view._soniox_key._current_status == "idle"
 
 
-def test_update_api_visibility_tracks_provider_and_region(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_update_api_visibility_tracks_provider_and_region(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     settings = _vnext(
         llm="gemini",
         stt_provider="qwen_audio",
         qwen_region=QwenRegion.BEIJING.value,
     )
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
     assert view._qwen_region_btn.visible is True
@@ -1080,7 +989,7 @@ def test_update_api_visibility_tracks_provider_and_region(monkeypatch: pytest.Mo
         stt_provider="qwen_audio",
         qwen_region=QwenRegion.SINGAPORE.value,
     )
-    view._settings = settings
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._update_api_visibility()
 
     assert view._google_key.visible is False
@@ -1088,7 +997,9 @@ def test_update_api_visibility_tracks_provider_and_region(monkeypatch: pytest.Mo
     assert view._alibaba_key_singapore.visible is True
 
 
-def test_update_api_visibility_shows_openrouter_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_update_api_visibility_shows_openrouter_key(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
     settings = _vnext(
         llm="openrouter",
@@ -1096,7 +1007,7 @@ def test_update_api_visibility_shows_openrouter_key(monkeypatch: pytest.MonkeyPa
         openrouter_alias=OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value,
     )
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
     assert view._google_key.visible is False
@@ -1107,14 +1018,16 @@ def test_update_api_visibility_shows_openrouter_key(monkeypatch: pytest.MonkeyPa
     assert view._translation_connection_row.visible is True
 
 
-def test_update_api_visibility_shows_deepseek_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_update_api_visibility_shows_deepseek_key(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     settings = _vnext(
         llm="deepseek",
         model=TranslationModel.DEEPSEEK_V4_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
     assert view._google_key.visible is False
@@ -1125,14 +1038,14 @@ def test_update_api_visibility_shows_deepseek_key(monkeypatch: pytest.MonkeyPatc
 
 
 def test_update_api_visibility_hides_openrouter_key_for_managed_trial(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
         llm="openrouter",
         openrouter_source="managed",
     )
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
     assert view._openrouter_key.visible is False
@@ -1142,15 +1055,15 @@ def test_update_api_visibility_hides_openrouter_key_for_managed_trial(
 
 
 def test_load_from_settings_shows_managed_usage_bar_in_managed_key_card(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
         llm="openrouter",
         openrouter_source="managed",
     )
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._managed_key_card not in view._api_keys_column.controls
     assert view._managed_key_card in _subtab_controls(view, "api")
@@ -1163,12 +1076,12 @@ def test_load_from_settings_shows_managed_usage_bar_in_managed_key_card(
 
 
 def test_load_from_settings_places_managed_key_card_above_provider_fields(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="openrouter", openrouter_source="managed")
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     api_controls = _subtab_controls(view, "api")
     api_card = _api_tab_card(view, t("settings.section.api_keys"))
@@ -1220,6 +1133,7 @@ def test_managed_key_card_visibility_follows_translation_connection(
     selected_source: OpenRouterCredentialSource,
     active_ref: str | None,
     expected_visible: bool,
+    settings_events,
 ) -> None:
     settings = _vnext(
         llm="openrouter",
@@ -1230,19 +1144,19 @@ def test_managed_key_card_visibility_follows_translation_connection(
         managed_credential_ref=active_ref,
     )
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._managed_key_card.visible is expected_visible
 
 
 def test_set_managed_trial_usage_state_tracks_visible_and_remaining_percent(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="openrouter", openrouter_source="managed")
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view.set_managed_trial_usage_state(visible=True, remaining_percent=71)
 
@@ -1264,11 +1178,11 @@ def test_set_managed_trial_usage_state_tracks_visible_and_remaining_percent(
 
 
 def test_set_managed_key_state_updates_card_controls_and_api_section_repaint(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="openrouter", openrouter_source="managed")
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     attach_dummy_page(monkeypatch, view)
     updates: list[str] = []
     mounted_page = object()
@@ -1294,7 +1208,7 @@ def test_set_managed_key_state_updates_card_controls_and_api_section_repaint(
 
 
 def test_set_managed_key_state_hides_card_for_openrouter_connection(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, llm=LLMProviderName.OPENROUTER)
@@ -1308,7 +1222,7 @@ def test_set_managed_key_state_hides_card_for_openrouter_connection(
     )
     settings = _vnext(settings, openrouter_source=OpenRouterCredentialSource.BYOK)
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     attach_dummy_page(monkeypatch, view)
 
     view.set_managed_key_state(
@@ -1322,7 +1236,7 @@ def test_set_managed_key_state_hides_card_for_openrouter_connection(
 
 
 def test_set_managed_key_state_keeps_card_visible_for_managed_connection_when_usage_hidden(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, llm=LLMProviderName.OPENROUTER)
@@ -1336,7 +1250,7 @@ def test_set_managed_key_state_keeps_card_visible_for_managed_connection_when_us
     )
     settings = _vnext(settings, openrouter_source=OpenRouterCredentialSource.MANAGED)
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
     view.set_managed_key_state(
         visible=False,
@@ -1380,6 +1294,7 @@ def test_translation_connection_selected_repaints_managed_key_card_immediately(
     initial_alias: OpenRouterSelectionAlias,
     selected_connection: TranslationConnection,
     expected_visible: bool,
+    settings_events,
 ) -> None:
     settings = _vnext(
         llm="openrouter",
@@ -1389,7 +1304,7 @@ def test_translation_connection_selected_repaints_managed_key_card_immediately(
         openrouter_alias=initial_alias,
         connection_history={TranslationModel.GEMMA4_26B_31B.value: initial_connection},
     )
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view = _make_llm_selection_view(monkeypatch, settings_events, settings)
     updates: list[str] = []
     mounted_page = object()
     view._managed_key_card = SimpleNamespace(
@@ -1419,14 +1334,14 @@ def test_translation_connection_selected_repaints_managed_key_card_immediately(
 
 
 def test_update_api_visibility_treats_peer_local_qwen_as_local_provider(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.LOCAL_QWEN)
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
     assert view._deepgram_key.visible is False
@@ -1438,7 +1353,7 @@ def test_update_api_visibility_treats_peer_local_qwen_as_local_provider(
 
 
 def test_deepseek_connection_selection_controls_api_key_visibility(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
     settings = _vnext(
@@ -1447,7 +1362,7 @@ def test_deepseek_connection_selection_controls_api_key_visibility(
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
     view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH_41.value)
     assert view._managed_trial_usage_bar.visible is True
@@ -1471,22 +1386,31 @@ def test_deepseek_connection_selection_controls_api_key_visibility(
 
 
 def test_on_llm_selected_updates_to_local_llms_with_ollama_connection(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
         llm="gemini",
         model=TranslationModel.GEMINI_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
     view._on_llm_selected(TranslationModel.LOCAL_LLM.value)
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.LOCAL_LLM.value
-    assert pending.intent.translation.connection == TranslationConnection.OLLAMA.value
-    assert _llm(pending) == LLMProviderName.LOCAL_LLM.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.LOCAL_LLM.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OLLAMA.value
+    )
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.LOCAL_LLM.value
+    )
     assert view._llm_text.content.value == t("provider.local_llms")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.ollama"
@@ -1495,7 +1419,7 @@ def test_on_llm_selected_updates_to_local_llms_with_ollama_connection(
 
 
 def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(
@@ -1504,7 +1428,7 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     applies: list[bool] = []
     view.on_providers_changed = lambda: applies.append(True)
 
@@ -1512,9 +1436,18 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.MANAGED_GEMMA.value
-    assert pending.intent.translation.connection == TranslationConnection.CPU.value
-    assert _llm(pending) == LLMProviderName.MANAGED_GEMMA.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.MANAGED_GEMMA.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.CPU.value
+    )
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.MANAGED_GEMMA.value
+    )
     assert applies == [True]
     assert view._translation_connection_row.visible is True
     assert view._translation_connection_title.value == t("settings.translation_connection")
@@ -1526,8 +1459,14 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.MANAGED_GEMMA.value
-    assert pending.intent.translation.connection == TranslationConnection.GPU.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.MANAGED_GEMMA.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.GPU.value
+    )
     assert applies == [True, True]
     assert view._get_llm_display_label(view._provider_draft or view._provider_snapshot) == t(
         "provider.managed_gemma_gpu"
@@ -1537,15 +1476,18 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.translation.connection == TranslationConnection.GPU.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.GPU.value
+    )
     assert applies == [True, True]
 
 
 def test_gemma_26b_selection_applies_gpu_only_and_preserves_e4b_history(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(model="managed_gemma", connection="cpu")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     applies: list[bool] = []
     discoveries: list[bool] = []
     view.on_providers_changed = lambda: applies.append(True)
@@ -1555,9 +1497,18 @@ def test_gemma_26b_selection_applies_gpu_only_and_preserves_e4b_history(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.translation.model == "managed_gemma_26b"
-    assert pending.intent.translation.connection == "gpu"
-    assert _llm(pending) == LLMProviderName.MANAGED_GEMMA.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == "managed_gemma_26b"
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == "gpu"
+    )
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.MANAGED_GEMMA.value
+    )
     assert view._translation_connection_row.visible is True
     assert view._gpu_device_row.visible is True
     assert view._get_llm_modal_value(view._provider_draft) == "managed_gemma_26b"
@@ -1567,23 +1518,40 @@ def test_gemma_26b_selection_applies_gpu_only_and_preserves_e4b_history(
 
     view._on_translation_connection_selected("cpu")
     pending = view.build_provider_apply_settings()
-    assert pending.intent.translation.model == "managed_gemma_26b"
-    assert pending.intent.translation.connection == "gpu"
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == "managed_gemma_26b"
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == "gpu"
+    )
     assert applies == [True]
 
     view._on_llm_selected("managed_gemma_cpu")
     pending = view.build_provider_apply_settings()
-    assert pending.intent.translation.model == "managed_gemma"
-    assert pending.intent.translation.connection == "cpu"
-    assert pending.intent.translation.connection_history["managed_gemma_26b"] == "gpu"
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == "managed_gemma"
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == "cpu"
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.connection_history["managed_gemma_26b"]
+        == "gpu"
+    )
     assert applies == [True, True]
 
 
 def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
     view._update_api_visibility()
 
@@ -1597,74 +1565,74 @@ def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
 
 
 def test_load_from_settings_loads_local_llm_api_key(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
     store = DummySecretStore({"local_llm_api_key": "server-secret"})
-    view, _ = _make_settings_view(monkeypatch, store)
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
 
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._local_llm_api_key.value == "server-secret"
 
 
 def test_order22_live_settings_view_audio_change_emits_copied_draft(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     settings = _vnext(
         stt_provider="deepgram",
         peer_stt_provider="deepgram",
         input_device="Built-in Mic",
     )
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     emitted: list[AppSettingsVNext] = []
-    view.on_settings_changed = emitted.append
+    settings_events.on_change = emitted.append
     view._audio_settings.microphone = "Headset Mic"
 
     view._on_audio_change()
 
     assert settings.intent.audio.input_device == "Built-in Mic"
-    assert view._settings is not None
-    assert view._settings.intent.audio.input_device == "Headset Mic"
+    assert settings_events.settings is not None
+    assert settings_events.settings.intent.audio.input_device == "Headset Mic"
     assert len(emitted) == 1
     assert emitted[0] is not settings
     assert emitted[0].intent.audio.input_device == "Headset Mic"
 
 
 def test_load_from_settings_without_local_llm_api_key_shows_empty_field(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
     store = DummySecretStore()
-    view, _ = _make_settings_view(monkeypatch, store)
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
 
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._local_llm_api_key.value == ""
 
 
 def test_load_from_settings_does_not_touch_existing_local_llm_api_key(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="gemini")
     store = DummySecretStore({"local_llm_api_key": "server-secret"})
-    view, _ = _make_settings_view(monkeypatch, store)
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
 
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert store.set_calls == []
     assert store.delete_calls == []
 
 
 def test_local_llm_secret_change_trims_saves_and_requests_rebuild(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
     store = DummySecretStore()
-    view, _ = _make_settings_view(monkeypatch, store)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._config_path = Path("settings.json")
     callbacks: list[str] = []
     view.on_local_llm_secret_changed = lambda: callbacks.append("changed")
@@ -1677,12 +1645,12 @@ def test_local_llm_secret_change_trims_saves_and_requests_rebuild(
 
 
 def test_local_llm_secret_change_whitespace_deletes_and_requests_rebuild(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
     store = DummySecretStore({"local_llm_api_key": "server-secret"})
-    view, _ = _make_settings_view(monkeypatch, store)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._config_path = Path("settings.json")
     callbacks: list[str] = []
     view.on_local_llm_secret_changed = lambda: callbacks.append("changed")
@@ -1695,7 +1663,7 @@ def test_local_llm_secret_change_whitespace_deletes_and_requests_rebuild(
 
 
 def test_local_llm_secret_change_failure_does_not_request_rebuild(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     class FailingSecretStore(DummySecretStore):
         def set(self, key: str, value: str) -> None:
@@ -1703,8 +1671,8 @@ def test_local_llm_secret_change_failure_does_not_request_rebuild(
 
     settings = _vnext(llm="local_llm")
     store = FailingSecretStore()
-    view, _ = _make_settings_view(monkeypatch, store)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._config_path = Path("settings.json")
     snackbars: list[str] = []
     callbacks: list[str] = []
@@ -1718,7 +1686,7 @@ def test_local_llm_secret_change_failure_does_not_request_rebuild(
 
 
 def test_local_llm_secret_delete_failure_does_not_request_rebuild(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     class FailingDeleteSecretStore(DummySecretStore):
         def delete(self, key: str) -> None:
@@ -1726,8 +1694,8 @@ def test_local_llm_secret_delete_failure_does_not_request_rebuild(
 
     settings = _vnext(llm="local_llm")
     store = FailingDeleteSecretStore({"local_llm_api_key": "server-secret"})
-    view, _ = _make_settings_view(monkeypatch, store)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._config_path = Path("settings.json")
     snackbars: list[str] = []
     callbacks: list[str] = []
@@ -1741,8 +1709,7 @@ def test_local_llm_secret_delete_failure_does_not_request_rebuild(
 
 
 def test_local_llm_secret_failure_logs_do_not_include_secret(
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, settings_events
 ) -> None:
     class LeakyFailureSecretStore(DummySecretStore):
         def set(self, key: str, value: str) -> None:
@@ -1750,8 +1717,8 @@ def test_local_llm_secret_failure_logs_do_not_include_secret(
 
     settings = _vnext(llm="local_llm")
     store = LeakyFailureSecretStore()
-    view, _ = _make_settings_view(monkeypatch, store)
-    view._settings = settings
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._config_path = Path("settings.json")
 
     with caplog.at_level(logging.WARNING):
@@ -1761,13 +1728,15 @@ def test_local_llm_secret_failure_logs_do_not_include_secret(
     assert any(record.levelno == logging.WARNING for record in caplog.records)
 
 
-def test_local_llm_fields_update_provider_draft(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_local_llm_fields_update_provider_draft(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     settings = _vnext(
         llm="local_llm",
         model=TranslationModel.LOCAL_LLM.value,
         connection=TranslationConnection.OLLAMA.value,
     )
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
     view._local_llm_base_url.value = "http://127.0.0.1:11434/v1/"
     view._on_local_llm_base_url_change_end(None)
@@ -1778,17 +1747,25 @@ def test_local_llm_fields_update_provider_draft(monkeypatch: pytest.MonkeyPatch)
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.local_llm.base_url == "http://127.0.0.1:11434/v1"
-    assert pending.intent.local_llm.model == "qwen2.5:7b"
-    assert pending.intent.local_llm.extra_body == {"enable_thinking": False}
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.local_llm.base_url
+        == "http://127.0.0.1:11434/v1"
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.local_llm.model
+        == "qwen2.5:7b"
+    )
+    assert apply_provider_intent(settings_events.settings, pending).intent.local_llm.extra_body == {
+        "enable_thinking": False
+    }
     assert view.has_provider_changes is True
 
 
 def test_local_llm_unblurred_fields_commit_when_building_provider_apply_settings(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._local_llm_base_url.value = "http://mac-studio.local:11434/v1"
     view._local_llm_model.value = "gemma3:4b"
     view._local_llm_extra_body.value = '{"think": false}'
@@ -1796,47 +1773,61 @@ def test_local_llm_unblurred_fields_commit_when_building_provider_apply_settings
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.local_llm.base_url == "http://mac-studio.local:11434/v1"
-    assert pending.intent.local_llm.model == "gemma3:4b"
-    assert pending.intent.local_llm.extra_body == {"think": False}
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.local_llm.base_url
+        == "http://mac-studio.local:11434/v1"
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.local_llm.model
+        == "gemma3:4b"
+    )
+    assert apply_provider_intent(settings_events.settings, pending).intent.local_llm.extra_body == {
+        "think": False
+    }
 
 
 def test_local_llm_invalid_base_url_shows_error_without_saving(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._local_llm_base_url.value = "ftp://127.0.0.1:11434/v1"
 
     view._on_local_llm_base_url_change_end(None)
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.local_llm.base_url == "http://127.0.0.1:11434/v1"
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.local_llm.base_url
+        == "http://127.0.0.1:11434/v1"
+    )
     assert view.has_provider_changes is False
     assert view._local_llm_base_url.value == "ftp://127.0.0.1:11434/v1"
     assert view._local_llm_base_url.error == t("settings.local_llm.base_url.invalid")
 
 
 def test_local_llm_empty_model_shows_error_without_saving(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._local_llm_model.value = "   "
 
     view._on_local_llm_model_change_end(None)
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.local_llm.model == "llama3.1:8b"
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.local_llm.model
+        == "llama3.1:8b"
+    )
     assert view.has_provider_changes is False
     assert view._local_llm_model.value == "   "
     assert view._local_llm_model.error == t("settings.local_llm.model.required")
 
 
 def test_local_llm_settings_survive_provider_draft_copy(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
         llm="local_llm",
@@ -1852,7 +1843,7 @@ def test_local_llm_settings_survive_provider_draft_copy(
             extra_body={"think": False},
         ),
     )
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
     view._local_llm_base_url.value = "http://127.0.0.1:11434/v1"
     view._on_local_llm_base_url_change_end(None)
@@ -1864,24 +1855,38 @@ def test_local_llm_settings_survive_provider_draft_copy(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.local_llm.backend == LocalLLMBackend.OLLAMA.value
-    assert pending.intent.local_llm.base_url == "http://127.0.0.1:11434/v1"
-    assert pending.intent.local_llm.model == "qwen2.5:7b"
-    assert pending.intent.local_llm.extra_body == {"enable_thinking": False}
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.local_llm.backend
+        == LocalLLMBackend.OLLAMA.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.local_llm.base_url
+        == "http://127.0.0.1:11434/v1"
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.local_llm.model
+        == "qwen2.5:7b"
+    )
+    assert apply_provider_intent(settings_events.settings, pending).intent.local_llm.extra_body == {
+        "enable_thinking": False
+    }
 
 
 def test_local_llm_extra_body_invalid_json_does_not_save(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._local_llm_extra_body.value = "{invalid-json"
 
     view._on_local_llm_extra_body_change_end(None)
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert apply_provider_intent(settings_events.settings, pending).intent.local_llm.extra_body == {
+        "reasoning_effort": "none",
+        "temperature": 0.6,
+    }
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body.value == "{invalid-json"
     assert view._local_llm_extra_body_error.visible is True
@@ -1889,33 +1894,38 @@ def test_local_llm_extra_body_invalid_json_does_not_save(
 
 
 def test_local_llm_blank_extra_body_uses_current_default(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._local_llm_extra_body.value = "  "
 
     view._on_local_llm_extra_body_change_end(None)
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert apply_provider_intent(settings_events.settings, pending).intent.local_llm.extra_body == {
+        "reasoning_effort": "none",
+        "temperature": 0.6,
+    }
 
 
 @pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
 def test_local_llm_extra_body_rejects_non_standard_json_constants(
-    monkeypatch: pytest.MonkeyPatch,
-    constant: str,
+    monkeypatch: pytest.MonkeyPatch, constant: str, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._local_llm_extra_body.value = f'{{"temperature": {constant}}}'
 
     view._on_local_llm_extra_body_change_end(None)
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert apply_provider_intent(settings_events.settings, pending).intent.local_llm.extra_body == {
+        "reasoning_effort": "none",
+        "temperature": 0.6,
+    }
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body.value == f'{{"temperature": {constant}}}'
     assert view._local_llm_extra_body_error.visible is True
@@ -1923,17 +1933,20 @@ def test_local_llm_extra_body_rejects_non_standard_json_constants(
 
 
 def test_local_llm_extra_body_non_object_json_does_not_save(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._local_llm_extra_body.value = '["not", "an", "object"]'
 
     view._on_local_llm_extra_body_change_end(None)
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert apply_provider_intent(settings_events.settings, pending).intent.local_llm.extra_body == {
+        "reasoning_effort": "none",
+        "temperature": 0.6,
+    }
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body.value == '["not", "an", "object"]'
     assert view._local_llm_extra_body_error.visible is True
@@ -1943,10 +1956,10 @@ def test_local_llm_extra_body_non_object_json_does_not_save(
 
 
 def test_local_llm_extra_body_non_serializable_value_does_not_save(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._local_llm_extra_body.value = '{"callback": "not actually serializable"}'
     monkeypatch.setattr(settings_view.json, "loads", lambda _raw, **_kwargs: {"callback": object()})
 
@@ -1954,7 +1967,10 @@ def test_local_llm_extra_body_non_serializable_value_does_not_save(
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert apply_provider_intent(settings_events.settings, pending).intent.local_llm.extra_body == {
+        "reasoning_effort": "none",
+        "temperature": 0.6,
+    }
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body_error.visible is True
     assert view._local_llm_extra_body_error.value == t(
@@ -1964,18 +1980,20 @@ def test_local_llm_extra_body_non_serializable_value_does_not_save(
 
 @pytest.mark.parametrize("key", sorted(LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS))
 def test_local_llm_extra_body_reserved_key_does_not_save(
-    monkeypatch: pytest.MonkeyPatch,
-    key: str,
+    monkeypatch: pytest.MonkeyPatch, key: str, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._local_llm_extra_body.value = json.dumps({key: True})
 
     view._on_local_llm_extra_body_change_end(None)
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert apply_provider_intent(settings_events.settings, pending).intent.local_llm.extra_body == {
+        "reasoning_effort": "none",
+        "temperature": 0.6,
+    }
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body_error.visible is True
     assert view._local_llm_extra_body_error.value == t(
@@ -1985,18 +2003,20 @@ def test_local_llm_extra_body_reserved_key_does_not_save(
 
 @pytest.mark.parametrize("key", sorted(LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS))
 def test_local_llm_extra_body_sensitive_key_does_not_save(
-    monkeypatch: pytest.MonkeyPatch,
-    key: str,
+    monkeypatch: pytest.MonkeyPatch, key: str, settings_events
 ) -> None:
     settings = _vnext(llm="local_llm")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._local_llm_extra_body.value = json.dumps({key: "do-not-save"})
 
     view._on_local_llm_extra_body_change_end(None)
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.local_llm.extra_body == {"reasoning_effort": "none", "temperature": 0.6}
+    assert apply_provider_intent(settings_events.settings, pending).intent.local_llm.extra_body == {
+        "reasoning_effort": "none",
+        "temperature": 0.6,
+    }
     assert view.has_provider_changes is False
     assert view._local_llm_extra_body_error.visible is True
     assert view._local_llm_extra_body_error.value == t(
@@ -2005,7 +2025,7 @@ def test_local_llm_extra_body_sensitive_key_does_not_save(
 
 
 def test_official_api_connection_hides_openrouter_key(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
         llm="openrouter",
@@ -2014,7 +2034,7 @@ def test_official_api_connection_hides_openrouter_key(
         openrouter_source=OpenRouterCredentialSource.BYOK,
     )
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
     assert view._openrouter_key.visible is True
 
@@ -2023,20 +2043,26 @@ def test_official_api_connection_hides_openrouter_key(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert _llm(pending) == LLMProviderName.DEEPSEEK.value
-    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.DEEPSEEK.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OFFICIAL_BYOK.value
+    )
     assert view._openrouter_key.visible is False
     assert view._deepseek_key.visible is True
 
 
 def test_on_stt_selected_updates_provider_and_pipeline_flags(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_stt_selected(STTProviderName.SONIOX.value)
 
@@ -2044,18 +2070,21 @@ def test_on_stt_selected_updates_provider_and_pipeline_flags(
 
     assert settings.intent.stt.provider == STTProviderName.LOCAL_CPU_AUTO.value
     assert pending is not None
-    assert pending.intent.stt.provider == STTProviderName.SONIOX.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.stt.provider
+        == STTProviderName.SONIOX.value
+    )
     assert view.has_provider_changes is True
     assert changed == []
 
 
 def test_on_stt_selected_stages_provider_without_immediate_apply(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(stt_provider=STTProviderName.SONIOX.value)
     applied: list[object] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.on_providers_changed = lambda: applied.append(True)
 
     view._on_stt_selected(STTProviderName.ROLLING_FREE.value)
@@ -2063,21 +2092,24 @@ def test_on_stt_selected_stages_provider_without_immediate_apply(
     pending = view.build_provider_apply_settings()
     assert settings.intent.stt.provider == STTProviderName.SONIOX.value
     assert pending is not None
-    assert pending.intent.stt.provider == STTProviderName.ROLLING_FREE.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.stt.provider
+        == STTProviderName.ROLLING_FREE.value
+    )
     assert applied == []
 
 
 def test_on_stt_selected_routes_compatibility_warning_through_snackbar_callback(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language="ko")
     snackbars: list[tuple[str, object]] = []
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     page = SimpleNamespace(opened=[])
     page.open = lambda control: page.opened.append(control)
     attach_dummy_page(monkeypatch, view, page)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     monkeypatch.setattr(view._qwen_region_btn, "update", lambda: None)
     monkeypatch.setattr(view._api_keys_column, "update", lambda: None)
     monkeypatch.setattr(view._stt_text, "update", lambda: None)
@@ -2102,13 +2134,13 @@ def test_on_stt_selected_routes_compatibility_warning_through_snackbar_callback(
 
 
 def test_on_peer_stt_selected_updates_provider_and_pipeline_flags(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_peer_stt_selected(STTProviderName.SONIOX.value)
 
@@ -2116,17 +2148,20 @@ def test_on_peer_stt_selected_updates_provider_and_pipeline_flags(
 
     assert settings.intent.peer_stt.provider == STTProviderName.LOCAL_CPU_AUTO.value
     assert pending is not None
-    assert pending.intent.peer_stt.provider == STTProviderName.SONIOX.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.peer_stt.provider
+        == STTProviderName.SONIOX.value
+    )
     assert view.has_provider_changes is True
     assert changed == []
 
 
 def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     attach_dummy_page(monkeypatch, view)
 
     captured: dict[str, object] = {}
@@ -2199,57 +2234,69 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
 
 
 def test_qwen_asr_model_button_is_removed_from_api_key_card(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, AppSettingsVNext(), config_path=Path("settings.json"))
 
     assert not hasattr(view, "_qwen_asr_model_btn")
     assert not hasattr(view, "_on_qwen_asr_model_click")
 
 
 def test_selecting_qwen_audio_stores_qwen_audio_provider_without_changing_peer(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_stt_selected(STTProviderName.QWEN_AUDIO.value)
 
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.stt.provider == STTProviderName.QWEN_AUDIO.value
-    assert pending.intent.peer_stt.provider == settings.intent.peer_stt.provider
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.stt.provider
+        == STTProviderName.QWEN_AUDIO.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.peer_stt.provider
+        == settings.intent.peer_stt.provider
+    )
     assert view._stt_text.content.value == t("provider.qwen_audio")
 
 
 def test_selecting_peer_qwen_audio_does_not_change_self(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_peer_stt_selected(STTProviderName.QWEN_AUDIO.value)
 
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.peer_stt.provider == STTProviderName.QWEN_AUDIO.value
-    assert pending.intent.stt.provider == settings.intent.stt.provider
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.peer_stt.provider
+        == STTProviderName.QWEN_AUDIO.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.stt.provider
+        == settings.intent.stt.provider
+    )
     assert view._peer_stt_text.content.value == t("provider.qwen_audio")
     assert view._stt_text.content.value == t("provider.local_cpu_auto")
 
 
 def test_peer_stt_local_qwen_choice_can_be_persisted(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_peer_stt_selected(STTProviderName.LOCAL_QWEN.value)
 
@@ -2257,27 +2304,33 @@ def test_peer_stt_local_qwen_choice_can_be_persisted(
 
     assert settings.intent.peer_stt.provider == STTProviderName.DEEPGRAM.value
     assert pending is not None
-    assert pending.intent.peer_stt.provider == STTProviderName.LOCAL_QWEN.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.peer_stt.provider
+        == STTProviderName.LOCAL_QWEN.value
+    )
     assert view.has_provider_changes is True
 
     settings = _vnext(settings, peer_stt_provider=STTProviderName.LOCAL_QWEN)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     normalized_pending = view.build_provider_apply_settings()
 
     assert normalized_pending is not None
-    assert normalized_pending.intent.peer_stt.provider == STTProviderName.LOCAL_QWEN.value
+    assert (
+        apply_provider_intent(settings_events.settings, normalized_pending).intent.peer_stt.provider
+        == STTProviderName.LOCAL_QWEN.value
+    )
 
 
 def test_gpu_selection_shows_one_shared_device_card_and_retains_unavailable_saved_device(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, peer_stt_provider=STTProviderName.LOCAL_QWEN_GPU)
     settings = _vnext(settings, gpu_device_id="vk:saved")
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.set_gpu_devices(devices=(GpuDeviceOption("vk:0", "NVIDIA GeForce RTX 4070", "Vulkan0"),))
 
     assert view._gpu_device_row.visible is True
@@ -2292,16 +2345,18 @@ def test_gpu_selection_shows_one_shared_device_card_and_retains_unavailable_save
     assert view._gpu_device_text.content.value == "NVIDIA GeForce RTX 4070"
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.stt.gpu_device_id == "vk:0"
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.stt.gpu_device_id == "vk:0"
+    )
 
 
 def test_gpu_card_is_standard_one_by_one_and_contains_only_device_selection(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN_GPU)
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     column = _wrapped_card_column(view._gpu_device_card)
 
@@ -2319,15 +2374,15 @@ def test_gpu_card_is_standard_one_by_one_and_contains_only_device_selection(
 
 
 def test_local_model_row_repaints_for_cpu_and_gpu_local_models_and_collapses_for_cloud(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.DEEPGRAM)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     repainted: list[ft.Control] = []
     monkeypatch.setattr(settings_view, "_update_control_if_mounted", repainted.append)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._gpu_device_row.visible is False
     assert view._http_extension_host.visible is False
@@ -2348,13 +2403,13 @@ def test_local_model_row_repaints_for_cpu_and_gpu_local_models_and_collapses_for
 
 
 def test_cpu_gemma_shows_the_local_model_row_and_keeps_the_diarization_row(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.DEEPGRAM)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_llm_selected("managed_gemma_cpu")
 
@@ -2363,12 +2418,12 @@ def test_cpu_gemma_shows_the_local_model_row_and_keeps_the_diarization_row(
 
 
 def test_gpu_card_shows_split_labels_when_asr_and_gemma_use_different_devices(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN_GPU)
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._on_llm_selected("managed_gemma_gpu")
     view.set_gpu_devices(
         devices=(GpuDeviceOption("vk:0", "NVIDIA GeForce RTX 4070", "Vulkan0"),),
@@ -2382,8 +2437,13 @@ def test_gpu_card_shows_split_labels_when_asr_and_gemma_use_different_devices(
     assert view._gpu_llm_text.content.value == "AMD Radeon Graphics"
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.stt.gpu_device_id == "vk:0"
-    assert pending.intent.translation.gpu_device_id == "Vulkan1"
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.stt.gpu_device_id == "vk:0"
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.gpu_device_id
+        == "Vulkan1"
+    )
 
     view._on_stt_selected(STTProviderName.LOCAL_QWEN.value)
 
@@ -2393,13 +2453,13 @@ def test_gpu_card_shows_split_labels_when_asr_and_gemma_use_different_devices(
 
 
 def test_gpu_card_click_opens_column_modal_and_refresh_requests_discovery(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN_GPU)
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     page = attach_dummy_page(monkeypatch, view)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     requests: list[str] = []
     opened: list[object] = []
     view.on_gpu_discovery_requested = lambda: requests.append("discover")
@@ -2427,13 +2487,13 @@ def test_gpu_card_click_opens_column_modal_and_refresh_requests_discovery(
 
 
 def test_selecting_gemma_gpu_requests_discovery_and_shows_card(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.DEEPGRAM)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     requests: list[str] = []
     view.on_gpu_discovery_requested = lambda: requests.append("discover")
 
@@ -2445,13 +2505,13 @@ def test_selecting_gemma_gpu_requests_discovery_and_shows_card(
 
 
 def test_selecting_gpu_for_self_or_peer_requests_discovery_once_per_new_selection(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.DEEPGRAM)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     requests: list[str] = []
     view.on_gpu_discovery_requested = lambda: requests.append("discover")
 
@@ -2464,9 +2524,9 @@ def test_selecting_gpu_for_self_or_peer_requests_discovery_once_per_new_selectio
 
 
 def test_settings_view_omits_legacy_overlay_peer_toggle_api(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     assert not hasattr(view, "on_overlay_toggle")
     assert not hasattr(view, "on_peer_translation_toggle")
@@ -2483,35 +2543,8 @@ def test_settings_view_omits_legacy_overlay_peer_toggle_api(
     assert not hasattr(settings_view.SettingsView, "_on_peer_translation_selected")
 
 
-def test_on_llm_selected_updates_model_and_prompt_state(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_FLASH.value,
-        connection=TranslationConnection.OFFICIAL_BYOK.value,
-    )
-    settings = _vnext(settings, system_prompt="G")
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
-
-    pending = view.build_provider_apply_settings()
-
-    assert _llm(settings) == LLMProviderName.GEMINI.value
-    assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.QWEN_38_FLASH.value
-    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
-    assert _llm(pending) == LLMProviderName.QWEN.value
-    assert pending.intent.translation.qwen.llm_model == QwenLLMModel.QWEN_38_FLASH.value
-    assert view._prompt_editor.value == "G"
-    assert settings.intent.prompts.system_prompt_override == "G"
-
-    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
-    assert view.has_provider_changes is True
-
-
-def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_state(
-    monkeypatch: pytest.MonkeyPatch,
+def test_on_llm_selected_updates_model_and_prompt_state(
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
         llm="gemini",
@@ -2520,7 +2553,47 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
     )
     settings = _vnext(settings, system_prompt="G")
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
+
+    pending = view.build_provider_apply_settings()
+
+    assert _llm(settings) == LLMProviderName.GEMINI.value
+    assert pending is not None
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.QWEN_38_FLASH.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OFFICIAL_BYOK.value
+    )
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending)) == LLMProviderName.QWEN.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.qwen.llm_model
+        == QwenLLMModel.QWEN_38_FLASH.value
+    )
+    assert view._prompt_editor.value == "G"
+    assert settings.intent.prompts.system_prompt_override == "G"
+
+    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
+    assert view.has_provider_changes is True
+
+
+def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_state(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    settings = _vnext(
+        llm="gemini",
+        model=TranslationModel.GEMINI_FLASH.value,
+        connection=TranslationConnection.OFFICIAL_BYOK.value,
+    )
+    settings = _vnext(settings, system_prompt="G")
+
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view.on_request_openrouter_pkce = lambda _settings: (_ for _ in ()).throw(
         AssertionError("BYOK selection should not launch PKCE immediately")
     )
@@ -2532,28 +2605,47 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
 
     assert _llm(settings) == LLMProviderName.GEMINI.value
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.GEMMA4_26B_31B.value
-    assert pending.intent.translation.connection == TranslationConnection.OPENROUTER.value
-    assert _llm(pending) == LLMProviderName.OPENROUTER.value
     assert (
-        pending.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.GEMMA4_26B_31B.value
     )
     assert (
-        pending.intent.translation.openrouter_selected_source
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OPENROUTER.value
+    )
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.OPENROUTER.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.openrouter_model
+        == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.BYOK.value
     )
     assert (
-        pending.intent.translation.openrouter_selection_alias
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
     )
-    assert pending.intent.prompts.system_prompt_override == "G"
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.prompts.system_prompt_override
+        == "G"
+    )
     assert view._prompt_editor.value == "G"
     assert settings.intent.prompts.system_prompt_override == "G"
     assert view.has_provider_changes is True
 
 
 def test_translation_selection_preserves_all_staged_history_and_unrelated_latest_entry(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(
@@ -2566,7 +2658,7 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
             TranslationModel.GEMINI_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
         },
     )
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
     view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
     view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH_41.value)
@@ -2578,24 +2670,30 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
             TranslationModel.GEMINI_FLASH.value: TranslationConnection.OPENROUTER,
         },
     )
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.connection_history[TranslationModel.GEMMA4_26B_31B.value] == (
+    assert apply_provider_intent(
+        settings_events.settings, pending
+    ).intent.translation.connection_history[TranslationModel.GEMMA4_26B_31B.value] == (
         TranslationConnection.OPENROUTER.value
     )
-    assert pending.intent.translation.connection_history[
-        TranslationModel.DEEPSEEK_V4_FLASH_41.value
-    ] == (TranslationConnection.OFFICIAL_BYOK.value)
-    assert pending.intent.translation.connection_history[TranslationModel.GEMINI_FLASH.value] == (
+    assert apply_provider_intent(
+        settings_events.settings, pending
+    ).intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH_41.value] == (
+        TranslationConnection.OFFICIAL_BYOK.value
+    )
+    assert apply_provider_intent(
+        settings_events.settings, pending
+    ).intent.translation.connection_history[TranslationModel.GEMINI_FLASH.value] == (
         TranslationConnection.OPENROUTER.value
     )
 
 
 def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
         llm="gemini",
@@ -2604,7 +2702,7 @@ def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
     )
     settings = _vnext(settings, system_prompt="G")
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
     view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
 
@@ -2612,14 +2710,30 @@ def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
 
     assert _llm(settings) == LLMProviderName.GEMINI.value
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH.value
-    assert pending.intent.translation.connection == TranslationConnection.OPENROUTER.value
-    assert _llm(pending) == LLMProviderName.OPENROUTER.value
     assert (
-        pending.intent.translation.openrouter_selection_alias
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.DEEPSEEK_V4_FLASH.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OPENROUTER.value
+    )
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.OPENROUTER.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value
     )
-    assert pending.intent.prompts.system_prompt_override == "G"
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.prompts.system_prompt_override
+        == "G"
+    )
     assert view._prompt_editor.value == "G"
     assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
     assert view._translation_connection_text.content.value == t(
@@ -2631,7 +2745,7 @@ def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
 
 
 def test_on_llm_selected_restores_saved_connection_history(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(
@@ -2648,17 +2762,31 @@ def test_on_llm_selected_restores_saved_connection_history(
     settings = _vnext(settings, openrouter_alias=OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED)
     settings = _vnext(settings, system_prompt="O")
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
     view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH_41.value)
 
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH_41.value
-    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
-    assert _llm(pending) == LLMProviderName.DEEPSEEK.value
-    assert pending.intent.translation.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.DEEPSEEK_V4_FLASH_41.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OFFICIAL_BYOK.value
+    )
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.DEEPSEEK.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.deepseek.llm_model
+        == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
+    )
     assert view._llm_text.content.value == t("provider.deepseek_v4_flash_41")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.official_byok"
@@ -2667,7 +2795,7 @@ def test_on_llm_selected_restores_saved_connection_history(
 
 
 def test_on_llm_selected_invalid_value_is_noop(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
         llm="gemini",
@@ -2676,7 +2804,7 @@ def test_on_llm_selected_invalid_value_is_noop(
     )
     settings = _vnext(settings, system_prompt="G")
 
-    view = _make_llm_selection_view(monkeypatch, settings)
+    view = _make_llm_selection_view(monkeypatch, settings_events, settings)
     view._llm_text.content.value = "Gemini 3 Flash"
     view._translation_connection_text.content.value = "Official BYOK"
 
@@ -2686,9 +2814,18 @@ def test_on_llm_selected_invalid_value_is_noop(
 
     assert pending is not None
     assert view._provider_draft is None
-    assert pending.intent.translation.model == TranslationModel.GEMINI_FLASH.value
-    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
-    assert _llm(pending) == LLMProviderName.GEMINI.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.GEMINI_FLASH.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OFFICIAL_BYOK.value
+    )
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.GEMINI.value
+    )
     assert view._llm_text.content.value == "Gemini 3 Flash"
     assert view._translation_connection_text.content.value == "Official BYOK"
     assert view._prompt_editor.value == "G"
@@ -2696,10 +2833,10 @@ def test_on_llm_selected_invalid_value_is_noop(
 
 
 def test_on_llm_selected_stages_openrouter_byok_alias_without_pkce(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view.on_request_openrouter_pkce = lambda _settings: (_ for _ in ()).throw(
         AssertionError("BYOK selection should not launch PKCE immediately")
     )
@@ -2709,22 +2846,35 @@ def test_on_llm_selected_stages_openrouter_byok_alias_without_pkce(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.GEMMA4_26B_31B.value
-    assert pending.intent.translation.connection == TranslationConnection.OPENROUTER.value
-    assert _llm(pending) == LLMProviderName.OPENROUTER.value
     assert (
-        pending.intent.translation.openrouter_selection_alias
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.GEMMA4_26B_31B.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OPENROUTER.value
+    )
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.OPENROUTER.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
     )
     assert (
-        pending.intent.translation.openrouter_selected_source
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.BYOK.value
     )
     assert view.has_provider_changes is True
 
 
 def test_on_llm_selected_stages_byok_with_default_openrouter_prompt_when_unsaved(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     monkeypatch.setattr(
         settings_view, "load_prompt_for_provider", lambda _provider: "DEFAULT PROMPT"
@@ -2735,7 +2885,7 @@ def test_on_llm_selected_stages_byok_with_default_openrouter_prompt_when_unsaved
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view.on_request_openrouter_pkce = lambda _settings: (_ for _ in ()).throw(
         AssertionError("BYOK selection should not launch PKCE immediately")
     )
@@ -2746,14 +2896,22 @@ def test_on_llm_selected_stages_byok_with_default_openrouter_prompt_when_unsaved
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert _llm(pending) == LLMProviderName.OPENROUTER.value
-    assert pending.intent.prompts.system_prompt_override is None
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.OPENROUTER.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.prompts.system_prompt_override
+        is None
+    )
 
     assert bool(view._prompt_editor.value.strip())
 
 
 def test_on_llm_selected_updates_managed_openrouter_label_and_source(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
         llm="gemini",
@@ -2762,22 +2920,30 @@ def test_on_llm_selected_updates_managed_openrouter_label_and_source(
     )
     settings = _vnext(settings, system_prompt="G")
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._on_llm_selected(TranslationModel.GEMMA4_26B_31B.value)
 
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert _llm(pending) == LLMProviderName.OPENROUTER.value
     assert (
-        pending.intent.translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.OPENROUTER.value
     )
     assert (
-        pending.intent.translation.openrouter_selected_source
+        apply_provider_intent(settings_events.settings, pending).intent.translation.openrouter_model
+        == OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.MANAGED.value
     )
     assert (
-        pending.intent.translation.openrouter_selection_alias
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
     )
     assert view._llm_text.content.value == t("provider.gemma4_26b_31b")
@@ -2789,7 +2955,7 @@ def test_on_llm_selected_updates_managed_openrouter_label_and_source(
 
 
 def test_on_llm_selected_openrouter_provider_value_defaults_to_gemma_managed(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
         llm="gemini",
@@ -2797,26 +2963,33 @@ def test_on_llm_selected_openrouter_provider_value_defaults_to_gemma_managed(
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._on_llm_selected(LLMProviderName.OPENROUTER.value)
 
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert _llm(pending) == LLMProviderName.OPENROUTER.value
     assert (
-        pending.intent.translation.openrouter_selected_source
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.OPENROUTER.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.MANAGED.value
     )
     assert (
-        pending.intent.translation.openrouter_selection_alias
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
     )
     assert view._llm_text.content.value == t("provider.gemma4_26b_31b")
 
 
 def test_on_llm_selected_sets_deepseek_managed_connection_and_label(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
         llm="gemini",
@@ -2825,22 +2998,38 @@ def test_on_llm_selected_sets_deepseek_managed_connection_and_label(
     )
     settings = _vnext(settings, system_prompt="G")
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
 
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH.value
-    assert pending.intent.translation.connection == TranslationConnection.OPENROUTER.value
-    assert _llm(pending) == LLMProviderName.OPENROUTER.value
     assert (
-        pending.intent.translation.openrouter_selection_alias
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.DEEPSEEK_V4_FLASH.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OPENROUTER.value
+    )
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.OPENROUTER.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value
     )
-    assert pending.intent.translation.openrouter_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
     assert (
-        pending.intent.translation.openrouter_selected_source
+        apply_provider_intent(settings_events.settings, pending).intent.translation.openrouter_model
+        == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.BYOK.value
     )
     assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
@@ -2851,13 +3040,13 @@ def test_on_llm_selected_sets_deepseek_managed_connection_and_label(
 
 
 def test_on_llm_selected_stages_byok_without_mutating_managed_identity_snapshot(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="openrouter", openrouter_source="managed")
     settings = _vnext(settings, verified_hardware_hash="hardware-hash")
     settings = _vnext(settings, verified_hardware_hash_salt_version=7)
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view.on_request_openrouter_pkce = lambda _settings: (_ for _ in ()).throw(
         AssertionError("BYOK selection should not launch PKCE immediately")
     )
@@ -2868,22 +3057,34 @@ def test_on_llm_selected_stages_byok_without_mutating_managed_identity_snapshot(
 
     assert pending is not None
     assert (
-        pending.intent.translation.openrouter_selected_source
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.BYOK.value
     )
-    assert pending.state.managed_connection.verified_hardware_hash == "hardware-hash"
-    assert pending.state.managed_connection.verified_hardware_hash_salt_version == 7
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).state.managed_connection.verified_hardware_hash
+        == "hardware-hash"
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).state.managed_connection.verified_hardware_hash_salt_version
+        == 7
+    )
 
 
 def test_on_llm_selected_round_trips_back_to_managed_without_dropping_verified_snapshot(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(llm="openrouter", openrouter_source="managed")
     settings = _vnext(settings, verified_hardware_hash="hardware-hash")
     settings = _vnext(settings, verified_hardware_hash_salt_version=7)
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
     view._on_translation_connection_selected(TranslationConnection.MANAGED.value)
@@ -2892,15 +3093,27 @@ def test_on_llm_selected_round_trips_back_to_managed_without_dropping_verified_s
 
     assert pending is not None
     assert (
-        pending.intent.translation.openrouter_selected_source
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.MANAGED.value
     )
-    assert pending.state.managed_connection.verified_hardware_hash == "hardware-hash"
-    assert pending.state.managed_connection.verified_hardware_hash_salt_version == 7
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).state.managed_connection.verified_hardware_hash
+        == "hardware-hash"
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).state.managed_connection.verified_hardware_hash_salt_version
+        == 7
+    )
 
 
 def test_on_llm_selected_switching_away_from_openrouter_preserves_saved_selection_alias(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(
@@ -2913,44 +3126,57 @@ def test_on_llm_selected_switching_away_from_openrouter_preserves_saved_selectio
     settings = _vnext(settings, openrouter_alias=OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK)
     settings = _vnext(settings, system_prompt="O")
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
 
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert _llm(pending) == LLMProviderName.QWEN.value
     assert (
-        pending.intent.translation.openrouter_selected_source
+        _llm(apply_provider_intent(settings_events.settings, pending)) == LLMProviderName.QWEN.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.BYOK.value
     )
     assert (
-        pending.intent.translation.openrouter_selection_alias
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
     )
 
 
 def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_gemini_and_qwen_changes(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_llm_selected(TranslationModel.GEMINI_FLASH.value)
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert _llm(pending) == LLMProviderName.GEMINI.value
     assert (
-        pending.intent.translation.openrouter_selected_source
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.GEMINI.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.MANAGED.value
     )
     assert (
-        pending.intent.translation.openrouter_selection_alias
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
     )
 
@@ -2958,28 +3184,42 @@ def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_g
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert _llm(pending) == LLMProviderName.QWEN.value
     assert (
-        pending.intent.translation.openrouter_selected_source
+        _llm(apply_provider_intent(settings_events.settings, pending)) == LLMProviderName.QWEN.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.MANAGED.value
     )
     assert (
-        pending.intent.translation.openrouter_selection_alias
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
     )
 
 
 def test_luna_ui_selection_switches_applicable_keys_and_restores_connection(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, AppSettingsVNext(), config_path=Path("settings.json"))
 
     view._on_llm_selected(TranslationModel.GPT_6_LUNA.value)
     first = view.build_provider_apply_settings()
     assert first is not None
-    assert first.intent.translation.connection == TranslationConnection.CHATGPT.value
-    assert first.intent.translation.openrouter_selection_alias is None
+    assert (
+        apply_provider_intent(settings_events.settings, first).intent.translation.connection
+        == TranslationConnection.CHATGPT.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, first
+        ).intent.translation.openrouter_selection_alias
+        is None
+    )
     assert view._chatgpt_account_card.visible
     assert not view._openrouter_key.visible
     assert not view._openrouter_pkce_button_row.visible
@@ -2988,7 +3228,12 @@ def test_luna_ui_selection_switches_applicable_keys_and_restores_connection(
     view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
     routed = view.build_provider_apply_settings()
     assert routed is not None
-    assert routed.intent.translation.openrouter_selection_alias == "gpt_6_luna_byok"
+    assert (
+        apply_provider_intent(
+            settings_events.settings, routed
+        ).intent.translation.openrouter_selection_alias
+        == "gpt_6_luna_byok"
+    )
     assert view._openrouter_key.visible
     assert view._openrouter_pkce_button_row.visible
     assert not view._chatgpt_account_card.visible
@@ -2998,9 +3243,24 @@ def test_luna_ui_selection_switches_applicable_keys_and_restores_connection(
     view._on_translation_connection_selected(TranslationConnection.OFFICIAL_BYOK.value)
     direct = view.build_provider_apply_settings()
     assert direct is not None
-    assert direct.intent.translation.connection_history["gpt_6_luna"] == "official_byok"
-    assert direct.intent.translation.openrouter_selection_alias is None
-    assert direct.intent.translation.openrouter_selected_source == "none"
+    assert (
+        apply_provider_intent(
+            settings_events.settings, direct
+        ).intent.translation.connection_history["gpt_6_luna"]
+        == "official_byok"
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, direct
+        ).intent.translation.openrouter_selection_alias
+        is None
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, direct
+        ).intent.translation.openrouter_selected_source
+        == "none"
+    )
     assert view._openai_key.visible
     assert view._openai_verification_notice.visible
     assert not view._openrouter_key.visible
@@ -3010,12 +3270,15 @@ def test_luna_ui_selection_switches_applicable_keys_and_restores_connection(
     view._on_llm_selected(TranslationModel.GPT_6_LUNA.value)
     restored = view.build_provider_apply_settings()
     assert restored is not None
-    assert restored.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
+    assert (
+        apply_provider_intent(settings_events.settings, restored).intent.translation.connection
+        == TranslationConnection.OFFICIAL_BYOK.value
+    )
     assert view._openai_key.visible
 
 
 def test_on_translation_connection_selected_updates_settings_and_flags(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(
@@ -3028,9 +3291,9 @@ def test_on_translation_connection_selected_updates_settings_and_flags(
     )
     changed: list[AppSettingsVNext] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_translation_connection_selected(TranslationConnection.OFFICIAL_BYOK.value)
 
@@ -3038,12 +3301,20 @@ def test_on_translation_connection_selected_updates_settings_and_flags(
 
     assert settings.intent.translation.connection == TranslationConnection.MANAGED.value
     assert pending is not None
-    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
     assert (
-        pending.intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH_41.value]
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OFFICIAL_BYOK.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH_41.value]
         == TranslationConnection.OFFICIAL_BYOK
     )
-    assert _llm(pending) == LLMProviderName.DEEPSEEK.value
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.DEEPSEEK.value
+    )
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.official_byok"
     )
@@ -3052,7 +3323,7 @@ def test_on_translation_connection_selected_updates_settings_and_flags(
 
 
 def test_on_translation_connection_selected_auto_applies_managed_connection(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(
@@ -3067,24 +3338,29 @@ def test_on_translation_connection_selected_auto_applies_managed_connection(
     settings = _vnext(settings, openrouter_source=OpenRouterCredentialSource.BYOK)
     provider_changes: list[str] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.on_providers_changed = lambda: provider_changes.append("apply")
 
     view._on_translation_connection_selected(TranslationConnection.MANAGED.value)
 
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.translation.connection == TranslationConnection.MANAGED.value
     assert (
-        pending.intent.translation.openrouter_selected_source
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.MANAGED.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.MANAGED.value
     )
     assert provider_changes == ["apply"]
 
 
 def test_on_translation_connection_selected_stages_deepseek_managed_china_routing(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(
@@ -3096,31 +3372,48 @@ def test_on_translation_connection_selected_stages_deepseek_managed_china_routin
         },
     )
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_translation_connection_selected(TranslationConnection.MANAGED_CHINA.value)
 
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH_41.value
-    assert pending.intent.translation.connection == TranslationConnection.MANAGED_CHINA.value
     assert (
-        pending.intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH_41.value]
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.DEEPSEEK_V4_FLASH_41.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.MANAGED_CHINA.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH_41.value]
         == TranslationConnection.MANAGED_CHINA
     )
-    assert _llm(pending) == LLMProviderName.OPENROUTER.value
     assert (
-        pending.intent.translation.openrouter_selected_source
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.OPENROUTER.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.MANAGED.value
     )
     assert (
-        pending.intent.translation.openrouter_selection_alias
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_MANAGED.value
     )
     assert (
-        pending.intent.translation.openrouter_provider_routing
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_provider_routing
         == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT.value
     )
     assert view._translation_connection_text.content.value == t(
@@ -3130,15 +3423,15 @@ def test_on_translation_connection_selected_stages_deepseek_managed_china_routin
 
 
 def test_openrouter_key_field_and_pkce_button_are_visible_for_byok_without_break_glass(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
-    view, _store = _make_settings_view(monkeypatch)
+    view, _store = _make_settings_view(monkeypatch, settings_events)
     settings = AppSettingsVNext()
     settings = _vnext(settings, llm=LLMProviderName.OPENROUTER)
     settings = _vnext(settings, openrouter_source=OpenRouterCredentialSource.BYOK)
 
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._openrouter_key.visible is True
     assert view._openrouter_pkce_button_row.visible is True
@@ -3156,17 +3449,17 @@ def test_openrouter_key_field_and_pkce_button_are_visible_for_byok_without_break
 
 
 def test_openrouter_pkce_button_shows_authenticated_state_after_verified_key(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     store = DummySecretStore({"openrouter_api_key": "sk-or-v1-pkce"})
-    view, _ = _make_settings_view(monkeypatch, store)
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
     settings = _vnext(
         llm="openrouter",
         openrouter_source="byok",
         verified_providers=("openrouter",),
     )
 
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._openrouter_pkce_button.content == t("settings.openrouter_authenticated")
     assert view._openrouter_pkce_button.disabled is True
@@ -3185,16 +3478,16 @@ def test_openrouter_pkce_button_shows_authenticated_state_after_verified_key(
 
 
 def test_openrouter_pkce_button_returns_to_authenticate_when_key_is_cleared(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     store = DummySecretStore({"openrouter_api_key": "sk-or-v1-pkce"})
-    view, _ = _make_settings_view(monkeypatch, store)
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
     settings = _vnext(
         llm="openrouter",
         openrouter_source="byok",
         verified_providers=("openrouter",),
     )
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._openrouter_key.value = ""
     view._on_secret_change("openrouter_api_key", "")
@@ -3205,10 +3498,10 @@ def test_openrouter_pkce_button_returns_to_authenticate_when_key_is_cleared(
 
 
 def test_openrouter_pkce_button_preview_renders_states_without_side_effects(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     store = DummySecretStore({"openrouter_api_key": "sk-or-v1-pkce"})
-    view, _ = _make_settings_view(monkeypatch, store)
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
     view.on_verify_api_key = lambda *_args, **_kwargs: pytest.fail("preview must not verify keys")
     key_before = view._openrouter_key.value
 
@@ -3231,13 +3524,13 @@ def test_openrouter_pkce_button_preview_renders_states_without_side_effects(
 
 @pytest.mark.asyncio
 async def test_openrouter_pkce_button_disables_after_manual_key_verification(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     settings = AppSettingsVNext()
     settings = _vnext(settings, llm=LLMProviderName.OPENROUTER)
     settings = _vnext(settings, openrouter_source=OpenRouterCredentialSource.BYOK)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._openrouter_key.value = "sk-or-v1-manual"
 
     async def fake_verify(provider: str, key: str) -> tuple[bool, str]:
@@ -3258,16 +3551,16 @@ async def test_openrouter_pkce_button_disables_after_manual_key_verification(
 
 @pytest.mark.asyncio
 async def test_openrouter_pkce_button_reenables_after_manual_key_verification_failure(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     store = DummySecretStore({"openrouter_api_key": "sk-or-v1-old"})
-    view, _ = _make_settings_view(monkeypatch, store)
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
     settings = _vnext(
         llm="openrouter",
         openrouter_source="byok",
         verified_providers=("openrouter",),
     )
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     assert view._openrouter_pkce_button.disabled is True
     view._openrouter_key.value = "invalid-openrouter-key"
 
@@ -3288,13 +3581,13 @@ async def test_openrouter_pkce_button_reenables_after_manual_key_verification_fa
 
 
 def test_on_llm_selected_stages_byok_even_when_legacy_openrouter_key_exists(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
     store = DummySecretStore({"openrouter_api_key": "legacy-openrouter-key"})
-    view, _ = _make_settings_view(monkeypatch, store)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.on_request_openrouter_pkce = lambda _settings: (_ for _ in ()).throw(
         AssertionError("BYOK selection should not launch PKCE immediately")
     )
@@ -3306,22 +3599,33 @@ def test_on_llm_selected_stages_byok_even_when_legacy_openrouter_key_exists(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.GEMINI_FLASH.value
-    assert pending.intent.translation.connection == TranslationConnection.OPENROUTER.value
-    assert _llm(pending) == LLMProviderName.OPENROUTER.value
     assert (
-        pending.intent.translation.openrouter_selection_alias
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.GEMINI_FLASH.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OPENROUTER.value
+    )
+    assert (
+        _llm(apply_provider_intent(settings_events.settings, pending))
+        == LLMProviderName.OPENROUTER.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.GEMINI_FLASH_BYOK.value
     )
 
 
 def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
     settings = _vnext(settings, system_prompt="G")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     requested: list[object] = []
     view.on_request_openrouter_pkce = requested.append
 
@@ -3336,13 +3640,13 @@ def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
 
 
 def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     store = DummySecretStore({"openrouter_api_key": "pkce-openrouter-key"})
     initial = _vnext(llm="gemini", source_language="ko", system_prompt="G")
 
-    view, _ = _make_settings_view(monkeypatch, store)
-    view.load_from_settings(initial, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
+    settings_events.load(view, initial, config_path=Path("settings.json"))
     store.values["alibaba_api_key"] = "unrelated-legacy-secret"
     store.get_calls.clear()
     store.set_calls.clear()
@@ -3358,7 +3662,10 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
         verified_providers=("openrouter",),
     )
 
-    view.refresh_after_openrouter_pkce_success(updated, config_path=Path("settings.json"))
+    provider, _general, prompt, _overlay = settings_view_surface_snapshots(updated)
+    view.refresh_after_openrouter_pkce_success(
+        provider=provider, prompt=prompt, config_path=Path("settings.json")
+    )
 
     assert view._custom_vocab_tag_editor._input_field.value == ""  # noqa: SLF001
     assert _custom_vocab_chip_terms(view) == []
@@ -3377,7 +3684,9 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
     assert store.set_calls == []
 
 
-def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_on_llm_selected_updates_gemini_model(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     settings = _vnext(
         llm="deepseek",
         model=TranslationModel.DEEPSEEK_V4_FLASH.value,
@@ -3385,8 +3694,8 @@ def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -
     )
     settings = _vnext(settings, system_prompt="G")
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._on_llm_selected(TranslationModel.GEMINI_FLASH.value)
 
     pending = view.build_provider_apply_settings()
@@ -3394,16 +3703,25 @@ def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -
     assert _llm(settings) == LLMProviderName.DEEPSEEK.value
     assert settings.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_FLASH.value
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.GEMINI_FLASH.value
-    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
-    assert pending.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_FLASH.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.GEMINI_FLASH.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OFFICIAL_BYOK.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.gemini.llm_model
+        == GeminiLLMModel.GEMINI_FLASH.value
+    )
     assert view._prompt_editor.value == "G"
     assert settings.intent.prompts.system_prompt_override == "G"
     assert view.has_provider_changes is True
 
 
 def test_on_llm_selected_logs_only_changed_fields_for_provider_switch(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(
@@ -3414,8 +3732,8 @@ def test_on_llm_selected_logs_only_changed_fields_for_provider_switch(
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
     basic_messages: list[str] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.runtime_log_basic = lambda message, *, level=logging.INFO: basic_messages.append(message)
 
     view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
@@ -3424,7 +3742,7 @@ def test_on_llm_selected_logs_only_changed_fields_for_provider_switch(
 
 
 def test_on_llm_selected_skips_log_when_selection_is_unchanged(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(
@@ -3435,8 +3753,8 @@ def test_on_llm_selected_skips_log_when_selection_is_unchanged(
     settings = _vnext(settings, llm=LLMProviderName.QWEN)
     basic_messages: list[str] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.runtime_log_basic = lambda message, *, level=logging.INFO: basic_messages.append(message)
 
     view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
@@ -3444,12 +3762,14 @@ def test_on_llm_selected_skips_log_when_selection_is_unchanged(
     assert basic_messages == []
 
 
-def test_on_ui_and_region_selection_emit_changes(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_on_ui_and_region_selection_emit_changes(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_ui_selected("ko")
     view._on_qwen_region_selected(QwenRegion.SINGAPORE.value)
@@ -3458,7 +3778,10 @@ def test_on_ui_and_region_selection_emit_changes(monkeypatch: pytest.MonkeyPatch
     assert settings.intent.translation.qwen.region == QwenRegion.BEIJING.value
     pending = view.build_provider_apply_settings()
     assert pending is not None
-    assert pending.intent.translation.qwen.region == QwenRegion.SINGAPORE.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.qwen.region
+        == QwenRegion.SINGAPORE.value
+    )
     assert view.has_provider_changes is True
     assert len(changed) == 1
     assert changed[0].intent.ui.locale == "ko"
@@ -3466,13 +3789,13 @@ def test_on_ui_and_region_selection_emit_changes(monkeypatch: pytest.MonkeyPatch
 
 
 def test_provider_draft_does_not_leak_into_immediate_settings_apply(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_stt_selected(STTProviderName.SONIOX.value)
     view._on_ui_selected("ko")
@@ -3483,17 +3806,20 @@ def test_provider_draft_does_not_leak_into_immediate_settings_apply(
     assert changed[0].intent.ui.locale == "ko"
     assert changed[0].intent.stt.provider == STTProviderName.LOCAL_CPU_AUTO.value
     assert pending is not None
-    assert pending.intent.stt.provider == STTProviderName.SONIOX.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.stt.provider
+        == STTProviderName.SONIOX.value
+    )
 
 
 def test_provider_selection_equality_guards_skip_noop_draft_changes(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_stt_selected(STTProviderName.LOCAL_CPU_AUTO.value)
     view._on_peer_stt_selected(STTProviderName.LOCAL_CPU_AUTO.value)
@@ -3504,12 +3830,14 @@ def test_provider_selection_equality_guards_skip_noop_draft_changes(
     assert changed == []
 
 
-def test_on_secret_change_saves_and_clears_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_on_secret_change_saves_and_clears_keys(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     settings = AppSettingsVNext()
     store = DummySecretStore()
     cleared: list[str] = []
-    view, _ = _make_settings_view(monkeypatch, store)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.on_secret_cleared = lambda key: cleared.append(key)
 
     view._on_secret_change("google_api_key", "abc")
@@ -3522,11 +3850,11 @@ def test_on_secret_change_saves_and_clears_keys(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_audio_and_vad_handlers_update_state(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     assert view._vad_slider.min == 0.10
     assert view._vad_slider.max == 1.00
     assert view._vad_slider.divisions == 18
@@ -3544,14 +3872,14 @@ def test_audio_and_vad_handlers_update_state(
     view._handle_vad_change(visual_event)
     view._handle_peer_vad_change(SimpleNamespace(control=SimpleNamespace(value=0.61)))
 
-    assert view._settings.intent.audio.input_host_api == "MME"
-    assert view._settings.intent.audio.input_device == "Mic 2"
-    assert view._settings.intent.stt.vad_speech_threshold == 0.72
-    assert view._settings.intent.desktop_audio.vad_speech_threshold == 0.61
+    assert settings_events.settings.intent.audio.input_host_api == "MME"
+    assert settings_events.settings.intent.audio.input_device == "Mic 2"
+    assert settings_events.settings.intent.stt.vad_speech_threshold == 0.72
+    assert settings_events.settings.intent.desktop_audio.vad_speech_threshold == 0.61
 
 
 def test_peer_vad_slider_change_updates_state_and_emits_intent(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     class UpdateRecorder:
         def __init__(self) -> None:
@@ -3562,16 +3890,16 @@ def test_peer_vad_slider_change_updates_state_and_emits_intent(
 
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
     attach_dummy_page(monkeypatch, view)
     slider_page = UpdateRecorder()
     attach_dummy_page(monkeypatch, view._peer_vad_slider, slider_page)
 
     view._handle_peer_vad_change(SimpleNamespace(control=SimpleNamespace(value=0.77)))
 
-    assert view._settings.intent.desktop_audio.vad_speech_threshold == 0.77
+    assert settings_events.settings.intent.desktop_audio.vad_speech_threshold == 0.77
     assert view._peer_vad_slider.label == "0.77"
     assert slider_page.updated == [view._peer_vad_slider]
     assert len(changed) == 1
@@ -3580,13 +3908,13 @@ def test_peer_vad_slider_change_updates_state_and_emits_intent(
 
 
 def test_audio_test_threshold_changes_share_the_settings_sliders_and_intents(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
     monkeypatch.setattr(type(view._vad_slider), "update", lambda self: None)
 
     view.apply_vad_threshold("self", 0.65)
@@ -3600,7 +3928,7 @@ def test_audio_test_threshold_changes_share_the_settings_sliders_and_intents(
 
 
 def test_audio_change_messages_use_basic_runtime_log(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, input_host_api=WINDOWS_WASAPI_COMPATIBILITY_HOST_API)
@@ -3609,10 +3937,10 @@ def test_audio_change_messages_use_basic_runtime_log(
     basic_messages: list[str] = []
     changed: list[AppSettingsVNext] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.runtime_log_basic = lambda message, *, level=logging.INFO: basic_messages.append(message)
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._audio_settings.host_api = "MME"
     view._audio_settings.microphone = "New Mic"
@@ -3626,9 +3954,9 @@ def test_audio_change_messages_use_basic_runtime_log(
     ]
 
     assert all(message in basic_messages for message in expected_messages)
-    assert view._settings.intent.audio.input_host_api == "MME"
-    assert view._settings.intent.audio.input_device == "New Mic"
-    assert view._settings.intent.desktop_audio.output_device == "New Speakers"
+    assert settings_events.settings.intent.audio.input_host_api == "MME"
+    assert settings_events.settings.intent.audio.input_device == "New Mic"
+    assert settings_events.settings.intent.desktop_audio.output_device == "New Speakers"
     assert len(changed) == 1
     assert changed[0] is not settings
     assert changed[0].intent.audio.input_host_api == "MME"
@@ -3637,11 +3965,11 @@ def test_audio_change_messages_use_basic_runtime_log(
 
 
 def test_retired_translation_policy_controls_are_not_constructed(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert not hasattr(view, "_low_latency_card")
     assert not hasattr(view, "_low_latency_text")
@@ -3652,27 +3980,27 @@ def test_retired_translation_policy_controls_are_not_constructed(
 
 
 def test_peer_qwen_region_control_is_removed_before_peer_translation_is_enabled(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert not hasattr(view, "_peer_qwen_region_label")
     assert not hasattr(view, "_peer_qwen_region_text")
 
 
-def test_update_api_visibility_keeps_peer_auth_controls_visible_when_peer_disabled(
-    monkeypatch: pytest.MonkeyPatch,
+def test_update_api_visibility_shows_selected_peer_deepgram_credentials(
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
     assert view._deepgram_key.visible is True
@@ -3681,13 +4009,13 @@ def test_update_api_visibility_keeps_peer_auth_controls_visible_when_peer_disabl
 
 
 def test_update_api_visibility_keeps_peer_qwen_credentials_visible_when_peer_disabled(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
     assert view._alibaba_key_beijing.visible is True
@@ -3695,51 +4023,36 @@ def test_update_api_visibility_keeps_peer_qwen_credentials_visible_when_peer_dis
 
 
 def test_peer_qwen_region_override_controls_are_removed(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     assert not hasattr(view, "_on_peer_qwen_region_selected")
     assert not hasattr(view, "_peer_qwen_region_text")
 
 
 def test_peer_soniox_model_override_controls_are_removed(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, peer_stt_provider=STTProviderName.SONIOX)
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     assert not hasattr(view, "_on_peer_soniox_model_selected")
     assert not hasattr(view, "_peer_soniox_model_text")
 
 
-def test_update_api_visibility_includes_enabled_peer_provider(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
-
-    assert view._deepgram_key.visible is True
-    assert view._google_key.visible is True
-
-
 def test_update_api_visibility_uses_shared_qwen_region_for_peer_and_self(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.QWEN_AUDIO)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
     settings = _vnext(settings, qwen_region=QwenRegion.BEIJING)
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
     assert view._alibaba_key_beijing.visible is True
@@ -3747,7 +4060,7 @@ def test_update_api_visibility_uses_shared_qwen_region_for_peer_and_self(
 
 
 def test_update_api_visibility_shows_shared_qwen_region_for_peer_qwen_only(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.SONIOX)
@@ -3755,7 +4068,7 @@ def test_update_api_visibility_shows_shared_qwen_region_for_peer_qwen_only(
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
     settings = _vnext(settings, qwen_region=QwenRegion.BEIJING)
 
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
     assert view._soniox_key.visible is True
@@ -3765,14 +4078,14 @@ def test_update_api_visibility_shows_shared_qwen_region_for_peer_qwen_only(
 
 
 def test_on_peer_stt_selected_refreshes_api_visibility_and_redraws_immediately(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     attach_dummy_page(monkeypatch, view)
 
     api_key_updates: list[str] = []
@@ -3798,7 +4111,10 @@ def test_on_peer_stt_selected_refreshes_api_visibility_and_redraws_immediately(
 
     assert settings.intent.peer_stt.provider == STTProviderName.DEEPGRAM.value
     assert pending is not None
-    assert pending.intent.peer_stt.provider == STTProviderName.SONIOX.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.peer_stt.provider
+        == STTProviderName.SONIOX.value
+    )
     assert view._peer_stt_text.content.value == t("provider.soniox")
     assert "peer_stt_text" in api_key_updates
     assert "qwen_region_btn" in api_key_updates
@@ -3806,10 +4122,10 @@ def test_on_peer_stt_selected_refreshes_api_visibility_and_redraws_immediately(
 
 
 def test_peer_auto_detection_languages_card_stays_on_prompt_tab(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
     prompt_cards = _prompt_tab_cards(view)
     assert prompt_cards[0] is _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
@@ -3820,58 +4136,60 @@ def test_peer_auto_detection_languages_card_stays_on_prompt_tab(
 
 
 def test_peer_auto_detection_languages_card_loads_saved_hints(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, peer_expected_languages=["ja", "zh-TW"])
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._peer_auto_languages_card.visible is True
     assert view._peer_auto_languages_editor._terms == ["ja", "zh-TW"]
 
 
 def test_hint_language_add_keeps_the_selected_language_when_settings_reload(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_peer_auto_languages_add("ja")
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._peer_auto_languages_editor._terms == ["ja"]
     assert view._general_snapshot.peer_expected_languages == ("ja",)
 
     view._on_peer_auto_languages_add("ar")
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._peer_auto_languages_editor._terms == ["ja", "ar"]
 
     view._on_peer_auto_languages_add("en")
-    view.load_from_settings(
+    settings_events.load(
+        view,
         _vnext(settings, peer_expected_languages=["ja"]),
         config_path=Path("settings.json"),
     )
 
     assert view._peer_auto_languages_editor._terms == ["ja", "ar", "en"]
 
-    view.load_from_settings(
+    settings_events.load(
+        view,
         _vnext(settings, peer_expected_languages=["ja", "ar", "en"]),
         config_path=Path("settings.json"),
     )
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._peer_auto_languages_editor._terms == []
 
 
 def test_hint_language_add_saves_hints_without_a_language_selection_change(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     recent: list[str] = ["zh-CN", "ca", "ja"]
 
     class Dashboard:
@@ -3886,13 +4204,13 @@ def test_hint_language_add_saves_hints_without_a_language_selection_change(
 
     view.bind_recent_language_queue(Dashboard())
     emitted: list[AppSettingsVNext] = []
-    view.on_settings_changed = emitted.append
+    settings_events.on_change = emitted.append
     editor = view._peer_auto_languages_editor
 
     editor._handle_select("ja")
     editor._handle_select("ar")
     editor._handle_select("en")
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert editor._terms == ["ja", "ar", "en"]
     assert [item.intent.languages.peer_expected_languages for item in emitted] == [
@@ -3913,9 +4231,9 @@ def test_hint_language_add_saves_hints_without_a_language_selection_change(
 
 
 def test_peer_auto_languages_add_button_uses_region_tone(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     add_button = view._peer_auto_languages_editor._add_button
 
     assert add_button.style.color[ft.ControlState.DEFAULT] == settings_view.COLOR_SECONDARY
@@ -3928,14 +4246,14 @@ def test_peer_auto_languages_add_button_uses_region_tone(
 
 
 def test_overlay_display_toggles_update_persistent_settings(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings_calls: list[AppSettingsVNext] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: settings_calls.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: settings_calls.append(incoming)
     attach_dummy_page(monkeypatch, view)
 
     view._on_overlay_translation_click(None)
@@ -3945,9 +4263,9 @@ def test_overlay_display_toggles_update_persistent_settings(
     assert settings.intent.overlay.show_translation is True
     assert settings.intent.overlay.show_peer_original is True
     assert settings.intent.overlay.desktop_flet.swap_caption_languages is False
-    assert view._settings.intent.overlay.show_translation is False
-    assert view._settings.intent.overlay.show_peer_original is False
-    assert view._settings.intent.overlay.desktop_flet.swap_caption_languages is True
+    assert settings_events.settings.intent.overlay.show_translation is False
+    assert settings_events.settings.intent.overlay.show_peer_original is False
+    assert settings_events.settings.intent.overlay.desktop_flet.swap_caption_languages is True
     assert len(settings_calls) == 3
     assert all(incoming is not settings for incoming in settings_calls)
     assert settings_calls[-1].intent.overlay.show_translation is False
@@ -3956,13 +4274,13 @@ def test_overlay_display_toggles_update_persistent_settings(
 
 
 def test_overlay_single_action_cards_use_broad_value_slot_click_targets(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     desktop_settings = AppSettingsVNext()
     desktop_settings = _vnext(desktop_settings, overlay_target="desktop")
-    desktop_view, _ = _make_settings_view(monkeypatch)
-    desktop_view.load_from_settings(desktop_settings, config_path=Path("settings.json"))
+    desktop_view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(desktop_view, desktop_settings, config_path=Path("settings.json"))
 
     cases = [
         (
@@ -4008,18 +4326,18 @@ def test_overlay_single_action_cards_use_broad_value_slot_click_targets(
 
 
 def test_overlay_text_scale_modal_selection_updates_settings_immediately(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_overlay_text_scale_selected("large")
 
     assert settings.intent.overlay.calibration.text_scale == 1.0
-    assert view._settings.intent.overlay.calibration.text_scale == 1.2
+    assert settings_events.settings.intent.overlay.calibration.text_scale == 1.2
     assert view._overlay_text_scale_text.content.value == t(
         "settings.overlay.calibration.text_scale.large"
     )
@@ -4028,13 +4346,13 @@ def test_overlay_text_scale_modal_selection_updates_settings_immediately(
 
 
 def test_desktop_gui_caption_location_selector_updates_settings_with_localized_choices(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(overlay_target="steamvr")
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
     attach_dummy_page(monkeypatch, view)
 
     captured: dict[str, object] = {}
@@ -4067,14 +4385,14 @@ def test_desktop_gui_caption_location_selector_updates_settings_with_localized_c
     captured_on_select("desktop")
 
     assert settings.intent.overlay.target == "steamvr"
-    assert view._settings.intent.overlay.target == "desktop"
+    assert settings_events.settings.intent.overlay.target == "desktop"
     assert view._overlay_target_button.content.value == t("settings.overlay.target.desktop")
     assert len(changed) == 1
     assert changed[0].intent.overlay.target == "desktop"
 
 
 def test_desktop_gui_product_standard_cards_show_current_values_and_desktop_only_controls(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     previous_locale = i18n_module.get_locale()
     try:
@@ -4082,8 +4400,8 @@ def test_desktop_gui_product_standard_cards_show_current_values_and_desktop_only
         settings = AppSettingsVNext()
         settings = _vnext(settings, overlay_target="desktop")
         settings = _vnext(settings, overlay_size_preset="large")
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(settings, config_path=Path("settings.json"))
+        view, _ = _make_settings_view(monkeypatch, settings_events)
+        settings_events.load(view, settings, config_path=Path("settings.json"))
 
         overlay_titles = _overlay_tab_card_titles(view)
         reset_card = _overlay_tab_card(view, t("settings.overlay.position_reset.desktop.title"))
@@ -4133,11 +4451,11 @@ def test_desktop_gui_product_standard_cards_show_current_values_and_desktop_only
 
 
 def test_overlay_tab_switches_visible_cards_when_caption_location_changes(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(overlay_target="steamvr")
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_overlay_target_selected("desktop")
 
@@ -4153,27 +4471,33 @@ def test_overlay_tab_switches_visible_cards_when_caption_location_changes(
 
 
 def test_desktop_gui_background_transparency_card_adjusts_in_ten_percent_steps(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(overlay_target="desktop")
     settings = _vnext(settings, overlay_background_alpha=0.5)
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     assert view._desktop_overlay_background_alpha_value_text.value == "50%"
 
     view._on_desktop_overlay_background_alpha_step(0.1)
 
-    assert view._settings is not None
-    assert view._settings.intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.4)
+    assert settings_events.settings is not None
+    assert (
+        settings_events.settings.intent.overlay.desktop_flet.visual.background_alpha
+        == pytest.approx(0.4)
+    )
     assert view._desktop_overlay_background_alpha_value_text.value == "60%"
 
     view._on_desktop_overlay_background_alpha_step(-0.1)
     view._on_desktop_overlay_background_alpha_step(-0.1)
 
-    assert view._settings.intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.6)
+    assert (
+        settings_events.settings.intent.overlay.desktop_flet.visual.background_alpha
+        == pytest.approx(0.6)
+    )
     assert view._desktop_overlay_background_alpha_value_text.value == "40%"
     assert [
         incoming.intent.overlay.desktop_flet.visual.background_alpha for incoming in changed
@@ -4181,13 +4505,13 @@ def test_desktop_gui_background_transparency_card_adjusts_in_ten_percent_steps(
 
 
 def test_desktop_overlay_swap_caption_languages_emits_copy_without_mutating_loaded_settings_reference(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(overlay_target="desktop")
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_desktop_overlay_swap_caption_languages_click(None)
 
@@ -4195,19 +4519,19 @@ def test_desktop_overlay_swap_caption_languages_emits_copy_without_mutating_load
     assert changed
     assert changed[-1] is not settings
     assert changed[-1].intent.overlay.desktop_flet.swap_caption_languages is True
-    assert view._settings is not None
-    assert view._settings.intent.overlay.desktop_flet.swap_caption_languages is True
+    assert settings_events.settings is not None
+    assert settings_events.settings.intent.overlay.desktop_flet.swap_caption_languages is True
 
 
 def test_desktop_gui_background_alpha_emits_copy_without_mutating_loaded_settings_reference(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(overlay_target="desktop")
     settings = _vnext(settings, overlay_background_alpha=0.5)
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_desktop_overlay_background_alpha_step(0.1)
 
@@ -4215,63 +4539,75 @@ def test_desktop_gui_background_alpha_emits_copy_without_mutating_loaded_setting
     assert changed
     assert changed[-1] is not settings
     assert changed[-1].intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.4)
-    assert view._settings.intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.4)
+    assert (
+        settings_events.settings.intent.overlay.desktop_flet.visual.background_alpha
+        == pytest.approx(0.4)
+    )
 
 
 def test_desktop_gui_background_transparency_card_clamps_to_zero_and_one(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(overlay_target="desktop")
     settings = _vnext(settings, overlay_background_alpha=0.05)
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_desktop_overlay_background_alpha_step(0.1)
     view._on_desktop_overlay_background_alpha_step(0.1)
 
-    assert view._settings is not None
-    assert view._settings.intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.0)
+    assert settings_events.settings is not None
+    assert (
+        settings_events.settings.intent.overlay.desktop_flet.visual.background_alpha
+        == pytest.approx(0.0)
+    )
     assert view._desktop_overlay_background_alpha_value_text.value == "100%"
 
-    current = view._settings
-    view._settings = replace(
-        current,
-        intent=replace(
-            current.intent,
-            overlay=replace(
-                current.intent.overlay,
-                desktop_flet=replace(
-                    current.intent.overlay.desktop_flet,
-                    visual=replace(
-                        current.intent.overlay.desktop_flet.visual,
-                        background_alpha=0.95,
+    current = settings_events.settings
+    settings_events.load(
+        view,
+        replace(
+            current,
+            intent=replace(
+                current.intent,
+                overlay=replace(
+                    current.intent.overlay,
+                    desktop_flet=replace(
+                        current.intent.overlay.desktop_flet,
+                        visual=replace(
+                            current.intent.overlay.desktop_flet.visual, background_alpha=0.95
+                        ),
                     ),
                 ),
             ),
         ),
+        config_path=Path("settings.json"),
     )
     view._sync_desktop_overlay_main_controls()
     view._on_desktop_overlay_background_alpha_step(-0.1)
     view._on_desktop_overlay_background_alpha_step(-0.1)
 
-    assert view._settings.intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(1.0)
+    assert (
+        settings_events.settings.intent.overlay.desktop_flet.visual.background_alpha
+        == pytest.approx(1.0)
+    )
     assert view._desktop_overlay_background_alpha_value_text.value == "0%"
 
 
 def test_desktop_gui_size_selection_persists_and_emits_settings(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(overlay_target="desktop")
     settings = _vnext(settings, overlay_size_preset="medium")
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_desktop_overlay_size_selected("xlarge")
 
     assert settings.intent.overlay.desktop_flet.size_preset == "medium"
-    assert view._settings.intent.overlay.desktop_flet.size_preset == "xlarge"
+    assert settings_events.settings.intent.overlay.desktop_flet.size_preset == "xlarge"
     assert view._desktop_overlay_size_button.content.value == t(
         "settings.overlay.desktop.size.option.xlarge"
     )
@@ -4280,15 +4616,15 @@ def test_desktop_gui_size_selection_persists_and_emits_settings(
 
 
 def test_desktop_gui_size_selection_uses_runtime_callback_when_available(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, overlay_size_preset="medium")
     changed: list[AppSettingsVNext] = []
     runtime_size_requests: list[str] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
     view.on_desktop_overlay_size_change = runtime_size_requests.append
 
     view._on_desktop_overlay_size_selected("xlarge")
@@ -4301,16 +4637,16 @@ def test_desktop_gui_size_selection_uses_runtime_callback_when_available(
     )
 
 
-def test_desktop_gui_runtime_size_selection_is_preserved_on_next_settings_emit(
-    monkeypatch: pytest.MonkeyPatch,
+def test_desktop_gui_runtime_size_selection_keeps_visible_pending_size_without_stale_emit(
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, overlay_size_preset="medium")
     changed: list[AppSettingsVNext] = []
     runtime_size_requests: list[str] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
     view.on_desktop_overlay_size_change = runtime_size_requests.append
 
     view._on_desktop_overlay_size_selected("xlarge")
@@ -4318,20 +4654,21 @@ def test_desktop_gui_runtime_size_selection_is_preserved_on_next_settings_emit(
 
     assert runtime_size_requests == ["xlarge"]
     assert settings.intent.overlay.desktop_flet.size_preset == "medium"
-    assert changed
-    assert changed[-1] is not settings
-    assert changed[-1].intent.overlay.desktop_flet.size_preset == "xlarge"
+    assert settings_events.immediate_intents == [OverlayTranslationSettingsIntent(False)]
     assert changed[-1].intent.overlay.show_translation is False
+    assert view._desktop_overlay_size_button.content.value == t(
+        "settings.overlay.desktop.size.option.xlarge"
+    )
 
 
 def test_desktop_gui_size_runtime_callback_can_return_to_previous_preset(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, overlay_size_preset="medium")
     runtime_size_requests: list[str] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.on_desktop_overlay_size_change = runtime_size_requests.append
 
     view._on_desktop_overlay_size_selected("xlarge")
@@ -4344,13 +4681,13 @@ def test_desktop_gui_size_runtime_callback_can_return_to_previous_preset(
 
 
 def test_desktop_gui_lock_card_displays_move_for_legacy_saved_lock_when_off(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(overlay_target="desktop")
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     assert view._desktop_overlay_lock_button.content.value == t(
         "settings.overlay.desktop.lock.value.move"
@@ -4363,14 +4700,14 @@ def test_desktop_gui_lock_card_displays_move_for_legacy_saved_lock_when_off(
 
 
 def test_desktop_gui_runtime_lock_callback_is_authoritative_without_settings_emit(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(overlay_target="desktop")
     changed: list[AppSettingsVNext] = []
     runtime_lock_requests: list[bool] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
     view.on_desktop_overlay_lock_change = runtime_lock_requests.append
     view.set_overlay_runtime_state(
         "connected",
@@ -4395,13 +4732,13 @@ def test_desktop_gui_runtime_lock_callback_is_authoritative_without_settings_emi
 
 
 def test_desktop_gui_non_desktop_runtime_lock_sync_displays_move_for_legacy_saved_lock(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(overlay_target="steamvr")
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
     view.on_desktop_overlay_lock_change = lambda _locked: None
 
     view.set_overlay_runtime_state(
@@ -4420,12 +4757,12 @@ def test_desktop_gui_non_desktop_runtime_lock_sync_displays_move_for_legacy_save
 
 
 def test_desktop_gui_runtime_lock_notification_controls_next_toggle(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(overlay_target="desktop")
     runtime_lock_requests: list[bool] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.on_desktop_overlay_lock_change = runtime_lock_requests.append
 
     view.set_overlay_runtime_state(
@@ -4446,12 +4783,12 @@ def test_desktop_gui_runtime_lock_notification_controls_next_toggle(
 
 
 def test_desktop_gui_clears_pending_runtime_lock_when_runtime_becomes_inactive(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(overlay_target="desktop")
     runtime_lock_requests: list[bool] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.on_desktop_overlay_lock_change = runtime_lock_requests.append
     view.set_overlay_runtime_state(
         "connected",
@@ -4486,13 +4823,12 @@ def test_desktop_gui_clears_pending_runtime_lock_when_runtime_becomes_inactive(
 
 @pytest.mark.parametrize("state", ["starting", "failed", "stopping", "off"])
 def test_desktop_gui_ignores_stale_runtime_lock_when_desktop_runtime_is_not_active(
-    monkeypatch: pytest.MonkeyPatch,
-    state: str,
+    monkeypatch: pytest.MonkeyPatch, state: str, settings_events
 ) -> None:
     settings = _vnext(overlay_target="desktop")
     runtime_lock_requests: list[bool] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.on_desktop_overlay_lock_change = runtime_lock_requests.append
 
     view.set_overlay_runtime_state(
@@ -4514,7 +4850,7 @@ def test_desktop_gui_ignores_stale_runtime_lock_when_desktop_runtime_is_not_acti
 
 
 def test_overlay_position_reset_card_separates_vr_and_desktop_reset_actions(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, overlay_distance=1.2)
@@ -4525,15 +4861,18 @@ def test_overlay_position_reset_card_separates_vr_and_desktop_reset_actions(
     settings = _vnext(settings, overlay_background_alpha=0.44)
     changed: list[AppSettingsVNext] = []
     desktop_resets: list[bool] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.set_overlay_calibration(settings.intent.overlay.calibration)
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_overlay_position_reset(None)
 
     assert settings.intent.overlay.calibration.distance == 1.2
-    assert view._settings.intent.overlay.calibration.distance == OverlayCalibration().distance
+    assert (
+        settings_events.settings.intent.overlay.calibration.distance
+        == OverlayCalibration().distance
+    )
     assert settings.intent.overlay.desktop_flet.position.x == 80
     assert settings.intent.overlay.desktop_flet.position.y == 90
     assert settings.intent.overlay.desktop_flet.size_preset == "large"
@@ -4548,9 +4887,12 @@ def test_overlay_position_reset_card_separates_vr_and_desktop_reset_actions(
     assert settings.intent.overlay.desktop_flet.size_preset == "large"
     assert not hasattr(settings.intent.overlay.desktop_flet, "locked")
     assert settings.intent.overlay.desktop_flet.visual.background_alpha == 0.44
-    assert view._settings.intent.overlay.calibration.offset_y == OverlayCalibration().offset_y
-    assert view._settings.intent.overlay.desktop_flet.position.x is None
-    assert view._settings.intent.overlay.desktop_flet.position.y is None
+    assert (
+        settings_events.settings.intent.overlay.calibration.offset_y
+        == OverlayCalibration().offset_y
+    )
+    assert settings_events.settings.intent.overlay.desktop_flet.position.x is None
+    assert settings_events.settings.intent.overlay.desktop_flet.position.y is None
     assert view._desktop_overlay_lock_button.content.value == t(
         "settings.overlay.desktop.lock.value.move"
     )
@@ -4562,7 +4904,7 @@ def test_overlay_position_reset_card_separates_vr_and_desktop_reset_actions(
 
 
 def test_desktop_gui_runtime_position_reset_defers_to_callback_without_stale_emit(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, overlay_pos_x=80)
@@ -4571,9 +4913,9 @@ def test_desktop_gui_runtime_position_reset_defers_to_callback_without_stale_emi
     settings = _vnext(settings, overlay_background_alpha=0.44)
     changed: list[AppSettingsVNext] = []
     desktop_resets: list[bool] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
     view.on_desktop_overlay_position_reset = lambda: desktop_resets.append(True)
 
     view._on_desktop_overlay_position_reset(None)
@@ -4589,16 +4931,15 @@ def test_desktop_gui_runtime_position_reset_defers_to_callback_without_stale_emi
 
     view._on_overlay_translation_selected("off")
 
-    assert changed
-    assert changed[-1] is not settings
-    assert changed[-1].intent.overlay.desktop_flet.position.x is None
-    assert changed[-1].intent.overlay.desktop_flet.position.y is None
-    assert changed[-1].intent.overlay.desktop_flet.size_preset == "large"
-    assert changed[-1].intent.overlay.desktop_flet.visual.background_alpha == 0.44
+    assert settings_events.immediate_intents == [OverlayTranslationSettingsIntent(False)]
+    assert changed[-1].intent.overlay.show_translation is False
+    assert view._desktop_overlay_lock_button.content.value == t(
+        "settings.overlay.desktop.lock.value.move"
+    )
 
 
 def test_overlay_failure_i18n_desktop_gui_recovery_actions_are_user_facing(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     previous_locale = i18n_module.get_locale()
     try:
@@ -4607,8 +4948,8 @@ def test_overlay_failure_i18n_desktop_gui_recovery_actions_are_user_facing(
         settings = _vnext(settings, overlay_target="desktop")
         recovery_actions: list[str] = []
         details_opened: list[bool] = []
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(settings, config_path=Path("settings.json"))
+        view, _ = _make_settings_view(monkeypatch, settings_events)
+        settings_events.load(view, settings, config_path=Path("settings.json"))
         view.on_desktop_overlay_recovery_action = recovery_actions.append
         view.on_view_logs = lambda: details_opened.append(True)
 
@@ -4665,19 +5006,21 @@ def test_overlay_failure_i18n_desktop_gui_recovery_actions_are_user_facing(
         i18n_module.set_locale(previous_locale)
 
 
-def test_audio_change_updates_desktop_loopback_controls(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_audio_change_updates_desktop_loopback_controls(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._audio_settings.desktop_output_device = "Speakers (Loopback)"
     view._on_audio_change()
     view._handle_peer_vad_change(SimpleNamespace(control=SimpleNamespace(value=0.72)))
 
-    assert view._settings.intent.desktop_audio.output_device == "Speakers (Loopback)"
-    assert view._settings.intent.desktop_audio.vad_speech_threshold == 0.72
+    assert settings_events.settings.intent.desktop_audio.output_device == "Speakers (Loopback)"
+    assert settings_events.settings.intent.desktop_audio.vad_speech_threshold == 0.72
     assert len(changed) == 2
     assert all(incoming is not settings for incoming in changed)
     assert changed[-1].intent.desktop_audio.output_device == "Speakers (Loopback)"
@@ -4685,11 +5028,11 @@ def test_audio_change_updates_desktop_loopback_controls(monkeypatch: pytest.Monk
 
 
 def test_api_translation_connection_row_places_cloud_free_tier_card(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
 
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     cards = _row_cards(view._translation_connection_row)
 
     assert len(cards) == 3
@@ -4714,10 +5057,11 @@ def test_api_translation_connection_row_places_cloud_free_tier_card(
 
 
 def test_soniox_speaker_detection_toggle_follows_peer_provider_and_preserves_draft(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(
+        view,
         _vnext(stt_provider="soniox", peer_stt_provider="deepgram"),
         config_path=Path("settings.json"),
     )
@@ -4756,13 +5100,12 @@ def test_soniox_speaker_detection_toggle_follows_peer_provider_and_preserves_dra
 
 @pytest.mark.parametrize("locale", ["en", "ko", "ja", "ru", "zh-CN"])
 def test_general_osc_card_is_locale_independent(
-    monkeypatch: pytest.MonkeyPatch,
-    locale: str,
+    monkeypatch: pytest.MonkeyPatch, locale: str, settings_events
 ) -> None:
     old_locale = i18n_module.get_locale()
     try:
         i18n_module.set_locale(locale)
-        view, _ = _make_settings_view(monkeypatch)
+        view, _ = _make_settings_view(monkeypatch, settings_events)
         general_row = _subtab_controls(view, "general")[0]
         api_row = view._translation_connection_row
 
@@ -4784,9 +5127,9 @@ def test_general_osc_card_is_locale_independent(
 
 
 def test_audio_test_card_click_invokes_start_callback_without_modal(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     calls: list[str] = []
     view.on_start_audio_test = lambda: calls.append("start")
     modal_calls: list[str] = []
@@ -4804,9 +5147,9 @@ def test_audio_test_card_click_invokes_start_callback_without_modal(
 
 
 def test_audio_test_card_clicks_always_request_start_without_inline_state(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     card = _general_tab_card(view, t("settings.audio_test"))
     calls: list[str] = []
     view.on_start_audio_test = lambda: calls.append("start")
@@ -4823,9 +5166,9 @@ def test_audio_test_card_clicks_always_request_start_without_inline_state(
 
 
 def test_api_tab_places_independent_managed_key_card_above_api_keys(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     api_controls = _subtab_controls(view, "api")
 
     assert len(api_controls) == 9
@@ -4866,11 +5209,11 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
 
 
 def test_api_tab_primary_value_typography_is_consistent_across_rows(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert {
         _container_text_size(view._stt_text),
@@ -4882,9 +5225,9 @@ def test_api_tab_primary_value_typography_is_consistent_across_rows(
 
 
 def test_general_tab_host_api_card_exposes_host_api_only(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     host_api_card = _general_tab_card(view, t("settings.audio_host_api"))
     host_api_labels = _control_labels(host_api_card)
 
@@ -4894,9 +5237,9 @@ def test_general_tab_host_api_card_exposes_host_api_only(
 
 
 def test_general_tab_microphone_audio_card_exposes_microphone_only(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     mic_audio_card = _general_tab_card(view, t("settings.section.microphone_audio"))
     mic_audio_labels = _control_labels(mic_audio_card)
 
@@ -4906,9 +5249,9 @@ def test_general_tab_microphone_audio_card_exposes_microphone_only(
 
 
 def test_general_tab_loopback_audio_card_exposes_loopback_device_only(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     loopback_audio_card = _general_tab_card(view, t("settings.section.loopback_audio"))
     loopback_audio_labels = _control_labels(loopback_audio_card)
 
@@ -4917,9 +5260,9 @@ def test_general_tab_loopback_audio_card_exposes_loopback_device_only(
 
 
 def test_general_tab_self_vad_card_contains_only_self_vad_slider(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     self_vad_card = _general_tab_card(view, t("settings.section.self_vad_sensitivity"))
 
     assert _tree_contains_control(self_vad_card, view._vad_slider)
@@ -4927,9 +5270,9 @@ def test_general_tab_self_vad_card_contains_only_self_vad_slider(
 
 
 def test_general_tab_peer_vad_card_contains_peer_fields_only(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     peer_vad_card = _general_tab_card(view, t("settings.section.peer_vad_sensitivity"))
     peer_vad_labels = _control_labels(peer_vad_card)
 
@@ -4939,9 +5282,9 @@ def test_general_tab_peer_vad_card_contains_peer_fields_only(
 
 
 def test_overlay_tab_uses_target_specific_unit_card_rows(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     overlay_titles = _overlay_tab_card_titles(view)
     overlay_controls = _subtab_controls(view, "overlay")
@@ -4996,12 +5339,12 @@ def test_overlay_tab_uses_target_specific_unit_card_rows(
 
 
 def test_apply_locale_updates_general_clickable_value_fonts_to_zh_cn(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, locale="en")
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     zh_font = font_for_language("zh-CN")
     assert zh_font is not None
@@ -5026,12 +5369,12 @@ def test_apply_locale_updates_general_clickable_value_fonts_to_zh_cn(
 
 
 def test_apply_locale_updates_all_settings_clickable_value_fonts_to_zh_cn(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, locale="ko")
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     zh_font = font_for_language("zh-CN")
     assert zh_font is not None
@@ -5062,13 +5405,13 @@ def test_apply_locale_updates_all_settings_clickable_value_fonts_to_zh_cn(
 
 
 def test_apply_locale_relocalizes_chatgpt_account_card(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     previous_locale = i18n_module.get_locale()
     i18n_module.set_locale("en")
     try:
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+        view, _ = _make_settings_view(monkeypatch, settings_events)
+        settings_events.load(view, AppSettingsVNext(), config_path=Path("settings.json"))
         view._on_llm_selected(TranslationModel.GPT_6_LUNA.value)
 
         i18n_module.set_locale("ko")
@@ -5102,9 +5445,10 @@ def test_signed_in_chatgpt_card_shows_account_line_instead_of_description(
     monkeypatch: pytest.MonkeyPatch,
     email: str | None,
     expected_text: Callable[[], str],
+    settings_events,
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, AppSettingsVNext(), config_path=Path("settings.json"))
     view._on_llm_selected(TranslationModel.GPT_6_LUNA.value)
     view._chatgpt_intents = SimpleNamespace(
         account_snapshot=lambda: ChatGptAccountSnapshot(signed_in=True, email=email)
@@ -5131,61 +5475,61 @@ def test_signed_in_chatgpt_card_shows_account_line_instead_of_description(
 
 
 def test_overlay_distance_step_buttons_apply_immediately(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_overlay_distance_step(0.05)
     view._on_overlay_distance_step(0.20)
 
-    assert view._settings.intent.overlay.calibration.distance == 1.35
+    assert settings_events.settings.intent.overlay.calibration.distance == 1.35
     assert view._overlay_distance_value_text.value == "1.35"
 
 
 def test_overlay_offset_step_buttons_apply_immediately(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_overlay_offset_x_step(0.05)
     view._on_overlay_offset_y_step(-0.05)
 
-    assert view._settings.intent.overlay.calibration.offset_x == 0.05
-    assert view._settings.intent.overlay.calibration.offset_y == -0.50
+    assert settings_events.settings.intent.overlay.calibration.offset_x == 0.05
+    assert settings_events.settings.intent.overlay.calibration.offset_y == -0.50
     assert view._overlay_offset_x_value_text.value == "0.05"
     assert view._overlay_offset_y_value_text.value == "-0.50"
 
 
 def test_overlay_calibration_hides_background_alpha_control(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, AppSettingsVNext(), config_path=Path("settings.json"))
 
     assert not hasattr(view, "_overlay_background_alpha_field")
     assert not hasattr(view, "_overlay_background_alpha_label")
 
 
 def test_overlay_reset_card_restores_defaults_immediately(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, overlay_distance=1.2)
     settings = _vnext(settings, overlay_offset_y=0.5)
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view.set_overlay_calibration(settings.intent.overlay.calibration)
 
     defaults = OverlayCalibration()
 
     view._on_overlay_position_reset(None)
 
-    assert view._settings.intent.overlay.calibration.distance == defaults.distance
-    assert view._settings.intent.overlay.calibration.offset_y == -0.45
+    assert settings_events.settings.intent.overlay.calibration.distance == defaults.distance
+    assert settings_events.settings.intent.overlay.calibration.offset_y == -0.45
     assert view._overlay_distance_value_text.value == view._format_overlay_calibration_number(
         defaults.distance
     )
@@ -5195,12 +5539,12 @@ def test_overlay_reset_card_restores_defaults_immediately(
 
 
 def test_overlay_tab_cards_use_settings_unit_card_defaults(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
     from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     overlay_cards = _overlay_tab_cards(view)
     assert all(isinstance(card, SharedCardWrapper) for card in overlay_cards)
@@ -5219,98 +5563,61 @@ def test_overlay_tab_cards_use_settings_unit_card_defaults(
 
 
 @pytest.mark.parametrize(
-    (
-        "title_key",
-        "decrease_name",
-        "increase_name",
-        "value_name",
-        "left_glyph",
-        "right_glyph",
-    ),
+    ("field", "title_key", "left_glyph", "right_glyph", "initial", "decreased"),
     [
-        pytest.param(
-            "settings.overlay.calibration.distance",
-            "_overlay_distance_decrease_button",
-            "_overlay_distance_increase_button",
-            "_overlay_distance_value_text",
-            "－",
-            "＋",
-            id="distance",
-        ),
-        pytest.param(
-            "settings.overlay.calibration.offset_x",
-            "_overlay_offset_x_decrease_button",
-            "_overlay_offset_x_increase_button",
-            "_overlay_offset_x_value_text",
-            "◀",
-            "▶",
-            id="offset_x",
-        ),
-        pytest.param(
-            "settings.overlay.calibration.offset_y",
-            "_overlay_offset_y_decrease_button",
-            "_overlay_offset_y_increase_button",
-            "_overlay_offset_y_value_text",
-            "▲",
-            "▼",
-            id="offset_y",
-        ),
+        ("distance", "settings.overlay.calibration.distance", "－", "＋", "1.25", "1.20"),
+        ("offset_x", "settings.overlay.calibration.offset_x", "◀", "▶", "0.20", "0.15"),
+        ("offset_y", "settings.overlay.calibration.offset_y", "▲", "▼", "-0.30", "-0.35"),
     ],
 )
-def test_overlay_stepper_cards_use_inline_value_layout(
+def test_overlay_stepper_controls_emit_and_display_both_directions(
     monkeypatch: pytest.MonkeyPatch,
+    settings_events,
+    field: str,
     title_key: str,
-    decrease_name: str,
-    increase_name: str,
-    value_name: str,
     left_glyph: str,
     right_glyph: str,
+    initial: str,
+    decreased: str,
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings = _vnext(overlay_distance=1.25, overlay_offset_x=0.20, overlay_offset_y=-0.30)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     card = _overlay_tab_card(view, t(title_key))
-    card_stack = _wrapped_card_stack(card)
-    column = _wrapped_card_column(card)
-    value_row = column.controls[1].content
-    decrease_button = getattr(view, decrease_name)
-    increase_button = getattr(view, increase_name)
-    value_container = value_row.controls[1]
+    decrease = getattr(view, f"_overlay_{field}_decrease_button")
+    increase = getattr(view, f"_overlay_{field}_increase_button")
+    value = getattr(view, f"_overlay_{field}_value_text")
 
-    assert isinstance(card_stack, ft.Stack)
-    assert card_stack.fit == ft.StackFit.EXPAND
-    click_row = card_stack.controls[0]
-    visual_layer = card_stack.controls[1]
+    assert _tree_contains_control(card, decrease)
+    assert _tree_contains_control(card, increase)
+    assert _tree_contains_control(card, value)
+    assert {left_glyph, right_glyph} <= set(_control_labels(card))
+    assert value.value == initial
+    assert not decrease.disabled
+    assert not increase.disabled
 
-    assert isinstance(click_row, ft.Row)
-    assert click_row.expand == 1
-    assert click_row.spacing == 0
-    assert click_row.vertical_alignment == ft.CrossAxisAlignment.STRETCH
-    assert click_row.controls[0] is decrease_button
-    assert click_row.controls[1] is increase_button
-    assert isinstance(visual_layer, ft.TransparentPointer)
-    assert visual_layer.content is column
-    assert isinstance(value_row, ft.Row)
-    assert value_row.controls[1].content is getattr(view, value_name)
-    assert value_row.spacing == 4
-    assert value_container.width == 84
-    assert isinstance(decrease_button, ft.Container)
-    assert isinstance(increase_button, ft.Container)
-    assert decrease_button.expand == 1
-    assert decrease_button.width is None
-    assert decrease_button.height is None
-    assert increase_button.expand == 1
-    assert increase_button.width is None
-    assert increase_button.height is None
-    assert value_row.controls[0].content.value == left_glyph
-    assert value_row.controls[0].alignment == ft.Alignment.CENTER_RIGHT
-    assert value_row.controls[2].content.value == right_glyph
-    assert value_row.controls[2].alignment == ft.Alignment.CENTER_LEFT
+    decrease.on_click(None)
+
+    assert value.value == decreased
+    assert len(settings_events.immediate_intents) == 1
+    assert getattr(settings_events.settings.intent.overlay.calibration, field) == pytest.approx(
+        float(decreased)
+    )
+    assert getattr(settings.intent.overlay.calibration, field) == float(initial)
+
+    increase.on_click(None)
+
+    assert value.value == initial
+    assert len(settings_events.immediate_intents) == 2
+    assert getattr(settings_events.settings.intent.overlay.calibration, field) == pytest.approx(
+        float(initial)
+    )
 
 
 def test_translation_card_no_longer_contains_translation_connection_row(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     translation_card = _api_tab_card(view, t("settings.section.translation"))
     translation_column = translation_card.content.content
@@ -5320,9 +5627,9 @@ def test_translation_card_no_longer_contains_translation_connection_row(
 
 @pytest.mark.asyncio
 async def test_verify_key_reports_unavailable_or_provider_result(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     unavailable = await view._verify_key("google", "abc")
     assert unavailable == (False, "Verification not available")
 
@@ -5334,12 +5641,14 @@ async def test_verify_key_reports_unavailable_or_provider_result(
     assert available == (True, "abc")
 
 
-def test_prompt_change_only_updates_draft_until_commit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_prompt_change_only_updates_draft_until_commit(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     original_prompt = settings.intent.prompts.system_prompt_override
     view._on_prompt_change("custom prompt")
@@ -5349,20 +5658,25 @@ def test_prompt_change_only_updates_draft_until_commit(monkeypatch: pytest.Monke
     assert settings.intent.prompts.system_prompt_override == original_prompt
     assert view.has_pending_prompt_changes is True
     assert pending is not None
-    assert pending.intent.prompts.system_prompt_override == "custom prompt"
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.prompts.system_prompt_override
+        == "custom prompt"
+    )
 
     assert changed == []
 
 
 def test_prompt_commit_preserves_peer_local_qwen_before_emit(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, peer_stt_provider=STTProviderName.LOCAL_QWEN)
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_prompt_change("custom prompt")
     view._on_prompt_commit("custom prompt")
@@ -5374,12 +5688,14 @@ def test_prompt_commit_preserves_peer_local_qwen_before_emit(
     assert changed[-1].intent.prompts.system_prompt_override == "custom prompt"
 
 
-def test_prompt_commit_noops_when_value_is_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_prompt_commit_noops_when_value_is_unchanged(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     current_prompt = view._prompt_editor.value
     view._on_prompt_commit(current_prompt)
@@ -5389,13 +5705,13 @@ def test_prompt_commit_noops_when_value_is_unchanged(monkeypatch: pytest.MonkeyP
 
 
 def test_prompt_reverting_to_committed_value_clears_pending_state(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     original_prompt = view._prompt_editor.value
 
@@ -5410,24 +5726,25 @@ def test_prompt_reverting_to_committed_value_clears_pending_state(
 
 
 def test_refresh_prompt_if_empty_displays_default_without_staging_override(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
-    blank_prompt_settings = view._settings
-    view._settings = replace(
-        blank_prompt_settings,
-        intent=replace(
-            blank_prompt_settings.intent,
-            prompts=replace(
-                blank_prompt_settings.intent.prompts,
-                system_prompt_override=None,
+    blank_prompt_settings = settings_events.settings
+    settings_events.load(
+        view,
+        replace(
+            blank_prompt_settings,
+            intent=replace(
+                blank_prompt_settings.intent,
+                prompts=replace(blank_prompt_settings.intent.prompts, system_prompt_override=None),
             ),
         ),
+        config_path=Path("settings.json"),
     )
-    view._provider_settings_draft = None
+    view._provider_draft = None
     view.has_provider_changes = False
     view.has_pending_prompt_changes = False
     view._prompt_editor.value = ""
@@ -5438,11 +5755,18 @@ def test_refresh_prompt_if_empty_displays_default_without_staging_override(
     assert bool(view._prompt_editor.value.strip())
     assert view.has_pending_prompt_changes is False
     assert pending is not None
-    assert pending.intent.prompts.system_prompt_override is None
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.prompts.system_prompt_override
+        is None
+    )
 
 
-def test_on_text_hover_updates_container_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+def test_on_text_hover_updates_container_once(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     updates: list[str] = []
     text_control = SimpleNamespace(color=settings_view.COLOR_ON_BACKGROUND)
     container = SimpleNamespace(
@@ -5457,11 +5781,11 @@ def test_on_text_hover_updates_container_once(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_apply_locale_refreshes_deepseek_api_key_field(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     calls: list[str] = []
     view._deepseek_key.apply_locale = lambda: calls.append("deepseek")
 
@@ -5471,20 +5795,22 @@ def test_apply_locale_refreshes_deepseek_api_key_field(
 
 
 def test_settings_view_does_not_create_peer_deepgram_model_controls(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     assert not hasattr(view, "_peer_deepgram_model_label")
     assert not hasattr(view, "_peer_deepgram_model_text")
 
 
-def test_on_vrc_mic_click_toggles_without_page(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_on_vrc_mic_click_toggles_without_page(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     settings = _vnext(vrc_mic_intercept=False)
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
     modal_calls: list[str] = []
 
     class DummyModal:
@@ -5496,7 +5822,7 @@ def test_on_vrc_mic_click_toggles_without_page(monkeypatch: pytest.MonkeyPatch) 
     view._on_vrc_mic_click(None)
 
     assert settings.intent.osc.vrc_mic_intercept is False
-    assert view._settings.intent.osc.vrc_mic_intercept is True
+    assert settings_events.settings.intent.osc.vrc_mic_intercept is True
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
     assert len(changed) == 1
     assert changed[0].intent.osc.vrc_mic_intercept is True
@@ -5504,13 +5830,13 @@ def test_on_vrc_mic_click_toggles_without_page(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_on_vrc_mic_click_toggles_immediately_without_modal(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(vrc_mic_intercept=True)
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
     attach_dummy_page(monkeypatch, view)
 
     modal_calls: list[str] = []
@@ -5528,7 +5854,7 @@ def test_on_vrc_mic_click_toggles_immediately_without_modal(
     view._on_vrc_mic_click(None)
 
     assert settings.intent.osc.vrc_mic_intercept is True
-    assert view._settings.intent.osc.vrc_mic_intercept is False
+    assert settings_events.settings.intent.osc.vrc_mic_intercept is False
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.off")
     assert len(changed) == 1
     assert changed[0].intent.osc.vrc_mic_intercept is False
@@ -5536,31 +5862,31 @@ def test_on_vrc_mic_click_toggles_immediately_without_modal(
 
 
 def test_on_vrc_mic_selected_updates_setting_label_and_emits_change(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
     attach_dummy_page(monkeypatch, view)
     monkeypatch.setattr(type(view._vrc_mic_text), "update", lambda self: None)
 
     view._on_vrc_mic_selected("on")
 
     assert settings.intent.osc.vrc_mic_intercept is False
-    assert view._settings.intent.osc.vrc_mic_intercept is True
+    assert settings_events.settings.intent.osc.vrc_mic_intercept is True
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
     assert len(changed) == 1
     assert changed[0].intent.osc.vrc_mic_intercept is True
 
 
 def test_on_vrc_mic_selected_without_settings_returns_early(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch)
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.on_change = lambda incoming: changed.append(incoming)
 
     view._on_vrc_mic_selected("on")
 
@@ -5568,7 +5894,7 @@ def test_on_vrc_mic_selected_without_settings_returns_early(
 
 
 def test_custom_vocabulary_loads_current_source_language_bucket_as_tags(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.SONIOX)
@@ -5576,8 +5902,8 @@ def test_custom_vocabulary_loads_current_source_language_bucket_as_tags(
     settings = _vnext(settings, custom_vocabulary_enabled=True)
     settings = _vnext(settings, custom_terms={"ko": ["Puripuly", "VRChat"], "en": ["Avatar"]})
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     custom_vocab_card = _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
 
     assert _tree_contains_control(custom_vocab_card, view._custom_vocab_tag_editor)
@@ -5597,23 +5923,22 @@ def test_custom_vocabulary_loads_current_source_language_bucket_as_tags(
     ["ko", "en", "zh-CN", "ja"],
 )
 def test_custom_vocabulary_loads_empty_tags_for_fresh_settings(
-    monkeypatch: pytest.MonkeyPatch,
-    source_language: str,
+    monkeypatch: pytest.MonkeyPatch, source_language: str, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language=source_language)
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert _custom_vocab_chip_terms(view) == []
     assert view._custom_vocab_tag_editor._chips_wrap.visible is False  # noqa: SLF001
 
 
 def test_custom_vocabulary_card_shows_one_line_provider_support_helper(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     custom_vocab_card = _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
     custom_vocab_column = _wrapped_card_column(custom_vocab_card)
@@ -5630,10 +5955,12 @@ def test_custom_vocabulary_card_shows_one_line_provider_support_helper(
     assert t("settings.custom_vocabulary_tooltip") not in _control_tooltips(custom_vocab_card)
 
 
-def test_prompt_tab_uses_shared_full_width_cards(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_prompt_tab_uses_shared_full_width_cards(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     prompt_cards = _subtab_controls(view, "prompt")
 
@@ -5644,7 +5971,7 @@ def test_prompt_tab_uses_shared_full_width_cards(monkeypatch: pytest.MonkeyPatch
 
 
 def test_prompt_tab_hides_prompt_provider_copy_and_old_language_helper_text(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, locale="ko")
@@ -5653,8 +5980,8 @@ def test_prompt_tab_hides_prompt_provider_copy_and_old_language_helper_text(
 
     old_locale = i18n_module.get_locale()
     try:
-        view, _ = _make_settings_view(monkeypatch)
-        view.load_from_settings(settings, config_path=Path("settings.json"))
+        view, _ = _make_settings_view(monkeypatch, settings_events)
+        settings_events.load(view, settings, config_path=Path("settings.json"))
 
         i18n_module.set_locale("ko")
         view.apply_locale()
@@ -5671,11 +5998,11 @@ def test_prompt_tab_hides_prompt_provider_copy_and_old_language_helper_text(
 
 
 def test_settings_api_unit_cards_use_settings_unit_card_defaults(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
 
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     unit_cards = [
         _api_tab_card(view, t("settings.section.stt")),
@@ -5690,11 +6017,11 @@ def test_settings_api_unit_cards_use_settings_unit_card_defaults(
 
 
 def test_general_cards_use_settings_unit_card_defaults(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
 
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     general_cards = [
         _general_tab_card(view, t("settings.section.ui")),
@@ -5716,10 +6043,12 @@ def test_general_cards_use_settings_unit_card_defaults(
     assert view._translation_connection_row.height is None
 
 
-def test_api_keys_card_uses_shared_full_width_auto_height(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_api_keys_card_uses_shared_full_width_auto_height(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
     from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     api_card = _api_tab_card(view, t("settings.section.api_keys"))
 
@@ -5729,14 +6058,14 @@ def test_api_keys_card_uses_shared_full_width_auto_height(monkeypatch: pytest.Mo
 
 
 def test_api_keys_card_omits_helper_copy_and_keeps_qwen_region_button_in_header(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, llm=LLMProviderName.QWEN)
     settings = _vnext(settings, qwen_region=QwenRegion.SINGAPORE)
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     api_card = _api_tab_card(view, t("settings.section.api_keys"))
     api_column = _wrapped_card_column(api_card)
@@ -5751,9 +6080,9 @@ def test_api_keys_card_omits_helper_copy_and_keeps_qwen_region_button_in_header(
 
 
 def test_api_provider_row_does_not_override_shared_card_height(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     api_provider_row = _subtab_controls(view, "api")[0]
 
@@ -5761,9 +6090,9 @@ def test_api_provider_row_does_not_override_shared_card_height(
 
 
 def test_integrated_context_controls_are_removed_from_overlay_tab(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     overlay_labels: list[str] = []
     for control in _subtab_controls(view, "overlay"):
@@ -5775,19 +6104,20 @@ def test_integrated_context_controls_are_removed_from_overlay_tab(
 
 
 def test_custom_vocabulary_switching_source_language_updates_tags_and_clears_add_input(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language="ko")
     settings = _vnext(settings, custom_terms={"ko": ["Puripuly"], "en": ["Avatar", "OSC"]})
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     assert _custom_vocab_chip_terms(view) == ["Puripuly"]
     view._custom_vocab_tag_editor._input_field.value = "unsubmitted hint"  # noqa: SLF001
 
     settings = _vnext(settings, source_language="en")
-    view.load_from_settings(
+    settings_events.load(
+        view,
         settings,
         config_path=Path("settings.json"),
         preserve_custom_vocab_draft=True,
@@ -5798,18 +6128,19 @@ def test_custom_vocabulary_switching_source_language_updates_tags_and_clears_add
 
 
 def test_custom_vocabulary_preserve_reload_discards_unsubmitted_add_input(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language="ko")
     settings = _vnext(settings, custom_terms={"ko": ["Puripuly"], "en": ["Avatar"]})
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._custom_vocab_tag_editor._input_field.value = "VRChat"  # noqa: SLF001
 
     settings = _vnext(settings, source_language="en")
-    view.load_from_settings(
+    settings_events.load(
+        view,
         settings,
         config_path=Path("settings.json"),
         preserve_custom_vocab_draft=True,
@@ -5819,7 +6150,8 @@ def test_custom_vocabulary_preserve_reload_discards_unsubmitted_add_input(
 
     settings = _vnext(settings, source_language="ko")
     view._custom_vocab_tag_editor._input_field.value = "Puripuly draft"  # noqa: SLF001
-    view.load_from_settings(
+    settings_events.load(
+        view,
         settings,
         config_path=Path("settings.json"),
         preserve_custom_vocab_draft=True,
@@ -5830,26 +6162,26 @@ def test_custom_vocabulary_preserve_reload_discards_unsubmitted_add_input(
 
 
 def test_custom_vocabulary_default_load_refreshes_from_settings(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language="ko")
     settings = _vnext(settings, custom_terms={"ko": ["Puripuly"]})
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._custom_vocab_tag_editor.set_terms(["Puripuly", "VRChat"])
     view._custom_vocab_tag_editor._input_field.value = "unsubmitted"  # noqa: SLF001
 
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert _custom_vocab_chip_terms(view) == ["Puripuly"]
     assert view._custom_vocab_tag_editor._input_field.value == ""  # noqa: SLF001
 
 
 def test_custom_vocabulary_token_input_persists_unique_space_terms_and_emits_once(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language="ko")
@@ -5857,43 +6189,43 @@ def test_custom_vocabulary_token_input_persists_unique_space_terms_and_emits_onc
     settings = _vnext(settings, custom_vocabulary_enabled=False)
     changed: list[AppSettingsVNext] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = lambda incoming: changed.append(incoming)
     view._custom_vocab_tag_editor._input_field.value = " VRChat Soniox\nPuripuly "  # noqa: SLF001
 
     view._custom_vocab_tag_editor._input_field.on_change(None)  # noqa: SLF001
 
     assert view._custom_vocab_tag_editor.on_add_terms is not None
     assert view._custom_vocab_tag_editor._input_field.value == ""  # noqa: SLF001
-    assert view._settings.intent.stt.custom_vocabulary_enabled is True
-    assert view._settings.intent.stt.custom_terms == {
+    assert settings_events.settings.intent.stt.custom_vocabulary_enabled is True
+    assert settings_events.settings.intent.stt.custom_terms == {
         "ko": ["Puripuly", "VRChat", "Soniox"],
         "en": ["Avatar"],
     }
     assert _custom_vocab_chip_terms(view) == ["Puripuly", "VRChat", "Soniox"]
     assert len(changed) == 1
-    assert changed[-1].intent.stt.custom_terms == view._settings.intent.stt.custom_terms
+    assert changed[-1].intent.stt.custom_terms == settings_events.settings.intent.stt.custom_terms
     assert changed[-1].intent.stt.custom_vocabulary_enabled is True
 
 
 def test_custom_vocabulary_add_normalizes_direct_raw_terms_exact_case_sensitive(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language="ko")
     settings = _vnext(settings, custom_terms={"ko": ["Puripuly"], "en": ["Avatar"]})
     changed: list[AppSettingsVNext] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = changed.append
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = changed.append
     view._custom_vocab_tag_editor._input_field.value = "draft"  # noqa: SLF001
 
     view._on_custom_vocabulary_add_terms([" puripuly Puripuly\nPURIPULY ", " "])
 
     assert view._custom_vocab_tag_editor._input_field.value == ""  # noqa: SLF001
-    assert view._settings.intent.stt.custom_terms == {
+    assert settings_events.settings.intent.stt.custom_terms == {
         "ko": ["Puripuly", "puripuly", "PURIPULY"],
         "en": ["Avatar"],
     }
@@ -5902,7 +6234,7 @@ def test_custom_vocabulary_add_normalizes_direct_raw_terms_exact_case_sensitive(
 
 
 def test_custom_vocabulary_empty_and_duplicate_adds_clear_input_without_emit(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language="ko")
@@ -5910,9 +6242,9 @@ def test_custom_vocabulary_empty_and_duplicate_adds_clear_input_without_emit(
     settings = _vnext(settings, custom_vocabulary_enabled=True)
     changed: list[AppSettingsVNext] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = changed.append
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = changed.append
     view._custom_vocab_tag_editor._input_field.value = " Puripuly  Puripuly  \n "  # noqa: SLF001
 
     view._custom_vocab_tag_editor._input_field.on_change(None)  # noqa: SLF001
@@ -5924,16 +6256,16 @@ def test_custom_vocabulary_empty_and_duplicate_adds_clear_input_without_emit(
 
 
 def test_custom_vocabulary_typing_add_input_does_not_emit_or_persist(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language="ko")
     settings = _vnext(settings, custom_terms={"ko": ["Puripuly"], "en": ["Avatar"]})
     changed: list[AppSettingsVNext] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = changed.append
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = changed.append
 
     view._custom_vocab_tag_editor._input_field.value = "Puripuly\nVRChat"  # noqa: SLF001
 
@@ -5943,7 +6275,7 @@ def test_custom_vocabulary_typing_add_input_does_not_emit_or_persist(
 
 
 def test_custom_vocabulary_remove_control_persists_current_bucket_and_emits_once(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language="ko")
@@ -5951,22 +6283,22 @@ def test_custom_vocabulary_remove_control_persists_current_bucket_and_emits_once
     settings = _vnext(settings, custom_vocabulary_enabled=True)
     changed: list[AppSettingsVNext] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = changed.append
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = changed.append
 
     chip = view._custom_vocab_tag_editor._chips_wrap.controls[0]  # noqa: SLF001
     chip.on_click(None)
 
-    assert view._settings.intent.stt.custom_vocabulary_enabled is True
-    assert view._settings.intent.stt.custom_terms == {"ko": ["VRChat"], "en": ["Avatar"]}
+    assert settings_events.settings.intent.stt.custom_vocabulary_enabled is True
+    assert settings_events.settings.intent.stt.custom_terms == {"ko": ["VRChat"], "en": ["Avatar"]}
     assert _custom_vocab_chip_terms(view) == ["VRChat"]
     assert len(changed) == 1
-    assert changed[-1].intent.stt.custom_terms == view._settings.intent.stt.custom_terms
+    assert changed[-1].intent.stt.custom_terms == settings_events.settings.intent.stt.custom_terms
 
 
 def test_custom_vocabulary_remove_last_term_derives_disabled_state(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language="ko")
@@ -5974,21 +6306,21 @@ def test_custom_vocabulary_remove_last_term_derives_disabled_state(
     settings = _vnext(settings, custom_vocabulary_enabled=True)
     changed: list[AppSettingsVNext] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = changed.append
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = changed.append
 
     view._on_custom_vocabulary_remove_term("Puripuly")
 
-    assert view._settings.intent.stt.custom_terms == {"ko": [], "en": []}
-    assert view._settings.intent.stt.custom_vocabulary_enabled is False
+    assert settings_events.settings.intent.stt.custom_terms == {"ko": [], "en": []}
+    assert settings_events.settings.intent.stt.custom_vocabulary_enabled is False
     assert _custom_vocab_chip_terms(view) == []
     assert len(changed) == 1
     assert changed[-1].intent.stt.custom_vocabulary_enabled is False
 
 
 def test_custom_vocabulary_add_caps_partial_terms_and_shows_snackbar(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language="ko")
@@ -5998,18 +6330,18 @@ def test_custom_vocabulary_add_caps_partial_terms_and_shows_snackbar(
     changed: list[AppSettingsVNext] = []
     snackbars: list[tuple[str, str]] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = changed.append
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = changed.append
     view.show_snackbar = lambda msg, bg: snackbars.append((msg, bg))
 
     view._on_custom_vocabulary_add_terms(["fits overflow"])
 
-    assert view._settings.intent.stt.custom_terms == {
+    assert settings_events.settings.intent.stt.custom_terms == {
         "ko": [*existing_terms, "fits"],
         "en": ["Avatar"],
     }
-    assert view._settings.intent.stt.custom_vocabulary_enabled is True
+    assert settings_events.settings.intent.stt.custom_vocabulary_enabled is True
     assert _custom_vocab_chip_terms(view)[-1] == "fits"
     assert len(changed) == 1
     assert snackbars == [
@@ -6018,7 +6350,7 @@ def test_custom_vocabulary_add_caps_partial_terms_and_shows_snackbar(
 
 
 def test_custom_vocabulary_add_when_bucket_full_shows_limit_without_emit(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, source_language="ko")
@@ -6028,9 +6360,9 @@ def test_custom_vocabulary_add_when_bucket_full_shows_limit_without_emit(
     changed: list[AppSettingsVNext] = []
     snackbars: list[tuple[str, str]] = []
 
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    view.on_settings_changed = changed.append
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    settings_events.on_change = changed.append
     view.show_snackbar = lambda msg, bg: snackbars.append((msg, bg))
 
     view._on_custom_vocabulary_add_terms(["overflow"])
@@ -6045,11 +6377,11 @@ def test_custom_vocabulary_add_when_bucket_full_shows_limit_without_emit(
 
 
 def test_on_qwen_region_selected_updates_provider_draft(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     view._on_qwen_region_selected(QwenRegion.SINGAPORE.value)
 
@@ -6057,28 +6389,10 @@ def test_on_qwen_region_selected_updates_provider_draft(
     assert view._provider_draft.qwen_region is QwenRegion.SINGAPORE
 
 
-def test_settings_view_uses_generic_subtab_shell(monkeypatch: pytest.MonkeyPatch) -> None:
-    from puripuly_heart.ui.components.subtab_shell import TextSubtabShell
-
-    view, _ = _make_settings_view(monkeypatch)
-
-    assert view.scroll is None
-    assert view.controls == [view._settings_subtab_shell]
-    assert isinstance(view._settings_subtab_shell, TextSubtabShell)
-    assert isinstance(view._settings_subtab_shell.body_host, ft.Stack)
-    assert view._settings_subtab_shell.title_region is None
-    assert isinstance(view._settings_subtab_shell.body_region, ft.Container)
-    assert view._settings_subtab_shell.body_region.content is view._settings_subtab_shell.body_host
-    assert view._settings_subtab_shell.controls == [
-        view._settings_subtab_shell.body_region,
-        view._settings_subtab_shell.subtab_bar,
-    ]
-
-
 def test_settings_subtab_shell_preserves_per_tab_scroll_state(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     shell = view._settings_subtab_shell
 
     api_body = shell.body_by_key["api"]
@@ -6099,9 +6413,9 @@ def test_settings_subtab_shell_preserves_per_tab_scroll_state(
 
 
 def test_settings_subtab_shell_restores_scroll_on_tab_switch_for_mounted_body(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     shell = view._settings_subtab_shell
     api_body = shell.body_by_key["api"]
     scroll_calls: list[tuple[float, int]] = []
@@ -6121,9 +6435,9 @@ def test_settings_subtab_shell_restores_scroll_on_tab_switch_for_mounted_body(
 
 
 def test_settings_subtab_bar_matches_bottom_nav_family_structure(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     shell = view._settings_subtab_shell
     main_nav = BottomNavBar(on_change=lambda _idx: None)
 
@@ -6256,8 +6570,10 @@ def _provider_snapshot_with(
     return provider
 
 
-def test_self_stt_control_returns_single_unit_card(monkeypatch: pytest.MonkeyPatch) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+def test_self_stt_control_returns_single_unit_card(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     first = view.self_stt_control()
     second = view.self_stt_control()
     assert first is second
@@ -6266,11 +6582,11 @@ def test_self_stt_control_returns_single_unit_card(monkeypatch: pytest.MonkeyPat
 
 
 def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_rolling_on(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(stt_provider=STTProviderName.ROLLING_FREE.value)
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     assert view._gemini_transcribe_key.visible is True
     assert view._deepgram_key.visible is False
     assert view._elevenlabs_scribe_key.visible is False
@@ -6288,15 +6604,15 @@ def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_rolling_
             STTProviderName.DEEPGRAM.value,
         ],
     )
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     assert view._gemini_transcribe_key.visible is True
     assert view._deepgram_key.visible is True
     assert view._elevenlabs_scribe_key.visible is False
 
 
 def test_recommended_cloud_modal_places_qwen_audio_below_soniox(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     assert STTProviderName.ROLLING_FREE in settings_view._STT_UI_PROVIDERS
     assert settings_view._STT_SECTION_BY_PROVIDER[STTProviderName.SONIOX] == (
@@ -6321,7 +6637,7 @@ def test_recommended_cloud_modal_places_qwen_audio_below_soniox(
         recommended_cloud_providers.index(STTProviderName.SONIOX) + 1
     )
 
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     for provider in (
         STTProviderName.DEEPGRAM,
         STTProviderName.GEMINI_TRANSCRIBE,
@@ -6337,11 +6653,11 @@ def test_recommended_cloud_modal_places_qwen_audio_below_soniox(
 
 
 def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_peer_rolling(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(peer_stt_provider=STTProviderName.ROLLING_FREE.value)
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     assert view._gemini_transcribe_key.visible is True
     assert view._deepgram_key.visible is False
     assert view._elevenlabs_scribe_key.visible is False
@@ -6350,17 +6666,17 @@ def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_peer_rol
 
 
 def test_load_from_settings_keeps_provider_row_as_unit_cards(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(stt_provider=STTProviderName.ROLLING_FREE.value)
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     assert view.self_stt_control() is view._self_stt_card
     assert not hasattr(view, "_stt_rolling_switch")
 
 
 def test_cloud_free_tier_modal_is_single_column_multi_select(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     captured: dict[str, object] = {}
 
@@ -6374,9 +6690,10 @@ def test_cloud_free_tier_modal_is_single_column_multi_select(
             captured["current"] = current
 
     monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     attach_dummy_page(monkeypatch, view)
-    view.load_from_settings(
+    settings_events.load(
+        view,
         _vnext(stt_provider=STTProviderName.ROLLING_FREE.value),
         config_path=Path("settings.json"),
     )
@@ -6400,10 +6717,11 @@ def test_cloud_free_tier_modal_is_single_column_multi_select(
 
 
 def test_cloud_free_tier_selection_gates_member_api_keys(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(
+        view,
         _vnext(stt_provider=STTProviderName.ROLLING_FREE.value),
         config_path=Path("settings.json"),
     )
@@ -6425,10 +6743,10 @@ def test_cloud_free_tier_selection_gates_member_api_keys(
 
 
 def test_cloud_free_tier_change_applies_providers(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, AppSettingsVNext(), config_path=Path("settings.json"))
     applied: list[bool] = []
     view.on_providers_changed = lambda: applied.append(True)
 
@@ -6443,11 +6761,11 @@ def test_cloud_free_tier_change_applies_providers(
 
 
 def test_dedicated_deepgram_stt_still_shows_deepgram_key(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(stt_provider=STTProviderName.DEEPGRAM.value)
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._deepgram_key.visible is True
     assert view._gemini_transcribe_key.visible is False
@@ -6457,9 +6775,9 @@ def test_dedicated_deepgram_stt_still_shows_deepgram_key(
 
 
 def test_cloud_free_tier_card_is_inactive_without_auto_select(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
+    view, _ = _make_settings_view(monkeypatch, settings_events)
     attach_dummy_page(monkeypatch, view)
     captured: dict[str, object] = {}
 
@@ -6471,7 +6789,7 @@ def test_cloud_free_tier_card_is_inactive_without_auto_select(
             captured["opened"] = current
 
     monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+    settings_events.load(view, AppSettingsVNext(), config_path=Path("settings.json"))
 
     assert view._gemini_transcribe_key.visible is False
     assert view._deepgram_key.visible is False
@@ -6523,7 +6841,7 @@ def _make_provider_apply_app(
     view: settings_view.SettingsView,
     backend: ProviderApplyBackend,
 ) -> tuple[TranslatorApp, list[Callable[[], Awaitable[None]]]]:
-    view.build_provider_apply_settings = view._build_provider_apply_intent
+
     backend.view = view
     app = TranslatorApp.__new__(TranslatorApp)
     app._current_tab = 1
@@ -6548,20 +6866,22 @@ def _provider_baseline() -> AppSettingsVNext:
 
 def _stage_peer_provider(
     monkeypatch: pytest.MonkeyPatch,
+    settings_events,
     settings: AppSettingsVNext,
 ):
-    view, _store = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view, _store = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
     view._on_peer_stt_selected(STTProviderName.ROLLING_FREE.value)
     return view
 
 
 @pytest.mark.asyncio
 async def test_failed_provider_apply_retains_the_settings_draft(
+    settings_events,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     baseline = _provider_baseline()
-    view = _stage_peer_provider(monkeypatch, baseline)
+    view = _stage_peer_provider(monkeypatch, settings_events, baseline)
     backend = ProviderApplyBackend(baseline, result=False)
     app, scheduled = _make_provider_apply_app(view, backend)
 
@@ -6580,13 +6900,13 @@ async def test_failed_provider_apply_retains_the_settings_draft(
 
 @pytest.mark.asyncio
 async def test_provider_apply_preserves_unrelated_external_settings_edits(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     baseline = _provider_baseline()
-    view = _stage_peer_provider(monkeypatch, baseline)
+    view = _stage_peer_provider(monkeypatch, settings_events, baseline)
     latest = _vnext(baseline, locale="ja", target_language="fr")
     backend = ProviderApplyBackend(latest)
-    view.load_from_settings(latest, config_path=Path("settings.json"))
+    settings_events.load(view, latest, config_path=Path("settings.json"))
     app, scheduled = _make_provider_apply_app(view, backend)
 
     app._on_nav_change(0)
@@ -6599,17 +6919,17 @@ async def test_provider_apply_preserves_unrelated_external_settings_edits(
 
 @pytest.mark.asyncio
 async def test_provider_apply_uses_local_draft_over_same_field_external_edit(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     baseline = _provider_baseline()
-    view = _stage_peer_provider(monkeypatch, baseline)
+    view = _stage_peer_provider(monkeypatch, settings_events, baseline)
     latest = _vnext(
         baseline,
         peer_stt_provider=STTProviderName.DEEPGRAM.value,
         locale="ja",
     )
     backend = ProviderApplyBackend(latest)
-    view.load_from_settings(latest, config_path=Path("settings.json"))
+    settings_events.load(view, latest, config_path=Path("settings.json"))
     dialogs: list[object] = []
     attach_dummy_page(
         monkeypatch,
@@ -6629,7 +6949,7 @@ async def test_provider_apply_uses_local_draft_over_same_field_external_edit(
 
 @pytest.mark.asyncio
 async def test_translation_apply_clears_draft_after_history_order_changes(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     baseline = _vnext(
         model=TranslationModel.GEMINI_FLASH,
@@ -6639,8 +6959,8 @@ async def test_translation_apply_clears_draft_after_history_order_changes(
             TranslationModel.GEMINI_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
         },
     )
-    view, _store = _make_settings_view(monkeypatch)
-    view.load_from_settings(baseline, config_path=Path("settings.json"))
+    view, _store = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, baseline, config_path=Path("settings.json"))
     view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH_41.value)
     backend = ProviderApplyBackend(baseline)
     app, scheduled = _make_provider_apply_app(view, backend)
@@ -6660,10 +6980,11 @@ async def test_translation_apply_clears_draft_after_history_order_changes(
 
 @pytest.mark.asyncio
 async def test_successful_provider_apply_acknowledgement_clears_the_draft(
+    settings_events,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     baseline = _provider_baseline()
-    view = _stage_peer_provider(monkeypatch, baseline)
+    view = _stage_peer_provider(monkeypatch, settings_events, baseline)
     backend = ProviderApplyBackend(baseline)
     app, scheduled = _make_provider_apply_app(view, backend)
 
@@ -6676,10 +6997,11 @@ async def test_successful_provider_apply_acknowledgement_clears_the_draft(
 
 @pytest.mark.asyncio
 async def test_provider_apply_acknowledgement_preserves_edits_staged_while_pending(
+    settings_events,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     baseline = _provider_baseline()
-    view = _stage_peer_provider(monkeypatch, baseline)
+    view = _stage_peer_provider(monkeypatch, settings_events, baseline)
     backend = ProviderApplyBackend(baseline)
     backend.apply_started = asyncio.Event()
     backend.release_apply = asyncio.Event()
@@ -6705,10 +7027,11 @@ async def test_provider_apply_acknowledgement_preserves_edits_staged_while_pendi
 
 @pytest.mark.asyncio
 async def test_provider_apply_acknowledgement_preserves_a_newer_edit_to_the_same_field(
+    settings_events,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     baseline = _provider_baseline()
-    view = _stage_peer_provider(monkeypatch, baseline)
+    view = _stage_peer_provider(monkeypatch, settings_events, baseline)
     backend = ProviderApplyBackend(baseline)
     backend.apply_started = asyncio.Event()
     backend.release_apply = asyncio.Event()
@@ -6731,10 +7054,11 @@ async def test_provider_apply_acknowledgement_preserves_a_newer_edit_to_the_same
 
 @pytest.mark.asyncio
 async def test_provider_auto_apply_keeps_prompt_staged_after_request(
+    settings_events,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     baseline = _provider_baseline()
-    view = _stage_peer_provider(monkeypatch, baseline)
+    view = _stage_peer_provider(monkeypatch, settings_events, baseline)
     backend = ProviderApplyBackend(baseline)
     backend.apply_started = asyncio.Event()
     backend.release_apply = asyncio.Event()
@@ -6759,10 +7083,11 @@ async def test_provider_auto_apply_keeps_prompt_staged_after_request(
 
 @pytest.mark.asyncio
 async def test_provider_apply_acknowledgement_preserves_a_newer_prompt_edit(
+    settings_events,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     baseline = _provider_baseline()
-    view = _stage_peer_provider(monkeypatch, baseline)
+    view = _stage_peer_provider(monkeypatch, settings_events, baseline)
     view._on_prompt_change("FIRST PROMPT")
     backend = ProviderApplyBackend(baseline)
     backend.apply_started = asyncio.Event()
@@ -6821,6 +7146,7 @@ class PromptApplyBackend:
 
 def _make_prompt_apply_app(
     monkeypatch: pytest.MonkeyPatch,
+    settings_events,
 ) -> tuple[
     TranslatorApp,
     settings_view.SettingsView,
@@ -6828,25 +7154,22 @@ def _make_prompt_apply_app(
     list[Callable[[], Awaitable[None]]],
 ]:
     baseline = AppSettingsVNext()
-    view, _store = _make_settings_view(monkeypatch)
-    view.load_from_settings(baseline, config_path=Path("settings.json"))
+    view, _store = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, baseline, config_path=Path("settings.json"))
     backend = PromptApplyBackend(view, baseline)
     app, scheduled = _make_provider_apply_app(view, backend)
-    monkeypatch.setattr(
-        view,
-        "_emit_prompt_apply_settings",
-        lambda intent: app._on_prompt_apply_settings(intent),
-    )
+    view.on_prompt_apply_settings = app._on_prompt_apply_settings
     return app, view, backend, scheduled
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("apply_on_navigation", [False, True])
 async def test_prompt_apply_preserves_newer_uncommitted_edit_and_can_apply_it_later(
+    settings_events,
     monkeypatch: pytest.MonkeyPatch,
     apply_on_navigation: bool,
 ) -> None:
-    app, view, backend, scheduled = _make_prompt_apply_app(monkeypatch)
+    app, view, backend, scheduled = _make_prompt_apply_app(monkeypatch, settings_events)
 
     view._on_prompt_change("FIRST PROMPT")
     if apply_on_navigation:
@@ -6874,9 +7197,10 @@ async def test_prompt_apply_preserves_newer_uncommitted_edit_and_can_apply_it_la
 
 @pytest.mark.asyncio
 async def test_failed_prompt_apply_keeps_submitted_edit_for_retry(
+    settings_events,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _app, view, backend, scheduled = _make_prompt_apply_app(monkeypatch)
+    _app, view, backend, scheduled = _make_prompt_apply_app(monkeypatch, settings_events)
     backend.succeed = False
     backend.release_apply.set()
 
@@ -6900,10 +7224,11 @@ async def test_failed_prompt_apply_keeps_submitted_edit_for_retry(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("apply_on_navigation", [False, True])
 async def test_prompt_apply_uses_local_draft_over_external_prompt_edit(
+    settings_events,
     monkeypatch: pytest.MonkeyPatch,
     apply_on_navigation: bool,
 ) -> None:
-    app, view, backend, scheduled = _make_prompt_apply_app(monkeypatch)
+    app, view, backend, scheduled = _make_prompt_apply_app(monkeypatch, settings_events)
     view._on_prompt_change("LOCAL PROMPT")
     backend.settings = _vnext(backend.settings, system_prompt="EXTERNAL PROMPT", locale="ja")
     backend.refresh_settings_projection()
@@ -6946,10 +7271,10 @@ def _qwen_view_settings(
 
 
 def test_qwen_api_host_selects_its_region_and_disables_region_button(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(_qwen_view_settings(), config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, _qwen_view_settings(), config_path=Path("settings.json"))
     applied: list[None] = []
     view.on_providers_changed = lambda: applied.append(None)
 
@@ -6969,7 +7294,7 @@ def test_qwen_api_host_selects_its_region_and_disables_region_button(
     assert view._alibaba_key_beijing.visible is False
     assert len(applied) == 1
     pending = view.build_provider_apply_settings()
-    qwen = pending.intent.translation.qwen
+    qwen = apply_provider_intent(settings_events.settings, pending).intent.translation.qwen
     assert qwen.region == QwenRegion.SINGAPORE.value
     assert qwen.singapore.endpoint_mode == "workspace_dedicated"
     assert qwen.singapore.api_host == "work-9.ap-southeast-1.maas.aliyuncs.com"
@@ -6977,10 +7302,10 @@ def test_qwen_api_host_selects_its_region_and_disables_region_button(
 
 
 def test_invalid_qwen_api_host_is_rejected_without_staging_or_echo(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(_qwen_view_settings(), config_path=Path("settings.json"))
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, _qwen_view_settings(), config_path=Path("settings.json"))
     applied: list[None] = []
     view.on_providers_changed = lambda: applied.append(None)
     toasts: list[str] = []
@@ -6998,11 +7323,12 @@ def test_invalid_qwen_api_host_is_rejected_without_staging_or_echo(
 
 
 def test_clearing_qwen_api_host_returns_to_shared_and_enables_region_button(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     host = "work-1.cn-beijing.maas.aliyuncs.com"
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(
+        view,
         _qwen_view_settings(beijing_host=host),
         config_path=Path("settings.json"),
     )
@@ -7016,17 +7342,23 @@ def test_clearing_qwen_api_host_returns_to_shared_and_enables_region_button(
 
     assert view._qwen_region_btn.disabled is False
     pending = view.build_provider_apply_settings()
-    beijing = pending.intent.translation.qwen.beijing
+    beijing = apply_provider_intent(
+        settings_events.settings, pending
+    ).intent.translation.qwen.beijing
     assert (beijing.endpoint_mode, beijing.api_host) == ("legacy_shared", "")
-    assert pending.intent.translation.qwen.region == QwenRegion.BEIJING.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.qwen.region
+        == QwenRegion.BEIJING.value
+    )
 
 
 def test_region_button_shows_each_region_host_and_keeps_other_region(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     host = "work-1.cn-beijing.maas.aliyuncs.com"
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(
+        view,
         _qwen_view_settings(region=QwenRegion.SINGAPORE.value, beijing_host=host),
         config_path=Path("settings.json"),
     )
@@ -7039,15 +7371,21 @@ def test_region_button_shows_each_region_host_and_keeps_other_region(
     assert view._qwen_api_host.value == host
     assert view._qwen_region_btn.disabled is True
     pending = view.build_provider_apply_settings()
-    assert pending.intent.translation.qwen.beijing.api_host == host
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.qwen.beijing.api_host
+        == host
+    )
 
 
 def test_qwen_api_host_change_reverifies_region_key_after_apply(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     store = DummySecretStore({"alibaba_api_key_singapore": "sk-singapore"})
-    view, _ = _make_settings_view(monkeypatch, store)
-    view.load_from_settings(
+    view, _ = _make_settings_view(monkeypatch, settings_events, store)
+    settings_events.load(
+        view,
         _qwen_view_settings(region=QwenRegion.SINGAPORE.value),
         config_path=Path("settings.json"),
     )

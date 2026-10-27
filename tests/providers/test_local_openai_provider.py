@@ -289,29 +289,6 @@ async def test_httpx_local_client_treats_whitespace_key_as_empty(monkeypatch) ->
     assert fake_client.last_request["headers"] == {"Content-Type": "application/json"}
 
 
-@pytest.mark.asyncio
-async def test_local_translate_redacts_trimmed_configured_api_key(monkeypatch) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=500,
-        response_data={"error": {"message": "plain leaked token local-secret"}},
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(
-        base_url="http://localhost:11434/v1",
-        model="m",
-        api_key="  local-secret  ",
-    )
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert "local-secret" not in message
-    assert "[redacted]" not in message
-
-
 def test_httpx_local_client_disables_env_proxy_and_redirects(monkeypatch) -> None:
     fake_client = FakeAsyncClient()
     seen_kwargs: dict[str, object] = {}
@@ -385,435 +362,89 @@ async def test_local_translate_raises_on_non_200(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_local_translate_sanitizes_server_error_text(monkeypatch) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=500,
-        response_data=ValueError("not json"),
-        response_text="Authorization: Bearer secret http://127.0.0.1:11434/v1 body={...}",
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(
-        base_url="http://localhost:11434/v1", model="m", api_key="secret"
-    )
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert "secret" not in message
-    assert "127.0.0.1" not in message
-    assert "Bearer [redacted]" not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_sanitizes_echoed_request_body_fragments(monkeypatch) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=500,
-        response_data=ValueError("not json"),
-        response_text=(
-            'body={"model":"llama3.1:8b","messages":[{"role":"user","content":"hello"}],"think":false} '
-            'json={"messages":[{"role":"system","content":"SYSTEM"}],"think":false} '
-            'messages=[{"role":"user","content":"hello"}] '
-            'raw extra body {"think":false}'
-        ),
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(
-        base_url="http://localhost:11434/v1",
-        model="llama3.1:8b",
-        extra_body={"think": False},
-    )
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert "body=" not in message
-    assert "json=" not in message
-    assert "messages=" not in message
-    assert '"think"' not in message
-    assert "hello" not in message
-    assert "[request-body-redacted]" not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_sanitizes_colon_form_request_body_fragments(monkeypatch) -> None:
-    source_text = "SECRET_SOURCE_TEXT_DO_NOT_LEAK"
-    fake_client = FakeAsyncClient(
-        response_status=500,
-        response_data=ValueError("not json"),
-        response_text=(
-            'body: {"model":"m","messages":[{"role":"user","content":"SECRET_SOURCE_TEXT_DO_NOT_LEAK"}],'
-            '"think":false,"stream":false}'
-        ),
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(
-        base_url="http://localhost:11434/v1", model="m", extra_body={"think": False}
-    )
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text=source_text, system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert "body:" not in message
-    assert "messages" not in message
-    assert '"think"' not in message
-    assert source_text not in message
-    assert "[request-body-redacted]" not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_sanitizes_raw_json_request_body_fragments(monkeypatch) -> None:
-    source_text = "RAW_JSON_SOURCE_TEXT_DO_NOT_LEAK"
-    fake_client = FakeAsyncClient(
-        response_status=500,
-        response_data=ValueError("not json"),
-        response_text=(
-            '{"model":"m","messages":[{"role":"system","content":"SYSTEM"},'
-            '{"role":"user","content":"RAW_JSON_SOURCE_TEXT_DO_NOT_LEAK"}],"think":false}'
-        ),
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(
-        base_url="http://localhost:11434/v1", model="m", extra_body={"think": False}
-    )
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text=source_text, system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert "messages" not in message
-    assert '"think"' not in message
-    assert source_text not in message
-    assert "[request-body-redacted]" not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_sanitizes_plain_source_text_echo(monkeypatch) -> None:
-    source_text = "PLAIN_SOURCE_TEXT_DO_NOT_LEAK"
-    fake_client = FakeAsyncClient(
-        response_status=500,
-        response_data={"error": {"message": f"generation failed for input {source_text}"}},
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(base_url="http://localhost:11434/v1", model="m")
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text=source_text, system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert source_text not in message
-    assert "[source-text-redacted]" not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_redacts_plain_standalone_configured_model(monkeypatch) -> None:
-    model_name = "llama3.1:8b"
-    fake_client = FakeAsyncClient(
-        response_status=404,
-        response_data={"error": {"message": f"server could not load {model_name} for chat"}},
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(base_url="http://localhost:11434/v1", model=model_name)
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert model_name not in message
-    assert "server could not load [model-redacted] for chat" not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_redacts_configured_model_followed_by_period(monkeypatch) -> None:
-    model_name = "llama3.1:8b"
-    fake_client = FakeAsyncClient(
-        response_status=404,
-        response_data={"error": {"message": f"server could not load {model_name}."}},
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(base_url="http://localhost:11434/v1", model=model_name)
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert model_name not in message
-    assert "server could not load [model-redacted]." not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_redacts_configured_model_followed_by_trailing_colon(
-    monkeypatch,
+@pytest.mark.parametrize("status_code", [404, 500], ids=["missing-model", "server-failure"])
+async def test_local_http_failure_keeps_metadata_without_inspecting_private_body_and_recovers(
+    monkeypatch, caplog: pytest.LogCaptureFixture, status_code: int
 ) -> None:
-    model_name = "llama3.1:8b"
-    fake_client = FakeAsyncClient(
-        response_status=404,
-        response_data={"error": {"message": f"server could not load {model_name}: not found"}},
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(base_url="http://localhost:11434/v1", model=model_name)
+    private_detail = "PRIVATE_LOCAL_RESPONSE_BODY"
 
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
+    class PrivateFailureResponse:
+        @property
+        def status_code(self):
+            return status_code
+
+        @property
+        def text(self):
+            raise AssertionError("non-200 response text must not be inspected")
+
+        def json(self):
+            raise AssertionError("non-200 response JSON must not be inspected")
+
+        def __repr__(self):
+            return private_detail
+
+    responses = iter(
+        (
+            PrivateFailureResponse(),
+            FakeResponse(data={"choices": [{"message": {"content": "valid translation"}}]}),
         )
-
-    message = _native_error_text(exc_info.value)
-    assert model_name not in message
-    assert "server could not load [model-redacted]: not found" not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_redacts_short_standalone_model_without_corrupting_words(
-    monkeypatch,
-) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=404,
-        response_data={"error": {"message": "backend m failed with temporary mismatch"}},
     )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(base_url="http://localhost:11434/v1", model="m")
+    requests = []
+    fake_http = FakeAsyncClient()
 
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
+    async def post(url, **kwargs):
+        requests.append({"url": url, **kwargs})
+        return next(responses)
 
-    message = _native_error_text(exc_info.value)
-    assert "backend m failed" not in message
-    assert "backend [model-redacted] failed" not in message
-    assert "temporary mismatch" not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_redacts_multikey_formatted_extra_body_json(monkeypatch) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=500,
-        response_data={
-            "error": {
-                "message": 'provider echoed extras { "seed" : 42, "think" : false } after failure'
-            }
-        },
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
+    monkeypatch.setattr(fake_http, "post", post)
+    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_http)
     client = HttpxLocalOpenAIClient(
-        base_url="http://localhost:11434/v1",
-        model="m",
-        extra_body={"think": False, "seed": 42},
+        base_url="http://127.0.0.1:11434/v1",
+        model="private-model",
+        api_key="  private-local-key  ",
+        extra_body={"thinking": {"type": "disabled"}, "seed": 42},
     )
+    try:
+        with pytest.raises(LLMResponseError) as failure:
+            await client.translate(
+                text="PRIVATE_SOURCE",
+                system_prompt="PRIVATE_PROMPT",
+                source_language="ko",
+                target_language="en",
+            )
 
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
+        assert failure.value.status_code == status_code
+        assert len(requests) == 1
+        message = str(failure.value) + repr(failure.value) + _native_error_text(failure.value)
+        rendered = message + caplog.text
+        for forbidden in (
+            private_detail,
+            "PRIVATE_SOURCE",
+            "PRIVATE_PROMPT",
+            "private-model",
+            "private-local-key",
+            "127.0.0.1",
+            "thinking",
+            "[model-redacted]",
+            "[request-body-redacted]",
+            "[extra-body-redacted]",
+        ):
+            assert forbidden not in rendered
+
+        assert (
+            await client.translate(
+                text="valid successor",
+                system_prompt="Translate",
+                source_language="ko",
+                target_language="en",
+            )
+            == "valid translation"
         )
-
-    message = _native_error_text(exc_info.value)
-    assert '"seed" : 42' not in message
-    assert '"think" : false' not in message
-    assert "[extra-body-redacted]" not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_redacts_extra_body_key_value_fragments(monkeypatch) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=500,
-        response_data={
-            "error": {"message": "provider rejected think: false; seed=42; num_ctx = 2048"}
-        },
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(
-        base_url="http://localhost:11434/v1",
-        model="m",
-        extra_body={"think": False, "seed": 42, "num_ctx": 2048},
-    )
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert "think: false" not in message
-    assert "seed=42" not in message
-    assert "num_ctx = 2048" not in message
-    assert "[extra-body-redacted]" not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_redacts_nested_extra_body_jsonish_key_value_fragment(
-    monkeypatch,
-) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=500,
-        response_data={
-            "error": {
-                "message": 'provider rejected thinking: { "type" : "disabled" } after failure'
-            }
-        },
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(
-        base_url="http://localhost:11434/v1",
-        model="m",
-        extra_body={"thinking": {"type": "disabled"}},
-    )
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert 'thinking: { "type" : "disabled" }' not in message
-    assert "[extra-body-redacted]" not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_redacts_nested_extra_body_python_repr_key_value_fragment(
-    monkeypatch,
-) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=500,
-        response_data={
-            "error": {"message": "provider rejected thinking={'type': 'disabled'} after failure"}
-        },
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(
-        base_url="http://localhost:11434/v1",
-        model="m",
-        extra_body={"thinking": {"type": "disabled"}},
-    )
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert "thinking={'type': 'disabled'}" not in message
-    assert "[extra-body-redacted]" not in message
-
-
-@pytest.mark.asyncio
-async def test_local_translate_redacts_short_model_without_corrupting_ordinary_words(
-    monkeypatch,
-) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=404,
-        response_data={"error": {"message": "model m failed with temporary mismatch"}},
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(base_url="http://localhost:11434/v1", model="m")
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert "model m" not in message
-    assert "[model-redacted]" not in message
-    assert "temporary mismatch" not in message
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("server_message", "visible_fragment"),
-    [
-        ("model m:latest was not found", "model m:latest"),
-        ("model=m.extra was not found", "model=m.extra"),
-    ],
-)
-async def test_local_translate_does_not_partially_redact_short_model_inside_longer_contextual_tokens(
-    monkeypatch, server_message: str, visible_fragment: str
-) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=404,
-        response_data={"error": {"message": server_message}},
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(base_url="http://localhost:11434/v1", model="m")
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert visible_fragment not in message
-    assert "[model-redacted]" not in message
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("server_message", "expected_fragment"),
-    [
-        ("model m: not found", "model [model-redacted]: not found"),
-        ("backend m failed", "backend [model-redacted] failed"),
-        ("model m.", "model [model-redacted]."),
-        ("model m:", "model [model-redacted]:"),
-    ],
-)
-async def test_local_translate_redacts_short_model_at_safe_boundaries(
-    monkeypatch, server_message: str, expected_fragment: str
-) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=404,
-        response_data={"error": {"message": server_message}},
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(base_url="http://localhost:11434/v1", model="m")
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert server_message not in message
-    assert expected_fragment not in message
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("server_message", ["model m: not found", 'model "m": not found'])
-async def test_local_translate_redacts_short_model_before_colon(
-    monkeypatch, server_message: str
-) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=404,
-        response_data={"error": {"message": server_message}},
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(base_url="http://localhost:11434/v1", model="m")
-
-    with pytest.raises(RuntimeError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-
-    message = _native_error_text(exc_info.value)
-    assert "model m:" not in message
-    assert 'model "m":' not in message
-    assert "[model-redacted]" not in message
-    assert "not found" not in message
+        assert len(requests) == 2
+        assert requests[1]["json"]["messages"][1]["content"] == "<input>\nvalid successor\n</input>"
+    finally:
+        await client.close()
+    assert fake_http.closed
 
 
 @pytest.mark.asyncio

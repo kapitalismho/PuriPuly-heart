@@ -262,7 +262,17 @@ async def authorize(adapter, source):
     return await adapter.execute_discord(None)
 
 
-def pending(owner, store, source, *, ack=None, key=None, bound=False, empty_installation=False):
+def pending(
+    owner,
+    store,
+    source,
+    *,
+    ack=None,
+    key=None,
+    bound=False,
+    empty_installation=False,
+    stage_ack=True,
+):
     state = factory.managed_identity_state_port_from_vnext(owner, owner.require_canonical())
     identity = ensure_managed_identity_bundle(state, store)
     operation = new_managed_operation_id()
@@ -274,10 +284,11 @@ def pending(owner, store, source, *, ack=None, key=None, bound=False, empty_inst
     if key is not None:
         store.set(managed_key_secret(source), key)
     if ack is not None:
-        state.pending_delivery_ack_source = source
-        state.pending_delivery_ack_delivery_id = ack.delivery_id
-        state.pending_delivery_ack_managed_credential_ref = ack.managed_credential_ref
-        state.pending_delivery_ack_expires_at = ack.expires_at
+        if stage_ack:
+            state.pending_delivery_ack_source = source
+            state.pending_delivery_ack_delivery_id = ack.delivery_id
+            state.pending_delivery_ack_managed_credential_ref = ack.managed_credential_ref
+            state.pending_delivery_ack_expires_at = ack.expires_at
         store.set(
             f"openrouter_managed_{'qq_' if source == 'qq' else ''}delivery_ack_token",
             ack.delivery_ack_token,
@@ -424,13 +435,9 @@ async def test_unknown_or_unbound_active_observation_preserves_authority(
     isolated_home, source, observation
 ):
     owner, store, boundary, broker, release, adapter = component(isolated_home, source)
-    operation, _ = pending(owner, store, source, ack=broker.metadata(), key=broker.key, bound=True)
-    state = factory.managed_identity_state_port_from_vnext(owner, owner.require_canonical())
-    state.pending_delivery_ack_source = None
-    state.pending_delivery_ack_delivery_id = None
-    state.pending_delivery_ack_managed_credential_ref = None
-    state.pending_delivery_ack_expires_at = None
-    state.persist()
+    operation, _ = pending(
+        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True, stage_ack=False
+    )
     if observation == "resume":
         boundary.fail_read = MANAGED_OPERATION_RESUME_TOKEN_SECRET
     else:
@@ -474,8 +481,7 @@ async def test_interrupted_delivery_never_acks_old_key_and_fresh_factory_recover
     isolated_home, source, failed_slot
 ):
     owner, store, boundary, broker, release, adapter = component(isolated_home, source)
-    pending(owner, store, source, key="old-key")
-    operation = owner.require_canonical().state.managed_connection.pending_managed_operation_id
+    operation, installation = pending(owner, store, source, key="old-key")
     broker.statuses = [ManagedOperationStatusResult(True, "RETRY_READY", "retry_authorized")]
     broker.resumes = [broker.resumed_delivery()]
     boundary.fail_write = {
@@ -488,11 +494,24 @@ async def test_interrupted_delivery_never_acks_old_key_and_fresh_factory_recover
         assert not broker.ack_observations
         disk = SettingsVNextCanonicalPersistenceAdapter().load_active(owner.path).canonical_settings
         assert disk.state.managed_connection.pending_managed_operation_id == operation
-        owner.canonical = disk
-        broker.statuses = [ManagedOperationStatusResult(True, "RETRY_READY", "retry_authorized")]
-        broker.resumes = [broker.resumed_delivery()]
+    finally:
+        await release.close()
+    owner, store, boundary, broker, release, adapter = component(
+        isolated_home, source, existing=True
+    )
+    broker.statuses = [ManagedOperationStatusResult(True, "RETRY_READY", "retry_authorized")]
+    broker.resumes = [broker.resumed_delivery()]
+    try:
         assert (await authorize(adapter, source)).succeeded
         assert broker.ack_observations == [(True, True)]
+        assert [name for name, _ in broker.calls] == ["status", "resume", "ack"]
+        assert all(
+            request.operation_id == operation
+            for name, request in broker.calls
+            if name in {"status", "resume"}
+        )
+        assert owner.require_canonical().state.managed_connection.installation_id == installation
+        assert store.get("unrelated") == "synthetic-unrelated"
     finally:
         await release.close()
 
@@ -1486,6 +1505,7 @@ async def test_physical_final_settings_failure_recovers_bound_delivery_after_rel
     "boundary",
     [
         "missing_key",
+        "valid",
         "wrong_key",
         "missing_token",
         "missing_receipt",
@@ -1511,14 +1531,8 @@ async def test_missing_ack_metadata_requires_exact_proof_and_broker_truth(
     monkeypatch.setattr(qq_managed_auth, "DEFAULT_STATUS_POLL_INTERVAL_MS", 0)
     owner, store, secrets, broker, release, adapter = component(isolated_home, source)
     operation, installation = pending(
-        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True
+        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True, stage_ack=False
     )
-    state = release.managed_state
-    state.pending_delivery_ack_source = None
-    state.pending_delivery_ack_delivery_id = None
-    state.pending_delivery_ack_managed_credential_ref = None
-    state.pending_delivery_ack_expires_at = None
-    state.persist()
     ack_slot = f"openrouter_managed_{'qq_' if source == 'qq' else ''}delivery_ack_token"
     if boundary == "missing_key":
         store.delete(managed_key_secret(source))
@@ -1568,10 +1582,28 @@ async def test_missing_ack_metadata_requires_exact_proof_and_broker_truth(
         monkeypatch.setattr(Path, "replace", deny_recovery_write)
     try:
         if consumer == "factory":
-            assert not (await authorize(adapter, source)).succeeded
+            result = await authorize(adapter, source)
+            assert result.succeeded is (boundary == "valid")
         else:
             result = await release.prepare_for_translation(allow_authorization=False)
-            assert result.behavior != ManagedOpenRouterReleaseBehavior.READY
+            assert (result.behavior == ManagedOpenRouterReleaseBehavior.READY) is (
+                boundary == "valid"
+            )
+        if boundary == "valid":
+            assert [name for name, _ in broker.calls] == ["status", "ack"]
+            assert broker.calls[0][1].operation_id == operation
+            assert broker.ack_observations == [(True, True)]
+            assert store.get(managed_key_secret(source)) == broker.key
+            assert (
+                owner.require_canonical().state.managed_connection.installation_id == installation
+            )
+            assert (
+                owner.require_canonical().state.managed_connection.pending_managed_operation_id
+                is None
+            )
+            assert store.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET) is None
+            assert store.get("unrelated") == "synthetic-unrelated"
+            return
         assert not broker.ack_observations
         assert all(name in {"status", "resume"} for name, _ in broker.calls)
         assert all(request.operation_id == operation for _, request in broker.calls)
@@ -1601,14 +1633,8 @@ async def test_reconstructed_ack_metadata_commit_settles_before_cancellation(
 ):
     owner, store, boundary, broker, release, adapter = component(isolated_home, source)
     operation, installation = pending(
-        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True
+        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True, stage_ack=False
     )
-    state = release.managed_state
-    state.pending_delivery_ack_source = None
-    state.pending_delivery_ack_delivery_id = None
-    state.pending_delivery_ack_managed_credential_ref = None
-    state.pending_delivery_ack_expires_at = None
-    state.persist()
     broker.statuses = [broker.pending_delivery()]
     entered, finish = threading.Event(), threading.Event()
     replace_file = Path.replace
@@ -1675,15 +1701,16 @@ async def test_terminal_delivery_never_promotes_retained_key_on_repeat_or_restar
 ):
     owner, store, boundary, broker, release, adapter = component(isolated_home, source)
     operation, installation = pending(
-        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True
+        owner,
+        store,
+        source,
+        ack=broker.metadata(),
+        key=broker.key,
+        bound=True,
+        stage_ack=metadata == "staged",
     )
     state = release.managed_state
-    if metadata == "missing":
-        state.pending_delivery_ack_source = None
-        state.pending_delivery_ack_delivery_id = None
-        state.pending_delivery_ack_managed_credential_ref = None
-        state.pending_delivery_ack_expires_at = None
-    else:
+    if metadata == "staged":
         state.pending_delivery_ack_expires_at = PAST
         state.active_managed_credential_ref = broker.ref
         state.active_managed_expires_at = FUTURE
@@ -1812,13 +1839,9 @@ async def test_terminal_projection_observation_failure_retains_recovery_authorit
 ):
     owner, store, boundary, broker, release, adapter = component(isolated_home, source)
     operation, installation = pending(
-        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True
+        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True, stage_ack=False
     )
     state = release.managed_state
-    state.pending_delivery_ack_source = None
-    state.pending_delivery_ack_delivery_id = None
-    state.pending_delivery_ack_managed_credential_ref = None
-    state.pending_delivery_ack_expires_at = None
     state.active_managed_credential_ref = broker.ref
     state.persist()
     resume = store.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET)

@@ -51,7 +51,9 @@ def file_server(tmp_path: Path):
     source_dir.mkdir()
     handler = partial(_QuietHttpHandler, directory=str(source_dir))
     server = socketserver.TCPServer(("127.0.0.1", 0), handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
     thread.start()
     try:
         yield source_dir, f"http://127.0.0.1:{server.server_address[1]}"

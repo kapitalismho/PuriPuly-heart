@@ -415,7 +415,7 @@ async def test_backend_uses_local_fake_http_server_without_public_network(
             return
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = Thread(target=server.serve_forever, daemon=True)
+    thread = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     thread.start()
     backend = None
     try:
@@ -490,7 +490,7 @@ async def test_committed_mymemory_example_uses_local_fake_http_server() -> None:
             return
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = Thread(target=server.serve_forever, daemon=True)
+    thread = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     thread.start()
     backend = None
     try:
@@ -534,7 +534,7 @@ async def test_backend_suppresses_descendant_http_failure_logs_without_private_v
             return
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = Thread(target=server.serve_forever, daemon=True)
+    thread = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     thread.start()
     backend = None
     source_value = "SOURCE-LEAK-ff19"

@@ -156,7 +156,9 @@ def file_server(temp_dir: Path):
         *args, directory=str(source_dir), **kwargs
     )
     server = socketserver.TCPServer(("127.0.0.1", 0), handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
     thread.start()
     try:
         yield source_dir, f"http://127.0.0.1:{server.server_address[1]}"

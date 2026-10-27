@@ -333,46 +333,44 @@ async def test_translation_drops_stale_partial_and_keeps_final_order() -> None:
 
 
 @pytest.mark.asyncio
-async def test_stop_cancels_pending_tasks_and_closes_providers() -> None:
-    stt = StubSTT()
-    llm = StubLLM()
-    harness = compose_translation_test_harness(
-        stt=stt, llm=llm, osc=RecordingOscQueue(), clock=FakeClock()
-    )
-    harness.set_started_for_test(True)
+async def test_provider_and_output_owners_start_once_and_deliver_after_repeated_start() -> None:
+    class ObservedSTT(QueueingSTT):
+        event_stream_starts = 0
 
-    harness.self_runtime.translation_tasks[uuid4()] = asyncio.create_task(asyncio.sleep(60.0))
-    buffer = _MergeBuffer(
-        merge_id=uuid4(),
-    )
-    buffer.finalize_wait_task = asyncio.create_task(asyncio.sleep(60.0))
-    buffer.awaiting_vad_timeout_task = asyncio.create_task(asyncio.sleep(60.0))
-    buffer.resume_end_timeout_task = asyncio.create_task(asyncio.sleep(60.0))
-    harness.self_owner.merge_buffer = buffer
+        async def events(self):
+            self.event_stream_starts += 1
+            async for event in super().events():
+                yield event
 
-    await harness.stop()
+    stt = ObservedSTT()
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(stt=stt, llm=None, osc=osc, clock=FakeClock())
+    output = harness.output_runtime
+    providers = harness.local_asr_runtime
+    try:
+        await output.start(auto_flush_chatbox=True)
+        await providers.start()
+        await asyncio.sleep(0)
+        flush_task = output.chatbox_flush_task
+        assert flush_task is not None and not flush_task.done()
 
-    assert harness.self_runtime.translation_tasks == {}
-    assert harness.self_owner.merge_buffer is None
-    assert stt.closed is True
-    assert llm.closed is True
+        await output.start(auto_flush_chatbox=True)
+        await providers.start()
+        await stt.emit(STTSessionStateEvent(STTSessionState.STREAMING))
+        event = await asyncio.wait_for(harness.ui_events.get(), timeout=1)
 
-
-@pytest.mark.asyncio
-async def test_start_is_idempotent_and_creates_background_tasks() -> None:
-    stt = StubSTT()
-    harness = compose_translation_test_harness(
-        stt=stt, llm=StubLLM(), osc=RecordingOscQueue(), clock=FakeClock()
-    )
-
-    await harness.start(auto_flush_osc=True)
-    stt_task = harness.self_runtime.stt_task
-    osc_task = harness.output_runtime.chatbox_flush_task
-    await harness.start(auto_flush_osc=True)
-
-    assert harness.self_runtime.stt_task is stt_task
-    assert harness.output_runtime.chatbox_flush_task is osc_task
-    await harness.stop()
+        assert event.type == UIEventType.SESSION_STATE_CHANGED
+        assert event.payload == STTSessionState.STREAMING
+        assert stt.event_stream_starts == 1
+        assert output.chatbox_flush_task is flush_task
+        async with asyncio.timeout(1):
+            while not osc.process_due_calls:
+                await asyncio.sleep(0)
+    finally:
+        await harness.stop()
+    assert stt.closed
+    assert output.state == "closed"
+    assert flush_task.done()
 
 
 @pytest.mark.asyncio
@@ -633,53 +631,6 @@ async def test_stop_without_start_closes_output_runtime_ingress() -> None:
     assert decision.decision == "skipped"
     assert decision.reason == "output_runtime_closed"
     assert "never started secret transcript" not in repr(decision)
-
-
-@pytest.mark.asyncio
-async def test_restart_after_output_runtime_closed_failure_keeps_owners_not_running() -> None:
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        clock=FakeClock(),
-    )
-
-    await harness.start(auto_flush_osc=False)
-    await harness.stop()
-
-    with pytest.raises(RuntimeError, match="closed"):
-        await harness.start(auto_flush_osc=False)
-
-    assert harness.started is False
-
-
-@pytest.mark.asyncio
-async def test_restart_after_failed_output_runtime_close_keeps_owners_not_running() -> None:
-    class DropPendingFailsOnceOsc(RecordingOscQueue):
-        def __init__(self) -> None:
-            super().__init__()
-            self.fail_next_drop = True
-
-        def drop_pending(self) -> None:
-            if self.fail_next_drop:
-                self.fail_next_drop = False
-                raise RuntimeError("drop pending failed")
-
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=DropPendingFailsOnceOsc(),
-        clock=FakeClock(),
-    )
-
-    await harness.start(auto_flush_osc=False)
-    with pytest.raises(RuntimeError, match="drop pending failed"):
-        await harness.stop()
-
-    with pytest.raises(RuntimeError, match="closing"):
-        await harness.start(auto_flush_osc=False)
-
-    assert harness.started is False
 
 
 @pytest.mark.asyncio

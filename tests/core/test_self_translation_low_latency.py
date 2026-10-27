@@ -447,7 +447,7 @@ async def test_public_low_latency_final_uses_declared_provider_generation_port()
 
 
 @pytest.mark.asyncio
-async def test_translation_exposes_named_provider_runtime_handles_and_shutdown_policies() -> None:
+async def test_resource_owner_closes_each_provider_once_and_revokes_ingress() -> None:
     stt = QueueingSTTProvider(channel="self")
     peer_stt = QueueingSTTProvider(channel="peer")
     llm = ClosingLLMProvider(response_text="translated", delay_s=0.0)
@@ -455,27 +455,22 @@ async def test_translation_exposes_named_provider_runtime_handles_and_shutdown_p
         stt=stt, peer_stt=peer_stt, llm=llm, osc=FakeOscQueue()
     )
 
-    llm_runtime = harness.llm_runtime
-
-    assert llm_runtime.owner_name == "ProviderRuntimeHandle:llm"
-    assert harness.local_asr_runtime is not None
-    assert harness.local_asr_runtime.snapshot.channel_for("self").has_resources
-    assert harness.local_asr_runtime.snapshot.channel_for("peer").has_resources
-    assert "await provider.close" in llm_runtime.shutdown_policy
-
     await harness.start(auto_flush_osc=False)
-    assert harness.self_runtime.stt_task is None
-
-    await harness.stop()
-    await harness.stop()
+    resources = harness.resources
+    await resources.close()
+    await resources.close()
 
     assert stt.closed is True
     assert peer_stt.closed is True
     assert llm.close_calls == 1
+    assert not resources.has_resources
+    assert not harness.self_owner.accepting_events
+    assert not harness.peer_owner.accepting_events
+    assert harness.output_runtime.state == "closed"
 
 
 @pytest.mark.asyncio
-async def test_stop_attempts_all_provider_closes_and_retries_failed_handles() -> None:
+async def test_resource_owner_continues_cleanup_and_retries_failed_providers() -> None:
     self_stt = FlakyCloseSTTProvider(
         channel="self",
         close_failures=1,
@@ -492,11 +487,19 @@ async def test_stop_attempts_all_provider_closes_and_retries_failed_handles() ->
     )
 
     await harness.start(auto_flush_osc=False)
+    resources = harness.resources
 
     with pytest.raises(ExceptionGroup) as excinfo:
-        await harness.stop()
+        await resources.close()
 
-    failure_messages = {str(exc) for exc in excinfo.value.exceptions}
+    pending = list(excinfo.value.exceptions)
+    failure_messages = set()
+    while pending:
+        failure = pending.pop()
+        if isinstance(failure, BaseExceptionGroup):
+            pending.extend(failure.exceptions)
+        else:
+            failure_messages.add(str(failure))
     assert failure_messages == {
         "self provider close failed",
         "peer provider close failed",
@@ -507,8 +510,12 @@ async def test_stop_attempts_all_provider_closes_and_retries_failed_handles() ->
     assert harness.local_asr_runtime.snapshot.channel_for("self").has_resources
     assert harness.local_asr_runtime.snapshot.channel_for("peer").has_resources
     assert harness.llm_runtime.provider is None
+    assert resources.has_resources
+    assert not harness.self_owner.accepting_events
+    assert not harness.peer_owner.accepting_events
+    assert harness.output_runtime.state == "closed"
 
-    await harness.stop()
+    await resources.close()
 
     assert self_stt.close_calls == 2
     assert peer_stt.close_calls == 2
@@ -517,6 +524,7 @@ async def test_stop_attempts_all_provider_closes_and_retries_failed_handles() ->
     assert not harness.local_asr_runtime.snapshot.channel_for("self").has_resources
     assert not harness.local_asr_runtime.snapshot.channel_for("peer").has_resources
     assert harness.llm_runtime.provider is None
+    assert not resources.has_resources
 
 
 @pytest.mark.asyncio
@@ -525,8 +533,6 @@ async def test_replaced_peer_provider_late_final_cannot_mutate_or_enqueue_chatbo
     new_peer = QueueingSTTProvider(channel="peer")
     osc = FakeOscQueue()
     harness = compose_translation_test_harness(stt=None, peer_stt=old_peer, llm=None, osc=osc)
-
-    assert harness.llm_runtime.owner_name == "ProviderRuntimeHandle:llm"
 
     await harness.start(auto_flush_osc=False)
     await harness.local_asr_runtime.replace_prebuilt_provider("peer", new_peer, start=True)

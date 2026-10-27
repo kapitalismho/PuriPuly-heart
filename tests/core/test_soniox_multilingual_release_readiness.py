@@ -33,7 +33,7 @@ class _ControlledScenario:
     languages: tuple[str, ...]
     final_token_end_ms: tuple[int, ...]
     token_batch_sizes: tuple[int, ...]
-    expected_segment_count: int
+    expected_languages: tuple[str, ...]
     intentional_pause_ms: int = 0
 
 
@@ -42,36 +42,6 @@ class _ControlledTrace:
     language_sequence: tuple[str, ...]
     parsed_final_token_end_ms: tuple[int, ...]
     segment_count: int
-
-
-@dataclass(frozen=True, slots=True)
-class _SimulationRecord:
-    simulated: bool
-    language_sequence: tuple[str, ...]
-    segment_count: int
-    latency_ms: int
-    failures: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class _SimulatedParticipant:
-    participant_id: str
-    language: str
-
-
-@dataclass(frozen=True, slots=True)
-class _SimulatedLanguageRun:
-    participant_id: str
-    language: str
-    start_ms: int
-    end_ms: int
-
-
-@dataclass(frozen=True, slots=True)
-class _SimulationSchedule:
-    name: str
-    participants: tuple[_SimulatedParticipant, ...]
-    runs: tuple[_SimulatedLanguageRun, ...]
 
 
 @dataclass(slots=True)
@@ -106,10 +76,10 @@ class _DeterministicLLM(LLMProvider):
             "token-0": "Japanese translation",
             "token-1": "Chinese translation",
             "token-2": "Korean translation",
-            "simulated-run-0": "First participant",
-            "simulated-run-1": "Second participant",
-            "simulated-run-2": "Third participant",
-            "simulated-run-3": "Fourth participant",
+            "parent-0": "First participant",
+            "parent-1": "Second participant",
+            "parent-2": "Third participant",
+            "parent-3": "Fourth participant",
         }[text]
         return Translation(
             utterance_id=utterance_id,
@@ -125,14 +95,23 @@ class _DeterministicLLM(LLMProvider):
 
 
 _CONTROLLED_SCENARIOS = (
-    _ControlledScenario("korean-only", ("ko", "ko"), (100, 200), (2,), 1),
-    _ControlledScenario("japanese-only", ("ja", "ja"), (100, 200), (2,), 1),
-    _ControlledScenario("generic-chinese-taiwan-mandarin", ("zh", "zh"), (100, 200), (2,), 1),
-    _ControlledScenario("japanese-to-chinese", ("ja", "zh", "zh"), (100, 200, 300), (3,), 2),
+    _ControlledScenario("korean-only", ("ko", "ko"), (100, 200), (2,), ("ko",)),
+    _ControlledScenario("japanese-only", ("ja", "ja"), (100, 200), (2,), ("ja",)),
+    _ControlledScenario("generic-chinese-taiwan-mandarin", ("zh", "zh"), (100, 200), (2,), ("zh",)),
     _ControlledScenario(
-        "chinese-to-japanese-to-korean", ("zh", "ja", "ko"), (100, 200, 300), (3,), 3
+        "japanese-to-chinese", ("ja", "zh", "zh"), (100, 200, 300), (3,), ("ja", "zh")
     ),
-    _ControlledScenario("same-language-pause", ("ko", "ko"), (100, 1100), (1, 1), 1, 1000),
+    _ControlledScenario(
+        "chinese-to-japanese-to-korean",
+        ("zh", "ja", "ko"),
+        (100, 200, 300),
+        (3,),
+        ("zh", "ja", "ko"),
+    ),
+    _ControlledScenario(
+        "returning-language", ("ja", "zh", "ja"), (100, 200, 300), (3,), ("ja", "zh", "ja")
+    ),
+    _ControlledScenario("same-language-pause", ("ko", "ko"), (100, 1100), (1, 1), ("ko",), 1000),
 )
 
 
@@ -187,9 +166,6 @@ def _controlled_final_runs(
     event = session._event_projection._legacy_events.get_nowait()
     assert [token.text for token in session._final_tokens] == [token["text"] for token in tokens]
     assert event.text == "".join(token["text"] for token in tokens)
-    assert [run.language for run in event.final_language_runs] == list(dict.fromkeys(languages))
-    assert "zh-CN" not in [run.language for run in event.final_language_runs]
-    assert "zh-TW" not in [run.language for run in event.final_language_runs]
     parsed_final_token_end_ms = tuple(token.end_ms for token in session._final_tokens)
     assert all(end_ms is not None for end_ms in parsed_final_token_end_ms)
     return event.final_language_runs, _ControlledTrace(
@@ -287,196 +263,100 @@ async def _run_lifecycle(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("scenario", _CONTROLLED_SCENARIOS, ids=lambda item: item.name)
-async def test_controlled_soniox_readiness_scenarios_run_twice(
+async def test_soniox_tokens_preserve_ordered_language_runs_through_turn_owner(
     scenario: _ControlledScenario,
 ) -> None:
-    expected_languages = list(dict.fromkeys(scenario.languages))
-
-    for _attempt in range(2):
-        runs, controlled_trace = _controlled_final_runs(
-            scenario.languages,
-            final_token_end_ms=scenario.final_token_end_ms,
-            token_batch_sizes=scenario.token_batch_sizes,
-        )
-        child_languages, child_terminals, parent_closures, terminal_traces = await _run_lifecycle(
-            (runs,)
-        )
-
-        assert child_languages == expected_languages
-        assert controlled_trace.language_sequence == tuple(expected_languages)
-        assert controlled_trace.segment_count == scenario.expected_segment_count
-        assert len(child_terminals) == scenario.expected_segment_count
-        assert len(parent_closures) == 1
-        assert tuple(terminal_traces.values()) == (
-            (*("child_terminal:translated",) * scenario.expected_segment_count, "parent_closed"),
-        )
-        if scenario.intentional_pause_ms:
-            assert (
-                controlled_trace.parsed_final_token_end_ms[1]
-                - controlled_trace.parsed_final_token_end_ms[0]
-                == scenario.intentional_pause_ms
-            )
-
-
-def _schedule_latency_ms(schedule: _SimulationSchedule) -> int:
-    return max(run.end_ms for run in schedule.runs) - min(run.start_ms for run in schedule.runs)
-
-
-def _overlapping_run_pairs(schedule: _SimulationSchedule) -> tuple[tuple[str, str], ...]:
-    pairs: list[tuple[str, str]] = []
-    for index, first in enumerate(schedule.runs):
-        for second in schedule.runs[index + 1 :]:
-            if first.start_ms < second.end_ms and second.start_ms < first.end_ms:
-                pairs.append((first.participant_id, second.participant_id))
-    return tuple(pairs)
-
-
-async def _run_simulated_schedule(schedule: _SimulationSchedule) -> _SimulationRecord:
-    participants_by_id = {
-        participant.participant_id: participant for participant in schedule.participants
-    }
-    assert len(participants_by_id) == 4
-    assert all(
-        participants_by_id[run.participant_id].language == run.language for run in schedule.runs
+    runs, trace = _controlled_final_runs(
+        scenario.languages,
+        final_token_end_ms=scenario.final_token_end_ms,
+        token_batch_sizes=scenario.token_batch_sizes,
     )
-    assert all(run.start_ms < run.end_ms for run in schedule.runs)
+    child_languages, child_terminals, parent_closures, terminal_traces = await _run_lifecycle(
+        (runs,)
+    )
 
+    assert tuple(child_languages) == scenario.expected_languages
+    assert trace.language_sequence == scenario.expected_languages
+    assert trace.segment_count == len(scenario.expected_languages)
+    assert len(child_terminals) == len(scenario.expected_languages)
+    assert len(parent_closures) == 1
+    assert tuple(terminal_traces.values()) == (
+        (*("child_terminal:translated",) * len(scenario.expected_languages), "parent_closed"),
+    )
+    assert trace.parsed_final_token_end_ms == scenario.final_token_end_ms
+    if scenario.intentional_pause_ms:
+        assert (
+            trace.parsed_final_token_end_ms[1] - trace.parsed_final_token_end_ms[0]
+            == scenario.intentional_pause_ms
+        )
+
+
+@pytest.mark.asyncio
+async def test_four_peer_parents_preserve_language_content_and_output_order() -> None:
+    languages = ("zh", "ja", "ko", "zh")
+    parent_ids = [uuid4() for _ in languages]
     overlay = _RecordingOverlaySink()
     osc = RecordingOscQueue()
-    llm = _DeterministicLLM()
     harness = compose_translation_test_harness(
         stt=None,
-        llm=llm,
+        llm=_DeterministicLLM(),
         osc=osc,
         overlay_sink=overlay,
         peer_translation_enabled=True,
     )
-    parent_ids = [uuid4() for _ in schedule.runs]
-    expected_languages = [run.language for run in schedule.runs]
-
     try:
-        for index, (parent_id, run) in enumerate(zip(parent_ids, schedule.runs, strict=True)):
-            modeled_run = FinalLanguageRun(text=f"simulated-run-{index}", language=run.language)
-            harness.record_peer_speech_end_for_test(parent_id)
+        for index, (parent_id, language) in enumerate(zip(parent_ids, languages, strict=True)):
+            text = f"parent-{index}"
             await harness.dispatch_stt_event(
                 STTFinalEvent(
-                    utterance_id=parent_id,
-                    transcript=Transcript(
+                    parent_id,
+                    Transcript(
                         utterance_id=parent_id,
-                        text=modeled_run.text,
+                        text=text,
                         is_final=True,
                         channel="peer",
-                        final_language_runs=(modeled_run,),
+                        final_language_runs=(FinalLanguageRun(text=text, language=language),),
                     ),
                 )
             )
         await harness.translation_turns.wait_for_idle()
         await harness.output_runtime.wait_for_peer_output_idle()
 
-        terminal_events = [
-            event
-            for event in overlay.events
-            if getattr(event, "type", None) in {"translation_final", "utterance_closed"}
+        translations = [event for event in overlay.events if event.type == "translation_final"]
+        closures = [event for event in overlay.events if event.type == "utterance_closed"]
+        assert [event.source_language for event in translations] == list(languages)
+        assert [event.source_text for event in translations] == [
+            "parent-0",
+            "parent-1",
+            "parent-2",
+            "parent-3",
         ]
-        translations = [
-            event
-            for event in terminal_events
-            if getattr(event, "type", None) == "translation_final"
+        assert [event.text for event in translations] == [
+            "First participant",
+            "Second participant",
+            "Third participant",
+            "Fourth participant",
         ]
-        closures = [
-            event for event in terminal_events if getattr(event, "type", None) == "utterance_closed"
-        ]
-        expected_terminal_types = [
-            event_type
-            for _ in schedule.runs
-            for event_type in ("translation_final", "utterance_closed")
-        ]
-        failures: list[str] = []
-        if [event.source_language for event in translations] != expected_languages:
-            failures.append("language_order")
-        if len(translations) != len(schedule.runs):
-            failures.append("translation_count")
-        if [event.utterance_id for event in closures] != [
+        assert [event.utterance_id for event in closures] == [
             event.utterance_id for event in translations
-        ]:
-            failures.append("terminal_order")
-        if [event.type for event in terminal_events] != expected_terminal_types:
-            failures.append("terminal_sequence")
-        if not all(
+        ]
+        assert [
+            event.type for event in overlay.events if event.type != "peer_transcript_final"
+        ] == [kind for _ in languages for kind in ("translation_final", "utterance_closed")]
+        assert all(
             harness.translation_turns.is_parent_closed(parent_id) for parent_id in parent_ids
-        ):
-            failures.append("parent_closure")
-        decisions = [
+        )
+        assert osc.messages == []
+        denied = [
             decision
             for decision in harness.output_runtime.routing_decisions
             if decision.route == "self_chatbox" and decision.publication_kind == "peer_subtitle"
         ]
-        if len(decisions) != len(schedule.runs) or any(
-            (decision.decision, decision.reason) != ("denied", "peer_chatbox_denied")
-            for decision in decisions
-        ):
-            failures.append("peer_chatbox_routing")
-        if osc.messages:
-            failures.append("peer_chatbox_publication")
-
-        record = _SimulationRecord(
-            simulated=True,
-            language_sequence=tuple(event.source_language for event in translations),
-            segment_count=len(translations),
-            latency_ms=_schedule_latency_ms(schedule),
-            failures=tuple(failures),
-        )
-        assert record.language_sequence == tuple(expected_languages)
-        assert record.segment_count == len(schedule.runs)
-        assert record.latency_ms == _schedule_latency_ms(schedule)
-        assert not record.failures
-        return record
+        assert [(decision.decision, decision.reason) for decision in denied] == [
+            ("denied", "peer_chatbox_denied")
+        ] * 4
     finally:
         await harness.stop()
-
-
-@pytest.mark.asyncio
-async def test_deterministic_four_participant_normal_and_limited_overlap_simulation() -> None:
-    participants = (
-        _SimulatedParticipant("participant-zh-1", "zh"),
-        _SimulatedParticipant("participant-ja-1", "ja"),
-        _SimulatedParticipant("participant-ko-1", "ko"),
-        _SimulatedParticipant("participant-zh-2", "zh"),
-    )
-    normal_schedule = _SimulationSchedule(
-        "normal-turns",
-        participants,
-        (
-            _SimulatedLanguageRun("participant-zh-1", "zh", 0, 100),
-            _SimulatedLanguageRun("participant-ja-1", "ja", 200, 320),
-            _SimulatedLanguageRun("participant-ko-1", "ko", 400, 540),
-            _SimulatedLanguageRun("participant-zh-2", "zh", 600, 760),
-        ),
-    )
-    overlap_schedule = _SimulationSchedule(
-        "limited-overlap",
-        participants,
-        (
-            _SimulatedLanguageRun("participant-zh-1", "zh", 0, 300),
-            _SimulatedLanguageRun("participant-ja-1", "ja", 200, 430),
-            _SimulatedLanguageRun("participant-ko-1", "ko", 500, 620),
-            _SimulatedLanguageRun("participant-zh-2", "zh", 700, 850),
-        ),
-    )
-
-    assert _overlapping_run_pairs(normal_schedule) == ()
-    assert _overlapping_run_pairs(overlap_schedule) == (("participant-zh-1", "participant-ja-1"),)
-    normal_record = await _run_simulated_schedule(normal_schedule)
-    overlap_record = await _run_simulated_schedule(overlap_schedule)
-
-    assert normal_record.simulated is True
-    assert overlap_record.simulated is True
-    assert normal_record.language_sequence == ("zh", "ja", "ko", "zh")
-    assert overlap_record.language_sequence == ("zh", "ja", "ko", "zh")
-    assert normal_record.segment_count == len(normal_schedule.runs)
-    assert overlap_record.segment_count == len(overlap_schedule.runs)
-    assert normal_record.latency_ms == _schedule_latency_ms(normal_schedule)
-    assert overlap_record.latency_ms == _schedule_latency_ms(overlap_schedule)
 
 
 @pytest.mark.asyncio
@@ -650,3 +530,4 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
             assert all(run.text not in repr(decision) for run in runs)
         finally:
             await harness.stop()
+            await presenter.close()

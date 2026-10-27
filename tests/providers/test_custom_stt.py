@@ -683,19 +683,41 @@ async def test_offline_empty_result_still_finalizes() -> None:
 
 
 @pytest.mark.asyncio
-async def test_offline_failure_does_not_leak_secret() -> None:
+async def test_offline_failure_does_not_leak_secret_and_next_utterance_progresses(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    responses = [
+        _FakeResponse(401, {"error": "invalid sk-secret-value PRIVATE_CUSTOM_BODY"}),
+        _FakeResponse(200, {"text": "valid successor"}),
+    ]
+    calls = []
+
     async def handler(url: str, **kwargs: Any) -> _FakeResponse:
-        _ = url, kwargs
-        return _FakeResponse(401, {"error": "invalid sk-secret-value"})
+        calls.append((url, kwargs))
+        return responses.pop(0)
 
     backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(handler))
     session = await backend.open_session()
-    await session.send_audio(b"\x00\x00" * 80)
-    await session.on_speech_end()
-    event = await anext(session.events())
-    await session.close()
-    assert event.is_final is True
-    assert event.text == ""
+    try:
+        await session.send_audio(b"\x00\x00" * 80)
+        await session.on_speech_end()
+        failed = await asyncio.wait_for(anext(session.events()), timeout=1)
+        assert failed.is_final is True
+        assert failed.text == ""
+        assert len(calls) == 1
+        assert caplog.records
+        for record in caplog.records:
+            rendered = record.getMessage() + repr(record.args) + repr(record.exc_info)
+            assert "sk-secret-value" not in rendered
+            assert "PRIVATE_CUSTOM_BODY" not in rendered
+
+        await session.send_audio(b"\x00\x40" * 80)
+        await session.on_speech_end()
+        recovered = await asyncio.wait_for(anext(session.events()), timeout=1)
+        assert (recovered.is_final, recovered.text) == (True, "valid successor")
+        assert len(calls) == 2
+    finally:
+        await session.close()
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import json
 from collections.abc import Iterator
 from pathlib import Path
@@ -25,25 +24,8 @@ def serialized_field_paths(data: dict[str, Any], prefix: str = "") -> Iterator[s
             yield path
         elif isinstance(value, dict) and value:
             yield from serialized_field_paths(value, path)
-        elif isinstance(value, dict):
-            yield path
         else:
             yield path
-
-
-def path_get(data: dict[str, Any], path: str) -> Any:
-    current: Any = data
-    for part in path.split("."):
-        current = current[part]
-    return current
-
-
-def path_remove(data: dict[str, Any], path: str) -> None:
-    parts = path.split(".")
-    current: Any = data
-    for part in parts[:-1]:
-        current = current[part]
-    current.pop(parts[-1], None)
 
 
 def _load_fixture(name: str) -> dict[str, Any]:
@@ -51,8 +33,8 @@ def _load_fixture(name: str) -> dict[str, Any]:
 
 
 def maximal_v24_settings_fixture() -> dict[str, Any]:
-    return copy.deepcopy(_load_fixture("maximal_v24_settings.json"))
+    return _load_fixture("maximal_v24_settings.json")
 
 
 def legacy_compatibility_settings_fixture() -> dict[str, Any]:
-    return copy.deepcopy(_load_fixture("legacy_compatibility_settings.json"))
+    return _load_fixture("legacy_compatibility_settings.json")

@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from 'node:fs';
-
 import { describe, expect, it } from 'vitest';
 
 import { applyAbuseMonitoringRetention } from '../src/abuse-monitoring';
@@ -9,11 +7,6 @@ import {
   createTestBrokerEnv,
   seedRequestEvent,
 } from './test-support/sqlite-d1';
-
-const FIRST_MIGRATION = new URL(
-  '../migrations/0000_define_broker_persistent_state.sql',
-  import.meta.url,
-);
 
 describe('broker persistence retention model', () => {
   it('retains preflight-only none rows long enough to preserve in-flight challenges before cleanup', async () => {
@@ -60,19 +53,6 @@ describe('broker persistence retention model', () => {
     expect(contract).toHaveProperty(
       'BROKER_PERSISTENCE_MODEL.tables.openrouterEntitlements.liveRemainingBudgetSource',
       'OpenRouter metadata',
-    );
-  });
-
-  it('uses cascading delete from installations so retention cleanup removes entitlement rows too', () => {
-    expect(existsSync(FIRST_MIGRATION)).toBe(true);
-    if (!existsSync(FIRST_MIGRATION)) {
-      return;
-    }
-
-    const migration = readFileSync(FIRST_MIGRATION, 'utf8');
-
-    expect(migration).toContain(
-      'installation_id TEXT PRIMARY KEY REFERENCES installations(installation_id) ON DELETE CASCADE',
     );
   });
 

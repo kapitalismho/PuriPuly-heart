@@ -1582,11 +1582,15 @@ class RecordingWindowZOrderPort:
 class RecordingWebSocket:
     def __init__(self) -> None:
         self.sent_messages: list[dict[str, object]] = []
+        self.close_calls = 0
 
     async def send(self, payload: str) -> None:
         decoded = json.loads(payload)
         assert isinstance(decoded, dict)
         self.sent_messages.append(decoded)
+
+    async def close(self) -> None:
+        self.close_calls += 1
 
 
 class FakeFletWindow:
@@ -6132,6 +6136,14 @@ async def test_desktop_overlay_events_are_bridge_only_and_do_not_use_stdout_fall
     finally:
         await renderer.shutdown()
 
+    assert websocket.close_calls == 1
+    assert renderer.is_shutdown is True
+    teardown = capsys.readouterr()
+    assert not any(
+        json.loads(line).get("type") == "runtime_error"
+        for line in (teardown.out + teardown.err).splitlines()
+    )
+
 
 @pytest.mark.asyncio
 async def test_desktop_overlay_lifecycle_errors_keep_stderr_fallback(
@@ -6156,6 +6168,14 @@ async def test_desktop_overlay_lifecycle_errors_keep_stderr_fallback(
         assert json.loads(captured.err) == runtime_error
     finally:
         await renderer.shutdown()
+
+    assert websocket.close_calls == 1
+    assert renderer.is_shutdown is True
+    teardown = capsys.readouterr()
+    assert not any(
+        json.loads(line).get("type") == "runtime_error"
+        for line in (teardown.out + teardown.err).splitlines()
+    )
 
 
 @pytest.mark.asyncio

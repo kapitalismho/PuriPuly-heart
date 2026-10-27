@@ -488,7 +488,11 @@ mod tests {
         writer.write_sample(0_i16).expect("valid sample");
         writer.finalize().expect("valid fixture finalize");
 
-        for path in [&invalid, &empty, &valid] {
+        for (path, expected_code, expected_audio_seconds) in [
+            (&invalid, "audio_invalid", None),
+            (&empty, "audio_invalid", Some(0.0)),
+            (&valid, "backend_failure", Some(1.0 / 16_000.0)),
+        ] {
             let started = Cell::new(false);
             let failure = GpuEngine::default()
                 .transcribe(Path::new(path), None, &CancelToken::new(), |_| {
@@ -498,6 +502,9 @@ mod tests {
             assert!(!started.get());
             assert!(!failure.attempt_started);
             assert_eq!(failure.decode_seconds, 0.0);
+            assert_eq!(failure.error.code(), expected_code, "{path:?}");
+            assert_eq!(failure.audio_seconds, expected_audio_seconds, "{path:?}");
+            assert!(failure.started_timing().is_none());
         }
     }
 

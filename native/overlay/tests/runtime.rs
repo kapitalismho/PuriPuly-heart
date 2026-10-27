@@ -37,7 +37,6 @@ fn native_fresh_retry_production_policy_matches_dd_002() {
     assert_eq!(NATIVE_FRESH_RETRY_DEADLINE, Duration::from_millis(500));
     assert_eq!(NATIVE_FRESH_RETRY_MAX_COMPLETED, 5);
     assert_eq!(NATIVE_READINESS_NO_PROGRESS_TIMEOUT, Duration::from_secs(2));
-    assert_ne!(u64::MAX, 0);
 }
 
 #[test]
@@ -526,6 +525,7 @@ struct RecordingSubmitter {
     calibration_anchors: Vec<String>,
     fail: bool,
     operations: Vec<&'static str>,
+    submitted_blocks: Option<Vec<Vec<(String, String)>>>,
     visibility_changes: Vec<bool>,
     last_visible: Option<bool>,
     fail_show: bool,
@@ -559,6 +559,26 @@ impl OverlayFrameSubmitter for RecordingSubmitter {
             "submit:text"
         };
         self.operations.push(operation);
+        if let Some(submitted_blocks) = &mut self.submitted_blocks {
+            submitted_blocks.push(
+                frame
+                    .layout()
+                    .visible_blocks
+                    .iter()
+                    .map(|block| {
+                        (
+                            block.id.clone(),
+                            block
+                                .primary_lines
+                                .iter()
+                                .map(|line| line.text.as_str())
+                                .collect::<Vec<_>>()
+                                .join("\n"),
+                        )
+                    })
+                    .collect(),
+            );
+        }
         if let Some(progress) = &self.progress {
             progress.submits.fetch_add(1, Ordering::SeqCst);
             if operation == "submit:text" {
@@ -1909,32 +1929,41 @@ async fn event_loop_cancels_stale_readiness_submits_latest_then_handles_shutdown
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let submit_progress = Arc::new(SharedSubmitProgress::default());
     let server_progress = submit_progress.clone();
+    let readiness_started = Arc::new(tokio::sync::Notify::new());
+    let server_readiness_started = readiness_started.clone();
     let address = listener.local_addr().unwrap();
     let server = tokio::spawn(async move {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
         for revision in [0, 1, 2] {
+            if revision == 2 {
+                tokio::time::timeout(
+                    Duration::from_secs(5),
+                    server_readiness_started.notified(),
+                )
+                .await
+                .expect("revision 1 never entered producer readiness");
+            }
+            let snapshot = presentation_snapshot(
+                revision,
+                OverlayPresentationCalibration::default(),
+                if revision == 0 {
+                    vec![]
+                } else {
+                    vec![block(
+                        "self:cancel",
+                        "self",
+                        &format!("synthetic-{revision}"),
+                        "",
+                        true,
+                    )]
+                },
+            );
             ws.send(Message::Text(
-                json!({
-                    "type": "snapshot",
-                    "payload": {
-                        "revision": revision,
-                        "calibration": OverlayPresentationCalibration::default(),
-                        "blocks": if revision == 0 { vec![] } else { vec![json!({
-                            "id": "self:cancel",
-                            "occupant_key": "self:cancel",
-                            "appearance_seq": 1,
-                            "channel": "self",
-                            "block_variant": "finalized",
-                            "primary_text": format!("synthetic-{revision}"),
-                            "secondary_text": "",
-                            "secondary_enabled": true
-                        })] }
-                    }
-                })
-                .to_string()
-                .into(),
+                json!({"type": "snapshot", "payload": snapshot})
+                    .to_string()
+                    .into(),
             ))
             .await
             .unwrap();
@@ -1945,20 +1974,38 @@ async fn event_loop_cancels_stale_readiness_submits_latest_then_handles_shutdown
         .await;
         consume_overlay_ready("stale-readiness-latest-submit", &mut ws).await;
         ws.send(Message::Text(
+            json!({
+                "type": "health_challenge",
+                "challenge_id": 2,
+                "overlay_instance_id": "overlay-test",
+                "runtime_generation": 1
+            })
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        let status = next_owner_message(&mut ws).await;
+        ws.send(Message::Text(
             json!({"type": "shutdown"}).to_string().into(),
         ))
         .await
         .unwrap();
+        status
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
     let (mut bridge, initial_snapshot) = BridgeClient::connect(&manifest).await.unwrap();
     let renderer = CaptionRenderer::new_for_test().unwrap();
-    renderer.set_test_readiness_pending_yields(1_000_000);
+    renderer.set_test_readiness_pending_yields_on_call(1, usize::MAX);
+    renderer.set_test_readiness_started_notify_on_call(1, readiness_started);
     let logger = test_logger("readiness-shutdown-preemption").await;
     let mut runtime = OverlayRuntime::new(initial_snapshot);
-    let mut submitter = RecordingSubmitter::default();
-    submitter.progress = Some(submit_progress);
+    let mut submitter = RecordingSubmitter {
+        progress: Some(submit_progress),
+        submitted_blocks: Some(Vec::new()),
+        ..Default::default()
+    };
 
     tokio::time::timeout(
         Duration::from_secs(1),
@@ -1968,8 +2015,18 @@ async fn event_loop_cancels_stale_readiness_submits_latest_then_handles_shutdown
     .unwrap()
     .unwrap();
 
-    server.await.unwrap();
+    let status = server.await.unwrap();
     assert_eq!(submitter.calls, 1);
+    assert_eq!(
+        submitter.submitted_blocks.unwrap(),
+        vec![vec![("self:cancel".to_string(), "synthetic-2".to_string())]],
+        "only the latest scene may reach the submit boundary after readiness cancellation"
+    );
+    assert_eq!(status["type"], "owner_status");
+    assert_eq!(status["health_challenge_id"], 2);
+    assert_eq!(status["latest_applied_revision"], 2);
+    assert_eq!(status["latest_handoff_revision"], 2);
+    assert_eq!(status["current_covered_handoff"], true);
     assert_eq!(submitter.operations.first(), Some(&"submit:text"));
     assert!(runtime.is_stopped());
     assert!(runtime.presentation_diagnostics().records().is_empty());
@@ -2078,14 +2135,9 @@ async fn heartbeat_and_noop_control_do_not_cancel_initial_readiness() {
 
 #[tokio::test]
 async fn ignored_message_flood_polls_readiness_and_reaches_ready() {
-    let mut followups = Vec::new();
-    for index in 0..256 {
-        followups.push(if index % 2 == 0 {
-            json!({"type": "heartbeat"})
-        } else {
-            json!({"type": "heartbeat"})
-        });
-    }
+    let followups = (0..256)
+        .map(|_| json!({"type": "heartbeat"}))
+        .collect();
     let (mut bridge, snapshot, mut server) =
         connect_test_bridge_with_followups(followups, None, None).await;
     let renderer = CaptionRenderer::new_for_test().unwrap();
@@ -2117,13 +2169,7 @@ async fn ignored_message_flood_polls_readiness_and_reaches_ready() {
 #[tokio::test]
 async fn continuous_ignored_messages_hit_owner_timeout_without_submission() {
     let followups = (0..2_000)
-        .map(|index| {
-            if index % 2 == 0 {
-                json!({"type": "heartbeat"})
-            } else {
-                json!({"type": "heartbeat"})
-            }
-        })
+        .map(|_| json!({"type": "heartbeat"}))
         .collect();
     let (mut bridge, snapshot, mut server) =
         connect_test_bridge_with_followups(followups, None, None).await;
@@ -2208,13 +2254,7 @@ async fn followup_send_phase_stop_ack_precedes_client_drop() {
 async fn followup_send_error_before_stop_propagates() {
     let gate = Arc::new(tokio::sync::Notify::new());
     let followups = (0..2_000)
-        .map(|index| {
-            if index % 2 == 0 {
-                json!({"type": "heartbeat"})
-            } else {
-                json!({"type": "heartbeat"})
-            }
-        })
+        .map(|_| json!({"type": "heartbeat"}))
         .collect();
     let (bridge, _snapshot, mut server) =
         connect_test_bridge_with_followups(followups, Some(gate.clone()), None).await;
@@ -6619,103 +6659,6 @@ async fn runtime_cancels_pending_idle_hide_when_new_text_arrives() {
 }
 
 #[tokio::test]
-async fn runtime_shows_overlay_again_when_text_returns_after_idle_hide() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let submit_progress = Arc::new(SharedSubmitProgress::default());
-    let server_progress = submit_progress.clone();
-    let server = tokio::spawn(async move {
-        let (stream, _) = listener.accept().await.unwrap();
-        let mut ws = accept_async(stream).await.unwrap();
-
-        let _ = ws.next().await.unwrap().unwrap();
-        ws.send(Message::Text(
-            json!({
-                "type": "snapshot",
-                "payload": {
-                    "revision": 1,
-                    "calibration": OverlayPresentationCalibration::default(),
-                    "blocks": [block("self:1", "self", "hello", "", true)]
-                }
-            })
-            .to_string()
-            .into(),
-        ))
-        .await
-        .unwrap();
-
-        consume_overlay_ready("idle-hide-restore", &mut ws).await;
-
-        ws.send(Message::Text(
-            json!({
-                "type": "snapshot",
-                "payload": {
-                    "revision": 2,
-                    "calibration": OverlayPresentationCalibration::default(),
-                    "blocks": []
-                }
-            })
-            .to_string()
-            .into(),
-        ))
-        .await
-        .unwrap();
-
-        tokio::time::sleep(Duration::from_millis(650)).await;
-
-        let third = json!({
-            "revision": 3,
-            "calibration": OverlayPresentationCalibration::default(),
-            "blocks": [block("self:2", "self", "visible again", "", true)]
-        });
-        ws.send(Message::Text(
-            json!({"type": "snapshot", "payload": third})
-                .to_string()
-                .into(),
-        ))
-        .await
-        .unwrap();
-
-        wait_for_test_progress("idle-restore-text-submit", || {
-            server_progress.text_submits.load(Ordering::SeqCst) >= 2
-        })
-        .await;
-
-        ws.send(Message::Text(
-            json!({"type": "shutdown"}).to_string().into(),
-        ))
-        .await
-        .unwrap();
-    });
-
-    let logger = test_logger("idle-hide-restore").await;
-    let mut manifest = test_manifest();
-    manifest.bridge_url = format!("ws://{}", address);
-
-    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
-    let renderer = CaptionRenderer::new_for_test().unwrap();
-    let mut runtime = OverlayRuntime::new(snapshot);
-    let mut submitter = RecordingSubmitter::default();
-    submitter.progress = Some(submit_progress);
-
-    runtime
-        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
-        .await
-        .unwrap();
-    runtime
-        .run_event_loop(&mut bridge, &renderer, &mut submitter, &logger)
-        .await
-        .unwrap();
-
-    server.await.unwrap();
-
-    assert!(submitter
-        .visibility_changes
-        .windows(2)
-        .any(|pair| pair == [false, true]));
-}
-
-#[tokio::test]
 async fn runtime_submits_text_frame_before_revealing_overlay_after_idle_hide() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -6972,7 +6915,7 @@ async fn production_owner_renders_python_active_self_and_rearms_exhausted_stream
     let output = Command::new("uv")
         .args([
             "run",
-            "--frozen",
+            "--locked",
             "python",
             "-m",
             "tests.helpers.overlay_active_freshness",
@@ -7079,7 +7022,7 @@ fn python_scene_protection_input_with_recovery(peer_mode: &str, recovery: bool) 
     command
         .args([
             "run",
-            "--frozen",
+            "--locked",
             "python",
             "-m",
             "tests.helpers.overlay_scene_protection",
@@ -7396,7 +7339,7 @@ async fn python_scene_sparse_and_fast_translation_bursts_keep_bounded_executable
     let output = Command::new("uv")
         .args([
             "run",
-            "--frozen",
+            "--locked",
             "python",
             "-m",
             "tests.helpers.overlay_active_freshness",

@@ -54,7 +54,7 @@ async def test_source_composed_cli_retains_local_http_and_audio_websocket_causes
                 return
 
     http = ThreadingHTTPServer(("127.0.0.1", 0), HttpFailure)
-    http_thread = Thread(target=http.serve_forever, daemon=True)
+    http_thread = Thread(target=http.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     http_thread.start()
     host = None
     stderr_file = tmp_path / "private-host-stderr.txt"
