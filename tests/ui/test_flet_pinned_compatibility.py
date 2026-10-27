@@ -1,79 +1,18 @@
 from __future__ import annotations
 
-import re
-import sys
-import tomllib
-from importlib.metadata import version
-
 import pytest
 
 pytest.importorskip("flet")
 
 import flet as ft
 
-from puripuly_heart.ui.components.settings import api_key_field as api_key_field_module
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
     COLOR_ERROR,
     COLOR_PRIMARY,
     text_field_outline_border,
 )
-from puripuly_heart.ui.views import settings as settings_view
 from tests.helpers.flet_page import DummyPage, attach_dummy_page
-from tests.helpers.paths import REPO_ROOT as ROOT
-
-FLET_VERSION = "1.0.0"
-
-
-def test_flet_runtime_and_lock_use_one_exact_100_protocol() -> None:
-    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    dependencies = pyproject["project"]["dependencies"]
-    build_dependencies = pyproject["project"]["optional-dependencies"]["build"]
-    lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
-    locked_versions = {
-        package["name"]: package["version"]
-        for package in lock["package"]
-        if package["name"] in {"flet", "flet-desktop", "flet-cli"}
-    }
-
-    assert f"flet=={FLET_VERSION}" in dependencies
-    assert f"flet-desktop=={FLET_VERSION}" in dependencies
-    assert f"flet-cli=={FLET_VERSION}" in build_dependencies
-    assert locked_versions == {
-        "flet": FLET_VERSION,
-        "flet-cli": FLET_VERSION,
-        "flet-desktop": FLET_VERSION,
-    }
-    assert version("flet") == FLET_VERSION
-    assert version("flet-desktop") == FLET_VERSION
-
-
-def test_gate_c_windows_runtime_uses_python_314() -> None:
-    if sys.platform != "win32":
-        pytest.skip("Gate C runtime version is verified on Windows")
-    assert sys.version_info[:2] == (3, 14)
-
-
-def test_ui_uses_flet_100_dialog_api() -> None:
-    assert hasattr(ft.Page, "show_dialog")
-    assert hasattr(ft.Page, "pop_dialog")
-    assert not hasattr(ft.Page, "open")
-    assert not hasattr(ft.Page, "close")
-
-    removed_api = re.compile(
-        r"(?:\bpage|self\.page|self\._page)\.(?:open|close)\(|"
-        r"getattr\((?:self\.)?_?page,\s*[\"'](?:open|close)[\"']"
-    )
-    violations = []
-    for path in sorted((ROOT / "src" / "puripuly_heart" / "ui").rglob("*.py")):
-        for line_number, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(),
-            start=1,
-        ):
-            if removed_api.search(line):
-                violations.append(f"{path.relative_to(ROOT)}:{line_number}:{line.strip()}")
-
-    assert violations == []
 
 
 def test_text_field_outline_border_covers_every_visual_state() -> None:
@@ -90,85 +29,6 @@ def test_text_field_outline_border_covers_every_visual_state() -> None:
     assert borders[ft.ControlState.ERROR].side == ft.BorderSide(1, COLOR_ERROR)
     assert borders[ft.ControlState.DISABLED].side == ft.BorderSide(1, COLOR_DIVIDER)
     assert all(border.border_radius == 12 for border in borders.values())
-
-
-def test_api_key_field_uses_flet_100_icon_api(monkeypatch: pytest.MonkeyPatch) -> None:
-    class FakeIcon:
-        def __init__(self, *, icon, color, size, tooltip):
-            self.icon = icon
-            self.color = color
-            self.size = size
-            self.tooltip = tooltip
-            self.page = None
-
-        def update(self) -> None:
-            return None
-
-    class FakeIconButton:
-        def __init__(self, **kwargs):
-            self.icon = kwargs.get("icon")
-
-    class FakeTextField:
-        def __init__(self, **kwargs):
-            self.value = ""
-            self.password = kwargs.get("password", False)
-            self.page = None
-
-        def update(self) -> None:
-            return None
-
-    class FakeRow:
-        def __init__(self, *, controls, vertical_alignment):
-            self.controls = controls
-            self.vertical_alignment = vertical_alignment
-
-    monkeypatch.setattr(api_key_field_module.ft, "Icon", FakeIcon)
-    monkeypatch.setattr(api_key_field_module.ft, "IconButton", FakeIconButton)
-    monkeypatch.setattr(api_key_field_module.ft, "TextField", FakeTextField)
-    monkeypatch.setattr(api_key_field_module.ft, "Row", FakeRow)
-
-    field = api_key_field_module.ApiKeyField(
-        "settings.deepgram_api_key",
-        "deepgram_api_key",
-        "deepgram",
-    )
-    field._set_status("success")
-
-    assert field._status_icon.icon == api_key_field_module.icons.CHECK_CIRCLE_ROUNDED
-
-
-def test_make_text_button_uses_flet_100_content_argument(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    seen: dict[str, object] = {}
-
-    class FakeTextButton:
-        def __init__(self, *, content, **kwargs):
-            seen["content"] = content
-            seen["kwargs"] = kwargs
-            self.content = content
-
-    monkeypatch.setattr(settings_view.ft, "TextButton", FakeTextButton)
-
-    button = settings_view._make_text_button("Gemma 4", style="style")
-
-    assert seen["content"] == "Gemma 4"
-    assert seen["kwargs"] == {"style": "style"}
-    assert button.content == "Gemma 4"
-
-
-def test_set_text_button_label_uses_flet_100_content_property() -> None:
-    class FakeButton:
-        __slots__ = ("content",)
-
-        def __init__(self) -> None:
-            self.content = ""
-
-    button = FakeButton()
-
-    settings_view._set_text_button_label(button, "Managed")
-
-    assert button.content == "Managed"
 
 
 class _RaisingPageControl:

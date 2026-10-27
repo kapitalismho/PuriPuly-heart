@@ -16,18 +16,22 @@ The technical metadata review performed for the AGPL transition found no obvious
 Notable shipped/runtime license families include MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, LGPL-2.1-or-later, SIL Open Font License 1.1, and CC-BY-4.0.
 
 Runtime/bundled notice-sensitive components:
-- huggingface-hub 1.26.0: Apache-2.0.
-- hf-xet 1.5.2 and its Windows native extension: Apache-2.0.
+- huggingface-hub 2.3.0: Apache-2.0.
+- hf-xet 1.7.0 and its Windows native extension: Apache-2.0.
+- httpx2 2.16.0 and httpcore2 2.16.0: BSD-3-Clause. Their upstream license payloads remain in the packaged distribution metadata.
+- Flet 1.0.5 and serious_python 5.0.0: Apache-2.0. Native Windows releases retain Flutter's generated dependency notices under data\flutter_assets\NOTICES.Z; the locked Python Flet wheel retains its upstream license metadata.
+- dart-bridge 1.10.0: MIT. The unmodified upstream license is packaged under puripuly_heart\data\licenses\DART-BRIDGE-1.10.0-LICENSE.txt. Source: https://github.com/flet-dev/dart-bridge/tree/v1.10.0 .
 - soxr / libsoxr: LGPL-2.1-or-later. Windows releases include the LGPL compliance bundle described below. The source-tree license text is `src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt`; installed releases stage it under the soxr compliance bundle.
 - python-zeroconf 0.150.0 and its Windows native extension modules: LGPL-2.1-or-later. The exact PyPI source distribution is included in the installed LGPL source bundle described below.
 - certifi: MPL-2.0.
 - NumPy and SciPy binary wheels bundle OpenBLAS, LAPACK, and compiler runtime notices. NumPy carries its wheel-provided notices in the packaged distribution; SciPy's wheel-provided license bundle is included under `puripuly_heart\data\licenses\SCIPY-1.18.0-LICENSE.txt`.
-- CPython 3.14.7: the official distribution LICENSE.txt is packaged under `puripuly_heart\data\licenses\PYTHON-3.14.7-LICENSE.txt`.
+- CPython 3.14.10: the official distribution LICENSE.txt is packaged under `puripuly_heart\data\licenses\PYTHON-3.14.10-LICENSE.txt`.
 - Microsoft Visual C++ Runtime: native Windows builds include the x64 Microsoft.VC143.CRT DLLs from the selected Visual Studio toolchain's official redist directory, deployed app-locally under Microsoft's Visual Studio license and redistribution terms. Exact versions, source paths, and SHA256 hashes are recorded in the build's `vc-runtime.json`; redistribution guidance: https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files?view=msvc-170 .
 - Native Python wheels: LICENSE, COPYING, NOTICE, AUTHORS, and third-party notice payloads from the locked distributions are retained under their upstream package or `.dist-info` paths as detailed below.
 - sounddevice 0.5.5: releases retain its standard PortAudio runtime and upstream license metadata, but intentionally omit the ASIO-only DLL. `SD_ENABLE_ASIO=1` is unsupported in this distribution.
 - OpenVR runtime DLL: BSD-3-Clause.
 - llama.cpp CPU and Vulkan runtime: MIT.
+- Native Rust overlay/GPU worker dependencies and the Rust standard library retain their upstream licenses. Supplemental aggregate notices are not bundled.
 - Noto Sans CJK Medium TTC: SIL Open Font License 1.1.
 - Silero VAD ONNX model: MIT.
 - Smart Turn v3.2 CPU ONNX model: BSD-2-Clause.
@@ -100,13 +104,45 @@ before release.
 
 ----
 
+Gemma 4 26B A4B local translation model asset
+Upstream model source: https://huggingface.co/google/gemma-4-26B-A4B-it
+Manifest distribution sources: https://huggingface.co/unsloth/gemma-4-26B-A4B-it-qat-GGUF , https://www.modelscope.cn/models/unsloth/gemma-4-26B-A4B-it-qat-GGUF
+License: Apache-2.0
+Pinned Hugging Face revision: 7b92b5b28818151e8669af2e45e88d6086f490dd
+Pinned ModelScope revision: f5f82bed79bc0bc49b01e0e577bb3dc949ebc564
+Target model: gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf
+Size: 14,249,047,104 bytes
+SHA-256: a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891
+
+This optional managed model is downloaded on demand and is not included in the
+application installer. It uses the same size, integrity, provenance, and license
+requirements as the E4B assets.
+
+----
+
 Hugging Face Hub and Xet download runtime
 Sources: https://github.com/huggingface/huggingface_hub , https://github.com/huggingface/xet-core
-Pinned packages: huggingface-hub 1.26.0 ; hf-xet 1.5.2
+Pinned packages: huggingface-hub 2.3.0 ; hf-xet 1.7.0
 License: Apache-2.0
 Bundled native runtime: hf_xet\hf_xet.pyd on Windows
 
-These packages provide the optional high-speed Hugging Face/Xet download path for the pinned GPU transcribe.cpp GGUF model. The application downloads that asset directly into app-owned staging and does not enable HF_XET_HIGH_PERFORMANCE by default.
+Embedded native dependencies retain their own licenses. The original upstream
+wheel, parent license and CycloneDX inventory are preserved without modification.
+They do not provide complete embedded-native attribution. Supply the applicable
+copyright, license, NOTICE and source-access materials before redistributing
+native builds.
+
+Native Xet transfers are enabled where compatible with the inherited transfer
+preference and application TLS/proxy policy. Explicit custom CAs, incompatible
+proxy bypass policies and mirrors retain HTTP; a failed native attempt retains
+the existing HTTP fallback. The worker sets HF_HUB_DISABLE_TELEMETRY=1 and
+HF_XET_TELEMETRY_ENABLED=0 to prevent Hub agent-harness discovery and native
+transfer telemetry. These opt-outs do not disable native Xet; the inherited
+HF_HUB_DISABLE_XET transfer preference remains independent. Downloads remain
+staged and checked against pinned size/SHA-256 before installation.
+These package updates do not fix all bundled native TLS advisories; see
+https://github.com/kapitalismho/PuriPuly-heart/issues/307 for remaining risks.
+File-integrity checks do not repair TLS validation.
 
 ----
 
@@ -246,15 +282,22 @@ their original package-relative paths.
 
 ----
 
-CPython 3.14.7 runtime
-Distribution archive: https://www.python.org/ftp/python/3.14.7/python-3.14.7-embed-amd64.zip
-Distribution archive SHA-256: d297e5ff019966817ad8502465176139f2d3d840fa4ed84b13bed399a6ab1f15
-License member: LICENSE.txt
-Packaged license path: puripuly_heart\data\licenses\PYTHON-3.14.7-LICENSE.txt
+CPython 3.14.10 runtime
+Distribution archive: https://www.python.org/ftp/python/3.14.10/python-3.14.10-embed-amd64.zip
+Distribution archive SHA-256: 90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159
+Full standard library and runtime: https://api.nuget.org/v3-flatcontainer/python/3.14.10/python.3.14.10.nupkg
+NuGet package SHA-256: f54ba67c9951c3d773ea47d2bb095150c037c399f0423a968bcda22809241784
+License member: tools/LICENSE.txt
+Packaged license path: puripuly_heart\data\licenses\PYTHON-3.14.10-LICENSE.txt
 
-The official embedded distribution's runtime members are byte-identical to
-the ordinary GIL-enabled CPython 3.14.7 runtime files collected by the Windows
-build. Its complete LICENSE.txt is included at the packaged path above.
+The official NuGet distribution supplies the complete GIL-enabled CPython 3.14.10
+standard library, core DLLs, and extension modules. Every runtime binary shared
+with the official embedded distribution is checked for byte identity before
+building the native shell. Its complete LICENSE.txt is included at the packaged
+path above, including OpenSSL and the runtime's other incorporated software.
+The native embedded runtime retains its existing reduced-standard-library policy:
+tests, optional GUI tools, bundled package installers, and Lib executables are
+omitted. All selected runtime files come from this same patched distribution.
 
 ----
 
@@ -264,9 +307,11 @@ Windows packaging retains the complete metadata directories for the exact
 locked distributions below. This preserves their upstream LICENSE, COPYING,
 NOTICE, and AUTHORS payloads at the original `.dist-info` paths:
 
+
 - cffi 2.0.0, including LICENSE and AUTHORS.
 - charset-normalizer 3.4.4.
 - msgpack 1.2.1.
+
 - psutil 7.2.2.
 - PyAudioWPatch 0.2.12.8.
 - PyYAML 6.0.3.
@@ -275,6 +320,7 @@ NOTICE, and AUTHORS payloads at the original `.dist-info` paths:
   project, and the complete LICENSE supplied by the sherpa-onnx wheel is
   retained together with both distributions' metadata.
 - sounddevice 0.5.5.
+
 - python-zeroconf 0.150.0.
 
 ONNX Runtime 1.28.0 supplies its license payloads in the package directory

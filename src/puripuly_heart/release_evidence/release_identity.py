@@ -20,7 +20,8 @@ _SHA64 = re.compile(r"[0-9a-f]{64}")
 
 PACKAGED_LICENSE_PATHS = (
     "puripuly_heart/data/licenses/SCIPY-1.18.0-LICENSE.txt",
-    "puripuly_heart/data/licenses/PYTHON-3.14.7-LICENSE.txt",
+    "puripuly_heart/data/licenses/PYTHON-3.14.10-LICENSE.txt",
+    "puripuly_heart/data/licenses/DART-BRIDGE-1.10.0-LICENSE.txt",
     "scipy/_lib/_uarray/LICENSE",
     "scipy/fft/_duccfft/LICENSE.md",
     "scipy/integrate/LICENSE_DOP",

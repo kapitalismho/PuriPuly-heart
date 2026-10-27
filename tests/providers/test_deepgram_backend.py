@@ -129,7 +129,9 @@ def local_sdk_client(monkeypatch: pytest.MonkeyPatch, url: str) -> None:
     def client(**kwargs):
         return AsyncDeepgramClient(
             **kwargs,
-            environment=DeepgramClientEnvironment(base=url, production=url, agent=url),
+            environment=DeepgramClientEnvironment(
+                base=url, production=url, agent=url, agent_rest=url
+            ),
         )
 
     monkeypatch.setattr("deepgram.AsyncDeepgramClient", client)

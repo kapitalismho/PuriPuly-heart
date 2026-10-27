@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import inspect
 import logging
+import os
 import re
 import socket
 import subprocess
@@ -37,12 +38,24 @@ GEMMA_SLOT_COUNT = 3
 _ServerResult = TypeVar("_ServerResult")
 
 
+def _managed_process_environment() -> dict[str, str]:
+    excluded = {"HF_TOKEN"}
+    if os.name == "nt":
+        excluded.update(("APPDATA", "PROGRAMDATA"))
+    return {
+        name: value
+        for name, value in os.environ.items()
+        if not name.upper().startswith("LLAMA_ARG_") and name.upper() not in excluded
+    }
+
+
 async def validate_gemma_runtime_version(executable: Path) -> None:
     process = await asyncio.create_subprocess_exec(
         str(executable),
         "--version",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        env=_managed_process_environment(),
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     try:
@@ -170,6 +183,7 @@ async def _default_process_factory(
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
         cwd=cwd,
+        env=_managed_process_environment(),
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
 

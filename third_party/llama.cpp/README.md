@@ -10,6 +10,8 @@ Commit: `8e2d31e0eb658d0382d3106a61369dff81f0c080`
 
 The Windows CPU and Vulkan release archives are fetched only while building the PuriPuly Heart application. Their pinned sizes and SHA-256 digests are enforced before the `llama-server.exe` runtime and its DLLs are staged. Model files are not part of these packaged runtime inputs.
 
+Managed Windows launches run offline and ignore inherited `LLAMA_ARG_*`, Hugging Face tokens, and llama.cpp user/system configuration. The application owns model provisioning and passes explicit local model, draft, backend, and loopback settings; the child is not a general-purpose remotely configured server.
+
 | Archive | Bytes | SHA-256 |
 | --- | ---: | --- |
 | `llama-b11537-bin-win-cpu-x64.zip` | 19513247 | `a05c2d35ebe9787489277d6e039b391fd006384a6c49d069395f3a7b47186fd2` |

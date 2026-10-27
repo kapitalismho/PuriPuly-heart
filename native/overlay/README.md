@@ -40,10 +40,10 @@ Python and native must agree on the manifest, protocol, and advertised execution
 
 ## Build and Verification
 
-Run from the repository root on Windows with Rust, the Windows build tools, and `uv`. Install the locked Python development environment: cross-language Rust tests invoke the real Python presenter. Use a short target path to avoid MSBuild tracking-file path limits.
+Run from the repository root on Windows with the Windows build tools and the Python/uv versions pinned in the [PR workflow](../../.github/workflows/pr-ci.yml). Use ordinary Rustup setup for the compiler selected by [rust-toolchain.toml](../../rust-toolchain.toml). Install the locked Python development environment: cross-language Rust tests invoke the real Python presenter. Use a short target path to avoid MSBuild tracking-file path limits.
 
 ```powershell
-uv sync --locked --extra dev
+uv sync --locked --extra dev --python 3.14.10
 $overlayTarget = Join-Path $env:TEMP 'puripuly-overlay-tests'
 cargo test --locked --manifest-path native/overlay/Cargo.toml --target-dir $overlayTarget -- --skip windows_graphics_
 

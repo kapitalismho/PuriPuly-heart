@@ -81,7 +81,7 @@ def _worker_policy(environment: dict[str, str]) -> ProxyPolicy:
     )
 
 
-def _worker_environment(*, disable_xet: bool) -> dict[str, str]:
+def _worker_environment() -> dict[str, str]:
     environment = os.environ.copy()
     tls = select_tls(environment=environment)
     policy = _worker_policy(environment)
@@ -92,6 +92,8 @@ def _worker_environment(*, disable_xet: bool) -> dict[str, str]:
             "system_bypass": policy.system_bypass,
         }
     )
+    environment["HF_XET_TELEMETRY_ENABLED"] = "0"
+    environment["HF_HUB_DISABLE_TELEMETRY"] = "1"
     proxy_urls = [
         policy.environment.get(scheme)
         or policy.environment.get("all")
@@ -114,7 +116,7 @@ def _worker_environment(*, disable_xet: bool) -> dict[str, str]:
             if value
         )
     )
-    if disable_xet or tls.source in ("explicit_file", "explicit_directory") or incompatible_proxy:
+    if tls.source in ("explicit_file", "explicit_directory") or incompatible_proxy:
         environment["HF_HUB_DISABLE_XET"] = "1"
         return environment
     for name in tuple(environment):
@@ -199,7 +201,7 @@ class HuggingFaceXetDownloadAdapter:
                     await asyncio.sleep(0.05)
 
             try:
-                environment = _worker_environment(disable_xet=False)
+                environment = _worker_environment()
                 if request.endpoint is not None:
                     if request.endpoint not in {
                         "https://huggingface.co",
@@ -453,7 +455,13 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
         name: value
         for name, value in os.environ.items()
         if name.lower().endswith("_proxy")
-        or name in ("HF_HUB_DISABLE_XET", _WORKER_PROXY_POLICY_ENV)
+        or name
+        in (
+            "HF_HUB_DISABLE_XET",
+            "HF_XET_TELEMETRY_ENABLED",
+            "HF_HUB_DISABLE_TELEMETRY",
+            _WORKER_PROXY_POLICY_ENV,
+        )
     }
     _WORKER_EVENT_PATH = event_path
     failure_code = "worker_request_failed"
@@ -463,7 +471,7 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
         xet_cache_dir = local_dir / ".cache" / "xet"
         os.environ["HF_XET_CACHE"] = str(xet_cache_dir)
         failure_code = "network_configuration_failed"
-        environment = _worker_environment(disable_xet=False)
+        environment = _worker_environment()
         for name in tuple(os.environ):
             if name.lower().endswith("_proxy") and name not in environment:
                 os.environ.pop(name)
@@ -478,11 +486,11 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
         from huggingface_hub import hf_hub_download, set_client_factory
         from huggingface_hub.utils._http import hf_request_event_hook
 
-        from puripuly_heart.core.network_clients import external_client
+        from .local_stt_huggingface_client import huggingface_client
 
         set_client_factory(
             partial(
-                external_client,
+                huggingface_client,
                 policy=_worker_policy(environment),
                 follow_redirects=True,
                 timeout=30.0 if payload.get("endpoint") else None,
@@ -530,6 +538,8 @@ def run_huggingface_xet_worker(*, request_path: Path, event_path: Path) -> int:
         for name in tuple(os.environ):
             if name.lower().endswith("_proxy") or name in (
                 "HF_HUB_DISABLE_XET",
+                "HF_XET_TELEMETRY_ENABLED",
+                "HF_HUB_DISABLE_TELEMETRY",
                 _WORKER_PROXY_POLICY_ENV,
             ):
                 os.environ.pop(name)

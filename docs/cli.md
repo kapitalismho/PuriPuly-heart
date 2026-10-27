@@ -132,6 +132,7 @@ Select the model/backend through `settings choices` and `settings apply`. `gemma
 - Asset operations preserve provider selection. On cancellation, wait for the original operation to settle before retrying a conflict; runtime demand changes do not cancel transfers. In-use deletion is rejected.
 - E4B supports CPU/GPU and may fall back internally from GPU to CPU. 26B is Vulkan-only and never substitutes CPU, E4B, or a remote provider after failure. Resolve the cause or explicitly choose another supported selection.
 - Self, Peer, and manual requests share the managed server's bounded capacity. Model/backend changes drain owned work before replacement. Preparation success is not translation success.
+- Managed Windows servers run offline and ignore inherited llama.cpp environment settings and user/system configuration. Model provisioning remains owned by the application; this is not an operating-system network sandbox.
 
 Fixed deployment profiles are not CLI tuning settings. Exact model identities/hashes, runtime pins, and execution options live in [assets.py](../src/puripuly_heart/core/local_translation/assets.py), [runtime_profile.py](../src/puripuly_heart/core/local_translation/runtime_profile.py), and the [runtime notice](../third_party/llama.cpp/README.md).
 

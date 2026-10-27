@@ -180,6 +180,7 @@ async def recording_proxy(context=None, *, socks=False):
 
     async def handle(reader, writer):
         remote = None
+        forwarding = ()
         try:
             if socks:
                 version, count = await reader.readexactly(2)
@@ -221,20 +222,23 @@ async def recording_proxy(context=None, *, socks=False):
                         path += "?" + parsed.query
                     remote.write(f"{method} {path} HTTP/1.1\r\n".encode() + remaining)
                     await remote.drain()
-            forward = asyncio.create_task(pipe(reader, remote))
-            backward = asyncio.create_task(pipe(upstream, writer))
-            done, pending = await asyncio.wait(
-                (forward, backward), return_when=asyncio.FIRST_COMPLETED
+            forwarding = (
+                asyncio.create_task(pipe(reader, remote)),
+                asyncio.create_task(pipe(upstream, writer)),
             )
-            for task in pending:
-                task.cancel()
-            await asyncio.gather(*done, *pending, return_exceptions=True)
+            await asyncio.wait(forwarding, return_when=asyncio.FIRST_COMPLETED)
         except ConnectionError, asyncio.IncompleteReadError:
             pass
         finally:
-            writer.close()
-            if remote is not None:
-                remote.close()
+            for task in forwarding:
+                task.cancel()
+            await asyncio.gather(*forwarding, return_exceptions=True)
+            streams = (writer,) if remote is None else (writer, remote)
+            for stream in streams:
+                stream.close()
+            await asyncio.gather(
+                *(stream.wait_closed() for stream in streams), return_exceptions=True
+            )
 
     def accept(reader, writer):
         task = asyncio.create_task(handle(reader, writer))
@@ -255,11 +259,76 @@ async def recording_proxy(context=None, *, socks=False):
     finally:
         for listener in servers:
             listener.close()
+            listener.abort_clients()
+        owned = tuple(tasks)
+        for task in owned:
+            task.cancel()
+        await asyncio.gather(*owned, return_exceptions=True)
         for listener in servers:
             await listener.wait_closed()
-        for task in tasks:
+
+
+async def test_proxy_teardown_closes_live_tunnel_and_drains_owned_tasks():
+    upstream_received = []
+    upstream_eof = []
+    upstream_closed = asyncio.Event()
+
+    async def upstream(reader, writer):
+        try:
+            data = await reader.readline()
+            upstream_received.append(data)
+            writer.write(b"echo:" + data)
+            await writer.drain()
+            upstream_eof.append(await reader.read())
+        finally:
+            writer.close()
+            await writer.wait_closed()
+            upstream_closed.set()
+
+    server = await asyncio.start_server(upstream, "127.0.0.1", 0)
+    target = f"127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    before = asyncio.all_tasks()
+    writer = None
+    try:
+        async with asyncio.timeout(3):
+            async with recording_proxy() as (proxy, recorded):
+                endpoint = urlsplit(proxy)
+                reader, writer = await asyncio.open_connection(endpoint.hostname, endpoint.port)
+                writer.write(f"CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n\r\n".encode())
+                await writer.drain()
+                assert await reader.readuntil(b"\r\n\r\n") == (
+                    b"HTTP/1.1 200 Connection Established\r\n\r\n"
+                )
+                writer.write(b"controlled-tunnel-progress\n")
+                await writer.drain()
+                assert await reader.readline() == b"echo:controlled-tunnel-progress\n"
+                assert upstream_received == [b"controlled-tunnel-progress\n"]
+                assert recorded == [("CONNECT", target)]
+                admitted = {
+                    task
+                    for task in asyncio.all_tasks() - before
+                    if task.get_coro().__qualname__.startswith(f"{recording_proxy.__name__}.")
+                }
+                assert admitted
+            assert await reader.read() == b""
+            await upstream_closed.wait()
+            assert upstream_eof == [b""]
+            assert all(task.done() for task in admitted), [
+                (task.get_coro().__qualname__, task.cancelling())
+                for task in admitted
+                if not task.done()
+            ]
+    finally:
+        if writer is not None:
+            writer.close()
+            await writer.wait_closed()
+        server.close()
+        server.close_clients()
+        remaining = asyncio.all_tasks() - before
+        for task in remaining:
             task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*remaining, return_exceptions=True)
+        await server.wait_closed()
 
 
 def test_proxy_selection_preserves_system_with_no_proxy_only():
@@ -527,7 +596,7 @@ async def test_huggingface_child_selects_compatible_transport(
 import json, os, pathlib, sys
 payload = json.loads(pathlib.Path(sys.argv[1]).read_text())
 target = pathlib.Path(payload['local_dir']) / payload['remote_path']
-target.write_text(json.dumps({name: os.environ.get(name) for name in ('SSL_CERT_FILE', 'HF_HUB_DISABLE_XET', 'HTTP_PROXY', 'HTTPS_PROXY')}))
+target.write_text(json.dumps({name: os.environ.get(name) for name in ('SSL_CERT_FILE', 'HF_HUB_DISABLE_XET', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY')}))
 pathlib.Path(sys.argv[2]).write_text(json.dumps({'type': 'complete', 'path': str(target)}) + '\\n')
 """
     adapter = HuggingFaceXetDownloadAdapter(
@@ -558,7 +627,8 @@ pathlib.Path(sys.argv[2]).write_text(json.dumps({'type': 'complete', 'path': str
         assert result["SSL_CERT_FILE"] == str(root)
     if policy_case == "proxy_normalized":
         assert result["HTTP_PROXY"] == "http://all.invalid:8888"
-        assert result["HTTPS_PROXY"] == "http://lower.invalid:8888"
+        assert result["HTTPS_PROXY"] == os.environ["HTTPS_PROXY"]
+        assert result["NO_PROXY"] == ","
 
 
 async def test_plain_http_uses_selected_https_proxy_trust(certificates, monkeypatch):

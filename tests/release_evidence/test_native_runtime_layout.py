@@ -140,7 +140,7 @@ def test_native_child_consumes_production_bundle_resources_without_installed_wri
         "data/vad/silero_vad.onnx",
         "data/fonts/NotoSansCJK-Medium.ttc",
         "data/THIRD_PARTY_NOTICES.txt",
-        "data/licenses/PYTHON-3.14.7-LICENSE.txt",
+        "data/licenses/PYTHON-3.14.10-LICENSE.txt",
         "data/models/qwen3-asr-0.6b-int8-sherpa.manifest.json",
     )
     for relative in resource_paths:
@@ -186,7 +186,7 @@ resources = [
     model,
     font,
     layout.package_resource("data", "THIRD_PARTY_NOTICES.txt"),
-    layout.package_resource("data", "licenses", "PYTHON-3.14.7-LICENSE.txt"),
+    layout.package_resource("data", "licenses", "PYTHON-3.14.10-LICENSE.txt"),
 ]
 manifest = local_stt_assets.load_local_stt_asset_manifest()
 print(json.dumps({
