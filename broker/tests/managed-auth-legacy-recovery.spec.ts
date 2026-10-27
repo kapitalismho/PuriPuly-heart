@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { buildManagedOperationId, buildManagedOperationResumeToken } from './test-support/managed-operation';
 
 import worker from '../src/index';
 import {
-  buildManagedOperationId, buildManagedOperationResumeToken, createManagedOperation,
+  createManagedOperation,
   hashManagedOperationResumeToken, providerKeyNameForOperationAttempt, sweepStaleManagedOperations,
 } from '../src/managed-operation';
 import { readBrokerMigrationSql } from './test-support/migrations';

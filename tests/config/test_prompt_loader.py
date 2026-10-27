@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
@@ -266,17 +265,6 @@ def test_load_prompt_for_provider_requires_translation_prompt_for_llm_provider(
 
     with pytest.raises(FileNotFoundError):
         load_prompt_for_provider("gemini")
-
-
-def test_get_prompts_dir_uses_pyinstaller_meipass(tmp_path, monkeypatch) -> None:
-    bundle_root = tmp_path / "bundle"
-    prompts_dir = bundle_root / "prompts"
-    prompts_dir.mkdir(parents=True)
-
-    monkeypatch.setattr(sys, "frozen", True, raising=False)
-    monkeypatch.setattr(sys, "_MEIPASS", str(bundle_root), raising=False)
-
-    assert get_prompts_dir() == prompts_dir
 
 
 def test_list_prompts_returns_empty_when_missing(monkeypatch, tmp_path) -> None:

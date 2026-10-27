@@ -22,7 +22,7 @@ use windows::Win32::Graphics::Direct2D::{
         D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_COMPOSITE_MODE_SOURCE_OVER,
         D2D1_PIXEL_FORMAT, D2D_RECT_F,
     },
-    D2D1CreateFactory, ID2D1Bitmap1, ID2D1DeviceContext, ID2D1Factory1, ID2D1Layer,
+    D2D1CreateFactory, ID2D1Bitmap1, ID2D1CommandList, ID2D1DeviceContext, ID2D1Factory1, ID2D1Layer,
     ID2D1SolidColorBrush, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
     D2D1_BITMAP_OPTIONS_TARGET, D2D1_BITMAP_PROPERTIES1, D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
     D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_INTERPOLATION_MODE_LINEAR, D2D1_LAYER_OPTIONS1_NONE,
@@ -60,7 +60,7 @@ use windows_core::BOOL;
 use windows_numerics::{Matrix3x2, Vector2};
 
 #[cfg(windows)]
-use super::cache::{CachedBlockVisual, CachedLineVisual, WindowsRendererCaches};
+use super::cache::WindowsRendererCaches;
 #[cfg(windows)]
 use super::font_resolver::{
     runtime_bundled_font_path, system_ui_language_hint, FontResolver, FontWeight,
@@ -74,7 +74,7 @@ use super::layout::DirectWriteLayoutEngine;
 use super::layout::{resolved_layout_has_drawable_text, CaptionLayoutPolicy};
 #[cfg(windows)]
 use super::types::{
-    contains_cjk, effective_background_alpha, fill_color_for_channel, outline_offsets_px,
+    effective_background_alpha, fill_color_for_channel, outline_offsets_px,
     BlockCacheKey, CaptionBlockVariant, CaptionChannel, LineCacheKey, LineRole,
     ResolvedBlockLayout, ResolvedLineLayout, ResolvedTextStyle, SpeakerDividerBand,
     DEFAULT_FONT_SIZE_PX, DEFAULT_SURFACE_HEIGHT_PX, DEFAULT_SURFACE_WIDTH_PX,
@@ -96,8 +96,8 @@ const GPU_READINESS_TIMEOUT: Duration = Duration::from_millis(50);
 #[cfg(windows)]
 #[derive(Default)]
 struct PreparedFrameVisuals {
-    lines: HashMap<LineCacheKey, CachedLineVisual>,
-    blocks: HashMap<BlockCacheKey, CachedBlockVisual>,
+    lines: HashMap<LineCacheKey, ID2D1CommandList>,
+    blocks: HashMap<BlockCacheKey, ID2D1CommandList>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -135,34 +135,6 @@ const CJK_WARMUP_SAMPLES: [(&str, &str); 4] = [
     ("zh-CN", "中文"),
     ("zh-TW", "繁體"),
 ];
-
-#[cfg(windows)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FirstCjkLayoutDiagnosticOutcome {
-    NoTiming,
-    AlreadyLogged,
-    Success,
-    Failure,
-}
-
-#[cfg(windows)]
-fn first_cjk_layout_diagnostic_outcome<T>(
-    timing: Option<T>,
-    already_logged: bool,
-    directwrite_succeeded: bool,
-) -> FirstCjkLayoutDiagnosticOutcome {
-    if timing.is_none() {
-        return FirstCjkLayoutDiagnosticOutcome::NoTiming;
-    }
-    if already_logged {
-        return FirstCjkLayoutDiagnosticOutcome::AlreadyLogged;
-    }
-    if directwrite_succeeded {
-        FirstCjkLayoutDiagnosticOutcome::Success
-    } else {
-        FirstCjkLayoutDiagnosticOutcome::Failure
-    }
-}
 
 #[cfg(windows)]
 #[derive(Debug, Clone, Copy, Default)]
@@ -733,10 +705,6 @@ struct WindowsCaptionRenderer {
     caches: WindowsRendererCaches,
     previous_layout: Option<ResolvedFrameLayout>,
     previous_debug_overlay_visible: bool,
-    first_cjk_layout_logged: bool,
-    first_cjk_line_visual_logged: bool,
-    visual_bounds_diagnostics: u8,
-    first_cjk_command_list_logged: bool,
     frame_text_format_cache_hits: u32,
     frame_text_format_cache_misses: u32,
     font_warmup_attempts: u32,
@@ -835,10 +803,6 @@ impl WindowsCaptionRenderer {
             caches: WindowsRendererCaches::default(),
             previous_layout: None,
             previous_debug_overlay_visible: false,
-            first_cjk_layout_logged: false,
-            first_cjk_line_visual_logged: false,
-            visual_bounds_diagnostics: 0,
-            first_cjk_command_list_logged: false,
             frame_text_format_cache_hits: 0,
             frame_text_format_cache_misses: 0,
             font_warmup_attempts: 0,
@@ -1090,11 +1054,9 @@ impl WindowsCaptionRenderer {
 
     fn build_cached_line_visual(
         &mut self,
-        policy: &CaptionLayoutPolicy,
         block: &ResolvedBlockLayout,
         line: &ResolvedLineLayout,
-        role: LineRole,
-    ) -> Result<CachedLineVisual, CaptionRenderError> {
+    ) -> Result<ID2D1CommandList, CaptionRenderError> {
         let channel = block.channel.unwrap_or(CaptionChannel::SelfChannel);
         let fill_brush = self.cache_brush_for_channel(channel, block.speaker_style);
         let outline_brush = self.cache_outline_brush.clone();
@@ -1102,25 +1064,6 @@ impl WindowsCaptionRenderer {
             fill_brush.SetOpacity(1.0);
             outline_brush.SetOpacity(1.0);
         }
-        self.build_line_visual_with_brushes(policy, block, line, role, &fill_brush, &outline_brush)
-    }
-
-    fn build_line_visual_with_brushes(
-        &mut self,
-        policy: &CaptionLayoutPolicy,
-        block: &ResolvedBlockLayout,
-        line: &ResolvedLineLayout,
-        role: LineRole,
-        fill_brush: &ID2D1SolidColorBrush,
-        outline_brush: &ID2D1SolidColorBrush,
-    ) -> Result<CachedLineVisual, CaptionRenderError> {
-        let line_has_cjk = contains_cjk(line.text.trim());
-        let line_visual_started = if line_has_cjk && !self.first_cjk_line_visual_logged {
-            Some(Instant::now())
-        } else {
-            None
-        };
-        let _ = policy;
         let text_layout = self.create_text_layout_for_line_style(
             &line.style,
             line.text.trim(),
@@ -1128,64 +1071,34 @@ impl WindowsCaptionRenderer {
             block.content_width_px,
             line.font_size_px * 1.15,
         )?;
-        let command_list_started = if line_has_cjk && !self.first_cjk_command_list_logged {
-            Some(Instant::now())
-        } else {
-            None
-        };
-        let glyph_visual = render_text_layout_to_command_list(
+        render_text_layout_to_command_list(
             &self.d2d_context,
             &self.d2d_factory,
             &text_layout,
-            fill_brush,
-            outline_brush,
+            &fill_brush,
+            &outline_brush,
             outline_offsets_px()[0]
                 .0
                 .abs()
                 .max(outline_offsets_px()[2].1.abs())
                 * 2.0,
-        )?;
-        if command_list_started.is_some() {
-            self.first_cjk_command_list_logged = true;
-        }
-        let _ = role;
-        if line_visual_started.is_some() {
-            self.first_cjk_line_visual_logged = true;
-        }
-        Ok(CachedLineVisual {
-            command_list: glyph_visual.command_list,
-            visual_bounds: glyph_visual.visual_bounds,
-        })
+        )
     }
 
     fn cached_line_visual(
         &mut self,
-        policy: &CaptionLayoutPolicy,
         block: &ResolvedBlockLayout,
         line: &ResolvedLineLayout,
         role: LineRole,
         diagnostics: &mut RenderDiagnostics,
-    ) -> Result<CachedLineVisual, CaptionRenderError> {
+    ) -> Result<ID2D1CommandList, CaptionRenderError> {
         let key = self.line_cache_key(block, line, role);
         if let Some(cached) = self.caches.line_cache.get(&key) {
             diagnostics.line_cache_hits += 1;
             return Ok(cached.clone());
         }
         diagnostics.line_cache_misses += 1;
-        let cached = self
-            .build_cached_line_visual(policy, block, line, role)
-            .map_err(|error| error)?;
-        let bounds = cached.visual_bounds;
-        let width = f64::from(bounds.right_px) - f64::from(bounds.left_px);
-        let height = f64::from(bounds.bottom_px) - f64::from(bounds.top_px);
-        let pixel_equivalent_bytes = width.max(0.0) * height.max(0.0) * 4.0;
-        if self.visual_bounds_diagnostics < 4
-            && (!width.is_finite()
-                || !height.is_finite()
-                || pixel_equivalent_bytes > 28.0 * 1024.0 * 1024.0)
-        {
-            self.visual_bounds_diagnostics += 1;
-        }
+        let cached = self.build_cached_line_visual(block, line)?;
         self.caches.line_cache.insert(key, cached.clone());
         Ok(cached)
     }
@@ -1196,7 +1109,7 @@ impl WindowsCaptionRenderer {
         block: &ResolvedBlockLayout,
         line: &ResolvedLineLayout,
         role: LineRole,
-    ) -> Result<CachedLineVisual, CaptionRenderError> {
+    ) -> Result<ID2D1CommandList, CaptionRenderError> {
         let key = self.line_cache_key(block, line, role);
         prepared.lines.get(&key).cloned().ok_or_else(|| {
             CaptionRenderError::Draw(format!(
@@ -1211,7 +1124,7 @@ impl WindowsCaptionRenderer {
         policy: &CaptionLayoutPolicy,
         block: &ResolvedBlockLayout,
         prepared: &PreparedFrameVisuals,
-    ) -> Result<CachedBlockVisual, CaptionRenderError> {
+    ) -> Result<ID2D1CommandList, CaptionRenderError> {
         let previous_target = unsafe { self.d2d_context.GetTarget().ok() };
         let command_list = unsafe {
             self.d2d_context
@@ -1223,7 +1136,6 @@ impl WindowsCaptionRenderer {
             self.d2d_context.BeginDraw();
         }
 
-        let mut visual_bounds: Option<super::types::VisualBounds> = None;
         let build_result = (|| {
             for (role, line) in block_lines(block) {
                 if line.text.trim().is_empty() {
@@ -1236,28 +1148,13 @@ impl WindowsCaptionRenderer {
                 };
                 unsafe {
                     self.d2d_context.DrawImage(
-                        &cached.command_list,
+                        &cached,
                         Some(&offset),
                         None,
                         D2D1_INTERPOLATION_MODE_LINEAR,
                         D2D1_COMPOSITE_MODE_SOURCE_OVER,
                     );
                 }
-                let translated = super::types::VisualBounds::new(
-                    cached.visual_bounds.left_px + offset.X,
-                    cached.visual_bounds.top_px + offset.Y,
-                    cached.visual_bounds.right_px + offset.X,
-                    cached.visual_bounds.bottom_px + offset.Y,
-                );
-                visual_bounds = Some(match visual_bounds {
-                    Some(current) => super::types::VisualBounds::new(
-                        current.left_px.min(translated.left_px),
-                        current.top_px.min(translated.top_px),
-                        current.right_px.max(translated.right_px),
-                        current.bottom_px.max(translated.bottom_px),
-                    ),
-                    None => translated,
-                });
             }
             Ok(())
         })();
@@ -1279,10 +1176,7 @@ impl WindowsCaptionRenderer {
                         .Close()
                         .map_err(|error| CaptionRenderError::Draw(error.to_string()))?;
                 }
-                Ok(CachedBlockVisual {
-                    command_list,
-                    visual_bounds: visual_bounds.unwrap_or(block.visual_bounds),
-                })
+                Ok(command_list)
             }
         }
     }
@@ -1293,7 +1187,7 @@ impl WindowsCaptionRenderer {
         block: &ResolvedBlockLayout,
         prepared: &PreparedFrameVisuals,
         diagnostics: &mut RenderDiagnostics,
-    ) -> Result<CachedBlockVisual, CaptionRenderError> {
+    ) -> Result<ID2D1CommandList, CaptionRenderError> {
         let key = self.block_cache_key(block);
         if let Some(cached) = self.caches.block_cache.get(&key) {
             diagnostics.block_cache_hits += 1;
@@ -1309,7 +1203,7 @@ impl WindowsCaptionRenderer {
         &mut self,
         policy: &CaptionLayoutPolicy,
         overlay: &CaptionDebugOverlay,
-    ) -> Result<CachedLineVisual, CaptionRenderError> {
+    ) -> Result<ID2D1CommandList, CaptionRenderError> {
         let label = overlay.label();
         let font_size_px = 34.0;
         let content_width_px = DEFAULT_SURFACE_WIDTH_PX as f32 - 96.0;
@@ -1344,12 +1238,7 @@ impl WindowsCaptionRenderer {
             self.cache_self_text_brush.SetOpacity(1.0);
             self.cache_outline_brush.SetOpacity(1.0);
         }
-        let visual = visual?;
-
-        Ok(CachedLineVisual {
-            command_list: visual.command_list,
-            visual_bounds: visual.visual_bounds,
-        })
+        visual
     }
 
     fn draw_speaker_divider(&self, band: SpeakerDividerBand) {
@@ -1375,11 +1264,11 @@ impl WindowsCaptionRenderer {
         }
     }
 
-    fn draw_debug_overlay_visual(&self, visual: &CachedLineVisual) {
+    fn draw_debug_overlay_visual(&self, visual: &ID2D1CommandList) {
         let offset = Vector2 { X: 32.0, Y: 24.0 };
         unsafe {
             self.d2d_context.DrawImage(
-                &visual.command_list,
+                visual,
                 Some(&offset),
                 None,
                 D2D1_INTERPOLATION_MODE_LINEAR,
@@ -1390,7 +1279,6 @@ impl WindowsCaptionRenderer {
 
     fn prepare_line_visuals(
         &mut self,
-        policy: &CaptionLayoutPolicy,
         layout: &ResolvedFrameLayout,
         diagnostics: &mut RenderDiagnostics,
     ) -> Result<PreparedFrameVisuals, CaptionRenderError> {
@@ -1405,7 +1293,7 @@ impl WindowsCaptionRenderer {
                     continue;
                 }
                 let visual = self
-                    .cached_line_visual(policy, block, line, role, diagnostics)
+                    .cached_line_visual(block, line, role, diagnostics)
                     .map_err(|error| prefix_render_error("line_cache_build", error))?;
                 prepared.lines.insert(key, visual);
             }
@@ -1473,12 +1361,6 @@ impl WindowsCaptionRenderer {
         self.frame_text_format_cache_hits = 0;
         self.frame_text_format_cache_misses = 0;
         let mut diagnostics = RenderDiagnostics::default();
-        let contains_cjk_text = caption_blocks_contain_cjk_style(&blocks);
-        let cjk_layout_started = if contains_cjk_text && !self.first_cjk_layout_logged {
-            Some(Instant::now())
-        } else {
-            None
-        };
         for block in &blocks {
             let key = policy.layout_cache_key_for_block_windows(
                 block,
@@ -1502,14 +1384,6 @@ impl WindowsCaptionRenderer {
         ) {
             Ok(layout) => {
                 diagnostics.directwrite_layout_success_count += 1;
-                if first_cjk_layout_diagnostic_outcome(
-                    cjk_layout_started.as_ref(),
-                    self.first_cjk_layout_logged,
-                    true,
-                ) == FirstCjkLayoutDiagnosticOutcome::Success
-                {
-                    self.first_cjk_layout_logged = true;
-                }
                 layout
             }
             Err(_error) => {
@@ -1525,7 +1399,7 @@ impl WindowsCaptionRenderer {
         } else {
             None
         };
-        let mut prepared = self.prepare_line_visuals(policy, &layout, &mut diagnostics)?;
+        let mut prepared = self.prepare_line_visuals(&layout, &mut diagnostics)?;
         self.prepare_block_visuals(policy, &layout, &mut prepared, &mut diagnostics)?;
         let debug_overlay_visual = debug_overlay
             .as_ref()
@@ -1586,7 +1460,7 @@ impl WindowsCaptionRenderer {
 
                 if let Some(cached_block) = prepared.blocks.get(&self.block_cache_key(block)) {
                     self.draw_cached_command_list_with_state(
-                        &cached_block.command_list,
+                        cached_block,
                         block.bounds.left_px,
                         block.bounds.top_px,
                         block.opacity,
@@ -1602,7 +1476,7 @@ impl WindowsCaptionRenderer {
                     }
                     let line_visual = self.prepared_line_visual(&prepared, block, line, role)?;
                     self.draw_cached_command_list_with_state(
-                        &line_visual.command_list,
+                        &line_visual,
                         block.bounds.left_px + policy.strip_horizontal_padding_px() as f32,
                         line.origin_y,
                         block.opacity,
@@ -2347,19 +2221,6 @@ fn block_lines(
         )
 }
 
-#[cfg(windows)]
-fn caption_blocks_contain_cjk_style(blocks: &[super::types::CaptionBlock]) -> bool {
-    blocks.iter().any(|block| {
-        FontLanguageBucket::for_text(block.primary_language.as_deref(), &block.primary_text)
-            != FontLanguageBucket::General
-            || (block.secondary_enabled
-                && FontLanguageBucket::for_text(
-                    block.secondary_language.as_deref(),
-                    &block.secondary_text,
-                ) != FontLanguageBucket::General)
-    })
-}
-
 fn prepare_layout_for_render(
     previous_layout: &mut Option<ResolvedFrameLayout>,
     mut layout: ResolvedFrameLayout,
@@ -2939,21 +2800,20 @@ mod tests {
             block.channel = Some(channel);
             for role in [LineRole::Primary, LineRole::Secondary] {
                 let visual = renderer
-                    .cached_line_visual(&policy, &block, &line, role, &mut diagnostics)
+                    .cached_line_visual(&block, &line, role, &mut diagnostics)
                     .unwrap();
-                let bounds = visual.visual_bounds;
-                let pixel_equivalent_bytes = f64::from(bounds.right_px - bounds.left_px)
-                    * f64::from(bounds.bottom_px - bounds.top_px)
+                let bounds = unsafe { renderer.d2d_context.GetImageLocalBounds(&visual) }.unwrap();
+                let pixel_equivalent_bytes = f64::from(bounds.right - bounds.left)
+                    * f64::from(bounds.bottom - bounds.top)
                     * 4.0;
                 assert!(pixel_equivalent_bytes > 64.0 * 1024.0 * 1024.0);
                 renderer
-                    .cached_line_visual(&policy, &block, &line, role, &mut diagnostics)
+                    .cached_line_visual(&block, &line, role, &mut diagnostics)
                     .unwrap();
             }
         }
         assert_eq!(diagnostics.line_cache_misses, 4);
         assert_eq!(diagnostics.line_cache_hits, 4);
-        assert_eq!(renderer.visual_bounds_diagnostics, 4);
     }
 
     use super::{prepare_layout_for_render, resolve_bounded_gpu_readiness, GpuReadinessProbe};
@@ -3147,30 +3007,6 @@ mod tests {
         let damage_band = rendered.damage_band.expect("first frame should damage");
         assert_eq!(damage_band.top_px, 0.0);
         assert_eq!(damage_band.bottom_px, 500.0);
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn first_cjk_layout_failure_does_not_consume_success_diagnostic() {
-        let mut logged = false;
-
-        assert_eq!(
-            super::first_cjk_layout_diagnostic_outcome(Some(()), logged, false),
-            super::FirstCjkLayoutDiagnosticOutcome::Failure
-        );
-        assert!(!logged);
-
-        let outcome = super::first_cjk_layout_diagnostic_outcome(Some(()), logged, true);
-        if outcome == super::FirstCjkLayoutDiagnosticOutcome::Success {
-            logged = true;
-        }
-
-        assert_eq!(outcome, super::FirstCjkLayoutDiagnosticOutcome::Success);
-        assert!(logged);
-        assert_eq!(
-            super::first_cjk_layout_diagnostic_outcome(Some(()), logged, true),
-            super::FirstCjkLayoutDiagnosticOutcome::AlreadyLogged
-        );
     }
 
     #[cfg(windows)]

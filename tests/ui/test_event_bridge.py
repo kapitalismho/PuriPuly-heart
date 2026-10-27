@@ -12,12 +12,11 @@ import pytest
 
 pytest.importorskip("flet")
 
-from puripuly_heart.core.managed_openrouter_release import (
+from puripuly_heart.core import messages
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterReleaseDiagnostics,
     ManagedOpenRouterUserFacingError,
 )
-
-from puripuly_heart.core import messages
 from puripuly_heart.core.runtime_logging import (
     RealtimeLogHandler,
     RuntimeLoggingSinks,

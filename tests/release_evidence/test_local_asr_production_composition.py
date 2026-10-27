@@ -12,11 +12,11 @@ from uuid import uuid4
 
 import numpy as np
 import pytest
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 
 import puripuly_heart.composition.local_asr_production_evidence as composition
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,

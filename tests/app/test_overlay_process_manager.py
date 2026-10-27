@@ -2036,20 +2036,24 @@ def test_default_overlay_process_runner_uses_staged_overlay_for_local_dev_when_s
     assert resolved == staged
 
 
+@pytest.mark.parametrize(
+    "source_relative_path",
+    ["native/overlay/src/presentation/retry/state.rs", "native/windows_version.rs"],
+)
 @pytest.mark.asyncio
 async def test_overlay_process_manager_rejects_stale_staged_overlay_build(
     tmp_path: Path,
+    source_relative_path: str,
 ) -> None:
     repo_root = tmp_path / "repo"
     staged = repo_root / "build" / "overlay" / "PuriPulyHeartOverlay.exe"
     staged.parent.mkdir(parents=True)
     staged.write_text("staged", encoding="utf-8")
 
-    overlay_source = (
-        repo_root / "native" / "overlay" / "src" / "presentation" / "retry" / "state.rs"
-    )
-    overlay_source.parent.mkdir(parents=True)
-    overlay_source.write_text("// changed overlay source", encoding="utf-8")
+    (repo_root / "native/overlay/src").mkdir(parents=True, exist_ok=True)
+    overlay_source = repo_root / source_relative_path
+    overlay_source.parent.mkdir(parents=True, exist_ok=True)
+    overlay_source.write_text("const CHECK: () = ();", encoding="utf-8")
 
     staged_mtime = 1_700_000_000
     source_mtime = staged_mtime + 60
@@ -2064,6 +2068,31 @@ async def test_overlay_process_manager_rejects_stale_staged_overlay_build(
 
     assert manager.state == "failed"
     assert manager.failure_reason == "stale_overlay_build"
+
+
+@pytest.mark.parametrize(
+    "source_relative_path",
+    ["native/overlay/src/presentation/retry/state.rs", "native/windows_version.rs"],
+)
+@pytest.mark.parametrize("source_age_s", [-60, 0], ids=["older", "same"])
+def test_default_overlay_process_runner_accepts_current_staged_overlay_build(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source_relative_path: str,
+    source_age_s: int,
+) -> None:
+    staged, bundle = _make_local_dev_overlay_fixture(tmp_path, staged_dll_bytes=None)
+    _patch_vendored_openvr_bundle(monkeypatch, bundle=bundle)
+    source = tmp_path / "repo" / source_relative_path
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text("const CHECK: () = ();", encoding="utf-8")
+    source_mtime = staged.stat().st_mtime + source_age_s
+    os.utime(source, (source_mtime, source_mtime))
+
+    resolved = DefaultOverlayProcessRunner(executable_path=staged).prepare(_overlay_manifest())
+
+    assert resolved == staged
+    assert staged.with_name("openvr_api.dll").read_bytes() == bundle.dll_path.read_bytes()
 
 
 @pytest.mark.parametrize("staged_dll_bytes", [None, b"stale-openvr-runtime"])

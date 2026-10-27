@@ -3,11 +3,11 @@ from __future__ import annotations
 import logging
 import math
 
-from puripuly_heart.app.services.local_asr_diagnostics import (
+from puripuly_heart.app.services.local_asr.local_asr_diagnostics import (
     LocalASRDiagnosticsGpuEffect,
     LocalASRDiagnosticsOwner,
 )
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 
 
 def _owner_with_logs() -> tuple[

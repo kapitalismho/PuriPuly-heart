@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
     LocalASRProviderRuntimePort,
     ProviderRuntimeBuildRequest,

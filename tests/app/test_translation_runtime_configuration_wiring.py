@@ -6,18 +6,18 @@ from threading import Barrier
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.app.wiring_provider_runtime import (
+
+from puripuly_heart.app.wiring.wiring_provider_runtime import (
     ProviderRuntimeEffects,
     project_translation_runtime_settings_from_vnext,
 )
-from puripuly_heart.app.wiring_runtime_pipeline import runtime_pipeline_inputs_from_vnext
-from puripuly_heart.app.wiring_translation_runtime_configuration import (
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import runtime_pipeline_inputs_from_vnext
+from puripuly_heart.app.wiring.wiring_translation_runtime_configuration import (
     build_translation_runtime_config,
     replace_translation_runtime_effective_flags,
     replace_translation_runtime_enabled,
     replace_translation_runtime_settings,
 )
-
 from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_GPT_6_LUNA
 from puripuly_heart.config.prompts import get_translation_prompt_template
 from puripuly_heart.config.runtime_resolution import OPENAI_MODEL_GPT_6_LUNA

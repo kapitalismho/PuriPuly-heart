@@ -223,6 +223,7 @@ Use returned identities, not invented placeholders. `capabilities.query_argument
 - History is bounded, in-memory, and current-instance only. Inspect gaps, eviction/truncation, and lookup outcomes. `not_retained`, `foreign_instance`, or `invalid_cursor` does not mean an operation succeeded or never failed.
 - History's `next_after` is a diagnostic cursor. An event's `sequence` is a replay cursor. They are not interchangeable; retain the originating instance with either.
 - `diagnostics.health` reports history/event/file/output delivery health independently of a working file sink. Enqueued is not written; written is not durable. Aggregate counters do not prove persistence of an individual record.
+- Terminal file records trigger delivery without waiting for ordinary batch expiry; their severity is unchanged. This does not bypass a blocked sink or the bounded close deadline: a timeout remains visible and cleanup stays listener-owned.
 - Diagnostics cannot establish remote UDP receipt or physical display. They exclude raw exceptions, arbitrary child output, personal paths, credentials, audio, and conversation content.
 
 Exact schemas, bounds, and projections live in [diagnostics](../src/puripuly_heart/core/diagnostics.py), [runtime logging](../src/puripuly_heart/core/runtime_logging.py), and [control events](../src/puripuly_heart/app/services/application_control_events.py).

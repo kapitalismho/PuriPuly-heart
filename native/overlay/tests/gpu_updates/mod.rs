@@ -113,7 +113,7 @@ async fn windows_graphics_python_snapshots_complete_paced_and_burst_with_readbac
     let output = Command::new("uv")
         .args([
             "run",
-            "--frozen",
+            "--locked",
             "python",
             "-m",
             "tests.helpers.overlay_active_freshness",

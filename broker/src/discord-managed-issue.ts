@@ -1,5 +1,7 @@
 import type { Context } from 'hono';
 
+import { encodeBase64Url, isBase64Url, randomBase64Url, sha256Base64Url, verifyEd25519Signature } from './crypto';
+
 import {
   checkActiveIssuanceBrake,
   checkEndpointRateLimit,
@@ -39,11 +41,8 @@ import {
   type DiscordUserResponse,
 } from './discord-oauth';
 import { getFingerprintSaltConfig } from './fingerprint-salt';
-import {
-  normalizeManagedState,
-} from './managed-state';
 import { createManagedKeyDelivery } from './managed-key-delivery';
-import { nonEmptyString, stringValue, validatePublicInput } from './public-input';
+import { nonEmptyString, parseIsoDate, readJsonBody, stringValue, validatePublicInput } from './public-input';
 import type {
   BrokerPendingDiscordOAuthSessionsConfig,
   DiscordOAuthSessionRecord,
@@ -78,8 +77,7 @@ const MANAGED_TRIAL_ALLOWED_MODEL_SET = new Set<string>(
 );
 const MANAGED_TRIAL_ALLOWED_MODEL_LIST =
   TRIAL_PROVIDER_POLICY.managedFreeTrial.models.join(', ');
-const STRICT_ISO_8601_TIMESTAMP =
-  /^(?<year>\d{4})-(?<month>0[1-9]|1[0-2])-(?<day>0[1-9]|[12]\d|3[01])T(?<hour>[01]\d|2[0-3]):(?<minute>[0-5]\d):(?<second>[0-5]\d)(?:\.(?<millisecond>\d{3}))?(?:(?<utc>Z)|(?<offsetSign>[+-])(?<offsetHour>[01]\d|2[0-3]):(?<offsetMinute>[0-5]\d))$/u;
+
 const textEncoder = new TextEncoder();
 const DISCORD_USER_REF_VERSION = 1;
 const DISCORD_USER_REF_PREFIX = `ph-discord-user-v${DISCORD_USER_REF_VERSION}_`;
@@ -691,7 +689,7 @@ export async function handleDiscordOpenRouterIssue(
       });
     }
 
-    const activationSucceeded = await activateDiscordReservation(c.env.BROKER_DB, {
+    await activateDiscordReservation(c.env.BROKER_DB, {
       stateHash,
       installationId: input.value.installationId,
       devicePublicKey: input.value.devicePublicKey,
@@ -3223,69 +3221,6 @@ function buildCanonicalDiscordIssuePayload(input: {
   );
 }
 
-async function verifyEd25519Signature(input: {
-  devicePublicKey: string;
-  signature: string;
-  payload: Uint8Array;
-}): Promise<boolean> {
-  try {
-    const publicKey = await crypto.subtle.importKey(
-      'raw',
-      toArrayBuffer(decodeBase64Url(input.devicePublicKey)),
-      { name: 'Ed25519' },
-      false,
-      ['verify'],
-    );
-
-    return crypto.subtle.verify(
-      { name: 'Ed25519' },
-      publicKey,
-      toArrayBuffer(decodeBase64Url(input.signature)),
-      toArrayBuffer(input.payload),
-    );
-  } catch {
-    return false;
-  }
-}
-
-function parseIsoDate(value: string): Date | null {
-  const match = STRICT_ISO_8601_TIMESTAMP.exec(value);
-  if (!match?.groups) {
-    return null;
-  }
-
-  const year = Number(match.groups.year);
-  const month = Number(match.groups.month);
-  const day = Number(match.groups.day);
-  const hour = Number(match.groups.hour);
-  const minute = Number(match.groups.minute);
-  const second = Number(match.groups.second);
-  const millisecond = Number(match.groups.millisecond ?? '0');
-  const offsetMinutes = match.groups.utc
-    ? 0
-    : (match.groups.offsetSign === '-' ? -1 : 1) *
-      (Number(match.groups.offsetHour) * 60 + Number(match.groups.offsetMinute));
-
-  const timestamp =
-    Date.UTC(year, month - 1, day, hour, minute, second, millisecond) -
-    offsetMinutes * 60_000;
-  const reconstructedLocalTime = new Date(timestamp + offsetMinutes * 60_000);
-
-  if (
-    reconstructedLocalTime.getUTCFullYear() !== year ||
-    reconstructedLocalTime.getUTCMonth() + 1 !== month ||
-    reconstructedLocalTime.getUTCDate() !== day ||
-    reconstructedLocalTime.getUTCHours() !== hour ||
-    reconstructedLocalTime.getUTCMinutes() !== minute ||
-    reconstructedLocalTime.getUTCSeconds() !== second ||
-    reconstructedLocalTime.getUTCMilliseconds() !== millisecond
-  ) {
-    return null;
-  }
-
-  return new Date(timestamp);
-}
-
 function discordStateUnknownResponse(c: Context<BrokerEnv>): Response {
   return publicErrorResponse(c, 410, {
     code: 'challenge_expired',
@@ -3397,22 +3332,6 @@ function discordEligibilityErrorResponse(
     message,
     entitlement: null,
   });
-}
-
-function discordActivationPlaceholderResponse(c: Context<BrokerEnv>): Response {
-  return c.json(
-    {
-      error: {
-        code: 'trial_unavailable',
-        class: 'retryable',
-        subcode: 'not_implemented',
-        retry_after_ms: null,
-        message: 'Discord OpenRouter activation is not implemented yet',
-      },
-      ...normalizeManagedState(null),
-    },
-    501,
-  );
 }
 
 async function resolveRequestEventIpMatchForPendingLimit(
@@ -3559,37 +3478,6 @@ function pendingInstallationLimitResponse(
   });
 }
 
-async function readJsonBody<T>(
-  c: Context<BrokerEnv>,
-): Promise<
-  | { ok: true; value: T }
-  | { ok: false; reason: 'invalid_json' | 'not_object' }
-> {
-  try {
-    const value = await c.req.json();
-    if (!isJsonObject(value)) {
-      return {
-        ok: false,
-        reason: 'not_object',
-      };
-    }
-
-    return {
-      ok: true,
-      value: value as T,
-    };
-  } catch {
-    return {
-      ok: false,
-      reason: 'invalid_json',
-    };
-  }
-}
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function invalidRequestBodyResponse(
   c: Context<BrokerEnv>,
   reason: 'invalid_json' | 'not_object',
@@ -3612,53 +3500,4 @@ function invalidRequestResponse(
     message,
     entitlement: null,
   });
-}
-
-async function sha256Base64Url(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', textEncoder.encode(value));
-  return encodeBase64Url(new Uint8Array(digest));
-}
-
-function randomBase64Url(byteLength: number): string {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-  return encodeBase64Url(bytes);
-}
-
-function isBase64Url(value: string, byteLength?: number): boolean {
-  if (!/^[A-Za-z0-9_-]+$/u.test(value)) {
-    return false;
-  }
-
-  try {
-    const decoded = decodeBase64Url(value);
-    return byteLength === undefined || decoded.length === byteLength;
-  } catch {
-    return false;
-  }
-}
-
-function decodeBase64Url(value: string): Uint8Array {
-  const padding = (4 - (value.length % 4 || 4)) % 4;
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat(padding);
-  const binary = atob(normalized);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes;
-}
-
-function encodeBase64Url(bytes: Uint8Array): string {
-  const binary = Array.from(bytes, (value) => String.fromCharCode(value)).join('');
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/u, '');
-}
-
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
 }

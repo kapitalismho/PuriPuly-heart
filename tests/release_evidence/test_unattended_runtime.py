@@ -192,71 +192,98 @@ async def test_qwen_cancellation_while_decode_blocked_closes_backend_source_and_
 ) -> None:
     from puripuly_heart.core.audio.process_source import ProcessAudioCaptureSource
     from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
+    from puripuly_heart.release_evidence import unattended_runtime as evidence
 
     closed = {"backend": 0, "source": 0, "scope": 0}
     supersede_started = asyncio.Event()
+    decode_settled = threading.Event()
+    events = []
+    release_decode = []
 
     monkeypatch.setattr(
-        "puripuly_heart.core.local_stt_assets.validate_local_stt_runtime_ready",
+        "puripuly_heart.core.local_asr.local_stt_assets.validate_local_stt_runtime_ready",
         lambda _path: None,
     )
 
-    async def ensure(self):  # noqa: ANN001
+    async def ensure(self):
         self._recognizer = object()
         return self._recognizer
 
-    def decode(self, recognizer, samples):  # noqa: ANN001
+    def decode(self, recognizer, samples):
+        decode_settled.set()
         return ""
 
-    async def close_backend(self):  # noqa: ANN001
-        closed["backend"] += 1
-        self._recognizer = None
-
+    original_backend_close = LocalQwenSherpaSTTBackend.close
     original_source_close = ProcessAudioCaptureSource.close
     original_scope_close = LifecycleScope.close
+    original_probe = evidence._product_process_source_probe
 
-    async def close_source(self):  # noqa: ANN001
+    async def close_backend(self):
+        assert decode_settled.is_set()
+        await original_backend_close(self)
+        assert self._recognizer is None
+        closed["backend"] += 1
+        events.append("backend-closed")
+
+    async def close_source(self):
         await original_source_close(self)
         closed["source"] += 1
+        events.append("source-closed")
 
-    async def close_scope(self):  # noqa: ANN001
+    async def close_scope(self):
         await original_scope_close(self)
         closed["scope"] += 1
+
+    async def observe_probe(*args, **kwargs):
+        release = kwargs["release_inflight"]
+        release_decode.append(release)
+
+        def observed_release():
+            events.append("decode-released")
+            release()
+
+        kwargs["release_inflight"] = observed_release
+        return await original_probe(*args, **kwargs)
 
     monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure)
     monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_decode_f32_sync", decode)
     monkeypatch.setattr(LocalQwenSherpaSTTBackend, "close", close_backend)
     monkeypatch.setattr(ProcessAudioCaptureSource, "close", close_source)
     monkeypatch.setattr(LifecycleScope, "close", close_scope)
+    monkeypatch.setattr(evidence, "_product_process_source_probe", observe_probe)
 
     async def publish() -> None:
-        return None
+        pytest.fail("Cancellation must not publish the blocked decode")
 
     async def blocked_supersede() -> None:
         supersede_started.set()
         await asyncio.Event().wait()
 
-    fake_runtime = type("Runtime", (), {"loop_task": None})()
-
     async def publication_gate():
         return (
             publish,
             blocked_supersede,
-            fake_runtime,
+            type("Runtime", (), {"loop_task": None})(),
             {"generation_before": 0, "attempted": 0, "published": 0},
         )
 
-    monkeypatch.setattr(
-        "puripuly_heart.release_evidence.unattended_runtime._active_peer_publication_gate",
-        publication_gate,
-    )
-
+    monkeypatch.setattr(evidence, "_active_peer_publication_gate", publication_gate)
     task = asyncio.create_task(run_local_qwen(tmp_path))
-    await asyncio.wait_for(supersede_started.wait(), timeout=2.0)
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
+    try:
+        await asyncio.wait_for(supersede_started.wait(), timeout=2.0)
+        assert not decode_settled.is_set()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(asyncio.shield(task), timeout=1.0)
+    finally:
+        for release in release_decode:
+            release()
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
 
+    assert decode_settled.is_set()
+    assert events.index("decode-released") < events.index("source-closed")
+    assert events.index("source-closed") < events.index("backend-closed")
     assert closed["backend"] == 1
     assert closed["source"] == 1
     assert closed["scope"] >= 1

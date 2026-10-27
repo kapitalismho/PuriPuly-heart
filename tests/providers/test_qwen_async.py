@@ -135,3 +135,13 @@ async def test_async_qwen_verify_api_key_uses_model_and_base_url(monkeypatch):
     body = seen["json"]
     assert body["model"] == "qwen3.8-flash"
     assert body["enable_thinking"] is False
+
+
+@pytest.mark.asyncio
+async def test_async_qwen_verify_empty_key_does_not_open_transport(monkeypatch) -> None:
+    def fail_if_constructed(*_args, **_kwargs):
+        raise AssertionError("empty-key verification must not construct an HTTP client")
+
+    monkeypatch.setattr("httpx.AsyncClient", fail_if_constructed)
+
+    assert await AsyncQwenLLMProvider.verify_api_key("") is False

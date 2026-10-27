@@ -145,12 +145,6 @@
         "--config",
         "{manifest_path}"
       ],
-      "desktop_frozen_runner_command": [
-        "{app_executable}",
-        "run-desktop-overlay",
-        "--config",
-        "{manifest_path}"
-      ],
       "explicit_env_overrides": [
         "PURIPULY_OVERLAY_QUIET_TAIL_PROFILE",
         "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT"
@@ -214,8 +208,6 @@
       "MyAppURL": "https://github.com/kapitalismho/PuriPuly-heart",
       "MyAppExeName": "PuriPulyHeart.exe",
       "MyOverlayExeName": "PuriPulyHeartOverlay.exe",
-      "MyPackagedAppDir": "dist\\PuriPulyHeart",
-      "MyStagedOverlayDir": "build\\overlay",
       "MyAppId": "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
     },
     "setup_lines": [
@@ -226,25 +218,6 @@
       "DefaultGroupName={#MyAppGroupName}",
       "UsePreviousAppDir=yes",
       "UsePreviousGroup=yes"
-    ],
-    "production_installer_build": "Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @(\"installer.iss\") -WorkingDirectory $PWD",
-    "smoke_alternate_app_id": "{{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}",
-    "smoke_guard_lines": [
-      "$InstallerSmokeDir = Join-Path $actualLocalApplicationData \"Programs\\PuriPulyHeart-Installer-Smoke-$InstallerSmokeRunId\"",
-      "$InstallerSmokeAppDataRoot = Join-Path $actualLocalApplicationData $InstallerTestNamespace",
-      "\"/DMyAppId=$InstallerTestAppId\"",
-      "\"/DMyAppDataDirName=$InstallerSmokeAppDataDirName\"",
-      "\"/DInstallerSmokeAppDataRoot=$InstallerSmokeAppDataRootForIscc\"",
-      "$env:LOCALAPPDATA = $InstallerSmokeRedirectedLocalAppData",
-      "$env:APPDATA = $InstallerSmokeRedirectedRoamingAppData",
-      "\"/DMyAppGroupName=$InstallerTestGroupName\"",
-      "\"/O$InstallerSmokeBuildDir\"",
-      "\"/CURRENTUSER\"",
-      "\"/VERYSILENT\"",
-      "\"/SUPPRESSMSGBOXES\"",
-      "\"/DIR=$InstallerSmokeDir\"",
-      "\"/LOG=$InstallerSmokeLogPath\"",
-      "Installer smoke passed and all current-run owned install, data, registry, shortcut, log, and binary byproducts were removed."
     ]
   },
   "prompts": {
@@ -396,9 +369,7 @@
       "tests/ui/test_i18n_key_usage.py::test_i18n_bundles_share_the_same_keys"
     ],
     "packaging": [
-      "tests/config/test_public_compatibility_surfaces.py::test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract",
-
-      "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_parses_in_powershell"
+      "tests/config/test_public_compatibility_surfaces.py::test_installer_identity_snapshot_matches_inno_contract"
     ]
   },
   "blockers": []

@@ -26,12 +26,8 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
-!build.spec
 
 # Installer logs
 pip-log.txt
@@ -232,19 +228,14 @@ refactoring/
 !/scripts/bench_*.py
 !/scripts/ci/
 /scripts/ci/*
-!/scripts/ci/build-release-artifacts.ps1
 !/scripts/ci/build-native-experimental.ps1
 !/scripts/ci/build-native-release-artifacts.ps1
 !/scripts/ci/build-gpu-worker-release.ps1
 !/scripts/ci/prepare-native-release-inputs.ps1
 !/scripts/ci/prepare-soxr-release-inputs.ps1
 !/scripts/ci/read-project-version.py
-!/scripts/installer/
-/scripts/installer/*
-!/scripts/installer/install-local-stt-model.ps1
 !/scripts/release/
 /scripts/release/*
-!/scripts/release/console_bootstrap.py
 !/scripts/release/unattended-runtime-evidence.py
 !/scripts/release/huggingface-xet-frozen-smoke.py
 .codex/

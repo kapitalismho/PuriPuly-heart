@@ -622,11 +622,10 @@ async def test_shutdown_cancels_and_drains_startup_before_runtime_teardown(cance
 @pytest.mark.asyncio
 @pytest.mark.parametrize("state", ["absent", "present", "failure"])
 async def test_shutdown_stops_only_existing_self_capture_and_propagates_real_failure(state) -> None:
-    from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
-
     from puripuly_heart.app.adapters.application_runtime_shutdown import (
         ApplicationRuntimeShutdownAdapter,
     )
+    from puripuly_heart.app.wiring.wiring_runtime_pipeline import RuntimePipelineHandle
 
     calls = []
 

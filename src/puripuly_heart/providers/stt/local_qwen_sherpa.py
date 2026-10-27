@@ -16,11 +16,11 @@ from puripuly_heart.core.audio.format import (
     pcm16le_bytes_to_float32,
 )
 from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
-from puripuly_heart.core.local_qwen_runtime import (
+from puripuly_heart.core.local_asr.local_qwen_runtime import (
     LocalQwenRuntimeBootstrapError,
     ensure_local_qwen_windows_runtime,
 )
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_STT_MODEL_ID,
     LocalQwenSherpaLoadError,
     load_local_stt_asset_manifest,
@@ -75,12 +75,6 @@ def _log_prefix(provider_id: str, stream_label: str | None) -> str:
     if stream_label:
         return f"{prefix}[{stream_label}]"
     return prefix
-
-
-def _pcm16le_duration_ms(pcm16le_size_bytes: int, sample_rate_hz: int) -> float:
-    if pcm16le_size_bytes <= 0:
-        return 0.0
-    return _sample_count_duration_ms(pcm16le_size_bytes // 2, sample_rate_hz)
 
 
 def _sample_count_duration_ms(sample_count: int, sample_rate_hz: int) -> float:

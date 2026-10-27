@@ -5,14 +5,15 @@ import threading
 from datetime import UTC, datetime
 
 import pytest
-from puripuly_heart.core.discord_managed_oauth import (
+
+from puripuly_heart.core.discord.discord_managed_oauth import (
     DiscordOAuthBrowserLaunchError,
     DiscordOAuthStateError,
     _timeout_seconds,
     register_discord_oauth_expected_state,
     run_discord_oauth_callback_flow,
 )
-from puripuly_heart.core.discord_oauth_loopback import (
+from puripuly_heart.core.discord.discord_oauth_loopback import (
     DiscordOAuthCallbackError,
     DiscordOAuthCallbackResult,
 )
@@ -53,7 +54,7 @@ async def test_browser_opens_authorization_url_and_returns_code_state(
     event_loop_thread_id = threading.get_ident()
 
     monkeypatch.setattr(
-        "puripuly_heart.core.discord_managed_oauth.webbrowser.open",
+        "puripuly_heart.core.discord.discord_managed_oauth.webbrowser.open",
         lambda url: opened_urls.append(url) or True,
     )
 
@@ -89,7 +90,7 @@ async def test_listener_error_propagates(monkeypatch: pytest.MonkeyPatch) -> Non
     listener = FakeListener()
     listener.error = DiscordOAuthCallbackError("access_denied", "discord-state-2")
     monkeypatch.setattr(
-        "puripuly_heart.core.discord_managed_oauth.webbrowser.open",
+        "puripuly_heart.core.discord.discord_managed_oauth.webbrowser.open",
         lambda _url: True,
     )
 
@@ -109,7 +110,7 @@ async def test_listener_error_propagates(monkeypatch: pytest.MonkeyPatch) -> Non
 async def test_browser_launch_failure_closes_without_waiting(monkeypatch) -> None:
     listener = FakeListener()
     monkeypatch.setattr(
-        "puripuly_heart.core.discord_managed_oauth.webbrowser.open", lambda _: False
+        "puripuly_heart.core.discord.discord_managed_oauth.webbrowser.open", lambda _: False
     )
     with pytest.raises(DiscordOAuthBrowserLaunchError):
         await run_discord_oauth_callback_flow(listener, "https://discord.invalid/", "invalid")
@@ -144,7 +145,7 @@ async def test_timeout_closes_listener_without_masking_error() -> None:
 
 @pytest.mark.asyncio
 async def test_cancel_settles_callback_wait_and_listener() -> None:
-    from puripuly_heart.core.discord_oauth_loopback import bind_first_available
+    from puripuly_heart.core.discord.discord_oauth_loopback import bind_first_available
 
     listener = bind_first_available()
     task = asyncio.create_task(
@@ -165,7 +166,7 @@ async def test_actual_callback_flow_ignores_stale_state_and_completes_current_st
     import urllib.error
     import urllib.request
 
-    from puripuly_heart.core.discord_oauth_loopback import bind_first_available
+    from puripuly_heart.core.discord.discord_oauth_loopback import bind_first_available
 
     listener = bind_first_available()
     authorization_url = "https://discord.invalid/?state=current"
@@ -184,7 +185,9 @@ async def test_actual_callback_flow_ignores_stale_state_and_completes_current_st
             assert response.status == 200
         return True
 
-    monkeypatch.setattr("puripuly_heart.core.discord_managed_oauth.webbrowser.open", browser)
+    monkeypatch.setattr(
+        "puripuly_heart.core.discord.discord_managed_oauth.webbrowser.open", browser
+    )
     try:
         assert await run_discord_oauth_callback_flow(listener, authorization_url, "invalid") == (
             "valid-code",

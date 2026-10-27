@@ -176,7 +176,7 @@ def test_require_local_qwen_model_assets_skips_missing_model_dir(tmp_path: Path)
 
 
 def test_skip_if_local_qwen_runtime_unavailable_converts_load_error_to_skip() -> None:
-    from puripuly_heart.core.local_stt_assets import LocalQwenSherpaLoadError
+    from puripuly_heart.core.local_asr.local_stt_assets import LocalQwenSherpaLoadError
 
     with pytest.raises(pytest.skip.Exception) as excinfo:
         helpers.skip_if_local_qwen_runtime_unavailable(

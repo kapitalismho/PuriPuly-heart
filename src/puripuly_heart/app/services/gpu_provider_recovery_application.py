@@ -10,7 +10,7 @@ from puripuly_heart.app.services.gpu_provider_recovery import (
     GpuProviderRecoveryReason,
     GpuProviderRecoveryResult,
 )
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     LocalASRProviderRuntimeSnapshot,
     ProviderRuntimeBuildRequest,

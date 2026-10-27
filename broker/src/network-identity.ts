@@ -1,12 +1,6 @@
 const NETWORK_IDENTITY_DOMAIN = 'puripuly-heart:network-identity:v1';
 export const NETWORK_IDENTITY_EPOCH_MS = 24 * 60 * 60_000;
 
-export interface NetworkIdentityDigest {
-  digest: string;
-  keyVersion: number;
-  epoch: string;
-}
-
 export function normalizeNetworkIdentityIp(ip: string): string | null {
   const trimmed = ip.trim();
   if (trimmed.length === 0 || trimmed.length > 256) {
@@ -114,12 +108,6 @@ export function normalizeNetworkIdentityPrefix(normalizedIp: string): string {
 export function resolveNetworkIdentityEpoch(now: Date): string {
   const day = new Date(Math.floor(now.getTime() / NETWORK_IDENTITY_EPOCH_MS) * NETWORK_IDENTITY_EPOCH_MS);
   return day.toISOString().slice(0, 10);
-}
-
-export function resolveNetworkIdentityEpochs(now: Date): string[] {
-  const current = resolveNetworkIdentityEpoch(now);
-  const previous = resolveNetworkIdentityEpoch(new Date(now.getTime() - NETWORK_IDENTITY_EPOCH_MS));
-  return previous === current ? [current] : [current, previous];
 }
 
 async function hmacHex(secret: string, message: string): Promise<string> {

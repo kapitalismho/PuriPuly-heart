@@ -3,15 +3,14 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from puripuly_heart.app.wiring_managed_auth_factory import (
-    ManagedAuthRuntimeAdapter,
-    _managed_connection_auth_settings_values,
-)
-
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.wiring.wiring_managed_auth_factory import (
+    ManagedAuthRuntimeAdapter,
+    _managed_connection_auth_settings_values,
+)
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 

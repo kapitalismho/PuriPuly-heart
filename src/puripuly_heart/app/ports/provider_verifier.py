@@ -10,7 +10,7 @@ from puripuly_heart.core.messages import (
     ErrorDiagnostics,
     UserMessageRef,
 )
-from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
+from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
 
 ProviderVerificationStatus = Literal["verified", "failed", "skipped"]
 PROVIDER_VERIFICATION_STATUS_VERIFIED: Final[ProviderVerificationStatus] = "verified"

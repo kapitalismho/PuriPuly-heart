@@ -11,12 +11,13 @@ from pathlib import Path
 
 import httpx
 import psutil
-from puripuly_heart.core.local_stt_download_port import (
+
+from puripuly_heart.core.local_asr.local_stt_download_port import (
     HuggingFaceDownloadProgress,
     HuggingFaceDownloadRequest,
     LocalSTTDownloadPortCancelled,
 )
-from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
+from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (
     HuggingFaceXetDownloadAdapter,
 )
 
@@ -43,6 +44,7 @@ def _frozen_worker_command(executable: Path):
     def build(_request, request_path: Path, event_path: Path):
         return [
             str(executable),
+            "--headless",
             "hf-xet-download-worker",
             "--request-file",
             str(request_path),

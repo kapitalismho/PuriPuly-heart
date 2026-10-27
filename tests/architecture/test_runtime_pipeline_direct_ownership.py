@@ -23,15 +23,11 @@ def test_pipeline_constructs_direct_durable_owners_and_peer_owner_constructs_non
         _call_name(node) for node in ast.walk(peer_owner_tree) if isinstance(node, ast.Call)
     }
 
-    assert pipeline_calls.count("OutputRuntime") == 1
     assert pipeline_calls.count("ChannelRuntime") == 2
     assert pipeline_calls.count("ContextResolver") == 1
     assert pipeline_calls.count("TranslationTurnLifecycleOwner") == 1
     assert pipeline_calls.count("ProviderRuntimeHandle") == 1
     assert pipeline_calls.count("TranslationLatencyDiagnosticsOwner") == 1
-    assert pipeline_calls.count("TranslationOutputProjectionOwner") == 1
-    assert pipeline_calls.count("TranslationRequestOwner") == 1
-    assert pipeline_calls.count("PeerTranslationChannelOwner") == 1
     assert {
         "OutputRuntime",
         "ChannelRuntime",

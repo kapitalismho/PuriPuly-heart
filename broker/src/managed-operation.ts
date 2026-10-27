@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 
 import { instrumentPublicPostRoute } from './abuse-controls';
 import type { BrokerBindings, BrokerEnv } from './contract';
+import { readJsonBody } from './public-input';
 import {
   createManagedCleanupBudget,
   MANAGED_CLEANUP_CLAIM_TTL_MS,
@@ -23,7 +24,7 @@ import {
 export const MANAGED_OPERATION_ID_PREFIX = 'ph-mop-v1_';
 export const MANAGED_OPERATION_RESUME_HASH_PREFIX = 'ph-mop-resume-v1_';
 export const MANAGED_OPERATION_AUTH_TTL_MS = 60 * 60_000;
-export const MANAGED_OPERATION_DELIVERY_TTL_MS = 15 * 60_000;
+
 export const STALE_CREATING_THRESHOLD_MS = 5 * 60_000;
 
 export const MANAGED_OPERATION_STATES = [
@@ -124,14 +125,6 @@ export interface ManagedOperationAttemptRecord {
   create_in_flight: number;
   legacy_cleanup_state: 'unclassified' | 'pending' | 'resolved';
   legacy_cleanup_checked_at: string | null;
-}
-
-export function buildManagedOperationId(): string {
-  return `${MANAGED_OPERATION_ID_PREFIX}${randomBase64Url(24)}`;
-}
-
-export function buildManagedOperationResumeToken(): string {
-  return randomBase64Url(32);
 }
 
 export async function hashManagedOperationResumeToken(resumeToken: string): Promise<string> {
@@ -732,17 +725,6 @@ function logManagedOperationEvent(
   console.info(event, { ...fields, broker_timestamp: new Date().toISOString() });
 }
 
-export function describeManagedOperationForLog(operation: ManagedOperationRecord): Record<string, string | number | null> {
-  return {
-    operation_id: operation.operation_id,
-    issue_source: operation.issue_source,
-    state: operation.state,
-    attempt_count: operation.attempt_count,
-    current_attempt_index: operation.current_attempt_index,
-    failure_reason: operation.failure_reason,
-  };
-}
-
 async function classifyLegacyManagedAttempts(db: D1Database): Promise<void> {
   await db.prepare(
     `UPDATE managed_operation_attempts
@@ -996,19 +978,6 @@ async function timingSafeEqual(left: string, right: string): Promise<boolean> {
   return diff === 0;
 }
 
-function randomBase64Url(byteLength: number): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
-  return encodeBase64Url(bytes);
-}
-
-function encodeBase64Url(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
 function isBase64Url(value: string, byteLength?: number): boolean {
   if (!/^[A-Za-z0-9_-]*$/u.test(value)) {
     return false;
@@ -1071,20 +1040,6 @@ export async function handleManagedOperationStatus(c: Context<BrokerEnv>): Promi
   }
   const attempts = await listManagedOperationAttempts(c.env.BROKER_DB, operationId);
   return c.json(await buildManagedOperationStatusBodyWithDelivery(c.env.BROKER_DB, auth.operation, attempts));
-}
-
-
-async function readJsonBody(c: Context<BrokerEnv>): Promise<{ ok: true; value: Record<string, unknown> } | { ok: false }> {
-  let parsed: unknown;
-  try {
-    parsed = await c.req.json();
-  } catch {
-    return { ok: false };
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    return { ok: false };
-  }
-  return { ok: true, value: parsed as Record<string, unknown> };
 }
 
 export type OperationIssueBinding =

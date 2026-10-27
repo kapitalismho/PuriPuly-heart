@@ -9,7 +9,12 @@ from uuid import uuid4
 
 import numpy as np
 import pytest
-from puripuly_heart.core.local_stt_assets import (
+
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+)
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_STT_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     PARAKEET_V3_MODEL_ID,
@@ -17,14 +22,9 @@ from puripuly_heart.core.local_stt_assets import (
     LocalSTTInstallState,
     load_local_stt_asset_manifest,
 )
-from puripuly_heart.core.local_stt_catalog import (
+from puripuly_heart.core.local_asr.local_stt_catalog import (
     LocalCPUInstallSnapshot,
     LocalCPUModelInstall,
-)
-
-from puripuly_heart.core.audio.ownership import (
-    AudioSegmentIdentity,
-    AudioSegmentSettingsSnapshot,
 )
 from puripuly_heart.core.stt.backend import (
     STTBackendTranscriptEvent,
@@ -180,13 +180,14 @@ async def test_local_cpu_scoped_decode_snapshots_pcm_and_emits_one_terminal(
     session = await backend.open_session(projection=SCOPED_PROJECTION)
     request = _scoped_request(channel=channel)
     await session.begin_turn(request)
-    await session.send_turn_audio(
-        request.identity,
-        b"\x00\x40" * 160,
-        payload_sequence=1,
-        source_ranges=(),
-        context_only=False,
-    )
+    for sequence, pcm in enumerate((b"\x00\x40" * 80, b"\x00\xc0" * 40), start=1):
+        await session.send_turn_audio(
+            request.identity,
+            pcm,
+            payload_sequence=sequence,
+            source_ranges=(),
+            context_only=False,
+        )
     await session.seal_turn(
         request.identity,
         sealed_content_ranges=(),
@@ -195,10 +196,14 @@ async def test_local_cpu_scoped_decode_snapshots_pcm_and_emits_one_terminal(
     )
     terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
     assert isinstance(terminal, STTProviderTurnTerminal)
+    assert terminal.identity == request.identity
     assert terminal.outcome == "final"
     assert terminal.text == "same same"
     assert len(decoded) == 1
-    assert decoded[0].size == 160
+    np.testing.assert_array_equal(
+        decoded[0],
+        np.array([0.5] * 80 + [-0.5] * 40, dtype=np.float32),
+    )
     await session.close()
     await backend.close()
 
@@ -907,7 +912,7 @@ async def test_cpu_auto_close_during_validation_prevents_late_delegate_creation(
 
     def inspect(*_args: object, **_kwargs: object) -> LocalCPUInstallSnapshot:
         inspection_started.set()
-        release_inspection.wait(timeout=2.0)
+        assert release_inspection.wait(timeout=2.0)
         return _ready_snapshot()
 
     monkeypatch.setattr(local_cpu_module, "inspect_required_cpu_model_installs", inspect)
@@ -920,13 +925,23 @@ async def test_cpu_auto_close_during_validation_prevents_late_delegate_creation(
         backend_factory=forbidden_factory,
     )
     open_task = asyncio.create_task(backend.open_session())
-    await asyncio.to_thread(inspection_started.wait, 1.0)
-
-    await backend.close()
-    release_inspection.set()
-
-    with pytest.raises(RuntimeError, match="closed"):
-        await open_task
+    close_task = None
+    try:
+        assert await asyncio.to_thread(inspection_started.wait, 1.0)
+        close_task = asyncio.create_task(backend.close())
+        await asyncio.sleep(0)
+        assert not close_task.done()
+        assert not open_task.done()
+        release_inspection.set()
+        with pytest.raises(RuntimeError, match="closed"):
+            await open_task
+        await asyncio.wait_for(close_task, timeout=1.0)
+    finally:
+        release_inspection.set()
+        await asyncio.gather(open_task, return_exceptions=True)
+        if close_task is not None:
+            await asyncio.gather(close_task, return_exceptions=True)
+        await backend.close()
 
 
 @pytest.mark.asyncio

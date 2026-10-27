@@ -21,9 +21,6 @@ from puripuly_heart.core.overlay.openvr_vendor import (
 from tests.helpers.paths import REPO_ROOT as ROOT
 
 PINNED_SOXR_SPECIFIER = "soxr==1.1.0"
-FLET_RUNTIME_PREPARATION_SCRIPT = "scripts/ci/prepare-flet-runtime.ps1"
-FLET_RUNTIME_VERSION = "1.0.0"
-FLET_RUNTIME_SHA256 = "758f21506fbb9ad180bd93c7460a2ca55630401c6026a9bc9e2273444014491d"
 SOXR_LICENSE_TEXT_RELATIVE_PATH = "src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt"
 OPENVR_VENDOR_DLL_RELATIVE_PATH = "third_party/openvr/win64/openvr_api.dll"
 OPENVR_VENDOR_SHA256_RELATIVE_PATH = "third_party/openvr/win64/openvr_api.dll.sha256"
@@ -186,54 +183,6 @@ def test_vendored_openvr_bundle_files_exist_and_sha256_line_is_exact() -> None:
     assert sha256_path.read_text(encoding="utf-8") == f"{OPENVR_VENDOR_SHA256_LINE}\n"
 
 
-def test_shared_windows_build_script_parses_in_powershell() -> None:
-    script_path = ROOT / "scripts" / "ci" / "build-release-artifacts.ps1"
-    powershell_path = shutil.which("pwsh") or shutil.which("powershell.exe")
-    if powershell_path is None:
-        pytest.skip("PowerShell executable not available")
-
-    escaped_script_path = str(script_path).replace("'", "''")
-    parse_command = (
-        "$tokens = $null; "
-        "$errors = $null; "
-        "[System.Management.Automation.Language.Parser]::ParseFile("
-        f"'{escaped_script_path}', [ref]$tokens, [ref]$errors"
-        ") > $null; "
-        "if ($errors.Count -ne 0) { "
-        '$errors | ForEach-Object { "{0}:{1}: {2}" -f $_.Extent.StartLineNumber, $_.Extent.StartColumnNumber, $_.Message }; '
-        "exit 1; "
-        "}"
-    )
-    completed = subprocess.run(
-        [powershell_path, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", parse_command],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert completed.returncode == 0, (
-        "PowerShell failed to parse scripts/ci/build-release-artifacts.ps1\n"
-        f"STDOUT:\n{completed.stdout}\nSTDERR:\n{completed.stderr}"
-    )
-
-
-def test_huggingface_xet_dependencies_and_windows_packaging_are_pinned_and_guarded() -> None:
-    project = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    spec = (ROOT / "build.spec").read_text(encoding="utf-8")
-    main = (ROOT / "src" / "puripuly_heart" / "main.py").read_text(encoding="utf-8")
-
-    assert '"huggingface-hub==1.26.0"' in project
-    assert '"hf-xet==1.5.2"' in project
-    assert 'collect_data_files("huggingface_hub")' in spec
-    assert 'collect_submodules("huggingface_hub")' in spec
-    assert 'get_module_file_attribute("hf_xet.hf_xet")' in spec
-    assert 'runtime_binaries += [(str(hf_xet_native_extension), "hf_xet")]' in spec
-    assert '"hf_xet.hf_xet"' in spec
-    assert "required_huggingface_hiddenimports" in spec
-    assert '"hf-xet-runtime-check"' in main
-    assert 'huggingface_hub.__version__ != "1.26.0"' in main
-
-
 def test_huggingface_xet_apache_notices_cover_pinned_runtime_packages() -> None:
     notices = (ROOT / "src" / "puripuly_heart" / "data" / "THIRD_PARTY_NOTICES.txt").read_text(
         encoding="utf-8"
@@ -242,23 +191,6 @@ def test_huggingface_xet_apache_notices_cover_pinned_runtime_packages() -> None:
     assert "huggingface-hub 1.26.0: Apache-2.0" in notices
     assert "hf-xet 1.5.2 and its Windows native extension: Apache-2.0" in notices
     assert "HF_XET_HIGH_PERFORMANCE by default" in notices
-
-
-def test_flet_runtime_preparation_and_build_spec_pin_the_official_windows_archive() -> None:
-    script = (ROOT / FLET_RUNTIME_PREPARATION_SCRIPT).read_text(encoding="utf-8")
-    spec = (ROOT / "build.spec").read_text(encoding="utf-8")
-
-    assert f'$FletVersion = "{FLET_RUNTIME_VERSION}"' in script
-    assert f'$ExpectedSha256 = "{FLET_RUNTIME_SHA256}"' in script
-    assert "/releases/download/v$FletVersion/flet-windows.zip" in script
-    assert FLET_RUNTIME_PREPARATION_SCRIPT in spec
-    assert FLET_RUNTIME_SHA256 in spec
-    assert "import flet_cli.__pyinstaller.config as flet_pyinstaller_hook_config" in spec
-    assert (
-        "flet_pyinstaller_hook_config.temp_bin_dir = "
-        "str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH.parent)" in spec
-    )
-    assert '(str(FLET_WINDOWS_RUNTIME_ARCHIVE_PATH), "flet_desktop/app")' not in spec
 
 
 def test_lgpl_text_file_exists_for_bundled_soxr_compliance_bundle() -> None:

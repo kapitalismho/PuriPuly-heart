@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
-from puripuly_heart.core.openrouter_credentials import (
+from puripuly_heart.core.openrouter.openrouter_credentials import (
     OPENROUTER_MANAGED_API_KEY_SECRET,
     OPENROUTER_MANAGED_USER_ID_SECRET,
     OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,

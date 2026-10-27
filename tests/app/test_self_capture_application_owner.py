@@ -5,14 +5,14 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from puripuly_heart.app.services.self_capture_application import (
+
+from puripuly_heart.app.services.capture.self_capture_application import (
     SelfCaptureApplicationOwner,
     SelfCaptureApplicationSettings,
     SelfCaptureRuntimeApplyError,
 )
-from puripuly_heart.app.wiring_capture_runtime import CaptureOwnerFactory
-from puripuly_heart.app.wiring_stt_factory import build_self_capture_session_config
-
+from puripuly_heart.app.wiring.wiring_capture_runtime import CaptureOwnerFactory
+from puripuly_heart.app.wiring.wiring_stt_factory import build_self_capture_session_config
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.self_capture import (

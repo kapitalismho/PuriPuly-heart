@@ -18,14 +18,15 @@ from typing import Sequence
 import numpy as np
 
 from puripuly_heart import __version__
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_STT_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     PARAKEET_V3_MODEL_ID,
     load_local_stt_asset_manifest,
 )
-from puripuly_heart.core.local_stt_catalog import inspect_required_cpu_model_installs
+from puripuly_heart.core.local_asr.local_stt_catalog import inspect_required_cpu_model_installs
 from puripuly_heart.providers.stt.local_cpu import create_local_cpu_backend
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 REPORT_SCHEMA = "puripuly-heart/local-cpu-real-decode/v1"
 
@@ -255,7 +256,7 @@ async def run_evidence(
                 "version": __version__,
                 "executable": str(executable),
                 "executable_sha256": _sha256(executable),
-                "frozen": bool(getattr(sys, "frozen", False)),
+                "host_kind": current_runtime_layout().host_kind,
                 "python": platform.python_version(),
                 "platform": platform.platform(),
             },
@@ -280,7 +281,7 @@ async def run_evidence(
             "application": {
                 "version": __version__,
                 "executable": str(executable),
-                "frozen": bool(getattr(sys, "frozen", False)),
+                "host_kind": current_runtime_layout().host_kind,
                 "python": platform.python_version(),
                 "platform": platform.platform(),
             },

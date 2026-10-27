@@ -5,9 +5,6 @@ import pytest
 from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
 from puripuly_heart.ui.dashboard import capture_notices
 from puripuly_heart.ui.dashboard.capture_notices import (
-    GPU_NOTICE_KEYS,
-    LOCAL_ASR_NOTICE_KEYS,
-    MANAGED_GEMMA_NOTICE_KEYS,
     gpu_capture_action_label,
     gpu_capture_notice,
     local_asr_capture_notice,
@@ -34,13 +31,28 @@ def test_no_local_asr_notice_without_status_or_for_unknown_status() -> None:
     assert local_asr_capture_notice(status="something-else") is None
 
 
-@pytest.mark.parametrize("status", sorted(LOCAL_ASR_NOTICE_KEYS))
-def test_every_local_asr_status_renders_text_and_tone(status: str) -> None:
+@pytest.mark.parametrize(
+    ("status", "expected_text", "tone"),
+    [
+        ("self_loading", "i18n:dashboard.local_stt_notice_self_loading", "info"),
+        ("peer_loading", "i18n:dashboard.local_stt_notice_peer_loading", "info"),
+        ("start_failed", "i18n:dashboard.local_stt_notice_start_failed", "error"),
+        ("missing", "i18n:dashboard.local_stt_notice_missing_model:model=", "warning"),
+        ("invalid", "i18n:dashboard.local_stt_notice_invalid_model:model=", "warning"),
+        ("downloading", "i18n:dashboard.local_stt_notice_downloading_model:model=", "info"),
+        (
+            "download_failed",
+            "i18n:dashboard.local_stt_notice_download_failed_model:model=",
+            "error",
+        ),
+    ],
+)
+def test_local_asr_status_renders_text_and_tone(status: str, expected_text: str, tone: str) -> None:
     notice = local_asr_capture_notice(status=status)
 
     assert notice is not None
-    assert notice.text == f"i18n:{LOCAL_ASR_NOTICE_KEYS[status]}"
-    assert notice.tone in {"info", "warning", "error"}
+    assert notice.text == expected_text
+    assert notice.tone == tone
     assert notice.action is None
 
 
@@ -80,18 +92,28 @@ def test_no_gpu_notice_without_notice_or_for_unknown_status() -> None:
     assert gpu_capture_notice(GpuDashboardNotice(status="ready")) is None
 
 
-@pytest.mark.parametrize("status", sorted(GPU_NOTICE_KEYS))
-def test_every_gpu_status_renders_text_tone_and_action(status: str) -> None:
+@pytest.mark.parametrize(
+    ("status", "expected_text", "tone"),
+    [
+        ("discovery_failed", "i18n:dashboard.gpu_notice.discovery_failed", "error"),
+        ("unsupported", "i18n:dashboard.gpu_notice.unsupported", "warning"),
+        ("unavailable_device", "i18n:dashboard.gpu_notice.unavailable_device", "warning"),
+        ("not_installed", "i18n:dashboard.gpu_notice.not_installed", "warning"),
+        ("invalid", "i18n:dashboard.gpu_notice.invalid", "warning"),
+        ("installing", "i18n:dashboard.gpu_notice.installing:percent=0", "info"),
+        ("install_failed", "i18n:dashboard.gpu_notice.install_failed", "error"),
+        ("activation_failed", "i18n:dashboard.gpu_notice.activation_failed", "error"),
+    ],
+)
+def test_gpu_status_renders_text_tone_and_action(
+    status: str, expected_text: str, tone: str
+) -> None:
     notice = gpu_capture_notice(GpuDashboardNotice(status=status, action="install"))
 
     assert notice is not None
-    assert notice.tone in {"info", "warning", "error"}
+    assert notice.text == expected_text
+    assert notice.tone == tone
     assert notice.action == "install"
-    if status == "installing":
-        assert notice.text == "i18n:dashboard.gpu_notice.installing:percent=0"
-        assert notice.tone == "info"
-    else:
-        assert notice.text == f"i18n:{GPU_NOTICE_KEYS[status]}"
 
 
 def test_gpu_install_progress_renders_percent() -> None:
@@ -107,18 +129,27 @@ def test_gpu_action_label_is_localized_only_when_an_action_exists() -> None:
     assert gpu_capture_action_label("install") is None
 
 
-@pytest.mark.parametrize("status", sorted(MANAGED_GEMMA_NOTICE_KEYS))
-def test_every_managed_gemma_status_renders_text_and_tone(status: str) -> None:
+@pytest.mark.parametrize(
+    ("status", "expected_text", "tone"),
+    [
+        ("checking", "i18n:dashboard.managed_gemma_notice.checking", "info"),
+        ("downloading", "i18n:dashboard.managed_gemma_notice.downloading:percent=42", "info"),
+        ("preparing", "i18n:dashboard.managed_gemma_notice.preparing", "info"),
+        ("failed", "i18n:dashboard.managed_gemma_notice.failed", "error"),
+        ("cancelled", "i18n:dashboard.managed_gemma_notice.cancelled", "warning"),
+    ],
+)
+def test_managed_gemma_status_renders_text_and_tone(
+    status: str, expected_text: str, tone: str
+) -> None:
     notice = managed_gemma_capture_notice(
         ManagedGemmaDashboardNotice(status=status, progress_percent=42)
     )
 
     assert notice is not None
-    assert notice.tone in {"info", "warning", "error"}
-    if status == "downloading":
-        assert notice.text == ("i18n:dashboard.managed_gemma_notice.downloading:percent=42")
-    else:
-        assert notice.text == f"i18n:{MANAGED_GEMMA_NOTICE_KEYS[status]}"
+    assert notice.text == expected_text
+    assert notice.tone == tone
+    assert notice.action is None
 
 
 @pytest.mark.parametrize(

@@ -24,6 +24,7 @@ from puripuly_heart.release_evidence.native_distribution import (
     main,
     stage_product_metadata,
     stage_sounddevice_portaudio_runtime,
+    validate_compliance,
     validate_dependencies,
     validate_target,
     verify_installed_soxr_record,
@@ -31,11 +32,144 @@ from puripuly_heart.release_evidence.native_distribution import (
     verify_wheel_record,
 )
 
+NOTO_CJK_CHECKSUM_RECORD = (
+    b"197d5e1e019faca33a4d55931c7d68b8056f3b97cb862049f5cb8de9efdfb8ce  NotoSansCJK-Medium.ttc"
+)
+
 
 def _record_digest(data: bytes) -> str:
     import base64
 
     return "sha256=" + base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
+
+
+@pytest.fixture
+def packaged_resource_compliance(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
+    from puripuly_heart.release_evidence import release_identity
+
+    checkout = Path(__file__).resolve().parents[2]
+    repo = tmp_path / "source repository"
+    shutil.copytree(checkout / "third_party/openvr", repo / "third_party/openvr")
+    shutil.copytree(checkout / "third_party/noto-sans-cjk", repo / "third_party/noto-sans-cjk")
+    target = tmp_path / "native payload 한글"
+    font = target / "app/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc"
+    font.parent.mkdir(parents=True)
+    shutil.copy2(checkout / "src/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc", font)
+    shutil.copy2(repo / "third_party/openvr/win64/openvr_api.dll", target / "openvr_api.dll")
+    shutil.copytree(repo / "third_party/noto-sans-cjk", target / "third_party/noto-sans-cjk")
+    monkeypatch.setattr(
+        release_identity, "verify_packaged_license_payloads", lambda *_args, **_kwargs: []
+    )
+    monkeypatch.setattr(release_identity, "verify_soxr_packaging", lambda *_args: {})
+    return target, repo
+
+
+@pytest.mark.parametrize("line_ending", [b"\n", b"\r\n"], ids=["lf", "crlf"])
+def test_native_compliance_accepts_independently_pinned_resources(
+    packaged_resource_compliance,
+    line_ending: bytes,
+) -> None:
+    target, repo = packaged_resource_compliance
+    checksum = NOTO_CJK_CHECKSUM_RECORD + line_ending
+    for root in (repo, target):
+        (root / "third_party/noto-sans-cjk/SHA256SUMS.txt").write_bytes(checksum)
+    report = validate_compliance(target, repo, target / "soxr.json")["resources"]
+    assert (
+        report["openvr_sha256"]
+        == report["openvr_source_sha256"]
+        == ("bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a")
+    )
+    assert report["noto_cjk_sha256"] == (
+        "197d5e1e019faca33a4d55931c7d68b8056f3b97cb862049f5cb8de9efdfb8ce"
+    )
+    assert set(report["noto_cjk_provenance"]) == {"OFL.txt", "README.md", "SHA256SUMS.txt"}
+    assert report["noto_cjk_provenance"]["SHA256SUMS.txt"] == hashlib.sha256(checksum).hexdigest()
+
+
+@pytest.mark.parametrize(
+    "checksum",
+    [
+        b"0" * 64 + b"  NotoSansCJK-Medium.ttc\r\n",
+        NOTO_CJK_CHECKSUM_RECORD.replace(b"Medium.ttc", b"Bold.ttc") + b"\r\n",
+        NOTO_CJK_CHECKSUM_RECORD + b"\r\n" + b"0" * 64 + b"  NotoSansCJK-Medium.ttc\r\n",
+        NOTO_CJK_CHECKSUM_RECORD
+        + b"\r\n"
+        + NOTO_CJK_CHECKSUM_RECORD.replace(b"Medium.ttc", b"Other.ttc")
+        + b"\r\n",
+    ],
+    ids=["wrong-hash", "wrong-name", "conflict", "extra-entry"],
+)
+def test_native_compliance_rejects_noncanonical_checksum_records(
+    packaged_resource_compliance, checksum: bytes
+) -> None:
+    target, repo = packaged_resource_compliance
+    for root in (repo, target):
+        (root / "third_party/noto-sans-cjk/SHA256SUMS.txt").write_bytes(checksum)
+    with pytest.raises(ValueError, match="does not record the pinned font"):
+        validate_compliance(target, repo, target / "soxr.json")
+
+
+@pytest.mark.parametrize("source_ending", [b"\n", b"\r\n"], ids=["source-lf", "source-crlf"])
+def test_native_compliance_requires_exact_source_payload_provenance_bytes(
+    packaged_resource_compliance, source_ending: bytes
+) -> None:
+    target, repo = packaged_resource_compliance
+    (repo / "third_party/noto-sans-cjk/SHA256SUMS.txt").write_bytes(
+        NOTO_CJK_CHECKSUM_RECORD + source_ending
+    )
+    packaged_ending = b"\r\n" if source_ending == b"\n" else b"\n"
+    (target / "third_party/noto-sans-cjk/SHA256SUMS.txt").write_bytes(
+        NOTO_CJK_CHECKSUM_RECORD + packaged_ending
+    )
+    with pytest.raises(ValueError, match="provenance mismatch"):
+        validate_compliance(target, repo, target / "soxr.json")
+
+
+@pytest.mark.parametrize(
+    "resource", ["openvr_api.dll", "app/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc"]
+)
+def test_native_compliance_rejects_wrong_resource_even_with_matching_inventory(
+    packaged_resource_compliance, resource: str
+) -> None:
+    target, repo = packaged_resource_compliance
+    path = target / resource
+    damaged = bytearray(path.read_bytes())
+    damaged[-1] ^= 1
+    path.write_bytes(damaged)
+    (target / "native-artifact-manifest.json").write_text(
+        json.dumps(
+            {
+                "inventory": [
+                    {"path": resource, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="sha256 mismatch|pinned payload"):
+        validate_compliance(target, repo, target / "soxr.json")
+
+
+@pytest.mark.parametrize("name", ["OFL.txt", "README.md", "SHA256SUMS.txt"])
+@pytest.mark.parametrize("damage", ["missing", "changed"])
+def test_native_compliance_rejects_missing_or_changed_font_provenance(
+    packaged_resource_compliance, name: str, damage: str
+) -> None:
+    target, repo = packaged_resource_compliance
+    path = target / "third_party/noto-sans-cjk" / name
+    if damage == "missing":
+        path.unlink()
+    else:
+        path.write_bytes(b"unapproved provenance")
+    with pytest.raises((FileNotFoundError, ValueError), match="Noto CJK provenance"):
+        validate_compliance(target, repo, target / "soxr.json")
+
+
+def test_native_compliance_rejects_missing_font(packaged_resource_compliance) -> None:
+    target, repo = packaged_resource_compliance
+    (target / "app/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc").unlink()
+    with pytest.raises(FileNotFoundError, match="Noto CJK font"):
+        validate_compliance(target, repo, target / "soxr.json")
 
 
 @pytest.mark.parametrize("archive_key", ["python_archive", "stdlib_archive"])
@@ -550,10 +684,9 @@ def test_bundle_failure_preserves_every_remaining_staged_input(
     ],
 )
 def test_manifest_rejects_inconsistent_deployed_bytecode_evidence(
-    tmp_path: Path, staged_archive_runtime: tuple[Path, Path, dict[str, object]], damage: str
+    tmp_path: Path, staged_bundled_runtime: tuple[Path, Path, dict[str, object]], damage: str
 ) -> None:
-    layout, bytecode, _ = staged_archive_runtime
-    bundled = bundle_runtime(tmp_path, layout, bytecode)
+    layout, bytecode, bundled = staged_bundled_runtime
     if damage == "archive-hash":
         bundled["archive"]["sha256"] = "0" * 64
     elif damage == "member-hash":
@@ -627,10 +760,9 @@ def test_validate_target_requires_the_deployed_python_archive(
     ],
 )
 def test_manifest_rejects_corrupt_or_ambiguous_archives(
-    tmp_path: Path, staged_archive_runtime: tuple[Path, Path, dict[str, object]], damage: str
+    tmp_path: Path, staged_bundled_runtime: tuple[Path, Path, dict[str, object]], damage: str
 ) -> None:
-    layout, bytecode, _ = staged_archive_runtime
-    bundled = bundle_runtime(tmp_path, layout, bytecode)
+    layout, bytecode, bundled = staged_bundled_runtime
     stdlib = damage.startswith("stdlib-")
     archive_path = tmp_path / bundled["stdlib_archive" if stdlib else "archive"]["path"]
     with zipfile.ZipFile(archive_path) as original:
@@ -685,7 +817,24 @@ def test_manifest_rejects_corrupt_or_ambiguous_archives(
     bytecode.write_text(json.dumps(bundled), encoding="utf-8")
     provenance = tmp_path / "provenance.json"
     provenance.write_text("{}", encoding="utf-8")
-    with pytest.raises((ValueError, FileNotFoundError)):
+    expected_error = {
+        "duplicate": "duplicate or ambiguous members",
+        "case-collision": "duplicate or ambiguous members",
+        "traversal": "normalized relative path",
+        "native": "cannot contain native modules",
+        "malformed-index": "malformed dependency index",
+        "index-traversal": "normalized relative path",
+        "index-module-alias": "invalid dependency index source",
+        "native-shadow": "differs from filesystem import precedence",
+        "package-shadow": "differs from filesystem import precedence",
+        "missing-code": "dependency index lacks archived bytecode",
+        "malformed-code": "malformed bytecode",
+        "stdlib-native": "cannot contain native modules",
+        "stdlib-malformed": "malformed bytecode",
+        "file-directory-collision": "file/directory collision",
+        "stdlib-disguised-native": "cannot contain native binaries",
+    }[damage]
+    with pytest.raises(ValueError, match=expected_error):
         create_manifest(tmp_path, layout, provenance, bytecode, tmp_path / "manifest.json")
 
 
@@ -693,10 +842,9 @@ def test_manifest_rejects_corrupt_or_ambiguous_archives(
     "damage", ["retained-source", "loose-dependency", "loose-stdlib", "loose-stdlib-resource"]
 )
 def test_manifest_rejects_source_drift_and_parallel_loose_content(
-    tmp_path: Path, staged_archive_runtime: tuple[Path, Path, dict[str, object]], damage: str
+    tmp_path: Path, staged_bundled_runtime: tuple[Path, Path, dict[str, object]], damage: str
 ) -> None:
-    layout, bytecode, _ = staged_archive_runtime
-    bundled = bundle_runtime(tmp_path, layout, bytecode)
+    layout, bytecode, bundled = staged_bundled_runtime
     if damage == "retained-source":
         (tmp_path / "site-packages/dependency.py").write_text("VALUE = 99\n", encoding="utf-8")
     else:

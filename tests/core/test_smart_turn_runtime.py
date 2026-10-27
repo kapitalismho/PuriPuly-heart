@@ -4,7 +4,6 @@ import asyncio
 import hashlib
 import math
 import shutil
-import sys
 import threading
 from pathlib import Path
 from uuid import uuid4
@@ -103,11 +102,9 @@ def test_pinned_input_fixture_identity_matches_authoritative_revision() -> None:
     assert features.shape == (80, 800)
 
 
-@pytest.mark.parametrize("host_kind", ("native", "pyinstaller"))
 def test_bundled_smart_turn_uses_filesystem_resources_with_relocated_module_origin(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    host_kind: str,
 ) -> None:
     resource_root = tmp_path / "installed app 한글"
     model_path = resource_root / "puripuly_heart" / smart_turn.SMART_TURN_RESOURCE_RELATIVE_PATH
@@ -118,12 +115,7 @@ def test_bundled_smart_turn_uses_filesystem_resources_with_relocated_module_orig
         "__file__",
         str(resource_root / "python.zip" / "puripuly_heart" / "core" / "audio" / "smart_turn.pyc"),
     )
-    if host_kind == "native":
-        monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(resource_root))
-    else:
-        monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
-        monkeypatch.setattr(sys, "frozen", True, raising=False)
-        monkeypatch.setattr(sys, "_MEIPASS", str(resource_root), raising=False)
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(resource_root))
     monkeypatch.chdir(tmp_path)
 
     bundled_path = smart_turn.bundled_smart_turn_onnx_path()

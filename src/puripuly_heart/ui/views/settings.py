@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Awaitable, Callable, Mapping
 
 import flet as ft
-from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
 
 from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretKey,
@@ -80,6 +79,7 @@ from puripuly_heart.app.ports.ui_models import OscControlPresentationState
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
+from puripuly_heart.app.services.local_asr.local_asr_selection import resolve_local_asr_selection
 from puripuly_heart.config.alibaba_connection import workspace_api_host_region
 from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
@@ -216,9 +216,7 @@ _DRAFT_TRANSLATION_FIELDS: dict[type, str] = {
 }
 
 
-_CJK_START = 0x3000
 _CENTER_ALIGNMENT = ft.Alignment(0, 0)
-_CENTER_RIGHT_ALIGNMENT = ft.Alignment(1, 0)
 _SETTINGS_SUBTAB_ORDER = ("api", "general", "prompt", "overlay")
 _OVERLAY_DISTANCE_MIN = 0.5
 _OVERLAY_DISTANCE_MAX = 2.0
@@ -391,39 +389,6 @@ def _custom_stt_extra_to_text(extra: Mapping[str, object]) -> str:
 
 def _update_control_if_mounted(control: ft.Control) -> None:
     update_control_if_mounted(control)
-
-
-def _make_overlay_anchor_dropdown(value: str, on_change) -> ft.Dropdown:
-    return ft.Dropdown(
-        value=value,
-        options=[
-            ft.dropdown.Option(
-                key=anchor,
-                text=t(f"settings.overlay.calibration.anchor.{anchor}"),
-            )
-            for anchor in OVERLAY_CALIBRATION_ANCHORS
-        ],
-        text_size=14,
-        border_radius=10,
-        border_color=COLOR_DIVIDER,
-        focused_border_color=COLOR_PRIMARY,
-        on_select=on_change,
-    )
-
-
-def _weighted_len(text: str) -> int:
-    return sum(2 if ord(char) >= _CJK_START else 1 for char in text)
-
-
-def _setting_action_text_size(text: str) -> int:
-    length = _weighted_len(text or "")
-    if length <= 6:
-        return 22
-    if length <= 10:
-        return 20
-    if length <= 18:
-        return 18
-    return 16
 
 
 def _derive_openrouter_selection_alias(
@@ -720,23 +685,6 @@ class SettingsView(ft.Column):
             on_hover=self._on_text_hover,
         )
 
-    def _build_setting_action_text(self, text: str, on_click) -> ft.Container:
-        return self._build_clickable_text(
-            text,
-            on_click,
-            size=_setting_action_text_size(text),
-            text_align=ft.TextAlign.RIGHT,
-            alignment=_CENTER_RIGHT_ALIGNMENT,
-            no_wrap=True,
-            max_lines=1,
-            overflow=ft.TextOverflow.ELLIPSIS,
-        )
-
-    def _set_setting_action_text(self, control: ft.Container, text: str) -> None:
-        text_control = control.content
-        text_control.value = text
-        text_control.size = _setting_action_text_size(text)
-
     def _set_unit_card_value_text(
         self, control: ft.Container, text: str, *, size: int = 28
     ) -> None:
@@ -989,13 +937,6 @@ class SettingsView(ft.Column):
             subtab_bar_position="bottom",
         )
 
-    def _build_setting_action_row(self, label: ft.Text, action: ft.Control) -> ft.Row:
-        return ft.Row(
-            controls=[label, ft.Container(expand=True), action],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-
     def _emit_runtime_basic(self, message: str, *, level: int = logging.INFO) -> None:
         runtime_log_basic = getattr(self, "runtime_log_basic", None)
         if runtime_log_basic is not None:
@@ -1027,54 +968,6 @@ class SettingsView(ft.Column):
             height=height,
         )
 
-    def _build_overlay_calibration_field(
-        self,
-        *,
-        value: float,
-        on_blur,
-    ) -> ft.TextField:
-        return ft.TextField(
-            value=self._format_overlay_calibration_number(value),
-            text_size=14,
-            width=120,
-            border_radius=10,
-            border_color=COLOR_DIVIDER,
-            focused_border_color=COLOR_PRIMARY,
-            on_blur=on_blur,
-        )
-
-    def _build_numeric_setting_field(
-        self,
-        *,
-        label: str,
-        value: str,
-        on_change_end,
-    ) -> ft.TextField:
-        return ft.TextField(
-            label=label,
-            value=value,
-            dense=True,
-            expand=True,
-            text_align=ft.TextAlign.CENTER,
-            border_radius=10,
-            border_color=COLOR_DIVIDER,
-            focused_border_color=COLOR_PRIMARY,
-            on_blur=on_change_end,
-            on_submit=on_change_end,
-        )
-
-    def _build_overlay_calibration_column(
-        self,
-        *,
-        label: ft.Text,
-        control: ft.Control,
-    ) -> ft.Column:
-        return ft.Column(
-            controls=[label, control],
-            spacing=6,
-            expand=True,
-        )
-
     def _format_overlay_calibration_number(self, value: float) -> str:
         return f"{value:.2f}"
 
@@ -1100,37 +993,6 @@ class SettingsView(ft.Column):
             return float(preset_key)
         except TypeError, ValueError:
             return 1.0
-
-    def _parse_setting_float(
-        self,
-        raw_value: str,
-        *,
-        fallback: float,
-        minimum: float,
-        maximum: float | None = None,
-    ) -> float:
-        try:
-            parsed = float(raw_value)
-        except TypeError, ValueError:
-            parsed = fallback
-        if parsed < minimum:
-            parsed = minimum
-        if maximum is not None and parsed > maximum:
-            parsed = maximum
-        return parsed
-
-    def _parse_setting_int(
-        self,
-        raw_value: str,
-        *,
-        fallback: int,
-        minimum: int,
-    ) -> int:
-        try:
-            parsed = int(raw_value)
-        except TypeError, ValueError:
-            parsed = fallback
-        return max(minimum, parsed)
 
     def _build_ui(self) -> None:
         """Build the settings UI with Bento grid layout."""
@@ -2745,20 +2607,6 @@ class SettingsView(ft.Column):
         self._record_provider_edit(LlmGpuDeviceEdit(translation.gpu_device_id))
         self.has_provider_changes = True
         self._sync_gpu_device_card()
-
-    def _populate_host_apis(self) -> None:
-        """Legacy hook for tests; host APIs are handled by AudioSettings."""
-        return None
-
-    def _refresh_microphones(self) -> None:
-        """Legacy hook for tests; microphone list is handled by AudioSettings."""
-        return None
-
-    def _build_locale_options(self) -> list[ft.dropdown.Option]:
-        """Build locale dropdown options."""
-        return [
-            ft.dropdown.Option(key=code, text=locale_label(code)) for code in available_locales()
-        ]
 
     def _http_extension_modal_options(self) -> list[OptionItem]:
         options = [OptionItem(value="", label=t("settings.http_extension.none"))]
@@ -6339,15 +6187,6 @@ class SettingsView(ft.Column):
                 self._desktop_overlay_pending_locked = None
                 self._desktop_overlay_captions_locked = False
         self._sync_overlay_controls()
-
-    def _on_overlay_calibration_reset(self, e) -> None:
-        _ = e
-        self._begin_overlay_calibration_session()
-        self._overlay_calibration_draft = OverlayCalibration()
-        self._sync_overlay_calibration_controls(self._overlay_calibration_draft)
-
-        if is_control_mounted(self):
-            self.update()
 
     def _on_overlay_translation_click(self, e) -> None:
         if self._overlay_snapshot is None or self._overlay_translation_button.disabled:

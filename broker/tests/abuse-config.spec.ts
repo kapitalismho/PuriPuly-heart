@@ -12,6 +12,7 @@ import {
   readAbuseControls,
   readAbuseRuntimeState,
   replaceAbuseControlsValue,
+  replaceAbuseRuntimeStateValue,
   updateAbuseControls,
   updateAbuseRuntimeState,
 } from './test-support/abuse-controls';
@@ -160,9 +161,42 @@ describe('broker abuse-controls runtime config validation', () => {
   it('seeds the approved warning and automatic-brake defaults', () => {
     const env = createTestBrokerEnv();
 
-    expect(readAbuseControls(env).immediateAlerts).toEqual({
+    expect(readAbuseControls(env).immediateAlerts).toMatchObject({
       warning: 10,
       brake: 70,
+    });
+  });
+
+  it('keeps raw stored evidence distinct from production fallback and legacy-state normalization', async () => {
+    const env = createTestBrokerEnv();
+    const incompleteControls = { trialChallenge: { maxRequests: 1 } };
+    replaceAbuseControlsValue(env, incompleteControls);
+    expect(readAbuseControls(env)).toEqual(incompleteControls);
+    await expect(getBrokerAbuseControlsConfig(env.BROKER_DB)).resolves.toEqual(
+      TEST_DEFAULT_ABUSE_CONTROLS,
+    );
+
+    const legacyRuntimeState = {
+      brake: {
+        active: true,
+        reason: 'manual',
+        changedAt: '2026-04-08T06:05:00.000Z',
+        changedBy: 'operator',
+      },
+      alertLatches: { warn1: true, warn2: false, warn3: false, critical: false },
+      dailyReport: { lastDeliveredAt: null, lastDeliveredDateUtc: null },
+    };
+    replaceAbuseRuntimeStateValue(env, legacyRuntimeState);
+    expect(readAbuseRuntimeState(env)).toEqual(legacyRuntimeState);
+    await expect(getBrokerAbuseRuntimeState(env.BROKER_DB)).resolves.toEqual({
+      brake: {
+        active: true,
+        reason: 'manual',
+        changedAt: '2026-04-08T06:05:00.000Z',
+        changedBy: 'operator',
+      },
+      alertLatches: { warning: true, warningObservedAt: null },
+      dailyReport: { lastDeliveredAt: null, lastDeliveredDateUtc: null },
     });
   });
 
@@ -324,10 +358,14 @@ describe('broker abuse-controls runtime config validation', () => {
     );
   });
 
-  it('seeds exact abuse runtime state defaults and persists runtime-state helper updates', () => {
+  it('seeds compatible stored runtime state and normalizes it through the production reader', async () => {
     const env = createTestBrokerEnv();
 
-    expect(readAbuseRuntimeState(env)).toEqual(TEST_DEFAULT_ABUSE_RUNTIME_STATE);
+    const stored = readAbuseRuntimeState(env);
+    expect(stored).toMatchObject(TEST_DEFAULT_ABUSE_RUNTIME_STATE);
+    await expect(getBrokerAbuseRuntimeState(env.BROKER_DB)).resolves.toEqual(
+      TEST_DEFAULT_ABUSE_RUNTIME_STATE,
+    );
 
     updateAbuseRuntimeState(env, (state) => {
       state.brake.active = true;
@@ -340,6 +378,7 @@ describe('broker abuse-controls runtime config validation', () => {
     });
 
     expect(readAbuseRuntimeState(env)).toEqual({
+      ...stored,
       brake: {
         active: true,
         reason: 'manual',
@@ -347,6 +386,7 @@ describe('broker abuse-controls runtime config validation', () => {
         changedBy: 'operator',
       },
       alertLatches: {
+        ...stored.alertLatches,
         warning: true,
         warningObservedAt: null,
       },

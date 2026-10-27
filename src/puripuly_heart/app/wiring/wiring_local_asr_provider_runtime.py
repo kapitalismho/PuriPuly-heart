@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import cast
 
 from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory
-from puripuly_heart.app.services.local_asr_selection import LOCAL_CPU_PROVIDERS
+from puripuly_heart.app.services.local_asr.local_asr_selection import LOCAL_CPU_PROVIDERS
 from puripuly_heart.config.provider_values import (
     STTProviderName,
     custom_stt_selection_for_provider,
@@ -22,7 +22,7 @@ from puripuly_heart.core.audio.listen_delivery import (
 )
 from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot
 from puripuly_heart.core.clock import Clock
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
     LocalASRProviderRuntimePort,
     ProviderGpuRuntimePort,
@@ -30,8 +30,8 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     ProviderRuntimeProviderFactoryPort,
     ProviderRuntimeTerminalFailureSink,
 )
-from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
-from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRProvisioningPort
+from puripuly_heart.core.local_asr.local_gpu_assets import local_gpu_model_path
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.gpu_asr import SharedGpuASRRuntime
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (

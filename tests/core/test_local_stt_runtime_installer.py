@@ -17,14 +17,15 @@ from pathlib import Path
 
 import httpx
 import pytest
-from puripuly_heart.core.local_stt_assets import (
+
+from puripuly_heart.core.local_asr.local_stt_assets import (
     InstalledLocalSTTManifest,
     LocalSTTAssetFile,
     LocalSTTAssetManifest,
     LocalSTTAssetSource,
     inspect_local_stt_install_state,
 )
-from puripuly_heart.core.local_stt_runtime_installer import (
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     LocalSTTRuntimeInstallCancelled,
     LocalSTTRuntimeInstallError,
     RuntimeLocalSTTStatusUpdate,
@@ -93,7 +94,7 @@ def test_second_process_cleanup_cannot_disturb_active_provisioning_lease(
     script = "\n".join(
         (
             "import pathlib, sys, time",
-            "from puripuly_heart.core.local_stt_runtime_installer import "
+            "from puripuly_heart.core.local_asr.local_stt_runtime_installer import "
             "LocalSTTProvisioningLease",
             "root = pathlib.Path(sys.argv[1])",
             "ready = pathlib.Path(sys.argv[2])",
@@ -156,7 +157,9 @@ def file_server(temp_dir: Path):
         *args, directory=str(source_dir), **kwargs
     )
     server = socketserver.TCPServer(("127.0.0.1", 0), handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
     thread.start()
     try:
         yield source_dir, f"http://127.0.0.1:{server.server_address[1]}"

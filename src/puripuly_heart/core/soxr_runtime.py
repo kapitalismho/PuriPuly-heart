@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -59,10 +58,3 @@ def validate_soxr_runtime_paths(runtime_paths: SoxrRuntimePaths) -> SoxrRuntimeP
             f"missing required soxr sibling DLL: {runtime_paths.sibling_dll_path}"
         )
     return runtime_paths
-
-
-def ensure_soxr_runtime_available_for_startup() -> SoxrRuntimePaths | None:
-    if sys.platform != "win32" or not getattr(sys, "frozen", False):
-        return None
-
-    return validate_soxr_runtime_paths(resolve_soxr_runtime_paths())

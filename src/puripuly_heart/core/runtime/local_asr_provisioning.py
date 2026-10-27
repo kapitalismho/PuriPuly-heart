@@ -13,7 +13,7 @@ from pathlib import Path
 from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
 from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.feature_diagnostics import log_feature
-from puripuly_heart.core.local_asr_provisioning import (
+from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRInstallRequest,
     LocalASRInstallResult,
     LocalASRInstallResultHandler,
@@ -23,12 +23,12 @@ from puripuly_heart.core.local_asr_provisioning import (
     LocalASRProvisioningDiagnostic,
     LocalASRProvisioningSnapshot,
 )
-from puripuly_heart.core.local_gpu_assets import (
+from puripuly_heart.core.local_asr.local_gpu_assets import (
     LocalGPUInstallSnapshot,
     inspect_local_gpu_install,
     load_local_gpu_asset_manifest,
 )
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
     InstalledLocalSTTManifest,
@@ -38,13 +38,13 @@ from puripuly_heart.core.local_stt_assets import (
     default_local_stt_model_root,
     load_local_stt_asset_manifest,
 )
-from puripuly_heart.core.local_stt_catalog import (
+from puripuly_heart.core.local_asr.local_stt_catalog import (
     LocalCPUInstallSnapshot,
     LocalCPUModelInstall,
     inspect_local_cpu_model_installs,
 )
-from puripuly_heart.core.local_stt_download_port import HuggingFaceDownloadPort
-from puripuly_heart.core.local_stt_runtime_installer import (
+from puripuly_heart.core.local_asr.local_stt_download_port import HuggingFaceDownloadPort
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     LocalSTTProvisioningLease,
     LocalSTTRuntimeInstallCancelled,
     LocalSTTRuntimeInstallError,

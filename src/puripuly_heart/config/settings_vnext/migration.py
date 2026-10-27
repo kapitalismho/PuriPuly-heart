@@ -51,71 +51,50 @@ _RELEASED_DEFAULT_PROMPT_SHA256 = frozenset(
 )
 
 
-def _requires_cerebras_retirement_migration(settings_version: object) -> bool:
+def _requires_version_migration(settings_version: object, migration_version: int) -> bool:
     if isinstance(settings_version, bool):
         return True
     if isinstance(settings_version, int):
-        return settings_version < _CEREBRAS_RETIREMENT_MIGRATION_VERSION
+        return settings_version < migration_version
     if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < _CEREBRAS_RETIREMENT_MIGRATION_VERSION
-    return True
-
-
-def _requires_managed_gemma_12b_retirement_migration(settings_version: object) -> bool:
-    if isinstance(settings_version, bool):
-        return True
-    if isinstance(settings_version, int):
-        return settings_version < _MANAGED_GEMMA_12B_RETIREMENT_MIGRATION_VERSION
-    if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < _MANAGED_GEMMA_12B_RETIREMENT_MIGRATION_VERSION
-    return True
-
-
-def _requires_translation_fallback_retirement_migration(settings_version: object) -> bool:
-    if isinstance(settings_version, bool):
-        return True
-    if isinstance(settings_version, int):
-        return settings_version < _TRANSLATION_FALLBACK_RETIREMENT_MIGRATION_VERSION
-    if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < _TRANSLATION_FALLBACK_RETIREMENT_MIGRATION_VERSION
-    return True
-
-
-def _requires_translation_concurrency_migration(settings_version: object) -> bool:
-    if isinstance(settings_version, bool):
-        return True
-    if isinstance(settings_version, int):
-        return settings_version < 46
-    if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < 46
+        return int(settings_version.strip()) < migration_version
     return True
 
 
 def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     migrate_telemetry = _requires_telemetry_boolean_migration(data)
-    migrate_local_qwen = _requires_local_qwen_cpu_auto_migration(data.get("settings_version"))
-    migrate_peer_source_auto = _requires_peer_source_auto_migration(data.get("settings_version"))
-    migrate_multi_model_gemma = _requires_multi_model_gemma_migration(data.get("settings_version"))
-    migrate_cerebras_retirement = _requires_cerebras_retirement_migration(
-        data.get("settings_version")
+    settings_version = data.get("settings_version")
+    migrate_local_qwen = _requires_version_migration(
+        settings_version, _LOCAL_QWEN_CPU_AUTO_MIGRATION_VERSION
     )
-    migrate_prompt_reset = _requires_prompt_override_migration(data.get("settings_version"))
-    migrate_prompt_override_reset = _requires_prompt_override_reset_migration(
-        data.get("settings_version")
+    migrate_peer_source_auto = _requires_version_migration(
+        settings_version, _PEER_SOURCE_AUTO_MIGRATION_VERSION
     )
-    migrate_deepgram_rolling = _requires_deepgram_rolling_migration(data.get("settings_version"))
-    migrate_deepseek_saved_connections = _requires_deepseek_41_saved_connection_migration(
-        data.get("settings_version")
+    migrate_multi_model_gemma = _requires_version_migration(
+        settings_version, _MULTI_MODEL_GEMMA_MIGRATION_VERSION
     )
-    migrate_managed_gemma_12b_retirement = _requires_managed_gemma_12b_retirement_migration(
-        data.get("settings_version")
+    migrate_cerebras_retirement = _requires_version_migration(
+        settings_version, _CEREBRAS_RETIREMENT_MIGRATION_VERSION
     )
-    migrate_translation_fallback_retirement = _requires_translation_fallback_retirement_migration(
-        data.get("settings_version")
+    migrate_prompt_reset = _requires_version_migration(
+        settings_version, _PROMPT_OVERRIDE_MIGRATION_VERSION
     )
-    migrate_translation_concurrency = _requires_translation_concurrency_migration(
-        data.get("settings_version")
+    migrate_prompt_override_reset = _requires_version_migration(
+        settings_version, _PROMPT_OVERRIDE_RESET_VERSION
     )
+    migrate_deepgram_rolling = _requires_version_migration(
+        settings_version, _DEEPGRAM_ROLLING_MIGRATION_VERSION
+    )
+    migrate_deepseek_saved_connections = _requires_version_migration(
+        settings_version, _DEEPSEEK_41_SAVED_CONNECTION_MIGRATION_VERSION
+    )
+    migrate_managed_gemma_12b_retirement = _requires_version_migration(
+        settings_version, _MANAGED_GEMMA_12B_RETIREMENT_MIGRATION_VERSION
+    )
+    migrate_translation_fallback_retirement = _requires_version_migration(
+        settings_version, _TRANSLATION_FALLBACK_RETIREMENT_MIGRATION_VERSION
+    )
+    migrate_translation_concurrency = _requires_version_migration(settings_version, 46)
     prepared = dict(copy.deepcopy(data))
     prepared["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION
     if migrate_prompt_reset:
@@ -403,84 +382,14 @@ def _is_released_default_prompt(value: str) -> bool:
 
 
 def system_prompt_backup_text(data: Mapping[str, Any]) -> str | None:
-    if is_vnext_shape_dict(data) and not _requires_prompt_override_reset_migration(
-        data.get("settings_version")
+    if is_vnext_shape_dict(data) and not _requires_version_migration(
+        data.get("settings_version"), _PROMPT_OVERRIDE_RESET_VERSION
     ):
         return None
     previous = _stored_system_prompt(data)
     if not previous or _is_released_default_prompt(previous):
         return None
     return previous
-
-
-def _requires_local_qwen_cpu_auto_migration(settings_version: object) -> bool:
-    if isinstance(settings_version, bool):
-        return True
-    if isinstance(settings_version, int):
-        return settings_version < _LOCAL_QWEN_CPU_AUTO_MIGRATION_VERSION
-    if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < _LOCAL_QWEN_CPU_AUTO_MIGRATION_VERSION
-    return True
-
-
-def _requires_peer_source_auto_migration(settings_version: object) -> bool:
-    if isinstance(settings_version, bool):
-        return True
-    if isinstance(settings_version, int):
-        return settings_version < _PEER_SOURCE_AUTO_MIGRATION_VERSION
-    if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < _PEER_SOURCE_AUTO_MIGRATION_VERSION
-    return True
-
-
-def _requires_multi_model_gemma_migration(settings_version: object) -> bool:
-    if isinstance(settings_version, bool):
-        return True
-    if isinstance(settings_version, int):
-        return settings_version < _MULTI_MODEL_GEMMA_MIGRATION_VERSION
-    if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < _MULTI_MODEL_GEMMA_MIGRATION_VERSION
-    return True
-
-
-def _requires_prompt_override_migration(settings_version: object) -> bool:
-    if isinstance(settings_version, bool):
-        return True
-    if isinstance(settings_version, int):
-        return settings_version < _PROMPT_OVERRIDE_MIGRATION_VERSION
-    if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < _PROMPT_OVERRIDE_MIGRATION_VERSION
-    return True
-
-
-def _requires_prompt_override_reset_migration(settings_version: object) -> bool:
-    if isinstance(settings_version, bool):
-        return True
-    if isinstance(settings_version, int):
-        return settings_version < _PROMPT_OVERRIDE_RESET_VERSION
-    if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < _PROMPT_OVERRIDE_RESET_VERSION
-    return True
-
-
-def _requires_deepgram_rolling_migration(settings_version: object) -> bool:
-    if isinstance(settings_version, bool):
-        return True
-    if isinstance(settings_version, int):
-        return settings_version < _DEEPGRAM_ROLLING_MIGRATION_VERSION
-    if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < _DEEPGRAM_ROLLING_MIGRATION_VERSION
-    return True
-
-
-def _requires_deepseek_41_saved_connection_migration(settings_version: object) -> bool:
-    if isinstance(settings_version, bool):
-        return True
-    if isinstance(settings_version, int):
-        return settings_version < _DEEPSEEK_41_SAVED_CONNECTION_MIGRATION_VERSION
-    if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < _DEEPSEEK_41_SAVED_CONNECTION_MIGRATION_VERSION
-    return True
 
 
 def _migrate_multi_model_gemma_translation(translation: dict[str, Any]) -> None:

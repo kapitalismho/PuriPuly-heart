@@ -14,11 +14,6 @@ pub use font_resolver::{
     TextLocaleKey, TextStyleKey, BUNDLED_NOTO_CJK_FILE_NAME,
 };
 pub use layout::CaptionLayoutPolicy;
-#[allow(unused_imports)]
-pub(crate) use types::{
-    effective_background_alpha, fill_color_for_channel, outline_offsets_px, text_script_bucket,
-    TextScriptBucket,
-};
 pub use types::{
     BlockBounds, BlockCacheKey, CaptionBlock, CaptionBlockVariant, CaptionChannel,
     CaptionDebugOverlay, CaptionLayoutResult, CaptionLineLayout, CaptionPresentation,

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningSnapshot
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRProvisioningSnapshot
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_STT_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     PARAKEET_V3_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )
-from puripuly_heart.core.local_stt_catalog import (
+from puripuly_heart.core.local_asr.local_stt_catalog import (
     LocalSTTUnsupportedLanguageError,
     local_cpu_model_supports_language,
     resolve_cpu_auto_model,

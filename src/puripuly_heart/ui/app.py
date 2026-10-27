@@ -11,9 +11,6 @@ from typing import Any
 from uuid import uuid4
 
 import flet as ft
-from puripuly_heart.core.discord_oauth_loopback import (
-    render_discord_oauth_callback_completion_page,
-)
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.chatgpt_account import (
@@ -41,6 +38,9 @@ from puripuly_heart.core.diagnostics import (
     diagnostic_operation,
     emit_failure,
     safe_exception_fields,
+)
+from puripuly_heart.core.discord.discord_oauth_loopback import (
+    render_discord_oauth_callback_completion_page,
 )
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.lifecycle import (
@@ -113,7 +113,6 @@ DEFAULT_WINDOW_WIDTH = FOUNDATION_DESIGN_TOKENS.window.width
 DEFAULT_WINDOW_HEIGHT = FOUNDATION_DESIGN_TOKENS.window.height
 APP_CONTENT_PADDING = FOUNDATION_DESIGN_TOKENS.spacing.page
 APP_LOGS_CONTENT_PADDING = ft.Padding.symmetric(vertical=APP_CONTENT_PADDING)
-FOUNDER_CONTACT_URL = "https://x.com/kapitalismho"
 FOUNDER_README_BASE_URL = "https://github.com/kapitalismho/PuriPuly-heart/blob/dev"
 FOUNDER_README_PATH_BY_LOCALE = {
     "ko": "docs/readme/README.ko.md",
@@ -147,16 +146,6 @@ async def _prepare_and_show_main_window(page: ft.Page) -> None:
     finally:
         page.window.visible = True
         page.update()
-
-
-def _callable_accepts_keyword(callable_obj: object, keyword: str) -> bool:
-    try:
-        parameters = inspect.signature(callable_obj).parameters
-    except TypeError, ValueError:
-        return True
-    return keyword in parameters or any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    )
 
 
 def founder_readme_url_for_locale(locale: str | None) -> str:
@@ -2152,25 +2141,12 @@ class TranslatorApp:
     def _build_managed_openrouter_byok_target(self) -> OpenRouterPkceTarget | None:
         return self.application.build_managed_openrouter_byok_target()
 
-    def _build_founder_letter_target(self) -> OpenRouterPkceTarget | None:
-        return self._build_managed_openrouter_byok_target()
-
     def _on_discord_managed_auth_byok(self) -> None:
         target = self._build_managed_openrouter_byok_target()
         if target is None:
             self._show_snackbar(t("openrouter.pkce.failed"), COLOR_WARNING)
             return
         self._on_request_openrouter_pkce(target, launch_source="discord_auth")
-
-    def _on_founder_letter_connect(self) -> None:
-        target = self._build_founder_letter_target()
-        if target is None:
-            self._show_snackbar(t("openrouter.pkce.failed"), COLOR_WARNING)
-            return
-        self._on_request_openrouter_pkce(target, launch_source="letter")
-
-    def _on_founder_letter_contact(self) -> None:
-        webbrowser.open(FOUNDER_CONTACT_URL)
 
     def _on_founder_letter_readme(self) -> None:
         webbrowser.open(founder_readme_url_for_locale(get_locale()))

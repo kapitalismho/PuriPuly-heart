@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from puripuly_heart.core import network_clients
-from puripuly_heart.core.oauth_callback_page import render_oauth_callback_completion_page
+from puripuly_heart.core.discord.oauth_callback_page import render_oauth_callback_completion_page
 from puripuly_heart.core.openrouter.authentication import (
     OpenRouterAuthenticationError,
     OpenRouterAuthStage,

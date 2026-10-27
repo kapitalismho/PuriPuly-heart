@@ -23,10 +23,10 @@ from puripuly_heart.app.ports.settings_repository import (
     SettingsCommitResult,
     SettingsSnapshot,
 )
-from puripuly_heart.app.services.provider_runtime_apply import (
+from puripuly_heart.app.services.provider.provider_runtime_apply import (
     _settings_mutation_diagnostics,
 )
-from puripuly_heart.app.services.settings_mutation_legacy import (
+from puripuly_heart.app.services.settings.settings_mutation_legacy import (
     apply_settings_path_patch,
 )
 from puripuly_heart.config.settings_vnext import serialization

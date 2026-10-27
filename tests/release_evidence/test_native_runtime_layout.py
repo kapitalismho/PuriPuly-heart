@@ -124,29 +124,6 @@ def test_native_python_child_environment_is_installed_only_and_non_recursive(
     assert "FLET_DART_BRIDGE_EXIT_PORT" not in environment
 
 
-def test_frozen_package_resources_and_child_environment_preserve_runtime_boundary(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    extraction_root = tmp_path / "frozen 한글"
-    notices = extraction_root / "puripuly_heart" / "data" / "THIRD_PARTY_NOTICES.txt"
-    notices.parent.mkdir(parents=True)
-    shutil.copy2(SOURCE_ROOT / "data" / "THIRD_PARTY_NOTICES.txt", notices)
-    monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
-    monkeypatch.setattr(sys, "frozen", True, raising=False)
-    monkeypatch.setattr(sys, "_MEIPASS", str(extraction_root), raising=False)
-
-    layout = current_runtime_layout()
-
-    assert layout.host_kind == "pyinstaller"
-    assert layout.package_resource("data", "THIRD_PARTY_NOTICES.txt") == notices
-    assert notices.read_text(encoding="utf-8") == (
-        SOURCE_ROOT / "data" / "THIRD_PARTY_NOTICES.txt"
-    ).read_text(encoding="utf-8")
-    environment = {"PYTHONPATH": "inherited", "PATH": "inherited"}
-    assert layout.python_child_environment(environment) == environment
-
-
 def test_native_child_consumes_production_bundle_resources_without_installed_writes(
     tmp_path: Path,
     staged_archive_runtime: tuple[Path, Path, dict[str, object]],

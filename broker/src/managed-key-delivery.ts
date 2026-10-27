@@ -1,5 +1,8 @@
 import type { Context } from 'hono';
 
+import { randomBase64Url } from './crypto';
+import { readJsonBody } from './public-input';
+
 import { instrumentPublicPostRoute } from './abuse-controls';
 import { errorResponse as publicErrorResponse } from './broker-error';
 import type { BrokerEnv } from './contract';
@@ -100,74 +103,6 @@ export async function createManagedKeyDelivery(
   if (Number(result.meta.changes ?? 0) !== 1) throw new Error('managed delivery attempt is no longer owned');
 
   return { deliveryId, deliveryAckToken, ackTokenHash };
-}
-
-export async function acknowledgeManagedKeyDelivery(
-  db: D1Database,
-  input: {
-    deliveryId: string;
-    managedCredentialRef: string;
-    deliveryAckToken: string;
-    now: Date;
-  },
-): Promise<ManagedKeyDeliveryAckResult> {
-  const row = await db
-    .prepare(
-      `SELECT delivery_id, managed_credential_ref, ack_token_hash, status, expires_at
-         FROM managed_key_deliveries
-        WHERE delivery_id = ?`,
-    )
-    .bind(input.deliveryId)
-    .first<Pick<ManagedKeyDeliveryRecord, 'delivery_id' | 'managed_credential_ref' | 'ack_token_hash' | 'status' | 'expires_at'>>();
-
-  if (!row) {
-    return { ok: false, reason: 'invalid' };
-  }
-  const candidateHash = await hashDeliveryAckToken(input.deliveryAckToken);
-  if (!(await timingSafeEqualHex(candidateHash, row.ack_token_hash))) {
-    return { ok: false, reason: 'invalid' };
-  }
-
-  if (row.managed_credential_ref !== input.managedCredentialRef) {
-    return { ok: false, reason: 'mismatched' };
-  }
-
-  if (row.status === 'acknowledged') {
-    return { ok: true, status: 'already_acknowledged' };
-  }
-
-  if (row.status === 'expired') {
-    return { ok: false, reason: 'expired' };
-  }
-
-  if (row.status === 'cleanup_required') {
-    return { ok: false, reason: 'failed' };
-  }
-
-  if (input.now.toISOString() > row.expires_at) {
-    return { ok: false, reason: 'expired' };
-  }
-
-  const acknowledgedAt = input.now.toISOString();
-  const result = await db
-    .prepare(
-      `UPDATE managed_key_deliveries
-          SET status = 'acknowledged', acknowledged_at = ?
-        WHERE delivery_id = ?
-          AND status = 'pending'`,
-    )
-    .bind(acknowledgedAt, input.deliveryId)
-    .run();
-
-  if ((result.meta?.changes ?? 0) === 0) {
-    const latest = await getManagedKeyDelivery(db, input.deliveryId);
-    if (latest?.status === 'acknowledged') {
-      return { ok: true, status: 'already_acknowledged' };
-    }
-    return { ok: false, reason: 'failed' };
-  }
-
-  return { ok: true, status: 'acknowledged' };
 }
 
 export async function validateManagedKeyDeliveryAck(
@@ -369,7 +304,14 @@ export async function handleManagedKeyDeliveryAck(
 ): Promise<Response> {
   const body = await readJsonBody<ManagedKeyDeliveryAckRequestBody>(c);
   if (!body.ok) {
-    return ackErrorResponse(c, 400, 'malformed', body.reason);
+    return ackErrorResponse(
+      c,
+      400,
+      'malformed',
+      body.reason === 'invalid_json'
+        ? 'request body must be valid JSON'
+        : 'request body must be a JSON object',
+    );
   }
 
   const deliveryId = nonEmptyString(body.value.delivery_id);
@@ -462,24 +404,6 @@ async function getManagedKeyDelivery(
     .first<ManagedKeyDeliveryRecord>();
 }
 
-async function readJsonBody<T>(
-  c: Context<BrokerEnv>,
-): Promise<
-  | { ok: true; value: T }
-  | { ok: false; reason: 'request body must be valid JSON' | 'request body must be a JSON object' }
-> {
-  try {
-    const value = await c.req.json();
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      return { ok: false, reason: 'request body must be a JSON object' };
-    }
-
-    return { ok: true, value: value as T };
-  } catch {
-    return { ok: false, reason: 'request body must be valid JSON' };
-  }
-}
-
 function ackErrorResponse(
   c: Context<BrokerEnv>,
   status: 400 | 404 | 409 | 410 | 429,
@@ -496,16 +420,6 @@ function ackErrorResponse(
 
 function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
-}
-
-function randomBase64Url(byteLength: number): string {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }
 
 function toHex(bytes: Uint8Array): string {

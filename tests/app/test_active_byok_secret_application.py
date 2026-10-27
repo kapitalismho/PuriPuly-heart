@@ -11,8 +11,8 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from puripuly_heart.app.services.provider_runtime_apply import ProviderRuntimeApplyPlan
 
+from puripuly_heart.app.services.provider.provider_runtime_apply import ProviderRuntimeApplyPlan
 from puripuly_heart.app.wiring import wiring_provider_runtime
 from puripuly_heart.app.wiring.wiring_secrets_factory import create_secret_store
 from puripuly_heart.composition import application_runtime

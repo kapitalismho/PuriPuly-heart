@@ -18,8 +18,8 @@ from puripuly_heart.app.wiring.wiring_managed_auth_factory import (
 from puripuly_heart.app.wiring.wiring_secrets_factory import create_secret_store
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import ErrorDiagnostics
-from puripuly_heart.core.openrouter_credentials import resolve_openrouter_credentials
-from puripuly_heart.core.openrouter_handoff import is_effectively_exhausted
+from puripuly_heart.core.openrouter.openrouter_credentials import resolve_openrouter_credentials
+from puripuly_heart.core.openrouter.openrouter_handoff import is_effectively_exhausted
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.providers.llm.index_translate import IndexTranslateProvider
 

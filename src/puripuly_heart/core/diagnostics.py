@@ -23,7 +23,7 @@ from puripuly_heart.core.diagnostic_validation import (
     stt_startup_failure_code,
 )
 from puripuly_heart.core.lifecycle import LIFECYCLE_SHUTDOWN_PHASE_ORDER
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )

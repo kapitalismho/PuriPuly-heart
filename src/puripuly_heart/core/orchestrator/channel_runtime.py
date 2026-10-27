@@ -39,20 +39,16 @@ class _MergeBuffer:
     recognition_origins: dict[UUID, tuple[RecognitionTextOrigin, ...]] = field(default_factory=dict)
     start_time: float | None = None
     last_end_time: float | None = None
-    last_final_at: float = 0.0
     recognition_scope: tuple[object, ...] | None = None
     resume_pending: bool = False
     resume_confirmed: bool = False
     resume_utterance_id: UUID | None = None
-    resume_chunk_count: int = 0
-    resume_started_at: float | None = None
     awaiting_vad_end: bool = False
     awaiting_vad_utterance_id: UUID | None = None
     awaiting_vad_timeout_task: asyncio.Task[None] | None = None
     finalize_wait_task: asyncio.Task[None] | None = None
     finalize_wait_started_at: float | None = None
     resume_end_timeout_task: asyncio.Task[None] | None = None
-    resume_end_utterance_id: UUID | None = None
 
 
 @dataclass(slots=True)

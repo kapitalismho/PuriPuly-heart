@@ -11,7 +11,6 @@ import pytest
 
 pytest.importorskip("flet")
 import flet as ft
-from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
 
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
@@ -23,6 +22,7 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 from puripuly_heart.app.services.github_star_prompt_settings import (
     compose_github_star_prompt_owner,
 )
+from puripuly_heart.app.services.managed.managed_usage import ManagedUsageOwner
 from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.settings_vnext.serialization import to_dict as canonical_to_dict

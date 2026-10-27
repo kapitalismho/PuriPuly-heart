@@ -4,7 +4,16 @@ from dataclasses import asdict, replace
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.core.openrouter_credentials import (
+
+from puripuly_heart.app.wiring import ManagedIdentityStateAdapter
+from puripuly_heart.config.provider_values import OpenRouterCredentialSource
+from puripuly_heart.config.settings_vnext.schema import ManagedConnectionState
+from puripuly_heart.core.managed_credential import (
+    ManagedCredentialBinding,
+    credential_binding_secret,
+    managed_key_secret,
+)
+from puripuly_heart.core.openrouter.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_SECRET,
     OPENROUTER_MANAGED_API_KEY_SECRET,
     OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
@@ -19,15 +28,6 @@ from puripuly_heart.core.openrouter_credentials import (
     load_managed_openrouter_user_identifier,
     normalize_managed_openrouter_user_identifier,
     resolve_openrouter_credentials,
-)
-
-from puripuly_heart.app.wiring import ManagedIdentityStateAdapter
-from puripuly_heart.config.provider_values import OpenRouterCredentialSource
-from puripuly_heart.config.settings_vnext.schema import ManagedConnectionState
-from puripuly_heart.core.managed_credential import (
-    ManagedCredentialBinding,
-    credential_binding_secret,
-    managed_key_secret,
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 

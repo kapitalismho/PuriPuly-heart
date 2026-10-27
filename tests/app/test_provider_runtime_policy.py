@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from puripuly_heart.app.wiring_provider_runtime_policy import (
+from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
     build_llm_provider_signature,
     llm_provider_requires_secret,
     provider_llm_for_translation,
 )
-
 from puripuly_heart.config.provider_values import OpenRouterLLMModel, OpenRouterSelectionAlias
 from puripuly_heart.config.runtime_resolution import OPENAI_MODEL_GPT_6_LUNA, PROVIDER_OPENAI
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext

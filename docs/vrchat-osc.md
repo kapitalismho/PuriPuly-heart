@@ -6,6 +6,7 @@
 - Automatic: OSCQuery discovery and dynamic receive port
 - Manual: send `9000`, receive `9001` by default
 - Off: stop control traffic and preserve manual ports
+- The OSC-enable warning follows the effective destination. It clears when OSC is Off or automatic discovery is starting; results from an earlier connection state cannot restore it.
 
 ## Progressive Self chatbox translations
 

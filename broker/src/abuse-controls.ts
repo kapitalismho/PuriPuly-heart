@@ -12,7 +12,6 @@ import {
   resolveRequestNetworkIdentityCandidates,
   type NetworkIdentitySecrets,
   type NetworkIdentityWriteMode,
-  type RequestNetworkIdentity,
 } from './network-identity';
 import {
   BROKER_RUNTIME_CONFIG_KEYS,
@@ -202,7 +201,7 @@ export async function persistBrokerAbuseRuntimeState(
   const guardClauses: string[] = [];
   const guardArguments: Array<string | number | null> = [];
 
-  for (const [path, value] of sectionsToPersist) {
+  for (const [path] of sectionsToPersist) {
     switch (path) {
       case '$.brake': {
         guardClauses.push(

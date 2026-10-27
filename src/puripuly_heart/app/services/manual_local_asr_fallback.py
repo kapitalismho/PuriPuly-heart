@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass
 
-from puripuly_heart.app.services.local_asr_selection import (
+from puripuly_heart.app.services.local_asr.local_asr_selection import (
     LOCAL_CPU_AUTO_PROVIDER,
     LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER,
     LOCAL_CPU_PROVIDERS,

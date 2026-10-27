@@ -3,16 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from puripuly_heart.app.services.capture_target_settings import (
-    CaptureTargetSettingsError,
-    persist_desktop_audio_capture_target,
-)
 
 from puripuly_heart.app.adapters import (
     settings_vnext_canonical_persistence as persistence_adapter,
 )
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
+)
+from puripuly_heart.app.services.capture.capture_target_settings import (
+    CaptureTargetSettingsError,
+    persist_desktop_audio_capture_target,
 )
 from puripuly_heart.config.settings_vnext import compat
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings, save_vnext_settings

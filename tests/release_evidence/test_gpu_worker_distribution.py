@@ -8,7 +8,6 @@ import pytest
 
 from puripuly_heart.release_evidence.gpu_worker_distribution import (
     GPU_WORKER_INVENTORY,
-    collect_gpu_worker_runtime_binaries,
     validate_gpu_worker_runtime,
 )
 
@@ -44,18 +43,13 @@ def gpu_payload(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_complete_payload_is_collected_beside_worker(gpu_payload: Path) -> None:
+def test_complete_payload_preserves_current_cpu_family(gpu_payload: Path) -> None:
     report = validate_gpu_worker_runtime(gpu_payload)
     assert report["cpu_modules"] == [
         "ggml-cpu-haswell.dll",
         "ggml-cpu-icelake.dll",
         "ggml-cpu-x64.dll",
     ]
-    binaries = collect_gpu_worker_runtime_binaries(gpu_payload)
-    assert {Path(path).name for path, _ in binaries} == {
-        path.name for path in gpu_payload.iterdir() if path.suffix in {".dll", ".exe"}
-    }
-    assert {destination for _, destination in binaries} == {"."}
 
 
 @pytest.mark.parametrize(
@@ -73,7 +67,7 @@ def test_complete_payload_is_collected_beside_worker(gpu_payload: Path) -> None:
 def test_omitted_current_build_runtime_is_rejected(gpu_payload: Path, name: str) -> None:
     (gpu_payload / name).unlink()
     with pytest.raises(ValueError, match="inventory mismatch"):
-        collect_gpu_worker_runtime_binaries(gpu_payload)
+        validate_gpu_worker_runtime(gpu_payload)
 
 
 @pytest.mark.parametrize("name", ["transcribe.dll", "ggml-vulkan.dll", "ggml-cpu-x64.dll"])
@@ -103,4 +97,4 @@ def test_stale_unlisted_variant_is_rejected(gpu_payload: Path) -> None:
 def test_missing_inventory_is_rejected(gpu_payload: Path) -> None:
     (gpu_payload / GPU_WORKER_INVENTORY).unlink()
     with pytest.raises(FileNotFoundError):
-        collect_gpu_worker_runtime_binaries(gpu_payload)
+        validate_gpu_worker_runtime(gpu_payload)

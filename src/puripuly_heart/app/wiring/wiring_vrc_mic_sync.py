@@ -42,6 +42,7 @@ def compose_vrc_mic_sync(
     ) = None,
     ui_state_sink: Callable[[OscControlPresentationState], None] | None = None,
     query_service: OscQueryServicePort | None = None,
+    connection_changed: Callable[[], None] | None = None,
 ) -> OscControlIntegrationOwner:
     def diagnostics_sink(event: str, metadata: Mapping[str, object]) -> None:
         log_diagnostic(
@@ -72,6 +73,7 @@ def compose_vrc_mic_sync(
         translation_model_normalizer=translation_model_normalizer,
         query_service=query_service or ZeroconfOscQueryService(),
         error_sink=error_sink,
+        connection_changed=connection_changed,
     )
 
 

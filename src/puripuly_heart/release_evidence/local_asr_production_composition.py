@@ -20,7 +20,7 @@ import numpy as np
 from puripuly_heart.app.ports.local_asr_production_evidence import (
     LocalASRProductionEvidenceFactoryPort,
 )
-from puripuly_heart.app.wiring_translation_runtime_configuration import (
+from puripuly_heart.app.wiring.wiring_translation_runtime_configuration import (
     replace_translation_runtime_enabled,
 )
 from puripuly_heart.composition.local_asr_production_evidence import (
@@ -32,8 +32,8 @@ from puripuly_heart.core.audio.ownership import (
     AudioSegmentSettingsSnapshot,
     PeerAudioSegmentLedger,
 )
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
-from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
+from puripuly_heart.core.local_asr.local_gpu_assets import local_gpu_model_path
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )

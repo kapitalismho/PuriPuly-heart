@@ -100,7 +100,7 @@ describe('POST /v1/providers/openrouter/issue route contract', () => {
       release_token_expires_at: release.releaseTokenExpiresAt,
     });
     expect(payload.managed_credential_ref).not.toBe(payload.openrouter_api_key);
-    expect(payload.openrouter_api_key).not.toBe(env.OPENROUTER_MANAGED_API_KEY);
+    expect(payload.openrouter_api_key).not.toBe(env.OPENROUTER_MANAGEMENT_API_KEY);
     await expect(sha256Base64Url(release.releaseToken)).resolves.toBe(
       entitlement.release_token_hash,
     );

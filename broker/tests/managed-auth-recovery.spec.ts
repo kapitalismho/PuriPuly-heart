@@ -6,7 +6,6 @@ import {
   startManagedOperationAttempt, sweepStaleManagedOperations, transitionOperationToPostCreateState,
 } from '../src/managed-operation';
 import { createManagedKeyDelivery } from '../src/managed-key-delivery';
-import { reconcileStaleManagedKeyDeliveries } from '../src/scheduled';
 import { createTestBrokerEnv, seedRequestEvent } from './test-support/sqlite-d1';
 import { ACK_PATH, RESUME_PATH, STATUS_PATH, controlledProvider, deferred, seedRecoverableOperation, workerPost } from './test-support/managed-recovery';
 import { MANAGED_CLEANUP_RETRY_MS } from '../src/managed-cleanup';

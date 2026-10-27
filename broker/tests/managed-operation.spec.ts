@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { buildManagedOperationId, buildManagedOperationResumeToken } from './test-support/managed-operation';
 
 import { app } from '../src/app';
 import {
   authorizeManagedOperationRequest,
   bindOperationForIssue,
-  buildManagedOperationId,
-  buildManagedOperationResumeToken,
   createManagedOperation,
   getManagedOperation,
   hashManagedOperationResumeToken,
@@ -18,8 +17,6 @@ import {
   sweepStaleManagedOperations,
   transitionManagedOperation,
   transitionOperationToPostCreateState,
-  failManagedOperationTerminal,
-  expireManagedOperation,
   findConflictingOperationDelivery,
   markOperationActiveOnAck,
 } from '../src/managed-operation';

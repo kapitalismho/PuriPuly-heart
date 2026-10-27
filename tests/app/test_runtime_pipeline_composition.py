@@ -8,23 +8,21 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from puripuly_heart.app.wiring_local_asr_provider_runtime import (
+
+from puripuly_heart.app.wiring import wiring_runtime_pipeline as runtime_pipeline_module
+from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
     SharedSTTProviderFactory,
 )
-from puripuly_heart.app.wiring_runtime_pipeline import (
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import (
     RuntimePipelineLauncher,
     RuntimePipelineResourceOwner,
     compose_runtime_pipeline,
+    runtime_pipeline_inputs_from_vnext,
 )
-
-from puripuly_heart.app import wiring_runtime_pipeline as runtime_pipeline_module
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import SystemClock
-from puripuly_heart.core.orchestrator.peer_translation_channel import (
-    PeerTranslationChannelOwner,
-)
 from puripuly_heart.core.osc.receiver import VrcMicState
 from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
     PrebuiltLocalASRProviderRuntimeFactory,
@@ -32,7 +30,6 @@ from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
-from tests.helpers.runtime_pipeline import pipeline_inputs_from_vnext
 
 
 class ManagedRelease:
@@ -122,7 +119,9 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
         return CaptureOwner("peer")
 
     pipeline = await compose_runtime_pipeline(
-        inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
+        inputs=runtime_pipeline_inputs_from_vnext(
+            AppSettingsVNext(), peer_translation_enabled=False
+        ),
         secrets=InMemorySecretStore(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
@@ -150,12 +149,14 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
     assert pipeline.self_translation_channel.runtime is pipeline.self_runtime
     assert pipeline.peer_translation_channel.runtime is pipeline.peer_runtime
     assert pipeline.peer_translation_channel.translation_turns is pipeline.translation_turns
+    assert pipeline.self_translation_channel.translation_turns is pipeline.translation_turns
     assert pipeline.translation_requests.context_resolver is pipeline.context_resolver
     assert pipeline.peer_translation_channel.diagnostics is pipeline.translation_diagnostics
     assert pipeline.peer_translation_channel.local_asr_runtime is pipeline.local_asr_runtime
     assert pipeline.translation_requests.provider_runtime is pipeline.llm_runtime
     assert pipeline.peer_translation_channel.translation_requests is pipeline.translation_requests
-    assert not hasattr(pipeline.peer_translation_channel, "_llm_provider_runtime")
+    assert pipeline.self_translation_channel.translation_requests is pipeline.translation_requests
+    assert pipeline.translation_requests.presentation is pipeline.translation_output_projection
     assert pipeline.resource_owner.output_runtime is pipeline.output_runtime
     assert pipeline.resource_owner.local_asr_runtime is pipeline.local_asr_runtime
     assert pipeline.resource_owner.self_translation_channel is pipeline.self_translation_channel
@@ -171,9 +172,6 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
         pipeline.local_asr_runtime,
         pipeline.peer_translation_channel,
     )
-    assert "llm" not in PeerTranslationChannelOwner.__dataclass_fields__
-    assert "stt" not in PeerTranslationChannelOwner.__dataclass_fields__
-    assert "peer_stt" not in PeerTranslationChannelOwner.__dataclass_fields__
 
 
 @pytest.mark.asyncio
@@ -209,7 +207,9 @@ async def test_pipeline_binds_stt_event_ingress_observer_to_translation_diagnost
     )
 
     pipeline = await compose_runtime_pipeline(
-        inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
+        inputs=runtime_pipeline_inputs_from_vnext(
+            AppSettingsVNext(), peer_translation_enabled=False
+        ),
         secrets=InMemorySecretStore(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
@@ -225,10 +225,21 @@ async def test_pipeline_binds_stt_event_ingress_observer_to_translation_diagnost
         stt_failure_sink=lambda _message: None,
     )
 
+    recorded = []
+    pipeline.translation_diagnostics.overlay_diagnostics = SimpleNamespace(
+        record_stt=lambda event, **fields: recorded.append((event, fields))
+    )
     observer = inner.event_ingress_observer
     assert observer is not None
-    assert observer.__self__ is pipeline.translation_diagnostics
-    assert observer.__func__ is type(pipeline.translation_diagnostics).record_stt_ingress
+    try:
+        observer("event_received", channel="self", event_type="final")
+        observer("event_received", channel="peer", event_type="partial")
+        assert recorded == [
+            ("event_received", {"channel": "self", "event_type": "final"}),
+            ("event_received", {"channel": "peer", "event_type": "partial"}),
+        ]
+    finally:
+        await pipeline.resource_owner.close()
 
 
 @pytest.mark.asyncio
@@ -283,7 +294,7 @@ async def test_managed_gemma_startup_constructs_provider_without_preparing(
     )
 
     pipeline = await compose_runtime_pipeline(
-        inputs=pipeline_inputs_from_vnext(settings),
+        inputs=runtime_pipeline_inputs_from_vnext(settings, peer_translation_enabled=False),
         secrets=InMemorySecretStore(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
@@ -306,8 +317,6 @@ async def test_managed_gemma_startup_constructs_provider_without_preparing(
     assert events == ["create"]
     await pipeline.resource_owner.close_llm()
     assert events[-1] == "close"
-    assert not hasattr(PeerTranslationChannelOwner, "start")
-    assert not hasattr(PeerTranslationChannelOwner, "stop")
     assert not pipeline.translation_turns.channel_ingress_open("self")
     assert not pipeline.translation_turns.channel_ingress_open("peer")
     await pipeline.start_callbacks.start_output(False)
@@ -369,7 +378,7 @@ async def test_pipeline_composition_preserves_runtime_configuration_and_gate(
     gate = VrcMicAudioGate(state=original_state, enabled=False)
 
     pipeline = await compose_runtime_pipeline(
-        inputs=pipeline_inputs_from_vnext(settings),
+        inputs=runtime_pipeline_inputs_from_vnext(settings, peer_translation_enabled=False),
         secrets=InMemorySecretStore(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
@@ -454,7 +463,7 @@ async def test_pipeline_launcher_replaces_owned_runtime_in_order(
         cleanup_failure_sink=lambda _message, _exception: None,
     )
     result = await launcher.launch(
-        pipeline_inputs_from_vnext(AppSettingsVNext(), peer_translation_enabled=True),
+        runtime_pipeline_inputs_from_vnext(AppSettingsVNext(), peer_translation_enabled=True),
         secrets=object(),
         vrc_mic_state=None,
         vrc_mic_audio_gate=None,
@@ -504,7 +513,9 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
     monkeypatch.setattr(runtime_pipeline_module, "ChatboxPaginator", lambda *_a, **_k: chatbox)
 
     pipeline = await compose_runtime_pipeline(
-        inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
+        inputs=runtime_pipeline_inputs_from_vnext(
+            AppSettingsVNext(), peer_translation_enabled=False
+        ),
         secrets=InMemorySecretStore(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
@@ -859,7 +870,9 @@ async def test_pipeline_composition_closes_pending_llm_on_early_failure(
 
     with pytest.raises(RuntimeError, match=f"{failure_stage} construction failed"):
         await compose_runtime_pipeline(
-            inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
+            inputs=runtime_pipeline_inputs_from_vnext(
+                AppSettingsVNext(), peer_translation_enabled=False
+            ),
             secrets=InMemorySecretStore(),
             config_path=Path("settings.json"),
             clock=SystemClock(),
@@ -929,7 +942,7 @@ async def test_pipeline_launcher_retains_failed_cleanup_for_retry(
 
     with pytest.raises(BaseExceptionGroup) as raised:
         await launcher.launch(
-            pipeline_inputs_from_vnext(AppSettingsVNext()),
+            runtime_pipeline_inputs_from_vnext(AppSettingsVNext(), peer_translation_enabled=False),
             secrets=object(),
             vrc_mic_state=None,
             vrc_mic_audio_gate=None,
@@ -987,7 +1000,9 @@ async def test_pipeline_dependency_preparation_remains_responsive_and_drains_can
     )
     task = asyncio.create_task(
         compose_runtime_pipeline(
-            inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
+            inputs=runtime_pipeline_inputs_from_vnext(
+                AppSettingsVNext(), peer_translation_enabled=False
+            ),
             secrets=InMemorySecretStore(),
             config_path=Path("settings.json"),
             clock=SystemClock(),
@@ -1081,7 +1096,9 @@ async def test_pipeline_managed_credential_observation_is_drained_before_loop_co
     )
     task = asyncio.create_task(
         compose_runtime_pipeline(
-            inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
+            inputs=runtime_pipeline_inputs_from_vnext(
+                AppSettingsVNext(), peer_translation_enabled=False
+            ),
             secrets=Store(),
             config_path=Path("settings.json"),
             clock=SystemClock(),

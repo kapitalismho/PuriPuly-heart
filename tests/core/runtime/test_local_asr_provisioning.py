@@ -10,12 +10,14 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from puripuly_heart.core.local_asr_provisioning import (
+
+from puripuly_heart.core.diagnostics import diagnostic_operation
+from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRInstallRequest,
     LocalASRInstallResult,
 )
-from puripuly_heart.core.local_gpu_assets import LocalGPUInstallSnapshot
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_gpu_assets import LocalGPUInstallSnapshot
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LOCAL_STT_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
@@ -25,17 +27,15 @@ from puripuly_heart.core.local_stt_assets import (
     LocalSTTInstallState,
     load_local_stt_asset_manifest,
 )
-from puripuly_heart.core.local_stt_catalog import (
+from puripuly_heart.core.local_asr.local_stt_catalog import (
     LocalCPUInstallSnapshot,
     LocalCPUModelInstall,
 )
-from puripuly_heart.core.local_stt_runtime_installer import (
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     LocalSTTRuntimeInstallCancelled,
     LocalSTTRuntimeInstallError,
     RuntimeLocalSTTStatusUpdate,
 )
-
-from puripuly_heart.core.diagnostics import diagnostic_operation
 from puripuly_heart.core.runtime import local_asr_provisioning as provisioning_module
 from puripuly_heart.core.runtime.local_asr_provisioning import LocalASRProvisioningOwner
 from puripuly_heart.core.runtime.local_stt_download import LocalSTTDownloadRuntime

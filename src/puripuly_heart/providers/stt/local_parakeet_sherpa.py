@@ -4,11 +4,11 @@ import importlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from puripuly_heart.core.local_qwen_runtime import (
+from puripuly_heart.core.local_asr.local_qwen_runtime import (
     LocalQwenRuntimeBootstrapError,
     ensure_local_qwen_windows_runtime,
 )
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_stt_assets import (
     PARAKEET_JAPANESE_MODEL_ID,
     PARAKEET_V3_MODEL_ID,
     LocalParakeetSherpaLoadError,

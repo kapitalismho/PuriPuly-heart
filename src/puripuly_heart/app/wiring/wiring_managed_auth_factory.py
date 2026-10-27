@@ -38,19 +38,19 @@ from puripuly_heart.app.services.canonical_settings_persistence import SettingsO
 from puripuly_heart.app.services.github_star_prompt import (
     github_star_prompt_utc_timestamp,
 )
-from puripuly_heart.app.services.managed_auth import (
+from puripuly_heart.app.services.managed.managed_auth import (
     ManagedAuthExecutionResult,
     ManagedAuthState,
 )
-from puripuly_heart.app.services.managed_auth_claims import (
+from puripuly_heart.app.services.managed.managed_auth_claims import (
     MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
     ManagedAuthClaimGuard,
 )
-from puripuly_heart.app.services.managed_connection_auth import (
+from puripuly_heart.app.services.managed.managed_connection_auth import (
     ManagedConnectionAuthRequest,
     ManagedConnectionAuthService,
 )
-from puripuly_heart.app.services.managed_key_delivery_ack import (
+from puripuly_heart.app.services.managed.managed_key_delivery_ack import (
     ManagedKeyDeliveryAckService,
 )
 from puripuly_heart.app.services.qq_managed_auth import (
@@ -82,7 +82,7 @@ from puripuly_heart.core.discord.discord_managed_oauth import (
     register_discord_oauth_expected_state,
     run_discord_oauth_callback_flow,
 )
-from puripuly_heart.core.discord_oauth_loopback import (
+from puripuly_heart.core.discord.discord_oauth_loopback import (
     DiscordOAuthCallbackError,
     DiscordOAuthLoopbackClosedError,
     DiscordOAuthLoopbackListener,
@@ -92,15 +92,6 @@ from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.managed_identity import (
     ManagedIdentityBundle,
     ensure_managed_identity_bundle,
-)
-from puripuly_heart.core.managed_openrouter_release import (
-    MANAGED_OPENROUTER_TRIAL_BUDGET_USD,
-    ManagedOpenRouterDiscordStartSuccess,
-    ManagedOpenRouterIssueSuccess,
-    ManagedOpenRouterReleaseBehavior,
-    ManagedOpenRouterReleaseError,
-    OpenRouterReleaseRuntimeConfig,
-    format_managed_openrouter_diagnostics,
 )
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
@@ -117,7 +108,16 @@ from puripuly_heart.core.messages import (
     TransactionResult,
     UserMessageRef,
 )
-from puripuly_heart.core.openrouter_credentials import (
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
+    MANAGED_OPENROUTER_TRIAL_BUDGET_USD,
+    ManagedOpenRouterDiscordStartSuccess,
+    ManagedOpenRouterIssueSuccess,
+    ManagedOpenRouterReleaseBehavior,
+    ManagedOpenRouterReleaseError,
+    OpenRouterReleaseRuntimeConfig,
+    format_managed_openrouter_diagnostics,
+)
+from puripuly_heart.core.openrouter.openrouter_credentials import (
     OPENROUTER_MANAGED_API_KEY_SECRET,
     OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     OPENROUTER_MANAGED_USER_ID_SECRET,
@@ -125,7 +125,7 @@ from puripuly_heart.core.openrouter_credentials import (
     OpenRouterCredentialRuntimeConfig,
     resolve_openrouter_credentials,
 )
-from puripuly_heart.core.openrouter_handoff import mark_founder_letter_shown
+from puripuly_heart.core.openrouter.openrouter_handoff import mark_founder_letter_shown
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.qq_auth_diagnostics import exception_fields, log_qq_auth
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
@@ -796,30 +796,6 @@ def _managed_credential_kind_from_connection(connection: str) -> str:
     return "standard"
 
 
-def _managed_credential_kind_for_settings(settings: object) -> str:
-    return _managed_credential_kind_from_connection(settings.intent.translation.connection)
-
-
-def _managed_release_service_for_alias(
-    managed_release_service: object | None,
-    *,
-    alias_settings: object,
-) -> object | None:
-    if managed_release_service is None:
-        return None
-    from dataclasses import asdict
-    from types import SimpleNamespace
-
-    return managed_release_service_for_openrouter_config(
-        managed_release_service,
-        openrouter_config=build_openrouter_release_runtime_config_from_vnext(alias_settings),
-        managed_state=ManagedIdentityStateAdapter(
-            SimpleNamespace(**asdict(alias_settings.state.managed_connection)),
-            lambda: managed_release_service.managed_state.persist(),
-        ),
-    )
-
-
 def managed_release_service_for_openrouter_config(
     managed_release_service: object | None,
     *,
@@ -829,7 +805,9 @@ def managed_release_service_for_openrouter_config(
     if managed_release_service is None:
         return None
 
-    from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterReleaseService
+    from puripuly_heart.core.openrouter.managed_openrouter_release import (
+        ManagedOpenRouterReleaseService,
+    )
 
     if not isinstance(managed_release_service, ManagedOpenRouterReleaseService):
         return managed_release_service

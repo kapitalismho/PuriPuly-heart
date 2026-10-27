@@ -6,7 +6,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from puripuly_heart.app.services.local_asr_selection import (
+from puripuly_heart.app.services.local_asr.local_asr_selection import (
     LOCAL_CPU_PROVIDERS,
     resolve_local_asr_selection,
 )
@@ -57,8 +57,8 @@ from puripuly_heart.config.runtime_resolution import (
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.language import get_local_qwen_language_hint
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LOCAL_STT_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
@@ -1126,7 +1126,7 @@ def create_stt_backend_from_resolved_config(
             raise RuntimeError("Local Vulkan ASR worker is not available")
         if config.channel not in {"self", "peer"}:
             raise ValueError(f"Unsupported GPU ASR channel: {config.channel}")
-        from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
+        from puripuly_heart.core.local_asr.local_gpu_assets import local_gpu_model_path
         from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 
         return LocalGpuSTTBackend(

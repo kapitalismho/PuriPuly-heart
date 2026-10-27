@@ -73,7 +73,7 @@ def test_contract_owner_consumes_provisioning_only_through_public_port() -> None
     source = owner_file.read_text(encoding="utf-8")
     imports = _imported_modules(owner_file)
 
-    assert "puripuly_heart.core.local_asr_provisioning" in imports
+    assert "puripuly_heart.core.local_asr.local_asr_provisioning" in imports
     assert "LocalASRProvisioningPort" in source
     assert ".inspect_gpu(" in source
     assert "LocalASRProvisioningOwner" not in source

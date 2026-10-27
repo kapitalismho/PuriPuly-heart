@@ -11,7 +11,6 @@ from puripuly_heart.core.soxr_runtime import (
     SOXR_SIBLING_DLL_NAME,
     SoxrRuntimeAvailabilityError,
     SoxrRuntimePaths,
-    ensure_soxr_runtime_available_for_startup,
     resolve_soxr_runtime_paths,
     validate_soxr_runtime_paths,
 )
@@ -103,9 +102,7 @@ def run_soxr_runtime_check() -> int:
         return 2
 
     try:
-        runtime_paths = ensure_soxr_runtime_available_for_startup()
-        if runtime_paths is None:
-            runtime_paths = validate_soxr_runtime_paths(resolve_soxr_runtime_paths())
+        runtime_paths = validate_soxr_runtime_paths(resolve_soxr_runtime_paths())
     except SoxrRuntimeAvailabilityError as exc:
         _print_error(f"failed to verify packaged soxr runtime: {exc}")
         return 2

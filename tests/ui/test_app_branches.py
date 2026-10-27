@@ -20,6 +20,7 @@ import puripuly_heart.ui.app as app_module
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
+from puripuly_heart.app.adapters.ui_runtime import UiProviderRuntimeAdapter
 from puripuly_heart.app.ports.chatgpt_account import (
     ChatGptAccountSnapshot,
     ChatGptConnectResult,
@@ -145,19 +146,21 @@ def _vnext(
 
 
 def _byok_pkce_target(settings: AppSettingsVNext) -> OpenRouterPkceTarget | None:
-    """Mirror the provider adapter's projection-to-PKCE-target wrapping."""
     owner = SettingsOwner(
         path=Path("settings.json"),
         persistence=SettingsVNextCanonicalPersistenceAdapter(),
         canonical=settings,
     )
-    target_settings = owner.build_managed_openrouter_byok_target(settings)
-    if target_settings is None:
-        return None
-    alias = target_settings.intent.translation.openrouter_selection_alias
-    if alias is None:
-        return None
-    return OpenRouterPkceTarget(OpenRouterSelectionAlias(alias))
+    provider = UiProviderRuntimeAdapter(
+        settings=owner,
+        provider_application=None,
+        gpu=None,
+        managed=None,
+        credential_verification=None,
+        provider_settings=None,
+        build_byok_target_settings=owner.build_managed_openrouter_byok_target,
+    )
+    return provider.build_managed_openrouter_byok_target()
 
 
 def _application_boundary_with_stop(backend: object) -> UiApplicationBoundary:
@@ -2358,11 +2361,11 @@ def test_debug_preview_qq_auth_states_are_pure_ui_without_tasks_or_persistence(
 def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     settings = _vnext(
-        model="openrouter_qwen35_flash",
-        connection="managed",
+        model=TranslationModel.GEMMA4_26B_31B.value,
+        connection=TranslationConnection.MANAGED.value,
         openrouter_source="managed",
-        openrouter_alias=OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED.value,
-        openrouter_model=OpenRouterLLMModel.QWEN_35_FLASH_02_23.value,
+        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value,
+        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
     )
     app._ui_application = SimpleNamespace(
         build_managed_openrouter_byok_target=lambda: _byok_pkce_target(settings),
@@ -2380,7 +2383,7 @@ def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -
     assert len(pkce_calls) == 1
     target, launch_source = pkce_calls[0]
     assert launch_source == "discord_auth"
-    assert target.selection_alias is OpenRouterSelectionAlias.QWEN35_FLASH_BYOK
+    assert target.selection_alias is OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
     assert (
         settings.intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.MANAGED.value

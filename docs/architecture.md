@@ -14,6 +14,8 @@ Keep this map about ownership, dependency direction, and cross-component invaria
 
 [Application composition](../src/puripuly_heart/composition/application_runtime.py) loads settings and secrets, selects adapters, connects services, and installs startup/shutdown. Long-lived resources must transfer to explicit owners. The [runtime pipeline launcher](../src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py) installs replaceable capture/provider/output components; callers must not retain them across replacement unless the API permits it.
 
+Python callers use canonical module paths and the current package facades. Pre-grouping app/core import aliases and the synchronous `puripuly_heart.providers.llm.qwen` import are unsupported; Qwen translation uses the [asynchronous adapter](../src/puripuly_heart/providers/llm/qwen_async.py).
+
 ## Runtime Ownership
 
 Paths below are navigation entry points, not an exhaustive class inventory.
@@ -109,14 +111,14 @@ Entry points: [provider application](../src/puripuly_heart/app/services/provider
 - Matching stops may preempt pending starts, while cleanup fences older queued starts and later replacements. Removing one channel's demand does not revoke another channel's shared resource.
 - Shutdown freezes ingress and startup, drains/cancels owned work, closes external resources, then clears runtime references. Primary operational failures and secondary cleanup failures remain distinct; failed cleanup stays owned and visible.
 
-[Dependency checks](../tests/architecture/test_dependency_boundaries.py) enforce import boundaries and record the narrow existing localization exception. [Task-ownership checks](../tests/architecture/test_lifecycle_task_guard.py) record reviewed creation sites and remaining lifetime debt. These structural checks do not prove runtime draining or cleanup; owner behavior tests do.
+[Dependency checks](../tests/architecture/test_dependency_boundaries.py) enforce import boundaries and record narrow pre-existing localization and application-wiring exceptions. These exact-edge exceptions do not permit additional dependencies from the same modules. [Task-ownership checks](../tests/architecture/test_lifecycle_task_guard.py) record reviewed creation sites and remaining lifetime debt. These structural checks do not prove runtime draining or cleanup; owner behavior tests do.
 
 ## Diagnostics and Runtime Layout
 
 - Owners produce typed causes and known operation/request/turn identities before reducing them to user messages. [Diagnostics](../src/puripuly_heart/core/diagnostics.py) and [runtime logging](../src/puripuly_heart/core/runtime_logging.py) validate and project that evidence; arbitrary exception prose is not a classification source.
 - Technical diagnostics exclude credentials, conversation content, audio, arbitrary child output, and personal paths. Accepted conversation records have a separate protected path; CLI content requires explicit opt-in.
 - History, subscribers, and file delivery are bounded. Loss and cleanup failure remain observable independently of a failed sink. Enqueued, written, durable, and physically displayed are different claims; current-instance history is not a durable audit. See [CLI diagnostics](cli.md#retained-diagnostics-and-delivery-health).
-- [Runtime layout](../src/puripuly_heart/runtime_layout.py) separates interpreter/host paths, immutable resources, and writable user data. Features use this boundary rather than the working directory or launcher flags. Packaged code changes require rebuilding the payload; startup never writes into installed directories.
+- [Runtime layout](../src/puripuly_heart/runtime_layout.py) separates interpreter/host paths, immutable resources, and writable user data. Windows distributions use the native host; source/developer execution remains supported. The PyInstaller packaging backend is unsupported. Features use this boundary rather than the working directory or launcher flags. Packaged code changes require rebuilding the payload; startup never writes into installed directories.
 - Model registries own pinned sources and integrity contracts. Provisioning validates owned staging before atomic replacement. Explicit asset operations have their own cancellation lifetime, separate from runtime demand. See [ASR installation](../src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py) and [translation provisioning](../src/puripuly_heart/core/local_translation/provisioning.py).
 
 Behavior: [runtime logging](../tests/core/test_runtime_logging.py), [output diagnostics](../tests/core/test_output_logging.py), [packaged layout](../tests/release_evidence/test_native_runtime_layout.py), [model provisioning](../tests/core/local_translation/test_gemma_provisioning.py).

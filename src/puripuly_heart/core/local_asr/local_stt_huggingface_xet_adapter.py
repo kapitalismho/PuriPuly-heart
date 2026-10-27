@@ -44,7 +44,7 @@ def _default_worker_command(
     command = [str(layout.host_executable)]
     if layout.host_kind == "source":
         command.extend(["-m", "puripuly_heart.main"])
-    elif layout.host_kind == "native":
+    else:
         command.append("--headless")
     command.extend(
         [

@@ -5,6 +5,7 @@ import io
 import json
 import logging
 import os
+import queue
 import re
 import threading
 import time
@@ -15,11 +16,11 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from puripuly_heart.app.services.local_asr_diagnostics import LocalASRDiagnosticsOwner
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 
+from puripuly_heart.app.services.local_asr.local_asr_diagnostics import LocalASRDiagnosticsOwner
 from puripuly_heart.app.wiring.wiring_capture_runtime import CaptureDiagnosticsAdapter
 from puripuly_heart.core import runtime_logging as runtime_logging_module
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     CONTENT_POLICY_RAW_USER_TEXT_ALLOWED,
@@ -1833,3 +1834,64 @@ def test_file_close_shares_absolute_budget_and_retry_cannot_extend_listener_owne
             closer.join(3)
         _wait_until(lambda: listener.cleanup_complete)
         sinks.close(force=True)
+
+
+@pytest.mark.parametrize("kind", ["terminal-info", "warning", "ordinary-info"])
+def test_file_delivery_flushes_priority_records_before_ordinary_batch_expiry(
+    tmp_path, monkeypatch, kind
+) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.terminal_flush.{uuid4()}")
+    root_logger.propagate = False
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    session = SessionRuntimeLoggingService(root_logger=root_logger, sinks=sinks)
+    writer_entered = threading.Event()
+    release_writer = threading.Event()
+    release_batch_expiry = threading.Event()
+    delivery_decided = threading.Event()
+    record_visible = threading.Event()
+    original_emit_batch = sinks.file_handler.emit_batch
+    original_get = sinks.file_queue.get
+
+    def emit_batch(records):
+        if not writer_entered.is_set():
+            writer_entered.set()
+            assert release_writer.wait(5)
+        original_emit_batch(records)
+        if any("phase=seal" in record.getMessage() for record in records):
+            record_visible.set()
+            delivery_decided.set()
+
+    def wait_for_batch_expiry(block=True, timeout=None):
+        if timeout is not None:
+            delivery_decided.set()
+            assert release_batch_expiry.wait(5)
+            raise queue.Empty
+        return original_get(block=block)
+
+    monkeypatch.setattr(sinks.file_handler, "emit_batch", emit_batch)
+    monkeypatch.setattr(sinks.file_queue, "get", wait_for_batch_expiry)
+    try:
+        session.emit_basic("[Lifecycle] boundary phase=source_open", level=logging.WARNING)
+        assert writer_entered.wait(5)
+        if kind == "terminal-info":
+            session.emit_persisted("[Lifecycle] boundary phase=seal", level=logging.INFO)
+        else:
+            level = logging.WARNING if kind == "warning" else logging.INFO
+            session.emit_basic("[Lifecycle] boundary phase=seal", level=level)
+        release_writer.set()
+
+        assert delivery_decided.wait(5)
+        if kind == "ordinary-info":
+            assert not record_visible.is_set()
+            release_batch_expiry.set()
+            assert record_visible.wait(5)
+        else:
+            assert record_visible.is_set(), "priority record waited for ordinary batch expiry"
+        content = sinks.log_file.read_text(encoding="utf-8")
+        assert "phase=source_open" in content
+        terminal_line = next(line for line in content.splitlines() if "phase=seal" in line)
+        assert ("[WARNING]" if kind == "warning" else "[INFO]") in terminal_line
+    finally:
+        release_writer.set()
+        release_batch_expiry.set()
+        session.close_terminal_owner()
