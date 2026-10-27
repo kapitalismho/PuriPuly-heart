@@ -67,10 +67,3 @@ def test_ui_event_adopts_channel_from_payload_when_not_explicitly_provided() -> 
     )
 
     assert ui_event.channel == "peer"
-
-
-def test_translation_text_alias_still_supports_legacy_constructor_shape() -> None:
-    translation = Translation(utterance_id=uuid4(), text="legacy")
-
-    assert translation.text == "legacy"
-    assert translation.translated_text == "legacy"

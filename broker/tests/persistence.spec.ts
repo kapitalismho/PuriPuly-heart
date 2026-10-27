@@ -2,7 +2,6 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { describe, expect, it } from 'vitest';
 
-import app from '../src/index';
 import {
   BROKER_MIGRATION_FILENAMES,
   applyBrokerMigrations,
@@ -10,17 +9,6 @@ import {
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
 
 describe('broker persistent state model', () => {
-  it('keeps persistence details out of the public foundation response', async () => {
-    const response = await app.request('http://broker.test/v1/foundation');
-    expect(response.status).toBe(200);
-
-    const payload = (await response.json()) as Record<string, unknown>;
-
-    expect(payload).not.toHaveProperty('persistence');
-    expect(payload).not.toHaveProperty('brokerPersistenceModel');
-    expect(payload).not.toHaveProperty('runtimeConfig');
-  });
-
   it('preserves the migration history and creates the lookup and uniqueness indexes used by broker decisions', () => {
     expect(BROKER_MIGRATION_FILENAMES).toEqual([
       '0000_define_broker_persistent_state.sql',

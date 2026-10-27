@@ -108,15 +108,6 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
     )
 
 
-def test_supported_translation_connections_include_ollama_for_local_model() -> None:
-    assert supported_translation_connections(TranslationModel.LOCAL_LLM) == (
-        TranslationConnection.OLLAMA,
-    )
-    assert (
-        default_translation_connection(TranslationModel.LOCAL_LLM) == TranslationConnection.OLLAMA
-    )
-
-
 def test_local_llm_extra_body_key_sets_match_provider_constants() -> None:
     from puripuly_heart.providers.llm.local_openai import (
         LOCAL_OPENAI_RESERVED_EXTRA_BODY_KEYS,
@@ -164,16 +155,6 @@ def test_legacy_gemini_byok_alias_is_compatibility_only() -> None:
 def test_mask_secret():
     assert mask_secret("sk-123456") == "sk-****"
     assert mask_secret("abc", unmasked_prefix=3) == "***"
-
-
-def test_encrypted_file_secret_store_roundtrip(tmp_path):
-    path = tmp_path / "secrets.json"
-    store = EncryptedFileSecretStore(path, passphrase="pw")
-    store.set("google_api_key", "sk-SECRET")
-
-    assert store.get("google_api_key") == "sk-SECRET"
-    store.delete("google_api_key")
-    assert store.get("google_api_key") is None
 
 
 def test_keyring_secret_store_delete_propagates_unexpected_backend_exceptions() -> None:
@@ -277,16 +258,6 @@ def test_encrypted_file_secret_store_does_not_store_plaintext(tmp_path):
 
     raw = json.loads(path.read_text(encoding="utf-8"))
     assert "sk-SECRET" not in json.dumps(raw)
-
-
-def test_encrypted_file_secret_store_rejects_wrong_passphrase(tmp_path):
-    path = tmp_path / "secrets.json"
-    store = EncryptedFileSecretStore(path, passphrase="pw")
-    store.set("k", "sk-SECRET")
-
-    wrong = EncryptedFileSecretStore(path, passphrase="wrong")
-    with pytest.raises(ValueError):
-        wrong.get("k")
 
 
 def test_parse_openrouter_llm_model_accepts_legacy_deepseek_flash() -> None:

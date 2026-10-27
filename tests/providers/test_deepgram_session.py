@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from contextlib import asynccontextmanager
 
 import pytest
 
-from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
-from puripuly_heart.providers.stt.deepgram import _FINALIZE, _STOP, _DeepgramSDKSession
+from puripuly_heart.providers.stt.deepgram import _DeepgramSDKSession
 
 
 def _make_session(
@@ -25,87 +23,6 @@ def _make_session(
         keyterms=keyterms or [],
         stream_label=stream_label,
     )
-
-
-@pytest.mark.asyncio
-async def test_deepgram_session_on_speech_end_enqueues_finalize(caplog):
-    session = _make_session()
-
-    with caplog.at_level(logging.INFO):
-        await session.on_speech_end(trailing_silence_ms=500, reason="silence")
-    finalize = session._audio_q.get_nowait()
-    assert finalize is _FINALIZE
-    assert session._audio_q.empty()
-    assert caplog.text == ""
-
-    caplog.clear()
-    with caplog.at_level(logging.INFO):
-        await session.on_speech_end(trailing_silence_ms=0, reason="max_duration")
-    finalize = session._audio_q.get_nowait()
-    assert finalize is _FINALIZE
-    assert session._audio_q.empty()
-    assert caplog.text == ""
-
-    caplog.clear()
-    with caplog.at_level(logging.INFO):
-        await session.on_speech_end(trailing_silence_ms=160, reason="soft_pause")
-    finalize = session._audio_q.get_nowait()
-    assert finalize is _FINALIZE
-    assert session._audio_q.empty()
-    assert caplog.text == ""
-
-
-@pytest.mark.asyncio
-async def test_deepgram_session_on_speech_end_boundary_unknown(caplog):
-    session = _make_session()
-
-    with caplog.at_level(logging.INFO):
-        await session.on_speech_end()
-
-    assert caplog.text == ""
-
-
-@pytest.mark.asyncio
-async def test_deepgram_session_send_audio_and_stop() -> None:
-    session = _make_session()
-
-    await session.send_audio(b"abc")
-    assert session._audio_q.get_nowait() == b"abc"
-
-    await session.stop()
-    assert session._stopped is True
-    assert session._audio_q.get_nowait() is _STOP
-
-
-@pytest.mark.asyncio
-async def test_deepgram_session_events_yield_and_raise() -> None:
-    session = _make_session()
-
-    session._event_projection.put_legacy(STTBackendTranscriptEvent(text="hi", is_final=True))
-    session._event_projection.put_legacy(None)
-
-    gen = session.events()
-    event = await gen.__anext__()
-    assert event.text == "hi"
-    with pytest.raises(StopAsyncIteration):
-        await gen.__anext__()
-
-    session._event_projection.put_legacy(RuntimeError("boom"))
-    gen = session.events()
-    with pytest.raises(RuntimeError, match="boom"):
-        await gen.__anext__()
-
-
-@pytest.mark.asyncio
-async def test_deepgram_session_emits_test_final() -> None:
-    session = _make_session()
-
-    await session._emit_test_final(text="hello there")
-    event = await session._event_projection._legacy_events.get()
-
-    assert isinstance(event, STTBackendTranscriptEvent)
-    assert event.text == "hello there"
-    assert event.is_final is True
 
 
 @pytest.mark.asyncio

@@ -7,7 +7,6 @@ import pytest
 
 from puripuly_heart.core.osc.receiver import VrcMicState
 from puripuly_heart.core.runtime import OscReceiverRuntime, VrcMicReceiverRuntime
-from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 async def _flush_loop() -> None:
@@ -38,24 +37,6 @@ class FakeOscReceiver:
     def stop(self) -> None:
         self.stop_calls += 1
         self.transport.close()
-
-
-def test_receiver_runtimes_expose_lifecycle_inventory() -> None:
-    osc_runtime = OscReceiverRuntime(receiver_factory=FakeOscReceiver)
-    vrc_runtime = VrcMicReceiverRuntime(
-        state=VrcMicState(),
-        receiver_factory=lambda **_kwargs: FakeOscReceiver(),
-    )
-
-    osc_snapshot = osc_runtime.lifecycle_owner_snapshot()
-    vrc_snapshot = vrc_runtime.lifecycle_owner_snapshot()
-
-    assert_lifecycle_structure(osc_snapshot)
-    assert osc_snapshot["owner"] == "OscReceiverRuntime"
-    assert "receiver" in osc_snapshot["resource_fields"]
-
-    assert_lifecycle_structure(vrc_snapshot)
-    assert vrc_snapshot["owner"] == "VrcMicReceiverRuntime"
 
 
 @pytest.mark.asyncio

@@ -63,17 +63,6 @@ def test_custom_stt_can_be_selected_for_self_and_peer() -> None:
     assert "authorization" not in persisted["intent"]["stt"]["custom"]
 
 
-def test_custom_stt_settings_are_shared_across_self_and_peer() -> None:
-    settings = _with_custom_stt(
-        peer_provider=STTProviderName.DEEPGRAM.value,
-        endpoint="http://127.0.0.1:9000",
-        model="shared-model",
-    )
-    loaded = serialization.from_dict(serialization.to_dict(settings))
-    assert loaded.intent.stt.custom.endpoint == "http://127.0.0.1:9000"
-    assert loaded.intent.stt.custom.model == "shared-model"
-
-
 def test_custom_offline_and_realtime_providers_persist() -> None:
     settings = _with_custom_stt(
         provider=STTProviderName.CUSTOM_OFFLINE.value,

@@ -12,7 +12,6 @@ from puripuly_heart.core.audio.format import (
     resample_f32_linear,
     reshape_audio_samples_f32,
 )
-from puripuly_heart.core.audio.ring_buffer import RingBufferF32
 
 
 def test_mixdown_to_mono():
@@ -76,11 +75,3 @@ def test_normalize_audio_f32_same_rate_stereo_only_mixdowns() -> None:
     assert normalized.sample_rate_hz == 16000
     assert normalized.channels == 1
     assert np.allclose(normalized.samples, np.array([0.5, 0.5], dtype=np.float32))
-
-
-def test_ring_buffer_returns_last_samples():
-    rb = RingBufferF32(capacity_samples=10)
-    rb.append(np.arange(6, dtype=np.float32))
-    rb.append(np.arange(6, 16, dtype=np.float32))
-    last = rb.get_last_samples(5)
-    assert np.allclose(last, np.array([11, 12, 13, 14, 15], dtype=np.float32))

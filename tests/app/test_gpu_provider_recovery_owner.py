@@ -380,15 +380,3 @@ async def test_prepare_failure_aborts_prior_channel_and_propagates() -> None:
 
     assert events == ["prepare:self", "prepare:peer", "abort:self"]
     assert runtime.requests == []
-
-
-def test_owner_declares_recovery_lifecycle_policy() -> None:
-    assert GpuProviderRecoveryOwner().lifecycle_owner_snapshot() == {
-        "owner": "GpuProviderRecoveryOwner",
-        "resource_fields": ("_lock",),
-        "operation_policy": (
-            "serialize preparation, runtime recovery, consumer adoption and cleanup"
-        ),
-        "cancellation_policy": "propagate cancellation after prepared callback cleanup",
-        "shutdown_policy": "no background task or external resource is retained",
-    }

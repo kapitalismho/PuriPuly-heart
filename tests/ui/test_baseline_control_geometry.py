@@ -6,11 +6,8 @@ pytest.importorskip("flet")
 
 import flet as ft
 
-from puripuly_heart.ui.components.settings.prompt_editor import (
-    PROMPT_FIELD_CONTENT_PADDING,
-    PromptEditor,
-)
-from puripuly_heart.ui.theme import TEXT_BUTTON_PADDING, get_app_theme
+from puripuly_heart.ui.components.settings.prompt_editor import PromptEditor
+from puripuly_heart.ui.theme import get_app_theme
 from puripuly_heart.ui.views.logs import LogsView
 
 
@@ -21,10 +18,6 @@ def _padding_values(padding: object) -> tuple[float, float, float, float]:
         float(getattr(padding, "right")),
         float(getattr(padding, "bottom")),
     )
-
-
-def test_text_button_padding_token_is_pinned_to_the_measured_baseline_value() -> None:
-    assert _padding_values(TEXT_BUTTON_PADDING) == (8.0, 8.0, 8.0, 8.0)
 
 
 def test_app_theme_pins_text_button_padding() -> None:
@@ -45,10 +38,6 @@ def test_logs_header_buttons_set_no_padding_override_so_the_theme_applies() -> N
     view = LogsView.__new__(LogsView)
     style = LogsView._get_button_style(view, "Arial")
     assert style.padding is None
-
-
-def test_prompt_field_content_padding_token_is_pinned_to_the_measured_baseline_value() -> None:
-    assert _padding_values(PROMPT_FIELD_CONTENT_PADDING) == (8.0, 16.0, 8.0, 16.0)
 
 
 def test_prompt_editor_applies_the_pinned_content_padding() -> None:

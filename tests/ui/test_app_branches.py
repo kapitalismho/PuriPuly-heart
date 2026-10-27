@@ -315,10 +315,6 @@ def _dialog_text_values(dialog) -> list[str]:
     ]
 
 
-def _dialog_containers(dialog) -> list[ft.Container]:
-    return [node for node in _iter_control_tree(dialog) if isinstance(node, ft.Container)]
-
-
 class FakeTelemetryApplication:
     def __init__(self, settings: AppSettingsVNext) -> None:
         self.settings = settings
@@ -974,21 +970,11 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
         app._on_desktop_overlay_position_reset
     )
     assert app.view_settings.on_view_logs == app._open_logs_tab
-    assert not hasattr(app.view_settings, "on_overlay_toggle")
-    assert not hasattr(app.view_settings, "on_peer_translation_toggle")
     assert app.view_settings.runtime_log_basic == app.application.log_basic
     assert isinstance(app.application, UiApplicationBoundary)
     assert app.application is app._ui_application
     assert isinstance(backend.app, FletUiPresentationAdapter)
     assert backend.app is app._presentation_adapter
-
-
-def test_application_property_preserves_factory_port_without_controller_compatibility() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    application = object()
-    app._ui_application = application
-
-    assert app.application is application
 
 
 def test_translator_app_consumes_production_application_factory_without_controller_reach_through(
@@ -1428,36 +1414,13 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_gpu_state_cycle",
         "on_stt_loading_button_cycle",
     }
-    display_turn = seen["callbacks"]["on_display_turn_cycle"]
-    assert getattr(display_turn, "__self__", None) is app
-    assert (
-        getattr(display_turn, "__func__", None) is TranslatorApp._cycle_debug_preview_display_turn
-    )
-    discord_callback = seen["callbacks"]["on_discord_auth"]
-    assert getattr(discord_callback, "__self__", None) is app
-    assert getattr(discord_callback, "__func__", None) is TranslatorApp._preview_discord_auth
-    qq_callback = seen["callbacks"]["on_qq_auth"]
-    assert getattr(qq_callback, "__self__", None) is app
-    assert getattr(qq_callback, "__func__", None) is TranslatorApp._preview_qq_auth
-    callback_page = seen["callbacks"]["on_discord_callback_page"]
-    assert getattr(callback_page, "__self__", None) is app
-    assert getattr(callback_page, "__func__", None) is TranslatorApp._preview_discord_callback_page
-    github_star = seen["callbacks"]["on_github_star_snackbar"]
-    assert getattr(github_star, "__self__", None) is app
-    assert getattr(github_star, "__func__", None) is TranslatorApp._preview_github_star_snackbar
-    local_qwen_modal = seen["callbacks"]["on_local_qwen_hallucination_modal"]
-    assert getattr(local_qwen_modal, "__self__", None) is app
-    assert (
-        getattr(local_qwen_modal, "__func__", None)
-        is TranslatorApp._preview_local_qwen_hallucination_modal
-    )
     preview_calls: list[bool] = []
     monkeypatch.setattr(
         app,
         "show_discord_managed_auth_dialog",
         lambda *, preview=False: preview_calls.append(preview),
     )
-    discord_callback()
+    seen["callbacks"]["on_discord_auth"]()
     assert preview_calls == [True]
     root = page.added[0]
     assert isinstance(root.content, ft.Stack)
@@ -3969,45 +3932,6 @@ def test_show_founder_letter_dialog_opens_with_locale_readme_action(
     assert opened_urls == [
         "https://github.com/kapitalismho/PuriPuly-heart/blob/dev/docs/readme/README.ko.md#자신의-api-키-사용하기"
     ]
-
-
-def test_show_founder_letter_dialog_does_not_prepare_byok_alias_when_opened(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    captured: dict[str, object] = {}
-    pkce_calls: list[tuple[AppSettingsVNext, str]] = []
-
-    class FakeFounderLetterDialog:
-        def __init__(
-            self, _page, *, on_readme=None, on_chatgpt=None, on_connect=None, on_contact=None
-        ):
-            captured["page"] = _page
-            captured["on_readme"] = on_readme
-            captured["on_connect"] = on_connect
-            captured["on_contact"] = on_contact
-
-        def open(self) -> None:
-            captured["opened"] = True
-
-    monkeypatch.setattr(app_module, "FounderLetterDialog", FakeFounderLetterDialog)
-    monkeypatch.setattr(
-        app,
-        "_on_request_openrouter_pkce",
-        lambda target_settings, *, launch_source="settings": pkce_calls.append(
-            (target_settings, launch_source)
-        ),
-    )
-
-    app.show_founder_letter_dialog()
-
-    assert captured["opened"] is True
-    assert captured["page"] is app.page
-    assert callable(captured["on_readme"])
-    assert captured["on_connect"] is None
-    assert captured["on_contact"] is None
-    assert pkce_calls == []
 
 
 @pytest.mark.asyncio

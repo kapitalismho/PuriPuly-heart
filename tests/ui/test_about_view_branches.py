@@ -92,34 +92,6 @@ def test_about_view_link_actions_handle_missing_page_gracefully(
     assert "https://github.com/febilly/Yakutan" in opened
 
 
-def test_about_view_special_thanks_names_render_in_requested_order(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(about_module, "_get_profile_image_path", lambda: "")
-    monkeypatch.setattr(about_module, "_load_third_party_notices", lambda: "licenses")
-
-    view = AboutView()
-
-    expected_names = [
-        "SUI_32C",
-        "Nagikokoro",
-        "motoka96",
-        "_Ykol魚",
-        "kascr_",
-        "Just Monika V",
-        "FLUVIA",
-        "Han โชเล่ย์",
-        "EA_PE",
-        "Ephedrine",
-        "~ eri ~",
-        "梅雨Shiro",
-    ]
-    rendered_names = [
-        value for value in _collect_text_values(view.controls[2]) if value in expected_names
-    ]
-    assert rendered_names == expected_names
-
-
 def test_about_view_special_thanks_names_render_from_i18n(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

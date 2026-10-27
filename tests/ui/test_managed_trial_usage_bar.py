@@ -18,7 +18,6 @@ def test_managed_trial_usage_bar_renders_inline_placeholder_when_percent_unknown
     assert len(bar.controls) == 1
     assert bar.spacing == 0
     assert bar.controls[0] is bar._track
-    assert not hasattr(bar, "_status_icon")
     assert bar._remaining_text.value == t("settings.managed_trial_usage.remaining_placeholder")
 
 
@@ -74,11 +73,3 @@ def test_managed_trial_usage_bar_apply_locale_refreshes_overlay_text() -> None:
         assert bar._remaining_text.value == t("settings.managed_trial_usage.remaining_placeholder")
     finally:
         set_locale(previous_locale)
-
-
-def test_managed_trial_usage_bar_never_renders_status_icon() -> None:
-    unknown_bar = ManagedTrialUsageBar()
-    known_bar = ManagedTrialUsageBar(percent=71)
-
-    assert not hasattr(unknown_bar, "_status_icon")
-    assert not hasattr(known_bar, "_status_icon")

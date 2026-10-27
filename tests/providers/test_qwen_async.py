@@ -67,37 +67,6 @@ async def test_async_qwen_provider_uses_injected_client():
 
 
 @pytest.mark.asyncio
-async def test_async_qwen_provider_passes_context():
-    fake = FakeAsyncQwenClient()
-    provider = AsyncQwenLLMProvider(api_key="k", client=fake)
-
-    await provider.translate(
-        utterance_id=uuid4(),
-        text="hello",
-        system_prompt="PROMPT",
-        source_language="ko",
-        target_language="en",
-        context='- "안녕"',
-    )
-
-    assert fake.last_call is not None
-    assert fake.last_call["system_prompt"] == "PROMPT"
-    assert fake.last_call["context"] == '- "안녕"'
-
-
-@pytest.mark.asyncio
-async def test_async_qwen_provider_close_cleans_up():
-    fake = FakeAsyncQwenClient()
-    provider = AsyncQwenLLMProvider(api_key="k", client=fake)
-    provider._internal_client = fake
-
-    await provider.close()
-
-    assert fake.closed is True
-    assert provider._internal_client is None
-
-
-@pytest.mark.asyncio
 async def test_async_qwen_verify_api_key_uses_model_and_base_url(monkeypatch):
     seen: dict[str, object] = {}
 

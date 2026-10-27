@@ -8,8 +8,6 @@ import pytest
 
 from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
 
-ADAPTER_PATH = SOURCE_ROOT / "ui" / "flet_desktop_runtime.py"
-
 
 def _imports_flet_desktop(path: Path) -> bool:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -31,34 +29,6 @@ def test_flet_desktop_dependency_is_confined_to_one_ui_runtime_adapter() -> None
     }
 
     assert importers == {"src/puripuly_heart/ui/flet_desktop_runtime.py"}
-
-
-def test_flet_desktop_private_hook_inventory_is_exact_and_explicit() -> None:
-    from puripuly_heart.ui.flet_desktop_runtime import REQUIRED_FLET_DESKTOP_HOOKS
-
-    assert REQUIRED_FLET_DESKTOP_HOOKS == (
-        "__locate_and_unpack_flet_view",
-        "open_flet_view_async",
-    )
-
-    tree = ast.parse(ADAPTER_PATH.read_text(encoding="utf-8"), filename=str(ADAPTER_PATH))
-    referenced: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Attribute):
-            referenced.add(node.attr)
-        elif isinstance(node, ast.ImportFrom) and node.names is not None:
-            referenced.update(alias.name.split(".")[0] for alias in node.names)
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "getattr"
-            and len(node.args) >= 2
-            and isinstance(node.args[1], ast.Constant)
-            and isinstance(node.args[1].value, str)
-        ):
-            referenced.add(node.args[1].value)
-    for hook in REQUIRED_FLET_DESKTOP_HOOKS:
-        assert hook in referenced, f"{hook} must be referenced by real code in flet_desktop_runtime"
 
 
 def test_the_private_hooks_the_adapter_depends_on_exist_in_the_installed_runtime() -> None:

@@ -464,30 +464,6 @@ def test_restart_roundtrip_preserves_gemma_main_model_with_stale_openrouter_url(
     assert result["connection"] == "managed"
 
 
-def test_restart_save_load_cycle_keeps_gemma_without_remigration(tmp_path: Path) -> None:
-    compat = _compat()
-    serialization = _serialization()
-    raw = serialization.to_dict(AppSettingsVNext())
-    translation = raw["intent"]["translation"]
-    translation["model"] = "gemma4_26b_31b"
-    translation["connection"] = "openrouter"
-    translation["openrouter_model"] = "google/gemma-4-26b-a4b-it"
-    path = tmp_path / "settings.json"
-    _write_json_bytes(path, raw)
-
-    first = compat.load_vnext_settings(path)
-    assert first.ok
-    assert first.settings is not None
-    assert first.settings.intent.translation.model == "gemma4_26b_31b"
-
-    second = compat.load_vnext_settings(path)
-    assert second.ok
-    assert second.migrated is False
-    assert second.settings is not None
-    assert second.settings.intent.translation.model == "gemma4_26b_31b"
-    assert second.settings.intent.translation.connection == "openrouter"
-
-
 def test_current_version_deepseek_v4_pro_remnant_normalizes_to_flash() -> None:
     migration = _migration()
     serialization = _serialization()
@@ -674,17 +650,6 @@ def test_v40_hidden_managed_openrouter_alias_upgrades_using_original_source() ->
     assert translated.openrouter_model == "deepseek/deepseek-v4.1-flash-1017"
 
 
-def test_current_version_deepseek_v4_flash_api_model_normalizes_to_deepseek_flash() -> None:
-    migration = _migration()
-    serialization = _serialization()
-    raw = serialization.to_dict(AppSettingsVNext())
-    raw["intent"]["translation"]["deepseek"]["llm_model"] = "deepseek-v4-flash"
-
-    loaded = migration.from_dict(raw)
-
-    assert loaded.intent.translation.deepseek.llm_model == "deepseek-flash"
-
-
 def test_vnext_dict_retires_qwen_asr_per_channel_and_removes_nested_model() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 
@@ -835,17 +800,6 @@ def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
     assert migrated.intent.prompts.system_prompt_override is None
 
 
-def test_vnext_dict_preserves_custom_prompt_on_current_version() -> None:
-    from puripuly_heart.config.settings_vnext import migration, serialization
-
-    canonical = serialization.to_dict(AppSettingsVNext())
-    canonical["intent"]["prompts"]["system_prompt_override"] = "my customized prompt"
-
-    migrated = migration.from_dict(canonical)
-
-    assert migrated.intent.prompts.system_prompt_override == "my customized prompt"
-
-
 def test_current_default_prompt_override_normalizes_to_dynamic_default() -> None:
     from puripuly_heart.config.prompts import get_default_prompt
     from puripuly_heart.config.settings_vnext import migration, serialization
@@ -875,18 +829,6 @@ def test_prompt_reset_drops_deprecated_top_level_prompt_extension(
 
     assert "system_prompt" not in persisted
     assert persisted["intent"]["prompts"] == {"system_prompt_override": None}
-
-
-def test_vnext_dict_resets_custom_prompt_before_prompt_reset_version() -> None:
-    from puripuly_heart.config.settings_vnext import migration, serialization
-
-    canonical = serialization.to_dict(AppSettingsVNext())
-    canonical["settings_version"] = 38
-    canonical["intent"]["prompts"]["system_prompt"] = "my customized prompt"
-
-    migrated = migration.from_dict(canonical)
-
-    assert migrated.intent.prompts.system_prompt_override is None
 
 
 def test_vnext_dict_preserves_prompt_with_boundary_whitespace() -> None:

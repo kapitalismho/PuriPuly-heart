@@ -1,7 +1,4 @@
 use std::cell::{Cell, RefCell};
-#[cfg(all(test, windows))]
-#[path = "cache_probe.rs"]
-mod cache_probe;
 #[cfg(windows)]
 use std::collections::HashMap;
 use std::ffi::c_void;

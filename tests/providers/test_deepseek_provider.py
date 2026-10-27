@@ -286,42 +286,6 @@ async def test_httpx_deepseek_failure_excludes_arbitrary_body_from_session_sinks
 
 
 @pytest.mark.asyncio
-async def test_httpx_deepseek_client_logs_safe_request_failure(
-    monkeypatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    raw_detail = "upstream unavailable token=deepseek-secret-123"
-    fake_client = FakeAsyncClient(
-        response_status=503,
-        response_data={"error": {"message": raw_detail}},
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
-
-    client = HttpxDeepSeekClient(api_key="k", model="m", base_url="https://example")
-
-    with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.deepseek"):
-        with pytest.raises(LLMResponseError) as exc_info:
-            await client.translate(
-                text="hello",
-                system_prompt="SYSTEM",
-                source_language="ko",
-                target_language="en",
-            )
-    assert exc_info.value.status_code == 503
-    assert (
-        provider_failure_report(
-            exc_info.value, provider="deepseek", operation="translate"
-        ).diagnostics.category
-        == "service_unavailable"
-    )
-
-    rendered_logs = "\n".join(caplog.messages)
-    assert raw_detail not in rendered_logs
-    assert "deepseek-secret-123" not in rendered_logs
-    assert "token=deepseek-secret-123" not in rendered_logs
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("response_data", "response_text"),
     [

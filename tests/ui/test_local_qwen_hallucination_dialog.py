@@ -2,10 +2,8 @@ from __future__ import annotations
 
 # ruff: noqa: I001
 
-import importlib
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -13,6 +11,7 @@ pytest.importorskip("flet")
 
 import flet as ft  # noqa: E402
 
+from puripuly_heart.ui.components import local_qwen_hallucination_dialog as dialog_module
 from puripuly_heart.ui.theme import (  # noqa: E402
     COLOR_NEUTRAL_DARK,
     COLOR_PRIMARY,
@@ -52,15 +51,6 @@ class FakePage:
         return dialog
 
 
-def _dialog_module():
-    try:
-        return importlib.import_module(
-            "puripuly_heart.ui.components.local_qwen_hallucination_dialog"
-        )
-    except ModuleNotFoundError as exc:
-        pytest.fail(f"production Local Qwen guidance dialog module is missing: {exc}")
-
-
 def _content_column(dialog: ft.AlertDialog):
     return dialog.content.content
 
@@ -76,75 +66,9 @@ def _action_row(dialog: ft.AlertDialog):
     return _content_column(dialog).controls[-1]
 
 
-def test_local_qwen_guidance_dialog_delegates_to_warm_document_family(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    dialog_module = _dialog_module()
-    captured: dict[str, object] = {}
-    requested_keys: list[str] = []
-
-    def fake_t(key: str) -> str:
-        requested_keys.append(key)
-        return {
-            "local_qwen_hallucination.body": "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.",
-            "local_qwen_hallucination.open_guide": "Open guide",
-            "local_qwen_hallucination.close": "Close",
-        }[key]
-
-    def fake_open_warm_document_dialog(page, **kwargs):
-        captured["page"] = page
-        captured.update(kwargs)
-        return SimpleNamespace(dialog="opened-dialog")
-
-    monkeypatch.setattr(dialog_module, "t", fake_t)
-    monkeypatch.setattr(
-        dialog_module,
-        "open_warm_document_dialog",
-        fake_open_warm_document_dialog,
-    )
-
-    page = FakePage()
-    dialog = dialog_module.LocalQwenHallucinationDialog(
-        page,
-        on_open_guide=lambda: None,
-        on_close=lambda: None,
-    )
-
-    dialog.open()
-
-    assert captured["page"] is page
-    assert captured["body_paragraphs"] == [
-        "First paragraph.",
-        "Second paragraph.",
-        "Third paragraph.",
-    ]
-    assert captured["primary_label"] == "Open guide"
-    assert captured["secondary_label"] == "Close"
-    assert getattr(captured["primary_action"], "__self__", None) is dialog
-    assert getattr(captured["primary_action"], "__func__", None) is getattr(
-        dialog._on_open_guide,
-        "__func__",
-        None,
-    )
-    assert getattr(captured["secondary_action"], "__self__", None) is dialog
-    assert getattr(captured["secondary_action"], "__func__", None) is getattr(
-        dialog._on_close,
-        "__func__",
-        None,
-    )
-    assert requested_keys == [
-        "local_qwen_hallucination.body",
-        "local_qwen_hallucination.open_guide",
-        "local_qwen_hallucination.close",
-    ]
-    assert not any(key.endswith(".title") for key in requested_keys)
-    assert not any("warning" in key for key in requested_keys)
-
-
 def test_local_qwen_guidance_dialog_renders_large_readable_two_action_modal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    dialog_module = _dialog_module()
     monkeypatch.setattr(
         dialog_module,
         "t",

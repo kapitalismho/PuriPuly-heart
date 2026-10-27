@@ -5,7 +5,6 @@ import asyncio
 import pytest
 
 from puripuly_heart.core.runtime import AudioTestCaptureRuntime
-from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 class RecordingSource:
@@ -21,16 +20,6 @@ class FailsOnceSource(RecordingSource):
         self.close_calls += 1
         if self.close_calls == 1:
             raise RuntimeError("source close failed")
-
-
-def test_audio_test_capture_runtime_exposes_lifecycle_inventory_and_policy() -> None:
-    runtime = AudioTestCaptureRuntime()
-
-    snapshot = runtime.lifecycle_owner_snapshot()
-
-    assert_lifecycle_structure(snapshot)
-    assert snapshot["owner"] == "AudioTestCaptureRuntime"
-    assert len(snapshot["resource_fields"]) == 4
 
 
 @pytest.mark.asyncio

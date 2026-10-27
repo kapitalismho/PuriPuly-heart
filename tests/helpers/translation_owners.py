@@ -315,12 +315,6 @@ class TranslationOwnersTestHarness:
         self._peer_owner._record_peer_owned_vad_event(owned)
         return owned
 
-    async def dispatch_retired_stt_event(self, event: object) -> None:
-        if getattr(event, "channel", "self") == "self":
-            await self._self_owner.handle_retired_stt_event(event)
-            return
-        await self._peer_owner.handle_retired_stt_event(event)
-
     async def dispatch_stt_failure(
         self,
         exc: Exception,
@@ -341,10 +335,6 @@ class TranslationOwnersTestHarness:
             await self._self_owner._ensure_translation(*args, **kwargs)
             return
         await self._peer_owner._ensure_translation(*args, **kwargs)
-
-    async def commit_self_merge(self, buffer: object, *, reason: str) -> None:
-        """Commit the current self merge buffer through the owner's commit path."""
-        await self._self_owner._commit_merge(buffer, reason=reason)
 
     async def process_translation(
         self,
@@ -456,14 +446,8 @@ class TranslationOwnersTestHarness:
             return
         await self._peer_owner.clear_language_runtime_state(channel=channel)
 
-    def clear_context(self) -> None:
-        self._self_owner.translation_requests.clear_context()
-
     def get_valid_context(self) -> object:
         return self._self_owner.translation_requests.get_valid_context()
-
-    def format_context(self, context: object) -> str:
-        return self._self_owner.translation_requests.format_context(context)
 
     def remember_context(
         self,
@@ -543,9 +527,6 @@ class TranslationOwnersTestHarness:
         object.__setattr__(self, "_started", False)
         await self._resources.close()
 
-    def has_stt_provider(self, channel: str) -> bool:
-        return self._local_asr_runtime.snapshot.channel_for(channel).provider_id is not None
-
     def stt_session_state(self, channel: str = "self") -> object | None:
         return self._stt_sessions.state(channel)
 
@@ -562,60 +543,6 @@ class TranslationOwnersTestHarness:
             start=self._started if start is None else start,
             on_terminal_failure=on_terminal_failure,
         )
-
-    async def handoff_stt_provider_request(
-        self,
-        request: object,
-        *,
-        start: bool | None = None,
-        on_terminal_failure=None,
-    ) -> object:
-        return await self._local_asr_runtime.handoff_provider(
-            request,
-            start=self._started if start is None else start,
-            on_terminal_failure=on_terminal_failure,
-        )
-
-    async def cancel_stt_provider_request_handoff(self) -> bool:
-        return await self._local_asr_runtime.cancel_handoff("self")
-
-    async def replace_peer_stt_provider_request(
-        self,
-        request: object,
-        *,
-        start: bool | None = None,
-        on_terminal_failure=None,
-    ) -> object:
-        await self._peer_owner.reset_provider_channel("peer")
-        return await self._local_asr_runtime.replace_provider(
-            request,
-            start=self._started if start is None else start,
-            on_terminal_failure=on_terminal_failure,
-        )
-
-    async def handoff_peer_stt_provider_request(
-        self,
-        request: object,
-        *,
-        start: bool | None = None,
-        on_terminal_failure=None,
-    ) -> object:
-        return await self._local_asr_runtime.handoff_provider(
-            request,
-            start=self._started if start is None else start,
-            on_terminal_failure=on_terminal_failure,
-        )
-
-    async def cancel_peer_stt_provider_request_handoff(self) -> bool:
-        return await self._local_asr_runtime.cancel_handoff("peer")
-
-    async def start_peer_stt_provider_ingress(self) -> None:
-        if self._started:
-            await self._local_asr_runtime.start_channel("peer")
-
-    async def abort_peer_stt_for_toggle_off(self) -> None:
-        await self._peer_owner.reset_provider_channel("peer")
-        await self._local_asr_runtime.release_channel("peer", mode="abort")
 
     async def replace_llm_provider(self, llm: object | None) -> object | None:
         backend = (
@@ -635,23 +562,6 @@ class TranslationOwnersTestHarness:
             mode="drain",
             release_backend_after=release_backend_after,
         )
-
-    async def abort_self_stt_for_toggle_off(self) -> None:
-        await self._self_owner.reset_provider_channel("self")
-        await self._local_asr_runtime.release_channel("self", mode="abort")
-
-    async def schedule_self_stt_idle_release(self, *, release_backend_after: float) -> None:
-        await self._local_asr_runtime.release_channel(
-            "self",
-            mode="drain",
-            release_backend_after=release_backend_after,
-        )
-
-    async def resume_self_stt_after_toggle_on(self) -> None:
-        await self._local_asr_runtime.start_channel("self")
-
-    async def warmup_stt_channel(self, channel: str) -> None:
-        await self._local_asr_runtime.warmup_channel(channel)
 
 
 def compose_translation_test_harness(**values: object) -> TranslationOwnersTestHarness:

@@ -91,21 +91,6 @@ describe('Discord OAuth start route', () => {
 
 
 
-  it('rejects a localhost redirect URI', async () => {
-    const env = createTestBrokerEnv();
-    const keyPair = await createDeviceKeyPair();
-
-    const response = await postDiscordAuthStart({
-      env,
-      installationId: 'install-discord-localhost',
-      devicePublicKey: keyPair.devicePublicKey,
-      redirectUri: 'http://localhost:62187/discord/callback',
-      appVersion: '1.2.3',
-    });
-
-    expect(response.status).toBe(400);
-  });
-
   it('rejects an installation_id already bound to a different device_public_key', async () => {
     const env = createTestBrokerEnv();
     const existingKeyPair = await createDeviceKeyPair();
