@@ -9,6 +9,8 @@ import threading
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import MappingProxyType
 
 import httpx
 import pytest
@@ -309,6 +311,46 @@ def pending(
         state.installation_id = ""
     state.persist()
     return operation, identity.installation_id
+
+
+@pytest.fixture(scope="module")
+async def pending_proof_seeds(tmp_path_factory):
+    seeds = {}
+    with TemporaryDirectory(
+        prefix="pending-proof-seeds-", dir=tmp_path_factory.getbasetemp()
+    ) as directory:
+        root = Path(directory)
+        with pytest.MonkeyPatch.context() as isolated:
+            for name in (
+                "HOME",
+                "APPDATA",
+                "LOCALAPPDATA",
+                "USERPROFILE",
+                "TEMP",
+                "TMP",
+                "XDG_CONFIG_HOME",
+            ):
+                home = root / name
+                home.mkdir()
+                isolated.setenv(name, str(home))
+            for source in ("discord", "qq"):
+                source_root = root / source
+                source_root.mkdir()
+                owner, store, boundary, broker, release, adapter = component(source_root, source)
+                try:
+                    pending(
+                        owner,
+                        store,
+                        source,
+                        ack=broker.metadata(),
+                        key=broker.key,
+                        bound=True,
+                        stage_ack=False,
+                    )
+                    seeds[source] = (owner.path.read_bytes(), store.path.read_bytes())
+                finally:
+                    await release.close()
+    return MappingProxyType(seeds)
 
 
 def observe_fresh_process(owner, store, source, key, installation):
@@ -1523,16 +1565,20 @@ async def test_physical_final_settings_failure_recovers_bound_delivery_after_rel
     ],
 )
 async def test_missing_ack_metadata_requires_exact_proof_and_broker_truth(
-    isolated_home, monkeypatch, source, consumer, boundary
+    isolated_home, pending_proof_seeds, monkeypatch, source, consumer, boundary
 ):
     monkeypatch.setattr(managed_connection_auth, "DEFAULT_MAX_STATUS_POLLS", 1)
     monkeypatch.setattr(qq_managed_auth, "DEFAULT_MAX_STATUS_POLLS", 1)
     monkeypatch.setattr(managed_connection_auth, "DEFAULT_STATUS_POLL_INTERVAL_MS", 0)
     monkeypatch.setattr(qq_managed_auth, "DEFAULT_STATUS_POLL_INTERVAL_MS", 0)
-    owner, store, secrets, broker, release, adapter = component(isolated_home, source)
-    operation, installation = pending(
-        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True, stage_ack=False
+    settings_bytes, secrets_bytes = pending_proof_seeds[source]
+    (isolated_home / "settings.json").write_bytes(settings_bytes)
+    (isolated_home / "secrets.json").write_bytes(secrets_bytes)
+    owner, store, secrets, broker, release, adapter = component(
+        isolated_home, source, existing=True
     )
+    state = owner.require_canonical().state.managed_connection
+    operation, installation = state.pending_managed_operation_id, state.installation_id
     ack_slot = f"openrouter_managed_{'qq_' if source == 'qq' else ''}delivery_ack_token"
     if boundary == "missing_key":
         store.delete(managed_key_secret(source))

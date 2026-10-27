@@ -35,12 +35,21 @@ jobs:
           uv-version: ${{ env.UV_VERSION }}
           sync-args: --extra dev
           lock-mode: locked
-          enable-cache: "true"
 
       - name: Ruff check
         run: uv run --locked ruff check .
 
+      - name: Cache Black results
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/black-cache
+          key: black-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('uv.lock', 'pyproject.toml') }}-${{ github.sha }}
+          restore-keys: |
+            black-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('uv.lock', 'pyproject.toml') }}-
+
       - name: Black check
+        env:
+          BLACK_CACHE_DIR: ${{ runner.temp }}/black-cache
         run: uv run --locked black --check .
 
       - name: Check Python test selection
@@ -60,10 +69,9 @@ jobs:
           uv-version: ${{ env.UV_VERSION }}
           sync-args: --extra dev
           lock-mode: locked
-          enable-cache: "true"
 
       - name: Run contract tests
-        run: uv run --locked pytest -ra --junitxml=contract-results.xml tests/domain tests/config tests/core
+        run: uv run --locked pytest -ra --numprocesses=2 --dist=loadfile --max-worker-restart=0 --capture=fd --junitxml=contract-results.xml tests/domain tests/config tests/core
 
       - name: Upload contract results
         if: always()
@@ -82,7 +90,7 @@ jobs:
           - name: Architecture
             pytest-args: tests/architecture
           - name: Runtime
-            pytest-args: tests/app
+            pytest-args: --numprocesses=2 --dist=loadfile --max-worker-restart=0 --capture=fd tests/app
           - name: Providers
             pytest-args: tests/providers
           - name: UI
@@ -100,7 +108,6 @@ jobs:
           uv-version: ${{ env.UV_VERSION }}
           sync-args: --extra dev
           lock-mode: locked
-          enable-cache: "true"
 
       - name: Run tests
         run: uv run --locked pytest -ra --junitxml=python-results.xml ${{ matrix.pytest-args }}
@@ -153,7 +160,6 @@ jobs:
           uv-version: ${{ env.UV_VERSION }}
           sync-args: --extra dev
           lock-mode: locked
-          enable-cache: "true"
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable

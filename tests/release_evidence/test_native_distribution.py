@@ -502,10 +502,15 @@ def test_runtime_build_rejects_uncompilable_dependency(tmp_path: Path) -> None:
         compile_runtime(tmp_path, layout)
 
 
+@pytest.mark.parametrize(
+    "runtime_fixture",
+    ["staged_archive_runtime", "staged_compact_archive_runtime"],
+    ids=["full-flet", "compact-flet"],
+)
 def test_bundle_cli_and_manifest_preserve_deployed_archive_and_member_evidence(
-    tmp_path: Path, staged_archive_runtime: tuple[Path, Path, dict[str, object]]
+    tmp_path: Path, request: pytest.FixtureRequest, runtime_fixture: str
 ) -> None:
-    layout, bytecode, compiled = staged_archive_runtime
+    layout, bytecode, compiled = request.getfixturevalue(runtime_fixture)
     assert (
         main(
             [
@@ -606,9 +611,11 @@ def test_bundling_identical_inputs_produces_identical_archives(
     ],
 )
 def test_bundle_failure_preserves_every_remaining_staged_input(
-    tmp_path: Path, staged_archive_runtime: tuple[Path, Path, dict[str, object]], damage: str
+    tmp_path: Path,
+    staged_compact_archive_runtime: tuple[Path, Path, dict[str, object]],
+    damage: str,
 ) -> None:
-    layout, bytecode, evidence = staged_archive_runtime
+    layout, bytecode, evidence = staged_compact_archive_runtime
     if damage == "invalid-archive-path":
         payload = json.loads(layout.read_text(encoding="utf-8"))
         payload["python_archive"] = "site-packages/flet/python.zip"
@@ -684,9 +691,11 @@ def test_bundle_failure_preserves_every_remaining_staged_input(
     ],
 )
 def test_manifest_rejects_inconsistent_deployed_bytecode_evidence(
-    tmp_path: Path, staged_bundled_runtime: tuple[Path, Path, dict[str, object]], damage: str
+    tmp_path: Path,
+    staged_compact_bundled_runtime: tuple[Path, Path, dict[str, object]],
+    damage: str,
 ) -> None:
-    layout, bytecode, bundled = staged_bundled_runtime
+    layout, bytecode, bundled = staged_compact_bundled_runtime
     if damage == "archive-hash":
         bundled["archive"]["sha256"] = "0" * 64
     elif damage == "member-hash":
@@ -760,9 +769,11 @@ def test_validate_target_requires_the_deployed_python_archive(
     ],
 )
 def test_manifest_rejects_corrupt_or_ambiguous_archives(
-    tmp_path: Path, staged_bundled_runtime: tuple[Path, Path, dict[str, object]], damage: str
+    tmp_path: Path,
+    staged_compact_bundled_runtime: tuple[Path, Path, dict[str, object]],
+    damage: str,
 ) -> None:
-    layout, bytecode, bundled = staged_bundled_runtime
+    layout, bytecode, bundled = staged_compact_bundled_runtime
     stdlib = damage.startswith("stdlib-")
     archive_path = tmp_path / bundled["stdlib_archive" if stdlib else "archive"]["path"]
     with zipfile.ZipFile(archive_path) as original:
@@ -842,9 +853,11 @@ def test_manifest_rejects_corrupt_or_ambiguous_archives(
     "damage", ["retained-source", "loose-dependency", "loose-stdlib", "loose-stdlib-resource"]
 )
 def test_manifest_rejects_source_drift_and_parallel_loose_content(
-    tmp_path: Path, staged_bundled_runtime: tuple[Path, Path, dict[str, object]], damage: str
+    tmp_path: Path,
+    staged_compact_bundled_runtime: tuple[Path, Path, dict[str, object]],
+    damage: str,
 ) -> None:
-    layout, bytecode, bundled = staged_bundled_runtime
+    layout, bytecode, bundled = staged_compact_bundled_runtime
     if damage == "retained-source":
         (tmp_path / "site-packages/dependency.py").write_text("VALUE = 99\n", encoding="utf-8")
     else:

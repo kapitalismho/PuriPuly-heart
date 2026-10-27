@@ -510,6 +510,7 @@ async def test_owner_reaps_process_attached_after_close_started(tmp_path: Path) 
 async def test_renderer_startup_timeout_reaps_process_before_page_creation(
     tmp_path: Path,
 ) -> None:
+    tasks_before = asyncio.all_tasks()
     process = FakeProcess()
     pid_file = _pid_file(tmp_path)
     owner = FletDesktopViewProcessOwner(
@@ -518,11 +519,10 @@ async def test_renderer_startup_timeout_reaps_process_before_page_creation(
         process_job=FakeProcessJob(),
         close_requester=FakeCloseRequester(),
     )
-    release_runner = asyncio.Event()
 
     async def app_runner(_target: object) -> None:
         await owner.attach(process, str(pid_file))
-        await release_runner.wait()
+        await process.wait()
 
     window = FletDesktopRendererWindow(
         app_runner=app_runner,
@@ -532,10 +532,20 @@ async def test_renderer_startup_timeout_reaps_process_before_page_creation(
 
     with pytest.raises(RuntimeError, match="page was not created"):
         await window.start(OverlayPresentationSnapshot())
+    runner_task = window._app_task
+    assert runner_task is not None
     await window.close()
 
     assert process.terminate_calls == 1
+    assert process.kill_calls == 0
+    assert process.returncode == 15
     assert not pid_file.exists()
+    assert owner.process_info is None
+    assert owner.cleanup_snapshot["cleanup_complete"] is True
+    assert runner_task.done()
+    assert not runner_task.cancelled()
+    assert runner_task.exception() is None
+    assert asyncio.all_tasks() == tasks_before
 
 
 @pytest.mark.asyncio

@@ -129,24 +129,23 @@ class _RaisingObservabilityRunner:
         raise RuntimeError("observability runner failure")
 
 
-class _DelayingForwardingHandler(logging.Handler):
+class _BlockingForwardingHandler(logging.Handler):
     def __init__(
         self,
         target: logging.Handler,
         *,
-        delayed_message: str,
-        delay_s: float = 0.2,
+        blocked_message: str,
     ) -> None:
         super().__init__()
         self._target = target
-        self._delayed_message = delayed_message
-        self._delay_s = delay_s
-        self.started = False
+        self._blocked_message = blocked_message
+        self.started = threading.Event()
+        self.release = threading.Event()
 
     def emit(self, record: logging.LogRecord) -> None:
-        if record.getMessage() == self._delayed_message:
-            self.started = True
-            time.sleep(self._delay_s)
+        if record.getMessage() == self._blocked_message:
+            self.started.set()
+            assert self.release.wait(timeout=5.0)
         self._target.handle(record)
 
 
@@ -241,6 +240,7 @@ def test_persisted_records_identify_date_and_process_without_changing_live_outpu
     record.msecs = 123.0
     try:
         root_logger.handle(record)
+        root_logger.warning("[Lifecycle] boundary phase=readiness")
     finally:
         if reused_sinks is not None:
             reused_sinks.close()
@@ -267,6 +267,7 @@ def test_configure_main_logging_routes_file_writes_through_queue(tmp_path) -> No
         assert sinks.file_handler not in root_logger.handlers
 
         root_logger.info("[Lifecycle] boundary phase=enqueue")
+        root_logger.warning("[Lifecycle] boundary phase=readiness")
         _wait_for_log_text(sinks.log_file, "phase=enqueue")
     finally:
         sinks.close()
@@ -557,6 +558,7 @@ def test_configure_main_logging_keeps_shared_queue_alive_until_last_close(tmp_pa
         assert second.file_queue_handler in root_logger.handlers
 
         root_logger.info("[Lifecycle] boundary phase=send")
+        root_logger.warning("[Lifecycle] boundary phase=readiness")
         _wait_for_log_text(second.log_file, "phase=send")
 
         second.close()
@@ -621,6 +623,7 @@ def test_default_session_logging_services_share_queue_until_last_close(
 
         first.close()
         second.emit_basic("[Lifecycle] boundary phase=readiness")
+        root_logger.warning("[Lifecycle] boundary phase=cleanup")
         _wait_for_log_text(second.log_file, "[Lifecycle] boundary phase=readiness")
 
         second.close()
@@ -642,6 +645,7 @@ def test_configure_main_logging_removes_stale_queue_when_log_dir_changes(tmp_pat
 
     first = configure_main_logging(root_logger=root_logger, log_dir=first_dir)
     root_logger.info("[Lifecycle] boundary phase=begin")
+    root_logger.warning("[Lifecycle] boundary phase=readiness")
     _wait_for_log_text(first.log_file, "phase=begin")
 
     second = configure_main_logging(root_logger=root_logger, log_dir=second_dir)
@@ -651,6 +655,7 @@ def test_configure_main_logging_removes_stale_queue_when_log_dir_changes(tmp_pat
         assert second.file_queue_handler in root_logger.handlers
 
         root_logger.info("[Lifecycle] boundary phase=seal")
+        root_logger.warning("[Lifecycle] boundary phase=readiness")
         _wait_for_log_text(second.log_file, "phase=seal")
         assert "phase=seal" not in first.log_file.read_text(encoding="utf-8")
     finally:
@@ -666,15 +671,15 @@ def test_bounded_file_queue_drops_under_pressure_without_blocking_producers(tmp_
     sinks.stream_handler.setLevel(logging.CRITICAL)
     assert sinks.file_queue_listener is not None
     assert sinks.file_queue_handler is not None
-    delaying_handler = _DelayingForwardingHandler(
+    blocking_handler = _BlockingForwardingHandler(
         sinks.file_handler,
-        delayed_message="[Lifecycle] boundary phase=source_read",
+        blocked_message="[Lifecycle] boundary phase=source_read",
     )
-    sinks.file_queue_listener.handlers = (delaying_handler,)
+    sinks.file_queue_listener.handlers = (blocking_handler,)
 
     try:
         root_logger.info("[Lifecycle] boundary phase=source_read")
-        _wait_until(lambda: delaying_handler.started)
+        assert blocking_handler.started.wait(timeout=2.0)
         started = time.monotonic()
         for index in range(3000):
             root_logger.info("[Lifecycle] boundary attempts=%s", index)
@@ -683,6 +688,7 @@ def test_bounded_file_queue_drops_under_pressure_without_blocking_producers(tmp_
         assert elapsed < 1.0
         assert sinks.file_queue_handler.dropped_records > 0
     finally:
+        blocking_handler.release.set()
         sinks.close()
 
 
@@ -693,16 +699,15 @@ def test_file_queue_reserves_capacity_and_evicts_info_before_error(tmp_path) -> 
     sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
     assert sinks.file_queue_listener is not None
     assert sinks.file_queue_handler is not None
-    delaying_handler = _DelayingForwardingHandler(
+    blocking_handler = _BlockingForwardingHandler(
         sinks.file_handler,
-        delayed_message="[Lifecycle] boundary phase=provider_warmup",
-        delay_s=1.0,
+        blocked_message="[Lifecycle] boundary phase=provider_warmup",
     )
-    sinks.file_queue_listener.handlers = (delaying_handler,)
+    sinks.file_queue_listener.handlers = (blocking_handler,)
 
     try:
         root_logger.info("[Lifecycle] boundary phase=provider_warmup")
-        _wait_until(lambda: delaying_handler.started)
+        assert blocking_handler.started.wait(timeout=2.0)
         for index in range(3000):
             root_logger.info("[Lifecycle] boundary attempts=%s", index)
         root_logger.error("[Provider] provider.network")
@@ -718,8 +723,10 @@ def test_file_queue_reserves_capacity_and_evicts_info_before_error(tmp_path) -> 
         ]
         assert retained_indexes == sorted(retained_indexes)
         assert sinks.file_queue_handler.dropped_records > 0
+        blocking_handler.release.set()
         _wait_for_log_text(sinks.log_file, "provider.network")
     finally:
+        blocking_handler.release.set()
         sinks.close()
 
 
@@ -776,12 +783,11 @@ def test_terminal_file_record_survives_queue_pressure_and_later_reports_loss(tmp
     sinks.stream_handler.setLevel(logging.CRITICAL)
     assert sinks.file_queue_listener is not None
     assert sinks.file_queue_handler is not None
-    delaying_handler = _DelayingForwardingHandler(
+    blocking_handler = _BlockingForwardingHandler(
         sinks.file_handler,
-        delayed_message="[Lifecycle] boundary phase=source_open",
-        delay_s=0.5,
+        blocked_message="[Lifecycle] boundary phase=source_open",
     )
-    sinks.file_queue_listener.handlers = (delaying_handler,)
+    sinks.file_queue_listener.handlers = (blocking_handler,)
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=root_logger,
         sinks=sinks,
@@ -789,12 +795,13 @@ def test_terminal_file_record_survives_queue_pressure_and_later_reports_loss(tmp
 
     try:
         root_logger.info("[Lifecycle] boundary phase=source_open")
-        _wait_until(lambda: delaying_handler.started)
+        assert blocking_handler.started.wait(timeout=2.0)
         assert sinks.file_queue is not None
         for _ in range(3000):
             root_logger.info("[Lifecycle] boundary phase=event_loop")
 
         runtime_logging.emit_persisted("[Lifecycle] boundary phase=abort")
+        blocking_handler.release.set()
         _wait_for_log_text(sinks.log_file, "[Lifecycle] boundary phase=abort")
         runtime_logging.emit_persisted("[Lifecycle] boundary phase=seal")
         _wait_for_log_text(sinks.log_file, "[Lifecycle] boundary phase=seal")
@@ -807,6 +814,7 @@ def test_terminal_file_record_survives_queue_pressure_and_later_reports_loss(tmp
         assert re.search(r"logging_delivery_dropped=[1-9]\d*", terminal_two)
         assert "logging_delivery_failures=0" in terminal_two
     finally:
+        blocking_handler.release.set()
         runtime_logging.close()
         sinks.close()
 
@@ -877,18 +885,19 @@ def test_emit_persisted_preserves_queued_record_order_before_direct_write(tmp_pa
     root_logger.propagate = False
     sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
     runtime_logging = SessionRuntimeLoggingService(root_logger=root_logger, sinks=sinks)
-    delaying_handler = _DelayingForwardingHandler(
+    blocking_handler = _BlockingForwardingHandler(
         sinks.file_handler,
-        delayed_message="basic before persisted",
+        blocked_message="basic before persisted",
     )
     assert sinks.file_queue_listener is not None
-    sinks.file_queue_listener.handlers = (delaying_handler,)
+    sinks.file_queue_listener.handlers = (blocking_handler,)
 
     try:
         runtime_logging.emit_basic("basic before persisted")
-        _wait_until(lambda: delaying_handler.started)
+        assert blocking_handler.started.wait(timeout=2.0)
 
         runtime_logging.emit_persisted("[Lifecycle] boundary phase=enqueue")
+        blocking_handler.release.set()
 
         _wait_for_log_text(sinks.log_file, "basic before persisted")
         _wait_for_log_text(sinks.log_file, "phase=enqueue")
@@ -901,6 +910,7 @@ def test_emit_persisted_preserves_queued_record_order_before_direct_write(tmp_pa
         )
         assert basic_index < persisted_index
     finally:
+        blocking_handler.release.set()
         runtime_logging.close()
         sinks.close()
 
@@ -1120,6 +1130,7 @@ def test_configure_main_logging_reconfigures_after_close(tmp_path) -> None:
         assert second.file_queue_handler is not first.file_queue_handler
         assert second.file_queue_handler in root_logger.handlers
         root_logger.info("[Lifecycle] boundary phase=receive")
+        root_logger.warning("[Lifecycle] boundary phase=readiness")
         _wait_for_log_text(second.log_file, "phase=receive")
     finally:
         second.close()
@@ -1566,6 +1577,7 @@ async def test_soniox_failure_metadata_survives_file_sink_without_external_conte
                             break
             finally:
                 await session.close()
+        provider_logger.warning("[Lifecycle] boundary phase=readiness")
     finally:
         sinks.close()
         provider_logger.removeHandler(sinks.stream_handler)

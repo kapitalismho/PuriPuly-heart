@@ -14,9 +14,6 @@ inputs:
   lock-mode:
     description: Lock enforcement mode (frozen for release callers, locked for PR verification).
     default: frozen
-  enable-cache:
-    description: Persist uv dependency downloads between verification runs.
-    default: "false"
 
 runs:
   using: composite
@@ -31,15 +28,13 @@ runs:
       with:
         version: ${{ inputs.uv-version }}
         python-version: ${{ inputs.python-version }}
-        enable-cache: ${{ inputs.enable-cache }}
-        cache-dependency-glob: |
-          uv.lock
-          pyproject.toml
-        cache-suffix: ${{ inputs.python-version }}
+        enable-cache: "false"
         cache-local-path: ${{ runner.temp }}/uv-cache
-        prune-cache: "false"
-        cache-python: "false"
 
     - name: Sync lockfile
       shell: bash
       run: uv sync ${{ inputs.sync-args }} --${{ inputs.lock-mode }}
+
+    - name: Report runner processors
+      shell: bash
+      run: python -c "import os; print(f'Runner CPUs = {os.cpu_count()}, process CPUs = {os.process_cpu_count()}')"

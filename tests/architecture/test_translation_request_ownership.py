@@ -59,15 +59,14 @@ def _request_preparation_sites(
     prompt_render_calls: list[tuple[Path, int]] = []
     for path in sorted(source_root.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
+        in_request_root = path.is_relative_to(request_root)
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
-            if (
-                path.is_relative_to(request_root)
-                and _call_name(node) == "TranslationBackendRequest"
-            ):
+            callee_name = _call_name(node)
+            if in_request_root and callee_name == "TranslationBackendRequest":
                 production_request_calls.append((path, node.lineno))
-            if _call_name(node) == "render_translation_prompt_template":
+            if callee_name == "render_translation_prompt_template":
                 prompt_render_calls.append((path, node.lineno))
     return production_request_calls, prompt_render_calls
 
