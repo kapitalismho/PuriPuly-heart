@@ -531,6 +531,20 @@ describe('broker direct deploy automation', () => {
   });
 
 
+  it.skipIf(!bashAvailable)('deploys with child-key management credentials instead of a shared inference key', () => {
+    const workflow = readFileSync(deployWorkflow, 'utf8');
+    const guardScript = extractWorkflowRunBlock(workflow, 'Guard production deploy ref and confirmation');
+
+    expect(runGuardScript(guardScript, {})).toEqual({ status: 0, stderr: '' });
+    const missingManagementKey = runGuardScript(guardScript, {
+      OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION: undefined,
+    });
+    expect(missingManagementKey.status).toBe(1);
+    expect(missingManagementKey.stderr).toContain(
+      'OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION is required and must not be blank.',
+    );
+  });
+
   it.skipIf(!bashAvailable)('guards network identity key versions and the previous pair before migrations', () => {
     const workflow = readFileSync(deployWorkflow, 'utf8');
     const guardScript = extractWorkflowRunBlock(
@@ -926,7 +940,6 @@ function guardScenarioEnv(overrides: Record<string, string | undefined>): Record
     CLOUDFLARE_API_TOKEN: 'guard-scenario-api-token',
     CLOUDFLARE_ACCOUNT_ID: 'guard-scenario-account-id',
     BROKER_D1_DATABASE_ID_PRODUCTION: 'guard-scenario-database-id',
-    OPENROUTER_MANAGED_API_KEY_PRODUCTION: 'guard-scenario-managed-key',
     OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION: 'guard-scenario-management-key',
     OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION: 'guard-scenario-guardrail-id',
     OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION: 'guard-scenario-user-hmac-secret',

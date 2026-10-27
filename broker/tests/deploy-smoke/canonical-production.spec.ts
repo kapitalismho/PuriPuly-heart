@@ -840,13 +840,6 @@ function normalizeDisallowedModel(
   return normalized;
 }
 
-function requireDisallowedModel(model: string | undefined): string {
-  if (!model) {
-    throw new Error('BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL is required for deploy smoke');
-  }
-
-  return model;
-}
 
 function normalizeSmokeBaseUrl(baseUrl: string | undefined): URL {
   if (!baseUrl) {

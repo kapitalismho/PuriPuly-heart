@@ -4,64 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 import app from '../src/index';
 import {
-  TEST_DEFAULT_ABUSE_CONTROLS,
-  TEST_DEFAULT_ABUSE_RUNTIME_STATE,
-} from './test-support/abuse-controls';
-import {
   BROKER_MIGRATION_FILENAMES,
   applyBrokerMigrations,
 } from './test-support/migrations';
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
 
 describe('broker persistent state model', () => {
-  it('keeps the documented runtime config and table columns aligned with migrated storage', async () => {
-    const contract = await import('../src/contract');
-
-    expect(contract).toHaveProperty('BROKER_RUNTIME_CONFIG_KEYS', {
-      fingerprintSalt: 'fingerprint_salt',
-      abuseControls: 'abuse_controls',
-      abuseRuntimeState: 'abuse_runtime_state',
-      networkIdentityMigration: 'network_identity_migration',
-    });
-    expect(contract).toHaveProperty('BROKER_RUNTIME_CONFIG_SCHEMA', {
-      fingerprint_salt: ['current', 'previous', 'rotated_at'],
-      abuse_controls: TEST_DEFAULT_ABUSE_CONTROLS,
-      abuse_runtime_state: TEST_DEFAULT_ABUSE_RUNTIME_STATE,
-      network_identity_migration: ['dual_write', 'keyed_only'],
-    });
-    expect(contract).toHaveProperty('BROKER_PUBLIC_INPUT_BOUNDS', {
-      installation_id: {
-        minLength: 1,
-        maxLength: 128,
-        rejectWhitespaceOnly: true,
-        rejectControlCharacters: true,
-        rejectNewlines: true,
-      },
-      app_version: {
-        minLength: 1,
-        maxLength: 64,
-        rejectWhitespaceOnly: true,
-        rejectControlCharacters: true,
-        rejectNewlines: true,
-      },
-      hardware_hash: {
-        minLength: 1,
-        maxLength: 128,
-        nullable: true,
-        rejectWhitespaceOnly: true,
-        rejectControlCharacters: true,
-        rejectNewlines: true,
-      },
-    });
-    const env = createTestBrokerEnv();
-    for (const table of Object.values(contract.BROKER_PERSISTENCE_MODEL.tables)) {
-      const columns = env.__db
-        .prepare('SELECT name FROM pragma_table_info(?) ORDER BY name')
-        .all(table.name) as Array<{ name: string }>;
-      expect(columns.map(({ name }) => name), table.name).toEqual([...table.columns].sort());
-    }
-  });
-
   it('keeps persistence details out of the public foundation response', async () => {
     const response = await app.request('http://broker.test/v1/foundation');
     expect(response.status).toBe(200);

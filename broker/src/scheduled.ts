@@ -603,13 +603,6 @@ export async function runDailyReport(
   return { ok: true, payload, sent: true };
 }
 
-export async function buildDailySummaryPacket(
-  db: BrokerBindings['BROKER_DB'],
-  now: Date,
-): Promise<DailyReportPayload> {
-  const window = resolveDailyReportWindow(now);
-  return buildDailySummaryPacketForWindow(db, window);
-}
 
 async function buildDailySummaryPacketForDate(
   db: BrokerBindings['BROKER_DB'],

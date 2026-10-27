@@ -127,7 +127,6 @@ export interface TestBrokerEnv extends Record<string, unknown> {
   BROKER_DB: D1Database;
   OPENROUTER_MANAGEMENT_API_KEY: string;
   OPENROUTER_MANAGED_GUARDRAIL_ID: string;
-  OPENROUTER_MANAGED_API_KEY: string;
   OPENROUTER_MANAGED_USER_HMAC_SECRET: string;
   DISCORD_CLIENT_ID: string;
   DISCORD_CLIENT_SECRET: string;
@@ -163,7 +162,6 @@ export function createTestBrokerEnv(options: SqliteD1Hooks & { throughMigration?
     BROKER_DB: new SqliteD1Database(db, options) as unknown as D1Database,
     OPENROUTER_MANAGEMENT_API_KEY: 'test-management-api-key',
     OPENROUTER_MANAGED_GUARDRAIL_ID: 'test-managed-guardrail-id',
-    OPENROUTER_MANAGED_API_KEY: 'test-managed-api-key',
     OPENROUTER_MANAGED_USER_HMAC_SECRET: 'test-managed-user-hmac-secret',
     DISCORD_CLIENT_ID: 'test-discord-client-id',
     DISCORD_CLIENT_SECRET: 'test-discord-client-secret',

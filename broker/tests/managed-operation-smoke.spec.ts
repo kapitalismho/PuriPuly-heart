@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { buildManagedOperationId, buildManagedOperationResumeToken } from './test-support/managed-operation';
 
 import { app } from '../src/app';
 import {
-  buildManagedOperationId,
-  buildManagedOperationResumeToken,
   createManagedOperation,
   hashManagedOperationResumeToken,
 } from '../src/managed-operation';

@@ -5,19 +5,13 @@ import {
 
 export {
   BROKER_PUBLIC_INPUT_BOUNDS,
-  BROKER_PERSISTENCE_MODEL,
-  BROKER_RETENTION_POLICY,
   BROKER_RUNTIME_CONFIG_KEYS,
-  BROKER_RUNTIME_CONFIG_SCHEMA,
   DEFAULT_BROKER_ABUSE_CONTROLS,
   DEFAULT_BROKER_ABUSE_RUNTIME_STATE,
-  FINGERPRINT_SALT_POLICY,
   MANAGED_KEY_DELIVERY_STATUS_VALUES,
   OPENROUTER_ENTITLEMENT_STATUS_VALUES,
-  QQ_MANAGED_ENTITLEMENT_AUTOMATIC_REISSUE_BLOCKING_STATUS_VALUES,
   QQ_MANAGED_ENTITLEMENT_STALE_ISSUING_POLICY,
   QQ_MANAGED_ENTITLEMENT_STATUS_VALUES,
-  QQ_SUBJECT_REF_POLICY,
 } from './persistence';
 export {
   MANAGED_TRIAL_BUDGET_POLICY,
@@ -29,20 +23,13 @@ export {
   TRIAL_PROVIDER_POLICY,
 } from './trial-policy';
 export type {
-  BrokerAbuseRuntimeAuditRecord,
   BrokerAbuseRuntimeStateValue,
   BrokerDailyIssuanceCapConfig,
   BrokerDailyIssuanceCapEndpoint,
   BrokerEndpointRateLimitConfig,
   BrokerPendingDiscordOAuthSessionsConfig,
-  QqAuthAssertionRecord,
   BrokerAbuseControlsConfigValue,
-  BrokerAbuseSubjectHookRecord,
-  BrokerConfigRow,
   BrokerIssueSuccessSource,
-  BrokerIssueSuccessEventRecord,
-  BrokerRequestEventRecord,
-  BrokerVelocityCapHookRecord,
   DiscordOAuthSessionRecord,
   DiscordOAuthSessionStatus,
   FingerprintSaltConfigValue,
@@ -69,10 +56,7 @@ export const BROKER_RUNTIME_STACK = {
 
 export const REQUIRED_BINDINGS = {
   d1: 'BROKER_DB',
-  // Transitional: the shared-key binding remains required until the runtime
-  // issuance path switches away from OPENROUTER_MANAGED_API_KEY in a later task.
   secrets: [
-    'OPENROUTER_MANAGED_API_KEY',
     'OPENROUTER_MANAGEMENT_API_KEY',
     'OPENROUTER_MANAGED_GUARDRAIL_ID',
     'OPENROUTER_MANAGED_USER_HMAC_SECRET',
@@ -93,7 +77,6 @@ export interface BrokerBindings {
   BROKER_DB: D1Database;
   OPENROUTER_MANAGEMENT_API_KEY: string;
   OPENROUTER_MANAGED_GUARDRAIL_ID: string;
-  OPENROUTER_MANAGED_API_KEY: string;
   OPENROUTER_MANAGED_USER_HMAC_SECRET: string;
   DISCORD_CLIENT_ID: string;
   DISCORD_CLIENT_SECRET: string;

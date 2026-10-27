@@ -46,7 +46,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
-          OPENROUTER_MANAGED_API_KEY_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_API_KEY_PRODUCTION }}
           OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION: ${{ secrets.OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION }}
           OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION }}
           OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION }}
@@ -112,11 +111,6 @@ jobs:
 
           if [[ -z "${BROKER_D1_DATABASE_ID_PRODUCTION//[[:space:]]/}" ]]; then
             echo 'BROKER_D1_DATABASE_ID_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${OPENROUTER_MANAGED_API_KEY_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'OPENROUTER_MANAGED_API_KEY_PRODUCTION is required and must not be blank.' >&2
             exit 1
           fi
 
@@ -689,7 +683,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          OPENROUTER_MANAGED_API_KEY_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_API_KEY_PRODUCTION }}
           OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION: ${{ secrets.OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION }}
           OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION }}
           OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION }}
@@ -703,10 +696,6 @@ jobs:
           NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: ${{ secrets.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION }}
           DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION: ${{ secrets.DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION }}
         run: |
-          # OPENROUTER_MANAGED_API_KEY_PRODUCTION remains for transitional runtime compatibility
-          # until the legacy binding is removed from the worker contract.
-          printf '%s' "$OPENROUTER_MANAGED_API_KEY_PRODUCTION" \
-            | pnpm exec wrangler secret put OPENROUTER_MANAGED_API_KEY --config "${{ steps.render.outputs.config_path }}"
           # OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION is required for managed child-key creation and cleanup.
           printf '%s' "$OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION" \
             | pnpm exec wrangler secret put OPENROUTER_MANAGEMENT_API_KEY --config "${{ steps.render.outputs.config_path }}"

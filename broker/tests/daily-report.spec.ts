@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  buildDailySummaryPacket,
   handleScheduled,
   resolveDailyReportWindow,
   runDailyReport,
@@ -433,17 +432,22 @@ describe('PuriPuly daily summary v2', () => {
 
   it('anchors retries to one fixed completed-day window', async () => {
     const env = createTestBrokerEnv();
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
 
-    const early = await buildDailySummaryPacket(
-      env.BROKER_DB,
+    const early = await runDailyReport(
+      env,
       new Date('2026-04-20T00:05:00.000Z'),
     );
-    const late = await buildDailySummaryPacket(
-      env.BROKER_DB,
+    const late = await runDailyReport(
+      env,
       new Date('2026-04-20T23:59:59.999Z'),
     );
 
-    expect(early).toEqual(late);
+    expect(early.payload).toEqual(late.payload);
+    expect(early.sent).toBe(true);
+    expect(late.sent).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(resolveDailyReportWindow(new Date('2026-04-20T12:00:00.000Z'))).toEqual({
       reportDateUtc: '2026-04-19',
       windowStart: '2026-04-19T00:00:00.000Z',
@@ -453,6 +457,7 @@ describe('PuriPuly daily summary v2', () => {
 
   it('uses a half-open key-delivery window and source-aware totals', async () => {
     const env = createTestBrokerEnv();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })));
     insertIssueSuccessEvent(env, {
       source: 'discord',
       label: 'prior-boundary',
@@ -490,8 +495,8 @@ describe('PuriPuly daily summary v2', () => {
       observedAt: '2026-04-20T00:00:00.000Z',
     });
 
-    const packet = await buildDailySummaryPacket(
-      env.BROKER_DB,
+    const { payload: packet } = await runDailyReport(
+      env,
       new Date('2026-04-20T00:05:00.000Z'),
     );
 
@@ -511,6 +516,7 @@ describe('PuriPuly daily summary v2', () => {
 
   it('calculates completed-day app DAU, WAU, and MAU', async () => {
     const env = createTestBrokerEnv();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })));
     await recordActiveDay(env, 'new-on-report-date', '2026-04-19');
     await recordActiveDay(env, 'new-on-report-date', '2026-04-19');
     await recordActiveDay(env, 'returning-on-report-date', '2026-04-01');
@@ -520,8 +526,8 @@ describe('PuriPuly daily summary v2', () => {
     await recordActiveDay(env, 'outside-month', '2026-03-20');
     await recordActiveDay(env, 'future-date', '2026-04-20');
 
-    const packet = await buildDailySummaryPacket(
-      env.BROKER_DB,
+    const { payload: packet } = await runDailyReport(
+      env,
       new Date('2026-04-20T00:05:00.000Z'),
     );
 
