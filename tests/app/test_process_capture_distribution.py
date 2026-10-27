@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -55,14 +57,38 @@ def test_installer_smoke_skip_is_compile_time_only_and_production_default_is_unc
 def test_production_build_and_cli_omit_release_only_smoke_helper() -> None:
     spec = (ROOT / "build.spec").read_text(encoding="utf-8")
     main_source = (ROOT / "src/puripuly_heart/main.py").read_text(encoding="utf-8")
-    helper_spec = (ROOT / "scripts/release/process-capture-runtime-smoke.spec").read_text(
-        encoding="utf-8"
-    )
 
     assert 'os.environ.get("PURIPULY_HEART_RELEASE_PROCESS_CAPTURE_SMOKE") == "1"' in spec
     assert "noarchive=release_smoke" in spec
     assert "process-capture-runtime-check" not in main_source
-    assert "must not collect duplicate production modules" in helper_spec
+    assignments = [
+        node
+        for node in ast.parse(spec).body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name)
+            and target.id in {"release_smoke", "entry_script", "executable_name"}
+            for target in node.targets
+        )
+    ]
+    selection = compile(ast.Module(body=assignments, type_ignores=[]), "build.spec", "exec")
+    for flag, entrypoint, executable in (
+        (None, ROOT / "src/puripuly_heart/main.py", "PuriPulyHeart"),
+        ("0", ROOT / "src/puripuly_heart/main.py", "PuriPulyHeart"),
+        (
+            "1",
+            ROOT / "scripts/release/process-capture-runtime-smoke.py",
+            "PuriPulyHeartProcessCaptureSmoke",
+        ),
+    ):
+        namespace = {
+            "os": SimpleNamespace(environ={"PURIPULY_HEART_RELEASE_PROCESS_CAPTURE_SMOKE": flag}),
+            "Path": Path,
+            "src_path": ROOT / "src",
+        }
+        exec(selection, namespace)
+        assert namespace["entry_script"] == entrypoint
+        assert namespace["executable_name"] == executable
 
 
 def test_installer_isolation_rejects_production_identity_and_workspace(tmp_path: Path) -> None:

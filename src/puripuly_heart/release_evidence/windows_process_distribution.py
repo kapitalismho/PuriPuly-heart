@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import ntpath
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -226,17 +225,6 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def load_report(path: Path) -> dict[str, object]:
-    value = json.loads(path.read_text(encoding="utf-8-sig"))
-    if not isinstance(value, dict):
-        raise ValueError("runtime report must be an object")
-    return value
-
-
-def artifact_sha256(path: Path) -> str:
-    return _sha256(path)
 
 
 def _utc_timestamp(value: float) -> str:

@@ -14,9 +14,7 @@
 #else
   #define MyAppDataDirName "puripuly-heart"
 #endif
-#ifdef MyAppId
-  #define MyAppIdWasExplicit
-#else
+#ifndef MyAppId
   #define MyAppId "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 #endif
 #if MyAppId != ProductionAppId
@@ -66,9 +64,6 @@
 #endif
 #define AppIconRelativePath PackagedApplicationRoot + "puripuly_heart\data\icons\icon.ico"
 #define NotoCjkFontRelativePath PackagedApplicationRoot + "puripuly_heart\data\fonts\NotoSansCJK-Medium.ttc"
-#define LocalSttManifestRelativePath PackagedApplicationRoot + "puripuly_heart\data\models\qwen3-asr-0.6b-int8-sherpa.manifest.json"
-#define ParakeetV3ManifestRelativePath PackagedApplicationRoot + "puripuly_heart\data\models\parakeet-tdt-0.6b-v3-int8-sherpa.manifest.json"
-#define ParakeetJapaneseManifestRelativePath PackagedApplicationRoot + "puripuly_heart\data\models\parakeet-tdt-ctc-0.6b-ja-int8-sherpa.manifest.json"
 
 #define InstallerPrivacyDir "installer\privacy"
 #define CanonicalSettingsVersion 53

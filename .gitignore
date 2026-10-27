@@ -239,9 +239,6 @@ refactoring/
 !/scripts/ci/prepare-native-release-inputs.ps1
 !/scripts/ci/prepare-soxr-release-inputs.ps1
 !/scripts/ci/read-project-version.py
-!/scripts/installer/
-/scripts/installer/*
-!/scripts/installer/install-local-stt-model.ps1
 !/scripts/release/
 /scripts/release/*
 !/scripts/release/console_bootstrap.py
