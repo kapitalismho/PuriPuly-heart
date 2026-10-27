@@ -23,6 +23,10 @@ from typing import Any
 
 from packaging.requirements import Requirement
 
+from puripuly_heart.core.overlay.openvr_vendor import (
+    validate_openvr_runtime_dll,
+    validate_vendored_openvr_bundle,
+)
 from puripuly_heart.release_evidence.gpu_worker_distribution import validate_gpu_worker_runtime
 from puripuly_heart.release_evidence.native_pe import stage_vc_runtime, validate_pe_dependencies
 
@@ -45,6 +49,9 @@ _FORBIDDEN_PTH = frozenset({"a1_coverage.pth", "distutils-precedence.pth"})
 _SOUNDDEVICE_RUNTIME_ROOT = PurePosixPath("_sounddevice_data/portaudio-binaries")
 _SOUNDDEVICE_STANDARD_DLL = _SOUNDDEVICE_RUNTIME_ROOT / "libportaudio64bit.dll"
 _SOUNDDEVICE_ASIO_DLL = _SOUNDDEVICE_RUNTIME_ROOT / "libportaudio64bit-asio.dll"
+_NOTO_CJK_FILENAME = "NotoSansCJK-Medium.ttc"
+_NOTO_CJK_SHA256 = "197d5e1e019faca33a4d55931c7d68b8056f3b97cb862049f5cb8de9efdfb8ce"
+_NOTO_CJK_BYTES = 18_354_360
 
 
 def _canonical_name(value: str) -> str:
@@ -1236,6 +1243,36 @@ def _validate_bundle_evidence(
         raise ValueError("loose bytecode compile evidence mismatch")
 
 
+def _validate_packaged_resources(target_root: Path, repo_root: Path) -> dict[str, Any]:
+    openvr = validate_vendored_openvr_bundle(repo_root / "third_party" / "openvr")
+    packaged_openvr = validate_openvr_runtime_dll(target_root / "openvr_api.dll")
+    font = target_root / "app" / "puripuly_heart" / "data" / "fonts" / _NOTO_CJK_FILENAME
+    if not font.is_file():
+        raise FileNotFoundError(f"native Noto CJK font not found: {font}")
+    if font.stat().st_size != _NOTO_CJK_BYTES or _sha256(font) != _NOTO_CJK_SHA256:
+        raise ValueError("native Noto CJK font does not match the pinned payload")
+    provenance = {}
+    for name in ("OFL.txt", "README.md", "SHA256SUMS.txt"):
+        source = repo_root / "third_party" / "noto-sans-cjk" / name
+        packaged = target_root / "third_party" / "noto-sans-cjk" / name
+        if not source.is_file() or not packaged.is_file():
+            raise FileNotFoundError(f"native Noto CJK provenance not found: {name}")
+        data = source.read_bytes()
+        if not data.strip() or packaged.read_bytes() != data:
+            raise ValueError(f"native Noto CJK provenance mismatch: {name}")
+        if name == "SHA256SUMS.txt" and data.decode("utf-8") != (
+            f"{_NOTO_CJK_SHA256}  {_NOTO_CJK_FILENAME}\n"
+        ):
+            raise ValueError("Noto CJK provenance does not record the pinned font")
+        provenance[name] = _sha256(packaged)
+    return {
+        "openvr_sha256": _sha256(packaged_openvr),
+        "openvr_source_sha256": openvr.dll_sha256,
+        "noto_cjk_sha256": _NOTO_CJK_SHA256,
+        "noto_cjk_provenance": provenance,
+    }
+
+
 def validate_compliance(target_root: Path, repo_root: Path, soxr_manifest: Path) -> dict[str, Any]:
     from puripuly_heart.release_evidence.release_identity import (
         verify_packaged_license_payloads,
@@ -1243,6 +1280,7 @@ def validate_compliance(target_root: Path, repo_root: Path, soxr_manifest: Path)
     )
 
     return {
+        "resources": _validate_packaged_resources(target_root, repo_root),
         "licenses": verify_packaged_license_payloads(
             target_root,
             application_root="app",

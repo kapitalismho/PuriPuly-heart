@@ -80,9 +80,3 @@ def validate_gpu_worker_runtime(root: Path) -> dict[str, Any]:
         "cpu_modules": cpu_modules,
         "files": dict(sorted(expected.items())),
     }
-
-
-def collect_gpu_worker_runtime_binaries(root: Path) -> list[tuple[str, str]]:
-    validate_gpu_worker_runtime(root)
-    inventory = json.loads((root / GPU_WORKER_INVENTORY).read_text(encoding="utf-8"))
-    return [(str(root / entry["path"]), ".") for entry in inventory["files"]]

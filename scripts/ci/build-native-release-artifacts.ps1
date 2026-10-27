@@ -197,6 +197,80 @@ function Assert-NativeInstalledRuntime {
     Copy-Item -LiteralPath $reportPath, $captureReport -Destination $evidenceRoot -Force
 }
 
+function Remove-InstallerLifecycleInstallations {
+    param(
+        [Parameter(Mandatory = $true)][Guid]$Identity,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$KnownTargets,
+        [Parameter(Mandatory = $true)][string]$DefaultDirectoryName,
+        [Parameter(Mandatory = $true)][string]$ExpectedHostSha256,
+        [Parameter(Mandatory = $true)][string]$StateRoot,
+        [Parameter(Mandatory = $true)][string]$WorkspaceRoot
+    )
+    if ($Identity -eq [Guid]"A1B2C3D4-E5F6-7890-ABCD-EF1234567890" -or
+        $DefaultDirectoryName -notmatch '^PuriPuly-native-smoke-[0-9a-f]{32}$' -or
+        $ExpectedHostSha256 -notmatch '^[0-9a-fA-F]{64}$') {
+        throw "Installer lifecycle cleanup requires its unique alternate identity and candidate hash."
+    }
+    $registration = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{$Identity}_is1"
+    $targets = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($path in $KnownTargets) { [void]$targets.Add([IO.Path]::GetFullPath($path).TrimEnd('\')) }
+    $results = [Collections.Generic.List[object]]::new()
+    if (Test-Path -LiteralPath $registration) {
+        try {
+            $registered = [IO.Path]::GetFullPath(
+                (Get-ItemProperty -LiteralPath $registration -Name InstallLocation -ErrorAction Stop).InstallLocation
+            ).TrimEnd('\')
+            if (-not $targets.Contains($registered) -and [IO.Path]::GetFileName($registered) -ne $DefaultDirectoryName) {
+                throw "Alternate AppId installation is outside the current run's exact owned targets."
+            }
+            [void]$targets.Add($registered)
+        } catch {
+            $results.Add(@{ target = $registration; disposition = "failed"; error = $_.Exception.Message })
+        }
+    }
+    foreach ($target in $targets) {
+        try {
+            if ([IO.Path]::GetFileName($target) -eq "PuriPulyHeart" -or $target -eq [IO.Path]::GetPathRoot($target) -or
+                $target -eq $WorkspaceRoot -or $target.StartsWith("$WorkspaceRoot\", [StringComparison]::OrdinalIgnoreCase) -or
+                $WorkspaceRoot.StartsWith("$target\", [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Refusing installer lifecycle cleanup at or across the checkout."
+            }
+            $ancestor = [IO.DirectoryInfo]::new($target)
+            while ($null -ne $ancestor) {
+                if ($ancestor.Exists -and ($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    throw "Refusing installer lifecycle cleanup through a reparse point."
+                }
+                $ancestor = $ancestor.Parent
+            }
+            $uninstaller = Join-Path $target "unins000.exe"
+            $hostPath = Join-Path $target "PuriPulyHeart.exe"
+            if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) {
+                if (Test-Path -LiteralPath $hostPath) { throw "Owned payload has no uninstaller; retained for explicit recovery." }
+                $results.Add(@{ target = $target; disposition = "absent"; error = $null })
+                continue
+            }
+            if (-not (Test-Path -LiteralPath $hostPath -PathType Leaf) -or
+                (Get-FileHash -LiteralPath $hostPath -Algorithm SHA256).Hash -ne $ExpectedHostSha256) {
+                throw "Refusing lifecycle uninstaller for an unrecognized installed candidate."
+            }
+            [void](Invoke-IsolatedProcess -FilePath $uninstaller `
+                -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") -StateRoot $StateRoot)
+            $deadline = [DateTime]::UtcNow.AddSeconds(15)
+            while ((Test-Path -LiteralPath $uninstaller) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 100 }
+            if ((Test-Path -LiteralPath $uninstaller) -or (Test-Path -LiteralPath $hostPath)) {
+                throw "Owned uninstaller left its executable payload."
+            }
+            $results.Add(@{ target = $target; disposition = "uninstalled"; error = $null })
+        } catch {
+            $results.Add(@{ target = $target; disposition = "failed"; error = $_.Exception.Message })
+        }
+    }
+    if (Test-Path -LiteralPath $registration) {
+        $results.Add(@{ target = $registration; disposition = "failed"; error = "Alternate AppId registration remains; no registry deletion attempted." })
+    }
+    return $results.ToArray()
+}
+
 function Invoke-InstallerLifecycle {
     $runId = [Guid]::NewGuid().ToString("N")
     $state = if ($InstallerSmokeRoot) { Resolve-RepoPath $InstallerSmokeRoot } else { Join-Path ([IO.Path]::GetTempPath()) "PuriPuly-native-lifecycle-$runId" }
@@ -216,7 +290,7 @@ function Invoke-InstallerLifecycle {
             throw "Installer lifecycle must remain outside the checkout."
         }
     }
-    if ($install.StartsWith("$state\", [StringComparison]::OrdinalIgnoreCase) -or $state.StartsWith("$install\", [StringComparison]::OrdinalIgnoreCase)) {
+    if ($install -eq $state -or $install.StartsWith("$state\", [StringComparison]::OrdinalIgnoreCase) -or $state.StartsWith("$install\", [StringComparison]::OrdinalIgnoreCase)) {
         throw "Installer lifecycle install and state roots must be disjoint."
     }
     if (Test-Path -LiteralPath $registration) { throw "Installer lifecycle refuses an occupied AppId." }
@@ -229,25 +303,42 @@ function Invoke-InstallerLifecycle {
     [IO.File]::WriteAllText($sentinel, $runId)
     $smokeInstaller = Join-Path $state "PuriPulyHeart-Setup-$appVersion.exe"
     $uninstaller = Join-Path $install "unins000.exe"
+    $defaultDirectoryName = "PuriPuly-native-smoke-$runId"
+    $checkoutTarget = Join-Path $state "synthetic-checkout"
+    $temporaryTarget = Join-Path $state "profile\unsafe-install"
+    New-Item -ItemType Directory -Path $checkoutTarget | Out-Null
+    [IO.File]::WriteAllText((Join-Path $checkoutTarget "pyproject.toml"), "[project]")
+    $attemptedTargets = [Collections.Generic.List[string]]::new()
+    $expectedHostHash = (Get-FileHash -LiteralPath (Join-Path $OutputDir "PuriPulyHeart.exe") -Algorithm SHA256).Hash
+    $primaryFailure = $null
+    $cleanupResults = @()
     $lifecyclePassed = $false
     try {
         Invoke-Checked -FilePath $iscc -ArgumentList @(
             "/DMyAppId=$appId", "/DMyAppDataDirName=$child",
             "/DMyAppGroupName=PuriPuly-native-smoke-$runId",
-            "/DMyAppDirName=PuriPuly-native-smoke-$runId",
+            "/DMyAppDirName=$defaultDirectoryName",
             "/DInstallerSmokeAppDataRoot=$($data.Replace('\', '/'))",
             "/DSkipLocalSttProvisioning=1", "/DMyPackagedAppDir=$OutputDir",
             "/DNativeCleanupInclude=$cleanupInclude", "/O$state", (Join-Path $repoRoot "installer.iss")
         )
-        $defaultTarget = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "Programs\PuriPuly-native-smoke-$runId"
-        foreach ($target in @($repoRoot, (Join-Path $state "profile\unsafe-install"), $defaultTarget)) {
-            $rejectionLog = Join-Path $state "rejected-$([Guid]::NewGuid().ToString('N')).log"
+        $negativeCases = @(
+            @{ name = "checkout"; directory = $checkoutTarget; marker = "Installer smoke build refused an install directory inside a repository checkout" },
+            @{ name = "temporary"; directory = $temporaryTarget; marker = "Installer smoke build refused an install directory inside a temporary directory" },
+            @{ name = "default"; directory = $null; marker = "Installer smoke build refused the production default install directory" }
+        )
+        foreach ($case in $negativeCases) {
+            $rejectionLog = Join-Path $state "rejected-$($case.name).log"
+            $arguments = @("/CURRENTUSER", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/LOG=$rejectionLog")
+            if ($case.directory) {
+                $attemptedTargets.Add($case.directory)
+                $arguments += "/DIR=$($case.directory)"
+            }
             $rejection = Invoke-IsolatedProcess -FilePath $smokeInstaller `
-                -ArgumentList @("/CURRENTUSER", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/DIR=$target", "/LOG=$rejectionLog") `
-                -StateRoot $state -AllowFailure
-            if ($rejection.ExitCode -eq 0 -or
-                (Get-Content -LiteralPath $rejectionLog -Raw) -notmatch "Installer smoke build refused") {
-                throw "Installer did not reject the unsafe smoke target at its safety boundary: $target"
+                -ArgumentList $arguments -StateRoot $state -AllowFailure
+            $rejectionText = Get-Content -LiteralPath $rejectionLog -Raw
+            if ($rejection.ExitCode -eq 0 -or $rejectionText -notmatch [regex]::Escape($case.marker)) {
+                throw "Installer did not reject the $($case.name) smoke target at its safety boundary."
             }
         }
         $manifest = Get-Content -LiteralPath (Join-Path $OutputDir "native-artifact-manifest.json") -Raw -Encoding utf8 | ConvertFrom-Json
@@ -257,6 +348,7 @@ function Invoke-InstallerLifecycle {
         ) + @($manifest.inventory | Where-Object { $_.path -like "third_party/soxr/*.zip" } | ForEach-Object { $_.path })
         foreach ($phase in @("installed", "reinstalled")) {
             $log = Join-Path $state "$phase.log"
+            if (-not $attemptedTargets.Contains($install)) { $attemptedTargets.Add($install) }
             [void](Invoke-IsolatedProcess -FilePath $smokeInstaller `
                 -ArgumentList @("/CURRENTUSER", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/DIR=$install", "/LOG=$log") -StateRoot $state)
             if (-not (Test-Path -LiteralPath $registration)) { throw "Installer did not register the isolated AppId." }
@@ -306,22 +398,30 @@ function Invoke-InstallerLifecycle {
         }
         if ([IO.File]::ReadAllText($sentinel) -ne $runId) { throw "Isolated lifecycle changed the protected synthetic production namespace." }
         $lifecyclePassed = $true
+    } catch {
+        $primaryFailure = $_
     } finally {
-        if (Test-Path -LiteralPath $uninstaller) {
-            [void](Invoke-IsolatedProcess -FilePath $uninstaller -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") -StateRoot $state)
-        }
+        $cleanupResults = @(Remove-InstallerLifecycleInstallations -Identity $identity `
+            -KnownTargets @($attemptedTargets) -DefaultDirectoryName $defaultDirectoryName `
+            -ExpectedHostSha256 $expectedHostHash -StateRoot $state -WorkspaceRoot $repoRoot)
+        $cleanupErrors = @($cleanupResults | Where-Object { $_.disposition -eq "failed" })
         @{
-            passed = $lifecyclePassed; app_id = $identity.ToString(); install_root = $install; data_root = $data;
-            protected_namespace = $protectedRoot; state_root = $state; model_provisioning = "skipped";
-            gui_presentation = "not_observed"
-        } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidenceRoot "installer-lifecycle.json") -Encoding utf8
+            passed = $lifecyclePassed -and $cleanupErrors.Count -eq 0; app_id = $identity.ToString();
+            install_root = $install; data_root = $data; protected_namespace = $protectedRoot; state_root = $state;
+            model_provisioning = "skipped"; gui_presentation = "not_observed";
+            attempted_targets = @($attemptedTargets); cleanup = $cleanupResults;
+            default_directory_name = $defaultDirectoryName; default_target_selector = "Inno DefaultDirName without /DIR";
+            primary_failure = if ($primaryFailure) { $primaryFailure.Exception.Message } else { $null }
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $evidenceRoot "installer-lifecycle.json") -Encoding utf8
         Get-ChildItem -LiteralPath $state -Filter "*.log" -File | Copy-Item -Destination $evidenceRoot -Force
-        if ($lifecyclePassed) {
+        if ($lifecyclePassed -and $cleanupErrors.Count -eq 0) {
             Remove-Item -LiteralPath $state -Recurse -Force
         } else {
             Write-Warning "Installer lifecycle failed; isolated state and logs retained at $state"
         }
     }
+    if ($primaryFailure) { throw $primaryFailure }
+    if ($cleanupErrors.Count -ne 0) { throw "Installer lifecycle owned cleanup failed; inspect installer-lifecycle.json." }
 }
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))

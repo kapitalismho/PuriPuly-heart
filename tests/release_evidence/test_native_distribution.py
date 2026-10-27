@@ -24,6 +24,7 @@ from puripuly_heart.release_evidence.native_distribution import (
     main,
     stage_product_metadata,
     stage_sounddevice_portaudio_runtime,
+    validate_compliance,
     validate_dependencies,
     validate_target,
     verify_installed_soxr_record,
@@ -36,6 +37,87 @@ def _record_digest(data: bytes) -> str:
     import base64
 
     return "sha256=" + base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
+
+
+@pytest.fixture
+def packaged_resource_compliance(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
+    from puripuly_heart.release_evidence import release_identity
+
+    repo = Path(__file__).resolve().parents[2]
+    target = tmp_path / "native payload 한글"
+    font = target / "app/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc"
+    font.parent.mkdir(parents=True)
+    shutil.copy2(repo / "src/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc", font)
+    shutil.copy2(repo / "third_party/openvr/win64/openvr_api.dll", target / "openvr_api.dll")
+    shutil.copytree(repo / "third_party/noto-sans-cjk", target / "third_party/noto-sans-cjk")
+    monkeypatch.setattr(
+        release_identity, "verify_packaged_license_payloads", lambda *_args, **_kwargs: []
+    )
+    monkeypatch.setattr(release_identity, "verify_soxr_packaging", lambda *_args: {})
+    return target, repo
+
+
+def test_native_compliance_accepts_independently_pinned_resources(
+    packaged_resource_compliance,
+) -> None:
+    target, repo = packaged_resource_compliance
+    report = validate_compliance(target, repo, target / "soxr.json")["resources"]
+    assert (
+        report["openvr_sha256"]
+        == report["openvr_source_sha256"]
+        == ("bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a")
+    )
+    assert report["noto_cjk_sha256"] == (
+        "197d5e1e019faca33a4d55931c7d68b8056f3b97cb862049f5cb8de9efdfb8ce"
+    )
+    assert set(report["noto_cjk_provenance"]) == {"OFL.txt", "README.md", "SHA256SUMS.txt"}
+
+
+@pytest.mark.parametrize(
+    "resource", ["openvr_api.dll", "app/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc"]
+)
+def test_native_compliance_rejects_wrong_resource_even_with_matching_inventory(
+    packaged_resource_compliance, resource: str
+) -> None:
+    target, repo = packaged_resource_compliance
+    path = target / resource
+    damaged = bytearray(path.read_bytes())
+    damaged[-1] ^= 1
+    path.write_bytes(damaged)
+    (target / "native-artifact-manifest.json").write_text(
+        json.dumps(
+            {
+                "inventory": [
+                    {"path": resource, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="sha256 mismatch|pinned payload"):
+        validate_compliance(target, repo, target / "soxr.json")
+
+
+@pytest.mark.parametrize("name", ["OFL.txt", "README.md", "SHA256SUMS.txt"])
+@pytest.mark.parametrize("damage", ["missing", "changed"])
+def test_native_compliance_rejects_missing_or_changed_font_provenance(
+    packaged_resource_compliance, name: str, damage: str
+) -> None:
+    target, repo = packaged_resource_compliance
+    path = target / "third_party/noto-sans-cjk" / name
+    if damage == "missing":
+        path.unlink()
+    else:
+        path.write_bytes(b"unapproved provenance")
+    with pytest.raises((FileNotFoundError, ValueError), match="Noto CJK provenance"):
+        validate_compliance(target, repo, target / "soxr.json")
+
+
+def test_native_compliance_rejects_missing_font(packaged_resource_compliance) -> None:
+    target, repo = packaged_resource_compliance
+    (target / "app/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc").unlink()
+    with pytest.raises(FileNotFoundError, match="Noto CJK font"):
+        validate_compliance(target, repo, target / "soxr.json")
 
 
 @pytest.mark.parametrize("archive_key", ["python_archive", "stdlib_archive"])
