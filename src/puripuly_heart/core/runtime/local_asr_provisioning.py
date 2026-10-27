@@ -76,6 +76,14 @@ DownloadRuntimeFactory = Callable[[], LocalSTTDownloadRuntime]
 logger = logging.getLogger(__name__)
 
 
+def _install_failure_leaves(failure: BaseException) -> tuple[BaseException, ...]:
+    if isinstance(failure, BaseExceptionGroup):
+        return tuple(
+            leaf for member in failure.exceptions for leaf in _install_failure_leaves(member)
+        )
+    return (failure,)
+
+
 class LocalASRProvisioningOwner:
     resource_fields = (
         "_cpu_install_runtime",
@@ -542,65 +550,64 @@ class LocalASRProvisioningOwner:
                             elapsed_seconds=time.monotonic() - started_at,
                         )
                     )
-                except LocalSTTRuntimeInstallCancelled:
-                    cancelled = True
-                    await self._restore_integrity_after_interruption(request.backend, model_id)
-                    self._set_operation(model_id, operation="cancelled")
-                    await self._emit_diagnostic(
-                        LocalASRProvisioningDiagnostic(
-                            event="install",
-                            backend=request.backend,
-                            model_id=model_id,
-                            origin=request.origin,
-                            outcome="cancelled",
-                            elapsed_seconds=time.monotonic() - started_at,
-                        )
-                    )
-                    break
-                except Exception as exc:
-                    failed.append(model_id)
-                    code = getattr(exc, "failure_code", "unknown")
-                    if (
-                        not isinstance(code, str)
-                        or not code.isascii()
-                        or not code.replace("_", "").isalnum()
+                except BaseException as exc:
+                    primary, *cleanup_failures = _install_failure_leaves(exc)
+                    if any(
+                        not isinstance(failure, (Exception, asyncio.CancelledError))
+                        for failure in (primary, *cleanup_failures)
                     ):
-                        code = "unknown"
-                    failure_codes.append(code)
-                    log_feature(
-                        "ModelDownload",
-                        "installation",
-                        code,
-                        error=exc,
-                        http_status=getattr(exc, "status_code", None),
+                        raise
+                    is_cancelled = isinstance(
+                        primary, (asyncio.CancelledError, LocalSTTRuntimeInstallCancelled)
                     )
-                    native = provider_failure_report(
-                        exc, provider="local_asr", operation="models.install"
-                    ).diagnostics
-                    diagnostics = replace(
-                        native,
-                        component="local_asr_provisioning",
-                        code="local_asr_install_failed",
-                        visibility="diagnostic_only",
-                        fields={**native.fields, "model_id": model_id},
-                        operation_id=diagnostic_identity.get("operation_id"),
-                        request_id=diagnostic_identity.get("request_id"),
-                        generation=generation,
-                    )
-                    emit_failure(logger, diagnostics, disposition="failed", stage="installation")
+                    if is_cancelled:
+                        cancelled = True
+                    else:
+                        failed.append(model_id)
+                        failure_codes.append(
+                            self._log_install_failure(
+                                primary,
+                                model_id=model_id,
+                                generation=generation,
+                                diagnostic_identity=diagnostic_identity,
+                                stage="installation",
+                            )
+                        )
+                    for cleanup_failure in cleanup_failures:
+                        self._log_install_failure(
+                            cleanup_failure,
+                            model_id=model_id,
+                            generation=generation,
+                            diagnostic_identity=diagnostic_identity,
+                            stage="cleanup",
+                        )
+                        await self._emit_diagnostic(
+                            LocalASRProvisioningDiagnostic(
+                                event="cleanup",
+                                backend=request.backend,
+                                model_id=model_id,
+                                origin=request.origin,
+                                outcome="failed",
+                                failure_type=type(cleanup_failure).__name__,
+                            )
+                        )
                     await self._restore_integrity_after_interruption(request.backend, model_id)
-                    self._set_operation(model_id, operation="download_failed")
+                    self._set_operation(
+                        model_id, operation="cancelled" if is_cancelled else "download_failed"
+                    )
                     await self._emit_diagnostic(
                         LocalASRProvisioningDiagnostic(
                             event="install",
                             backend=request.backend,
                             model_id=model_id,
                             origin=request.origin,
-                            outcome="failed",
+                            outcome="cancelled" if is_cancelled else "failed",
                             elapsed_seconds=time.monotonic() - started_at,
-                            failure_type=type(exc).__name__,
+                            failure_type=None if is_cancelled else type(primary).__name__,
                         )
                     )
+                    if is_cancelled:
+                        break
                 finally:
                     await self._publish_state()
         except asyncio.CancelledError:
@@ -633,6 +640,41 @@ class LocalASRProvisioningOwner:
             snapshot=self.snapshot,
             failure_codes=tuple(failure_codes),
         )
+
+    def _log_install_failure(
+        self,
+        failure: BaseException,
+        *,
+        model_id: str,
+        generation: int,
+        diagnostic_identity: dict[str, str | None],
+        stage: str,
+    ) -> str:
+        code = getattr(failure, "failure_code", "unknown")
+        if not isinstance(code, str) or not code.isascii() or not code.replace("_", "").isalnum():
+            code = "unknown"
+        log_feature(
+            "ModelDownload",
+            stage,
+            "cleanup_failed" if stage == "cleanup" else code,
+            error=failure,
+            http_status=getattr(failure, "status_code", None),
+        )
+        native = provider_failure_report(
+            failure, provider="local_asr", operation="models.install"
+        ).diagnostics
+        diagnostics = replace(
+            native,
+            component="local_asr_provisioning",
+            code="local_asr_install_failed",
+            visibility="diagnostic_only",
+            fields={**native.fields, "model_id": model_id},
+            operation_id=diagnostic_identity.get("operation_id"),
+            request_id=diagnostic_identity.get("request_id"),
+            generation=generation,
+        )
+        emit_failure(logger, diagnostics, disposition="failed", stage=stage, exception=failure)
+        return code
 
     async def _ensure_startup_cleanup(
         self,

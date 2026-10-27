@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import errno
+import hashlib
 import io
 import json
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from pathlib import Path
 from uuid import uuid4
 
 import httpx
 import pytest
 
+from puripuly_heart.core import feature_diagnostics
 from puripuly_heart.core.diagnostics import diagnostic_operation
 from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRInstallRequest,
@@ -24,6 +28,7 @@ from puripuly_heart.core.local_asr.local_stt_assets import (
     PARAKEET_V3_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
     InstalledLocalSTTManifest,
+    LocalSTTAssetFile,
     LocalSTTInstallState,
     load_local_stt_asset_manifest,
 )
@@ -31,7 +36,12 @@ from puripuly_heart.core.local_asr.local_stt_catalog import (
     LocalCPUInstallSnapshot,
     LocalCPUModelInstall,
 )
+from puripuly_heart.core.local_asr.local_stt_download_port import (
+    HuggingFaceDownloadProgress,
+    LocalSTTDownloadPortCancelled,
+)
 from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
+    LocalSTTProvisioningLease,
     LocalSTTRuntimeInstallCancelled,
     LocalSTTRuntimeInstallError,
     RuntimeLocalSTTStatusUpdate,
@@ -693,3 +703,228 @@ async def test_owner_close_retains_timed_out_install_cleanup_for_retry() -> None
     assert task.done() is True
     assert owner.snapshot.activities == ()
     assert owner._cpu_install_runtime.download_task is None
+
+
+class _HeldProvisioningDownload:
+    def __init__(self, payload: bytes, cleanup_failure: Exception | None) -> None:
+        self.payload = payload
+        self.cleanup_failure = cleanup_failure
+        self.release = asyncio.Event()
+        self.cancellation_requested = asyncio.Event()
+        self.active = 0
+        self.requests = []
+
+    async def download(self, request, *, cancel_event, on_progress):
+        self.requests.append(request)
+        self.active += 1
+        path = request.local_dir / request.remote_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(self.payload[:1])
+        on_progress(HuggingFaceDownloadProgress(1, len(self.payload)))
+        try:
+            try:
+                while not self.release.is_set():
+                    if cancel_event.is_set():
+                        self.cancellation_requested.set()
+                        await self.release.wait()
+                        raise LocalSTTDownloadPortCancelled("controlled cancellation")
+                    await asyncio.sleep(0.005)
+            except asyncio.CancelledError:
+                self.cancellation_requested.set()
+                await self.release.wait()
+                raise
+            path.write_bytes(self.payload)
+            return path
+        finally:
+            self.active -= 1
+            if self.cleanup_failure is not None:
+                raise self.cleanup_failure
+
+
+async def _wait_for_condition(predicate) -> None:
+    async with asyncio.timeout(5):
+        while not predicate():
+            await asyncio.sleep(0.005)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["observer", "grouped_observer", "cancel"])
+@pytest.mark.parametrize("cleanup_fails", [False, True], ids=["settles", "cleanup-fails"])
+async def test_composed_installer_failure_reconciles_results_safe_diagnostics_and_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str, cleanup_fails: bool
+) -> None:
+    private = "private-observer-cleanup-path-and-secret-312"
+    payload = b"synthetic-model"
+    base = load_local_stt_asset_manifest(LOCAL_QWEN_GPU_MODEL_ID)
+    manifest = replace(
+        base,
+        sources={"huggingface": base.sources["huggingface"]},
+        files=(
+            LocalSTTAssetFile(
+                relative_path="synthetic.gguf",
+                sha256=hashlib.sha256(payload).hexdigest(),
+                size_bytes=len(payload),
+            ),
+        ),
+    )
+    downloader = _HeldProvisioningDownload(
+        payload, PermissionError(errno.EACCES, private, private) if cleanup_fails else None
+    )
+    snapshots = []
+    owner = LocalASRProvisioningOwner(
+        model_root=tmp_path / "models",
+        gpu_manifest_loader=lambda: manifest,
+        huggingface_downloader=downloader,
+        state_changed=snapshots.append,
+    )
+    root = logging.getLogger(f"test.composed-model-diagnostic.{uuid4().hex}")
+    root.propagate = False
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path / "logs")
+    basic = io.StringIO()
+    sinks.stream_handler.setStream(basic)
+    service = SessionRuntimeLoggingService(root_logger=root, sinks=sinks)
+    instance, operation, request_id = str(uuid4()), uuid4().hex, uuid4().hex
+    events = []
+    service.configure_diagnostics(instance_id=instance, event_sink=events.append)
+    monkeypatch.setattr(provisioning_module, "logger", root)
+    monkeypatch.setattr(feature_diagnostics, "logger", root)
+    delivered = []
+    progress = asyncio.Event()
+    observer_failure = ValueError(private)
+    if mode == "grouped_observer":
+        observer_failure = BaseExceptionGroup(private, (asyncio.CancelledError(), observer_failure))
+    statuses = []
+
+    async def on_status(update):
+        statuses.append(update)
+        if update.downloaded_bytes:
+            progress.set()
+            if mode != "cancel":
+                raise observer_failure
+
+    request = LocalASRInstallRequest(
+        backend="gpu",
+        model_ids=(manifest.model_id,),
+        locale="en",
+        origin="manual",
+        explicit_gpu_intent=True,
+        preferred_source="huggingface",
+    )
+    task = None
+    cancellation = None
+    try:
+        with diagnostic_operation(instance, operation, request_id):
+            task = owner.start_install(
+                request, on_status=on_status, result_handler=delivered.append
+            )
+        await asyncio.wait_for(progress.wait(), timeout=5)
+        if mode == "cancel":
+            cancellation = asyncio.create_task(owner.cancel_install("gpu"))
+        await asyncio.wait_for(downloader.cancellation_requested.wait(), timeout=5)
+        assert not task.done()
+        assert downloader.active == 1
+        assert owner.snapshot.state_for(manifest.model_id).operation == "downloading"
+        assert owner.snapshot.activity_for("gpu") is not None
+        staging = list((tmp_path / "models").glob(f"{manifest.install_dirname}.staging-*"))
+        assert len(staging) == 1
+        assert LocalSTTProvisioningLease.acquire(model_root=tmp_path / "models", wait=False) is None
+        assert any(
+            snapshot.activity_for("gpu") is not None
+            and snapshot.activity_for("gpu").progress_percent > 0
+            for snapshot in snapshots
+        )
+        assert {update.status for update in statuses} == {"downloading"}
+        downloader.release.set()
+        result = await asyncio.wait_for(task, timeout=5)
+        if cancellation is not None:
+            await cancellation
+        await _wait_for_condition(
+            lambda: delivered == [result] and not owner.active_result_delivery_task_names
+        )
+        assert downloader.active == 0
+        assert len(downloader.requests) == 1
+        assert not staging[0].exists()
+        assert result.installed_model_ids == ()
+        assert result.cancelled == (mode == "cancel")
+        assert result.failed_model_ids == (() if mode == "cancel" else (manifest.model_id,))
+        assert result.failure_codes == (() if mode == "cancel" else ("status_callback_failed",))
+        terminal = owner.snapshot.state_for(manifest.model_id)
+        assert terminal.operation == ("cancelled" if mode == "cancel" else "download_failed")
+        assert terminal.integrity == "missing"
+        assert owner.snapshot.activities == ()
+        assert {update.status for update in statuses} == {"downloading"}
+        terminal_diagnostics = [item for item in owner.diagnostics if item.event == "install"]
+        assert [item.outcome for item in terminal_diagnostics] == [
+            "started",
+            "cancelled" if mode == "cancel" else "failed",
+        ]
+        if mode != "cancel":
+            assert terminal_diagnostics[-1].failure_type == "_StatusCallbackError"
+            assert "code=status_callback_failed" in basic.getvalue()
+        cleanup_diagnostics = [
+            item
+            for item in owner.diagnostics
+            if item.event == "cleanup" and item.origin == "manual"
+        ]
+        assert len(cleanup_diagnostics) == int(cleanup_fails)
+        records = service.diagnostic_history({"operation_id": operation})["records"]
+        cleanup_records = [record for record in records if record["stage"] == "cleanup"]
+        assert len(cleanup_records) == int(cleanup_fails)
+        assert len(records) == int(mode != "cancel") + int(cleanup_fails)
+        if cleanup_fails:
+            assert cleanup_diagnostics[0].failure_type == "PermissionError"
+            secondary = cleanup_records[0]
+            assert secondary["fields"]["exception_class"] == "PermissionError"
+            assert secondary["fields"]["errno"] == errno.EACCES
+            assert secondary["fields"]["model_id"] == manifest.model_id
+            assert secondary["request_id"] == request_id
+            assert secondary["disposition"] == "failed"
+            assert (
+                "stage=cleanup code=cleanup_failed exception_type=PermissionError"
+                in basic.getvalue()
+            )
+            assert f"os_code={errno.EACCES}" in basic.getvalue()
+        assert len(events) == len(records)
+        assert private not in repr(owner.diagnostics)
+        assert private not in json.dumps(records)
+        assert private not in json.dumps(events)
+        assert private not in basic.getvalue()
+        lease = LocalSTTProvisioningLease.acquire(model_root=tmp_path / "models", wait=False)
+        assert lease is not None
+        lease.close()
+
+        inspected = await owner.inspect_gpu(explicit_intent=True, verify_checksums=True)
+        assert inspected.state_for(manifest.model_id).operation == "idle"
+        deleted = await owner.delete_model(manifest.model_id)
+        assert deleted.state_for(manifest.model_id).integrity == "missing"
+        downloader.cleanup_failure = None
+        retry_statuses = []
+        retry = await owner.start_install(request, on_status=retry_statuses.append)
+        assert retry.installed_model_ids == (manifest.model_id,)
+        assert not retry.cancelled and retry.failed_model_ids == ()
+        assert retry.snapshot.state_for(manifest.model_id).available
+        assert retry_statuses[-1].status == "ready"
+        assert downloader.active == 0
+        assert not list((tmp_path / "models").glob("*.staging-*"))
+    finally:
+        downloader.release.set()
+        if task is not None:
+            await asyncio.gather(task, return_exceptions=True)
+        if cancellation is not None:
+            await asyncio.gather(cancellation, return_exceptions=True)
+        await owner.close()
+        service.close()
+        sinks.close(force=True)
+        root.handlers.clear()
+    if not records:
+        assert not sinks.log_file.exists()
+        return
+    file_text = sinks.log_file.read_text(encoding="utf-8")
+    persisted = [
+        json.loads(line.partition("[Failure] ")[2])
+        for line in file_text.splitlines()
+        if "[Failure] {" in line
+    ]
+    assert persisted == records
+    assert private not in file_text
+    assert str(tmp_path) not in file_text
