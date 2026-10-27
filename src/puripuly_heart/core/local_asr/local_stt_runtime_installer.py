@@ -190,6 +190,10 @@ class LocalSTTRuntimeInstallCancelled(LocalSTTAssetError):
     """Raised when runtime local STT provisioning is cancelled."""
 
 
+class _StatusCallbackError(LocalSTTRuntimeInstallError):
+    pass
+
+
 async def _emit_status(
     on_status: StatusCallback | None,
     status: RuntimeLocalSTTStatus,
@@ -200,16 +204,22 @@ async def _emit_status(
 ) -> None:
     if on_status is None:
         return
-    result = on_status(
-        RuntimeLocalSTTStatusUpdate(
-            status=status,
-            percent=percent,
-            downloaded_bytes=downloaded_bytes,
-            total_bytes=total_bytes,
+    try:
+        result = on_status(
+            RuntimeLocalSTTStatusUpdate(
+                status=status,
+                percent=percent,
+                downloaded_bytes=downloaded_bytes,
+                total_bytes=total_bytes,
+            )
         )
-    )
-    if inspect.isawaitable(result):
-        await result
+        if inspect.isawaitable(result):
+            await result
+    except Exception as exc:
+        raise _StatusCallbackError(
+            "Local STT installation status callback failed",
+            failure_code="status_callback_failed",
+        ) from exc
 
 
 class _DownloadProgress:
@@ -272,19 +282,74 @@ def _raise_if_cancelled(cancel_event: threading.Event | None) -> None:
 
 async def _owned_io(function, *, io_cancel_event: threading.Event, **kwargs):
     worker = asyncio.create_task(asyncio.to_thread(function, **kwargs))
+    settled = asyncio.Event()
+    worker.add_done_callback(lambda _worker: settled.set())
     try:
-        return await asyncio.shield(worker)
-    except asyncio.CancelledError:
+        await settled.wait()
+    except asyncio.CancelledError as cancellation:
         io_cancel_event.set()
         while not worker.done():
             try:
-                await asyncio.shield(worker)
+                await settled.wait()
             except asyncio.CancelledError:
                 continue
-            except Exception:
-                break
-        await asyncio.gather(worker, return_exceptions=True)
+        try:
+            worker.result()
+        except asyncio.CancelledError, LocalSTTRuntimeInstallCancelled:
+            pass
+        except BaseException as cleanup_failure:
+            raise BaseExceptionGroup(
+                "Local STT I/O cancellation and cleanup failed",
+                (cancellation, cleanup_failure),
+            ) from cancellation
         raise
+    return worker.result()
+
+
+async def _cleanup_failed_download(
+    download_task: asyncio.Task[InstalledLocalSTTManifest] | None,
+    *,
+    staging_dir: Path,
+    cancel_event: threading.Event | None,
+    primary_failure: BaseException,
+) -> None:
+    cleanup_failures: list[BaseException] = []
+    if download_task is not None:
+        if not download_task.done():
+            if cancel_event is not None:
+                cancel_event.set()
+            if isinstance(primary_failure, asyncio.CancelledError):
+                download_task.cancel()
+            settled = asyncio.Event()
+            download_task.add_done_callback(lambda _task: settled.set())
+            while not download_task.done():
+                try:
+                    await settled.wait()
+                except asyncio.CancelledError:
+                    continue
+        try:
+            download_task.result()
+        except asyncio.CancelledError, LocalSTTRuntimeInstallCancelled:
+            pass
+        except BaseException as cleanup_failure:
+            if cleanup_failure is not primary_failure:
+                if isinstance(cleanup_failure, BaseExceptionGroup):
+                    _, cleanup_failure = cleanup_failure.split(
+                        (asyncio.CancelledError, LocalSTTRuntimeInstallCancelled)
+                    )
+                if cleanup_failure is not None:
+                    cleanup_failures.append(cleanup_failure)
+    try:
+        shutil.rmtree(staging_dir)
+    except FileNotFoundError:
+        pass
+    except BaseException as cleanup_failure:
+        cleanup_failures.append(cleanup_failure)
+    if cleanup_failures:
+        raise BaseExceptionGroup(
+            "Local STT installation and cleanup failed",
+            (primary_failure, *cleanup_failures),
+        ) from primary_failure
 
 
 def _download_source_into_staging(
@@ -295,65 +360,61 @@ def _download_source_into_staging(
     cancel_event: threading.Event | None = None,
     progress: _DownloadProgress | None = None,
 ) -> InstalledLocalSTTManifest:
-    try:
-        _raise_if_cancelled(cancel_event)
-        source = manifest.sources[source_name]
-        with network_clients.external_client(
-            timeout=httpx.Timeout(30.0, connect=15.0), follow_redirects=True
-        ) as client:
-            for asset in manifest.files:
-                _raise_if_cancelled(cancel_event)
-                asset_path = staging_dir / asset.relative_path
-                asset_path.parent.mkdir(parents=True, exist_ok=True)
-                digest = hashlib.sha256()
-                size_bytes = 0
-                url = source.download_url_template.format(
-                    path=asset.remote_path_for_source(source_name)
+    _raise_if_cancelled(cancel_event)
+    source = manifest.sources[source_name]
+    with network_clients.external_client(
+        timeout=httpx.Timeout(30.0, connect=15.0), follow_redirects=True
+    ) as client:
+        for asset in manifest.files:
+            _raise_if_cancelled(cancel_event)
+            asset_path = staging_dir / asset.relative_path
+            asset_path.parent.mkdir(parents=True, exist_ok=True)
+            digest = hashlib.sha256()
+            size_bytes = 0
+            url = source.download_url_template.format(
+                path=asset.remote_path_for_source(source_name)
+            )
+            with client.stream("GET", url) as response:
+                response.raise_for_status()
+                with asset_path.open("wb") as handle:
+                    for chunk in response.iter_bytes():
+                        _raise_if_cancelled(cancel_event)
+                        if not chunk:
+                            continue
+                        handle.write(chunk)
+                        digest.update(chunk)
+                        size_bytes += len(chunk)
+                        if asset.size_bytes is not None and size_bytes > asset.size_bytes:
+                            raise LocalSTTRuntimeInstallError(
+                                "Downloaded file too large", failure_code="file_size_mismatch"
+                            )
+                        if progress is not None:
+                            progress.add(len(chunk))
+            if digest.hexdigest() != asset.sha256:
+                raise LocalSTTRuntimeInstallError(
+                    f"checksum mismatch for required model file: {asset.relative_path}",
+                    failure_code="checksum_failed",
                 )
-                with client.stream("GET", url) as response:
-                    response.raise_for_status()
-                    with asset_path.open("wb") as handle:
-                        for chunk in response.iter_bytes():
-                            _raise_if_cancelled(cancel_event)
-                            if not chunk:
-                                continue
-                            handle.write(chunk)
-                            digest.update(chunk)
-                            size_bytes += len(chunk)
-                            if asset.size_bytes is not None and size_bytes > asset.size_bytes:
-                                raise LocalSTTRuntimeInstallError(
-                                    "Downloaded file too large", failure_code="file_size_mismatch"
-                                )
-                            if progress is not None:
-                                progress.add(len(chunk))
-                if digest.hexdigest() != asset.sha256:
-                    raise LocalSTTRuntimeInstallError(
-                        f"checksum mismatch for required model file: {asset.relative_path}",
-                        failure_code="checksum_failed",
-                    )
-                if asset.size_bytes is not None and size_bytes != asset.size_bytes:
-                    raise LocalSTTRuntimeInstallError(
-                        f"size mismatch for required model file: {asset.relative_path}",
-                        failure_code="file_size_mismatch",
-                    )
+            if asset.size_bytes is not None and size_bytes != asset.size_bytes:
+                raise LocalSTTRuntimeInstallError(
+                    f"size mismatch for required model file: {asset.relative_path}",
+                    failure_code="file_size_mismatch",
+                )
 
-        installed = InstalledLocalSTTManifest(
-            manifest_version=manifest.installed_manifest_version,
-            model_id=manifest.model_id,
-            engine=manifest.engine,
-            install_dirname=manifest.install_dirname,
-            selected_source=source_name,
-            selected_revision=source.revision,
-        )
-        (staging_dir / manifest.installed_manifest_filename).write_text(
-            json.dumps(installed.to_dict(), indent=2),
-            encoding="utf-8",
-        )
-        validate_local_stt_install(staging_dir, manifest=manifest)
-        return installed
-    except LocalSTTRuntimeInstallCancelled:
-        shutil.rmtree(staging_dir, ignore_errors=True)
-        raise
+    installed = InstalledLocalSTTManifest(
+        manifest_version=manifest.installed_manifest_version,
+        model_id=manifest.model_id,
+        engine=manifest.engine,
+        install_dirname=manifest.install_dirname,
+        selected_source=source_name,
+        selected_revision=source.revision,
+    )
+    (staging_dir / manifest.installed_manifest_filename).write_text(
+        json.dumps(installed.to_dict(), indent=2),
+        encoding="utf-8",
+    )
+    validate_local_stt_install(staging_dir, manifest=manifest)
+    return installed
 
 
 def _uses_huggingface_xet(
@@ -467,7 +528,6 @@ async def _download_huggingface_xet_source_into_staging(
         )
         return installed
     except LocalSTTDownloadPortCancelled as exc:
-        shutil.rmtree(staging_dir, ignore_errors=True)
         raise LocalSTTRuntimeInstallCancelled("runtime local STT install cancelled") from exc
 
 
@@ -553,6 +613,7 @@ async def ensure_local_stt_installed(
     cancellation = cancel_event or threading.Event()
     _raise_if_cancelled(cancellation)
     lease = None
+    primary_failure: BaseException | None = None
 
     def acquire_lease() -> None:
         nonlocal lease
@@ -576,9 +637,20 @@ async def ensure_local_stt_installed(
             cancel_event=cancellation,
             huggingface_downloader=huggingface_downloader,
         )
+    except BaseException as exc:
+        primary_failure = exc
+        raise
     finally:
         if lease is not None:
-            await _owned_io(lease.close, io_cancel_event=cancellation)
+            try:
+                await _owned_io(lease.close, io_cancel_event=cancellation)
+            except BaseException as cleanup_failure:
+                if primary_failure is not None:
+                    raise BaseExceptionGroup(
+                        "Local STT installation and lease cleanup failed",
+                        (primary_failure, cleanup_failure),
+                    ) from primary_failure
+                raise
 
 
 async def _ensure_local_stt_installed_with_lease(
@@ -696,18 +768,25 @@ async def _ensure_local_stt_installed_with_lease(
             )
             await _emit_status(on_status, "ready", percent=None)
             return installed
-        except asyncio.CancelledError:
-            if download_task is not None and not download_task.done():
-                download_task.cancel()
-                await asyncio.gather(download_task, return_exceptions=True)
-            shutil.rmtree(staging_dir, ignore_errors=True)
-            raise
-        except LocalSTTRuntimeInstallCancelled:
-            if download_task is not None and not download_task.done():
-                await asyncio.gather(download_task, return_exceptions=True)
-            shutil.rmtree(staging_dir, ignore_errors=True)
+        except (
+            asyncio.CancelledError,
+            LocalSTTRuntimeInstallCancelled,
+            _StatusCallbackError,
+        ) as exc:
+            await _cleanup_failed_download(
+                download_task,
+                staging_dir=staging_dir,
+                cancel_event=cancel_event,
+                primary_failure=exc,
+            )
             raise
         except Exception as exc:
+            await _cleanup_failed_download(
+                download_task,
+                staging_dir=staging_dir,
+                cancel_event=cancel_event,
+                primary_failure=exc,
+            )
             if first_error is None:
                 first_error = exc
             failures.append(f"{source_label}: {exc}")
@@ -718,7 +797,6 @@ async def _ensure_local_stt_installed_with_lease(
                 f"source={source_label} cause={type(exc).__name__}",
                 level=logging.WARNING,
             )
-            shutil.rmtree(staging_dir, ignore_errors=True)
 
     await _emit_status(on_status, "download_failed", percent=None)
     code = getattr(last_error, "failure_code", "unknown")
