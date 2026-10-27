@@ -806,7 +806,7 @@ class _SafeQueueListener(QueueListener):
                 if (
                     len(batch) >= _FILE_BATCH_MAX_RECORDS
                     or batch_bytes >= _FILE_BATCH_MAX_BYTES
-                    or prepared.levelno >= logging.WARNING
+                    or _is_priority_file_record(prepared)
                 ):
                     self._deliver_batch(batch)
                     for _ in batch:
