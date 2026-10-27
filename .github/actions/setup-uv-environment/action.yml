@@ -14,6 +14,9 @@ inputs:
   lock-mode:
     description: Lock enforcement mode (frozen for release callers, locked for PR verification).
     default: frozen
+  enable-cache:
+    description: Persist uv dependency downloads between verification runs.
+    default: "false"
 
 runs:
   using: composite
@@ -22,11 +25,21 @@ runs:
       uses: actions/setup-python@v7
       with:
         python-version: ${{ inputs.python-version }}
-        cache: pip
-        cache-dependency-path: uv.lock
 
-    - name: Install pinned uv and sync lockfile
+    - name: Install pinned uv
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+      with:
+        version: ${{ inputs.uv-version }}
+        python-version: ${{ inputs.python-version }}
+        enable-cache: ${{ inputs.enable-cache }}
+        cache-dependency-glob: |
+          uv.lock
+          pyproject.toml
+        cache-suffix: ${{ inputs.python-version }}
+        cache-local-path: ${{ runner.temp }}/uv-cache
+        prune-cache: "false"
+        cache-python: "false"
+
+    - name: Sync lockfile
       shell: bash
-      run: |
-        python -m pip install --upgrade pip "uv==${{ inputs.uv-version }}"
-        uv sync ${{ inputs.sync-args }} --${{ inputs.lock-mode }}
+      run: uv sync ${{ inputs.sync-args }} --${{ inputs.lock-mode }}

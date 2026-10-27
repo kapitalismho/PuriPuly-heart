@@ -32,6 +32,7 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigurationOwner,
 )
+from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.manifest import (
     OVERLAY_EXECUTION_CONTRACT,
     OVERLAY_NATIVE_RETRY_CONTRACT,
@@ -256,6 +257,8 @@ class _TestManagedProcess:
     _events: asyncio.Queue[dict[str, object]] = dataclass_field(default_factory=asyncio.Queue)
     _exit_future: asyncio.Future[int | None] | None = dataclass_field(default=None, init=False)
     terminated: bool = dataclass_field(default=False, init=False)
+    shutdown_requested: bool = dataclass_field(default=False, init=False)
+    readers_finished: bool = dataclass_field(default=False, init=False)
 
     def __post_init__(self) -> None:
         loop = asyncio.get_running_loop()
@@ -286,7 +289,19 @@ class _TestManagedProcess:
         return await asyncio.shield(self._exit_future)
 
     async def finish_readers(self) -> None:
-        return None
+        self.readers_finished = True
+
+    def acknowledge_shutdown(self) -> None:
+        assert self._exit_future is not None
+        self.shutdown_requested = True
+        if not self._exit_future.done():
+            self._events.put_nowait(
+                {
+                    "type": "shutdown_complete",
+                    "overlay_instance_id": self.overlay_instance_id,
+                }
+            )
+            self._exit_future.set_result(0)
 
     async def terminate(self) -> None:
         self.terminated = True
@@ -351,6 +366,36 @@ class _GatedProcessRunner:
         return self.last_process
 
 
+@pytest.fixture
+def fake_process_runner(monkeypatch: pytest.MonkeyPatch) -> Any:
+    runners: list[Any] = []
+    broadcast_shutdown = OverlayBridge.broadcast_shutdown
+
+    async def shutdown(bridge: OverlayBridge) -> None:
+        await broadcast_shutdown(bridge)
+        for runner in runners:
+            process = runner.last_process
+            if process is not None and process.overlay_instance_id == bridge.overlay_instance_id:
+                process.acknowledge_shutdown()
+                return
+        raise AssertionError("shutdown requested without a matching fake process")
+
+    def register(runner: Any) -> Any:
+        runners.append(runner)
+        return runner
+
+    monkeypatch.setattr(OverlayBridge, "broadcast_shutdown", shutdown)
+    yield register
+
+    for runner in runners:
+        process = runner.last_process
+        assert process is not None
+        assert process.shutdown_requested
+        assert process.returncode == 0
+        assert process.readers_finished
+        assert not process.terminated
+
+
 async def _start_via_begin_start(
     owner: OverlayApplicationOwner,
     runner: object,
@@ -391,12 +436,17 @@ async def _restart_via_transition(
 
 async def test_disabled_startup_first_snapshot_is_source_primary(
     monkeypatch: pytest.MonkeyPatch,
+    fake_process_runner: Any,
 ) -> None:
     config_owner = TranslationRuntimeConfigurationOwner(
         TranslationRuntimeConfig(translation_enabled=False)
     )
     owner = make_owner(config_owner)
-    runtime = await _start_via_begin_start(owner, _TestProcessRunner(), monkeypatch)
+    runtime = await _start_via_begin_start(
+        owner, fake_process_runner(_TestProcessRunner()), monkeypatch
+    )
+    manager = runtime.process_manager
+    assert manager is not None
     try:
         assert owner.state == "connected"
         presenter = cast(OverlayPresenter, runtime.presenter)
@@ -445,15 +495,24 @@ async def test_disabled_startup_first_snapshot_is_source_primary(
     finally:
         await owner.teardown(preserve_presenter_state=False)
 
+    receipt = manager.shutdown_receipt()
+    assert receipt["graceful_completed"] is True
+    assert receipt["forced"] is False
+    assert receipt["cleanup_succeeded"] is True
+    assert receipt["terminal_cause"] is None
+
 
 async def test_restart_reuse_rebuilds_visible_row_as_source_primary(
     monkeypatch: pytest.MonkeyPatch,
+    fake_process_runner: Any,
 ) -> None:
     config_owner = TranslationRuntimeConfigurationOwner(
         TranslationRuntimeConfig(translation_enabled=True)
     )
     owner = make_owner(config_owner)
-    first_runtime = await _start_via_begin_start(owner, _TestProcessRunner(), monkeypatch)
+    first_runtime = await _start_via_begin_start(
+        owner, fake_process_runner(_TestProcessRunner()), monkeypatch
+    )
     try:
         assert owner.state == "connected"
         first_presenter = cast(OverlayPresenter, first_runtime.presenter)
@@ -487,7 +546,9 @@ async def test_restart_reuse_rebuilds_visible_row_as_source_primary(
         before = first_presenter.snapshot().blocks[0]
         assert before.primary_text == "peer translation toggle"
         replace_translation_runtime_enabled(config_owner, False)
-        second_runtime = await _restart_via_transition(owner, _TestProcessRunner(), monkeypatch)
+        second_runtime = await _restart_via_transition(
+            owner, fake_process_runner(_TestProcessRunner()), monkeypatch
+        )
         assert owner.state == "connected", owner.failure_reason
         reused = cast(OverlayPresenter, second_runtime.presenter)
         assert reused is first_presenter
@@ -505,13 +566,14 @@ async def test_restart_reuse_rebuilds_visible_row_as_source_primary(
 
 async def test_paused_start_applies_latest_translation_request(
     monkeypatch: pytest.MonkeyPatch,
+    fake_process_runner: Any,
 ) -> None:
     config_owner = TranslationRuntimeConfigurationOwner(
         TranslationRuntimeConfig(translation_enabled=True)
     )
     owner = make_owner(config_owner)
     enable_owner, _dashboard = make_enable_owner(config_owner, owner, llm_available=True)
-    runner = _GatedProcessRunner()
+    runner = fake_process_runner(_GatedProcessRunner())
     monkeypatch.setattr(
         OverlayApplicationOwner,
         "process_runner",
@@ -558,13 +620,16 @@ async def test_paused_start_applies_latest_translation_request(
 
 async def test_generation_failure_preserves_source_primary_truth(
     monkeypatch: pytest.MonkeyPatch,
+    fake_process_runner: Any,
 ) -> None:
     config_owner = TranslationRuntimeConfigurationOwner(
         TranslationRuntimeConfig(translation_enabled=False)
     )
     owner = make_owner(config_owner)
     runtime = await _start_via_begin_start(
-        owner, _TestProcessRunner(failure_reason="startup_timeout"), monkeypatch
+        owner,
+        fake_process_runner(_TestProcessRunner(failure_reason="startup_timeout")),
+        monkeypatch,
     )
     try:
         assert owner.state == "failed"

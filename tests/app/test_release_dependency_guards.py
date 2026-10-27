@@ -233,9 +233,6 @@ def test_shared_setup_action_preserves_release_default_and_rejects_stale_pr_lock
         (ROOT / ".github/actions/setup-uv-environment/action.yml").read_text(encoding="utf-8")
     )
     workflow = yaml.safe_load((ROOT / ".github/workflows/pr-ci.yml").read_text(encoding="utf-8"))
-    setup_python = next(step for step in action["runs"]["steps"] if "uses" in step)
-    assert setup_python["uses"] == "actions/setup-python@v7"
-    assert setup_python["with"]["cache-dependency-path"] == "uv.lock"
     inputs = {
         "sync-args": "--extra dev",
         "uv-version": workflow["env"]["UV_VERSION"],
@@ -261,9 +258,6 @@ def test_shared_setup_action_preserves_release_default_and_rejects_stale_pr_lock
         for line in step.get("run", "").splitlines()
         if line.strip()
     ]
-    installer = next(command for command in commands if command[:3] == ["python", "-m", "pip"])
-    assert "install" in installer
-    assert f"uv=={inputs['uv-version']}" in installer
     sync_commands = [command for command in commands if command[:2] == ["uv", "sync"]]
     assert len(sync_commands) == 1
     uv = shutil.which("uv")

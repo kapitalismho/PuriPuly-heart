@@ -306,9 +306,10 @@ async def test_noninterruptible_persistence_drains_before_host_closes(offline, m
             raise TimeoutError("save gate not released")
         return original(self, path, settings)
 
-    monkeypatch.setattr(type(host.control.settings.persistence), "persist", slow_save)
     try:
         await host.start()
+        assert not entered.is_set()
+        monkeypatch.setattr(type(host.control.settings.persistence), "persist", slow_save)
         control = host.control
         initial = await control.query("settings.current", {})
         stream = control.subscribe(topics=["settings"])
