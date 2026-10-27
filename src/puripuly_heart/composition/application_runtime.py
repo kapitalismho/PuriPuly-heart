@@ -1244,6 +1244,9 @@ def compose_application_runtime(
                 ui_state_sink=presentation.project_osc_control_state,
                 language_state_provider=language_state,
                 translation_model_normalizer=settings.materialize_translation,
+                connection_changed=lambda: (
+                    vrchat_presence.connection_changed() if vrchat_presence is not None else None
+                ),
             )
         return vrc_mic_sync
 

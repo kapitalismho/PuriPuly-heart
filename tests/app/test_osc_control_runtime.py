@@ -241,6 +241,7 @@ def _integration(
     osc_state: OscCanonicalState | None = None,
     state_provider: Callable[[], OscCanonicalState] | None = None,
     resync_timeout_seconds: float = 1.5,
+    connection_changed: Callable[[], None] | None = None,
 ) -> OscControlIntegrationOwner:
     return OscControlIntegrationOwner(
         receiver_owner=receiver_owner,
@@ -253,7 +254,30 @@ def _integration(
         translation_model_normalizer=materialize_canonical_translation_settings,
         query_service=service,
         resync_timeout_seconds=resync_timeout_seconds,
+        connection_changed=connection_changed,
     )
+
+
+@pytest.mark.asyncio
+async def test_connection_observer_failure_does_not_fail_effective_transition() -> None:
+    def connection_changed() -> None:
+        raise RuntimeError("presentation unavailable")
+
+    integration = _integration(
+        AppSettingsVNext(),
+        FakeReceiverOwner(),
+        FakeSender(),
+        FakeService(info=None),
+        connection_changed=connection_changed,
+    )
+    try:
+        await integration.configure_connection(mode="manual", send_port=9123, receive_port=9124)
+        assert integration.output_snapshot()["effective_mode"] == "manual"
+        assert integration.output_snapshot()["local_availability"] == "available"
+        await integration.configure_connection(mode="off", send_port=9123, receive_port=9124)
+        assert integration.output_snapshot()["effective_mode"] == "off"
+    finally:
+        await integration.close()
 
 
 @pytest.mark.asyncio
