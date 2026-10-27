@@ -488,11 +488,8 @@ async def _start_background(path: Path, timeout: float) -> int:
     ready = Path(filename)
     ready.unlink()
     service_args = ["run-headless", "--config", str(path), "--ready-file", str(ready)]
-    if layout.host_kind == "pyinstaller":
-        argv = [str(layout.host_executable), *service_args]
-    else:
-        module = "product_bootstrap" if layout.host_kind == "native" else "puripuly_heart.main"
-        argv = [str(layout.python_executable), "-m", module, *service_args]
+    module = "product_bootstrap" if layout.host_kind == "native" else "puripuly_heart.main"
+    argv = [str(layout.python_executable), "-m", module, *service_args]
     options: dict[str, Any] = {
         "stdin": subprocess.DEVNULL,
         "stdout": subprocess.DEVNULL,

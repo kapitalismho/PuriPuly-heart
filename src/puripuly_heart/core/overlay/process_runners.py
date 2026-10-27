@@ -277,9 +277,6 @@ class DefaultOverlayProcessRunner:
 
 @dataclass(slots=True)
 class DesktopFletOverlayRunner:
-    frozen: bool | None = None
-    python_executable: Path | None = None
-    app_executable: Path | None = None
     module_name: str = "puripuly_heart.ui.desktop_overlay"
     task_factory: Any | None = None
 
@@ -305,22 +302,7 @@ class DesktopFletOverlayRunner:
     ) -> tuple[str, ...]:
         launcher = executable_path or self._launcher_executable()
         layout = current_runtime_layout()
-        if self.frozen is None and self.python_executable is None and self.app_executable is None:
-            if layout.host_kind == "source":
-                return (
-                    str(layout.python_executable),
-                    "-m",
-                    self.module_name,
-                    "--config",
-                    str(manifest_path),
-                )
-            return (
-                str(layout.host_executable),
-                "run-desktop-overlay",
-                "--config",
-                str(manifest_path),
-            )
-        if self._is_frozen():
+        if layout.host_kind == "native":
             return (str(launcher), "run-desktop-overlay", "--config", str(manifest_path))
         return (str(launcher), "-m", self.module_name, "--config", str(manifest_path))
 
@@ -342,13 +324,8 @@ class DesktopFletOverlayRunner:
         )
         return _AsyncioOverlayProcess(process=process, task_factory=self.task_factory)
 
-    def _is_frozen(self) -> bool:
-        if self.frozen is not None:
-            return self.frozen
-        return current_runtime_layout().host_kind != "source"
-
     def _launcher_executable(self) -> Path:
         layout = current_runtime_layout()
-        if self._is_frozen():
-            return self.app_executable or layout.host_executable
-        return self.python_executable or layout.python_executable
+        if layout.host_kind == "native":
+            return layout.host_executable
+        return layout.python_executable

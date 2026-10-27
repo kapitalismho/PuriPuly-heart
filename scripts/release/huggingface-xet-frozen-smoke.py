@@ -44,6 +44,7 @@ def _frozen_worker_command(executable: Path):
     def build(_request, request_path: Path, event_path: Path):
         return [
             str(executable),
+            "--headless",
             "hf-xet-download-worker",
             "--request-file",
             str(request_path),

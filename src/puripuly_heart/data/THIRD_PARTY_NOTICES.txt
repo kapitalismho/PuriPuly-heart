@@ -13,7 +13,7 @@ This notice file focuses on components that are bundled, shipped, installed, or 
 
 The technical metadata review performed for the AGPL transition found no obvious license blocker to licensing PuriPuly Heart's own code under AGPL-3.0-or-later. This is a repository metadata review, not legal advice.
 
-Notable shipped/runtime license families include MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, LGPL-2.1-or-later, SIL Open Font License 1.1, CC-BY-4.0, and GPL-2.0-or-later WITH Bootloader-exception for PyInstaller-built binaries.
+Notable shipped/runtime license families include MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, LGPL-2.1-or-later, SIL Open Font License 1.1, and CC-BY-4.0.
 
 Runtime/bundled notice-sensitive components:
 - huggingface-hub 1.26.0: Apache-2.0.
@@ -32,7 +32,6 @@ Runtime/bundled notice-sensitive components:
 - Silero VAD ONNX model: MIT.
 - Smart Turn v3.2 CPU ONNX model: BSD-2-Clause.
 - Bundled fonts: SIL Open Font License 1.1.
-- PyInstaller bootloader/runtime packaging: GPL-2.0-or-later WITH Bootloader-exception.
 
 Broker runtime direct dependency:
 - Hono: MIT.
@@ -51,7 +50,6 @@ For package-managed dependencies, the authoritative license texts are distribute
 - LGPL-2.1-or-later: source-tree copy at src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt; installed release copy in third_party\soxr\ next to the LGPL source bundle.
 - SIL Open Font License 1.1: included below for bundled fonts.
 - CC-BY-4.0: https://creativecommons.org/licenses/by/4.0/legalcode.en
-- PyInstaller bootloader exception: https://github.com/pyinstaller/pyinstaller/blob/develop/COPYING.txt
 
 ----
 

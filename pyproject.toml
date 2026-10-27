@@ -61,7 +61,6 @@ build = [
   "cmake>=3.31",
   "flet-cli==1.0.0",
   "libclang>=18.1",
-  "pyinstaller==6.21.0",
   "pefile==2024.8.26",
   "scikit-build-core>=0.10",
   "nanobind>=2",

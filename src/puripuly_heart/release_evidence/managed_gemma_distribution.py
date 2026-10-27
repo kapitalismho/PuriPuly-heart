@@ -480,46 +480,9 @@ def prepare_runtime(repo_root: Path, cache_dir: Path, output_root: Path) -> dict
             shutil.rmtree(temporary_root)
 
 
-def pyinstaller_data_entries(repo_root: Path) -> list[tuple[str, str]]:
-    repo_root = repo_root.resolve()
-    runtime_root = repo_root / "build" / LLAMA_CPP_SOURCE_RELATIVE_DIR
-    manifest_path = runtime_root / "manifest.json"
-    manifest = _validate_runtime_tree(manifest_path, runtime_root)
-    provenance = _validate_provenance(repo_root)
-    entries: list[tuple[str, str]] = []
-    archives = manifest["archives"]
-    for backend, entry in archives.items():
-        destination = PACKAGED_RUNTIME_RELATIVE_DIR / backend
-        for record in entry["files"]:
-            entries.append((str(runtime_root / backend / record["path"]), destination.as_posix()))
-    entries.append((str(manifest_path), PACKAGED_RUNTIME_RELATIVE_DIR.as_posix()))
-    for name in provenance:
-        entries.append(
-            (str(repo_root / PROVENANCE_RELATIVE_DIR / name), PROVENANCE_RELATIVE_DIR.as_posix())
-        )
-    return entries
-
-
 def validate_runtime_root(runtime_root: Path) -> dict[str, object]:
     runtime_root = runtime_root.resolve()
     return _validate_runtime_tree(runtime_root / "manifest.json", runtime_root)
-
-
-def normalize_pyinstaller_binaries(binaries: list[tuple[str, str, str]], repo_root: Path) -> None:
-    prepared_root = (repo_root.resolve() / "build" / LLAMA_CPP_SOURCE_RELATIVE_DIR).resolve()
-    packaged_prefix = f"{PACKAGED_RUNTIME_RELATIVE_DIR.as_posix().casefold()}/"
-    retained = []
-    for binary in binaries:
-        destination, source, _typecode = binary
-        normalized_destination = destination.replace("\\", "/").casefold()
-        try:
-            Path(source).resolve().relative_to(prepared_root)
-        except ValueError:
-            retained.append(binary)
-            continue
-        if normalized_destination.startswith(packaged_prefix):
-            retained.append(binary)
-    binaries[:] = retained
 
 
 def verify_package(package_root: Path, *, launch: bool = False) -> dict[str, object]:

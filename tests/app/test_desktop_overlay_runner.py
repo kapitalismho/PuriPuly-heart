@@ -31,36 +31,20 @@ def _overlay_manifest(**overrides: object) -> OverlayLaunchManifest:
     return OverlayLaunchManifest(**values)  # type: ignore[arg-type]
 
 
-def test_desktop_runner_source_command_uses_current_python_module(tmp_path: Path) -> None:
+def test_desktop_runner_source_command_uses_current_python_module(
+    tmp_path: Path, monkeypatch
+) -> None:
     manifest_path = tmp_path / "overlay-manifest.json"
     python_path = tmp_path / "python.exe"
-    runner = process_module.DesktopFletOverlayRunner(
-        frozen=False,
-        python_executable=python_path,
-    )
+    monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
+    monkeypatch.setattr(sys, "executable", str(python_path))
+    runner = process_module.DesktopFletOverlayRunner()
 
     assert runner.prepare(_overlay_manifest()) == python_path
     assert runner.build_command(manifest_path) == (
         str(python_path),
         "-m",
         "puripuly_heart.ui.desktop_overlay",
-        "--config",
-        str(manifest_path),
-    )
-
-
-def test_desktop_runner_frozen_command_uses_app_executable_subcommand(tmp_path: Path) -> None:
-    manifest_path = tmp_path / "overlay-manifest.json"
-    app_executable = tmp_path / "PuriPulyHeart.exe"
-    runner = process_module.DesktopFletOverlayRunner(
-        frozen=True,
-        app_executable=app_executable,
-    )
-
-    assert runner.prepare(_overlay_manifest()) == app_executable
-    assert runner.build_command(manifest_path) == (
-        str(app_executable),
-        "run-desktop-overlay",
         "--config",
         str(manifest_path),
     )
@@ -129,12 +113,9 @@ def test_desktop_runner_command_does_not_resolve_native_overlay_or_openvr_checks
         fail_stale_build_check,
     )
 
-    runner = process_module.DesktopFletOverlayRunner(
-        frozen=False,
-        python_executable=tmp_path / "python.exe",
-    )
+    runner = process_module.DesktopFletOverlayRunner()
 
-    assert runner.prepare(_overlay_manifest()) == tmp_path / "python.exe"
+    assert runner.prepare(_overlay_manifest()) == Path(sys.executable).resolve()
     assert "PuriPulyHeartOverlay.exe" not in " ".join(
         runner.build_command(tmp_path / "overlay-manifest.json")
     )
@@ -153,10 +134,7 @@ async def test_desktop_runner_uses_background_priority_on_windows(
         return type("FakeProcess", (), {"stdout": None, "stderr": None})()
 
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_spawn)
-    runner = process_module.DesktopFletOverlayRunner(
-        frozen=False,
-        python_executable=tmp_path / "python.exe",
-    )
+    runner = process_module.DesktopFletOverlayRunner()
 
     await runner.spawn(tmp_path / "python.exe", tmp_path / "overlay-manifest.json")
 

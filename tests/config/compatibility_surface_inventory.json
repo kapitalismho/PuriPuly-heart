@@ -173,10 +173,10 @@
       "classification": "public_compatibility_preserve",
       "source_of_truth_refs": [
         "installer.iss",
-        "scripts/ci/build-release-artifacts.ps1"
+        "scripts/ci/build-native-release-artifacts.ps1"
       ],
       "fixture_or_guard_refs": [
-        "tests/config/test_public_compatibility_surfaces.py::test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract"
+        "tests/config/test_public_compatibility_surfaces.py::test_installer_identity_snapshot_matches_inno_contract"
       ],
       "detail_owner_work_ref": "freeze-overlay-native-and-installer-fixtures"
     },

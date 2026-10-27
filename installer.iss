@@ -1,5 +1,4 @@
 ; Inno Setup Script for PuriPuly <3
-; Compile with: ISCC installer.iss
 
 #define MyAppName "PuriPuly <3"
 #define ProductionAppId "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
@@ -39,28 +38,21 @@
 #define MyOverlayExeName "PuriPulyHeartOverlay.exe"
 #define MyGpuWorkerExeName "PuriPulyHeartGpuWorker.exe"
 #ifndef MyPackagedAppDir
-  #define MyPackagedAppDir "dist\PuriPulyHeart"
+  #error Pass MyPackagedAppDir from the native release builder.
 #endif
 #ifndef MyStagedOverlayDir
-  #define MyStagedOverlayDir "build\overlay"
+  #define MyStagedOverlayDir MyPackagedAppDir
 #endif
-#ifdef NativeExperimental
-  #if VER < EncodeVer(7, 1, 0)
-    #error Native packaging requires Inno Setup 7.1.0 or newer for extended-length bytecode paths.
-  #endif
-  #define PackagedApplicationRoot "app\"
-  #define PackagedSoxrRoot "site-packages\soxr"
-  #define AppShortcutIdentity 'AppUserModelID: "com.salee.PuriPulyHeart";'
-  #ifndef NativeCleanupInclude
-    #define NativeCleanupInclude MyPackagedAppDir + "\..\native-installer-cleanup.iss"
-  #endif
-  #if !FileExists(NativeCleanupInclude)
-    #error NativeExperimental requires the generated native cleanup include. Generate it from the official legacy ownership manifest and final native artifact manifest.
-  #endif
-#else
-  #define PackagedApplicationRoot ""
-  #define PackagedSoxrRoot "soxr"
-  #define AppShortcutIdentity ""
+#if VER < EncodeVer(7, 1, 0)
+  #error Native packaging requires Inno Setup 7.1.0 or newer for extended-length bytecode paths.
+#endif
+#define PackagedApplicationRoot "app\"
+#define AppShortcutIdentity 'AppUserModelID: "com.salee.PuriPulyHeart";'
+#ifndef NativeCleanupInclude
+  #define NativeCleanupInclude MyPackagedAppDir + "\..\native-installer-cleanup.iss"
+#endif
+#if !FileExists(NativeCleanupInclude)
+  #error Native packaging requires the generated native cleanup include. Generate it from the official legacy ownership manifest and final native artifact manifest.
 #endif
 #define AppIconRelativePath PackagedApplicationRoot + "puripuly_heart\data\icons\icon.ico"
 #define NotoCjkFontRelativePath PackagedApplicationRoot + "puripuly_heart\data\fonts\NotoSansCJK-Medium.ttc"
@@ -201,20 +193,14 @@ Source: "{#InstallerPrivacyDir}\ko.txt"; Flags: dontcopy noencryption
 Source: "{#InstallerPrivacyDir}\ja.txt"; Flags: dontcopy noencryption
 Source: "{#InstallerPrivacyDir}\zh-CN.txt"; Flags: dontcopy noencryption
 Source: "{#InstallerPrivacyDir}\zh-TW.txt"; Flags: dontcopy noencryption
-#ifdef NativeExperimental
 Source: "installer\native-cleanup.ps1"; Flags: dontcopy noencryption
-#endif
 Source: "{#MyPackagedAppDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyPackagedAppDir}\{#MyCliExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyStagedOverlayDir}\{#MyOverlayExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyPackagedAppDir}\{#MyGpuWorkerExeName}"; DestDir: "{app}"; Flags: ignoreversion
-; Vendored OpenVR runtime DLL comes from dist\PuriPulyHeart\openvr_api.dll in the packaged tree built by build.spec.
 ; Installer build/install never resolves SteamVR paths for openvr_api.dll.
 ; Bundled CJK font is staged at {#MyPackagedAppDir}\{#NotoCjkFontRelativePath}; the recursive packaged-tree copy installs it to {app}\{#NotoCjkFontRelativePath}.
 Source: "{#MyPackagedAppDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "{#MyAppExeName},{#MyCliExeName},{#MyOverlayExeName},{#MyGpuWorkerExeName}"
-#ifdef ProcessCaptureSmokeArtifactRoot
-Source: "{#ProcessCaptureSmokeArtifactRoot}\*"; DestDir: "{app}\process-capture-smoke"; Flags: ignoreversion recursesubdirs createallsubdirs
-#endif
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
@@ -223,13 +209,6 @@ Name: "{group}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; IconFilena
 Name: "{group}\{cm:UninstallProgram,{#MyAppGroupName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#AppIconRelativePath}"; Tasks: desktopicon; {#AppShortcutIdentity}
 Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#AppIconRelativePath}"; Tasks: quicklaunchicon; {#AppShortcutIdentity}
-#endif
-
-#ifndef NativeExperimental
-[InstallDelete]
-; Remove stale legacy soxr runtime names before laying down the current packaged tree.
-Type: files; Name: "{app}\soxr.dll"
-Type: files; Name: "{app}\{#PackagedSoxrRoot}\libsoxr.dll"
 #endif
 
 [UninstallDelete]
@@ -266,9 +245,7 @@ const
   ParakeetJapaneseDownloadSize = 655571161;
   LocalSttDiskSpaceMargin = 67108864;
 
-#ifdef NativeExperimental
 #include "installer\native-cleanup.iss"
-#endif
 
 function DirectoryLooksLikeRepositoryCheckout(Path: String): Boolean;
 var
@@ -1438,9 +1415,7 @@ begin
   if ResolveInstallerTelemetryConfigPath() <> '' then begin
     Parameters := '--config "' + ResolveInstallerTelemetryConfigPath() + '" ' + Parameters;
   end;
-#ifdef NativeExperimental
   Parameters := '--headless ' + Parameters;
-#endif
   if not ExecAsOriginalUser(
     ExpandConstant('{app}\{#MyAppExeName}'),
     Parameters,
@@ -1457,9 +1432,7 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then begin
     PersistTelemetryPreference();
-#ifdef NativeExperimental
     CompleteNativeLegacyCleanup();
-#endif
   end;
 end;
 

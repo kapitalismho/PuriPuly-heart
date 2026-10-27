@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import shutil
-import sys
 import types
 from pathlib import Path
 
@@ -214,11 +213,9 @@ def test_about_helper_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
     assert about_module._get_profile_image_path() == ""
 
 
-@pytest.mark.parametrize("host_kind", ("native", "pyinstaller"))
 def test_about_resources_resolve_real_files_outside_module_archive(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    host_kind: str,
 ) -> None:
     resource_root = tmp_path / "relocated app 한글"
     data_root = resource_root / "puripuly_heart" / "data"
@@ -231,12 +228,7 @@ def test_about_resources_resolve_real_files_outside_module_archive(
         "__file__",
         str(resource_root / "python.zip" / "puripuly_heart" / "ui" / "views" / "about.pyc"),
     )
-    if host_kind == "native":
-        monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(resource_root))
-    else:
-        monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
-        monkeypatch.setattr(sys, "frozen", True, raising=False)
-        monkeypatch.setattr(sys, "_MEIPASS", str(resource_root), raising=False)
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(resource_root))
 
     assert about_module._load_third_party_notices() == (
         SOURCE_ROOT / "data" / "THIRD_PARTY_NOTICES.txt"

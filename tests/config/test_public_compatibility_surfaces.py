@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import sys
 from collections.abc import Iterator
 from dataclasses import fields
 from pathlib import Path
@@ -226,12 +227,6 @@ def _inno_define_literals(script: str) -> dict[str, str]:
     quoted = re.findall(r'^\s*#define\s+([A-Za-z0-9_]+)\s+"([^"]*)"', script, re.M)
     numeric = re.findall(r"^\s*#define\s+([A-Za-z0-9_]+)\s+(\d+)\s*$", script, re.M)
     return dict([*quoted, *numeric])
-
-
-def _powershell_string_variable(script: str, variable_name: str) -> str:
-    match = re.search(rf'^\s*\${re.escape(variable_name)}\s*=\s+"([^"]*)"', script, re.M)
-    assert match is not None, variable_name
-    return match.group(1)
 
 
 def _test_function_names(path: Path) -> set[str]:
@@ -664,8 +659,7 @@ def test_guard_coverage_includes_overlay_python_and_installer_freeze_refs() -> N
     )
     assert (
         "tests/config/test_public_compatibility_surfaces.py::"
-        "test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract"
-        in coverage["packaging"]
+        "test_installer_identity_snapshot_matches_inno_contract" in coverage["packaging"]
     )
 
 
@@ -883,26 +877,15 @@ async def test_overlay_startup_contract_snapshot_matches_python_runners_and_mani
     startup = _load_snapshot()["overlay"]["startup_contract"]
     manifest_path = tmp_path / "overlay-manifest.json"
     python_executable = tmp_path / "python.exe"
-    app_executable = tmp_path / "PuriPulyHeart.exe"
     overlay_executable = tmp_path / "PuriPulyHeartOverlay.exe"
 
-    source_runner = overlay_process_module.DesktopFletOverlayRunner(
-        frozen=False,
-        python_executable=python_executable,
-    )
-    frozen_runner = overlay_process_module.DesktopFletOverlayRunner(
-        frozen=True,
-        app_executable=app_executable,
-    )
+    monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
+    monkeypatch.setattr(sys, "executable", str(python_executable))
+    source_runner = overlay_process_module.DesktopFletOverlayRunner()
 
     assert source_runner.build_command(manifest_path) == _render_command_template(
         startup["desktop_source_runner_command"],
         python_executable=str(python_executable),
-        manifest_path=str(manifest_path),
-    )
-    assert frozen_runner.build_command(manifest_path) == _render_command_template(
-        startup["desktop_frozen_runner_command"],
-        app_executable=str(app_executable),
         manifest_path=str(manifest_path),
     )
 
@@ -984,12 +967,9 @@ async def test_overlay_startup_contract_snapshot_matches_python_runners_and_mani
     ]
 
 
-def test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract() -> None:
+def test_installer_identity_snapshot_matches_inno_contract() -> None:
     snapshot = _load_snapshot()["installer_identity"]
     installer_script = (REPO_ROOT / "installer.iss").read_text(encoding="utf-8")
-    release_script = (REPO_ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(
-        encoding="utf-8"
-    )
     defines = _inno_define_literals(installer_script)
 
     for name, value in snapshot["defines"].items():
@@ -998,14 +978,6 @@ def test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract() -> 
         assert setup_line in installer_script
 
     assert defines["CanonicalSettingsVersion"] == str(VNEXT_SETTINGS_SCHEMA_VERSION)
-
-    assert snapshot["production_installer_build"] in release_script
-    assert (
-        _powershell_string_variable(release_script, "InstallerTestAppId")
-        == snapshot["smoke_alternate_app_id"]
-    )
-    for guard_line in snapshot["smoke_guard_lines"]:
-        assert guard_line in release_script
 
 
 def test_prompt_loader_prefers_named_files_then_defaults(
