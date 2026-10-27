@@ -8,6 +8,56 @@ import pytest
 from puripuly_heart.cli import main as cli
 
 
+@pytest.mark.parametrize("native", [False, True], ids=["source", "native"])
+def test_background_start_uses_current_host_and_matching_readiness(
+    tmp_path, monkeypatch, capsys, native
+):
+    import sys
+    from pathlib import Path
+
+    from puripuly_heart.core import control_instance
+
+    root = tmp_path / "설치 with spaces"
+    root.mkdir()
+    if native:
+        monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(root / "app"))
+        monkeypatch.setenv("PURIPULY_HEART_NATIVE_RUNTIME_ROOT", str(root))
+        monkeypatch.setenv("PURIPULY_HEART_NATIVE_PYTHON_EXECUTABLE", str(root / "python.exe"))
+        monkeypatch.setenv("PURIPULY_HEART_NATIVE_HOST_EXECUTABLE", str(root / "PuriPulyHeart.exe"))
+    else:
+        monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
+    config = tmp_path / "설정 with spaces.json"
+    calls = []
+    record = SimpleNamespace(instance_id="matching-instance")
+    discovered = iter((None, record))
+    monkeypatch.setattr(control_instance, "discover", lambda _path: next(discovered))
+
+    def launch(command, **options):
+        calls.append((command, options))
+        ready = Path(command[command.index("--ready-file") + 1])
+        ready.write_text(
+            json.dumps({"state": "ready", "instance_id": record.instance_id}), encoding="utf-8"
+        )
+        return SimpleNamespace(pid=1234)
+
+    monkeypatch.setattr(cli.subprocess, "Popen", launch)
+    assert cli.main(["--config", str(config), "app", "start", "--background"]) == 0
+    command, options = calls[0]
+    assert command[:3] == [
+        str(root / "python.exe") if native else str(Path(sys.executable).resolve()),
+        "-m",
+        "product_bootstrap" if native else "puripuly_heart.main",
+    ]
+    assert command[3:6] == ["run-headless", "--config", str(config)]
+    assert not Path(command[-1]).exists()
+    if native:
+        assert options["env"]["PURIPULY_HEART_NATIVE_RUNTIME_ROOT"] == str(root)
+        assert options["env"]["PYTHONNOUSERSITE"] == "1"
+    else:
+        assert "env" not in options
+    assert json.loads(capsys.readouterr().out)["instance_id"] == record.instance_id
+
+
 def test_oauth_without_browser_reports_matching_challenge_and_unfinished_operation(
     monkeypatch, capsys
 ):
@@ -94,6 +144,26 @@ def test_operation_wait_preserves_receipt_and_reports_exit(
     output = capsys.readouterr()
     assert output.err == ""
     assert json.loads(output.out) == {"output_version": 1, **receipt}
+
+
+@pytest.mark.parametrize("status", ["accepted", "running", "unknown"])
+def test_operation_wait_rejects_invalid_terminal_status(monkeypatch, capsys, status):
+    monkeypatch.setattr(cli, "_instance", lambda _path: SimpleNamespace(instance_id="session"))
+
+    async def fake_request(_record, method, arguments=None, *, timeout):
+        return {"status": status, "terminal": True, "operation_id": "operation"}
+
+    monkeypatch.setattr(cli, "request", fake_request)
+
+    assert cli.main(["operation", "wait", "operation"]) == 3
+    output = capsys.readouterr()
+    assert json.loads(output.out) == {
+        "output_version": 1,
+        "status": status,
+        "terminal": True,
+        "operation_id": "operation",
+    }
+    assert json.loads(output.err)["error"]["code"] == "malformed_response"
 
 
 @pytest.mark.parametrize("no_wait", [False, True], ids=["wait", "no-wait"])

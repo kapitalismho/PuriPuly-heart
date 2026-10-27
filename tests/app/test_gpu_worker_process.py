@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 
 import pytest
-from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
 
 import puripuly_heart.app.adapters.gpu_worker_process as gpu_worker_process_module
 from puripuly_heart.app.adapters.gpu_worker_process import (
@@ -18,6 +17,7 @@ from puripuly_heart.app.ports.gpu_worker import (
     GpuWorkerRequestError,
 )
 from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+from puripuly_heart.core.local_asr.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
 from puripuly_heart.core.runtime.gpu_asr import GpuASRRuntimeState, SharedGpuASRRuntime
 from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 

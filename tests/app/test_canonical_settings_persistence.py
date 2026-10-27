@@ -9,13 +9,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.app.services.provider_settings import (
-    ProviderSettingsOwner,
-    provider_verification_context,
-)
-from puripuly_heart.app.services.provider_verification_binding import (
-    ProviderVerificationBindingOwner,
-)
 
 from puripuly_heart.app.adapters import (
     settings_vnext_canonical_persistence as adapter_module,
@@ -32,6 +25,13 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
     SettingsOwner,
     compose_settings_owner,
     materialize_canonical_translation_settings,
+)
+from puripuly_heart.app.services.provider.provider_settings import (
+    ProviderSettingsOwner,
+    provider_verification_context,
+)
+from puripuly_heart.app.services.provider.provider_verification_binding import (
+    ProviderVerificationBindingOwner,
 )
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
@@ -445,7 +445,9 @@ def test_old_settings_without_openai_evidence_keep_existing_translation_history(
 async def test_openai_verification_is_bound_to_luna_and_invalidated_by_key_changes(
     tmp_path: Path,
 ) -> None:
-    from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
+    from puripuly_heart.app.services.settings.settings_application import (
+        settings_view_surface_snapshots,
+    )
 
     path = tmp_path / "settings.json"
     initial_key = "private-openai-credential"

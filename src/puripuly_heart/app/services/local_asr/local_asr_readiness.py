@@ -6,20 +6,20 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Literal
 
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     ProviderRuntimeChannelSnapshot,
 )
-from puripuly_heart.core.local_asr_provisioning import (
+from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRProvisioningPort,
     LocalASRProvisioningSnapshot,
 )
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LocalParakeetSherpaLoadError,
     LocalQwenSherpaLoadError,
     LocalSTTManifestInvalidError,
     LocalSTTModelMissingError,
 )
-from puripuly_heart.core.local_stt_catalog import LocalCPUAutoUnavailableError
+from puripuly_heart.core.local_asr.local_stt_catalog import LocalCPUAutoUnavailableError
 
 from .local_asr_cpu_repair import (
     LocalASRCpuRepairOwner,

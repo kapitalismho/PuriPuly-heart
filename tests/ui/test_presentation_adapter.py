@@ -3,9 +3,11 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
 
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.services.settings.settings_application import (
+    settings_view_surface_snapshots,
+)
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.ui.event_bridge import UIEventBridge
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter

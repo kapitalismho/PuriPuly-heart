@@ -199,17 +199,6 @@ class OverlaySink(Protocol):
 
 
 @dataclass(slots=True)
-class NullOverlaySink:
-    async def emit(self, event: OverlayEventUnion) -> OverlayApplicationReceipt:
-        return OverlayApplicationReceipt(
-            stage="application_accepted",
-            outcome="applied",
-            publication_id=event.event_id,
-            scene_revision=None,
-        )
-
-
-@dataclass(slots=True)
 class OverlayEventAdapter:
     clock: Clock = field(default_factory=SystemClock)
     _sequence_namespace: int = field(

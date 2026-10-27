@@ -7,7 +7,9 @@ import urllib.parse
 import urllib.request
 
 import pytest
-from puripuly_heart.core.discord_oauth_loopback import (
+
+from puripuly_heart.core.discord import discord_oauth_loopback as loopback
+from puripuly_heart.core.discord.discord_oauth_loopback import (
     DISCORD_OAUTH_LOOPBACK_PATH,
     DISCORD_OAUTH_LOOPBACK_PORTS,
     DiscordOAuthCallbackError,
@@ -18,8 +20,6 @@ from puripuly_heart.core.discord_oauth_loopback import (
     _send_success_callback_response,
     bind_first_available,
 )
-
-from puripuly_heart.core import discord_oauth_loopback as loopback
 
 
 def _callback_url(listener: object, **params: str) -> str:

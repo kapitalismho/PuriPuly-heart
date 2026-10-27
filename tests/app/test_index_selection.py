@@ -6,7 +6,6 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
 
 from puripuly_heart.app.ports.settings_repository import SettingsCommitRequest
 from puripuly_heart.app.services.canonical_settings_persistence import compose_settings_owner
@@ -22,6 +21,7 @@ from puripuly_heart.core.llm.index_translate import (
     IndexServiceUnavailableError,
 )
 from puripuly_heart.core.messages import TransactionResult
+from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 
 

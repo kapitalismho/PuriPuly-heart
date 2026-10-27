@@ -20,7 +20,6 @@ pub(crate) const DEFAULT_FONT_SIZE_PX: f32 = 132.0;
 pub(crate) const DEFAULT_AVERAGE_GLYPH_ADVANCE_PX: u32 =
     (DEFAULT_FONT_SIZE_PX * DEFAULT_AVERAGE_GLYPH_ADVANCE_RATIO) as u32;
 pub(crate) const SECONDARY_FONT_SCALE: f32 = 0.62;
-#[allow(dead_code)]
 pub(crate) const PRIMARY_SECONDARY_GAP_PX: f32 = 30.0;
 pub(crate) const TEXT_OUTLINE_OVERHANG_PX: f32 = 5.0;
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -679,13 +678,6 @@ impl TextStyleDescriptor {
     }
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum TextScriptBucket {
-    Latin,
-    Cjk,
-}
-
 #[cfg(windows)]
 #[derive(Debug, Clone)]
 pub(crate) struct ResolvedTextStyle {
@@ -735,11 +727,3 @@ pub(crate) fn contains_cjk(text: &str) -> bool {
     })
 }
 
-#[allow(dead_code)]
-pub(crate) fn text_script_bucket(text: &str) -> TextScriptBucket {
-    if contains_cjk(text) {
-        TextScriptBucket::Cjk
-    } else {
-        TextScriptBucket::Latin
-    }
-}

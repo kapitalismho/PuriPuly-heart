@@ -28,7 +28,6 @@ dependencies = [
   "onnxruntime==1.28.0",
   "google-genai>=2.21.0,<3.0.0",
   "elevenlabs>=2.60.0,<3.0.0",
-  "dashscope==1.26.4",
   "websockets==16.1.1",
   "deepgram-sdk>=5.3.4,<6.0.0",
   "sherpa-onnx==1.13.8",
@@ -57,13 +56,11 @@ dev = [
   "PyYAML>=6.0.3,<7",
   "ruff>=0.6.0",
   "black>=24.4.0",
-  "pre-commit>=3.7.0",
 ]
 build = [
   "cmake>=3.31",
   "flet-cli==1.0.0",
   "libclang>=18.1",
-  "pyinstaller==6.21.0",
   "pefile==2024.8.26",
   "scikit-build-core>=0.10",
   "nanobind>=2",

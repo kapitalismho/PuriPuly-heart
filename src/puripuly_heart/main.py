@@ -387,7 +387,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "hf-xet-download-worker":
-        from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
+        from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (
             run_huggingface_xet_worker,
         )
 

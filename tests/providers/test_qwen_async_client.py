@@ -4,18 +4,8 @@ import asyncio
 
 import pytest
 
-from puripuly_heart.providers.llm.qwen_async import HttpxQwenClient
-
-
-def test_httpx_client_normalizes_language_codes() -> None:
-    assert HttpxQwenClient._normalize_language_code("") == "auto"
-    assert HttpxQwenClient._normalize_language_code("auto") == "auto"
-    assert HttpxQwenClient._normalize_language_code("zh-CN") == "zh"
-    assert HttpxQwenClient._normalize_language_code("zh-Hant") == "zh_tw"
-    assert HttpxQwenClient._normalize_language_code("zh-TW") == "zh_tw"
-    assert HttpxQwenClient._normalize_language_code("ko-KR") == "ko"
-    assert HttpxQwenClient._normalize_language_code("en-US") == "en"
-    assert HttpxQwenClient._normalize_language_code("ja") == "ja"
+from puripuly_heart.providers.llm.error_details import LLMResponseError
+from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider, HttpxQwenClient
 
 
 class FakeResponse:
@@ -63,7 +53,7 @@ async def test_httpx_client_builds_correct_request(monkeypatch):
     client = HttpxQwenClient(api_key="test-key", model="qwen3.5-flash", base_url="https://example")
     result = await client.translate(
         text="hello",
-        system_prompt="SYSTEM",
+        system_prompt="Translate {source_language} to {target_language}",
         source_language="ko-KR",
         target_language="en",
         context='- "previous"',
@@ -84,7 +74,7 @@ async def test_httpx_client_builds_correct_request(monkeypatch):
     assert body["model"] == "qwen3.5-flash"
     assert body["enable_thinking"] is False
     assert body["messages"][0]["role"] == "system"
-    assert "SYSTEM" in body["messages"][0]["content"]
+    assert body["messages"][0]["content"] == "Translate ko-KR to en"
     assert body["messages"][1]["role"] == "user"
     assert "<context>" in body["messages"][1]["content"]
     assert "</context>" in body["messages"][1]["content"]
@@ -239,3 +229,76 @@ async def test_httpx_client_handles_cancellation(monkeypatch):
 
     with pytest.raises(asyncio.CancelledError):
         await task
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model", ["qwen3.5-plus", "qwen3.8-flash"])
+async def test_async_provider_translates_with_canonical_model(monkeypatch, model):
+    from uuid import uuid4
+
+    fake_client = FakeAsyncClient()
+    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
+    provider = AsyncQwenLLMProvider(
+        api_key="synthetic-key",
+        model=model,
+        base_url="https://example/compatible-mode/v1",
+    )
+    utterance_id = uuid4()
+    try:
+        result = await provider.translate(
+            utterance_id=utterance_id,
+            text="hello",
+            system_prompt="Translate {source_language} to {target_language}",
+            source_language="ko",
+            target_language="en",
+            context='- "previous"',
+        )
+        assert result.utterance_id == utterance_id
+        assert result.text == "OK"
+        assert fake_client.last_request["url"] == (
+            "https://example/compatible-mode/v1/chat/completions"
+        )
+        body = fake_client.last_request["json"]
+        assert body["model"] == "qwen3.8-flash"
+        assert body["enable_thinking"] is False
+        assert body["messages"] == [
+            {"role": "system", "content": "Translate ko to en"},
+            {
+                "role": "user",
+                "content": '<context>\n- "previous"\n</context>\n\n<input>\nhello\n</input>',
+            },
+        ]
+    finally:
+        await provider.close()
+    assert fake_client.closed
+
+
+@pytest.mark.asyncio
+async def test_async_client_rate_limit_preserves_safe_diagnostics(monkeypatch, caplog):
+    private_body = "synthetic-provider-private-body"
+
+    class RateLimitedResponse(FakeResponse):
+        status_code = 429
+        text = private_body
+
+    class RateLimitedClient(FakeAsyncClient):
+        async def post(self, url, **kwargs):
+            return RateLimitedResponse({"error": {"message": private_body}})
+
+    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: RateLimitedClient())
+    client = HttpxQwenClient(api_key="synthetic-key", model="qwen3.8-flash")
+    try:
+        with pytest.raises(LLMResponseError) as caught:
+            await client.translate(
+                text="hello",
+                system_prompt="Translate",
+                source_language="en",
+                target_language="ko",
+            )
+        assert caught.value.failure_diagnostics.status_code == 429
+        assert caught.value.failure_diagnostics.category == "rate_limit"
+        assert private_body not in str(caught.value)
+        assert private_body not in str(caught.value.failure_diagnostics)
+        assert private_body not in caplog.text
+    finally:
+        await client.close()

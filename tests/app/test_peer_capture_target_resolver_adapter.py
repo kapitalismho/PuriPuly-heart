@@ -4,10 +4,10 @@ import threading
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.app.adapters.peer_capture_target_resolver import (
+
+from puripuly_heart.app.adapters.peer_capture.peer_capture_target_resolver import (
     PeerCaptureTargetResolverAdapter,
 )
-
 from puripuly_heart.app.wiring import create_peer_capture_target_resolver_adapter
 from puripuly_heart.core.audio.process_identity import default_current_user_process_snapshots
 from puripuly_heart.core.peer_capture import (

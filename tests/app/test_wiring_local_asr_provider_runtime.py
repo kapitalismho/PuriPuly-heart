@@ -8,17 +8,18 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import numpy as np
-import puripuly_heart.app.wiring_local_asr_provider_runtime as runtime_wiring
 import pytest
-from puripuly_heart.app.adapters.self_capture_provider import SelfCaptureProviderAdapter
-from puripuly_heart.app.wiring_local_asr_provider_runtime import (
+
+import puripuly_heart.app.wiring.wiring_local_asr_provider_runtime as runtime_wiring
+from puripuly_heart.app.adapters.self_capture.self_capture_provider import (
+    SelfCaptureProviderAdapter,
+)
+from puripuly_heart.app.ports.gpu_worker import GpuWorkerRequestError
+from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
     SharedSTTProviderFactory,
     _recognition_retention_profile,
 )
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
-
-from puripuly_heart.app.ports.gpu_worker import GpuWorkerRequestError
 from puripuly_heart.app.wiring.wiring_stt_factory import build_peer_stt_provider_request
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.resolved import (
@@ -28,6 +29,7 @@ from puripuly_heart.config.resolved import (
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot, PeerAudioSegmentLedger
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.peer_capture import (
     PeerCaptureLanguageFacts,
     PeerCaptureSessionConfig,

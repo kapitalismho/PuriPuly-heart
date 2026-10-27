@@ -8,25 +8,25 @@ from puripuly_heart.app.ports.ui_models import (
     GpuDeviceOption,
     GpuNoticeAction,
 )
-from puripuly_heart.app.services.local_asr_diagnostics import (
+from puripuly_heart.app.services.local_asr.local_asr_diagnostics import (
     LocalASRDiagnosticsGpuEffect,
 )
-from puripuly_heart.app.services.local_asr_gpu_provisioning import (
+from puripuly_heart.app.services.local_asr.local_asr_gpu_provisioning import (
     LocalASRGpuProvisioningDiagnostic,
     LocalASRGpuProvisioningEffect,
     LocalASRGpuProvisioningOwner,
     LocalASRGpuProvisioningState,
 )
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     GpuWorkerDevice,
     LocalASRProviderRuntimePort,
     LocalASRProviderRuntimeSnapshot,
 )
-from puripuly_heart.core.local_asr_provisioning import (
+from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRProvisioningPort,
     LocalASRProvisioningSnapshot,
 )
-from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
+from puripuly_heart.core.local_asr.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
 
 

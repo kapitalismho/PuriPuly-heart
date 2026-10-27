@@ -60,7 +60,7 @@ async def test_peer_desktop_transcripts_are_routed_to_peer_runtime_and_never_sen
 
 
 @pytest.mark.asyncio
-async def test_peer_final_runs_owner_creates_ordered_children_for_language_runs() -> None:
+async def test_peer_translation_creates_ordered_children_for_language_runs() -> None:
     harness = compose_translation_test_harness(
         stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock(_now=10.0)
     )

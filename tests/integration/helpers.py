@@ -67,13 +67,6 @@ def require_env(name: str) -> str:
     return value
 
 
-def require_module(module: str, *, reason: str) -> None:
-    try:
-        __import__(module)
-    except ModuleNotFoundError as exc:  # pragma: no cover
-        raise RuntimeError(reason) from exc
-
-
 def require_optional_module(module: str, *, reason: str):
     try:
         return __import__(module)
@@ -228,14 +221,14 @@ def get_local_qwen_stt_model_dir() -> Path:
     model_dir = os.getenv("LOCAL_QWEN_STT_MODEL_DIR")
     if model_dir:
         return Path(model_dir)
-    from puripuly_heart.core.local_stt_assets import default_local_stt_model_dir
+    from puripuly_heart.core.local_asr.local_stt_assets import default_local_stt_model_dir
 
     return default_local_stt_model_dir()
 
 
 def require_local_qwen_model_assets(model_dir: str | Path | None = None) -> Path:
     resolved = Path(model_dir) if model_dir is not None else get_local_qwen_stt_model_dir()
-    from puripuly_heart.core.local_stt_assets import (
+    from puripuly_heart.core.local_asr.local_stt_assets import (
         LocalSTTManifestInvalidError,
         LocalSTTModelMissingError,
         validate_local_stt_runtime_ready,
@@ -249,7 +242,7 @@ def require_local_qwen_model_assets(model_dir: str | Path | None = None) -> Path
 
 
 def skip_if_local_qwen_runtime_unavailable(exc: BaseException) -> None:
-    from puripuly_heart.core.local_stt_assets import LocalQwenSherpaLoadError
+    from puripuly_heart.core.local_asr.local_stt_assets import LocalQwenSherpaLoadError
 
     if isinstance(exc, LocalQwenSherpaLoadError):
         pytest.skip("local Qwen Sherpa runtime is unavailable")

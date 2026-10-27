@@ -5,8 +5,6 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import AsyncIterator, Literal, Protocol, TypeVar, runtime_checkable
 
-import numpy as np
-
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import (
     AudioSegmentIdentity,
@@ -14,7 +12,6 @@ from puripuly_heart.core.audio.ownership import (
     SegmentTerminalOutcome,
 )
 from puripuly_heart.core.messages import ErrorDiagnostics
-from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
 from puripuly_heart.domain.recognition import (
@@ -353,19 +350,9 @@ class STTBackendSession(Protocol):
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]: ...
 
 
-@runtime_checkable
-class STTBackendFloat32Session(Protocol):
-    async def send_audio_f32(self, samples_f32: np.ndarray) -> None: ...
-
-
 class STTBackend(Protocol):
     async def open_session(
         self,
         *,
         projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
     ) -> STTBackendSession: ...
-
-
-@runtime_checkable
-class LocalASRReconfigurableBackend(Protocol):
-    async def reconfigure_session_options(self, options: LocalASRSessionOptions) -> None: ...

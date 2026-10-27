@@ -74,7 +74,7 @@ from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackPlan,
 )
 from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState
-from puripuly_heart.app.services.provider_runtime_apply import (
+from puripuly_heart.app.services.provider.provider_runtime_apply import (
     NoopRuntimeApply,
     OverlayOscOutputRuntimeApplyAdapter,
     ProviderRuntimeApplyAdapter,

@@ -4,19 +4,19 @@ import threading
 from dataclasses import replace
 
 import pytest
-from puripuly_heart.core.local_asr_provisioning import LocalASRInstallRequest
-from puripuly_heart.core.local_stt_assets import (
+
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRInstallRequest
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LOCAL_STT_MODEL_ID,
     load_local_stt_asset_manifest,
 )
-from puripuly_heart.core.local_stt_download_port import LocalSTTDownloadPortError
-from puripuly_heart.core.local_stt_runtime_installer import (
+from puripuly_heart.core.local_asr.local_stt_download_port import LocalSTTDownloadPortError
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     LocalSTTRuntimeInstallError,
     _source_plans,
     ensure_local_stt_installed,
 )
-
 from puripuly_heart.core.model_download_sources import HF_MIRROR_ENDPOINT
 from tests.core.runtime.test_local_asr_provisioning import (
     MutableProvisioningBackend,

@@ -14,30 +14,67 @@ from pathlib import Path
 
 import psutil
 import pytest
-from puripuly_heart.core.local_stt_assets import (
+
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LocalSTTAssetFile,
     LocalSTTAssetManifest,
     LocalSTTAssetSource,
 )
-from puripuly_heart.core.local_stt_download_port import (
+from puripuly_heart.core.local_asr.local_stt_download_port import (
     HuggingFaceDownloadProgress,
     HuggingFaceDownloadRequest,
     LocalSTTDownloadPortError,
 )
-from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
+from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (
     HuggingFaceXetDownloadAdapter,
     run_huggingface_xet_worker,
 )
-from puripuly_heart.core.local_stt_runtime_installer import (
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     LocalSTTRuntimeInstallCancelled,
     LocalSTTRuntimeInstallError,
     RuntimeLocalSTTStatusUpdate,
     ensure_local_stt_installed,
 )
-
 from puripuly_heart.core.network_diagnostics import safe_transport_fields
 from puripuly_heart.core.runtime import LocalSTTDownloadRuntime
+
+
+@pytest.mark.parametrize("native", [False, True], ids=["source", "native"])
+def test_worker_command_keeps_request_paths_and_current_host_protocol(
+    tmp_path, monkeypatch, native
+):
+    from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (
+        _default_worker_command,
+    )
+    from puripuly_heart.runtime_layout import current_runtime_layout
+
+    root = tmp_path / "설치 with spaces"
+    if native:
+        monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(root / "app"))
+        monkeypatch.setenv("PURIPULY_HEART_NATIVE_HOST_EXECUTABLE", str(root / "PuriPulyHeart.exe"))
+    else:
+        monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
+    request_path = tmp_path / "요청 with spaces.json"
+    event_path = tmp_path / "events with spaces.jsonl"
+    request = HuggingFaceDownloadRequest(
+        repo_id="fixture/repo",
+        revision="pinned",
+        remote_path="asset.bin",
+        local_dir=tmp_path,
+        expected_size_bytes=1,
+    )
+    command = list(_default_worker_command(request, request_path, event_path))
+    prefix = [str(current_runtime_layout().host_executable)]
+    prefix += ["--headless"] if native else ["-m", "puripuly_heart.main"]
+    assert command == [
+        *prefix,
+        "hf-xet-download-worker",
+        "--request-file",
+        str(request_path),
+        "--event-file",
+        str(event_path),
+    ]
 
 
 class _QuietHttpHandler(http.server.SimpleHTTPRequestHandler):

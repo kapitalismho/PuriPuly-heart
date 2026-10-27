@@ -4,13 +4,13 @@ import asyncio
 from dataclasses import dataclass, field
 
 import pytest
-from puripuly_heart.app.services.overlay_session_transition import (
+
+from puripuly_heart.app.services.overlay.overlay_session_transition import (
     OverlaySessionShutdownExecution,
     OverlaySessionStartExecution,
     OverlaySessionTransitionDiagnostic,
     OverlaySessionTransitionOwner,
 )
-
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 
 

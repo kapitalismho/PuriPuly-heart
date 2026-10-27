@@ -72,6 +72,7 @@ class OscControlIntegrationOwner:
         query_service: OscQueryServicePort | None = None,
         error_sink: Callable[[str], None] | None = None,
         resync_timeout_seconds: float = 1.5,
+        connection_changed: Callable[[], None] | None = None,
     ) -> None:
         self._receiver_owner = receiver_owner
         self._settings_provider = settings_provider
@@ -81,6 +82,7 @@ class OscControlIntegrationOwner:
         self._ui_state_provider = ui_state_provider
         self._ui_state_sink = ui_state_sink
         self._error_sink = error_sink
+        self._connection_changed = connection_changed
         self._mode: OscConnectionMode = "off"
         self._send_port = 9000
         self._receive_port = 9001
@@ -329,6 +331,7 @@ class OscControlIntegrationOwner:
         self._host = host
         self._mode = mode
         self._configured_connection = (host, mode, self._send_port, self._receive_port)
+        self._notify_connection_changed()
         resync_generation = self._begin_resync() if mode != "off" else None
         receiver_port = 0 if mode == "automatic" else self._receive_port
         await self._receiver_owner.configure_control(
@@ -364,6 +367,7 @@ class OscControlIntegrationOwner:
             self._run_automatic_query_start(resync_generation, generation),
             name=f"oscquery-automatic-start-{generation}",
         )
+        self._notify_connection_changed()
 
     async def _run_automatic_query_start(
         self,
@@ -411,6 +415,7 @@ class OscControlIntegrationOwner:
         finally:
             if self._automatic_query_task is asyncio.current_task():
                 self._automatic_query_task = None
+                self._notify_connection_changed()
 
     async def _cancel_automatic_query_start(self) -> None:
         task = self._automatic_query_task
@@ -432,6 +437,7 @@ class OscControlIntegrationOwner:
             return
         self.stop_ingress()
         self._closed = True
+        self._notify_connection_changed()
         await self.wait_automatic_query_start()
         await self._scope.close()
         await self.query_runtime.stop()
@@ -495,6 +501,12 @@ class OscControlIntegrationOwner:
         if not callable(setter):
             raise RuntimeError("VRChat OSC sender does not support destination changes")
         setter(host, int(port))
+        self._notify_connection_changed()
+
+    def _notify_connection_changed(self) -> None:
+        if self._connection_changed is not None:
+            with contextlib.suppress(Exception):
+                self._connection_changed()
 
     def _ensure_publisher(self) -> OscStatePublisher | None:
         sender = self._sender_provider()

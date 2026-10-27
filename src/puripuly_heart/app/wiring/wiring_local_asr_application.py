@@ -12,22 +12,22 @@ from puripuly_heart.app.adapters.local_asr_application import (
     LocalASRNoticeProjector,
     LocalASRNoticeSink,
 )
-from puripuly_heart.app.services.local_asr_cpu_repair import (
+from puripuly_heart.app.services.local_asr.local_asr_cpu_repair import (
     LocalASRCpuRepairOwner,
     LocalASRCpuRepairRequest,
 )
-from puripuly_heart.app.services.local_asr_readiness import LocalASRReadinessOwner
-from puripuly_heart.app.services.local_asr_selection import (
+from puripuly_heart.app.services.local_asr.local_asr_readiness import LocalASRReadinessOwner
+from puripuly_heart.app.services.local_asr.local_asr_selection import (
     local_asr_status_for_provider,
     required_local_asr_model_ids,
 )
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.config.provider_values import STTProviderName
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     ProviderRuntimeChannelSnapshot,
 )
-from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 
 from .wiring_composition import (

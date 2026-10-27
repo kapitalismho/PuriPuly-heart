@@ -3,13 +3,13 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from puripuly_heart.core.local_asr_provisioning import LocalASRInstallRequest
-from puripuly_heart.core.local_stt_assets import (
+
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRInstallRequest
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_STT_MODEL_ID,
     load_local_stt_asset_manifest,
 )
-from puripuly_heart.core.local_stt_runtime_installer import LocalSTTRuntimeInstallError
-
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import LocalSTTRuntimeInstallError
 from tests.core.runtime.test_local_asr_provisioning import (
     MutableProvisioningBackend,
     _all_states,

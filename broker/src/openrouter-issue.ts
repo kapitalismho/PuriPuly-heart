@@ -1,12 +1,14 @@
 import type { Context } from 'hono';
 
+import { isBase64Url, sha256Base64Url, verifyEd25519Signature } from './crypto';
+
 import type {
   InstallationRecord,
   OpenRouterEntitlementRecord,
 } from './persistence';
 import type { BrokerEnv } from './contract';
 import { deleteExpiredChallengePreflightInstallations } from './preflight-retention';
-import { nonEmptyString, stringValue, validatePublicInput } from './public-input';
+import { nonEmptyString, parseIsoDate, readJsonBody, stringValue, validatePublicInput } from './public-input';
 import {
   checkActiveIssuanceBrake,
   extractRequestNetworkMetadata,
@@ -71,9 +73,6 @@ class PostActivationMonitoringStateError extends Error {
     this.issueSuccessRecorded = input.issueSuccessRecorded;
   }
 }
-
-const STRICT_ISO_8601_TIMESTAMP =
-  /^(?<year>\d{4})-(?<month>0[1-9]|1[0-2])-(?<day>0[1-9]|[12]\d|3[01])T(?<hour>[01]\d|2[0-3]):(?<minute>[0-5]\d):(?<second>[0-5]\d)(?:\.(?<millisecond>\d{3}))?(?:(?<utc>Z)|(?<offsetSign>[+-])(?<offsetHour>[01]\d|2[0-3]):(?<offsetMinute>[0-5]\d))$/u;
 
 interface IssueRequestBody {
   installation_id?: unknown;
@@ -1024,37 +1023,6 @@ function isDiscordManagedPendingRelease(
   );
 }
 
-async function readJsonBody<T>(
-  c: Context<BrokerEnv>,
-): Promise<
-  | { ok: true; value: T }
-  | { ok: false; reason: 'invalid_json' | 'not_object' }
-> {
-  try {
-    const value = await c.req.json();
-    if (!isJsonObject(value)) {
-      return {
-        ok: false,
-        reason: 'not_object',
-      };
-    }
-
-    return {
-      ok: true,
-      value: value as T,
-    };
-  } catch {
-    return {
-      ok: false,
-      reason: 'invalid_json',
-    };
-  }
-}
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function invalidRequestBodyResponse(
   c: Context<BrokerEnv>,
   reason: 'invalid_json' | 'not_object',
@@ -1127,75 +1095,6 @@ function normalizeLegacyIssueError(
   }
 }
 
-function isBase64Url(value: string, byteLength?: number): boolean {
-  if (!/^[A-Za-z0-9_-]+$/u.test(value)) {
-    return false;
-  }
-
-  try {
-    const decoded = decodeBase64Url(value);
-    return byteLength === undefined || decoded.length === byteLength;
-  } catch {
-    return false;
-  }
-}
-
-function decodeBase64Url(value: string): Uint8Array {
-  const padding = (4 - (value.length % 4 || 4)) % 4;
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat(padding);
-  const binary = atob(normalized);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes;
-}
-
-function encodeBase64Url(bytes: Uint8Array): string {
-  const binary = Array.from(bytes, (value) => String.fromCharCode(value)).join('');
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/u, '');
-}
-
-function parseIsoDate(value: string): Date | null {
-  const match = STRICT_ISO_8601_TIMESTAMP.exec(value);
-  if (!match?.groups) {
-    return null;
-  }
-
-  const year = Number(match.groups.year);
-  const month = Number(match.groups.month);
-  const day = Number(match.groups.day);
-  const hour = Number(match.groups.hour);
-  const minute = Number(match.groups.minute);
-  const second = Number(match.groups.second);
-  const millisecond = Number(match.groups.millisecond ?? '0');
-  const offsetMinutes = match.groups.utc
-    ? 0
-    : (match.groups.offsetSign === '-' ? -1 : 1) *
-      (Number(match.groups.offsetHour) * 60 + Number(match.groups.offsetMinute));
-
-  const timestamp =
-    Date.UTC(year, month - 1, day, hour, minute, second, millisecond) -
-    offsetMinutes * 60_000;
-  const reconstructedLocalTime = new Date(timestamp + offsetMinutes * 60_000);
-
-  if (
-    reconstructedLocalTime.getUTCFullYear() !== year ||
-    reconstructedLocalTime.getUTCMonth() + 1 !== month ||
-    reconstructedLocalTime.getUTCDate() !== day ||
-    reconstructedLocalTime.getUTCHours() !== hour ||
-    reconstructedLocalTime.getUTCMinutes() !== minute ||
-    reconstructedLocalTime.getUTCSeconds() !== second ||
-    reconstructedLocalTime.getUTCMilliseconds() !== millisecond
-  ) {
-    return null;
-  }
-
-  return new Date(timestamp);
-}
-
 function buildCanonicalIssuePayload(input: {
   installation_id: string;
   device_public_key: string;
@@ -1209,53 +1108,6 @@ function buildCanonicalIssuePayload(input: {
   return new TextEncoder().encode(
     ISSUE_SIGNATURE_PAYLOAD_FIELDS.map((field) => String(input[field])).join('\n'),
   );
-}
-
-async function verifyEd25519Signature(input: {
-  devicePublicKey: string;
-  signature: string;
-  payload: Uint8Array;
-}): Promise<boolean> {
-  try {
-    const publicKey = await crypto.subtle.importKey(
-      'raw',
-      toArrayBuffer(decodeBase64Url(input.devicePublicKey)),
-      { name: 'Ed25519' },
-      false,
-      ['verify'],
-    );
-
-    return crypto.subtle.verify(
-      { name: 'Ed25519' },
-      publicKey,
-      toArrayBuffer(decodeBase64Url(input.signature)),
-      toArrayBuffer(input.payload),
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function sha256Base64Url(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    toArrayBuffer(new TextEncoder().encode(value)),
-  );
-
-  return encodeBase64Url(new Uint8Array(digest));
-}
-
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
-}
-
-function randomBase64Url(byteLength: number): string {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-  return encodeBase64Url(bytes);
 }
 
 function addMonthsUtc(value: Date, months: number): Date {

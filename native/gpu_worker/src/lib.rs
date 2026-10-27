@@ -192,7 +192,7 @@ async fn run_worker(manifest: LaunchManifest) -> Result<(), i32> {
                         ));
                     }
                     Request::Discover { request_id, .. } => {
-                        active = Some(spawn_discovery(request_id, Arc::clone(&engine)));
+                        active = Some(spawn_discovery(request_id));
                     }
                     Request::Activate { request_id, model_path, device_id, .. } => {
                         if manifest.mode != WorkerMode::Persistent {
@@ -292,11 +292,10 @@ async fn run_worker(manifest: LaunchManifest) -> Result<(), i32> {
     Ok(())
 }
 
-fn spawn_discovery(request_id: String, engine: Arc<Mutex<GpuEngine>>) -> ActiveOperation {
+fn spawn_discovery(request_id: String) -> ActiveOperation {
     let token = CancelToken::new();
     let task_request_id = request_id.clone();
     let handle = tokio::task::spawn_blocking(move || {
-        let _ = engine;
         OperationResult {
             request_id: task_request_id,
             payload: GpuEngine::discover()

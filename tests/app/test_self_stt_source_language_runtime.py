@@ -10,22 +10,22 @@ from urllib.parse import parse_qs, urlsplit
 
 import numpy as np
 import pytest
-from puripuly_heart.app.services.self_capture_application import (
+from websockets.asyncio.client import connect
+from websockets.asyncio.server import serve
+from websockets.exceptions import ConnectionClosed
+
+from puripuly_heart.app.services.capture.self_capture_application import (
     SelfCaptureApplicationOwner,
     SelfCaptureApplicationSettings,
 )
-from puripuly_heart.app.wiring_stt_factory import (
+from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import SharedSTTProviderFactory
+from puripuly_heart.app.wiring.wiring_stt_factory import (
     build_self_capture_session_config,
     build_self_capture_vad_signature,
     build_self_stt_provider_request,
     build_self_stt_provider_signature,
     build_self_stt_runtime_signature,
 )
-from websockets.asyncio.client import connect
-from websockets.asyncio.server import serve
-from websockets.exceptions import ConnectionClosed
-
-from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import SharedSTTProviderFactory
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core import network_clients

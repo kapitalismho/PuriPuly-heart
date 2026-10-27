@@ -23,28 +23,28 @@ from puripuly_heart.app.services.clipboard_auto_translation import (
 from puripuly_heart.app.services.github_star_prompt import GithubStarPromptOwner
 from puripuly_heart.app.services.gpu_runtime_interaction import GpuRuntimeInteractionOwner
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
-from puripuly_heart.app.services.overlay_application import (
+from puripuly_heart.app.services.overlay.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
 from puripuly_heart.app.services.provider.provider_runtime_apply import (
     ProviderRuntimeConvergenceError,
 )
-from puripuly_heart.app.wiring_audio_test import AudioTestRuntime
-from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
-from puripuly_heart.app.wiring_provider_runtime import (
+from puripuly_heart.app.wiring.wiring_audio_test import AudioTestRuntime
+from puripuly_heart.app.wiring.wiring_peer_application import PeerApplicationRuntime
+from puripuly_heart.app.wiring.wiring_provider_runtime import (
     ProviderRuntimeSignatures,
     project_translation_runtime_settings_from_vnext,
 )
-from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
-from puripuly_heart.app.wiring_stt_factory import (
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import RuntimePipelineHandle
+from puripuly_heart.app.wiring.wiring_stt_factory import (
     build_peer_capture_session_config_from_vnext,
     build_peer_stt_runtime_signature_from_vnext,
     build_self_capture_session_config_from_vnext,
     build_self_capture_vad_signature_from_vnext,
     build_self_stt_runtime_signature_from_vnext,
 )
-from puripuly_heart.app.wiring_translation_runtime_configuration import (
+from puripuly_heart.app.wiring.wiring_translation_runtime_configuration import (
     replace_translation_runtime_settings,
 )
 from puripuly_heart.config.prompts import resolve_system_prompt
@@ -56,7 +56,7 @@ from puripuly_heart.config.translation_values import (
     TranslationModel,
     provider_llm_for_translation,
 )
-from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigChange,
 )

@@ -6,20 +6,21 @@ from collections.abc import Callable
 from dataclasses import replace
 
 import pytest
-from puripuly_heart.app.services.local_asr_gpu_provisioning import (
+
+from puripuly_heart.app.services.local_asr.local_asr_gpu_provisioning import (
     LocalASRGpuProvisioningDiagnostic,
     LocalASRGpuProvisioningEffect,
     LocalASRGpuProvisioningOwner,
     LocalASRGpuProvisioningState,
 )
-from puripuly_heart.core.local_asr_provisioning import (
+from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRInstallRequest,
     LocalASRInstallResult,
     LocalASRModelProvisioningState,
     LocalASRProvisioningActivity,
     LocalASRProvisioningSnapshot,
 )
-from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
+from puripuly_heart.core.local_asr.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
 
 
 def _snapshot(

@@ -12,7 +12,7 @@ from puripuly_heart.app.ports.translation_runtime_configuration import (
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTranslationOwner
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner, PeerApplicationState
-from puripuly_heart.app.services.provider_runtime_apply import (
+from puripuly_heart.app.services.provider.provider_runtime_apply import (
     LlmProviderRebuildContext,
     LlmProviderRebuildOwner,
     ProviderRuntimeApplyPlan,
@@ -27,7 +27,7 @@ from puripuly_heart.config.translation_values import MANAGED_GEMMA_MODELS
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.chatgpt.session import ChatGptAccessTokenPort
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
-from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
@@ -69,13 +69,6 @@ from .wiring_translation_backend import create_translation_backend
 from .wiring_translation_runtime_configuration import (
     replace_translation_runtime_settings,
 )
-
-
-def _runtime_peer_translation_enabled(owner: object) -> bool:
-    flag = getattr(owner, "peer_translation_enabled", None)
-    if callable(flag):
-        return bool(flag())
-    return False
 
 
 def project_translation_runtime_settings(

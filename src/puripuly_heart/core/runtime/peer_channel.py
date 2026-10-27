@@ -114,13 +114,6 @@ class _PeerCaptureProviderHandoffFailed(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
-class PeerRuntimeDiagnostic:
-    reason: PeerRuntimeFailureReason
-    capture_kind: str
-    process_unavailable_reason: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class PeerRuntimeConfig:
     backend: ResolvedSTTConfig
     output_device: str

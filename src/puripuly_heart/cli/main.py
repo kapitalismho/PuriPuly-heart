@@ -16,18 +16,6 @@ from typing import Any
 
 from puripuly_heart.cli.transport import ControlTransportError, follow, request
 
-TERMINAL = frozenset(
-    {
-        "applied",
-        "degraded",
-        "rejected",
-        "persistence_failed",
-        "failed",
-        "action_required",
-        "cancelled",
-        "interrupted",
-    }
-)
 EXIT_CODES = {
     "applied": 0,
     "degraded": 4,
@@ -481,7 +469,7 @@ def _status_code(result: dict[str, Any], *, waiting: bool) -> int:
         if status == "action_required":
             return EXIT_CODES[status]
         return 0 if not waiting and status in ("accepted", "running") else 7
-    if status in TERMINAL:
+    if status in EXIT_CODES:
         return EXIT_CODES[status]
     raise ControlTransportError("malformed_response", "Terminal operation has invalid status")
 
@@ -500,11 +488,8 @@ async def _start_background(path: Path, timeout: float) -> int:
     ready = Path(filename)
     ready.unlink()
     service_args = ["run-headless", "--config", str(path), "--ready-file", str(ready)]
-    if layout.host_kind == "pyinstaller":
-        argv = [str(layout.host_executable), *service_args]
-    else:
-        module = "product_bootstrap" if layout.host_kind == "native" else "puripuly_heart.main"
-        argv = [str(layout.python_executable), "-m", module, *service_args]
+    module = "product_bootstrap" if layout.host_kind == "native" else "puripuly_heart.main"
+    argv = [str(layout.python_executable), "-m", module, *service_args]
     options: dict[str, Any] = {
         "stdin": subprocess.DEVNULL,
         "stdout": subprocess.DEVNULL,

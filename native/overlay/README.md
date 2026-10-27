@@ -79,4 +79,5 @@ For behavior, protocol, or startup changes, complete Rust checks, a Windows rele
 | Retry ownership and execution evidence | [Retry episodes](src/retry_episode.rs), [frame cycle](src/frame_cycle.rs), [diagnostics](src/runtime_diagnostics.rs) |
 | Rendering, fitting, and spatial placement | [Renderer](src/renderer/), [spatial policy](src/spatial_policy.rs), [OpenVR](src/openvr.rs) |
 | Desktop renderer | [Desktop overlay](../../src/puripuly_heart/ui/desktop_overlay.py) |
+| Windows executable version resources | [Shared metadata generator](../windows_version.rs), [overlay build](build.rs), [GPU worker build](../gpu_worker/build.rs) |
 | Native behavior and integration selection | [Rust tests](tests/), [CI workflow](../../.github/workflows/pr-ci.yml) |

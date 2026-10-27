@@ -1,3 +1,5 @@
+import { encodeBase64Url } from './crypto';
+
 export const DISCORD_AUTHORIZE_URL = 'https://discord.com/oauth2/authorize';
 export const DISCORD_TOKEN_URL = 'https://discord.com/api/oauth2/token';
 export const DISCORD_USER_URL = 'https://discord.com/api/users/@me';
@@ -269,32 +271,4 @@ export function deriveDiscordAccountCreatedAt(discordUserId: string): string {
   }
 
   return createdAt.toISOString();
-}
-
-export async function deriveDiscordUserRef(input: {
-  secret: string;
-  discordUserId: string;
-}): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    textEncoder.encode(input.secret),
-    {
-      name: 'HMAC',
-      hash: 'SHA-256',
-    },
-    false,
-    ['sign'],
-  );
-  const signature = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    textEncoder.encode(input.discordUserId),
-  );
-
-  return encodeBase64Url(new Uint8Array(signature));
-}
-
-function encodeBase64Url(bytes: Uint8Array): string {
-  const binary = Array.from(bytes, (value) => String.fromCharCode(value)).join('');
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/u, '');
 }

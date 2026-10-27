@@ -193,36 +193,6 @@ impl CaptionLayoutPolicy {
         .into()
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn layout_cache_key_for_block(
-        &self,
-        block: &CaptionBlock,
-        surface_width_px: u32,
-        presentation: &CaptionPresentation,
-    ) -> LayoutCacheKey {
-        let resolver = FontResolver::default();
-        let primary_style = style_descriptor_for_text(
-            &resolver,
-            block.primary_language.as_deref(),
-            &block.primary_text,
-        );
-        let secondary_style = style_descriptor_for_text(
-            &resolver,
-            block.secondary_language.as_deref(),
-            &block.secondary_text,
-        );
-        layout_cache_key_for_block(
-            block,
-            self.content_width_px(surface_width_px),
-            presentation.text_scale.max(0.1),
-            primary_style.style_key,
-            secondary_style.style_key,
-            block.fit_scales.unwrap_or_else(|| {
-                self.fit_scales_for_block(block, surface_width_px, presentation)
-            }),
-        )
-    }
-
     #[cfg(windows)]
     pub(crate) fn layout_cache_key_for_block_windows(
         &self,
@@ -251,21 +221,6 @@ impl CaptionLayoutPolicy {
     }
 
     pub fn resolve_blocks_for_presentation(
-        &self,
-        blocks: Vec<CaptionBlock>,
-        surface_width_px: u32,
-        surface_height_px: u32,
-        presentation: &CaptionPresentation,
-    ) -> ResolvedFrameLayout {
-        self.resolve_blocks_for_presentation_fallback(
-            blocks,
-            surface_width_px,
-            surface_height_px,
-            presentation,
-        )
-    }
-
-    fn resolve_blocks_for_presentation_fallback(
         &self,
         blocks: Vec<CaptionBlock>,
         surface_width_px: u32,
@@ -1774,12 +1729,13 @@ fn utf16_null(value: &str) -> Vec<u16> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::types::TEXT_OUTLINE_OVERHANG_PX;
+    use super::super::types::{
+        effective_background_alpha, fill_color_for_channel, outline_offsets_px,
+        TEXT_OUTLINE_OVERHANG_PX,
+    };
     use super::{measure_text_width, wrap_text, CaptionLayoutPolicy};
     use crate::renderer::{
-        effective_background_alpha, fill_color_for_channel, outline_offsets_px, text_script_bucket,
         CaptionBlock, CaptionChannel, CaptionPresentation, FontResolver, SpeakerStyle,
-        TextScriptBucket,
     };
 
     fn fallback_styles(
@@ -1973,16 +1929,6 @@ mod tests {
 
         assert_eq!(cache.len(), cache_len_after_first);
         assert!(cache.get(&lookup_key).is_some());
-    }
-
-    #[test]
-    fn text_script_bucket_prefers_latin_for_non_cjk_text() {
-        assert_eq!(text_script_bucket("hello world"), TextScriptBucket::Latin);
-    }
-
-    #[test]
-    fn text_script_bucket_uses_cjk_bucket_for_korean_text() {
-        assert_eq!(text_script_bucket("안녕하세요"), TextScriptBucket::Cjk);
     }
 
     #[test]

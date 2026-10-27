@@ -145,3 +145,47 @@ async def test_owner_rejects_new_probes_after_ingress_stop_and_cancel() -> None:
 
     assert owner.task is None
     assert presence.ports == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("current_port", [None, 9123, 9001])
+async def test_connection_change_discards_delayed_result_without_replacing_owned_probe(
+    current_port: int | None,
+) -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+    current_probed = asyncio.Event()
+    ports: list[int] = []
+    port: int | None = 9001
+
+    class BlockingPresence:
+        async def should_prompt_enable_osc(self, *, port: int) -> bool:
+            ports.append(port)
+            if len(ports) == 1:
+                started.set()
+                await release.wait()
+                return True
+            current_probed.set()
+            return False
+
+    owner, notices, _ = _owner(BlockingPresence())
+    owner.port_provider = lambda: port
+    owner.schedule()
+    await asyncio.wait_for(started.wait(), timeout=5)
+    task = owner.task
+    try:
+        port = None
+        owner.connection_changed()
+        port = current_port
+        owner.connection_changed()
+        release.set()
+        if current_port is not None:
+            await asyncio.wait_for(current_probed.wait(), timeout=5)
+        else:
+            await asyncio.sleep(0)
+        assert notices == []
+        assert ports == ([9001] if current_port is None else [9001, current_port])
+        assert owner.task is task
+        assert task is not None and not task.done()
+    finally:
+        await owner.cancel()

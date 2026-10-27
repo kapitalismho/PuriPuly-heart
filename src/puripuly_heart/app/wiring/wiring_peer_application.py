@@ -8,23 +8,23 @@ from puripuly_heart.app.adapters.peer_application_state import (
     PeerApplicationSettings,
     PeerApplicationStateAdapter,
 )
-from puripuly_heart.app.adapters.peer_capture_inventory import (
+from puripuly_heart.app.adapters.peer_capture.peer_capture_inventory import (
     PeerCaptureTargetRuntimeEffectsAdapter,
     WindowsLoopbackDeviceInventoryAdapter,
     WindowsProcessCaptureInventoryAdapter,
 )
 from puripuly_heart.app.ports.settings_view import GeneralSettingsSnapshot
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
+from puripuly_heart.app.services.capture.peer_capture_target_application import (
+    PeerCaptureTargetApplicationOwner,
+)
+from puripuly_heart.app.services.overlay.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.peer_application import (
     PeerApplicationOwner,
     PeerApplicationState,
 )
-from puripuly_heart.app.services.peer_capture_target_application import (
-    PeerCaptureTargetApplicationOwner,
-)
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
 )

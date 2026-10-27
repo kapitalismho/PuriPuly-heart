@@ -7,9 +7,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
-from puripuly_heart.app.services.settings_mutation_legacy import apply_settings_path_patch
-from puripuly_heart.app.services.settings_projection import SettingsProjectionOwner
 
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
@@ -29,6 +26,9 @@ from puripuly_heart.app.services.manual_local_asr_fallback import (
 from puripuly_heart.app.services.settings import (
     settings_application as settings_application_module,
 )
+from puripuly_heart.app.services.settings.settings_application import SettingsApplicationOwner
+from puripuly_heart.app.services.settings.settings_mutation_legacy import apply_settings_path_patch
+from puripuly_heart.app.services.settings.settings_projection import SettingsProjectionOwner
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.migration import apply_canonical_delta
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext

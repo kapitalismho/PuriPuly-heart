@@ -60,7 +60,7 @@ from puripuly_heart.config.resolved import (
     ResolvedLLMTarget,
     ResolvedSTTConfig,
 )
-from puripuly_heart.config.runtime_resolution import resolve_stt_config
+from puripuly_heart.config.runtime_resolution import resolve_llm_config, resolve_stt_config
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     DesktopFletOverlayIntent,
@@ -1033,8 +1033,10 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert_bounded_concurrency(provider, 3)
 
 
+@pytest.mark.parametrize("resolved", [False, True], ids=["runtime-input", "resolved-export"])
 def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_user_identifier(
     monkeypatch: pytest.MonkeyPatch,
+    resolved: bool,
 ) -> None:
     settings = _vnext(llm="openrouter", connection="managed", openrouter_source="managed")
     secrets = InMemorySecretStore()
@@ -1057,11 +1059,19 @@ def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_use
         raising=False,
     )
 
-    provider = create_llm_provider(
-        settings,
-        secrets=secrets,
-        managed_release_service=object(),
-    )
+    if resolved:
+        provider = create_llm_provider_from_resolved_config(
+            resolve_llm_config(runtime_resolution_input_from_vnext(settings)),
+            secrets=secrets,
+            managed_release_service=object(),
+            extras=llm_factory_extras_from_vnext(settings),
+        )
+    else:
+        provider = create_llm_provider(
+            settings,
+            secrets=secrets,
+            managed_release_service=object(),
+        )
 
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner.primary, OpenRouterLLMProvider)

@@ -201,7 +201,7 @@ async def test_qwen_cancellation_while_decode_blocked_closes_backend_source_and_
     release_decode = []
 
     monkeypatch.setattr(
-        "puripuly_heart.core.local_stt_assets.validate_local_stt_runtime_ready",
+        "puripuly_heart.core.local_asr.local_stt_assets.validate_local_stt_runtime_ready",
         lambda _path: None,
     )
 

@@ -15,6 +15,7 @@ from puripuly_heart.core.diagnostic_validation import (
     PROVIDER_RESPONSE_BODY_KEYS,
     PROVIDER_RESPONSE_BODY_REDACTION_MARKER,
     DiagnosticSink,
+    redact_raw_assignment_values,
     validate_diagnostics_for_sink,
 )
 from puripuly_heart.core.diagnostics import (
@@ -222,17 +223,17 @@ def sanitize_legacy_raw_user_visible_error_text(value: object) -> str | None:
     if not text:
         return None
 
-    text = _redact_raw_assignment_values(
+    text = redact_raw_assignment_values(
         text,
         _PROVIDER_RESPONSE_TEXT_RE,
         PROVIDER_RESPONSE_BODY_REDACTION_MARKER,
     )
-    text = _redact_raw_assignment_values(
+    text = redact_raw_assignment_values(
         text,
         _BROKER_RAW_TEXT_RE,
         BROKER_RAW_MESSAGE_REDACTION_MARKER,
     )
-    text = _redact_raw_assignment_values(
+    text = redact_raw_assignment_values(
         text,
         _LOCAL_LLM_EXTRA_BODY_TEXT_RE,
         LOCAL_LLM_EXTRA_BODY_REDACTION_MARKER,
@@ -253,71 +254,6 @@ def sanitize_legacy_raw_user_visible_error_text(value: object) -> str | None:
 
 def _redact_secret_assignment(match: re.Match[str]) -> str:
     return f"{match.group(1)}={DIAGNOSTIC_REDACTION_MARKER}"
-
-
-def _redact_raw_assignment_values(
-    text: str,
-    pattern: re.Pattern[str],
-    marker: str,
-) -> str:
-    redacted_parts: list[str] = []
-    cursor = 0
-    for match in pattern.finditer(text):
-        if match.start() < cursor:
-            continue
-        redacted_parts.append(text[cursor : match.start()])
-        redacted_parts.append(marker)
-        cursor = _raw_assignment_value_end(text, match.end())
-    redacted_parts.append(text[cursor:])
-    return "".join(redacted_parts)
-
-
-def _raw_assignment_value_end(text: str, start: int) -> int:
-    if start >= len(text):
-        return start
-    char = text[start]
-    if char in ("{", "["):
-        return _balanced_raw_value_end(text, start)
-    if char in ("'", '"'):
-        return _quoted_raw_value_end(text, start)
-
-    end = start
-    while end < len(text) and text[end] not in "\n;":
-        end += 1
-    return end
-
-
-def _balanced_raw_value_end(text: str, start: int) -> int:
-    closing_for_open = {"{": "}", "[": "]"}
-    expected_closers = [closing_for_open[text[start]]]
-    index = start + 1
-    while index < len(text):
-        char = text[index]
-        if char in ("'", '"'):
-            index = _quoted_raw_value_end(text, index)
-            continue
-        if char in closing_for_open:
-            expected_closers.append(closing_for_open[char])
-        elif char == expected_closers[-1]:
-            expected_closers.pop()
-            if not expected_closers:
-                return index + 1
-        index += 1
-    return len(text)
-
-
-def _quoted_raw_value_end(text: str, start: int) -> int:
-    quote = text[start]
-    index = start + 1
-    while index < len(text):
-        char = text[index]
-        if char == "\\":
-            index += 2
-            continue
-        if char == quote:
-            return index + 1
-        index += 1
-    return len(text)
 
 
 def _failure_report(

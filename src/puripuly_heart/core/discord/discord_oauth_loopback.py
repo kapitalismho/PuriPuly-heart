@@ -4,7 +4,6 @@ import socket
 import threading
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import NoReturn
 from urllib.parse import parse_qs, urlsplit
 
 from .oauth_callback_page import (
@@ -241,7 +240,3 @@ def _single_non_empty(params: dict[str, list[str]], key: str) -> str | None:
         return None
     value = values[0]
     return value or None
-
-
-def _unreachable() -> NoReturn:
-    raise AssertionError("unreachable")

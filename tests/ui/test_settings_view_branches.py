@@ -13,8 +13,6 @@ import pytest
 
 pytest.importorskip("flet")
 
-from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
-
 from puripuly_heart.app.ports.chatgpt_account import ChatGptAccountSnapshot
 from puripuly_heart.app.ports.settings_view import (
     CustomSttEndpointEdit,
@@ -29,6 +27,9 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
     materialize_canonical_translation_settings,
 )
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
+from puripuly_heart.app.services.settings.settings_application import (
+    settings_view_surface_snapshots,
+)
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
     provider_llm_for_translation,
@@ -106,8 +107,6 @@ def _make_settings_view(
     store: DummySecretStore | None = None,
     settings: AppSettingsVNext | None = None,
 ):
-    monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
     store = store or DummySecretStore()
     view = settings_view.SettingsView()
@@ -901,8 +900,6 @@ def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch, settin
     settings = AppSettingsVNext()
     basic_messages: list[str] = []
 
-    monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
 
     def raise_store():
@@ -6564,7 +6561,9 @@ def _provider_snapshot_with(
     monkeypatch: pytest.MonkeyPatch,
     settings: AppSettingsVNext,
 ):
-    from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
+    from puripuly_heart.app.services.settings.settings_application import (
+        settings_view_surface_snapshots,
+    )
 
     provider, _general, _prompt, _overlay = settings_view_surface_snapshots(settings)
     return provider

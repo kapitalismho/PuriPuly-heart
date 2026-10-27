@@ -29,20 +29,6 @@ def test_main_version_prints(capsys) -> None:
     assert capsys.readouterr().out.strip() == __version__
 
 
-def test_main_version_prints_without_soxr_runtime_startup_check(monkeypatch, capsys) -> None:
-    monkeypatch.setattr(
-        main_module,
-        "ensure_soxr_runtime_available_for_startup",
-        lambda: pytest.fail("--version should not run the soxr startup check"),
-        raising=False,
-    )
-
-    result = main_module.main(["--version"])
-
-    assert result == 0
-    assert capsys.readouterr().out.strip() == __version__
-
-
 def test_main_gui_startup_check_imports_gui_runtime_without_starting_flet(monkeypatch) -> None:
     import flet
 
@@ -521,13 +507,6 @@ def test_main_local_qwen_runtime_check_dispatches_runner(monkeypatch, tmp_path) 
 def test_main_soxr_runtime_check_dispatches_runner(monkeypatch, tmp_path) -> None:
     calls: dict[str, object] = {}
 
-    monkeypatch.setattr(
-        main_module,
-        "ensure_soxr_runtime_available_for_startup",
-        lambda: None,
-        raising=False,
-    )
-
     def fake_run_soxr_runtime_check() -> int:
         calls["called"] = True
         return 0
@@ -646,7 +625,7 @@ def test_run_soxr_runtime_check_rejects_non_windows(monkeypatch, capsys) -> None
     monkeypatch.setattr(runtime_check_module.sys, "platform", "linux", raising=False)
     monkeypatch.setattr(
         runtime_check_module,
-        "ensure_soxr_runtime_available_for_startup",
+        "resolve_soxr_runtime_paths",
         lambda: pytest.fail("should not validate soxr runtime on non-Windows"),
         raising=False,
     )
@@ -678,7 +657,7 @@ def test_run_soxr_runtime_check_reports_runtime_validation_failure(monkeypatch, 
     )
     monkeypatch.setattr(
         runtime_check_module,
-        "ensure_soxr_runtime_available_for_startup",
+        "resolve_soxr_runtime_paths",
         raise_runtime_error,
         raising=False,
     )
@@ -710,10 +689,10 @@ def test_run_soxr_runtime_check_reports_soxr_import_or_smoke_failure(
     monkeypatch.setattr(runtime_check_module.sys, "platform", "win32", raising=False)
     monkeypatch.setattr(
         runtime_check_module,
-        "ensure_soxr_runtime_available_for_startup",
+        "resolve_soxr_runtime_paths",
         lambda: runtime_paths,
-        raising=False,
     )
+    monkeypatch.setattr(runtime_check_module, "validate_soxr_runtime_paths", lambda paths: paths)
     real_import_module = runtime_check_module.importlib.import_module
 
     def fake_import_module(name: str, *args, **kwargs):
@@ -773,11 +752,11 @@ def test_run_soxr_runtime_check_imports_soxr_runs_smoke_and_reports_paths(
     monkeypatch.setattr(runtime_check_module.sys, "platform", "win32", raising=False)
     monkeypatch.setattr(
         runtime_check_module,
-        "ensure_soxr_runtime_available_for_startup",
+        "resolve_soxr_runtime_paths",
         lambda: runtime_paths,
-        raising=False,
     )
 
+    monkeypatch.setattr(runtime_check_module, "validate_soxr_runtime_paths", lambda paths: paths)
     real_import_module = runtime_check_module.importlib.import_module
 
     def fake_import_module(name: str, *args, **kwargs):
@@ -838,9 +817,10 @@ def test_run_soxr_runtime_check_writes_json_report_when_env_var_is_set(
     monkeypatch.setenv("PURIPULY_HEART_SOXR_RUNTIME_REPORT_PATH", str(report_path))
     monkeypatch.setattr(
         runtime_check_module,
-        "ensure_soxr_runtime_available_for_startup",
+        "resolve_soxr_runtime_paths",
         lambda: runtime_paths,
     )
+    monkeypatch.setattr(runtime_check_module, "validate_soxr_runtime_paths", lambda paths: paths)
     monkeypatch.setattr(
         runtime_check_module,
         "_resolve_loaded_soxr_dll_path",

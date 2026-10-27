@@ -8,8 +8,6 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import Protocol
 
-from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterUserFacingError
-
 from puripuly_heart.core.diagnostic_validation import (
     DIAGNOSTIC_REDACTION_MARKER,
     DIAGNOSTIC_SINK_DASHBOARD,
@@ -22,6 +20,9 @@ from puripuly_heart.core.diagnostic_validation import (
 from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.error_messages import sanitize_legacy_raw_user_visible_error_text
 from puripuly_heart.core.messages import ErrorDiagnostics, UserErrorReport, UserMessageRef
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
+    ManagedOpenRouterUserFacingError,
+)
 from puripuly_heart.domain.events import SelfTurnPresentation, STTSessionState, UIEvent
 from puripuly_heart.domain.models import OSCMessage, Translation
 from puripuly_heart.ui.event_mapping import map_ui_event

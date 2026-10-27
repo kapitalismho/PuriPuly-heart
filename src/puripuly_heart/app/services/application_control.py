@@ -2037,7 +2037,7 @@ class ApplicationControlOwner:
         return {"status": "applied", "asset": entry.to_dict()}
 
     def _start_model_install(self, args: dict, operation_id: str) -> asyncio.Task:
-        from puripuly_heart.core.local_asr_provisioning import LocalASRInstallRequest
+        from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRInstallRequest
 
         owner = self.provisioning()
         if owner is None:

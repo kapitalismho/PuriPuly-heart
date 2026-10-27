@@ -19,19 +19,19 @@ from puripuly_heart.app.services.canonical_settings_persistence import SettingsO
 from puripuly_heart.app.services.secret_settings_transaction import (
     SecretSettingsTransaction,
 )
-from puripuly_heart.app.services.settings_mutation import (
+from puripuly_heart.app.services.settings.settings_mutation import (
     SettingsMutationInterrupted,
     SettingsMutationService,
     SttLanguageAudioSettingsMutation,
     TranslationProviderSettingsMutation,
 )
-from puripuly_heart.app.services.settings_mutation_legacy import (
+from puripuly_heart.app.services.settings.settings_mutation_legacy import (
     apply_settings_path_patch,
     build_stt_language_audio_settings_path_patch,
     build_translation_provider_settings_path_patch,
     settings_path_mutation_validator_for_command,
 )
-from puripuly_heart.app.services.settings_transaction_result import (
+from puripuly_heart.app.services.settings.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
 from puripuly_heart.config.alibaba_connection import resolve_alibaba_connection

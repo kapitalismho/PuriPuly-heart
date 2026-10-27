@@ -6,13 +6,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
-from puripuly_heart.app.services.settings_application import (
-    materialize_immediate_settings_intent,
-    materialize_prompt_apply_intent,
-    materialize_provider_apply_intent,
-    settings_view_surface_snapshots,
-)
-
 from puripuly_heart.app.ports.application_runtime_logging import (
     ApplicationRuntimeLoggingPort,
 )
@@ -49,6 +42,12 @@ from puripuly_heart.app.services.application_shutdown import (
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
 from puripuly_heart.app.services.canonical_settings_persistence import (
     materialize_canonical_translation_settings,
+)
+from puripuly_heart.app.services.settings.settings_application import (
+    materialize_immediate_settings_intent,
+    materialize_prompt_apply_intent,
+    materialize_provider_apply_intent,
+    settings_view_surface_snapshots,
 )
 
 

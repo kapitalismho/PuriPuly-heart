@@ -6,7 +6,7 @@ from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
 from puripuly_heart.app.services.application_runtime_logging import (
     ApplicationRuntimeLoggingOwner,
 )
-from puripuly_heart.app.wiring_capture_runtime import CaptureDiagnosticsAdapter
+from puripuly_heart.app.wiring.wiring_capture_runtime import CaptureDiagnosticsAdapter
 from puripuly_heart.core.audio.diagnostics import (
     EXPECTED_FAULT_SIGNATURES,
     AudioFaultProfile,

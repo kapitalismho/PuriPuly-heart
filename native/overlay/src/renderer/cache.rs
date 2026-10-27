@@ -114,7 +114,6 @@ impl Default for LayoutCache {
 }
 
 impl LayoutCache {
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self {
             entries: BoundedLruCache::with_capacity(capacity),
@@ -139,28 +138,12 @@ impl LayoutCache {
 }
 
 #[cfg(windows)]
-#[derive(Debug, Clone)]
-pub(crate) struct CachedLineVisual {
-    pub command_list: ID2D1CommandList,
-    pub visual_bounds: VisualBounds,
-}
-
-#[cfg(windows)]
-#[derive(Debug, Clone)]
-pub(crate) struct CachedBlockVisual {
-    pub command_list: ID2D1CommandList,
-    #[allow(dead_code)]
-    pub visual_bounds: VisualBounds,
-}
-
-#[cfg(windows)]
 #[derive(Debug)]
 pub(crate) struct WindowsRendererCaches {
     pub text_format_cache: BoundedLruCache<(TextStyleKey, u32), IDWriteTextFormat>,
-    #[allow(dead_code)]
     pub layout_cache: LayoutCache,
-    pub line_cache: BoundedLruCache<LineCacheKey, CachedLineVisual>,
-    pub block_cache: BoundedLruCache<BlockCacheKey, CachedBlockVisual>,
+    pub line_cache: BoundedLruCache<LineCacheKey, ID2D1CommandList>,
+    pub block_cache: BoundedLruCache<BlockCacheKey, ID2D1CommandList>,
 }
 
 #[cfg(windows)]

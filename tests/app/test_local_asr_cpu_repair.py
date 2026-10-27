@@ -5,15 +5,16 @@ from collections.abc import Callable
 from dataclasses import replace
 
 import pytest
-from puripuly_heart.app.services.local_asr_cpu_repair import (
+
+from puripuly_heart.app.services.local_asr.local_asr_cpu_repair import (
     LocalASRCpuRepairEffect,
     LocalASRCpuRepairEffectType,
     LocalASRCpuRepairOwner,
     LocalASRCpuRepairRequest,
     LocalASRCpuRepairRuntimeState,
 )
-from puripuly_heart.app.wiring_composition import create_local_asr_cpu_repair_owner
-from puripuly_heart.core.local_asr_provisioning import (
+from puripuly_heart.app.wiring.wiring_composition import create_local_asr_cpu_repair_owner
+from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRInstallRequest,
     LocalASRInstallResult,
     LocalASRInstallResultHandler,
@@ -21,7 +22,7 @@ from puripuly_heart.core.local_asr_provisioning import (
     LocalASRProvisioningActivity,
     LocalASRProvisioningSnapshot,
 )
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_STT_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     PARAKEET_V3_MODEL_ID,

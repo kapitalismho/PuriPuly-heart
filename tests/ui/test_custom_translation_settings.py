@@ -68,8 +68,6 @@ def _view(
     store: SecretStore,
     directory_opener: object | None = None,
 ) -> settings_view.SettingsView:
-    monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
     view = settings_view.SettingsView(
         http_extension_registry=HttpExtensionRegistryService(

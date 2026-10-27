@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from puripuly_heart.app import wiring_runtime_pipeline as runtime_module
+from puripuly_heart.app.wiring import wiring_runtime_pipeline as runtime_module
 from puripuly_heart.app.wiring.wiring_runtime_pipeline import (
     compose_runtime_pipeline,
     runtime_pipeline_inputs_from_vnext,

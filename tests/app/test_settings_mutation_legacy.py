@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from puripuly_heart.app.services.settings_mutation_legacy import (
+
+from puripuly_heart.app.services.settings import settings_mutation
+from puripuly_heart.app.services.settings.settings_mutation_legacy import (
     ORDER21_TRANSLATION_PROVIDER_SETTINGS_PATHS,
     ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS,
     ORDER23_OVERLAY_OSC_OUTPUT_SETTINGS_PATHS,
@@ -15,8 +17,6 @@ from puripuly_heart.app.services.settings_mutation_legacy import (
     build_stt_language_audio_settings_path_patch,
     build_translation_provider_settings_path_patch,
 )
-
-from puripuly_heart.app.services import settings_mutation
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core import messages
 

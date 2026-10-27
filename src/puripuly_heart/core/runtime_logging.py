@@ -806,7 +806,7 @@ class _SafeQueueListener(QueueListener):
                 if (
                     len(batch) >= _FILE_BATCH_MAX_RECORDS
                     or batch_bytes >= _FILE_BATCH_MAX_BYTES
-                    or prepared.levelno >= logging.WARNING
+                    or _is_priority_file_record(prepared)
                 ):
                     self._deliver_batch(batch)
                     for _ in batch:
@@ -1781,14 +1781,6 @@ def _new_session_logger_name() -> str:
 
 def _new_correlation_id(prefix: str) -> str:
     return f"{prefix}-{uuid4()}"
-
-
-def _severity_for_level(level: int) -> Severity:
-    if level >= logging.ERROR:
-        return SEVERITY_ERROR
-    if level >= logging.WARNING:
-        return SEVERITY_WARNING
-    return SEVERITY_INFO
 
 
 def _level_for_severity(severity: Severity) -> int:

@@ -29,7 +29,6 @@ describe('broker foundation', () => {
       bindings: {
         d1: 'BROKER_DB',
         secrets: [
-          'OPENROUTER_MANAGED_API_KEY',
           'OPENROUTER_MANAGEMENT_API_KEY',
           'OPENROUTER_MANAGED_GUARDRAIL_ID',
           'OPENROUTER_MANAGED_USER_HMAC_SECRET',

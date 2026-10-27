@@ -7,11 +7,11 @@ vi.mock('../src/openrouter-management', async (importOriginal) => ({
 
 import app from '../src/index';
 import {
-  acknowledgeManagedKeyDelivery,
   claimStaleManagedKeyDeliveryCleanup,
   createManagedKeyDelivery,
   hashDeliveryAckToken,
   listStalePendingManagedKeyDeliveries,
+  markManagedKeyDeliveryAcknowledged,
 } from '../src/managed-key-delivery';
 import {
   cleanupManagedChildKey,
@@ -147,7 +147,7 @@ describe('managed key delivery ACK foundation', () => {
     expect(JSON.stringify(row)).not.toContain(delivery.deliveryAckToken);
   });
 
-  it('acknowledges once and treats duplicate valid ACK as idempotent', async () => {
+  it('marks finalized delivery acknowledgement once and keeps repair idempotent', async () => {
     const env = createTestBrokerEnv();
     const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
       issueSource: 'qq',
@@ -157,17 +157,13 @@ describe('managed key delivery ACK foundation', () => {
       expiresAt: new Date('2026-07-05T00:10:00.000Z'),
     });
 
-    const first = await acknowledgeManagedKeyDelivery(env.BROKER_DB, {
+    const first = await markManagedKeyDeliveryAcknowledged(env.BROKER_DB, {
       deliveryId: delivery.deliveryId,
-      managedCredentialRef: 'managed-credential-2',
-      deliveryAckToken: delivery.deliveryAckToken,
-      now: new Date('2026-07-05T00:01:00.000Z'),
+      acknowledgedAt: new Date('2026-07-05T00:01:00.000Z'),
     });
-    const second = await acknowledgeManagedKeyDelivery(env.BROKER_DB, {
+    const second = await markManagedKeyDeliveryAcknowledged(env.BROKER_DB, {
       deliveryId: delivery.deliveryId,
-      managedCredentialRef: 'managed-credential-2',
-      deliveryAckToken: delivery.deliveryAckToken,
-      now: new Date('2026-07-05T00:02:00.000Z'),
+      acknowledgedAt: new Date('2026-07-05T00:02:00.000Z'),
     });
 
     expect(first).toEqual({ ok: true, status: 'acknowledged' });

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LOCAL_STT_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,

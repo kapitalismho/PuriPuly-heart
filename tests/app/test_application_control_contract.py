@@ -11,7 +11,6 @@ from uuid import uuid4
 
 import numpy as np
 import pytest
-from puripuly_heart.app.services.settings_transaction_result import SettingsTransactionResultOwner
 
 from puripuly_heart.app.adapters.ui_runtime import UiManagedRuntimeAdapter
 from puripuly_heart.app.services.application_control import ApplicationControlOwner
@@ -25,6 +24,9 @@ from puripuly_heart.app.services.managed.managed_auth import (
     ManagedAuthState,
 )
 from puripuly_heart.app.services.overlay.overlay_application import OverlayApplicationOwner
+from puripuly_heart.app.services.settings.settings_transaction_result import (
+    SettingsTransactionResultOwner,
+)
 from puripuly_heart.app.wiring import wiring_audio_test
 from puripuly_heart.composition import application_runtime
 from puripuly_heart.composition.headless_application import (
@@ -1387,12 +1389,11 @@ async def test_control_translation_enable_never_starts_implicit_authorization(
 async def test_gui_cli_and_osc_mutations_share_revision_and_preserve_focused_edits(
     tmp_path, monkeypatch
 ):
-    from puripuly_heart.core.managed_openrouter_release import (
-        UnavailableManagedOpenRouterReleaseClient,
-    )
-
     from puripuly_heart.app.ports.settings_view import LocaleSettingsIntent
     from puripuly_heart.app.wiring import wiring_managed_account
+    from puripuly_heart.core.openrouter.managed_openrouter_release import (
+        UnavailableManagedOpenRouterReleaseClient,
+    )
 
     monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
     monkeypatch.setattr(

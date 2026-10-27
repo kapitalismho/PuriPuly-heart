@@ -5,10 +5,6 @@ from dataclasses import replace
 from uuid import UUID, uuid4
 
 import numpy as np
-from puripuly_heart.core.local_asr_provider_runtime import (
-    LocalASRProviderRuntimeCallbacks,
-    LocalASRProviderRuntimePort,
-)
 
 from puripuly_heart.app.wiring.wiring_runtime_pipeline import RuntimePipelineResourceOwner
 from puripuly_heart.core.audio.ownership import (
@@ -17,6 +13,10 @@ from puripuly_heart.core.audio.ownership import (
     PeerAudioSegmentLedger,
 )
 from puripuly_heart.core.clock import Clock, SystemClock
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
+    LocalASRProviderRuntimeCallbacks,
+    LocalASRProviderRuntimePort,
+)
 from puripuly_heart.core.orchestrator.channel_runtime import (
     ChannelRuntime,
 )

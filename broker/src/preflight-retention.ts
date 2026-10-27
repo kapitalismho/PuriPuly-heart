@@ -1,7 +1,4 @@
-import { BROKER_RETENTION_POLICY } from './persistence';
-
-const CHALLENGE_PREFLIGHT_RETENTION_MS =
-  BROKER_RETENTION_POLICY.challengePreflight.inactiveDays * 24 * 60 * 60 * 1000;
+const CHALLENGE_PREFLIGHT_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 export async function deleteExpiredChallengePreflightInstallations(
   db: D1Database,

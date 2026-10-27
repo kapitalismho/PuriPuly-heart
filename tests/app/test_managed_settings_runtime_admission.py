@@ -8,10 +8,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.app.services.provider_verification_binding import (
-    ProviderVerificationBindingOwner,
-)
-from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
 
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
@@ -46,6 +42,9 @@ from puripuly_heart.app.services.provider.provider_settings import (
     ProviderSettingsOwner,
     provider_verification_context,
 )
+from puripuly_heart.app.services.provider.provider_verification_binding import (
+    ProviderVerificationBindingOwner,
+)
 from puripuly_heart.app.services.settings.settings_application import (
     settings_view_surface_snapshots,
 )
@@ -75,6 +74,7 @@ from puripuly_heart.config.provider_values import OpenRouterSelectionAlias, STTP
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.clock import SystemClock
+from puripuly_heart.core.openrouter.openrouter_pkce import OpenRouterPKCEExchangeResult
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigurationOwner,

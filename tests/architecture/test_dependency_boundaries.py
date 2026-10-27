@@ -353,13 +353,62 @@ EXTERNAL_MODULE_LAYERS = {
     "keyring": ADAPTERS,
 }
 
-CORE_BOUNDARY_TRANSITIONAL_DEBT = {
+DEPENDENCY_TRANSITIONAL_DEBT = {
     (
         "puripuly_heart.core.discord.oauth_callback_page",
         "puripuly_heart.ui.i18n",
     ): (
         "OAuth callback HTML currently uses shared UI localization lazily; moving "
         "localization responsibility requires a separate product-scoped refactor."
+    ),
+    (
+        "puripuly_heart.app.services.settings.settings_runtime_effects",
+        "puripuly_heart.app.wiring.wiring_audio_test",
+    ): (
+        "Settings runtime effects assembles the existing audio-test runtime handle; "
+        "removing this pre-existing composition coupling requires a separate architecture cutover."
+    ),
+    (
+        "puripuly_heart.app.services.settings.settings_runtime_effects",
+        "puripuly_heart.app.wiring.wiring_peer_application",
+    ): (
+        "Settings runtime effects applies the existing Peer application handle; "
+        "removing this pre-existing composition coupling requires a separate architecture cutover."
+    ),
+    (
+        "puripuly_heart.app.services.settings.settings_runtime_effects",
+        "puripuly_heart.app.wiring.wiring_provider_runtime",
+    ): (
+        "Settings runtime effects uses the existing provider runtime projection and signatures; "
+        "removing this pre-existing composition coupling requires a separate architecture cutover."
+    ),
+    (
+        "puripuly_heart.app.services.settings.settings_runtime_effects",
+        "puripuly_heart.app.wiring.wiring_runtime_pipeline",
+    ): (
+        "Settings runtime effects applies the existing pipeline handle; "
+        "removing this pre-existing composition coupling requires a separate architecture cutover."
+    ),
+    (
+        "puripuly_heart.app.services.settings.settings_runtime_effects",
+        "puripuly_heart.app.wiring.wiring_stt_factory",
+    ): (
+        "Settings runtime effects builds the existing Self/Peer runtime signatures; "
+        "removing this pre-existing composition coupling requires a separate architecture cutover."
+    ),
+    (
+        "puripuly_heart.app.services.settings.settings_runtime_effects",
+        "puripuly_heart.app.wiring.wiring_translation_runtime_configuration",
+    ): (
+        "Settings runtime effects replaces the existing translation runtime configuration; "
+        "removing this pre-existing composition coupling requires a separate architecture cutover."
+    ),
+    (
+        "puripuly_heart.app.services.audio_diagnostics_application",
+        "puripuly_heart.app.wiring.wiring_capture_runtime",
+    ): (
+        "Audio diagnostics assembles the existing CaptureDiagnosticsAdapter; "
+        "removing this pre-existing adapter coupling requires a separate architecture cutover."
     ),
 }
 
@@ -560,7 +609,7 @@ def _dependency_violations() -> frozenset[ImportViolation]:
                     imported_module == root or imported_module.startswith(f"{root}.")
                     for root in (f"{PACKAGE_NAME}.ui", f"{PACKAGE_NAME}.composition")
                 )
-                and (importer_module, imported_module) not in CORE_BOUNDARY_TRANSITIONAL_DEBT
+                and (importer_module, imported_module) not in DEPENDENCY_TRANSITIONAL_DEBT
             ):
                 violations.add(
                     ImportViolation(
@@ -578,6 +627,8 @@ def _dependency_violations() -> frozenset[ImportViolation]:
             if imported_layer is None:
                 continue
             if imported_layer not in rule.forbidden_layers:
+                continue
+            if (importer_module, imported_module) in DEPENDENCY_TRANSITIONAL_DEBT:
                 continue
 
             violations.add(
@@ -784,10 +835,10 @@ def _flat_settings_patch_violations(
 ) -> set[SettingsRuntimeConfinementViolation]:
     violations: set[SettingsRuntimeConfinementViolation] = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module in {
-            "puripuly_heart.app.services.settings_mutation",
-            "puripuly_heart.app.services.settings.settings_mutation",
-        }:
+        if (
+            isinstance(node, ast.ImportFrom)
+            and node.module == "puripuly_heart.app.services.settings.settings_mutation"
+        ):
             for alias in node.names:
                 if alias.name in FLAT_SETTINGS_PATCH_SYMBOLS:
                     violations.add(
@@ -1669,11 +1720,43 @@ def test_oauth_localization_debt_is_only_an_exact_import_edge(
 
     assert bool(violations) is not allowed
     if allowed:
-        assert CORE_BOUNDARY_TRANSITIONAL_DEBT[
+        assert DEPENDENCY_TRANSITIONAL_DEBT[
             (f"{PACKAGE_NAME}.core.{importer.replace('/', '.')}", f"{PACKAGE_NAME}.{target}")
         ]
     else:
         assert {violation.imported for violation in violations} == {f"{PACKAGE_NAME}.{target}"}
+
+
+@pytest.mark.parametrize(
+    ("importer", "target", "allowed"),
+    (
+        ("settings/settings_runtime_effects", "wiring_audio_test", True),
+        ("settings/settings_runtime_effects", "wiring_overlay_factory", False),
+        ("settings/settings_runtime_effects", "wiring_audio_test.child", False),
+        ("settings/settings_runtime_effects_extra", "wiring_audio_test", False),
+        ("audio_diagnostics_application", "wiring_capture_runtime", True),
+        ("audio_diagnostics_application", "wiring_audio_test", False),
+        ("audio_diagnostics_application", "wiring_capture_runtime.child", False),
+        ("audio_diagnostics_application_extra", "wiring_capture_runtime", False),
+    ),
+)
+def test_runtime_assembly_debt_is_only_an_exact_import_edge(
+    dependency_source_tree: Path, importer: str, target: str, allowed: bool
+) -> None:
+    path = dependency_source_tree / "app" / "services" / f"{importer}.py"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    imported = f"{PACKAGE_NAME}.app.wiring.{target}"
+    path.write_text(f"import {imported}\n", encoding="utf-8")
+
+    violations = _dependency_violations()
+
+    assert bool(violations) is not allowed
+    if allowed:
+        assert DEPENDENCY_TRANSITIONAL_DEBT[
+            (f"{PACKAGE_NAME}.app.services.{importer.replace('/', '.')}", imported)
+        ]
+    else:
+        assert {violation.imported for violation in violations} == {imported}
 
 
 def test_generic_dependency_rules_still_reject_type_only_imports(

@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import FrozenInstanceError, replace
 
 import pytest
-from puripuly_heart.app.services.settings_application import osc_control_presentation_state
 
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
+from puripuly_heart.app.services.settings.settings_application import osc_control_presentation_state
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel

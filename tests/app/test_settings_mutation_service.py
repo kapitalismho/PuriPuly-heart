@@ -13,7 +13,7 @@ import pytest
 from puripuly_heart.app.ports import runtime_apply, settings_repository
 from puripuly_heart.core import messages
 
-SERVICE_MODULE = "puripuly_heart.app.services.settings_mutation"
+SERVICE_MODULE = "puripuly_heart.app.services.settings.settings_mutation"
 
 FORBIDDEN_SERVICE_IMPORT_PREFIXES = (
     "flet",
@@ -23,7 +23,7 @@ FORBIDDEN_SERVICE_IMPORT_PREFIXES = (
     "puripuly_heart.config.settings",
     "puripuly_heart.config.settings_vnext",
     "puripuly_heart.config.runtime_resolution",
-    "puripuly_heart.core.managed_openrouter_broker_client",
+    "puripuly_heart.core.openrouter.managed_openrouter_broker_client",
     "puripuly_heart.core.orchestrator",
     "puripuly_heart.core.runtime",
     "puripuly_heart.core.storage",

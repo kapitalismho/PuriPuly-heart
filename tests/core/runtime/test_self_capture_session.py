@@ -8,8 +8,8 @@ from uuid import uuid4
 
 import numpy as np
 import pytest
-from puripuly_heart.app.adapters.self_capture_vad_sink import SelfCaptureVadSinkAdapter
 
+from puripuly_heart.app.adapters.self_capture.self_capture_vad_sink import SelfCaptureVadSinkAdapter
 from puripuly_heart.config.resolved import vad_exit_threshold
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import (

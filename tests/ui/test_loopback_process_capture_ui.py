@@ -9,14 +9,16 @@ from types import SimpleNamespace
 
 import flet as ft
 import pytest
-from puripuly_heart.app.adapters.peer_capture_target_resolver import (
+
+from puripuly_heart.app.adapters.peer_capture.peer_capture_target_resolver import (
     PeerCaptureTargetResolverAdapter,
 )
-from puripuly_heart.app.services.peer_capture_target_application import (
+from puripuly_heart.app.services.capture.peer_capture_target_application import (
     PeerCaptureTargetApplicationOwner,
 )
-from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
-
+from puripuly_heart.app.services.settings.settings_application import (
+    settings_view_surface_snapshots,
+)
 from puripuly_heart.config.capture_target_resolution import (
     resolve_desktop_audio_capture_target,
 )

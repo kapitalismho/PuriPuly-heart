@@ -6,17 +6,6 @@ from dataclasses import FrozenInstanceError, dataclass, fields, is_dataclass
 from typing import Any
 
 import pytest
-from puripuly_heart.app.services.managed_auth_claims import (
-    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
-    MANAGED_AUTH_CLAIM_SOURCE_QQ,
-    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
-    OPENROUTER_MANAGED_USER_ID_SECRET,
-    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
-    ManagedAuthClaimGuard,
-)
-from puripuly_heart.app.services.managed_key_delivery_ack import (
-    ManagedKeyDeliveryAckService,
-)
 
 from puripuly_heart.app.ports import (
     broker_client,
@@ -24,13 +13,24 @@ from puripuly_heart.app.ports import (
     secret_store,
     settings_repository,
 )
+from puripuly_heart.app.services.managed.managed_auth_claims import (
+    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+    MANAGED_AUTH_CLAIM_SOURCE_QQ,
+    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+    OPENROUTER_MANAGED_USER_ID_SECRET,
+    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
+    ManagedAuthClaimGuard,
+)
+from puripuly_heart.app.services.managed.managed_key_delivery_ack import (
+    ManagedKeyDeliveryAckService,
+)
 from puripuly_heart.core import messages
 from puripuly_heart.core.managed_credential import (
     ManagedCredentialBinding,
     credential_binding_secret,
 )
 
-SERVICE_MODULE = "puripuly_heart.app.services.managed_connection_auth"
+SERVICE_MODULE = "puripuly_heart.app.services.managed.managed_connection_auth"
 DISCORD_AUTH_PORT_MODULE = "puripuly_heart.app.ports.discord_auth"
 LOCAL_IDENTITY_PORT_MODULE = "puripuly_heart.app.ports.managed_identity"
 

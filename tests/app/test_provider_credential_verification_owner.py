@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import pytest
-from puripuly_heart.app.services.provider_credential_verification import (
+
+from puripuly_heart.app.services.provider.provider_credential_verification import (
     PROVIDER_CREDENTIAL_EMPTY,
     PROVIDER_CREDENTIAL_ERROR,
     PROVIDER_CREDENTIAL_FAILED,
@@ -13,7 +14,7 @@ from puripuly_heart.app.services.provider_credential_verification import (
     ProviderCredentialVerificationOwner,
     ProviderCredentialVerificationRequest,
 )
-from puripuly_heart.app.wiring_composition import (
+from puripuly_heart.app.wiring.wiring_composition import (
     create_provider_credential_verification_interaction_owner,
 )
 

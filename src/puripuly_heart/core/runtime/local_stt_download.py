@@ -6,7 +6,7 @@ import threading
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from puripuly_heart.core.local_stt_runtime_installer import RuntimeLocalSTTStatusUpdate
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import RuntimeLocalSTTStatusUpdate
 
 LocalSTTDownloadRunner = Callable[[threading.Event, int], Awaitable[object]]
 LocalSTTDownloadStateChanged = Callable[["LocalSTTDownloadRuntime"], None]

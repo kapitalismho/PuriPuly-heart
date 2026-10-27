@@ -11,28 +11,6 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from puripuly_heart.core.discord_oauth_loopback import DiscordOAuthCallbackError
-from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterDiscordStartSuccess,
-    ManagedOpenRouterFingerprintSalt,
-    ManagedOpenRouterIssueSuccess,
-    ManagedOpenRouterLLMProvider,
-    ManagedOpenRouterReleaseBehavior,
-    ManagedOpenRouterReleaseDiagnostics,
-    ManagedOpenRouterReleaseError,
-    ManagedOpenRouterReleaseResult,
-    ManagedOpenRouterReleaseService,
-    ManagedOpenRouterUserFacingError,
-    UnavailableManagedOpenRouterReleaseClient,
-    format_managed_openrouter_diagnostics,
-)
-from puripuly_heart.core.openrouter_credentials import (
-    OPENROUTER_MANAGED_API_KEY_SECRET,
-    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
-    OPENROUTER_MANAGED_USER_ID_SECRET,
-    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
-    load_managed_openrouter_user_identifier,
-)
 
 from puripuly_heart.app.ports.broker_client import ManagedKeyDeliveryAckResult
 from puripuly_heart.app.wiring import (
@@ -47,11 +25,33 @@ from puripuly_heart.config.provider_values import (
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
+from puripuly_heart.core.discord.discord_oauth_loopback import DiscordOAuthCallbackError
 from puripuly_heart.core.managed_credential import (
     ManagedCredentialBinding,
     credential_binding_secret,
 )
 from puripuly_heart.core.managed_identity import ensure_managed_identity_bundle
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
+    ManagedOpenRouterDiscordStartSuccess,
+    ManagedOpenRouterFingerprintSalt,
+    ManagedOpenRouterIssueSuccess,
+    ManagedOpenRouterLLMProvider,
+    ManagedOpenRouterReleaseBehavior,
+    ManagedOpenRouterReleaseDiagnostics,
+    ManagedOpenRouterReleaseError,
+    ManagedOpenRouterReleaseResult,
+    ManagedOpenRouterReleaseService,
+    ManagedOpenRouterUserFacingError,
+    UnavailableManagedOpenRouterReleaseClient,
+    format_managed_openrouter_diagnostics,
+)
+from puripuly_heart.core.openrouter.openrouter_credentials import (
+    OPENROUTER_MANAGED_API_KEY_SECRET,
+    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+    OPENROUTER_MANAGED_USER_ID_SECRET,
+    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
+    load_managed_openrouter_user_identifier,
+)
 from puripuly_heart.core.runtime import OAuthRuntime
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.domain.models import Translation

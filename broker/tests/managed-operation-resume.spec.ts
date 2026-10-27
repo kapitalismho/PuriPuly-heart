@@ -1,13 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { buildManagedOperationId, buildManagedOperationResumeToken } from './test-support/managed-operation';
 
 import app from '../src/index';
 import {
-  buildManagedOperationId,
-  buildManagedOperationResumeToken,
   createManagedOperation,
   getManagedOperation,
   hashManagedOperationResumeToken,
-  listManagedOperationAttempts,
   recordAttemptCredential,
   saveOperationIssuanceContext,
   startManagedOperationAttempt,

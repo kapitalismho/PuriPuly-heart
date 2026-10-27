@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 
-from puripuly_heart.app import wiring_runtime_pipeline as runtime_pipeline_module
+from puripuly_heart.app.wiring import wiring_runtime_pipeline as runtime_pipeline_module
 from puripuly_heart.app.wiring.wiring_runtime_pipeline import (
     RuntimePipelineLauncher,
     RuntimePipelineResourceOwner,

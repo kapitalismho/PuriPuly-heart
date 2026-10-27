@@ -17,14 +17,15 @@ from pathlib import Path
 
 import httpx
 import pytest
-from puripuly_heart.core.local_stt_assets import (
+
+from puripuly_heart.core.local_asr.local_stt_assets import (
     InstalledLocalSTTManifest,
     LocalSTTAssetFile,
     LocalSTTAssetManifest,
     LocalSTTAssetSource,
     inspect_local_stt_install_state,
 )
-from puripuly_heart.core.local_stt_runtime_installer import (
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     LocalSTTRuntimeInstallCancelled,
     LocalSTTRuntimeInstallError,
     RuntimeLocalSTTStatusUpdate,
@@ -93,7 +94,7 @@ def test_second_process_cleanup_cannot_disturb_active_provisioning_lease(
     script = "\n".join(
         (
             "import pathlib, sys, time",
-            "from puripuly_heart.core.local_stt_runtime_installer import "
+            "from puripuly_heart.core.local_asr.local_stt_runtime_installer import "
             "LocalSTTProvisioningLease",
             "root = pathlib.Path(sys.argv[1])",
             "ready = pathlib.Path(sys.argv[2])",

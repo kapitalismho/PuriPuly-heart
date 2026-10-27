@@ -4,14 +4,14 @@ import hashlib
 import json
 from pathlib import Path
 
-from puripuly_heart.core.local_gpu_assets import (
+from puripuly_heart.core.local_asr.local_gpu_assets import (
     LOCAL_QWEN_GPU_ENGINE,
     LOCAL_QWEN_GPU_MODEL_FILENAME,
     inspect_local_gpu_install,
     load_local_gpu_asset_manifest,
     local_gpu_model_path,
 )
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LocalSTTAssetFile,
     LocalSTTAssetManifest,

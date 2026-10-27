@@ -9,7 +9,7 @@ from functools import partial
 from pathlib import Path
 
 from puripuly_heart.core.language import get_local_qwen_language_hint
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_STT_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     PARAKEET_V3_MODEL_ID,
@@ -17,7 +17,7 @@ from puripuly_heart.core.local_stt_assets import (
     default_local_stt_model_root,
     load_local_stt_asset_manifest,
 )
-from puripuly_heart.core.local_stt_catalog import (
+from puripuly_heart.core.local_asr.local_stt_catalog import (
     LocalCPUAutoUnavailableError,
     inspect_required_cpu_model_installs,
     resolve_cpu_auto_model,

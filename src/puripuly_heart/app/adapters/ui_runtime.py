@@ -33,6 +33,9 @@ from puripuly_heart.app.services.application_after_launch import (
     ApplicationAfterLaunchOwner,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.capture.self_capture_application import (
+    SelfCaptureApplicationOwner,
+)
 from puripuly_heart.app.services.chatgpt_account import ChatGptAccountOwner
 from puripuly_heart.app.services.desktop_overlay_application import (
     DesktopOverlayApplicationOwner,
@@ -45,36 +48,33 @@ from puripuly_heart.app.services.managed_gemma_translation import (
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.model_assets import ModelAssetsApplication
-from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
-from puripuly_heart.app.services.overlay_calibration_application import (
+from puripuly_heart.app.services.overlay.overlay_application import OverlayApplicationOwner
+from puripuly_heart.app.services.overlay.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
 )
 from puripuly_heart.app.services.provider.alibaba_workspace import AlibabaWorkspaceOwner
-from puripuly_heart.app.services.provider_credential_verification import (
+from puripuly_heart.app.services.provider.provider_credential_verification import (
     ProviderCredentialVerificationInteractionOwner,
 )
-from puripuly_heart.app.services.provider_settings import (
+from puripuly_heart.app.services.provider.provider_settings import (
     ProviderApplicationOwner,
     ProviderSettingsOwner,
 )
-from puripuly_heart.app.services.self_capture_application import (
-    SelfCaptureApplicationOwner,
-)
-from puripuly_heart.app.services.settings_application import (
+from puripuly_heart.app.services.settings.settings_application import (
     SettingsApplicationOwner,
     materialize_immediate_settings_intent,
     materialize_prompt_apply_intent,
     materialize_provider_apply_intent,
     settings_view_surface_snapshots,
 )
-from puripuly_heart.app.services.settings_projection import (
+from puripuly_heart.app.services.settings.settings_projection import (
     SettingsProjectionOwner,
 )
 from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
-from puripuly_heart.app.wiring_audio_test import AudioTestRuntime
-from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
-from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
-from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
+from puripuly_heart.app.wiring.wiring_audio_test import AudioTestRuntime
+from puripuly_heart.app.wiring.wiring_managed_account import ManagedAccountComponents
+from puripuly_heart.app.wiring.wiring_peer_application import PeerApplicationRuntime
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import RuntimePipelineHandle
 from puripuly_heart.config.alibaba_connection import AlibabaEndpointMode, AlibabaRegion
 from puripuly_heart.config.prompts import resolve_system_prompt
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext

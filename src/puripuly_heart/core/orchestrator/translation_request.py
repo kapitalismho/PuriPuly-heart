@@ -18,13 +18,15 @@ from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.language import get_llm_language_name, map_detected_language_for_llm
 from puripuly_heart.core.llm.latency import observe_request
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
-from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterUserFacingError
 from puripuly_heart.core.messages import (
     SEVERITY_ERROR,
     ErrorDiagnostics,
     SafeMessageParam,
     UserErrorReport,
     UserMessageRef,
+)
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
+    ManagedOpenRouterUserFacingError,
 )
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime, ContextEntry
 from puripuly_heart.core.orchestrator.configuration import (
