@@ -148,13 +148,6 @@ def _with_star_success(settings: AppSettingsVNext) -> AppSettingsVNext:
     )
 
 
-def test_official_byok_fixture_uses_supported_model_provider_combo() -> None:
-    settings = _settings_for_connection("official_byok")
-
-    assert settings.intent.translation.model == "deepseek_v4_flash_41"
-    assert settings.intent.translation.connection == "official_byok"
-
-
 def test_github_star_prompt_is_eligible_for_managed_remaining_percent_at_threshold() -> None:
     controller = _prompt_backend_for(_settings_for_connection("managed"))
     controller._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(

@@ -2992,32 +2992,6 @@ mod tests {
     }
 
     #[test]
-    fn direct_native_owner_uses_and_reports_p05_defaults() {
-        let mut owner = NativePresentationOwner::new(
-            OverlayPresentationSnapshot::default(),
-            CaptionRenderer::new_for_test().unwrap(),
-            FakeOpenVr::default(),
-        );
-        assert_eq!(owner.retry_profile, "p05");
-        assert_eq!(owner.retry_policy.deadline, Duration::from_millis(500));
-        assert_eq!(owner.retry_policy.max_completed, 5);
-        owner
-            .runtime
-            .presentation_diagnostics
-            .accept_logical_revision(PresentationBackend::Test, 1, PresentationCauses::default());
-        assert_eq!(
-            owner
-                .runtime
-                .presentation_diagnostics
-                .records()
-                .back()
-                .unwrap()
-                .retry_profile,
-            "p05"
-        );
-    }
-
-    #[test]
     fn native_fresh_audit_drops_oldest_with_bounded_count() {
         let mut owner = NativePresentationOwner::new(
             OverlayPresentationSnapshot::default(),
@@ -4167,38 +4141,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn spatial_diagnostic_write_error_does_not_block_first_visible_pose_unavailable_reveal() {
-        let (mut bridge, server) = controlled_test_bridge(None).await;
-        let renderer = CaptionRenderer::new_for_test().unwrap();
-        let logger = controlled_logger(ControlledSink::new(ControlledSinkMode::Error));
-        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
-            revision: 1,
-            calibration: OverlayPresentationCalibration {
-                anchor: "spatial_locked".to_string(),
-                ..OverlayPresentationCalibration::default()
-            },
-            blocks: vec![block("self:A", "self", "A", "", true)],
-            native_fresh_render_generations: None,
-            ..Default::default()
-        });
-        runtime.first_texture_submitted = true;
-        let mut submitter = SpatialSubmitProbe {
-            outcome: SpatialReanchorOutcome::PoseUnavailable,
-            operations: Vec::new(),
-        };
-
-        let result = runtime
-            .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
-            .await;
-
-        assert!(result.is_ok());
-        assert_eq!(submitter.operations, vec!["reanchor"]);
-        assert!(runtime.redraw_requested);
-        drop(bridge);
-        server.await.unwrap();
-    }
-
-    #[tokio::test]
     async fn spatial_diagnostic_write_failure_cannot_drop_preempted_latest_frame() {
         let readiness_started = Arc::new(tokio::sync::Notify::new());
         let latest_snapshot = OverlayPresentationSnapshot {
@@ -4339,30 +4281,6 @@ mod tests {
     }
 
     #[test]
-    fn caption_blocks_follow_snapshot_order_exactly() {
-        let runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
-            native_fresh_render_generations: None,
-            revision: 3,
-            calibration: OverlayPresentationCalibration::default(),
-            blocks: vec![
-                block("peer:1", "peer", "peer one", "원문", true),
-                block("self:2", "self", "self two", "translated", true),
-            ],
-            ..Default::default()
-        });
-
-        let blocks = runtime.caption_blocks();
-
-        assert_eq!(
-            blocks
-                .iter()
-                .map(|block| (block.id.as_str(), block.primary_text.as_str()))
-                .collect::<Vec<_>>(),
-            vec![("peer:1", "peer one"), ("self:2", "self two"),]
-        );
-    }
-
-    #[test]
     fn apply_snapshot_replaces_snapshot_blocks_and_calibration_without_retaining_removed_rows() {
         let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
             native_fresh_render_generations: None,
@@ -4428,30 +4346,6 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![("self:older", "older"), ("peer:newer", "newer"),]
         );
-    }
-
-    #[test]
-    fn runtime_converts_active_peer_snapshot_to_active_peer_caption_block() {
-        let mut active_peer = slot_block("peer:active", "peer:turn-1", 1, "peer", "");
-        active_peer.block_variant = OverlayPresentationBlockVariant::ActivePeer;
-        active_peer.secondary_text = "Can you hear me?".into();
-        active_peer.secondary_enabled = true;
-        let runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
-            native_fresh_render_generations: None,
-            revision: 5,
-            calibration: OverlayPresentationCalibration::default(),
-            blocks: vec![active_peer],
-            ..Default::default()
-        });
-
-        let blocks = runtime.caption_blocks();
-
-        assert_eq!(blocks[0].id, "peer:active");
-        assert_eq!(blocks[0].block_variant, CaptionBlockVariant::ActivePeer);
-        assert_eq!(blocks[0].channel, Some(CaptionChannel::PeerChannel));
-        assert_eq!(blocks[0].primary_text, "");
-        assert_eq!(blocks[0].secondary_text, "Can you hear me?");
-        assert!(blocks[0].secondary_enabled);
     }
 
     #[tokio::test]

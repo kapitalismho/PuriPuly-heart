@@ -247,18 +247,6 @@ async def test_cancelled_transition_releases_admission_lock_and_reports_metadata
     assert diagnostics[1].outcome == "already_off"
 
 
-def test_owner_declares_cross_generation_transition_policy() -> None:
-    assert OverlaySessionTransitionOwner().lifecycle_owner_snapshot() == {
-        "owner": "OverlaySessionTransitionOwner",
-        "resource_fields": ("_lock",),
-        "operation_policy": ("serialize cross-generation overlay start and shutdown transitions"),
-        "cancellation_policy": "propagate cancellation without admitting another transition",
-        "shutdown_policy": (
-            "delegate generation teardown to OverlayRuntimeHandle before publishing completion"
-        ),
-    }
-
-
 @pytest.mark.asyncio
 async def test_start_superseded_during_teardown_does_not_launch_replacement() -> None:
     harness = StartHarness(state="failed")

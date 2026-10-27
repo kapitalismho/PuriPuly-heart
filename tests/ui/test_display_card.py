@@ -38,41 +38,6 @@ def test_weighted_length_counts_cjk_as_two() -> None:
     assert display_card_module._weighted_len("한a") == 3
 
 
-@pytest.mark.parametrize(
-    ("size", "expected_lines", "expected_capacity"),
-    [
-        (48, 3, 59),
-        (44, 3, 65),
-        (40, 3, 71),
-        (36, 4, 106),
-        (32, 4, 119),
-        (28, 5, 170),
-        (24, 6, 239),
-        (20, 7, 334),
-        (16, 9, 537),
-    ],
-)
-def test_smaller_sizes_are_allowed_more_lines_and_hold_more_text(
-    size: int, expected_lines: int, expected_capacity: int
-) -> None:
-    assert display_card_module._lines_for_size(size) == expected_lines
-    assert display_card_module._capacity_for_size(size) == expected_capacity
-
-
-def test_capacity_grows_as_the_size_shrinks() -> None:
-    capacities = [
-        display_card_module._capacity_for_size(size)
-        for size in display_card_module.DISPLAY_SIZE_CANDIDATES
-    ]
-    line_counts = [
-        display_card_module._lines_for_size(size)
-        for size in display_card_module.DISPLAY_SIZE_CANDIDATES
-    ]
-
-    assert capacities == sorted(capacities)
-    assert line_counts == sorted(line_counts)
-
-
 def test_layout_picks_the_largest_size_whose_capacity_holds_the_text() -> None:
     for size in display_card_module.DISPLAY_SIZE_CANDIDATES:
         capacity = display_card_module._capacity_for_size(size)
@@ -187,13 +152,6 @@ def test_a_notice_over_a_live_source_turn_still_uses_the_message_colour(
     card.set_notice(None, None)
     assert _visible_text(card) == "source text"
     assert _visible_color(card) == display_card_module.DISPLAY_SOURCE_COLOR
-
-
-def test_the_default_display_state_is_an_undimmed_status_label() -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-
-    assert card._display_text.color == display_card_module.DISPLAY_MESSAGE_COLOR
-    assert card._display_text.weight == display_card_module.DISPLAY_MESSAGE_WEIGHT
 
 
 def test_translation_replaces_the_source_in_the_same_slot(

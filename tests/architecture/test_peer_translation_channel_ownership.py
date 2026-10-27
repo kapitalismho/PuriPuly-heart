@@ -72,24 +72,6 @@ def test_peer_owner_has_explicit_ingress_lifecycle_and_dependencies() -> None:
     }.isdisjoint(fields)
 
 
-def test_production_peer_consumers_bind_directly_without_hub_residue() -> None:
-    paths = (
-        SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py",
-        SOURCE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py",
-        SOURCE_ROOT / "composition" / "application_runtime.py",
-    )
-
-    for path in paths:
-        source = path.read_text(encoding="utf-8")
-        assert "pipeline.hub" not in source
-        assert "components.hub" not in source
-        assert "ClientHub" not in source
-        assert "core.orchestrator.hub" not in source
-
-    assert not (SOURCE_ROOT / "core" / "orchestrator" / "hub.py").exists()
-    assert not (SOURCE_ROOT / "core" / "orchestrator" / "hub_callbacks.py").exists()
-
-
 def test_durable_callbacks_dispatch_peer_work_through_public_owner_contract() -> None:
     source = CALLBACKS_PATH.read_text(encoding="utf-8")
 

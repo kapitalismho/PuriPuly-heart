@@ -7,7 +7,6 @@ import pytest
 from puripuly_heart.app.adapters.peer_capture.peer_capture_admission import (
     PeerCaptureAdmissionAdapter,
 )
-from puripuly_heart.app.wiring import create_peer_capture_admission_adapter
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionStatus,
     PeerCaptureLanguageFacts,
@@ -125,16 +124,3 @@ async def test_adapter_propagates_readiness_exception_and_cancellation() -> None
     )
     with pytest.raises(asyncio.CancelledError):
         await adapter.admit(_config(local_provider=True))
-
-
-def test_wiring_factory_composes_internal_peer_admission_adapter() -> None:
-    async def ensure_local_ready() -> bool:
-        return True
-
-    adapter = create_peer_capture_admission_adapter(
-        runtime_available=lambda: True,
-        ensure_local_ready=ensure_local_ready,
-    )
-
-    assert isinstance(adapter, PeerCaptureAdmissionAdapter)
-    assert adapter.ensure_local_ready is ensure_local_ready

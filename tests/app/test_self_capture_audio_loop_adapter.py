@@ -7,7 +7,6 @@ import pytest
 from puripuly_heart.app.adapters.self_capture.self_capture_audio_loop import (
     SelfCaptureAudioLoopAdapter,
 )
-from puripuly_heart.app.wiring import create_self_capture_audio_loop_adapter
 
 
 @pytest.mark.asyncio
@@ -81,13 +80,3 @@ async def test_adapter_propagates_cancellation_to_owned_runner_call() -> None:
         await task
 
     assert released.is_set()
-
-
-def test_wiring_factory_composes_internal_self_audio_loop_adapter() -> None:
-    adapter = create_self_capture_audio_loop_adapter(
-        audio_gate_provider=lambda: None,
-        log_basic=lambda _message: None,
-    )
-
-    assert isinstance(adapter, SelfCaptureAudioLoopAdapter)
-    assert adapter.runner.__name__ == "run_audio_vad_loop"

@@ -39,7 +39,6 @@ from puripuly_heart.ui.overlay_peer_contract import (
     build_overlay_peer_consumer_contract,
     is_process_capture_warning_reason,
 )
-from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.views.dashboard import DashboardView
 from puripuly_heart.ui.views.settings import SettingsView
 from tests.helpers.ui_application import compose_test_ui_application_boundary
@@ -71,16 +70,6 @@ def _make_process_warning_view(
     view.set_display_text = set_display_text  # type: ignore[method-assign]
     view._sync_overlay_peer_buttons = lambda: None  # type: ignore[method-assign]
     return view, displays
-
-
-def _presentation(
-    app: object,
-    *,
-    page: object | None = None,
-) -> FletUiPresentationAdapter:
-    if page is not None:
-        setattr(app, "page", page)
-    return FletUiPresentationAdapter(app)
 
 
 def _vnext(settings: AppSettingsVNext | None = None) -> AppSettingsVNext:

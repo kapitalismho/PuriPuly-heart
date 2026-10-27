@@ -68,15 +68,6 @@ REQUIRED_SURFACES = (
     "guard_coverage",
     "blockers",
 )
-REQUIRED_SOURCE_PUBLIC_COMPATIBILITY_SURFACES = {
-    "SecretStore keys": ("secret_store",),
-    "Broker /v1": ("broker_v1",),
-    "overlay protocol and startup contract": ("overlay",),
-    "prompt fallback behavior": ("prompt_loader",),
-    "provider aliases": ("provider_aliases",),
-    "i18n key parity": ("i18n_parity",),
-    "installer identity": ("packaging",),
-}
 REQUIRED_INVENTORY_SURFACES = (
     "public_import_facades",
     "settings_runtime_compatibility",
@@ -201,12 +192,6 @@ EXPECTED_SECRET_ENV_LOOKUP_PATHS = (
         "legacy_keys": [],
         "ignored_env_vars": ["LOCAL_LLM_API_KEY"],
     },
-)
-EXPECTED_PROMPT_FALLBACK_ORDER = (
-    "{name}.md",
-    "{name}.txt",
-    "default.md",
-    "default.txt",
 )
 EXPECTED_ENCRYPTED_FILE_PASSPHRASE = "fixture-passphrase-not-secret"
 
@@ -492,22 +477,6 @@ def _assert_local_llm_optional_secret_store_only(entry: dict[str, Any]) -> None:
             os.environ["LOCAL_LLM_API_KEY"] = previous_env
 
 
-def _assert_qwen_resolved_credential_helper_preserves_legacy_fallbacks() -> None:
-    helper = wiring.require_secret_any
-
-    store = InMemorySecretStore()
-    store.set("alibaba_api_key_beijing", "fake-beijing")
-    assert (
-        helper(
-            store,
-            key="alibaba_api_key_beijing",
-            env_vars=("ALIBABA_API_KEY_BEIJING", "ALIBABA_API_KEY", "DASHSCOPE_API_KEY"),
-            legacy_keys=("alibaba_api_key",),
-        )
-        == "fake-beijing"
-    )
-
-
 def test_public_compatibility_snapshot_declares_all_required_surfaces() -> None:
     snapshot = _load_snapshot()
 
@@ -621,48 +590,6 @@ def test_guard_coverage_references_existing_tests_for_every_surface() -> None:
             assert test_name in _test_function_names(test_path), ref
 
 
-def test_source_named_public_compatibility_surfaces_have_guard_evidence() -> None:
-    snapshot = _load_snapshot()
-    coverage = snapshot["guard_coverage"]
-    inventory = _load_inventory()["compatibility_surfaces"]
-
-    assert REQUIRED_SOURCE_PUBLIC_COMPATIBILITY_SURFACES.keys() == {
-        "SecretStore keys",
-        "Broker /v1",
-        "overlay protocol and startup contract",
-        "prompt fallback behavior",
-        "provider aliases",
-        "i18n key parity",
-        "installer identity",
-    }
-    assert "prompt_fallback" in inventory
-    assert "installer_identity" in inventory
-    assert inventory["prompt_fallback"]["fixture_or_guard_refs"]
-    assert inventory["installer_identity"]["fixture_or_guard_refs"]
-
-    for source_surface, coverage_surfaces in REQUIRED_SOURCE_PUBLIC_COMPATIBILITY_SURFACES.items():
-        refs = [ref for surface in coverage_surfaces for ref in coverage[surface]]
-        assert refs, source_surface
-        for ref in refs:
-            file_name, separator, test_name = ref.partition("::")
-            assert separator == "::", ref
-            assert test_name in _test_function_names(REPO_ROOT / file_name), ref
-
-
-def test_guard_coverage_includes_overlay_python_and_installer_freeze_refs() -> None:
-    coverage = _load_snapshot()["guard_coverage"]
-
-    assert (
-        "tests/config/test_public_compatibility_surfaces.py::"
-        "test_overlay_startup_contract_snapshot_matches_python_runners_and_manifest_handoff"
-        in coverage["overlay"]
-    )
-    assert (
-        "tests/config/test_public_compatibility_surfaces.py::"
-        "test_installer_identity_snapshot_matches_inno_contract" in coverage["packaging"]
-    )
-
-
 def test_secret_store_key_registry_snapshot_matches_current_public_keys() -> None:
     snapshot = _load_snapshot()["secret_store"]
     registry_keys = tuple(snapshot["registry_keys"])
@@ -686,8 +613,6 @@ def test_secret_store_key_registry_snapshot_matches_current_public_keys() -> Non
     assert managed_identity.MANAGED_DEVICE_PUBLIC_KEY_SECRET == "managed_device_public_key"
     assert managed_identity.MANAGED_IDENTITY_BINDING_SECRET == "managed_identity_binding"
 
-    _assert_qwen_resolved_credential_helper_preserves_legacy_fallbacks()
-
 
 def test_secret_store_env_lookup_snapshot_matches_current_fallback_behavior(
     monkeypatch: pytest.MonkeyPatch,
@@ -708,27 +633,6 @@ def test_secret_store_env_lookup_snapshot_matches_current_fallback_behavior(
             _assert_local_llm_optional_secret_store_only(entry)
         else:  # pragma: no cover - snapshot guard should fail before this branch matters.
             raise AssertionError(f"unknown SecretStore lookup snapshot type: {lookup!r}")
-
-
-@pytest.mark.parametrize(
-    "current_key",
-    ["alibaba_api_key_beijing", "alibaba_api_key_singapore"],
-)
-def test_secret_store_accepts_legacy_alibaba_key_and_backfills_current_key(
-    current_key: str,
-) -> None:
-    store = InMemorySecretStore()
-    store.set("alibaba_api_key", "fake-legacy-alibaba-key")
-
-    value = wiring.require_secret_any(
-        store,
-        key=current_key,
-        env_vars=(),
-        legacy_keys=("alibaba_api_key",),
-    )
-
-    assert value == "fake-legacy-alibaba-key"
-    assert store.get(current_key) == "fake-legacy-alibaba-key"
 
 
 def test_settings_serialization_excludes_secret_store_registry_keys() -> None:

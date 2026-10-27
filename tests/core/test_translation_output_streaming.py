@@ -1312,50 +1312,6 @@ async def test_peer_partial_stt_event_remains_ignored_without_outputs_or_tasks()
 
 
 @pytest.mark.asyncio
-async def test_identical_inflight_peer_finals_reject_the_second_final() -> None:
-    parent_vad_id = uuid4()
-    sink = RecordingOverlaySink()
-    llm = RecordingSequencedTranslateLLMProvider(
-        responses=["반복 번역 1"],
-        delay_s=0.05,
-    )
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=llm,
-        osc=RecordingOscQueue(),
-        overlay_sink=sink,
-        peer_translation_enabled=True,
-    )
-
-    for created_at in (11.0, 12.0):
-        await harness.dispatch_stt_event(
-            STTFinalEvent(
-                utterance_id=parent_vad_id,
-                transcript=Transcript(
-                    utterance_id=parent_vad_id,
-                    text="repeat this",
-                    is_final=True,
-                    created_at=created_at,
-                    channel="peer",
-                ),
-            )
-        )
-    await asyncio.sleep(0)
-
-    assert not any(event.type == "peer_active_update" for event in sink.events)
-    await harness.translation_turns.wait_for_idle()
-    await harness.output_runtime.wait_for_peer_output_idle()
-
-    close_events = [event for event in sink.events if event.type == "utterance_closed"]
-    translation_events = [event for event in sink.events if event.type == "translation_final"]
-    peer_turn_ids = [event.utterance_id for event in translation_events]
-    assert [event.utterance_id for event in close_events] == peer_turn_ids
-    assert [event.source_text for event in translation_events] == ["repeat this"]
-    assert llm.calls == [(peer_turn_ids[0], "repeat this")]
-    assert _latest_peer_chatbox_decision(harness).reason == "peer_chatbox_denied"
-
-
-@pytest.mark.asyncio
 async def test_peer_overlay_applied_emits_compact_basic_latency_summary() -> None:
     runtime_logging, stream = _make_runtime_logging_capture()
     clock = FakeClock(_now=10.0)
@@ -1446,39 +1402,6 @@ async def test_peer_overlay_applied_waits_for_llm_done_and_application_receipt()
     finally:
         runtime_logging.close()
         await harness.stop()
-
-
-@pytest.mark.asyncio
-async def test_peer_overlay_success_clears_latency_timeline() -> None:
-    utterance_id = uuid4()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=SequencedTranslateLLMProvider(responses=["hello"], delay_s=0.0),
-        osc=RecordingOscQueue(),
-        overlay_sink=RecordingOverlaySink(),
-        peer_translation_enabled=True,
-        clock=FakeClock(_now=10.0),
-    )
-
-    harness.record_peer_speech_end_for_test(utterance_id)
-    await harness.dispatch_stt_event(
-        STTFinalEvent(
-            utterance_id=utterance_id,
-            transcript=Transcript(
-                utterance_id=utterance_id,
-                text="안녕",
-                is_final=True,
-                created_at=harness.clock.now(),
-                channel="peer",
-            ),
-        )
-    )
-    await harness.translation_turns.wait_for_idle()
-    await harness.output_runtime.wait_for_peer_output_idle()
-
-    assert not harness.translation_diagnostics.snapshot().timeline_keys
-    assert harness.peer_runtime.utterance_start_times == {}
-    assert harness.peer_runtime.speech_ended_ids == set()
 
 
 @pytest.mark.asyncio
@@ -1799,38 +1722,6 @@ async def test_peer_without_overlay_sink_succeeds_via_translate() -> None:
 
 
 @pytest.mark.asyncio
-async def test_peer_test_helper_returns_new_logical_turn_for_identical_text_without_overlay_sink() -> (
-    None
-):
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-    )
-
-    first_peer_turn_id = await harness.handle_peer_transcript_final_for_test(text="repeat")
-    second_peer_turn_id = await harness.handle_peer_transcript_final_for_test(text="repeat")
-
-    assert second_peer_turn_id != first_peer_turn_id
-    assert second_peer_turn_id in harness.peer_runtime.utterances
-    assert harness.peer_runtime.utterances[second_peer_turn_id].final.text == "repeat"
-
-
-@pytest.mark.asyncio
-async def test_chatbox_stays_self_final_only_while_overlay_sink_receives_peer_finals() -> None:
-    osc = RecordingOscQueue()
-    sink = RecordingOverlaySink()
-    harness = compose_translation_test_harness(stt=None, llm=None, osc=osc, overlay_sink=sink)
-
-    await harness.self_owner.submit_text("self text", source="You")
-    await harness.handle_peer_transcript_final_for_test(text="peer text")
-
-    assert len(osc.messages) == 1
-    assert osc.messages[0].text == "self text"
-    assert sink.events[-1].channel == "peer"
-
-
-@pytest.mark.asyncio
 async def test_peer_no_translation_source_only_overlay_close_remains_final() -> None:
     sink = RecordingOverlaySink()
     harness = compose_translation_test_harness(
@@ -2100,33 +1991,10 @@ async def test_peer_translation_overlay_waits_for_translation_and_includes_sourc
         assert sink.events[0].channel == "peer"
         assert sink.events[0].text == "hello"
         assert sink.events[0].source_text == "안녕"
+        assert sink.events[-1].channel == "peer"
+        assert sink.events[-1].is_final is True
     finally:
         await harness.stop()
-
-
-@pytest.mark.asyncio
-async def test_peer_translation_emits_final_only_overlay_events() -> None:
-    sink = RecordingOverlaySink()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=SequencedTranslateLLMProvider(responses=["hello"], delay_s=0.0),
-        osc=RecordingOscQueue(),
-        overlay_sink=sink,
-        peer_translation_enabled=True,
-    )
-
-    await harness.translate_peer_text_for_test("안녕")
-
-    assert [event.type for event in sink.events] == [
-        "translation_final",
-        "utterance_closed",
-    ]
-    assert not any(event.type == "translation_stream_update" for event in sink.events)
-    assert sink.events[0].channel == "peer"
-    assert sink.events[0].text == "hello"
-    assert sink.events[0].source_text == "안녕"
-    assert sink.events[1].channel == "peer"
-    assert sink.events[1].is_final is True
 
 
 @pytest.mark.asyncio
@@ -2280,24 +2148,6 @@ async def test_peer_overlay_emit_failures_still_emit_translation_done_and_deny_c
 
 
 @pytest.mark.asyncio
-async def test_overlay_sink_failures_do_not_break_chatbox_or_translation_completion() -> None:
-    sink = FailingOverlaySink()
-    osc = RecordingOscQueue()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=StubTranslateLLMProvider(text="hello"),
-        osc=osc,
-        overlay_sink=sink,
-    )
-
-    await harness.self_owner.submit_text("self text", source="You")
-    await asyncio.gather(*harness.self_runtime.translation_tasks.values(), return_exceptions=True)
-
-    assert osc.messages[0].text == "self text (hello)"
-    assert harness.translation_diagnostics.snapshot().last_error_source == "overlay_sink"
-
-
-@pytest.mark.asyncio
 async def test_translation_emits_self_translation_to_overlay_after_translation_completion() -> None:
     sink = RecordingOverlaySink()
     osc = RecordingOscQueue()
@@ -2318,10 +2168,13 @@ async def test_translation_emits_self_translation_to_overlay_after_translation_c
     ]
 
     assert osc.messages[0].text == "self text (hello)"
-    assert [event.type for event in sink.events[:2]] == [
+    assert [event.type for event in sink.events] == [
         "self_transcript_final",
         "translation_final",
+        "utterance_closed",
     ]
+    assert sink.events[-1].channel == "self"
+    assert sink.events[-1].is_final is True
     assert translation_events[-1].text == "hello"
     assert translation_events[-1].text != osc.messages[0].text
 
@@ -2367,28 +2220,6 @@ async def test_translation_newer_self_row_replaces_older_translated_self_row_wit
 
 
 @pytest.mark.asyncio
-async def test_translation_closes_self_overlay_line_after_translation_completion() -> None:
-    sink = RecordingOverlaySink()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=StubTranslateLLMProvider(text="hello"),
-        osc=RecordingOscQueue(),
-        overlay_sink=sink,
-    )
-
-    await harness.self_owner.submit_text("self text", source="You")
-    await asyncio.gather(*harness.self_runtime.translation_tasks.values(), return_exceptions=True)
-
-    assert [event.type for event in sink.events] == [
-        "self_transcript_final",
-        "translation_final",
-        "utterance_closed",
-    ]
-    assert sink.events[-1].channel == "self"
-    assert sink.events[-1].is_final is True
-
-
-@pytest.mark.asyncio
 async def test_self_translation_failure_closes_overlay_line_as_incomplete() -> None:
     sink = RecordingOverlaySink()
     harness = compose_translation_test_harness(
@@ -2406,28 +2237,6 @@ async def test_self_translation_failure_closes_overlay_line_as_incomplete() -> N
         "utterance_closed",
     ]
     assert sink.events[-1].channel == "self"
-    assert sink.events[-1].utterance_id == utterance_id
-    assert sink.events[-1].is_final is False
-
-
-@pytest.mark.asyncio
-async def test_peer_translation_failure_closes_line_as_incomplete() -> None:
-    sink = RecordingOverlaySink()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=ImmediateFailingTranslateLLMProvider(error=RuntimeError("boom")),
-        osc=RecordingOscQueue(),
-        overlay_sink=sink,
-        peer_translation_enabled=True,
-    )
-
-    utterance_id = await harness.translate_peer_text_for_test("안녕")
-
-    assert [event.type for event in sink.events] == [
-        "peer_transcript_final",
-        "utterance_closed",
-    ]
-    assert sink.events[-1].channel == "peer"
     assert sink.events[-1].utterance_id == utterance_id
     assert sink.events[-1].is_final is False
 

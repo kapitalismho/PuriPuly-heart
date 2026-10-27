@@ -7,7 +7,6 @@ import pytest
 from puripuly_heart.app.adapters.peer_capture.peer_capture_audio_loop import (
     PeerCaptureAudioLoopAdapter,
 )
-from puripuly_heart.app.wiring import create_peer_capture_audio_loop_adapter
 
 
 @pytest.mark.asyncio
@@ -68,12 +67,3 @@ async def test_adapter_propagates_cancellation_to_owned_runner_call() -> None:
         await task
 
     assert released.is_set()
-
-
-def test_wiring_factory_composes_internal_peer_audio_loop_adapter() -> None:
-    adapter = create_peer_capture_audio_loop_adapter(
-        log_basic=lambda _message: None,
-    )
-
-    assert isinstance(adapter, PeerCaptureAudioLoopAdapter)
-    assert adapter.runner.__name__ == "run_audio_vad_loop"

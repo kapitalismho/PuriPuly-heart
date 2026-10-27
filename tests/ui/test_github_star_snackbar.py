@@ -217,10 +217,6 @@ def _eligible_app(
     return app, page, backend
 
 
-async def _async_noop(*_args: object, **_kwargs: object) -> None:
-    return None
-
-
 @pytest.mark.parametrize(
     ("changes", "expected"),
     [

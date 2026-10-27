@@ -158,13 +158,6 @@ describe('broker deploy smoke helpers', () => {
     ).toThrow(/must differ from the managed allowlisted models/i);
     expect(() =>
       normalizeDisallowedModel(
-        'google/gemma-4-31b-it',
-        MANAGED_ALLOWLIST_MODELS,
-        true,
-      ),
-    ).toThrow(/must differ from the managed allowlisted models/i);
-    expect(() =>
-      normalizeDisallowedModel(
         'deepseek/deepseek-v4.1-flash-1017',
         MANAGED_ALLOWLIST_MODELS,
         true,

@@ -467,6 +467,8 @@ uv run --locked python scripts/ci/check_test_selection.py
 
 Run the affected Python partition or individual failing node using the [PR verification guide](.github/CONTRIBUTING.md#pr-verification) and [workflow selections](.github/workflows/pr-ci.yml). The workflow keeps live-provider/model integrations explicitly excluded. A focused test pass does not replace wider checks or actual-application verification.
 
+Keep a permanent test only when it adds meaningful fault detection or materially better diagnosis beyond the retained suite; compare the same failure family across files and layers before adding another case. Preserve consequential boundaries, state transitions, privacy, persistence, ordering, cancellation, recovery, and continued progress. Change-specific probes need not become permanent tests: remove redundant cases and their unused fixtures instead of moving them into helpers or larger matrices.
+
 [Broker development (Linux)](broker/README.md) · [VR overlay development (Windows)](native/overlay/README.md)
 
 ---

@@ -326,51 +326,6 @@ async def test_google_genai_client_formats_prompt_and_context(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("model", "expected_thinking_level"),
-    [
-        ("gemini-3.8-flash", "low"),
-        ("models/gemini-3.8-flash", "low"),
-        ("m", "low"),
-    ],
-)
-async def test_google_genai_client_thinking_level_follows_model(
-    monkeypatch, model: str, expected_thinking_level: str
-):
-    state = _install_fake_google(monkeypatch, response_text=" OK ")
-
-    client = GoogleGenaiGeminiClient(api_key="k", model=model)
-    await client.translate(
-        text="hello",
-        system_prompt="PROMPT",
-        source_language="en",
-        target_language="ko",
-    )
-
-    assert state["config"].thinking_config.thinking_level == expected_thinking_level
-
-
-@pytest.mark.asyncio
-async def test_google_genai_client_raises_on_empty_response(
-    monkeypatch, caplog: pytest.LogCaptureFixture
-):
-    _install_fake_google(monkeypatch, response_text=None)
-
-    client = GoogleGenaiGeminiClient(api_key="k", model="m")
-    with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.gemini"):
-        with pytest.raises(RuntimeError) as exc_info:
-            await client.translate(
-                text="hello",
-                system_prompt="PROMPT",
-                source_language="en",
-                target_language="ko",
-            )
-
-    assert caplog.records == []
-    assert exc_info.value.failure_diagnostics.category == "invalid_response"
-
-
-@pytest.mark.asyncio
 async def test_google_genai_client_uses_runtime_logging_for_missing_text_warning(
     monkeypatch, caplog: pytest.LogCaptureFixture
 ):

@@ -11,7 +11,6 @@ from puripuly_heart.config.prompts import (
     get_prompts_dir,
     get_translation_prompt_template,
     list_prompts,
-    load_prompt,
     load_prompt_for_provider,
     normalize_system_prompt_override,
     render_translation_prompt_template,
@@ -28,10 +27,6 @@ def test_load_prompt_for_llm_providers_uses_shared_translation_prompt() -> None:
     assert load_prompt_for_provider("deepseek") == raw
     assert load_prompt_for_provider("openrouter") == raw
     assert load_prompt_for_provider("local_llm") == raw
-
-
-def test_local_llm_uses_shared_translation_prompt() -> None:
-    assert load_prompt_for_provider("local_llm") == get_translation_prompt_template()
 
 
 def test_default_prompt_override_follows_packaged_prompt_changes(
@@ -233,25 +228,6 @@ def test_list_prompts_returns_sorted_names(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("PURIPULY_HEART_PROMPTS_DIR", str(prompts_dir))
 
     assert list_prompts() == ["a", "b"]
-
-
-def test_load_prompt_falls_back_to_default(tmp_path, monkeypatch) -> None:
-    prompts_dir = tmp_path / "prompts"
-    prompts_dir.mkdir()
-    (prompts_dir / "default.txt").write_text("DEFAULT", encoding="utf-8")
-
-    monkeypatch.setenv("PURIPULY_HEART_PROMPTS_DIR", str(prompts_dir))
-
-    assert load_prompt("missing") == "DEFAULT"
-
-
-def test_load_prompt_returns_empty_when_missing(tmp_path, monkeypatch) -> None:
-    prompts_dir = tmp_path / "prompts"
-    prompts_dir.mkdir()
-
-    monkeypatch.setenv("PURIPULY_HEART_PROMPTS_DIR", str(prompts_dir))
-
-    assert load_prompt("missing") == ""
 
 
 def test_load_prompt_for_provider_requires_translation_prompt_for_llm_provider(

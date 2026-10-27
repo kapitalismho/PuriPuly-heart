@@ -7,17 +7,6 @@ import pytest
 
 from puripuly_heart.core.local_asr.local_stt_runtime_installer import RuntimeLocalSTTStatusUpdate
 from puripuly_heart.core.runtime import LocalSTTDownloadRuntime
-from tests.helpers.lifecycle import assert_lifecycle_structure
-
-
-def test_local_stt_download_runtime_exposes_lifecycle_inventory_and_policy() -> None:
-    runtime = LocalSTTDownloadRuntime()
-
-    snapshot = runtime.lifecycle_owner_snapshot()
-
-    assert_lifecycle_structure(snapshot)
-    assert snapshot["owner"] == "LocalSTTDownloadRuntime"
-    assert len(snapshot["resource_fields"]) == 4
 
 
 @pytest.mark.asyncio

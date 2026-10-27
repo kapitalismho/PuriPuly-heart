@@ -1856,19 +1856,6 @@ mod tests {
     }
 
     #[test]
-    fn fake_openvr_reasserts_show_when_cached_visible_but_actual_hidden() {
-        let mut openvr = FakeOpenVr::default();
-        openvr.set_overlay_visible(true).expect("show overlay");
-        openvr.set_observed_overlay_visible(Some(false));
-
-        openvr
-            .set_overlay_visible(true)
-            .expect("reassert show overlay");
-        assert_eq!(openvr.last_call().as_deref(), Some("ShowOverlay"));
-        assert_eq!(openvr.observed_overlay_visible(), Some(true));
-    }
-
-    #[test]
     fn openvr_runtime_events_classify_fatal_reconfigure_and_ignore() {
         for (event, class) in [
             (OpenVrRuntimeEvent::Quit, OpenVrEventClass::Fatal),
@@ -2028,23 +2015,6 @@ mod tests {
         assert!(openvr.poll_runtime_events(1).is_empty());
     }
 
-    #[test]
-    fn fake_openvr_poll_runtime_events_are_bounded() {
-        let mut openvr = FakeOpenVr::default();
-        for _ in 0..8 {
-            openvr.push_runtime_event(OpenVrRuntimeEvent::Ignored(1));
-        }
-        openvr.push_runtime_event(OpenVrRuntimeEvent::Quit);
-
-        let first = openvr.poll_runtime_events(3);
-        assert_eq!(first.len(), 3);
-        assert!(first
-            .iter()
-            .all(|event| *event == OpenVrRuntimeEvent::Ignored(1)));
-        let rest = openvr.poll_runtime_events(16);
-        assert_eq!(rest.len(), 6);
-        assert_eq!(rest[5], OpenVrRuntimeEvent::Quit);
-    }
 }
 
 #[cfg(all(test, windows))]

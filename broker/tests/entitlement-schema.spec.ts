@@ -2,60 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
 
-const OPENROUTER_ENTITLEMENT_COLUMNS = [
-  'installation_id',
-  'status',
-  'budget_usd',
-  'managed_credential_ref',
-  'issued_at',
-  'expires_at',
-  'release_session_ref',
-  'release_token_hash',
-  'release_token_expires_at',
-  'verified_hardware_hash',
-  'verified_hardware_hash_salt_version',
-  'discord_user_ref',
-  'discord_issue_status',
-  'discord_issue_reserved_at',
-  'discord_issue_delivered_at',
-];
-
-describe('openrouter entitlement schema', () => {
-  it('applies the verified hardware snapshot columns to migrated test databases', () => {
-    const env = createTestBrokerEnv();
-    const columns = env.__db
-      .prepare("SELECT name FROM pragma_table_info('openrouter_entitlements') ORDER BY cid")
-      .all() as Array<{ name: string }>;
-
-    expect(columns.map((column) => column.name)).toEqual(OPENROUTER_ENTITLEMENT_COLUMNS);
-  });
-});
-
-const QQ_MANAGED_ENTITLEMENT_COLUMNS = [
-  'qq_subject_ref',
-  'status',
-  'issue_ref',
-  'managed_credential_ref',
-  'budget_usd',
-  'reserved_at',
-  'issued_at',
-  'expires_at',
-  'delivered_at',
-  'created_at',
-  'updated_at',
-  'child_key_creation_started_at',
-];
-
 describe('QQ managed entitlement schema', () => {
-  it('migrates the QQ managed entitlement table columns', () => {
-    const env = createTestBrokerEnv();
-
-    const columns = env.__db
-      .prepare("SELECT name FROM pragma_table_info('qq_managed_entitlements') ORDER BY cid")
-      .all() as Array<{ name: string }>;
-    expect(columns.map((column) => column.name)).toEqual(QQ_MANAGED_ENTITLEMENT_COLUMNS);
-  });
-
   it('enforces QQ managed entitlement state invariants and unique operational refs', () => {
     const env = createTestBrokerEnv();
     const insertEntitlement = env.__db.prepare(

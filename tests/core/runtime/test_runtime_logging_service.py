@@ -13,7 +13,6 @@ from puripuly_heart.core.runtime_logging import (
     SessionRuntimeLoggingService,
     configure_main_logging,
 )
-from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 class FakeSessionRuntimeLogging:
@@ -173,15 +172,6 @@ def _assert_close_error_is_diagnostic_safe(
         for attr_name, attr_value in public_attrs.items():
             assert not _contains_object_identity(attr_value, raw_failure), attr_name
             assert raw_message not in repr(attr_value), attr_name
-
-
-def test_runtime_logging_service_exposes_lifecycle_inventory() -> None:
-    service = RuntimeLoggingService(session_service=FakeSessionRuntimeLogging())
-
-    snapshot = service.lifecycle_owner_snapshot()
-
-    assert_lifecycle_structure(snapshot)
-    assert snapshot["owner"] == "RuntimeLoggingService"
 
 
 def test_runtime_logging_owner_requires_exactly_one_adapter_boundary() -> None:

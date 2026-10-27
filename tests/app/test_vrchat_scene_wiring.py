@@ -156,17 +156,6 @@ async def test_scene_start_and_close_callbacks_drive_owned_service(monkeypatch) 
     assert scene.closed is False
 
 
-async def test_shared_scene_survives_pipeline_resource_close(monkeypatch) -> None:
-    _patch_backend(monkeypatch)
-    scene = FakeSceneService()
-
-    pipeline = await compose_runtime_pipeline(**_compose_kwargs(), vrchat_scene=scene)
-    await pipeline.resource_owner.close()
-
-    assert scene.closed is False
-    assert pipeline.resource_owner.vrchat_scene is None
-
-
 async def test_owned_scene_closes_with_pipeline_resources(monkeypatch) -> None:
     _patch_backend(monkeypatch)
 

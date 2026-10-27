@@ -547,18 +547,6 @@ def test_output_snapshot_distinguishes_attempt_from_presented_runtime_and_failur
     assert failed["presentation_ready"] is False
 
 
-def test_connect_transition_keeps_peer_activation_starting_alive() -> None:
-    recorder = Recorder()
-    owner = make_owner(recorder)
-
-    owner.mark_connected()
-
-    assert owner.state == "connected"
-    assert recorder.cancel_peer_activation_calls == 0
-    assert recorder.sync_peer_effective_calls == 1
-    assert recorder.states == [("connected", None)]
-
-
 def test_failure_transition_cancels_peer_activation_starting() -> None:
     for failure_reason in (
         "startup_timeout",
@@ -585,38 +573,6 @@ def test_disconnect_transitions_cancel_peer_activation_starting() -> None:
     owner.on_runtime_crashed()
 
     assert recorder.cancel_peer_activation_calls == 2
-
-
-async def test_internal_steamvr_fallback_keeps_one_visible_peer_activation() -> None:
-    recorder = Recorder()
-    owner = make_owner(recorder)
-    owner.state = "starting"
-    owner.active_target = "steamvr"
-    owner._notify_state()
-
-    async def start_desktop() -> None:
-        runtime = owner.new_runtime()
-        owner._mark_starting(runtime, owner.effective_target_for_start())
-
-    owner.fallback_owner.start_overlay = start_desktop
-
-    await owner.handle_start_failure("steamvr_not_running")
-    fallback_task = owner.fallback_owner.task
-    assert fallback_task is not None
-    await fallback_task
-
-    recorder.peer_effective_enabled = True
-    owner.mark_connected()
-
-    assert recorder.cancel_peer_activation_calls == 0
-    assert recorder.states == [("starting", None), ("connected", None)]
-    assert recorder.peer_surface_states == ["starting", "on"]
-    assert owner.snapshot.fallback_active is True
-    assert owner.active_target == "desktop"
-    assert any(
-        "policy=retry_every_enable reason=steamvr_not_running" in message
-        for message in recorder.logs
-    )
 
 
 async def test_retry_every_enable_policy_retries_configured_steamvr_after_disable() -> None:
@@ -775,31 +731,6 @@ async def test_fallback_teardown_failed_terminates_real_peer_activation() -> Non
 
     harness.assert_terminal_fallback_failure()
     assert harness.overlay.fallback_owner.task is None
-
-
-async def test_watch_runtime_restarts_connected_crash_and_keeps_peer_activation() -> None:
-    recorder = Recorder()
-    owner = make_owner(recorder)
-    runtime = owner.new_runtime()
-    manager = SimpleNamespace(
-        state="failed",
-        restart_scheduled=True,
-        failure_reason="runtime_crashed",
-        restart_refill_ready=False,
-    )
-    runtime.attach_process_manager(manager)
-    owner.state = "connected"
-    owner._transition_owner = cast(object, FixedStartTransition("started"))
-    monitor = asyncio.get_running_loop().create_future()
-    monitor.set_result(None)
-
-    await owner.watch_runtime(manager, monitor, runtime=runtime)
-    await owner._recovery_task
-
-    assert owner.auto_restart_scheduled is True
-    assert owner.state == "starting"
-    assert owner.failure_reason is None
-    assert recorder.cancel_peer_activation_calls == 0
 
 
 async def test_watch_runtime_does_not_restart_when_shutdown_was_not_scheduled() -> None:

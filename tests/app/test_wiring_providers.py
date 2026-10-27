@@ -42,8 +42,6 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
     self_stt_runtime_intent_from_vnext,
 )
 from puripuly_heart.config.provider_values import (
-    DeepSeekLLMModel,
-    GeminiLLMModel,
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
@@ -159,13 +157,10 @@ def _vnext(
     openrouter_alias: str | None = None,
     openrouter_routing: str | None = None,
     openrouter_routing_mode: str | None = None,
-    gemini_model: str | None = None,
     qwen_model: str | None = None,
     qwen_region: str | None = None,
-    deepseek_model: str | None = None,
     stt_provider: str | None = None,
     peer_stt_provider: str | None = None,
-    low_latency: bool | None = None,
     local_base_url: str | None = None,
     local_model: str | None = None,
     local_extra_body: dict[str, object] | None = None,
@@ -203,11 +198,6 @@ def _vnext(
         translation = replace(translation, concurrency_limit=concurrency_limit)
     if openrouter_routing_mode is not None:
         translation = replace(translation, openrouter_routing_mode=openrouter_routing_mode)
-    if gemini_model is not None:
-        translation = replace(
-            translation,
-            gemini=replace(translation.gemini, llm_model=gemini_model),
-        )
     if qwen_model is not None or qwen_region is not None:
         translation = replace(
             translation,
@@ -217,18 +207,11 @@ def _vnext(
                 region=qwen_region or translation.qwen.region,
             ),
         )
-    if deepseek_model is not None:
-        translation = replace(
-            translation,
-            deepseek=replace(translation.deepseek, llm_model=deepseek_model),
-        )
     if http_extension_id is not None:
         translation = replace(translation, http_extension_id=http_extension_id)
     stt = settings.intent.stt
     if stt_provider is not None:
         stt = replace(stt, provider=stt_provider)
-    if low_latency is not None:
-        stt = replace(stt, low_latency_mode=low_latency)
     if custom_vocabulary_enabled is not None:
         stt = replace(stt, custom_vocabulary_enabled=custom_vocabulary_enabled)
     if custom_terms is not None:
@@ -446,67 +429,19 @@ def _resolved_stt_config(
     )
 
 
-def test_resolved_peer_stt_config_constructor_exposes_provider_fields() -> None:
-    resolved = ResolvedPeerSTTConfig(
-        provider=STTProviderName.SONIOX,
-        source_language="zh-CN",
-        sample_rate_hz=16000,
-        keyterms=("Airi", "Shinano"),
-        deepgram_model="nova-peer",
-        qwen_region=QwenRegion.SINGAPORE,
-        soniox_model="stt-rt-v4-peer",
-        soniox_endpoint="wss://peer-soniox.example/realtime",
-        soniox_keepalive_interval_s=12.5,
-        soniox_trailing_silence_ms=700,
-    )
-
-    assert resolved.provider is STTProviderName.SONIOX
-    assert resolved.source_language == "zh-CN"
-    assert resolved.sample_rate_hz == 16000
-    assert resolved.keyterms == ("Airi", "Shinano")
-    assert resolved.deepgram_model == "nova-peer"
-    assert resolved.qwen_region is QwenRegion.SINGAPORE
-    assert resolved.soniox_model == "stt-rt-v4-peer"
-    assert resolved.soniox_endpoint == "wss://peer-soniox.example/realtime"
-    assert resolved.soniox_keepalive_interval_s == 12.5
-    assert resolved.soniox_trailing_silence_ms == 700
-
-
 def test_create_llm_provider_gemini_uses_secret_and_concurrency_limit() -> None:
     settings = _vnext(llm="gemini", concurrency_limit=3)
-    secrets = InMemorySecretStore()
-    secrets.set("google_api_key", "k")
-
-    provider = create_llm_provider(settings, secrets=secrets)
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner.primary, GeminiLLMProvider)
-    assert provider.inner.primary.api_key == "k"
-    assert provider.inner.primary.model == "gemini-3.8-flash"
-    assert_bounded_concurrency(provider, 3)
-
-
-def test_create_llm_provider_gemini_uses_selected_model() -> None:
-    settings = _vnext(llm="gemini", gemini_model=GeminiLLMModel.GEMINI_FLASH.value)
-    secrets = InMemorySecretStore()
-    secrets.set("google_api_key", "k")
-
-    provider = create_llm_provider(settings, secrets=secrets)
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner.primary, GeminiLLMProvider)
-    assert provider.inner.primary.model == "gemini-3.8-flash"
-
-
-def test_create_llm_provider_gemini_passes_runtime_logging() -> None:
-    settings = _vnext(llm="gemini")
     secrets = InMemorySecretStore()
     secrets.set("google_api_key", "k")
     runtime_logging = object()
 
     provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
-
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner.primary, GeminiLLMProvider)
+    assert provider.inner.primary.api_key == "k"
+    assert provider.inner.primary.model == "gemini-3.8-flash"
     assert provider.inner.primary.runtime_logging is runtime_logging
+    assert_bounded_concurrency(provider, 3)
 
 
 def test_create_llm_provider_qwen_uses_secret() -> None:
@@ -514,25 +449,14 @@ def test_create_llm_provider_qwen_uses_secret() -> None:
     secrets = InMemorySecretStore()
     # Default region is Beijing, so we need alibaba_api_key_beijing
     secrets.set("alibaba_api_key_beijing", "k2")
+    runtime_logging = object()
 
-    provider = create_llm_provider(settings, secrets=secrets)
+    provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner.primary, AsyncQwenLLMProvider)
     assert provider.inner.primary.api_key == "k2"
     assert provider.inner.primary.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
     assert provider.inner.primary.model == "qwen3.8-flash"
-
-
-def test_create_llm_provider_qwen_low_latency_passes_runtime_logging() -> None:
-    settings = _vnext(llm="qwen")
-    secrets = InMemorySecretStore()
-    secrets.set("alibaba_api_key_beijing", "k2")
-    runtime_logging = object()
-
-    provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner.primary, AsyncQwenLLMProvider)
     assert provider.inner.primary.runtime_logging is runtime_logging
 
 
@@ -568,94 +492,21 @@ def test_create_llm_provider_qwen_uses_legacy_alibaba_secret_key() -> None:
     assert secrets.get("alibaba_api_key_beijing") == "legacy-k2"
 
 
-def test_create_llm_provider_qwen_historical_false_still_uses_async_provider() -> None:
-    settings = _vnext(
-        llm="qwen",
-        low_latency=False,
-        qwen_model=QwenLLMModel.QWEN_38_FLASH.value,
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("alibaba_api_key_beijing", "k2")
-
-    provider = create_llm_provider(settings, secrets=secrets)
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner.primary, AsyncQwenLLMProvider)
-    assert provider.inner.primary.api_key == "k2"
-    assert provider.inner.primary.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    assert provider.inner.primary.model == "qwen3.8-flash"
-
-
-def test_create_llm_provider_qwen_historical_false_passes_runtime_logging() -> None:
-    settings = _vnext(llm="qwen", low_latency=False)
-    secrets = InMemorySecretStore()
-    secrets.set("alibaba_api_key_beijing", "k2")
-    runtime_logging = object()
-
-    provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner.primary, AsyncQwenLLMProvider)
-    assert provider.inner.primary.runtime_logging is runtime_logging
-
-
-def test_create_llm_provider_qwen_historical_false_uses_async_singapore() -> None:
-    settings = _vnext(
-        llm="qwen",
-        qwen_region=QwenRegion.SINGAPORE.value,
-        qwen_model=QwenLLMModel.QWEN_35_FLASH.value,
-        low_latency=False,
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("alibaba_api_key_singapore", "k3")
-
-    provider = create_llm_provider(settings, secrets=secrets)
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner.primary, AsyncQwenLLMProvider)
-    assert provider.inner.primary.api_key == "k3"
-    assert (
-        provider.inner.primary.base_url == "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-    )
-    assert provider.inner.primary.model == "qwen3.5-flash"
-
-
 def test_create_llm_provider_deepseek_uses_secret_and_model() -> None:
     settings = _vnext(llm="deepseek", concurrency_limit=4)
     secrets = InMemorySecretStore()
     secrets.set("deepseek_api_key", "ds-key")
+    runtime_logging = object()
 
-    provider = create_llm_provider(settings, secrets=secrets)
+    provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
 
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner.primary, DeepSeekLLMProvider)
     assert provider.inner.primary.api_key == "ds-key"
     assert provider.inner.primary.model == "deepseek-flash"
     assert provider.inner.primary.base_url == "https://api.deepseek.com"
-    assert_bounded_concurrency(provider, 4)
-
-
-def test_create_llm_provider_deepseek_uses_flash_model() -> None:
-    settings = _vnext(llm="deepseek", deepseek_model=DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value)
-    secrets = InMemorySecretStore()
-    secrets.set("deepseek_api_key", "ds-key")
-
-    provider = create_llm_provider(settings, secrets=secrets)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner.primary, DeepSeekLLMProvider)
-    assert provider.inner.primary.model == "deepseek-flash"
-
-
-def test_create_llm_provider_deepseek_passes_runtime_logging() -> None:
-    settings = _vnext(llm="deepseek")
-    secrets = InMemorySecretStore()
-    secrets.set("deepseek_api_key", "ds-key")
-    runtime_logging = object()
-
-    provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner.primary, DeepSeekLLMProvider)
     assert provider.inner.primary.runtime_logging is runtime_logging
+    assert_bounded_concurrency(provider, 4)
 
 
 def test_create_llm_provider_local_llm_uses_settings_without_secret(
@@ -761,8 +612,9 @@ def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "or-key")
+    runtime_logging = object()
 
-    provider = create_llm_provider(settings, secrets=secrets)
+    provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
 
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
@@ -770,6 +622,7 @@ def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
     assert provider.inner.primary.model == "google/gemma-4-26b-a4b-it"
     assert provider.inner.primary.base_url == "https://openrouter.ai/api/v1"
     assert provider.inner.primary.routing_mode == OpenRouterRoutingMode.LATENCY
+    assert provider.inner.primary.runtime_logging is runtime_logging
     assert_bounded_concurrency(provider, 4)
 
 
@@ -802,25 +655,6 @@ def test_create_llm_provider_from_resolved_openrouter_gemini_byok_uses_google_la
     assert provider.inner.routing_mode == OpenRouterRoutingMode.LATENCY
     assert provider.inner.provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
     assert_bounded_concurrency(provider, 3)
-
-
-def test_create_llm_provider_openrouter_byok_still_uses_user_owned_secret_after_pkce_storage() -> (
-    None
-):
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_source="byok",
-        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value,
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("openrouter_api_key", "pkce-user-key")
-    secrets.set("openrouter_managed_api_key", "managed-key")
-
-    provider = create_llm_provider(settings, secrets=secrets)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
-    assert provider.inner.primary.api_key == "pkce-user-key"
 
 
 def test_create_llm_provider_canonical_qwen_byok_uses_selected_model() -> None:
@@ -866,22 +700,6 @@ def test_create_llm_provider_openrouter_qwen_byok_deepseek_only_keeps_identity_h
     assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
     assert provider.inner.primary.model == OpenRouterLLMModel.QWEN_35_FLASH_02_23.value
     assert provider.inner.primary.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
-
-
-def test_create_llm_provider_openrouter_passes_runtime_logging() -> None:
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_source="byok",
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("openrouter_api_key", "or-key")
-    runtime_logging = object()
-
-    provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
-    assert provider.inner.primary.runtime_logging is runtime_logging
 
 
 def test_create_llm_provider_openrouter_uses_env_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1557,20 +1375,6 @@ def test_resolve_overlay_config_maps_desktop_flet_to_resolved_desktop_options() 
     assert "desktop_flet" not in resolved.desktop_overlay_options
 
 
-def test_create_stt_backend_deepgram_uses_settings_and_secret() -> None:
-    settings = _vnext(stt_provider="deepgram", deepgram_model="nova-3")
-    secrets = InMemorySecretStore()
-    secrets.set("deepgram_api_key", "k3")
-
-    backend = create_stt_backend(settings, secrets=secrets)
-    assert isinstance(backend, DeepgramRealtimeSTTBackend)
-    assert backend.api_key == "k3"
-    assert backend.model == "nova-3"
-    assert backend.sample_rate_hz == 16000
-    assert backend.language == get_deepgram_language(settings.intent.languages.source_language)
-    assert list(backend.keyterms) == []
-
-
 def test_create_stt_backend_deepgram_passes_effective_custom_terms() -> None:
     settings = _vnext(
         stt_provider="deepgram",
@@ -1585,18 +1389,6 @@ def test_create_stt_backend_deepgram_passes_effective_custom_terms() -> None:
 
     assert isinstance(backend, DeepgramRealtimeSTTBackend)
     assert list(backend.keyterms) == ["Puripuly", "VRChat"]
-
-
-def test_create_stt_backend_local_qwen_uses_shared_model_path_without_secret() -> None:
-    settings = _vnext(stt_provider="local_qwen")
-    secrets = InMemorySecretStore()
-
-    backend = create_stt_backend(settings, secrets=secrets)
-
-    assert isinstance(backend, LocalQwenSherpaSTTBackend)
-    assert backend.model_dir == default_local_stt_model_dir()
-    assert backend.sample_rate_hz == 16000
-    assert backend.stream_label == "self"
 
 
 def test_create_stt_backend_local_qwen_passes_language_hint_without_hotwords() -> None:
@@ -1636,6 +1428,8 @@ def test_create_peer_stt_backend_uses_dedicated_deepgram_configuration_without_h
         stt_provider="soniox",
         peer_stt_provider="deepgram",
         deepgram_model="nova-3",
+        source_language="ko",
+        peer_source_language="zh-CN",
     )
     secrets = InMemorySecretStore()
     secrets.set("deepgram_api_key", "peer-k")
@@ -1651,40 +1445,6 @@ def test_create_peer_stt_backend_uses_dedicated_deepgram_configuration_without_h
     )
     assert list(backend.keyterms) == []
     assert backend.stream_label == "peer"
-
-
-def test_create_peer_stt_backend_uses_effective_peer_source_language_without_hint_terms() -> None:
-    settings = _vnext(
-        stt_provider="soniox",
-        peer_stt_provider="deepgram",
-        deepgram_model="nova-3",
-        source_language="ko",
-        peer_source_language="zh-CN",
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("deepgram_api_key", "peer-k")
-
-    backend = create_peer_stt_backend(settings, secrets=secrets)
-
-    assert isinstance(backend, DeepgramRealtimeSTTBackend)
-    assert backend.language == get_deepgram_language(
-        settings.intent.languages.effective_peer_source
-    )
-    assert list(backend.keyterms) == []
-
-
-def test_self_stt_provider_setting_does_not_change_peer_backend_choice() -> None:
-    secrets = InMemorySecretStore()
-    secrets.set("deepgram_api_key", "peer-k")
-
-    soniox_settings = _vnext(stt_provider="soniox", peer_stt_provider="deepgram")
-    qwen_settings = _vnext(stt_provider="qwen_audio", peer_stt_provider="deepgram")
-
-    soniox_backend = create_peer_stt_backend(soniox_settings, secrets=secrets)
-    qwen_backend = create_peer_stt_backend(qwen_settings, secrets=secrets)
-
-    assert isinstance(soniox_backend, DeepgramRealtimeSTTBackend)
-    assert isinstance(qwen_backend, DeepgramRealtimeSTTBackend)
 
 
 def test_resolve_peer_stt_config_always_uses_self_deepgram_model() -> None:
@@ -2164,18 +1924,6 @@ def test_peer_stt_provider_signature_tracks_qwen_audio_language_hints() -> None:
     ) != build_peer_stt_provider_signature_from_vnext(manual_settings)
 
 
-def test_create_peer_stt_backend_uses_peer_local_qwen_provider_and_fixed_sample_rate() -> None:
-    settings = _vnext(peer_stt_provider="local_qwen")
-    secrets = InMemorySecretStore()
-
-    backend = create_peer_stt_backend(settings, secrets=secrets)
-
-    assert isinstance(backend, LocalQwenSherpaSTTBackend)
-    assert backend.model_dir == default_local_stt_model_dir()
-    assert backend.sample_rate_hz == 16000
-    assert backend.stream_label == "peer"
-
-
 def test_create_peer_stt_backend_local_qwen_uses_peer_language_without_hotwords() -> None:
     settings = _vnext(
         peer_stt_provider="local_qwen",
@@ -2598,17 +2346,6 @@ def test_rolling_backend_rebinds_only_the_changed_member() -> None:
     with pytest.raises(RuntimeError, match="was not prepared"):
         by_name["gemini_transcribe"].build_backend()
     assert by_name["deepgram"].build_backend() is deepgram_backend
-
-
-def test_create_stt_backend_soniox_uses_secret() -> None:
-    settings = _vnext(stt_provider="soniox")
-    secrets = InMemorySecretStore()
-    secrets.set("soniox_api_key", "k6")
-
-    backend = create_stt_backend(settings, secrets=secrets)
-    assert isinstance(backend, SonioxRealtimeSTTBackend)
-    assert backend.api_key == "k6"
-    assert list(backend.context_terms) == []
 
 
 def test_create_stt_backend_soniox_passes_effective_custom_terms() -> None:

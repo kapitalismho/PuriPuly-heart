@@ -319,6 +319,15 @@ async def test_gpu_start_failure_falls_back_internally_to_cpu(tmp_path: Path) ->
         system_prompt="translate",
         vulkan_device="Vulkan1",
     )
+    repeated = await owner.prepare(
+        backend="gpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt="translate",
+        vulkan_device="Vulkan1",
+    )
+
+    assert repeated == readiness
 
     assert readiness.requested_backend == "gpu"
     assert readiness.effective_backend == "cpu"
@@ -426,7 +435,7 @@ async def test_release_stops_process_and_allows_reselection_but_close_is_termina
 
 @pytest.mark.asyncio
 async def test_vulkan_prefill_failure_stops_gpu_and_prepares_cpu_prefix(tmp_path: Path) -> None:
-    owner, commands, processes, transports, _provision_calls, logs = _runtime(
+    owner, commands, processes, transports, provision_calls, logs = _runtime(
         tmp_path,
         transport_failures=(RuntimeError("Vulkan inference failed"), None),
     )
@@ -437,6 +446,15 @@ async def test_vulkan_prefill_failure_stops_gpu_and_prepares_cpu_prefix(tmp_path
         target_language="en",
         system_prompt="translate",
     )
+    repeated = await owner.prepare(
+        backend="gpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt="translate",
+    )
+
+    assert repeated == readiness
+    assert len(provision_calls) == 1
 
     assert readiness.effective_backend == "cpu"
     assert len(commands) == 2
@@ -574,52 +592,6 @@ async def test_cancel_exclusive_prefix_retains_cleanup_failure_until_release_ret
     await owner.release()
     assert transports[0].closed
     await owner.close()
-
-
-@pytest.mark.asyncio
-async def test_repeated_gpu_request_reuses_cpu_fallback_and_prefix(tmp_path: Path) -> None:
-    owner, commands, _processes, transports, provision_calls, _logs = _runtime(
-        tmp_path,
-        fail_gpu=True,
-    )
-    arguments = {
-        "backend": "gpu",
-        "source_language": "ko",
-        "target_language": "en",
-        "system_prompt": "translate",
-    }
-
-    first = await owner.prepare(**arguments)
-    second = await owner.prepare(**arguments)
-
-    assert first == second
-    assert first.effective_backend == "cpu"
-    assert len(commands) == 2
-    assert len(provision_calls) == 1
-    assert transports[0].prefixes == ["translate"]
-
-
-@pytest.mark.asyncio
-async def test_repeated_gpu_request_reuses_cpu_after_prefill_fallback(tmp_path: Path) -> None:
-    owner, commands, _processes, transports, provision_calls, _logs = _runtime(
-        tmp_path,
-        transport_failures=(RuntimeError("Vulkan inference failed"), None),
-    )
-    arguments = {
-        "backend": "gpu",
-        "source_language": "ko",
-        "target_language": "en",
-        "system_prompt": "translate",
-    }
-
-    first = await owner.prepare(**arguments)
-    second = await owner.prepare(**arguments)
-
-    assert first == second
-    assert first.effective_backend == "cpu"
-    assert len(commands) == 2
-    assert len(provision_calls) == 1
-    assert transports[1].prefixes == ["translate"]
 
 
 @pytest.mark.asyncio

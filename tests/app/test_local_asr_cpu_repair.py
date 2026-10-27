@@ -668,18 +668,3 @@ async def test_non_manual_success_clears_switched_intent_without_resume() -> Non
     assert calls == []
     assert owner.snapshot.self_pending is False
     assert owner.snapshot.peer_pending is False
-
-
-def test_owner_lifecycle_inventory_declares_state_without_resources() -> None:
-    provisioning = RecordingProvisioning(_snapshot())
-    owner = _owner(provisioning, [_state()])
-
-    inventory = owner.lifecycle_owner_snapshot()
-
-    assert inventory["owner"] == "LocalASRCpuRepairOwner"
-    assert inventory["state_fields"] == (
-        "_self_pending",
-        "_self_activation_generation",
-        "_peer_pending",
-    )
-    assert inventory["shutdown_policy"] == "no task or external resource is retained"

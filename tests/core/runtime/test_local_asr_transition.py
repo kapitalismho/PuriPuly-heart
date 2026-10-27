@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import pytest
 
+from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.runtime import local_asr_transition
 from puripuly_heart.core.runtime.local_asr_transition import (
     LocalASRSessionOptions,
     LocalASRTransitionCoordinator,
@@ -33,9 +36,39 @@ def request(model_id: str) -> LocalASRTransitionRequest:
     )
 
 
+@pytest.mark.parametrize(
+    ("admission", "first_status", "expected_models"),
+    [
+        ("during_stabilization", "superseded", ["qwen"]),
+        ("after_first_commit", "applied", ["parakeet-v3", "qwen"]),
+    ],
+)
 @pytest.mark.asyncio
-async def test_stabilization_prepares_only_latest_request() -> None:
-    coordinator = LocalASRTransitionCoordinator(channel="self", stabilization_s=0.02)
+async def test_stabilization_respects_second_request_admission_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+    admission: str,
+    first_status: str,
+    expected_models: list[str],
+) -> None:
+    clock = FakeClock()
+    stabilization_entered = asyncio.Event()
+    expire = asyncio.Event()
+
+    async def controlled_expiry(waiter, *, timeout: float) -> None:
+        stabilization_entered.set()
+        try:
+            await expire.wait()
+            clock.advance(timeout)
+        finally:
+            waiter.close()
+        raise TimeoutError
+
+    controlled_asyncio = SimpleNamespace(**vars(asyncio))
+    controlled_asyncio.wait_for = controlled_expiry
+    monkeypatch.setattr(local_asr_transition, "asyncio", controlled_asyncio)
+    coordinator = LocalASRTransitionCoordinator(
+        channel="self", stabilization_s=0.02, clock=clock.now
+    )
     prepared_models: list[str] = []
     committed_models: list[str] = []
 
@@ -56,18 +89,32 @@ async def test_stabilization_prepares_only_latest_request() -> None:
     first = asyncio.create_task(
         coordinator.request_transition(request("parakeet-v3"), prepare=prepare, commit=commit)
     )
-    await asyncio.sleep(0.005)
-    second = asyncio.create_task(
-        coordinator.request_transition(request("qwen"), prepare=prepare, commit=commit)
-    )
+    try:
+        await stabilization_entered.wait()
+        assert prepared_models == committed_models == []
+        if admission == "during_stabilization":
+            second = asyncio.create_task(
+                coordinator.request_transition(request("qwen"), prepare=prepare, commit=commit)
+            )
+            first_outcome = await first
+            assert prepared_models == committed_models == []
+            expire.set()
+            second_outcome = await second
+        else:
+            expire.set()
+            first_outcome = await first
+            assert committed_models == ["parakeet-v3"]
+            second_outcome = await coordinator.request_transition(
+                request("qwen"), prepare=prepare, commit=commit
+            )
 
-    first_outcome, second_outcome = await asyncio.gather(first, second)
-
-    assert first_outcome.status == "superseded"
-    assert second_outcome.status == "applied"
-    assert prepared_models == ["qwen"]
-    assert committed_models == ["qwen"]
-    await coordinator.close()
+        assert first_outcome.status == first_status
+        assert second_outcome.status == "applied"
+        assert prepared_models == expected_models
+        assert committed_models == expected_models
+    finally:
+        expire.set()
+        await coordinator.close()
 
 
 @pytest.mark.asyncio

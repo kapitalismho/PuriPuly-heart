@@ -26,7 +26,6 @@ from puripuly_heart.core.runtime.output_batch import OUTPUT_BATCH_MAX_UNSENT
 from puripuly_heart.domain.models import OSCMessage, Transcript
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from tests.helpers.fakes import FakeSender
-from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 def _output_runtime_class():
@@ -318,17 +317,6 @@ async def _publish_peer_overlay(owner, event, *, source_order: int = 1):
         publication_generation=1,
         source_order=source_order,
     )
-
-
-def test_output_runtime_exposes_lifecycle_inventory_and_policy() -> None:
-    OutputRuntime = _output_runtime_class()
-    owner = OutputRuntime(chatbox=RecordingChatbox(), clock=FakeClock(_now=10.0))
-
-    snapshot = owner.lifecycle_owner_snapshot()
-
-    assert_lifecycle_structure(snapshot)
-    assert snapshot["owner"] == "OutputRuntime"
-    assert "overlay_event_adapter" in snapshot["resource_fields"]
 
 
 @pytest.mark.asyncio

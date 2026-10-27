@@ -18,7 +18,6 @@ import {
 } from '../src/openrouter-management';
 import { handleScheduled, reconcileStaleManagedKeyDeliveries } from '../src/scheduled';
 import { normalizedErrorEnvelope } from './test-support/errors';
-import { BROKER_MIGRATION_FILENAMES } from './test-support/migrations';
 import {
   createTestBrokerEnv,
   seedRequestEvent,
@@ -31,20 +30,8 @@ describe('managed key delivery ACK foundation', () => {
     vi.unstubAllGlobals();
   });
 
-  it('orders migration 0012 after telemetry 0011 and creates delivery ACK schema', () => {
+  it('accepts delivery-pending entitlement rows for Discord and QQ', () => {
     const env = createTestBrokerEnv();
-
-    expect(BROKER_MIGRATION_FILENAMES).toEqual(
-      expect.arrayContaining([
-        '0011_add_telemetry_active_days.sql',
-        '0012_add_managed_key_delivery_ack.sql',
-      ]),
-    );
-    expect(
-      BROKER_MIGRATION_FILENAMES.indexOf('0012_add_managed_key_delivery_ack.sql'),
-    ).toBe(
-      BROKER_MIGRATION_FILENAMES.indexOf('0011_add_telemetry_active_days.sql') + 1,
-    );
 
     env.__db
       .prepare(
@@ -87,38 +74,6 @@ describe('managed key delivery ACK foundation', () => {
         '2026-08-05T00:00:00.000Z',
       );
     expect(Number(qqDeliveryPending.changes)).toBe(1);
-
-    const deliveryColumns = env.__db
-      .prepare("SELECT name FROM pragma_table_info('managed_key_deliveries') ORDER BY cid")
-      .all() as Array<{ name: string }>;
-    expect(deliveryColumns.map(({ name }) => name)).toEqual([
-      'delivery_id',
-      'issue_source',
-      'subject_ref',
-      'installation_id',
-      'managed_credential_ref',
-      'ack_token_hash',
-      'status',
-      'created_at',
-      'expires_at',
-      'acknowledged_at',
-      'failed_at',
-      'failure_reason',
-      'operation_id',
-      'attempt_index',
-    ]);
-
-    const indexes = env.__db
-      .prepare("SELECT name FROM pragma_index_list('managed_key_deliveries') ORDER BY name")
-      .all() as Array<{ name: string }>;
-    expect(indexes.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        'idx_managed_key_deliveries_issue_source_created_at',
-        'idx_managed_key_deliveries_managed_credential_ref',
-        'idx_managed_key_deliveries_operation_id',
-        'idx_managed_key_deliveries_status_expires_at',
-      ]),
-    );
   });
 
   it('creates pending delivery rows with hashed ACK tokens only', async () => {

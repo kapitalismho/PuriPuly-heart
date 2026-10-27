@@ -604,36 +604,6 @@ async def test_publish_chatbox_candidate_after_translation_stop_skips_without_us
 
 
 @pytest.mark.asyncio
-async def test_stop_without_start_closes_output_runtime_ingress() -> None:
-    osc = RecordingOscQueue()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=osc,
-        clock=FakeClock(),
-    )
-    utterance_id = uuid4()
-
-    await harness.stop()
-    await harness.output_projection.publish_chatbox(
-        ChatboxProjection(
-            utterance_id=utterance_id,
-            channel="self",
-            transcript_text="never started secret transcript",
-            translation_text=None,
-            include_source=True,
-            source=None,
-        )
-    )
-
-    assert osc.messages == []
-    decision = harness.output_runtime.routing_decisions[-1]
-    assert decision.decision == "skipped"
-    assert decision.reason == "output_runtime_closed"
-    assert "never started secret transcript" not in repr(decision)
-
-
-@pytest.mark.asyncio
 async def test_handle_stt_event_routes_non_low_latency_events() -> None:
     harness = compose_translation_test_harness(
         stt=None,

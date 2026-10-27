@@ -79,21 +79,6 @@ class RejectingApplication(FakeApplication):
 
 
 @pytest.mark.asyncio
-async def test_router_routes_boolean_and_language_controls() -> None:
-    application = FakeApplication()
-    router = OscControlRouter(application)
-
-    assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Talk", True)
-    await router.dispatch_packet("/avatar/parameters/PuriPuly_SelfSrcLang", 16)
-
-    assert application.calls == [
-        ("self_capture", True),
-        ("languages", ("ja", "en", "en", "ko")),
-    ]
-    await router.close()
-
-
-@pytest.mark.asyncio
 async def test_router_publishes_canonical_delta_after_successful_application() -> None:
     application = FakeApplication()
     delta_calls = 0

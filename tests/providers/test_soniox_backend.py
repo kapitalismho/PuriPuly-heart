@@ -672,37 +672,6 @@ async def test_soniox_session_appends_final_tokens_across_messages_in_receive_or
 
 
 @pytest.mark.asyncio
-async def test_soniox_session_preserves_equal_and_regressing_timestamp_tokens() -> None:
-    session = _make_session()
-    await _request_finalize(session)
-
-    session._handle_message(
-        json.dumps(
-            {
-                "tokens": [
-                    {"text": "A", "is_final": True, "end_ms": 100},
-                    {"text": "B", "is_final": True, "end_ms": 100},
-                ]
-            }
-        )
-    )
-    session._handle_message(
-        json.dumps(
-            {
-                "tokens": [
-                    {"text": "C", "is_final": True, "end_ms": 90},
-                    {"text": "<fin>", "is_final": True},
-                ]
-            }
-        )
-    )
-    event = session._event_projection._legacy_events.get_nowait()
-
-    assert isinstance(event, STTBackendTranscriptEvent)
-    assert event.text == "ABC"
-
-
-@pytest.mark.asyncio
 async def test_soniox_session_on_speech_end_enqueues_finalize(caplog) -> None:
     session = _make_session()
 

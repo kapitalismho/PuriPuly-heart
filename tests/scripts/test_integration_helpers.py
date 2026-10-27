@@ -111,27 +111,12 @@ def test_suppressed_runtime_logger_discards_messages_without_rendering_lazy_text
         return "secret lazy text"
 
     logger.emit_basic("secret request text")
-    logger.emit_diagnostic("secret response text")
-    logger.emit_diagnostic_lazy(lambda: _mark_rendered_and_return_secret())
+    assert logger.emit_diagnostic("secret response text") is False
+    assert logger.emit_diagnostic_lazy(_mark_rendered_and_return_secret) is False
 
     assert rendered is False
     assert logger.emitted_count == 3
     assert "secret" not in repr(logger)
-
-
-def test_suppressed_runtime_logger_detailed_methods_return_false() -> None:
-    rendered = False
-    logger = helpers.suppressed_runtime_logger()
-
-    def _mark_rendered_and_return_secret() -> str:
-        nonlocal rendered
-        rendered = True
-        return "secret lazy text"
-
-    assert logger.emit_diagnostic("secret response text") is False
-    assert logger.emit_diagnostic_lazy(lambda: _mark_rendered_and_return_secret()) is False
-
-    assert rendered is False
 
 
 @pytest.mark.asyncio

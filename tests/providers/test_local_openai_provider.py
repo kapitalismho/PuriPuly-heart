@@ -347,21 +347,6 @@ async def test_local_verify_connection_allows_empty_key(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_local_translate_raises_on_non_200(monkeypatch) -> None:
-    fake_client = FakeAsyncClient(
-        response_status=404, response_data={"error": {"message": "model not found"}}
-    )
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
-    client = HttpxLocalOpenAIClient(base_url="http://localhost:11434/v1", model="missing")
-
-    with pytest.raises(LLMResponseError) as exc_info:
-        await client.translate(
-            text="hello", system_prompt="SYSTEM", source_language="ko", target_language="en"
-        )
-    assert exc_info.value.status_code == 404
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize("status_code", [404, 500], ids=["missing-model", "server-failure"])
 async def test_local_http_failure_keeps_metadata_without_inspecting_private_body_and_recovers(
     monkeypatch, caplog: pytest.LogCaptureFixture, status_code: int

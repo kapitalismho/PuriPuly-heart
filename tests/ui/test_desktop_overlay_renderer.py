@@ -228,178 +228,6 @@ def test_native_renderer_uses_embedded_flet_without_viewer_owner(monkeypatch) ->
     assert window._window_process_info_provider() == (os.getpid(), None)
 
 
-def test_desktop_overlay_snapshot_mapping_table_covers_block_contract_and_emitted_lines() -> None:
-    rows = {
-        (row.snapshot_field, row.block_type, row.slot): row
-        for row in desktop_overlay.DESKTOP_CAPTION_MAPPING_TABLE
-    }
-    row_by_block_and_role = {
-        (row.block_type, row.role): row for row in desktop_overlay.DESKTOP_CAPTION_MAPPING_TABLE
-    }
-    cases = [
-        (
-            "active_self/self",
-            _block(
-                "self-active",
-                channel="self",
-                block_variant="active_self",
-                appearance_seq=10,
-                primary_text="active self source",
-                secondary_text="active self translation",
-                secondary_enabled=True,
-            ),
-            ("active self source", "active self translation"),
-            {
-                ("blocks[]", "primary"): {
-                    "role": "active_self_source",
-                    "color": _DESKTOP_CAPTION_WHITE,
-                },
-                ("blocks[]", "secondary"): {
-                    "role": "active_self_translation",
-                    "color": _DESKTOP_CAPTION_WHITE,
-                },
-            },
-        ),
-        (
-            "active_peer/peer",
-            _block(
-                "peer-active",
-                channel="peer",
-                block_variant="active_peer",
-                appearance_seq=20,
-                primary_text="",
-                secondary_text="active peer source",
-                secondary_enabled=True,
-            ),
-            ("active peer source",),
-            {
-                ("blocks[]", "primary"): {
-                    "role": "active_peer_source",
-                    "promoted": True,
-                    "color": _DESKTOP_SPEAKER_COLORS["gray"],
-                },
-            },
-        ),
-        (
-            "finalized/peer translated",
-            _block(
-                "peer-translated",
-                channel="peer",
-                block_variant="finalized",
-                appearance_seq=30,
-                primary_text="peer translation",
-                secondary_text="peer original",
-                secondary_enabled=True,
-            ),
-            ("peer translation", "peer original"),
-            {
-                ("blocks[]", "primary"): {
-                    "role": "peer_translation",
-                    "color": _DESKTOP_SPEAKER_COLORS["gray"],
-                },
-                ("blocks[]", "secondary"): {
-                    "color": _DESKTOP_SPEAKER_COLORS["gray"],
-                },
-            },
-        ),
-        (
-            "finalized/peer source-only",
-            _block(
-                "peer-source-only",
-                channel="peer",
-                block_variant="finalized",
-                appearance_seq=40,
-                primary_text="",
-                secondary_text="peer source only",
-                secondary_enabled=True,
-            ),
-            ("peer source only",),
-            {
-                ("blocks[]", "primary"): {
-                    "promoted": True,
-                    "color": _DESKTOP_SPEAKER_COLORS["gray"],
-                },
-            },
-        ),
-        (
-            "finalized/self",
-            _block(
-                "self-finalized",
-                channel="self",
-                block_variant="finalized",
-                appearance_seq=50,
-                primary_text="self source",
-                secondary_text="self translation",
-                secondary_enabled=True,
-            ),
-            ("self source", "self translation"),
-            {
-                ("blocks[]", "secondary"): {
-                    "role": "self_translation",
-                    "color": _DESKTOP_CAPTION_WHITE,
-                },
-            },
-        ),
-        (
-            "finalized/self secondary-only",
-            _block(
-                "self-secondary-only",
-                channel="self",
-                block_variant="finalized",
-                appearance_seq=60,
-                primary_text="",
-                secondary_text="self translation only",
-                secondary_enabled=True,
-            ),
-            ("self translation only",),
-            {
-                ("blocks[]", "primary"): {
-                    "role": "self_translation",
-                    "promoted": True,
-                    "color": _DESKTOP_CAPTION_WHITE,
-                },
-            },
-        ),
-        (
-            "all",
-            None,
-            None,
-            {("calibration", "none"): {"role": "desktop_visual_ignored"}},
-        ),
-        (
-            "none/edit",
-            None,
-            None,
-            {
-                ("blocks[]", "none"): {
-                    "role": "edit_no_caption_empty_card",
-                },
-            },
-        ),
-    ]
-
-    for block_type, block, expected_texts, expected_rows in cases:
-        for (snapshot_field, slot), expected_attrs in expected_rows.items():
-            row = rows[(snapshot_field, block_type, slot)]
-            for attr, value in expected_attrs.items():
-                assert getattr(row, attr) == value, (block_type, slot, attr)
-        if block is None:
-            continue
-        plan = desktop_overlay.build_desktop_caption_plan(
-            OverlayPresentationSnapshot(blocks=[block])
-        )
-        assert tuple(line.text for line in plan.lines) == expected_texts
-        for line in plan.lines:
-            row = row_by_block_and_role[(block_type, line.role)]
-            assert row.slot == line.slot, (block_type, line.role)
-            assert row.promoted is line.promoted, (block_type, line.role)
-            assert row.color == line.color, (block_type, line.role)
-            assert int(row.priority.split(maxsplit=1)[0]) == line.priority, (
-                block_type,
-                line.role,
-            )
-
-
 def test_desktop_overlay_swap_caption_languages_reverses_source_and_target_slots() -> None:
     snapshot = OverlayPresentationSnapshot(
         blocks=[
@@ -1445,34 +1273,6 @@ def test_desktop_overlay_caption_font_policy_preserves_language_specific_weights
     assert text_control.style.weight == expected_flet_weight
 
 
-def test_desktop_overlay_caption_weight_uses_semibold_for_general_text() -> None:
-    plan = desktop_overlay.build_desktop_caption_plan(
-        OverlayPresentationSnapshot(
-            blocks=[
-                _block(
-                    "caption-weight",
-                    channel="peer",
-                    block_variant="finalized",
-                    appearance_seq=1,
-                    primary_text="Readable semibold caption",
-                )
-            ]
-        )
-    )
-
-    assert {line.weight for line in plan.lines} == {"semibold"}
-
-    surface = desktop_overlay.build_desktop_caption_surface(plan)
-    slot_column = surface.content.controls[0]
-    outer_slot = slot_column.controls[0]
-    inner_card = outer_slot.content
-    text_layer = inner_card.content
-    text_column = text_layer.content
-    text_control = text_column.controls[0].content
-    assert text_control.weight == ft.FontWeight.W_600
-    assert text_control.style.weight == ft.FontWeight.W_600
-
-
 class RecordingLifecycleSink:
     def __init__(self) -> None:
         self.events: list[dict[str, object]] = []
@@ -1714,23 +1514,6 @@ class FakeFletPage:
         return task
 
 
-class JumpingRevealFletPage(FakeFletPage):
-    def __init__(self, app: FakeFletApp) -> None:
-        super().__init__(app)
-        self.reveal_jump_done = False
-
-    def update(self) -> None:
-        super().update()
-        if (
-            not self.reveal_jump_done
-            and self.window.visible is True
-            and self.window.ignore_mouse_events is True
-        ):
-            self.window.left = 608
-            self.window.top = 1117
-            self.reveal_jump_done = True
-
-
 class FakeFletApp:
     def __init__(self) -> None:
         self.closed = asyncio.Event()
@@ -1743,13 +1526,6 @@ class FakeFletApp:
         if inspect.isawaitable(result):
             await result
         await self.closed.wait()
-
-
-class JumpingRevealFletApp(FakeFletApp):
-    def __init__(self) -> None:
-        self.closed = asyncio.Event()
-        self.page = JumpingRevealFletPage(self)
-        self.targets: list[Any] = []
 
 
 class FakeWindowEvent:
@@ -2085,29 +1861,6 @@ def test_desktop_overlay_preview_fixtures_cover_required_local_qa_cases() -> Non
             ),
         )
         assert plan.lines, fixture.id
-
-
-def test_desktop_overlay_preview_no_caption_fixture_supports_manual_qa_states() -> None:
-    catalog = desktop_overlay.build_desktop_overlay_preview_catalog(locale="en")
-
-    fixture = next(fixture for fixture in catalog.fixtures if "no_caption" in fixture.coverage_tags)
-
-    assert fixture.label == desktop_overlay.t_for_locale(
-        "en", "settings.overlay.desktop.preview.fixture.no_captions"
-    )
-    edit_plan = desktop_overlay.build_desktop_caption_plan(
-        fixture.snapshot,
-        interaction_mode="edit",
-    )
-    locked_plan = desktop_overlay.build_desktop_caption_plan(
-        fixture.snapshot,
-        interaction_mode="pass_through",
-    )
-    assert edit_plan.lines == ()
-    assert edit_plan.surface_visible is True
-    assert edit_plan.background_alpha == pytest.approx(0.6)
-    assert locked_plan.lines == ()
-    assert locked_plan.surface_visible is False
 
 
 def test_desktop_overlay_preview_uses_edit_mode_for_no_caption_empty_state() -> None:
@@ -4294,37 +4047,6 @@ async def test_desktop_overlay_preset_visual_tokens_match_product_table() -> Non
 
 
 @pytest.mark.asyncio
-async def test_desktop_overlay_shipping_surface_has_no_overlay_local_controls() -> None:
-    app = FakeFletApp()
-    sink = RecordingLifecycleSink()
-    window = desktop_overlay.FletDesktopRendererWindow(
-        app_runner=app.run,
-        event_sink=sink.emit,
-        locale="en",
-        bounds_debounce_s=0.01,
-    )
-
-    try:
-        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
-        assert app.page.run_task_calls == 0
-        for task in list(app.page.tasks):
-            await task
-        assert sink.events == []
-        _assert_no_overlay_local_renderer_text(app.page)
-        buttons = _text_buttons(app.page)
-        assert [button.content for button in buttons] == [
-            desktop_overlay.t_for_locale("en", "settings.overlay.desktop.empty_state.action.lock")
-        ]
-        assert not any(
-            isinstance(item, ft.Button)
-            for control in app.page.controls
-            for item in _walk_control_tree(control)
-        )
-    finally:
-        await window.close()
-
-
-@pytest.mark.asyncio
 async def test_desktop_overlay_interaction_mode_bounds_and_visual_runtime_controls_validate_atomically() -> (
     None
 ):
@@ -5409,12 +5131,6 @@ def test_desktop_overlay_renderer_diagnostic_policy_requires_exact_safe_flat_sch
     )
 
 
-class FailingStartWindow(FakeRendererWindow):
-    async def start(self, initial_snapshot: OverlayPresentationSnapshot) -> None:
-        await super().start(initial_snapshot)
-        raise RuntimeError("window bootstrap failed")
-
-
 class SensitiveFailingStartWindow(FakeRendererWindow):
     def __init__(self, secret: str) -> None:
         super().__init__()
@@ -5477,17 +5193,6 @@ def test_desktop_overlay_parent_monitor_factory_prefers_windows_handle() -> None
 
     assert isinstance(monitor, desktop_overlay.WindowsParentHandleMonitor)
     assert monitor.handle == "handle-4321"
-
-
-def test_desktop_overlay_parent_monitor_factory_falls_back_when_handle_unavailable() -> None:
-    monitor = desktop_overlay.create_parent_monitor(
-        4321,
-        is_windows=True,
-        open_windows_handle=lambda _pid: None,
-    )
-
-    assert isinstance(monitor, desktop_overlay.BridgeDisconnectParentMonitor)
-    assert monitor.parent_pid == 4321
 
 
 @pytest.mark.asyncio

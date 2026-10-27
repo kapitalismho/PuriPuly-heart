@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-from collections import Counter
 
 from tests.helpers.paths import REPO_ROOT
 from tests.helpers.task_creation import (
@@ -601,23 +600,6 @@ TASK_CREATION_REVIEWS = (
 REVIEWED_TASK_CREATION = dict(TASK_CREATION_REVIEWS)
 
 
-def _allowlist_summary(classification: TaskClassification) -> Counter[tuple[str, str]]:
-    summary: Counter[tuple[str, str]] = Counter()
-    for identity, disposition in TASK_CREATION_REVIEWS:
-        if disposition.classification == classification:
-            summary[(identity.module, identity.family)] += disposition.max_count
-    return summary
-
-
-LEGACY_TASK_CREATION_ALLOWLIST = _allowlist_summary("legacy_exception")
-NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = _allowlist_summary("named_owner")
-TASK_CREATION_ALLOWLIST_RATIONALES = {
-    (identity.module, identity.family): disposition.rationale
-    for identity, disposition in TASK_CREATION_REVIEWS
-    if disposition.classification != "owner_primitive"
-}
-
-
 def test_first_party_creation_sites_have_reviewed_bounded_ownership() -> None:
     sites = scan_task_creation_sites(REPO_ROOT, PROTECTED_TASK_SOURCE_ROOTS)
     assert sites
@@ -627,90 +609,6 @@ def test_first_party_creation_sites_have_reviewed_bounded_ownership() -> None:
 def test_reviewed_task_identities_are_unique_and_have_lifetime_rationales() -> None:
     assert len(REVIEWED_TASK_CREATION) == len(TASK_CREATION_REVIEWS)
     assert_task_ownership([], REVIEWED_TASK_CREATION)
-
-
-def test_lifecycle_scope_file_is_the_allowed_task_owner_primitive() -> None:
-    assert (REPO_ROOT / "src" / "puripuly_heart" / "core" / "lifecycle.py").is_file()
-
-
-def test_task_creation_allowlists_have_explicit_gate6_rationale() -> None:
-    expected = LEGACY_TASK_CREATION_ALLOWLIST + NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-
-    assert set(TASK_CREATION_ALLOWLIST_RATIONALES) == set(expected)
-    assert all(
-        rationale and "unclassified" not in rationale
-        for rationale in TASK_CREATION_ALLOWLIST_RATIONALES.values()
-    )
-
-
-def test_order34_named_owner_allowlist_has_no_retired_stt_controller_tasks() -> None:
-    stt_controller_tasks = (
-        "src/puripuly_heart/core/stt/controller.py",
-        ASYNCIO_CREATE_TASK,
-    )
-
-    assert stt_controller_tasks not in LEGACY_TASK_CREATION_ALLOWLIST
-    assert stt_controller_tasks not in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-
-
-def test_order37_named_owner_allowlist_retires_controller_bounds_task_debt() -> None:
-    assert (
-        "src/puripuly_heart/ui/foundation/runtime.py",
-        RUN_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/openrouter/managed_openrouter_release.py",
-        ASYNCIO_CREATE_TASK,
-    ) not in LEGACY_TASK_CREATION_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/runtime/oauth.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/runtime/clipboard.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-
-
-def test_order38_named_owner_allowlist_preserves_installer_legacy_task_debt() -> None:
-    assert (
-        "src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py",
-        ASYNCIO_CREATE_TASK,
-    ) in LEGACY_TASK_CREATION_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/runtime/local_stt_download.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/runtime/audio_test.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-
-
-def test_order39_named_owner_allowlist_adds_receiver_prompt_and_bounds_owners() -> None:
-    assert (
-        "src/puripuly_heart/core/runtime/receiver.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/runtime/github_star_prompt.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/runtime/desktop_overlay_bounds.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    assert (
-        "src/puripuly_heart/ui/foundation/runtime.py",
-        RUN_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-
-
-def test_order40_named_owner_allowlist_adds_vrchat_osc_presence_owner() -> None:
-    assert (
-        "src/puripuly_heart/core/runtime/vrchat_osc_presence.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
 
 
 def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:

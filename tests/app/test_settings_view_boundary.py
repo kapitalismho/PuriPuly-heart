@@ -14,7 +14,6 @@ from puripuly_heart.app.ports.settings_view import (
     AudioInputSettingsIntent,
     AudioSettingsIntent,
     ChatboxSourceSettingsIntent,
-    CloudFreeTierProvidersEdit,
     CustomSttEndpointEdit,
     CustomVocabularySettingsIntent,
     DesktopOverlayBackgroundAlphaIntent,
@@ -30,7 +29,6 @@ from puripuly_heart.app.ports.settings_view import (
     QwenSingaporeApiHostEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
-    SonioxSpeakerDiarizationEdit,
     SttGpuDeviceEdit,
     SystemPromptEdit,
     TranslationSelectionEdit,
@@ -611,85 +609,6 @@ def test_rolling_free_provider_selection_persists_self_and_peer() -> None:
     )
     assert peer_updated.intent.stt.provider == STTProviderName.ROLLING_FREE.value
     assert peer_updated.intent.peer_stt.provider == STTProviderName.ROLLING_FREE.value
-
-
-def test_cloud_free_tier_provider_selection_persists() -> None:
-    current = AppSettingsVNext()
-    assert current.intent.stt.cloud_free_tier_providers == ["gemini_transcribe"]
-
-    updated = materialize_provider_apply_intent(
-        current,
-        ProviderApplyIntent(
-            (
-                CloudFreeTierProvidersEdit(
-                    (
-                        STTProviderName.GEMINI_TRANSCRIBE,
-                        STTProviderName.DEEPGRAM,
-                    )
-                ),
-            )
-        ),
-        materialize_translation=materialize_canonical_translation_settings,
-    )
-    assert updated.intent.stt.cloud_free_tier_providers == [
-        "gemini_transcribe",
-        "deepgram",
-    ]
-
-
-def test_soniox_speaker_diarization_preference_persists_independently_of_provider() -> None:
-    from puripuly_heart.composition.application_runtime import (
-        _copy_provider_prompt_apply_fields,
-    )
-
-    current = AppSettingsVNext()
-    updated = materialize_provider_apply_intent(
-        current,
-        ProviderApplyIntent((SonioxSpeakerDiarizationEdit(False),)),
-        materialize_translation=materialize_canonical_translation_settings,
-    )
-    merged = _copy_provider_prompt_apply_fields(updated, current)
-
-    assert updated.intent.stt.provider == current.intent.stt.provider
-    assert updated.intent.stt.soniox.enable_speaker_diarization is False
-    assert merged.intent.stt.soniox.enable_speaker_diarization is False
-
-
-def test_provider_apply_merge_keeps_cloud_free_tier_pool() -> None:
-    from puripuly_heart.composition.application_runtime import (
-        _copy_provider_prompt_apply_fields,
-    )
-
-    baseline = AppSettingsVNext()
-    current = replace(
-        baseline,
-        intent=replace(
-            baseline.intent,
-            stt=replace(baseline.intent.stt, vad_speech_threshold=0.25),
-        ),
-    )
-    pending = materialize_provider_apply_intent(
-        current,
-        ProviderApplyIntent(
-            (
-                CloudFreeTierProvidersEdit(
-                    (
-                        STTProviderName.GEMINI_TRANSCRIBE,
-                        STTProviderName.DEEPGRAM,
-                    )
-                ),
-            )
-        ),
-        materialize_translation=materialize_canonical_translation_settings,
-    )
-
-    merged = _copy_provider_prompt_apply_fields(pending, current)
-
-    assert merged.intent.stt.cloud_free_tier_providers == [
-        "gemini_transcribe",
-        "deepgram",
-    ]
-    assert merged.intent.stt.vad_speech_threshold == 0.25
 
 
 def test_legacy_deepseek_openrouter_model_still_builds_provider_snapshot() -> None:

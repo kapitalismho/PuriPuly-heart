@@ -802,15 +802,6 @@ impl DirectWriteLayoutEngine {
     }
 
     #[cfg(test)]
-    fn resolved_text_style_key_for_test(
-        &self,
-        policy: &CaptionLayoutPolicy,
-        text: &str,
-    ) -> TextStyleKey {
-        self.resolve_text_style(policy, None, text).style_key
-    }
-
-    #[cfg(test)]
     pub(crate) fn new_for_test() -> Result<Self, windows::core::Error> {
         let factory: IDWriteFactory = unsafe { DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED)? };
         let factory2: IDWriteFactory2 = factory.cast()?;
@@ -1795,85 +1786,6 @@ mod tests {
 
         assert_eq!(primary_texts, vec!["aaaaaaaaaaaaaaa"]);
         assert_close(template.primary_lines[0].font_size_px, 132.0);
-    }
-
-    #[test]
-    fn fallback_layout_secondary_origin_includes_scaled_primary_secondary_gap() {
-        let policy = CaptionLayoutPolicy::default();
-        let block = CaptionBlock::new("peer:translated", "translated peer text")
-            .with_secondary_text("source peer text", true);
-        let (primary_style, secondary_style) = fallback_styles(&block);
-        let template = policy.build_fallback_block_template(
-            &block,
-            3200.0,
-            1.25,
-            primary_style,
-            secondary_style,
-        );
-        let secondary = template
-            .secondary_line
-            .as_ref()
-            .expect("secondary line should be present");
-
-        assert_close(secondary.origin_y, (32.0 + 2.0 * 150.0 + 30.0) * 1.25);
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn windows_graphics_directwrite_layout_secondary_origin_includes_scaled_primary_secondary_gap()
-    {
-        let policy = CaptionLayoutPolicy::default();
-        let engine = super::DirectWriteLayoutEngine::new_for_test()
-            .expect("DirectWrite layout should initialize on Windows");
-        let layout = policy
-            .resolve_blocks_for_presentation_windows_cached(
-                vec![CaptionBlock::new("peer:translated", "translated peer text")
-                    .with_secondary_text("source peer text", true)],
-                3840,
-                1024,
-                &CaptionPresentation::default(),
-                &engine,
-                None,
-            )
-            .expect("DirectWrite layout should initialize on Windows");
-        let block = &layout.visible_blocks[0];
-        let secondary = block
-            .secondary_line
-            .as_ref()
-            .expect("secondary line should be present");
-
-        assert_close(
-            secondary.origin_y,
-            block.bounds.top_px + 32.0 + 2.0 * 150.0 + 30.0,
-        );
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn windows_graphics_layout_key_and_line_key_use_same_resolved_style_as_measurement() {
-        let policy = CaptionLayoutPolicy::default();
-        let engine = super::DirectWriteLayoutEngine::new_for_test()
-            .expect("DirectWrite layout should initialize on Windows");
-        let layout = policy
-            .resolve_blocks_for_presentation_windows_cached(
-                vec![CaptionBlock::new("latin", "hello style identity")],
-                3840,
-                1024,
-                &CaptionPresentation::default(),
-                &engine,
-                None,
-            )
-            .expect("DirectWrite layout should initialize on Windows");
-
-        let block = &layout.visible_blocks[0];
-        let line = block
-            .primary_lines
-            .first()
-            .expect("primary line should be present");
-        let resolved_style_key = engine.resolved_text_style_key_for_test(&policy, &line.text);
-
-        assert_eq!(block.layout_cache_key.primary_style_key, resolved_style_key);
-        assert_eq!(line.style_key, resolved_style_key);
     }
 
     #[cfg(windows)]

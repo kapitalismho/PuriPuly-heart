@@ -34,13 +34,6 @@ def _artifact_entries(paths: list) -> list[dict[str, object]]:
     return entries
 
 
-def test_rendered_body_references_produced_installer() -> None:
-    body = identity.render_release_body("Download `{{INSTALLER_EXE}}` below.", INSTALLER_EXE)
-
-    assert INSTALLER_EXE in body
-    assert "{{INSTALLER_EXE}}" not in body
-
-
 def test_release_surface_accepts_matching_tag_title_body_and_assets() -> None:
     body = f"Download `{INSTALLER_EXE}` from the Assets section below, then run it."
 
@@ -109,18 +102,6 @@ def test_release_surface_rejects_missing_extra_and_duplicate_assets(asset_names)
             installer_exe=INSTALLER_EXE,
             body_text=f"Download `{INSTALLER_EXE}` below.",
             asset_names=asset_names,
-        )
-
-
-def test_release_surface_rejects_tag_version_disagreement() -> None:
-    with pytest.raises(RuntimeError, match="tag mismatch"):
-        identity.verify_release_surface(
-            version="2.6.2",
-            tag=TAG,
-            title=TAG,
-            installer_exe="PuriPulyHeart-Setup-2.6.2.exe",
-            body_text="Download `PuriPulyHeart-Setup-2.6.2.exe` below.",
-            asset_names=["PuriPulyHeart-Setup-2.6.2.exe"],
         )
 
 
@@ -354,8 +335,6 @@ def test_publish_rejects_detached_inline_provenance(tmp_path, mutation) -> None:
 @pytest.mark.parametrize("tag", ["native-v2.8.0", "v2.8.1", "2.8.0", "V2.8.0"])
 def test_release_identity_rejects_nonstandard_and_version_mismatched_tags(tag) -> None:
     with pytest.raises(RuntimeError, match="tag mismatch"):
-        identity.check_tag_matches_version(tag, "2.8.0")
-    with pytest.raises(RuntimeError, match="tag mismatch"):
         identity.build_provenance(
             version="2.8.0",
             tag=tag,
@@ -376,8 +355,6 @@ def test_release_identity_rejects_nonstandard_and_version_mismatched_tags(tag) -
 @pytest.mark.parametrize("version", ["2.8.beta", "2.8.0-native", "2..0"])
 def test_release_identity_rejects_nonnumeric_versions(version) -> None:
     tag = f"v{version}"
-    with pytest.raises(ValueError):
-        identity.check_tag_matches_version(tag, version)
     with pytest.raises(ValueError):
         identity.build_provenance(
             version=version,

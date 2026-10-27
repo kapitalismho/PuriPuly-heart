@@ -40,7 +40,6 @@ from puripuly_heart.core.runtime import local_asr_provisioning as provisioning_m
 from puripuly_heart.core.runtime.local_asr_provisioning import LocalASRProvisioningOwner
 from puripuly_heart.core.runtime.local_stt_download import LocalSTTDownloadRuntime
 from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService, configure_main_logging
-from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 def _installed(model_id: str) -> InstalledLocalSTTManifest:
@@ -694,13 +693,3 @@ async def test_owner_close_retains_timed_out_install_cleanup_for_retry() -> None
     assert task.done() is True
     assert owner.snapshot.activities == ()
     assert owner._cpu_install_runtime.download_task is None
-
-
-def test_owner_lifecycle_inventory_names_all_provisioning_resources() -> None:
-    owner = _owner(MutableProvisioningBackend(_all_states()))
-
-    snapshot = owner.lifecycle_owner_snapshot()
-
-    assert_lifecycle_structure(snapshot)
-    assert snapshot["owner"] == "LocalASRProvisioningOwner"
-    assert len(snapshot["resource_fields"]) == 7

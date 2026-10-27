@@ -14,47 +14,6 @@ describe('GET /v1/trial/status signing contract', () => {
     vi.useRealTimers();
   });
 
-  it('accepts canonical Ed25519-signed status headers for a registered installation', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-04-08T06:00:00Z'));
-
-    const env = createTestBrokerEnv();
-    const keyPair = await createDeviceKeyPair();
-    await issueChallenge({
-      env,
-      installationId: 'install-status-signed',
-      devicePublicKey: keyPair.devicePublicKey,
-      appVersion: '1.2.3',
-    });
-    const signedRequest = await signCanonicalStatusRequest(keyPair.privateKey, {
-      installation_id: 'install-status-signed',
-      timestamp: '2026-04-08T06:00:30.000Z',
-    });
-
-    const response = await getTrialStatus({
-      env,
-      installationId: 'install-status-signed',
-      headers: {
-        'X-Puripuly-Timestamp': signedRequest.timestamp,
-        'X-Puripuly-Signature': signedRequest.signature,
-      },
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      managed_state: {
-        lifecycle: 'none',
-        managed_availability: true,
-      },
-      current_entitlement: null,
-      onboarding_eligibility: {
-        eligible: true,
-        reason: 'discord_required',
-        requires_discord_oauth: true,
-      },
-    });
-  });
-
   it('rejects signatures that do not use the canonical installation_id-then-timestamp payload order', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-08T06:00:00Z'));

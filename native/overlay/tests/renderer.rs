@@ -4,10 +4,10 @@ use puripuly_heart_overlay::renderer::LineRole;
 #[cfg(windows)]
 use puripuly_heart_overlay::WindowsBundledFontCollection;
 use puripuly_heart_overlay::{
-    bundled_font_path_from_exe_dir, AdapterIdentity, BlockBounds, BundledFaceId, CaptionBlock,
+    bundled_font_path_from_exe_dir, AdapterIdentity, BundledFaceId, CaptionBlock,
     CaptionBlockVariant, CaptionChannel, CaptionDebugOverlay, CaptionLayoutPolicy,
-    CaptionPresentation, CaptionRenderer, DamageBand, FontFallbackReason, FontLanguageBucket,
-    FontResolver, FontSource, FontWeight, OverlayPlacementPolicy, OverlayPresentationBlock,
+    CaptionPresentation, CaptionRenderer, FontFallbackReason, FontLanguageBucket,
+    FontResolver, FontSource, FontWeight, OverlayPresentationBlock,
     OverlayPresentationBlockVariant, OverlayPresentationCalibration, OverlayPresentationSnapshot,
     OverlayRuntime, PresentationBackend, ReadinessCancellation, ReadinessOutcome, RenderedFrame,
 };
@@ -396,7 +396,6 @@ fn renderer_font_resolver_selects_bundled_faces_and_locales_by_bucket() {
         assert_eq!(style.weight, FontWeight::Medium);
         assert_eq!(style.locale, locale);
         assert_eq!(style.system_fallback_families(), system_fallbacks);
-        assert_no_installed_noto_cjk_intermediates(style.system_fallback_families());
     }
 }
 
@@ -484,7 +483,6 @@ fn renderer_font_resolver_uses_system_branches_when_bundle_unavailable() {
         assert_eq!(style.family_name, family);
         assert_eq!(style.locale, locale);
         assert_eq!(style.system_fallback_families(), system_fallbacks);
-        assert_no_installed_noto_cjk_intermediates(style.system_fallback_families());
     }
 }
 
@@ -596,52 +594,6 @@ fn renderer_style_resolution_fallback_for_requested_style_stays_out_of_layout_fa
     );
 }
 
-fn assert_no_installed_noto_cjk_intermediates(candidates: &[&str]) {
-    for installed_noto_cjk in [
-        "Noto Sans CJK KR",
-        "Noto Sans CJK JP",
-        "Noto Sans CJK SC",
-        "Noto Sans CJK TC",
-    ] {
-        assert!(
-            !candidates.contains(&installed_noto_cjk),
-            "installed {installed_noto_cjk} must not be searched as an intermediate system candidate"
-        );
-    }
-}
-
-#[test]
-fn renderer_uses_fixed_surface_defaults_for_mvp_caption_layout() {
-    let policy = CaptionLayoutPolicy::default();
-    assert_eq!(policy.default_surface_size(), (4096, 1056));
-}
-
-#[test]
-fn renderer_default_typography_resolves_132px_primary_and_81_84px_secondary() {
-    let policy = CaptionLayoutPolicy::default();
-    let result = policy.layout_blocks(
-        vec![bilingual_block(
-            "peer:translated",
-            "translated peer line",
-            "source peer line",
-            true,
-        )],
-        3840,
-        1024,
-    );
-
-    let block = &result.visible_blocks[0];
-    let primary = &block.primary_lines[0];
-    let secondary = block
-        .secondary_line
-        .as_ref()
-        .expect("secondary source line should be present");
-
-    assert_close(primary.font_size_px, 132.0);
-    assert_close(secondary.font_size_px, 81.84);
-    assert!(secondary.font_size_px < primary.font_size_px);
-}
-
 #[test]
 fn renderer_layout_preserves_channel_metadata_for_visible_blocks() {
     let policy = CaptionLayoutPolicy::default();
@@ -674,12 +626,6 @@ fn renderer_keeps_active_self_and_finalized_variants_distinct() {
 
     assert!(variants.contains(&CaptionBlockVariant::Finalized));
     assert!(variants.contains(&CaptionBlockVariant::ActiveSelf));
-}
-
-#[test]
-fn openvr_overlay_policy_defaults_to_head_locked_mode() {
-    let policy = OverlayPlacementPolicy::default();
-    assert!(policy.is_head_locked());
 }
 
 #[test]
@@ -751,74 +697,6 @@ fn renderer_centers_each_line_within_strip_bounds() {
     let line_center_x = line.origin_x + line.width_px * 0.5;
 
     assert!((line_center_x - block.bounds.center_x()).abs() < 1.0);
-}
-
-#[test]
-fn renderer_secondary_origin_includes_30px_gap_after_primary_budget() {
-    let policy = CaptionLayoutPolicy::default();
-    let result = policy.layout_blocks(
-        vec![bilingual_block(
-            "peer:translated",
-            "translated peer line",
-            "source peer line",
-            true,
-        )],
-        3840,
-        1024,
-    );
-
-    let block = &result.visible_blocks[0];
-    let secondary = block
-        .secondary_line
-        .as_ref()
-        .expect("secondary source line should be present");
-
-    assert_close(
-        secondary.origin_y,
-        block.bounds.top_px + 32.0 + 2.0 * 150.0 + 30.0,
-    );
-}
-
-#[test]
-fn renderer_secondary_origin_gap_scales_with_text_scale() {
-    let policy = CaptionLayoutPolicy::default();
-    let result = policy.layout_blocks_for_presentation(
-        vec![bilingual_block(
-            "peer:translated",
-            "translated peer line",
-            "source peer line",
-            true,
-        )],
-        3840,
-        1536,
-        &CaptionPresentation {
-            text_scale: 1.5,
-            ..CaptionPresentation::default()
-        },
-    );
-
-    let block = &result.visible_blocks[0];
-    let secondary = block
-        .secondary_line
-        .as_ref()
-        .expect("secondary source line should be present");
-
-    assert_close(
-        secondary.origin_y,
-        block.bounds.top_px + (32.0 + 2.0 * 150.0 + 30.0) * 1.5,
-    );
-}
-
-#[test]
-fn renderer_damage_band_covers_old_and_new_strip_bounds() {
-    let damage = DamageBand::from_bounds([
-        BlockBounds::new(0.0, 100.0, 1000.0, 260.0),
-        BlockBounds::new(0.0, 180.0, 1000.0, 340.0),
-    ])
-    .unwrap();
-
-    assert_eq!(damage.top_px, 100.0);
-    assert_eq!(damage.bottom_px, 340.0);
 }
 
 #[test]
@@ -919,24 +797,6 @@ fn renderer_source_only_peer_finalized_with_state_generated_slots_does_not_overl
         CaptionBlockVariant::Finalized,
         "translation unavailable, showing original source text",
     );
-}
-
-#[test]
-fn renderer_secondary_reserved_block_height_remains_468px_at_default_scale() {
-    let policy = CaptionLayoutPolicy::default();
-    let result = policy.layout_blocks(
-        vec![bilingual_block(
-            "peer:translated",
-            "translated peer line",
-            "source peer line",
-            true,
-        )],
-        3840,
-        1024,
-    );
-
-    let block = &result.visible_blocks[0];
-    assert_close(block.bounds.bottom_px - block.bounds.top_px, 468.0);
 }
 
 #[test]
@@ -1391,44 +1251,6 @@ fn renderer_turning_secondary_off_expands_primary_line_budget() {
 }
 
 #[test]
-fn renderer_height_scale_changes_rendered_block_bounds_height() {
-    let policy = CaptionLayoutPolicy::default();
-    let full = policy.layout_blocks(vec![CaptionBlock::new("self", "hello")], 1600, 900);
-    let exiting = policy.layout_blocks(
-        vec![CaptionBlock::new("self", "hello").with_visual_state(1.0, 0.0, 0.5)],
-        1600,
-        900,
-    );
-
-    let full_height =
-        full.visible_blocks[0].bounds.bottom_px - full.visible_blocks[0].bounds.top_px;
-    let exiting_height =
-        exiting.visible_blocks[0].bounds.bottom_px - exiting.visible_blocks[0].bounds.top_px;
-
-    assert!(exiting_height < full_height);
-}
-
-#[test]
-fn renderer_layout_cache_key_ignores_animation_only_visual_state() {
-    let policy = CaptionLayoutPolicy::default();
-    let presentation = CaptionPresentation::default();
-    let stable = bilingual_block("self:1", "hello there", "secondary line", true)
-        .with_channel(CaptionChannel::SelfChannel)
-        .with_variant(CaptionBlockVariant::Finalized);
-    let animated = stable.clone().with_visual_state(0.42, 64.0, 0.5);
-
-    let stable_layout =
-        policy.resolve_blocks_for_presentation(vec![stable], 1600, 900, &presentation);
-    let animated_layout =
-        policy.resolve_blocks_for_presentation(vec![animated], 1600, 900, &presentation);
-
-    assert_eq!(
-        stable_layout.visible_blocks[0].layout_cache_key,
-        animated_layout.visible_blocks[0].layout_cache_key
-    );
-}
-
-#[test]
 fn renderer_layout_cache_key_separates_slotted_source_only_peer_geometry() {
     let policy = CaptionLayoutPolicy::default();
     let presentation = CaptionPresentation::default();
@@ -1455,26 +1277,6 @@ fn renderer_layout_cache_key_separates_slotted_source_only_peer_geometry() {
     assert_ne!(
         non_slotted.layout_cache_key, slotted.layout_cache_key,
         "slotted and non-slotted peer source-only rows use different reserved geometry"
-    );
-}
-
-#[test]
-fn renderer_block_cache_key_ignores_animation_only_visual_state() {
-    let policy = CaptionLayoutPolicy::default();
-    let presentation = CaptionPresentation::default();
-    let stable = bilingual_block("self:1", "hello there", "secondary line", true)
-        .with_channel(CaptionChannel::SelfChannel)
-        .with_variant(CaptionBlockVariant::Finalized);
-    let animated = stable.clone().with_visual_state(0.35, -48.0, 1.35);
-
-    let stable_layout =
-        policy.resolve_blocks_for_presentation(vec![stable], 1600, 900, &presentation);
-    let animated_layout =
-        policy.resolve_blocks_for_presentation(vec![animated], 1600, 900, &presentation);
-
-    assert_eq!(
-        stable_layout.visible_blocks[0].block_cache_key(),
-        animated_layout.visible_blocks[0].block_cache_key()
     );
 }
 
@@ -1543,14 +1345,6 @@ fn renderer_uses_near_full_safe_width_for_content() {
 }
 
 #[test]
-fn renderer_first_usable_frame_is_fully_transparent_before_real_caption_content() {
-    let renderer = CaptionRenderer::new_for_test().unwrap();
-    let frame = renderer.render_empty_frame().unwrap();
-
-    assert!(frame.is_fully_transparent());
-}
-
-#[test]
 fn renderer_debug_overlay_is_absent_by_default_and_reported_when_supplied() {
     let renderer = CaptionRenderer::new_for_test().unwrap();
 
@@ -1589,36 +1383,6 @@ fn renderer_debug_overlay_is_absent_by_default_and_reported_when_supplied() {
         debug.debug_overlay_label(),
         Some("DBG r7 ap=peer h=1a2b b=peer")
     );
-}
-
-#[test]
-fn renderer_presentation_text_scale_changes_block_bounds_height() {
-    let renderer = CaptionRenderer::new_for_test().unwrap();
-    let default_frame = renderer.render_blocks(vec![test_block("hello")]).unwrap();
-    let default_height = default_frame.layout().visible_blocks[0].bounds.bottom_px
-        - default_frame.layout().visible_blocks[0].bounds.top_px;
-
-    renderer.set_presentation(CaptionPresentation {
-        text_scale: 1.25,
-        ..CaptionPresentation::default()
-    });
-    let scaled_frame = renderer.render_blocks(vec![test_block("hello")]).unwrap();
-    let scaled_height = scaled_frame.layout().visible_blocks[0].bounds.bottom_px
-        - scaled_frame.layout().visible_blocks[0].bounds.top_px;
-
-    assert!(scaled_height > default_height);
-}
-
-#[cfg(windows)]
-#[test]
-fn windows_graphics_returns_a_renderable_d3d11_texture_result() {
-    let renderer = CaptionRenderer::new().unwrap();
-    let frame = renderer.render_blocks(vec![test_block("hello")]).unwrap();
-
-    assert!(frame.texture_ptr().is_some());
-    assert!(frame.d3d11_texture().is_some());
-    assert_eq!(frame.width(), 4096);
-    assert_eq!(frame.height(), 1056);
 }
 
 #[cfg(windows)]
@@ -1676,90 +1440,6 @@ fn windows_graphics_pipeline_reports_directwrite_layout_for_mixed_script_frame()
     assert!(!frame.layout().visible_blocks[0].primary_lines.is_empty());
     assert_eq!(frame.diagnostics().directwrite_layout_success_count, 1);
     assert_eq!(frame.diagnostics().heuristic_layout_fallback_count, 0);
-}
-
-#[cfg(windows)]
-#[test]
-fn windows_graphics_first_active_self_frame_after_empty_frame_is_renderable() {
-    let renderer = CaptionRenderer::new().unwrap();
-    let empty = renderer.render_empty_frame().unwrap();
-    let active = CaptionBlock::new("self:active", "live self preview")
-        .with_variant(CaptionBlockVariant::ActiveSelf)
-        .with_secondary_text("", true)
-        .with_channel(CaptionChannel::SelfChannel);
-    let frame = renderer.render_blocks(vec![active]).unwrap();
-
-    assert!(empty.is_fully_transparent());
-    assert!(!frame.is_fully_transparent());
-    assert_eq!(
-        frame.layout().visible_blocks[0].block_variant,
-        CaptionBlockVariant::ActiveSelf
-    );
-    assert!(frame.texture_ptr().is_some());
-    assert!(frame.d3d11_texture().is_some());
-}
-
-#[cfg(windows)]
-#[test]
-fn windows_graphics_first_finalized_bilingual_frame_after_empty_frame_is_renderable() {
-    let renderer = CaptionRenderer::new().unwrap();
-    let empty = renderer.render_empty_frame().unwrap();
-    let finalized = bilingual_block("self:1", "hello there", "secondary line", true)
-        .with_channel(CaptionChannel::SelfChannel);
-    let frame = renderer.render_blocks(vec![finalized]).unwrap();
-
-    assert!(empty.is_fully_transparent());
-    assert!(!frame.is_fully_transparent());
-    assert_eq!(
-        frame.layout().visible_blocks[0].block_variant,
-        CaptionBlockVariant::Finalized
-    );
-    assert!(frame.texture_ptr().is_some());
-    assert!(frame.d3d11_texture().is_some());
-}
-
-#[cfg(windows)]
-#[test]
-fn windows_graphics_secondary_only_finalized_peer_frame_is_renderable() {
-    let renderer = CaptionRenderer::new().unwrap();
-    let source_only_peer = CaptionBlock::new("peer:source-only", "")
-        .with_channel(CaptionChannel::PeerChannel)
-        .with_variant(CaptionBlockVariant::Finalized)
-        .with_secondary_text("Can you hear me?", true);
-
-    let frame = renderer.render_blocks(vec![source_only_peer]).unwrap();
-    let block = &frame.layout().visible_blocks[0];
-
-    assert!(!frame.is_fully_transparent());
-    assert_eq!(block.block_variant, CaptionBlockVariant::Finalized);
-    assert!(block.primary_lines.iter().all(|line| line.text.is_empty()));
-    assert_eq!(
-        block.secondary_line.as_ref().map(|line| line.text.as_str()),
-        Some("Can you hear me?")
-    );
-    assert!(frame.texture_ptr().is_some());
-    assert!(frame.d3d11_texture().is_some());
-}
-
-#[cfg(windows)]
-#[test]
-fn windows_graphics_debug_overlay_frame_is_renderable() {
-    let renderer = CaptionRenderer::new().unwrap();
-    let frame = renderer
-        .render_blocks_with_debug_overlay(
-            vec![test_block("hello")],
-            Some(CaptionDebugOverlay::new("DBG r7 ap=peer h=1a2b b=peer").unwrap()),
-        )
-        .unwrap();
-
-    assert!(!frame.is_fully_transparent());
-    assert_eq!(
-        frame.debug_overlay_label(),
-        Some("DBG r7 ap=peer h=1a2b b=peer")
-    );
-    assert!(frame.texture_ptr().is_some());
-    assert!(frame.d3d11_texture().is_some());
-    assert_eq!(frame.diagnostics().debug_overlay_draw_count, 1);
 }
 
 #[cfg(windows)]

@@ -435,33 +435,6 @@ def test_openrouter_cache_schema_requires_luna_only_routing_and_preserves_custom
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_gemma_uses_cloudflare_dekallm_nextbit_makora_routing(
-    monkeypatch,
-) -> None:
-    fake_client = FakeAsyncClient()
-    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
-
-    client = HttpxOpenRouterClient(
-        api_key="test-key",
-        model="google/gemma-4-26b-a4b-it",
-        base_url="https://example",
-    )
-    await client.translate(
-        text="hello",
-        system_prompt="SYSTEM",
-        source_language="ko-KR",
-        target_language="en",
-    )
-
-    body = fake_client.last_request["json"]
-    assert body["provider"] == {
-        "sort": {"by": "latency"},
-        "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16", "makora"],
-        "allow_fallbacks": True,
-    }
-
-
-@pytest.mark.asyncio
 async def test_httpx_openrouter_client_google_gemini_latency_denies_data_collection(
     monkeypatch,
 ) -> None:
