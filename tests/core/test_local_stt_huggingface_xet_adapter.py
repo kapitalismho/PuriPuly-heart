@@ -7,8 +7,8 @@ import json
 import os
 import socketserver
 import sys
-import textwrap
 import threading
+from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
 
@@ -38,6 +38,12 @@ from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
 )
 from puripuly_heart.core.network_diagnostics import safe_transport_fields
 from puripuly_heart.core.runtime import LocalSTTDownloadRuntime
+from tests.core.test_external_network import (
+    isolated_network_environment as isolated_network_environment,
+)
+from tests.core.test_external_network import (
+    recording_proxy,
+)
 
 
 @pytest.mark.parametrize("native", [False, True], ids=["source", "native"])
@@ -98,6 +104,253 @@ def file_server(tmp_path: Path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+@contextmanager
+def _xet_advertising_file_server(payload: bytes, *, fail_native: bool = False):
+    requests: list[tuple[str, str]] = []
+    started = threading.Event()
+    release = threading.Event()
+    chunks = [payload[offset : offset + 65536] for offset in range(0, len(payload), 65536)]
+    wire = b"".join(
+        b"\0" + len(chunk).to_bytes(3, "little") + b"\0" + len(chunk).to_bytes(3, "little") + chunk
+        for chunk in chunks
+    )
+    xorb_hash = "c" * 64
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_HEAD(self):
+            requests.append(("HEAD", self.path))
+            self.send_response(200)
+            self.send_header("X-Repo-Commit", "a" * 40)
+            self.send_header("ETag", f'"{hashlib.sha256(payload).hexdigest()}"')
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("X-Xet-Hash", "b" * 64)
+            self.send_header(
+                "X-Xet-Refresh-Route",
+                f"http://127.0.0.1:{self.server.server_address[1]}/xet-auth",
+            )
+            self.end_headers()
+
+        def do_GET(self):
+            requests.append(("GET", self.path))
+            endpoint = f"http://127.0.0.1:{self.server.server_address[1]}"
+            if self.path == "/xet-auth":
+                self.send_response(200)
+                self.send_header("X-Xet-Cas-Url", endpoint)
+                self.send_header("X-Xet-Access-Token", "synthetic-cas-token")
+                self.send_header("X-Xet-Token-Expiration", "4102444800")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            if self.path.startswith("/v2/reconstructions/"):
+                if fail_native:
+                    self.send_error(400)
+                    return
+                requested_range = self.headers.get("Range", "bytes=0-")
+                range_start = int(requested_range.partition("=")[2].partition("-")[0])
+                if range_start >= len(payload):
+                    self.send_error(416)
+                    return
+                body = json.dumps(
+                    {
+                        "offset_into_first_range": 0,
+                        "terms": [
+                            {
+                                "hash": xorb_hash,
+                                "unpacked_length": len(payload),
+                                "range": {"start": 0, "end": len(chunks)},
+                            }
+                        ],
+                        "xorbs": {
+                            xorb_hash: [
+                                {
+                                    "url": f"{endpoint}/xorb",
+                                    "ranges": [
+                                        {
+                                            "chunks": {"start": 0, "end": len(chunks)},
+                                            "bytes": {"start": 0, "end": len(wire) - 1},
+                                        }
+                                    ],
+                                }
+                            ]
+                        },
+                    }
+                ).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            content = wire if self.path == "/xorb" else payload
+            self.send_response(206 if self.path == "/xorb" else 200)
+            self.send_header("Content-Length", str(len(content)))
+            if self.path == "/xorb":
+                self.send_header("Content-Range", f"bytes 0-{len(wire) - 1}/{len(wire)}")
+            self.end_headers()
+            started.set()
+            try:
+                self.wfile.write(content[:1024])
+                release.wait(timeout=10)
+                self.wfile.write(content[1024:])
+            except BrokenPipeError, ConnectionResetError, ConnectionAbortedError:
+                pass
+
+        def do_POST(self):
+            requests.append(("POST", self.path))
+            self.send_error(400)
+
+        def log_message(self, *_args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}", requests, started, release
+    finally:
+        release.set()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.fixture
+async def download_proxy(transport):
+    async with recording_proxy(socks=transport == "native_socks") as selected:
+        yield selected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("transport", "outcome"),
+    [
+        ("native", "complete"),
+        ("native", "cancel"),
+        ("native_proxy", "complete"),
+        ("native_socks", "complete"),
+        ("native", "corrupt"),
+        ("disabled", "complete"),
+        ("disabled", "cancel"),
+        ("native_failure", "complete"),
+        ("native_failure", "cancel"),
+        ("unavailable", "complete"),
+    ],
+)
+async def test_actual_worker_transfer_preserves_verified_atomic_install(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, outcome: str, transport: str, download_proxy
+) -> None:
+    payload = b"controlled-http-model\0" * 65536
+    manifest = _gpu_manifest(payload if outcome != "corrupt" else b"x" * len(payload))
+    cancel_event = threading.Event()
+    statuses: list[RuntimeLocalSTTStatusUpdate] = []
+    monkeypatch.setenv("HF_HUB_DISABLE_XET", "true" if transport == "disabled" else "0")
+    monkeypatch.setenv("HF_HOME", str(tmp_path / "isolated-hf-home"))
+    monkeypatch.setenv("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
+    monkeypatch.setenv("NO_PROXY", "*")
+    for name in ("SSL_CERT_FILE", "SSL_CERT_DIR", "HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    proxy, proxied = download_proxy
+    if transport in ("native_proxy", "native_socks"):
+        monkeypatch.delenv("NO_PROXY")
+        monkeypatch.setenv("HTTP_PROXY", proxy)
+        monkeypatch.setenv("HTTPS_PROXY", proxy)
+    script = """
+import pathlib, sys
+from huggingface_hub.utils import _runtime
+_runtime._package_versions["hf_xet"] = "N/A"
+from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import run_huggingface_xet_worker
+raise SystemExit(run_huggingface_xet_worker(
+    request_path=pathlib.Path(sys.argv[1]), event_path=pathlib.Path(sys.argv[2])
+))
+"""
+    with _xet_advertising_file_server(payload, fail_native=transport == "native_failure") as (
+        endpoint,
+        requests,
+        started,
+        release,
+    ):
+        monkeypatch.setenv("HF_ENDPOINT", endpoint)
+        adapter = HuggingFaceXetDownloadAdapter(
+            worker_command_factory=(
+                (
+                    lambda _request, request_path, event_path: [
+                        sys.executable,
+                        "-c",
+                        script,
+                        str(request_path),
+                        str(event_path),
+                    ]
+                )
+                if transport == "unavailable"
+                else None
+            )
+        )
+        task = asyncio.create_task(
+            ensure_local_stt_installed(
+                manifest=manifest,
+                model_root=tmp_path,
+                preferred_source="huggingface",
+                cancel_event=cancel_event,
+                on_status=statuses.append,
+                huggingface_downloader=adapter,
+            )
+        )
+        try:
+            assert await asyncio.to_thread(started.wait, 10)
+            assert not (tmp_path / manifest.install_dirname).exists()
+            worker_pid = int(adapter.child_states[0].split("pid=", 1)[1].split(":", 1)[0])
+            if outcome == "cancel":
+                cancel_event.set()
+                with pytest.raises(LocalSTTRuntimeInstallCancelled):
+                    await asyncio.wait_for(task, timeout=10)
+                assert not (tmp_path / manifest.install_dirname).exists()
+            elif outcome == "corrupt":
+                release.set()
+                with pytest.raises(LocalSTTRuntimeInstallError, match="checksum mismatch"):
+                    await asyncio.wait_for(task, timeout=15)
+                assert not (tmp_path / manifest.install_dirname).exists()
+            else:
+                release.set()
+                installed = await asyncio.wait_for(task, timeout=15)
+                assert installed.selected_source == "huggingface"
+                target = tmp_path / manifest.install_dirname / manifest.files[0].relative_path
+                assert target.read_bytes() == payload
+                assert any(item.status == "downloading" and item.percent > 0 for item in statuses)
+            assert adapter.child_states == ()
+            assert not psutil.pid_exists(worker_pid)
+        finally:
+            release.set()
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
+    resolve_path = (
+        "/handy-computer/Qwen3-ASR-1.7B-gguf/resolve/"
+        "92282af1610a2db19d66f2bef1e260f5deca782d/remote/model-q6-k.gguf"
+    )
+    assert requests[0] == ("HEAD", resolve_path)
+    assert not any(method == "POST" for method, _path in requests)
+    if transport in ("native", "native_proxy", "native_socks"):
+        assert ("GET", "/xet-auth") in requests
+        assert ("GET", "/v2/reconstructions/" + "b" * 64) in requests
+        assert ("GET", "/xorb") in requests
+        assert ("GET", resolve_path) not in requests
+    elif transport == "native_failure":
+        assert ("GET", "/xet-auth") in requests
+        assert ("GET", "/v2/reconstructions/" + "b" * 64) in requests
+        assert ("GET", resolve_path) in requests
+    else:
+        assert requests == [("HEAD", resolve_path), ("GET", resolve_path)]
+    assert not tuple(tmp_path.rglob(".hf-xet-*"))
+    assert not tuple(tmp_path.rglob(".cache"))
+    assert not tuple(tmp_path.glob("*.staging-*"))
+    if transport == "native_proxy":
+        assert ("GET", endpoint + "/xorb") in proxied
+    elif transport == "native_socks":
+        assert any(method == "SOCKS5" for method, _target in proxied)
+    else:
+        assert proxied == []
 
 
 def _gpu_manifest(payload: bytes, *, modelscope_url: str = "") -> LocalSTTAssetManifest:
@@ -453,53 +706,23 @@ async def test_adapter_preserves_worker_failure_metadata(tmp_path: Path) -> None
 
 
 @pytest.mark.asyncio
-async def test_adapter_retries_native_download_failure_without_xet(
+@pytest.mark.parametrize("inherited_disable_xet", [None, "0", "true"])
+async def test_adapter_respects_inherited_native_xet_choice(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    inherited_disable_xet: str | None,
 ) -> None:
-    script = textwrap.dedent("""
-        import json
-        import os
-        import pathlib
-        import sys
-
-        request_path = pathlib.Path(sys.argv[1])
-        event_path = pathlib.Path(sys.argv[2])
-        payload = json.loads(request_path.read_text(encoding="utf-8"))
-        local_dir = pathlib.Path(payload["local_dir"])
-        attempts_path = local_dir / "attempts.jsonl"
-        attempt = len(attempts_path.read_text(encoding="utf-8").splitlines()) if attempts_path.exists() else 0
-        record = {
-            "disable_xet": os.environ.get("HF_HUB_DISABLE_XET"),
-            "ssl_cert_file": os.environ.get("SSL_CERT_FILE"),
-            "ssl_cert_dir": os.environ.get("SSL_CERT_DIR"),
-            "cache_exists": (local_dir / ".cache").exists(),
-        }
-        with attempts_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record) + "\\n")
-        if attempt == 0:
-            cache = local_dir / ".cache" / "xet"
-            cache.mkdir(parents=True)
-            (cache / "partial").write_bytes(b"partial")
-            event_path.write_text(json.dumps({
-                "type": "error",
-                "failure_code": "download_failed",
-                "error_type": "RuntimeError",
-                "message": "fixture xet failure",
-            }) + "\\n", encoding="utf-8")
-            raise SystemExit(1)
-        target = local_dir / payload["remote_path"]
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(b"fixture")
-        event_path.write_text(json.dumps({"type": "complete", "path": str(target)}) + "\\n", encoding="utf-8")
-        """)
-    for name in tuple(os.environ):
-        if name.lower().endswith("_proxy") or name in ("SSL_CERT_FILE", "SSL_CERT_DIR"):
-            monkeypatch.delenv(name)
-    from puripuly_heart.core import external_network
-
-    monkeypatch.setattr(external_network, "_windows_proxy_settings", lambda: ({}, ""))
-    monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
+    if inherited_disable_xet is None:
+        monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
+    else:
+        monkeypatch.setenv("HF_HUB_DISABLE_XET", inherited_disable_xet)
+    script = """
+import json, os, pathlib, sys
+request = json.loads(pathlib.Path(sys.argv[1]).read_text())
+target = pathlib.Path(request["local_dir"]) / request["remote_path"]
+target.write_text(json.dumps(os.environ.get("HF_HUB_DISABLE_XET")))
+pathlib.Path(sys.argv[2]).write_text(json.dumps({"type": "complete", "path": str(target)}) + "\\n")
+"""
     adapter = HuggingFaceXetDownloadAdapter(
         worker_command_factory=lambda _request, request_path, event_path: [
             sys.executable,
@@ -514,30 +737,15 @@ async def test_adapter_retries_native_download_failure_without_xet(
         revision="pinned-revision",
         remote_path="model.gguf",
         local_dir=tmp_path / "local",
-        expected_size_bytes=7,
+        expected_size_bytes=None,
     )
 
     downloaded = await adapter.download(request, cancel_event=None, on_progress=None)
 
-    attempts = [
-        json.loads(line)
-        for line in (request.local_dir / "attempts.jsonl").read_text(encoding="utf-8").splitlines()
-    ]
-    assert downloaded.read_bytes() == b"fixture"
-    assert attempts == [
-        {
-            "disable_xet": None,
-            "ssl_cert_file": None,
-            "ssl_cert_dir": None,
-            "cache_exists": False,
-        },
-        {
-            "disable_xet": "1",
-            "ssl_cert_file": None,
-            "ssl_cert_dir": None,
-            "cache_exists": False,
-        },
-    ]
+    assert json.loads(downloaded.read_text()) == inherited_disable_xet
+    assert os.environ.get("HF_HUB_DISABLE_XET") == inherited_disable_xet
+    assert adapter.child_states == ()
+    assert not tuple(request.local_dir.glob(".hf-xet-*"))
 
 
 @pytest.mark.asyncio

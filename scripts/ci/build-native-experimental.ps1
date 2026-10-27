@@ -133,6 +133,7 @@ try {
 
 $layoutPath = Join-Path $repoRoot "native\windows_host\artifact-layout.json"
 $inputSpecPath = Join-Path $repoRoot "native\windows_host\upstream-inputs.json"
+$spec = Get-Content -LiteralPath $inputSpecPath -Raw -Encoding utf8 | ConvertFrom-Json
 $overlayRoot = Join-Path $repoRoot "native\windows_host\template"
 $pythonBootstrapPath = Join-Path $repoRoot "native\windows_host\python_bootstrap.py.in"
 $inputIndex = Join-Path $BuildRoot "input-index"
@@ -141,7 +142,7 @@ $fixtureRoot = Join-Path $BuildRoot "fixture"
 $fletOutput = Join-Path $BuildRoot "flet-output"
 $fletCache = Join-Path $BuildRoot "flet-cache"
 $flutterSdkRoot = Join-Path $BuildRoot "flutter-sdk"
-$pythonEmbedRoot = Join-Path $BuildRoot "official-python-embed"
+$pythonRuntimeRoot = Join-Path $BuildRoot "official-python-runtime"
 $requirementsPath = Join-Path $BuildRoot "requirements-native.txt"
 $requirementsExportPath = Join-Path $BuildRoot "requirements-export.txt"
 $soxrRoot = Join-Path $BuildRoot "soxr-release-inputs"
@@ -159,7 +160,7 @@ foreach ($transient in @(
     $templateRoot,
     $fixtureRoot,
     $fletOutput,
-    $pythonEmbedRoot,
+    $pythonRuntimeRoot,
     $soxrRoot,
     $llamaRoot,
     $artifactRoot,
@@ -168,10 +169,9 @@ foreach ($transient in @(
     Remove-Item -LiteralPath $transient -Recurse -Force -ErrorAction SilentlyContinue
 }
 New-Item -ItemType Directory -Path $inputIndex, $evidenceRoot -Force | Out-Null
-$spec = Get-Content -LiteralPath $inputSpecPath -Raw -Encoding utf8 | ConvertFrom-Json
 foreach ($property in $spec.inputs.PSObject.Properties) {
     $filename = $property.Name
-    $source = if ($filename -eq "python-3.14.7-embed-amd64.zip") { $PythonEmbedArchive } else { Resolve-OneFile -Root $PinnedInputRoot -Name $filename }
+    $source = if ($filename -eq "python-$($spec.versions.python)-embed-amd64.zip") { $PythonEmbedArchive } else { Resolve-OneFile -Root $PinnedInputRoot -Name $filename }
     try {
         New-Item -ItemType HardLink -Path (Join-Path $inputIndex $filename) -Target $source | Out-Null
     } catch {
@@ -204,7 +204,7 @@ try {
     $flutterCommand = Join-Path $flutterSdkRoot "flutter\bin\flutter.bat"
     if (-not (Test-Path -LiteralPath $flutterCommand -PathType Leaf)) {
         Remove-Item -LiteralPath $flutterSdkRoot -Recurse -Force -ErrorAction SilentlyContinue
-        Expand-Archive -LiteralPath (Join-Path $inputIndex "flutter_windows_3.44.8-stable.zip") -DestinationPath $flutterSdkRoot
+        Expand-Archive -LiteralPath (Join-Path $inputIndex "flutter_windows_$($spec.versions.flutter)-stable.zip") -DestinationPath $flutterSdkRoot
     }
     $flutterVersionOutput = (& $flutterCommand --version --machine | Out-String)
     $flutterJsonOffset = $flutterVersionOutput.IndexOf("{")
@@ -221,6 +221,14 @@ try {
         throw "Pinned Flet cache not found: $sourceCache"
     }
     Copy-Tree -Source $sourceCache -Destination $fletCache
+    $pythonInputEvidence = Join-Path $evidenceRoot "python-runtime.json"
+    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
+        "-m", "puripuly_heart.release_evidence.native_distribution", "prepare-python-inputs",
+        "--spec", $inputSpecPath, "--input-root", $inputIndex, "--cache-root", $fletCache,
+        "--output", $pythonInputEvidence
+    ) -WorkingDirectory $repoRoot
+    $pythonInputs = Get-Content -LiteralPath $pythonInputEvidence -Raw -Encoding utf8 | ConvertFrom-Json
+    Expand-Archive -LiteralPath $pythonInputs.runtime_archive -DestinationPath $pythonRuntimeRoot
     New-Item -ItemType Directory -Path $fixtureRoot -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $repoRoot "native\windows_host\product_bootstrap.py") -Destination (Join-Path $fixtureRoot "product_bootstrap.py") -Force
     @"
@@ -233,19 +241,21 @@ requires-python = ">=3.14,<3.15"
 org = "com.salee"
 product = "PuriPuly <3"
 company = "salee"
-
-[tool.flet.flutter.pubspec.dependency_overrides]
-jni_flutter = "1.0.3"
-shared_preferences_android = "2.4.28"
 "@ | Set-Content -LiteralPath (Join-Path $fixtureRoot "pyproject.toml") -Encoding utf8
 
     $env:FLET_CACHE_DIR = $fletCache
+    $env:FLET_PYTHON_BUILD_MANIFEST = $pythonInputs.manifest
+    $env:SERIOUS_PYTHON_FULL_VERSION = $spec.versions.python
+    $env:SERIOUS_PYTHON_DIST_RELEASE = $spec.versions.python_dist_release
+    $env:SERIOUS_PYTHON_BUILD_DATE = $spec.versions.python_build_release
+    $env:DART_BRIDGE_VERSION = $spec.versions.dart_bridge
     $env:PATH = "$(Join-Path $flutterSdkRoot "flutter\bin");$env:PATH"
     $env:PIP_CACHE_DIR = Join-Path $BuildRoot "pip-cache"
     $env:PYTHONDONTWRITEBYTECODE = "1"
     $env:PYTHONOPTIMIZE = "0"
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(
-        "-m", "flet.cli", "build", "windows", $fixtureRoot,
+        "-m", "flet.cli",
+        "build", "windows", $fixtureRoot,
         "--output", $fletOutput,
         "--project", "puripuly-heart",
         "--artifact", "PuriPulyHeart",
@@ -265,12 +275,11 @@ shared_preferences_android = "2.4.28"
     ) -WorkingDirectory $repoRoot
 
     Copy-Tree -Source $fletOutput -Destination $artifactRoot
-    Copy-Tree -Source (Join-Path $fixtureRoot "build\flutter\build\build_python_$($spec.versions.python)\python\DLLs") -Destination (Join-Path $artifactRoot "DLLs")
+    Remove-Item -LiteralPath (Join-Path $artifactRoot "DLLs"), (Join-Path $artifactRoot "Lib") -Recurse -Force
+    Copy-Tree -Source $pythonRuntimeRoot -Destination $artifactRoot
     Remove-Item -LiteralPath (Join-Path $artifactRoot "app") -Recurse -Force
     Remove-Item -LiteralPath (Join-Path $artifactRoot "site-packages") -Recurse -Force
     New-Item -ItemType Directory -Path (Join-Path $artifactRoot "app"), (Join-Path $artifactRoot "site-packages") | Out-Null
-    Expand-Archive -LiteralPath $PythonEmbedArchive -DestinationPath $pythonEmbedRoot
-    Copy-Item -LiteralPath (Join-Path $pythonEmbedRoot "python.exe") -Destination (Join-Path $artifactRoot "python.exe") -Force
 
     $uvCommand = (Get-Command uv -ErrorAction Stop).Source
     Invoke-Checked -FilePath $uvCommand -ArgumentList @(
@@ -280,9 +289,9 @@ shared_preferences_android = "2.4.28"
         "-m", "puripuly_heart.release_evidence.native_distribution", "filter-requirements", $requirementsExportPath, $requirementsPath
     ) -WorkingDirectory $repoRoot
     Invoke-Checked -FilePath $uvCommand -ArgumentList @(
-        "pip", "install",
+        "--no-config", "pip", "install",
         "--python", $ToolPython,
-        "--python-version", "3.14.7",
+        "--python-version", $spec.versions.python,
         "--python-platform", "x86_64-pc-windows-msvc",
         "--require-hashes",
         "--no-deps",

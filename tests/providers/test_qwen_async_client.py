@@ -182,11 +182,14 @@ async def test_httpx_client_raises_on_empty_content(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_httpx_client_handles_cancellation(monkeypatch):
+    entered = asyncio.Event()
+
     class SlowFakeAsyncClient:
         async def aclose(self):
             return None
 
         async def post(self, url, **kwargs):
+            entered.set()
             await asyncio.sleep(10)  # Long wait
             return FakeResponse()
 
@@ -203,7 +206,7 @@ async def test_httpx_client_handles_cancellation(monkeypatch):
         )
 
     task = asyncio.create_task(translate_task())
-    await asyncio.sleep(0.05)  # Let it start
+    await asyncio.wait_for(entered.wait(), 1)
     task.cancel()
 
     with pytest.raises(asyncio.CancelledError):

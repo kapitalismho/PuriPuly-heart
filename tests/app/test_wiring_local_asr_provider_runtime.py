@@ -29,6 +29,7 @@ from puripuly_heart.config.resolved import (
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot, PeerAudioSegmentLedger
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.peer_capture import (
     PeerCaptureLanguageFacts,
@@ -39,7 +40,11 @@ from puripuly_heart.core.runtime.gpu_asr import SharedGpuASRRuntime
 from puripuly_heart.core.runtime.local_asr_provider_runtime import LocalASRProviderRuntimeOwner
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
-from puripuly_heart.core.stt.backend import PermanentSTTScopedSessionError, STTSessionProjection
+from puripuly_heart.core.stt.backend import (
+    PermanentSTTScopedSessionError,
+    STTProviderTurnTerminal,
+    STTSessionProjection,
+)
 from puripuly_heart.core.stt.custom import (
     CustomSTTConfigurationError,
     normalize_custom_stt_extra,
@@ -545,7 +550,9 @@ async def test_production_retention_profiles_accept_listen_boundary_and_long_sel
 @pytest.mark.parametrize("provider_id", ["custom", "custom_offline"])
 async def test_production_profile_accounts_real_offline_custom_buffer_for_both_selectors(
     provider_id: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level("WARNING", logger="puripuly_heart.core.stt.scoped_engine")
     settings = _retention_settings(provider_id)
     config = SimpleNamespace(
         channel="peer",
@@ -554,6 +561,7 @@ async def test_production_profile_accounts_real_offline_custom_buffer_for_both_s
         sample_rate_hz=16000,
     )
     sessions: list[_OfflineOpenAITranscriptionSession] = []
+    emitted: list[object] = []
 
     async def open_session(_settings, epoch_id):
         session = _OfflineOpenAITranscriptionSession(
@@ -572,6 +580,7 @@ async def test_production_profile_accounts_real_offline_custom_buffer_for_both_s
     engine = ScopedRecognitionEngine(
         channel="peer",
         session_factory=open_session,
+        event_sink=emitted.append,
         retention_profile_resolver=lambda snapshot: _recognition_retention_profile(
             config,
             snapshot,
@@ -581,12 +590,36 @@ async def test_production_profile_accounts_real_offline_custom_buffer_for_both_s
 
     await engine.handle_owned_vad_event(start)
     session = sessions[0]
+    identity = session._event_projection.active_identity
+    assert identity is not None
+    assert identity.segment == start.segment.identity
+    assert identity.provider_epoch_id == session.projection.provider_epoch_id
 
     assert len(session._scoped_buffer) == 3200
     assert engine.retention_snapshot.retained_samples == 1600
     assert engine.retention_snapshot.retained_bytes == len(session._scoped_buffer)
     await engine.abort()
     await engine.close()
+
+    assert len(emitted) == 1
+    terminal = emitted[0]
+    assert isinstance(terminal, STTProviderTurnTerminal)
+    assert terminal.identity == identity
+    assert terminal.outcome == "cancelled"
+    assert terminal.failure_reason == "cancelled"
+    assert terminal.text_authority == "none"
+    assert terminal.epoch_disposition == "retire"
+    assert engine.retention_snapshot.retained_samples == 0
+    assert engine.retention_snapshot.retained_bytes == 0
+    assert engine.cleanup_debt == 0
+    assert not engine.is_live
+    assert session._stopped
+    assert session._client is None
+    assert not any(
+        value[0].fields.get("recognition_cause") == "provider_event_drain_timeout"
+        for record in caplog.records
+        if (value := getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE, None)) is not None
+    )
 
 
 def test_custom_realtime_profile_releases_after_completed_write() -> None:

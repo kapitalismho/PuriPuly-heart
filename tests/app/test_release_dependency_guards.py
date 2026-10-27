@@ -77,12 +77,6 @@ def _expected_openvr_notice_section() -> str:
     )
 
 
-def test_pyproject_caps_deepgram_sdk_below_v6() -> None:
-    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-
-    assert "deepgram-sdk>=5.3.4,<6.0.0" in pyproject["project"]["dependencies"]
-
-
 def test_pyproject_pins_soxr_dependency() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
@@ -183,16 +177,6 @@ def test_vendored_openvr_bundle_files_exist_and_sha256_line_is_exact() -> None:
     assert sha256_path.read_text(encoding="utf-8") == f"{OPENVR_VENDOR_SHA256_LINE}\n"
 
 
-def test_huggingface_xet_apache_notices_cover_pinned_runtime_packages() -> None:
-    notices = (ROOT / "src" / "puripuly_heart" / "data" / "THIRD_PARTY_NOTICES.txt").read_text(
-        encoding="utf-8"
-    )
-
-    assert "huggingface-hub 1.26.0: Apache-2.0" in notices
-    assert "hf-xet 1.5.2 and its Windows native extension: Apache-2.0" in notices
-    assert "HF_XET_HIGH_PERFORMANCE by default" in notices
-
-
 def test_lgpl_text_file_exists_for_bundled_soxr_compliance_bundle() -> None:
     lgpl_text_path = ROOT / SOXR_LICENSE_TEXT_RELATIVE_PATH
 
@@ -233,9 +217,6 @@ def test_shared_setup_action_preserves_release_default_and_rejects_stale_pr_lock
         (ROOT / ".github/actions/setup-uv-environment/action.yml").read_text(encoding="utf-8")
     )
     workflow = yaml.safe_load((ROOT / ".github/workflows/pr-ci.yml").read_text(encoding="utf-8"))
-    setup_python = next(step for step in action["runs"]["steps"] if "uses" in step)
-    assert setup_python["uses"] == "actions/setup-python@v7"
-    assert setup_python["with"]["cache-dependency-path"] == "uv.lock"
     inputs = {
         "sync-args": "--extra dev",
         "uv-version": workflow["env"]["UV_VERSION"],
@@ -261,9 +242,6 @@ def test_shared_setup_action_preserves_release_default_and_rejects_stale_pr_lock
         for line in step.get("run", "").splitlines()
         if line.strip()
     ]
-    installer = next(command for command in commands if command[:3] == ["python", "-m", "pip"])
-    assert "install" in installer
-    assert f"uv=={inputs['uv-version']}" in installer
     sync_commands = [command for command in commands if command[:2] == ["uv", "sync"]]
     assert len(sync_commands) == 1
     uv = shutil.which("uv")

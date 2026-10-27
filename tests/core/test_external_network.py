@@ -10,6 +10,7 @@ import ssl
 import threading
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from datetime import datetime, timedelta, timezone
+from functools import cache
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
@@ -41,8 +42,8 @@ def isolated_network_environment(monkeypatch):
     monkeypatch.setattr(external_network, "_windows_proxy_settings", lambda: ({}, ""))
 
 
-@pytest.fixture
-def certificates(tmp_path):
+@cache
+def _certificate_material():
     now = datetime.now(timezone.utc)
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "network test root")])
@@ -61,9 +62,7 @@ def certificates(tmp_path):
         .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
         .sign(key, hashes.SHA256())
     )
-    root_path = tmp_path / "root.pem"
-    root_path.write_bytes(root.public_bytes(serialization.Encoding.PEM))
-    contexts = {}
+    leaf_material = []
     for variant in ("valid", "expired"):
         leaf_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         expiry = now - timedelta(hours=1) if variant == "expired" else now + timedelta(days=1)
@@ -82,23 +81,38 @@ def certificates(tmp_path):
             )
             .sign(key, hashes.SHA256())
         )
-        cert_path, key_path = tmp_path / f"{variant}.pem", tmp_path / f"{variant}.key"
-        cert_path.write_bytes(leaf.public_bytes(serialization.Encoding.PEM))
-        key_path.write_bytes(
-            leaf_key.private_bytes(
-                serialization.Encoding.PEM,
-                serialization.PrivateFormat.PKCS8,
-                serialization.NoEncryption(),
+        leaf_material.append(
+            (
+                variant,
+                leaf.public_bytes(serialization.Encoding.PEM),
+                leaf_key.private_bytes(
+                    serialization.Encoding.PEM,
+                    serialization.PrivateFormat.PKCS8,
+                    serialization.NoEncryption(),
+                ),
             )
         )
+    canonical_name = name.public_bytes()[2:]
+    ca_hash = int.from_bytes(hashlib.sha1(canonical_name).digest()[:4], "little")
+    return root.public_bytes(serialization.Encoding.PEM), f"{ca_hash:08x}.0", tuple(leaf_material)
+
+
+@pytest.fixture
+def certificates(tmp_path):
+    root_pem, ca_filename, leaf_material = _certificate_material()
+    root_path = tmp_path / "root.pem"
+    root_path.write_bytes(root_pem)
+    contexts = {}
+    for variant, cert_pem, key_pem in leaf_material:
+        cert_path, key_path = tmp_path / f"{variant}.pem", tmp_path / f"{variant}.key"
+        cert_path.write_bytes(cert_pem)
+        key_path.write_bytes(key_pem)
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.load_cert_chain(cert_path, key_path)
         contexts[variant] = context
-    canonical_name = name.public_bytes()[2:]
     ca_dir = tmp_path / "ca"
     ca_dir.mkdir()
-    ca_hash = int.from_bytes(hashlib.sha1(canonical_name).digest()[:4], "little")
-    (ca_dir / f"{ca_hash:08x}.0").write_bytes(root_path.read_bytes())
+    (ca_dir / ca_filename).write_bytes(root_pem)
     return root_path, ca_dir, contexts
 
 
@@ -166,6 +180,7 @@ async def recording_proxy(context=None, *, socks=False):
 
     async def handle(reader, writer):
         remote = None
+        forwarding = ()
         try:
             if socks:
                 version, count = await reader.readexactly(2)
@@ -207,20 +222,23 @@ async def recording_proxy(context=None, *, socks=False):
                         path += "?" + parsed.query
                     remote.write(f"{method} {path} HTTP/1.1\r\n".encode() + remaining)
                     await remote.drain()
-            forward = asyncio.create_task(pipe(reader, remote))
-            backward = asyncio.create_task(pipe(upstream, writer))
-            done, pending = await asyncio.wait(
-                (forward, backward), return_when=asyncio.FIRST_COMPLETED
+            forwarding = (
+                asyncio.create_task(pipe(reader, remote)),
+                asyncio.create_task(pipe(upstream, writer)),
             )
-            for task in pending:
-                task.cancel()
-            await asyncio.gather(*done, *pending, return_exceptions=True)
+            await asyncio.wait(forwarding, return_when=asyncio.FIRST_COMPLETED)
         except ConnectionError, asyncio.IncompleteReadError:
             pass
         finally:
-            writer.close()
-            if remote is not None:
-                remote.close()
+            for task in forwarding:
+                task.cancel()
+            await asyncio.gather(*forwarding, return_exceptions=True)
+            streams = (writer,) if remote is None else (writer, remote)
+            for stream in streams:
+                stream.close()
+            await asyncio.gather(
+                *(stream.wait_closed() for stream in streams), return_exceptions=True
+            )
 
     def accept(reader, writer):
         task = asyncio.create_task(handle(reader, writer))
@@ -241,11 +259,76 @@ async def recording_proxy(context=None, *, socks=False):
     finally:
         for listener in servers:
             listener.close()
+            listener.abort_clients()
+        owned = tuple(tasks)
+        for task in owned:
+            task.cancel()
+        await asyncio.gather(*owned, return_exceptions=True)
         for listener in servers:
             await listener.wait_closed()
-        for task in tasks:
+
+
+async def test_proxy_teardown_closes_live_tunnel_and_drains_owned_tasks():
+    upstream_received = []
+    upstream_eof = []
+    upstream_closed = asyncio.Event()
+
+    async def upstream(reader, writer):
+        try:
+            data = await reader.readline()
+            upstream_received.append(data)
+            writer.write(b"echo:" + data)
+            await writer.drain()
+            upstream_eof.append(await reader.read())
+        finally:
+            writer.close()
+            await writer.wait_closed()
+            upstream_closed.set()
+
+    server = await asyncio.start_server(upstream, "127.0.0.1", 0)
+    target = f"127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    before = asyncio.all_tasks()
+    writer = None
+    try:
+        async with asyncio.timeout(3):
+            async with recording_proxy() as (proxy, recorded):
+                endpoint = urlsplit(proxy)
+                reader, writer = await asyncio.open_connection(endpoint.hostname, endpoint.port)
+                writer.write(f"CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n\r\n".encode())
+                await writer.drain()
+                assert await reader.readuntil(b"\r\n\r\n") == (
+                    b"HTTP/1.1 200 Connection Established\r\n\r\n"
+                )
+                writer.write(b"controlled-tunnel-progress\n")
+                await writer.drain()
+                assert await reader.readline() == b"echo:controlled-tunnel-progress\n"
+                assert upstream_received == [b"controlled-tunnel-progress\n"]
+                assert recorded == [("CONNECT", target)]
+                admitted = {
+                    task
+                    for task in asyncio.all_tasks() - before
+                    if task.get_coro().__qualname__.startswith(f"{recording_proxy.__name__}.")
+                }
+                assert admitted
+            assert await reader.read() == b""
+            await upstream_closed.wait()
+            assert upstream_eof == [b""]
+            assert all(task.done() for task in admitted), [
+                (task.get_coro().__qualname__, task.cancelling())
+                for task in admitted
+                if not task.done()
+            ]
+    finally:
+        if writer is not None:
+            writer.close()
+            await writer.wait_closed()
+        server.close()
+        server.close_clients()
+        remaining = asyncio.all_tasks() - before
+        for task in remaining:
             task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*remaining, return_exceptions=True)
+        await server.wait_closed()
 
 
 def test_proxy_selection_preserves_system_with_no_proxy_only():
@@ -513,7 +596,7 @@ async def test_huggingface_child_selects_compatible_transport(
 import json, os, pathlib, sys
 payload = json.loads(pathlib.Path(sys.argv[1]).read_text())
 target = pathlib.Path(payload['local_dir']) / payload['remote_path']
-target.write_text(json.dumps({name: os.environ.get(name) for name in ('SSL_CERT_FILE', 'HF_HUB_DISABLE_XET', 'HTTP_PROXY', 'HTTPS_PROXY')}))
+target.write_text(json.dumps({name: os.environ.get(name) for name in ('SSL_CERT_FILE', 'HF_HUB_DISABLE_XET', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY')}))
 pathlib.Path(sys.argv[2]).write_text(json.dumps({'type': 'complete', 'path': str(target)}) + '\\n')
 """
     adapter = HuggingFaceXetDownloadAdapter(
@@ -544,7 +627,8 @@ pathlib.Path(sys.argv[2]).write_text(json.dumps({'type': 'complete', 'path': str
         assert result["SSL_CERT_FILE"] == str(root)
     if policy_case == "proxy_normalized":
         assert result["HTTP_PROXY"] == "http://all.invalid:8888"
-        assert result["HTTPS_PROXY"] == "http://lower.invalid:8888"
+        assert result["HTTPS_PROXY"] == os.environ["HTTPS_PROXY"]
+        assert result["NO_PROXY"] == ","
 
 
 async def test_plain_http_uses_selected_https_proxy_trust(certificates, monkeypatch):
@@ -658,7 +742,17 @@ async def test_header_and_body_stalls_keep_selected_route_and_tls(
     server = await asyncio.start_server(
         respond, "127.0.0.1", 0, ssl=contexts["valid"] if secure else None
     )
+    servers = [server]
     try:
+        if socket.has_ipv6:
+            servers.append(
+                await asyncio.start_server(
+                    respond,
+                    "::1",
+                    server.sockets[0].getsockname()[1],
+                    ssl=contexts["valid"] if secure else None,
+                )
+            )
         scheme = "https" if secure else "http"
         url = f"{scheme}://localhost:{server.sockets[0].getsockname()[1]}"
         timeout = httpx.Timeout(2.0, read=0.1)
@@ -686,8 +780,10 @@ async def test_header_and_body_stalls_keep_selected_route_and_tls(
             assert fields["http_status"] == 200
     finally:
         release.set()
-        server.close()
-        await server.wait_closed()
+        for current in servers:
+            current.close()
+        for current in servers:
+            await current.wait_closed()
         await asyncio.gather(*connections)
 
 

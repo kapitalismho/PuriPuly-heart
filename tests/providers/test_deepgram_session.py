@@ -74,8 +74,14 @@ def controlled_connection(monkeypatch: pytest.MonkeyPatch):
                 raise self.write_error
             self.written.append(data)
 
-        async def send_control(self, message):
-            self.written.append(message.type)
+        async def send_finalize(self):
+            self.written.append("Finalize")
+
+        async def send_close_stream(self):
+            self.written.append("CloseStream")
+
+        async def send_keep_alive(self):
+            self.written.append("KeepAlive")
 
     connection = Connection()
     clients = []
