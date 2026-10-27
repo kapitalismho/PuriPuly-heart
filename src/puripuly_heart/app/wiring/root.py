@@ -3,20 +3,24 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from puripuly_heart.app import wiring_llm_factory as _llm_factory
-from puripuly_heart.app.adapters.peer_capture_provider import PeerCaptureProviderAdapter
-from puripuly_heart.app.adapters.self_capture_provider import SelfCaptureProviderAdapter
+from puripuly_heart.app.adapters.peer_capture.peer_capture_provider import (
+    PeerCaptureProviderAdapter,
+)
+from puripuly_heart.app.adapters.self_capture.self_capture_provider import (
+    SelfCaptureProviderAdapter,
+)
 from puripuly_heart.app.adapters.sync_secret_store import (
     SyncSecretStore,
     SyncSecretStoreAdapter,
 )
 from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
 from puripuly_heart.app.ports.secret_store import SecretStorePort
-from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
-from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
+from puripuly_heart.app.wiring import wiring_llm_factory as _llm_factory
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import LocalASRProviderRuntimePort
+from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (
     HuggingFaceXetDownloadAdapter,
 )
-from puripuly_heart.core.openrouter_credentials import (
+from puripuly_heart.core.openrouter.openrouter_credentials import (
     load_managed_openrouter_user_identifier as load_managed_openrouter_user_identifier,
 )
 from puripuly_heart.core.peer_capture import (

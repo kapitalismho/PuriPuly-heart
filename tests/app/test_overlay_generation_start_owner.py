@@ -6,15 +6,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
-from puripuly_heart.app.services.overlay_generation_start import (
+
+from puripuly_heart.app.services.overlay import (
+    overlay_generation_start as overlay_generation_start_module,
+)
+from puripuly_heart.app.services.overlay.overlay_generation_start import (
     OverlayGenerationStartDiagnostic,
     OverlayGenerationStartEffects,
     OverlayGenerationStartOwner,
     OverlayGenerationStartRequest,
-)
-
-from puripuly_heart.app.services import (
-    overlay_generation_start as overlay_generation_start_module,
 )
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.resolved import ResolvedOverlayConfig

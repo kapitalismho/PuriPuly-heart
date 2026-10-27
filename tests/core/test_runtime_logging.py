@@ -15,11 +15,11 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from puripuly_heart.app.services.local_asr_diagnostics import LocalASRDiagnosticsOwner
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 
+from puripuly_heart.app.services.local_asr.local_asr_diagnostics import LocalASRDiagnosticsOwner
 from puripuly_heart.app.wiring.wiring_capture_runtime import CaptureDiagnosticsAdapter
 from puripuly_heart.core import runtime_logging as runtime_logging_module
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     CONTENT_POLICY_RAW_USER_TEXT_ALLOWED,

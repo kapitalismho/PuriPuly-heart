@@ -3,13 +3,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from puripuly_heart.app.services.settings_application import (
-    materialize_immediate_settings_intent,
-    materialize_prompt_apply_intent,
-    materialize_provider_apply_intent,
-    settings_view_surface_snapshots,
-)
-
 from puripuly_heart.app.ports.settings_view import (
     ImmediateSettingsIntent,
     PromptApplyIntent,
@@ -17,6 +10,12 @@ from puripuly_heart.app.ports.settings_view import (
 )
 from puripuly_heart.app.services.canonical_settings_persistence import (
     materialize_canonical_translation_settings,
+)
+from puripuly_heart.app.services.settings.settings_application import (
+    materialize_immediate_settings_intent,
+    materialize_prompt_apply_intent,
+    materialize_provider_apply_intent,
+    settings_view_surface_snapshots,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.ui.views.settings import SettingsView

@@ -61,6 +61,10 @@ from puripuly_heart.app.services.audio_diagnostics_application import (
 from puripuly_heart.app.services.canonical_settings_persistence import (
     compose_settings_owner,
 )
+from puripuly_heart.app.services.capture.self_capture_application import (
+    SelfCaptureApplicationOwner,
+    SelfCaptureApplicationSettings,
+)
 from puripuly_heart.app.services.chatgpt_account import ChatGptAccountOwner
 from puripuly_heart.app.services.clipboard_auto_translation import (
     ClipboardAutoTranslationOwner,
@@ -93,11 +97,11 @@ from puripuly_heart.app.services.index_selection import (
     translation_selection,
 )
 from puripuly_heart.app.services.llm_connection_readiness import LlmConnectionReadinessOwner
-from puripuly_heart.app.services.local_asr_diagnostics import LocalASRDiagnosticsOwner
-from puripuly_heart.app.services.local_asr_gpu_provisioning import (
+from puripuly_heart.app.services.local_asr.local_asr_diagnostics import LocalASRDiagnosticsOwner
+from puripuly_heart.app.services.local_asr.local_asr_gpu_provisioning import (
     LocalASRGpuProvisioningDiagnostic,
 )
-from puripuly_heart.app.services.local_asr_selection import (
+from puripuly_heart.app.services.local_asr.local_asr_selection import (
     LOCAL_CPU_PROVIDERS,
     resolve_local_asr_selection,
 )
@@ -112,35 +116,31 @@ from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.model_assets import ModelAssetsApplication
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
-from puripuly_heart.app.services.overlay_application import (
+from puripuly_heart.app.services.overlay.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
-from puripuly_heart.app.services.overlay_calibration_application import (
+from puripuly_heart.app.services.overlay.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
 )
-from puripuly_heart.app.services.provider_credential_verification import (
+from puripuly_heart.app.services.provider.provider_credential_verification import (
     ProviderCredentialVerificationInteractionOwner,
 )
-from puripuly_heart.app.services.provider_runtime_apply import ProviderRuntimeApplyPlan
-from puripuly_heart.app.services.provider_settings import (
+from puripuly_heart.app.services.provider.provider_runtime_apply import ProviderRuntimeApplyPlan
+from puripuly_heart.app.services.provider.provider_settings import (
     ProviderApplicationOwner,
     ProviderSettingsOwner,
     provider_verification_context,
 )
-from puripuly_heart.app.services.provider_verification_binding import (
+from puripuly_heart.app.services.provider.provider_verification_binding import (
     ProviderVerificationBindingOwner,
 )
-from puripuly_heart.app.services.self_capture_application import (
-    SelfCaptureApplicationOwner,
-    SelfCaptureApplicationSettings,
-)
-from puripuly_heart.app.services.settings_application import (
+from puripuly_heart.app.services.settings.settings_application import (
     SettingsApplicationOwner,
     osc_control_presentation_state,
 )
-from puripuly_heart.app.services.settings_projection import SettingsProjectionOwner
-from puripuly_heart.app.services.settings_runtime_effects import (
+from puripuly_heart.app.services.settings.settings_projection import SettingsProjectionOwner
+from puripuly_heart.app.services.settings.settings_runtime_effects import (
     SettingsRuntimeEffectsAdapter,
     SettingsRuntimeEffectsState,
 )
@@ -164,32 +164,16 @@ from puripuly_heart.app.wiring import (
     resolve_overlay_config_from_vnext,
     runtime_pipeline_inputs_from_vnext,
 )
-from puripuly_heart.app.wiring.wiring_index_selection import (
-    IndexManagedAllowanceObserver,
-    check_index_availability,
-    gemma_fallback_settings,
-    unknown_managed_allowance,
-)
-from puripuly_heart.app.wiring.wiring_managed_gemma import (
-    create_managed_gemma_runtime,
-    managed_gemma_selection,
-    managed_gemma_translation_desired,
-    sync_managed_gemma_demand,
-)
-from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
-    build_llm_provider_signature,
-    provider_llm_for_translation,
-)
-from puripuly_heart.app.wiring_application_runtime_logging import (
+from puripuly_heart.app.wiring.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
 )
-from puripuly_heart.app.wiring_audio_test import (
+from puripuly_heart.app.wiring.wiring_audio_test import (
     AudioTestCaptureControl,
     AudioTestRuntime,
     compose_audio_test_runtime,
 )
-from puripuly_heart.app.wiring_capture_runtime import CaptureOwnerFactory
-from puripuly_heart.app.wiring_composition import (
+from puripuly_heart.app.wiring.wiring_capture_runtime import CaptureOwnerFactory
+from puripuly_heart.app.wiring.wiring_composition import (
     create_desktop_overlay_policy,
     create_gpu_provider_recovery_application_owner,
     create_gpu_runtime_interaction_owner,
@@ -199,35 +183,51 @@ from puripuly_heart.app.wiring_composition import (
     create_vrchat_osc_presence_probe_owner,
     create_windows_desktop_work_area,
 )
-from puripuly_heart.app.wiring_local_asr_application import (
+from puripuly_heart.app.wiring.wiring_index_selection import (
+    IndexManagedAllowanceObserver,
+    check_index_availability,
+    gemma_fallback_settings,
+    unknown_managed_allowance,
+)
+from puripuly_heart.app.wiring.wiring_local_asr_application import (
     LocalASRApplicationRuntime,
     compose_local_asr_application,
 )
-from puripuly_heart.app.wiring_managed_account import (
+from puripuly_heart.app.wiring.wiring_managed_account import (
     ManagedAccountComponents,
     ManagedOpenRouterReleaseRuntime,
     ManagedTranslationRuntimeAccess,
     compose_managed_account,
 )
-from puripuly_heart.app.wiring_peer_application import (
+from puripuly_heart.app.wiring.wiring_managed_gemma import (
+    create_managed_gemma_runtime,
+    managed_gemma_selection,
+    managed_gemma_translation_desired,
+    sync_managed_gemma_demand,
+)
+from puripuly_heart.app.wiring.wiring_peer_application import (
     PeerApplicationRuntime,
     compose_peer_application,
 )
-from puripuly_heart.app.wiring_provider_runtime import (
+from puripuly_heart.app.wiring.wiring_provider_runtime import (
     ProviderRuntimeComponents,
     ProviderRuntimeSignatures,
     compose_provider_runtime,
 )
-from puripuly_heart.app.wiring_runtime_composition import RuntimeCompositionComponents
-from puripuly_heart.app.wiring_runtime_pipeline import (
+from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
+    build_llm_provider_signature,
+    provider_llm_for_translation,
+)
+from puripuly_heart.app.wiring.wiring_runtime_composition import RuntimeCompositionComponents
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import (
     RuntimePipelineComponents,
     RuntimePipelineHandle,
     RuntimePipelineLauncher,
 )
-from puripuly_heart.app.wiring_translation_runtime_configuration import (
+from puripuly_heart.app.wiring.wiring_translation_runtime_configuration import (
     replace_translation_runtime_enabled,
 )
-from puripuly_heart.app.wiring_vrc_mic_sync import compose_vrc_mic_sync
+from puripuly_heart.app.wiring.wiring_vrc_mic_sync import compose_vrc_mic_sync
 from puripuly_heart.composition.application_startup import (
     ApplicationStartupAdapter,
     compose_application_startup,
@@ -253,10 +253,10 @@ from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
 )
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
 )
-from puripuly_heart.core.local_asr_provisioning import (
+from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRProvisioningDiagnostic,
     LocalASRProvisioningPort,
     LocalASRProvisioningSnapshot,
@@ -2287,7 +2287,7 @@ def compose_application_runtime(
     )
 
     def model_assets_active_ids() -> frozenset[str]:
-        from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
+        from puripuly_heart.core.local_asr.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
 
         active: set[str] = set()
         runtime = pipeline.local_asr_runtime

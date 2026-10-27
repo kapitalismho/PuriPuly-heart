@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from puripuly_heart.app.services.provider_settings import ProviderApplicationOwner
+from puripuly_heart.app.services.provider.provider_settings import ProviderApplicationOwner
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 
 from .wiring_managed_account import ManagedAccountComponents

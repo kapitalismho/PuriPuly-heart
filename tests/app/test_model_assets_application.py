@@ -4,14 +4,14 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.core.local_stt_assets import (
+
+from puripuly_heart.app.services.model_assets import ModelAssetsApplication, ModelAssetsError
+from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice, model_asset_choices
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LOCAL_STT_MODEL_ID,
     load_local_stt_asset_manifest,
 )
-
-from puripuly_heart.app.services.model_assets import ModelAssetsApplication, ModelAssetsError
-from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice, model_asset_choices
 
 
 def test_model_manager_names_drop_runtime_suffixes_and_place_qwen_gpu_second() -> None:

@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.app.services.provider_runtime_apply import (
+
+from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
+from puripuly_heart.app.services.provider.provider_runtime_apply import (
     LlmProviderRebuildContext,
     LlmProviderRebuildOwner,
     ProviderRuntimeApplyAdapter,
@@ -13,8 +15,6 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     ProviderRuntimeOwner,
     ProviderRuntimeState,
 )
-
-from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
 from puripuly_heart.app.services.translation_enable import (
     ManagedTranslationPreparation,
     TranslationEnableOwner,

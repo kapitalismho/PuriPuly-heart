@@ -10,7 +10,7 @@ from puripuly_heart.core.diagnostic_validation import (
     stt_startup_failure_stage,
     stt_startup_failure_type,
 )
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 
 LocalASRBasicLogSink = Callable[[str, int], None]
 LocalASRDiagnosticLogSink = Callable[[str], object]

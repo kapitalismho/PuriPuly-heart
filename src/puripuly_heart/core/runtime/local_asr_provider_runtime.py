@@ -37,7 +37,7 @@ from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     ProviderRuntimeReleaseMode,
     ProviderRuntimeTerminalFailureSink,
 )
-from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnostic
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle

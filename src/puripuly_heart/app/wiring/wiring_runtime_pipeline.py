@@ -31,7 +31,7 @@ from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.chatgpt.session import ChatGptAccessTokenPort
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
     LocalASRProviderRuntimeFactoryPort,
     LocalASRProviderRuntimePort,

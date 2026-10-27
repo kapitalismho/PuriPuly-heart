@@ -266,13 +266,9 @@ Windows packaging retains the complete metadata directories for the exact
 locked distributions below. This preserves their upstream LICENSE, COPYING,
 NOTICE, and AUTHORS payloads at the original `.dist-info` paths:
 
-- aiohttp 3.13.2, including its vendored llhttp LICENSE.
 - cffi 2.0.0, including LICENSE and AUTHORS.
 - charset-normalizer 3.4.4.
-- frozenlist 1.8.0.
 - msgpack 1.2.1.
-- multidict 6.7.0.
-- propcache 0.4.1, including LICENSE and NOTICE.
 - psutil 7.2.2.
 - PyAudioWPatch 0.2.12.8.
 - PyYAML 6.0.3.
@@ -281,7 +277,6 @@ NOTICE, and AUTHORS payloads at the original `.dist-info` paths:
   project, and the complete LICENSE supplied by the sherpa-onnx wheel is
   retained together with both distributions' metadata.
 - sounddevice 0.5.5.
-- yarl 1.22.0, including LICENSE and NOTICE.
 - python-zeroconf 0.150.0.
 
 ONNX Runtime 1.28.0 supplies its license payloads in the package directory

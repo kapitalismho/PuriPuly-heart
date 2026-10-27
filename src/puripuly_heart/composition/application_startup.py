@@ -14,20 +14,20 @@ from puripuly_heart.app.services.gpu_runtime_interaction import GpuRuntimeIntera
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
 )
-from puripuly_heart.app.services.overlay_calibration_application import (
+from puripuly_heart.app.services.overlay.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
 )
 from puripuly_heart.app.wiring import create_secret_store, runtime_pipeline_inputs_from_vnext
-from puripuly_heart.app.wiring_runtime_pipeline import (
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import (
     RuntimePipelineHandle,
     RuntimePipelineLauncher,
 )
-from puripuly_heart.app.wiring_translation_runtime_configuration import (
+from puripuly_heart.app.wiring.wiring_translation_runtime_configuration import (
     replace_translation_runtime_enabled,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.diagnostics import safe_exception_fields
-from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.messages import ErrorDiagnostics
 
 

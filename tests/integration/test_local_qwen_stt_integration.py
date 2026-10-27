@@ -37,7 +37,7 @@ def _require_sherpa_onnx_importable() -> None:
             [
                 sys.executable,
                 "-c",
-                "from puripuly_heart.core.local_qwen_runtime import "
+                "from puripuly_heart.core.local_asr.local_qwen_runtime import "
                 "ensure_local_qwen_windows_runtime; "
                 "ensure_local_qwen_windows_runtime(); "
                 "import sherpa_onnx; import sherpa_onnx.offline_recognizer",

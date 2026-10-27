@@ -9,7 +9,12 @@ from uuid import uuid4
 
 import numpy as np
 import pytest
-from puripuly_heart.core.local_stt_assets import (
+
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+)
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_STT_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     PARAKEET_V3_MODEL_ID,
@@ -17,14 +22,9 @@ from puripuly_heart.core.local_stt_assets import (
     LocalSTTInstallState,
     load_local_stt_asset_manifest,
 )
-from puripuly_heart.core.local_stt_catalog import (
+from puripuly_heart.core.local_asr.local_stt_catalog import (
     LocalCPUInstallSnapshot,
     LocalCPUModelInstall,
-)
-
-from puripuly_heart.core.audio.ownership import (
-    AudioSegmentIdentity,
-    AudioSegmentSettingsSnapshot,
 )
 from puripuly_heart.core.stt.backend import (
     STTBackendTranscriptEvent,

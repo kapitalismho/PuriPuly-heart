@@ -17,7 +17,7 @@ FORBIDDEN_IMPORT_PREFIXES = (
     "keyring",
     "puripuly_heart.app.adapters",
     "puripuly_heart.config.settings",
-    "puripuly_heart.core.managed_openrouter_broker_client",
+    "puripuly_heart.core.openrouter.managed_openrouter_broker_client",
     "puripuly_heart.core.storage",
     "puripuly_heart.providers",
     "puripuly_heart.ui",

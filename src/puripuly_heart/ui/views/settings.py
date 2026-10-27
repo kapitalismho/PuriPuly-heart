@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Awaitable, Callable, Mapping
 
 import flet as ft
-from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
 
 from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretKey,
@@ -80,6 +79,7 @@ from puripuly_heart.app.ports.ui_models import OscControlPresentationState
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
+from puripuly_heart.app.services.local_asr.local_asr_selection import resolve_local_asr_selection
 from puripuly_heart.config.alibaba_connection import workspace_api_host_region
 from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,

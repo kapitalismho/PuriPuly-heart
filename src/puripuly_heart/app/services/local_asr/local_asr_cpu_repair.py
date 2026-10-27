@@ -5,12 +5,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Literal
 
-from puripuly_heart.core.local_asr_provisioning import (
+from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRInstallRequest,
     LocalASRInstallResult,
     LocalASRProvisioningPort,
 )
-from puripuly_heart.core.local_stt_assets import LOCAL_STT_MODEL_ID
+from puripuly_heart.core.local_asr.local_stt_assets import LOCAL_STT_MODEL_ID
 
 LocalASRCpuRepairChannel = Literal["self", "peer"]
 

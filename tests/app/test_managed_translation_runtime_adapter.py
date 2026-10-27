@@ -5,21 +5,21 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.app.services.managed_auth import ManagedAuthState
-from puripuly_heart.app.wiring_managed_auth_factory import (
-    ManagedTranslationRuntimeAdapter,
-)
-from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterReleaseBehavior,
-    ManagedOpenRouterReleaseDiagnostics,
-    ManagedOpenRouterReleaseResult,
-)
 
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.managed.managed_auth import ManagedAuthState
+from puripuly_heart.app.wiring.wiring_managed_auth_factory import (
+    ManagedTranslationRuntimeAdapter,
+)
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
+    ManagedOpenRouterReleaseBehavior,
+    ManagedOpenRouterReleaseDiagnostics,
+    ManagedOpenRouterReleaseResult,
+)
 
 
 class AuthAdapter:

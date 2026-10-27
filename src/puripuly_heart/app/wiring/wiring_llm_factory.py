@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, replace
 
 from puripuly_heart.app.ports.secret_store import SecretReadResult
-from puripuly_heart.app.services.managed_auth_claims import (
+from puripuly_heart.app.services.managed.managed_auth_claims import (
     MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
     MANAGED_AUTH_CLAIM_SOURCE_QQ,
     ManagedAuthClaimGuard,
@@ -73,9 +73,9 @@ from puripuly_heart.core.local_translation.assets import (
 )
 from puripuly_heart.core.local_translation.devices import resolve_llama_vulkan_device
 from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
-from puripuly_heart.core.managed_openrouter_release import OpenRouterReleaseRuntimeConfig
 from puripuly_heart.core.observability import ProviderObservationPort
-from puripuly_heart.core.openrouter_credentials import (
+from puripuly_heart.core.openrouter.managed_openrouter_release import OpenRouterReleaseRuntimeConfig
+from puripuly_heart.core.openrouter.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_ENV,
     OPENROUTER_BYOK_API_KEY_SECRET,
     OpenRouterCredentialResolution,
@@ -311,7 +311,9 @@ def _shared_managed_release_service_for_fallback(
     primary: LLMProvider,
     managed_release_service: object | None,
 ) -> object | None:
-    from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
+    from puripuly_heart.core.openrouter.managed_openrouter_release import (
+        ManagedOpenRouterLLMProvider,
+    )
 
     if isinstance(primary, ManagedOpenRouterLLMProvider):
         return _unwrap_claim_guarded_managed_release_service(primary.release_service)
@@ -408,7 +410,7 @@ def _guarded_managed_release_service_for_claim(
 
 
 def _managed_release_result_from_claim_result(result: object) -> object:
-    from puripuly_heart.core.managed_openrouter_release import (
+    from puripuly_heart.core.openrouter.managed_openrouter_release import (
         ManagedOpenRouterReleaseBehavior,
         ManagedOpenRouterReleaseDiagnostics,
         ManagedOpenRouterReleaseResult,
@@ -685,7 +687,9 @@ def _openrouter_provider_from_resolved_fields(
                 else None
             )
         if force_managed_wrapper or managed_api_key is None:
-            from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
+            from puripuly_heart.core.openrouter.managed_openrouter_release import (
+                ManagedOpenRouterLLMProvider,
+            )
 
             return ManagedOpenRouterLLMProvider(
                 release_service=guarded_managed_release_service,

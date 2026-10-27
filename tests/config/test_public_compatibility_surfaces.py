@@ -30,10 +30,8 @@ from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     SecretsIntent,
 )
-from puripuly_heart.core import (
-    managed_identity,
-    openrouter_credentials,
-)
+from puripuly_heart.core import managed_identity
+from puripuly_heart.core.openrouter import openrouter_credentials
 from puripuly_heart.core.overlay import manifest as overlay_manifest_module
 from puripuly_heart.core.overlay import process as overlay_process_module
 from puripuly_heart.core.overlay.manifest import OVERLAY_CONTRACT_VERSION
@@ -106,9 +104,9 @@ DOCUMENTED_ENTRY_POINT_OR_TEST_IMPORT_MODULES = frozenset(
         "puripuly_heart.config.prompts",
         "puripuly_heart.config.settings_vnext.schema",
         "puripuly_heart.core.managed_identity",
-        "puripuly_heart.core.managed_openrouter_broker_client",
-        "puripuly_heart.core.managed_openrouter_release",
-        "puripuly_heart.core.openrouter_credentials",
+        "puripuly_heart.core.openrouter.managed_openrouter_broker_client",
+        "puripuly_heart.core.openrouter.managed_openrouter_release",
+        "puripuly_heart.core.openrouter.openrouter_credentials",
         "puripuly_heart.core.overlay.manifest",
         "puripuly_heart.core.overlay.protocol",
         "puripuly_heart.core.storage.secrets",
@@ -119,7 +117,6 @@ DOCUMENTED_ENTRY_POINT_OR_TEST_IMPORT_MODULES = frozenset(
         "puripuly_heart.providers.llm.gemini",
         "puripuly_heart.providers.llm.local_openai",
         "puripuly_heart.providers.llm.openrouter",
-        "puripuly_heart.providers.llm.qwen",
         "puripuly_heart.providers.llm.qwen_async",
         "puripuly_heart.providers.stt.deepgram",
         "puripuly_heart.providers.stt.local_qwen_sherpa",

@@ -14,28 +14,28 @@ from pathlib import Path
 
 import psutil
 import pytest
-from puripuly_heart.core.local_stt_assets import (
+
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     LocalSTTAssetFile,
     LocalSTTAssetManifest,
     LocalSTTAssetSource,
 )
-from puripuly_heart.core.local_stt_download_port import (
+from puripuly_heart.core.local_asr.local_stt_download_port import (
     HuggingFaceDownloadProgress,
     HuggingFaceDownloadRequest,
     LocalSTTDownloadPortError,
 )
-from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
+from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (
     HuggingFaceXetDownloadAdapter,
     run_huggingface_xet_worker,
 )
-from puripuly_heart.core.local_stt_runtime_installer import (
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     LocalSTTRuntimeInstallCancelled,
     LocalSTTRuntimeInstallError,
     RuntimeLocalSTTStatusUpdate,
     ensure_local_stt_installed,
 )
-
 from puripuly_heart.core.network_diagnostics import safe_transport_fields
 from puripuly_heart.core.runtime import LocalSTTDownloadRuntime
 

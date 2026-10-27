@@ -784,7 +784,7 @@
         {"name": "gemini", "kind": "submodule"},
         {"name": "local_openai", "kind": "submodule"},
         {"name": "openrouter", "kind": "submodule"},
-        {"name": "qwen", "kind": "submodule"}
+        {"name": "qwen_async", "kind": "submodule"}
       ]
     },
     {
@@ -818,14 +818,6 @@
       "runtime_all_matches_exports": false,
       "facade_contract": null,
       "exports": [{"name": "OpenRouterLLMProvider", "kind": "attribute"}]
-    },
-    {
-      "module": "puripuly_heart.providers.llm.qwen",
-      "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/providers/llm/qwen.py", "tests/integration/test_qwen_llm_integration.py"],
-      "runtime_all_matches_exports": false,
-      "facade_contract": null,
-      "exports": [{"name": "QwenLLMProvider", "kind": "attribute"}]
     },
     {
       "module": "puripuly_heart.providers.llm.qwen_async",
@@ -1107,7 +1099,7 @@
       "examples": [
         "puripuly_heart.app.services.secret_settings_transaction",
         "puripuly_heart.app.services.settings.settings_mutation",
-        "puripuly_heart.app.services.managed_connection_auth"
+        "puripuly_heart.app.services.managed.managed_connection_auth"
       ],
       "rationale": "Application services are internal use-case boundaries. Their public names are stable execution inputs for later gates, but this inventory does not classify them as external public import compatibility."
     },
@@ -1354,7 +1346,7 @@
       "modules": [
         "puripuly_heart.core.discord"
       ],
-      "rationale": "Domain-aligned grouping package that re-exports the moved Discord OAuth modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+      "rationale": "Domain-aligned grouping package that re-exports the canonical Discord OAuth modules; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "puripuly_heart.core.openrouter domain grouping package",
@@ -1362,7 +1354,7 @@
       "modules": [
         "puripuly_heart.core.openrouter"
       ],
-      "rationale": "Domain-aligned grouping package that re-exports the moved OpenRouter credential, PKCE, handoff, and managed release modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+      "rationale": "Domain-aligned grouping package that re-exports the canonical OpenRouter credential, PKCE, handoff, and managed release modules; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "puripuly_heart.core.chatgpt Sign in with ChatGPT package",
@@ -1378,7 +1370,7 @@
       "modules": [
         "puripuly_heart.core.local_asr"
       ],
-      "rationale": "Domain-aligned grouping package that re-exports the moved local ASR/STT contract, asset, catalog, download, and installer modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+      "rationale": "Domain-aligned grouping package that re-exports the canonical local ASR/STT contract, asset, catalog, download, and installer modules; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "puripuly_heart.app.wiring.root composition facade module",
@@ -1394,7 +1386,7 @@
       "modules": [
         "puripuly_heart.app.adapters.peer_capture"
       ],
-      "rationale": "Domain-aligned grouping package that re-exports the moved peer capture adapter modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+      "rationale": "Domain-aligned grouping package that re-exports the canonical peer capture adapter modules; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "puripuly_heart.app.adapters.self_capture domain grouping package",
@@ -1402,7 +1394,7 @@
       "modules": [
         "puripuly_heart.app.adapters.self_capture"
       ],
-      "rationale": "Domain-aligned grouping package that re-exports the moved self capture adapter modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+      "rationale": "Domain-aligned grouping package that re-exports the canonical self capture adapter modules; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "broker source modules",

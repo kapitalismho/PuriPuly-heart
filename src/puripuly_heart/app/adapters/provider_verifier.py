@@ -22,7 +22,7 @@ from puripuly_heart.core.error_messages import (
     provider_failure_report,
     stt_failure_report,
 )
-from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
+from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider

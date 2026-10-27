@@ -19,8 +19,10 @@ from puripuly_heart.core import network_clients
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
-from puripuly_heart.core.openrouter_credentials import normalize_managed_openrouter_user_identifier
-from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
+from puripuly_heart.core.openrouter.openrouter_credentials import (
+    normalize_managed_openrouter_user_identifier,
+)
+from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
 from puripuly_heart.core.openrouter_routing import (
     OpenRouterProviderRouting,
     OpenRouterRoutingMode,

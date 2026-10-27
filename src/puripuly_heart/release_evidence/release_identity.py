@@ -28,23 +28,15 @@ PACKAGED_LICENSE_PATHS = (
     "zeroconf-0.150.0.dist-info/licenses/COPYING",
     "onnxruntime/LICENSE",
     "onnxruntime/ThirdPartyNotices.txt",
-    "aiohttp-3.13.2.dist-info/licenses/LICENSE.txt",
-    "aiohttp-3.13.2.dist-info/licenses/vendor/llhttp/LICENSE",
     "sherpa_onnx-1.13.8.dist-info/licenses/LICENSE",
     "sounddevice-0.5.5.dist-info/licenses/LICENSE",
     "charset_normalizer-3.4.4.dist-info/licenses/LICENSE",
     "cffi-2.0.0.dist-info/licenses/AUTHORS",
     "cffi-2.0.0.dist-info/licenses/LICENSE",
     "pyaudiowpatch-0.2.12.8.dist-info/licenses/LICENSE.txt",
-    "frozenlist-1.8.0.dist-info/licenses/LICENSE",
     "msgpack-1.2.1.dist-info/licenses/COPYING",
-    "multidict-6.7.0.dist-info/licenses/LICENSE",
-    "propcache-0.4.1.dist-info/licenses/LICENSE",
-    "propcache-0.4.1.dist-info/licenses/NOTICE",
     "psutil-7.2.2.dist-info/LICENSE",
     "pyyaml-6.0.3.dist-info/licenses/LICENSE",
-    "yarl-1.22.0.dist-info/licenses/LICENSE",
-    "yarl-1.22.0.dist-info/licenses/NOTICE",
 )
 SOXR_LICENSE_SOURCE_PARTS = ("src", "puripuly_heart", "data", "licenses", "COPYING.LGPL-2.1.txt")
 SOXR_MANIFEST_PARTS = ("build", "soxr-release-inputs", "manifest.json")

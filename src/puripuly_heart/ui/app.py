@@ -11,9 +11,6 @@ from typing import Any
 from uuid import uuid4
 
 import flet as ft
-from puripuly_heart.core.discord_oauth_loopback import (
-    render_discord_oauth_callback_completion_page,
-)
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.chatgpt_account import (
@@ -41,6 +38,9 @@ from puripuly_heart.core.diagnostics import (
     diagnostic_operation,
     emit_failure,
     safe_exception_fields,
+)
+from puripuly_heart.core.discord.discord_oauth_loopback import (
+    render_discord_oauth_callback_completion_page,
 )
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.lifecycle import (

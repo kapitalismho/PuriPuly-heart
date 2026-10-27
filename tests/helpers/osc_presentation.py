@@ -2,15 +2,14 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from puripuly_heart.app.services.settings_application import (
-    osc_control_presentation_state as _project_osc_control_presentation_state,
-)
-
 from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationName,
     OscControlPresentationState,
 )
 from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState, state_from_settings
+from puripuly_heart.app.services.settings.settings_application import (
+    osc_control_presentation_state as _project_osc_control_presentation_state,
+)
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 

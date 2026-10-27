@@ -483,7 +483,7 @@ async def _download_source_into_staging_async(
 ) -> InstalledLocalSTTManifest:
     if endpoint is not None or _uses_huggingface_xet(source_name=source_name, manifest=manifest):
         if huggingface_downloader is None:
-            from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
+            from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (
                 HuggingFaceXetDownloadAdapter,
             )
 

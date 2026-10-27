@@ -10,25 +10,25 @@ from puripuly_heart.app.ports.self_capture_admission import (
     SelfCaptureAdmissionEffectType,
     SelfCaptureAdmissionState,
 )
-from puripuly_heart.app.services.local_asr_cpu_repair import (
+from puripuly_heart.app.services.local_asr.local_asr_cpu_repair import (
     LocalASRCpuRepairEffect,
     LocalASRCpuRepairEffectType,
     LocalASRCpuRepairOwner,
     LocalASRCpuRepairRuntimeState,
 )
-from puripuly_heart.app.services.local_asr_readiness import (
+from puripuly_heart.app.services.local_asr.local_asr_readiness import (
     LocalASRReadinessEffect,
     LocalASRReadinessEffectType,
     LocalASRReadinessState,
 )
-from puripuly_heart.app.services.local_asr_selection import (
+from puripuly_heart.app.services.local_asr.local_asr_selection import (
     LOCAL_CPU_PROVIDERS,
     local_asr_status_for_provider,
     required_local_asr_model_ids,
     resolve_local_asr_selection,
 )
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
-from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningSnapshot
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRProvisioningSnapshot
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import (
     SelfCaptureSessionConfig,

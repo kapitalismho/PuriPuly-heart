@@ -11,12 +11,13 @@ from pathlib import Path
 
 import httpx
 import psutil
-from puripuly_heart.core.local_stt_download_port import (
+
+from puripuly_heart.core.local_asr.local_stt_download_port import (
     HuggingFaceDownloadProgress,
     HuggingFaceDownloadRequest,
     LocalSTTDownloadPortCancelled,
 )
-from puripuly_heart.core.local_stt_huggingface_xet_adapter import (
+from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (
     HuggingFaceXetDownloadAdapter,
 )
 

@@ -8,21 +8,6 @@ from pathlib import Path
 from typing import cast
 
 import pytest
-from puripuly_heart.app.services.provider_runtime_apply import (
-    ProviderRuntimeApplyPlan,
-)
-from puripuly_heart.app.services.provider_settings import (
-    ProviderSettingsOwner,
-    provider_verification_context,
-)
-from puripuly_heart.app.services.provider_verification_binding import (
-    ProviderVerificationBindingOwner,
-)
-from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
-from puripuly_heart.app.services.settings_transaction_result import (
-    SettingsTransactionResultOwner,
-)
-from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
 
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
@@ -39,6 +24,22 @@ from puripuly_heart.app.services.openrouter_pkce_flow import (
     OpenRouterPkceApplicationOwner,
     OpenRouterPkceFlowOwner,
 )
+from puripuly_heart.app.services.provider.provider_runtime_apply import (
+    ProviderRuntimeApplyPlan,
+)
+from puripuly_heart.app.services.provider.provider_settings import (
+    ProviderSettingsOwner,
+    provider_verification_context,
+)
+from puripuly_heart.app.services.provider.provider_verification_binding import (
+    ProviderVerificationBindingOwner,
+)
+from puripuly_heart.app.services.settings.settings_application import (
+    settings_view_surface_snapshots,
+)
+from puripuly_heart.app.services.settings.settings_transaction_result import (
+    SettingsTransactionResultOwner,
+)
 from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
@@ -49,6 +50,7 @@ from puripuly_heart.config.translation_values import TranslationConnection, Tran
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
 )
+from puripuly_heart.core.openrouter.openrouter_pkce import OpenRouterPKCEExchangeResult
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 

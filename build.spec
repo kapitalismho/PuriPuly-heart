@@ -23,7 +23,6 @@ import hashlib
 import json
 import os
 import sys
-from importlib import import_module
 from pathlib import Path
 
 import flet_cli.__pyinstaller.config as flet_pyinstaller_hook_config
@@ -40,22 +39,12 @@ os.environ["HF_HUB_OFFLINE"] = "1"
 # Add src to path for imports
 src_path = Path("src").resolve()
 sys.path.insert(0, str(src_path))
-from puripuly_heart._compat import moved_module_alias_targets
 from puripuly_heart.release_evidence.windows_product_metadata import (
     PRODUCT_NAME,
     ensure_pyinstaller_version_file,
     read_project_version,
 )
 
-for moved_module_alias_parent in (
-    "puripuly_heart.app",
-    "puripuly_heart.app.adapters",
-    "puripuly_heart.app.services",
-    "puripuly_heart.core",
-):
-    import_module(moved_module_alias_parent)
-
-moved_module_hiddenimports = list(moved_module_alias_targets())
 release_smoke = os.environ.get("PURIPULY_HEART_RELEASE_PROCESS_CAPTURE_SMOKE") == "1"
 entry_script = (
     Path("scripts/release/process-capture-runtime-smoke.py").resolve()
@@ -97,7 +86,7 @@ from puripuly_heart.release_evidence.gpu_worker_distribution import (
 gpu_worker_staged_root = Path("build").resolve() / "gpu_worker"
 gpu_worker_runtime_binaries = collect_gpu_worker_runtime_binaries(gpu_worker_staged_root)
 
-from puripuly_heart.core.local_qwen_runtime import LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR
+from puripuly_heart.core.local_asr.local_qwen_runtime import LOCAL_QWEN_PACKAGED_RUNTIME_RELATIVE_DIR
 
 from puripuly_heart.core.overlay.openvr_vendor import collect_vendored_openvr_runtime_binaries
 from puripuly_heart.release_evidence.managed_gemma_distribution import (
@@ -119,21 +108,16 @@ NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR = Path("third_party/noto-sans-cjk")
 HTTP_EXTENSION_EXAMPLES_SOURCE_DIR = Path("examples/http_extensions").resolve()
 HTTP_EXTENSION_EXAMPLES_PACKAGED_DIR = Path("examples/http_extensions")
 THIRD_PARTY_LICENSE_METADATA_DISTRIBUTIONS = (
-    "aiohttp",
     "cffi",
     "charset-normalizer",
-    "frozenlist",
     "msgpack",
-    "multidict",
     "onnxruntime",
-    "propcache",
     "psutil",
     "PyAudioWPatch",
     "PyYAML",
     "sherpa-onnx",
     "sherpa-onnx-core",
     "sounddevice",
-    "yarl",
     "zeroconf",
 )
 SOUNDDEVICE_PORTAUDIO_RUNTIME_DIR = "_sounddevice_data/portaudio-binaries"
@@ -335,10 +319,8 @@ hiddenimports = [
     "puripuly_heart.providers.stt.qwen_audio",
     "puripuly_heart.providers.stt.soniox",
     "puripuly_heart.providers.llm.gemini",
-    "puripuly_heart.providers.llm.qwen",
     "puripuly_heart.providers.llm.qwen_async",
     "google.genai",
-    "dashscope",
     "deepgram",
     "websockets",
     "flet",
@@ -354,6 +336,7 @@ hiddenimports = [
     "sherpa_onnx.lib._sherpa_onnx",
     "sherpa_onnx.offline_recognizer",
     "keyring.backends.Windows",
+    "puripuly_heart.app.services.capture.capture_target_settings",
     "onnxruntime",
     # NumPy's C-extension is required before the packaged CLI can even boot.
     "numpy._core._multiarray_umath",
@@ -368,7 +351,7 @@ hiddenimports = [
     "proctap",
     "proctap._native",
     "proctap.backends.windows",
-] + moved_module_hiddenimports + collect_submodules("huggingface_hub")
+] + collect_submodules("huggingface_hub")
 
 required_proctap_hiddenimports = {"proctap", "proctap._native", "proctap.backends.windows"}
 if not required_proctap_hiddenimports.issubset(set(hiddenimports)):

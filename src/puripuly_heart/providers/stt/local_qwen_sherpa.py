@@ -16,11 +16,11 @@ from puripuly_heart.core.audio.format import (
     pcm16le_bytes_to_float32,
 )
 from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
-from puripuly_heart.core.local_qwen_runtime import (
+from puripuly_heart.core.local_asr.local_qwen_runtime import (
     LocalQwenRuntimeBootstrapError,
     ensure_local_qwen_windows_runtime,
 )
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_STT_MODEL_ID,
     LocalQwenSherpaLoadError,
     load_local_stt_asset_manifest,

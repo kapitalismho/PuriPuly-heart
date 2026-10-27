@@ -1125,12 +1125,11 @@ async def test_logout_restores_active_translation_after_failed_persistence_and_h
 async def test_managed_logout_preserves_other_account_metadata_and_compensates_failed_save(
     offline, monkeypatch
 ):
-    from puripuly_heart.core.openrouter_credentials import (
+    from puripuly_heart.app.wiring.wiring_managed_auth_factory import ManagedAuthRuntimeAdapter
+    from puripuly_heart.core.openrouter.openrouter_credentials import (
         OPENROUTER_MANAGED_API_KEY_SECRET,
         OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     )
-
-    from puripuly_heart.app.wiring.wiring_managed_auth_factory import ManagedAuthRuntimeAdapter
 
     app = compose_headless_application(offline)
     owner = app._settings.settings
@@ -1200,12 +1199,12 @@ async def test_qq_network_recovery_login_remains_action_required_without_reasser
     import ssl
 
     import httpx
-    from puripuly_heart.app.services.managed_auth import (
+
+    from puripuly_heart.app.services.managed.managed_auth import (
         ManagedAuthExecutionResult,
         ManagedAuthOwner,
         ManagedAuthState,
     )
-
     from puripuly_heart.core import messages
     from tests.app.test_qq_managed_auth import (
         RAW_QQ_CREDENTIAL,

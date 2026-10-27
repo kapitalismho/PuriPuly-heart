@@ -575,7 +575,7 @@ async def run_local_qwen(model_dir: Path) -> dict[str, Any]:
     report = new_report("local_qwen", model_dir)
     stages = report["stages"]
     try:
-        from puripuly_heart.core.local_stt_assets import (
+        from puripuly_heart.core.local_asr.local_stt_assets import (
             LocalQwenSherpaLoadError,
             LocalSTTManifestInvalidError,
             LocalSTTModelMissingError,
@@ -1162,7 +1162,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     if args.target == "local-qwen" and args.model_dir is None:
-        from puripuly_heart.core.local_stt_assets import default_local_stt_model_dir
+        from puripuly_heart.core.local_asr.local_stt_assets import default_local_stt_model_dir
 
         args.model_dir = default_local_stt_model_dir()
     report = asyncio.run(execute(args))

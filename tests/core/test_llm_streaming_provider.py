@@ -5,11 +5,11 @@ from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
 import pytest
-from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
 
 from puripuly_heart.app.wiring import _LazyFactoryLLMProvider
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
+from puripuly_heart.core.openrouter.managed_openrouter_release import ManagedOpenRouterLLMProvider
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.deepseek import (
     DeepSeekClient,
@@ -30,11 +30,6 @@ from puripuly_heart.providers.llm.openrouter import (
     HttpxOpenRouterClient,
     OpenRouterClient,
     OpenRouterLLMProvider,
-)
-from puripuly_heart.providers.llm.qwen import (
-    DashScopeQwenClient,
-    QwenClient,
-    QwenLLMProvider,
 )
 from puripuly_heart.providers.llm.qwen_async import (
     AsyncQwenClient,
@@ -93,8 +88,6 @@ class TranslateOnlyLLMProvider(LLMProvider):
         GoogleGenaiGeminiClient,
         OpenRouterLLMProvider,
         HttpxOpenRouterClient,
-        QwenLLMProvider,
-        DashScopeQwenClient,
         AsyncQwenLLMProvider,
         HttpxQwenClient,
         DeepSeekLLMProvider,
@@ -112,7 +105,6 @@ def test_production_llm_classes_do_not_expose_stream_translate(provider_type: ty
     [
         GeminiClient,
         OpenRouterClient,
-        QwenClient,
         AsyncQwenClient,
         DeepSeekClient,
         LocalOpenAIClient,

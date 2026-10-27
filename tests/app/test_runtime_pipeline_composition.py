@@ -8,18 +8,18 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from puripuly_heart.app.wiring_local_asr_provider_runtime import (
+
+from puripuly_heart.app.wiring import wiring_runtime_pipeline as runtime_pipeline_module
+from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
     SharedSTTProviderFactory,
 )
-from puripuly_heart.app.wiring_runtime_pipeline import (
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import (
     RuntimePipelineLauncher,
     RuntimePipelineResourceOwner,
     compose_runtime_pipeline,
     runtime_pipeline_inputs_from_vnext,
 )
-
-from puripuly_heart.app import wiring_runtime_pipeline as runtime_pipeline_module
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.clock import SystemClock

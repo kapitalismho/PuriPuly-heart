@@ -8,7 +8,7 @@ from typing import Literal
 from puripuly_heart.app.services.application_shutdown import (
     DEFAULT_APPLICATION_SHUTDOWN_CALLBACK_TIMEOUT_SECONDS,
 )
-from puripuly_heart.app.services.local_asr_selection import LOCAL_CPU_PROVIDERS
+from puripuly_heart.app.services.local_asr.local_asr_selection import LOCAL_CPU_PROVIDERS
 from puripuly_heart.app.services.provider.provider_runtime_apply import (
     ProviderRuntimeConvergenceError,
 )

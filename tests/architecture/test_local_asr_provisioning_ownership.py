@@ -66,8 +66,8 @@ def test_application_owners_delegate_provisioning_without_asset_or_task_ownershi
     assert "required_local_asr_model_ids(" in readiness
     assert "local_asr_status_for_provider(" in readiness
     assert ".close()" in source
-    assert "puripuly_heart.core.local_stt_runtime_installer" not in imports
-    assert "puripuly_heart.core.local_stt_huggingface_xet_adapter" not in imports
+    assert "puripuly_heart.core.local_asr.local_stt_runtime_installer" not in imports
+    assert "puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter" not in imports
     assert "puripuly_heart.core.runtime.local_stt_download" not in imports
     assert "inspect_local_stt_install_state" not in source
     assert "inspect_local_cpu_model_installs" not in source

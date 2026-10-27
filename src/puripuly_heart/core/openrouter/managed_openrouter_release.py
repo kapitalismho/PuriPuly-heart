@@ -41,7 +41,7 @@ from puripuly_heart.core.discord.discord_managed_oauth import (
     register_discord_oauth_expected_state,
     run_discord_oauth_callback_flow,
 )
-from puripuly_heart.core.discord_oauth_loopback import (
+from puripuly_heart.core.discord.discord_oauth_loopback import (
     DiscordOAuthCallbackError,
     DiscordOAuthLoopbackClosedError,
     DiscordOAuthLoopbackListener,

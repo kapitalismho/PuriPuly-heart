@@ -41,7 +41,7 @@ from puripuly_heart.app.services.gpu_runtime_interaction import (
     GpuRuntimeProvider,
     GpuRuntimeProvisioningProvider,
 )
-from puripuly_heart.app.services.local_asr_cpu_repair import (
+from puripuly_heart.app.services.local_asr.local_asr_cpu_repair import (
     LocalASRCpuModelIdsForProvider,
     LocalASRCpuPeerResume,
     LocalASRCpuProvisioningProvider,
@@ -52,14 +52,14 @@ from puripuly_heart.app.services.local_asr_cpu_repair import (
     LocalASRCpuSelfResume,
     LocalASRCpuStatusForProvider,
 )
-from puripuly_heart.app.services.local_asr_diagnostics import (
+from puripuly_heart.app.services.local_asr.local_asr_diagnostics import (
     LocalASRBasicLogSink,
     LocalASRDiagnosticLogSink,
     LocalASRDiagnosticsGpuEffectSink,
     LocalASRDiagnosticsOwner,
     LocalASRGpuDiscoveryOriginProvider,
 )
-from puripuly_heart.app.services.local_asr_readiness import (
+from puripuly_heart.app.services.local_asr.local_asr_readiness import (
     LocalASRReadinessAsyncEffect,
     LocalASRReadinessChannelProvider,
     LocalASRReadinessEffectSink,
@@ -74,14 +74,14 @@ from puripuly_heart.app.services.local_asr_readiness import (
     LocalASRReadinessStateProvider,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
-from puripuly_heart.app.services.provider_credential_verification import (
+from puripuly_heart.app.services.provider.provider_credential_verification import (
     ProviderCredentialSelectedModelProvider,
     ProviderCredentialVerificationErrorSink,
     ProviderCredentialVerificationInteractionOwner,
     ProviderCredentialVerificationOwner,
 )
 from puripuly_heart.config.alibaba_connection import AlibabaConnection
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeRecoveryQuiesce
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeRecoveryQuiesce
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
     PeerCaptureTargetResolverPort,
@@ -317,7 +317,9 @@ def create_self_capture_source_adapter(
     log_diagnostic: Callable[..., object],
     wrap_source: Callable[[object], object],
 ) -> SelfCaptureSourceFactory:
-    from puripuly_heart.app.adapters.self_capture_source import SelfCaptureSourceAdapter
+    from puripuly_heart.app.adapters.self_capture.self_capture_source import (
+        SelfCaptureSourceAdapter,
+    )
     from puripuly_heart.config.audio_host_api import normalize_input_host_api
     from puripuly_heart.core.audio.source import (
         SoundDeviceAudioSource,
@@ -341,7 +343,7 @@ def create_self_capture_admission_adapter(
     validate_gpu_activation: SelfCaptureGpuActivationValidator,
     effect_sink: SelfCaptureAdmissionEffectSink,
 ) -> SelfCaptureAdmissionPort:
-    from puripuly_heart.app.adapters.self_capture_admission import (
+    from puripuly_heart.app.adapters.self_capture.self_capture_admission import (
         SelfCaptureAdmissionAdapter,
     )
 
@@ -353,7 +355,7 @@ def create_self_capture_admission_adapter(
 
 
 def create_self_capture_vad_adapter() -> SelfCaptureVadFactory:
-    from puripuly_heart.app.adapters.self_capture_vad import SelfCaptureVadAdapter
+    from puripuly_heart.app.adapters.self_capture.self_capture_vad import SelfCaptureVadAdapter
     from puripuly_heart.core.vad.bundled import bundled_silero_vad_onnx_path
     from puripuly_heart.core.vad.gating import VadGating
     from puripuly_heart.core.vad.silero import SileroVadOnnx
@@ -370,7 +372,7 @@ def create_self_capture_audio_loop_adapter(
     audio_gate_provider: Callable[[], object | None],
     log_basic: Callable[[str], object],
 ) -> SelfCaptureAudioLoop:
-    from puripuly_heart.app.adapters.self_capture_audio_loop import (
+    from puripuly_heart.app.adapters.self_capture.self_capture_audio_loop import (
         SelfCaptureAudioLoopAdapter,
     )
     from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
@@ -387,7 +389,9 @@ def create_peer_capture_source_adapter(
     log_diagnostic: Callable[[str], object],
     wrap_source: Callable[[object], object],
 ) -> PeerCaptureSourceFactory:
-    from puripuly_heart.app.adapters.peer_capture_source import PeerCaptureSourceAdapter
+    from puripuly_heart.app.adapters.peer_capture.peer_capture_source import (
+        PeerCaptureSourceAdapter,
+    )
     from puripuly_heart.core.audio.desktop_pipeline import DesktopPeerPipeline
     from puripuly_heart.core.audio.desktop_source import DesktopLoopbackAudioSource
     from puripuly_heart.core.audio.process_identity import PsutilProcessIdentityWatcher
@@ -404,7 +408,7 @@ def create_peer_capture_source_adapter(
 
 
 def create_peer_capture_target_resolver_adapter() -> PeerCaptureTargetResolverPort:
-    from puripuly_heart.app.adapters.peer_capture_target_resolver import (
+    from puripuly_heart.app.adapters.peer_capture.peer_capture_target_resolver import (
         PeerCaptureTargetResolverAdapter,
     )
     from puripuly_heart.config.process_capture_resolution import ProcessCaptureResolver
@@ -419,7 +423,7 @@ def create_peer_capture_target_resolver_adapter() -> PeerCaptureTargetResolverPo
 
 
 def create_peer_capture_vad_adapter() -> PeerCaptureVadFactory:
-    from puripuly_heart.app.adapters.peer_capture_vad import PeerCaptureVadAdapter
+    from puripuly_heart.app.adapters.peer_capture.peer_capture_vad import PeerCaptureVadAdapter
     from puripuly_heart.core.vad.bundled import bundled_silero_vad_onnx_path
     from puripuly_heart.core.vad.gating import create_peer_vad_gating
     from puripuly_heart.core.vad.silero import SileroVadOnnx
@@ -435,7 +439,7 @@ def create_peer_capture_audio_loop_adapter(
     *,
     log_basic: Callable[[str], object],
 ) -> PeerCaptureAudioLoop:
-    from puripuly_heart.app.adapters.peer_capture_audio_loop import (
+    from puripuly_heart.app.adapters.peer_capture.peer_capture_audio_loop import (
         PeerCaptureAudioLoopAdapter,
     )
     from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
@@ -451,7 +455,7 @@ def create_peer_capture_admission_adapter(
     runtime_available: Callable[[], bool],
     ensure_local_ready: Callable[[], Awaitable[bool]],
 ) -> PeerCaptureAdmissionPort:
-    from puripuly_heart.app.adapters.peer_capture_admission import (
+    from puripuly_heart.app.adapters.peer_capture.peer_capture_admission import (
         PeerCaptureAdmissionAdapter,
     )
 
@@ -465,7 +469,7 @@ def create_peer_capture_vad_sink_adapter(
     *,
     runtime_provider: Callable[[], object | None],
 ) -> object:
-    from puripuly_heart.app.adapters.peer_capture_vad_sink import (
+    from puripuly_heart.app.adapters.peer_capture.peer_capture_vad_sink import (
         PeerCaptureVadSinkAdapter,
     )
 
@@ -476,7 +480,7 @@ def create_self_capture_vad_sink_adapter(
     *,
     runtime_provider: Callable[[], object | None],
 ) -> object:
-    from puripuly_heart.app.adapters.self_capture_vad_sink import (
+    from puripuly_heart.app.adapters.self_capture.self_capture_vad_sink import (
         SelfCaptureVadSinkAdapter,
     )
 

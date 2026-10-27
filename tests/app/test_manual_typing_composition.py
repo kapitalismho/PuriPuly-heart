@@ -4,8 +4,8 @@ import asyncio
 from uuid import uuid4
 
 import pytest
-from puripuly_heart.app.wiring_composition import create_manual_typing_owner
 
+from puripuly_heart.app.wiring.wiring_composition import create_manual_typing_owner
 from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
 
 

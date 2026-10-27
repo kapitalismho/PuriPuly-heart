@@ -752,10 +752,12 @@ async def test_http_proxy_denial_has_no_direct_fallback_and_corrected_route_work
 async def test_actual_broker_oauth_start_retains_proxy_tls_rate_limit_and_valid_retry(
     certificates, monkeypatch, proxy_scheme
 ):
-    from puripuly_heart.core.managed_openrouter_broker_client import (
+    from puripuly_heart.core.openrouter.managed_openrouter_broker_client import (
         HttpManagedOpenRouterBrokerClient,
     )
-    from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterReleaseError
+    from puripuly_heart.core.openrouter.managed_openrouter_release import (
+        ManagedOpenRouterReleaseError,
+    )
 
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))

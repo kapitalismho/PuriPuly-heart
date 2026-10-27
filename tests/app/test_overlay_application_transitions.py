@@ -6,13 +6,13 @@ from typing import cast
 from uuid import uuid4
 
 import pytest
-from puripuly_heart.app.services.overlay_application import (
+
+from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.services.overlay.overlay_application import (
     OVERLAY_STARTUP_TIMEOUT_MS,
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
-
-from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.overlay.overlay_session_transition import (
     OverlaySessionTransitionDiagnostic,
 )

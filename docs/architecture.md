@@ -14,6 +14,8 @@ Keep this map about ownership, dependency direction, and cross-component invaria
 
 [Application composition](../src/puripuly_heart/composition/application_runtime.py) loads settings and secrets, selects adapters, connects services, and installs startup/shutdown. Long-lived resources must transfer to explicit owners. The [runtime pipeline launcher](../src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py) installs replaceable capture/provider/output components; callers must not retain them across replacement unless the API permits it.
 
+Python callers use canonical module paths and the current package facades. Pre-grouping app/core import aliases and the synchronous `puripuly_heart.providers.llm.qwen` import are unsupported; Qwen translation uses the [asynchronous adapter](../src/puripuly_heart/providers/llm/qwen_async.py).
+
 ## Runtime Ownership
 
 Paths below are navigation entry points, not an exhaustive class inventory.
@@ -109,7 +111,7 @@ Entry points: [provider application](../src/puripuly_heart/app/services/provider
 - Matching stops may preempt pending starts, while cleanup fences older queued starts and later replacements. Removing one channel's demand does not revoke another channel's shared resource.
 - Shutdown freezes ingress and startup, drains/cancels owned work, closes external resources, then clears runtime references. Primary operational failures and secondary cleanup failures remain distinct; failed cleanup stays owned and visible.
 
-[Dependency checks](../tests/architecture/test_dependency_boundaries.py) enforce import boundaries and record the narrow existing localization exception. [Task-ownership checks](../tests/architecture/test_lifecycle_task_guard.py) record reviewed creation sites and remaining lifetime debt. These structural checks do not prove runtime draining or cleanup; owner behavior tests do.
+[Dependency checks](../tests/architecture/test_dependency_boundaries.py) enforce import boundaries and record narrow pre-existing localization and application-wiring exceptions. These exact-edge exceptions do not permit additional dependencies from the same modules. [Task-ownership checks](../tests/architecture/test_lifecycle_task_guard.py) record reviewed creation sites and remaining lifetime debt. These structural checks do not prove runtime draining or cleanup; owner behavior tests do.
 
 ## Diagnostics and Runtime Layout
 

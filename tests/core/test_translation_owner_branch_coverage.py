@@ -8,14 +8,14 @@ from uuid import UUID, uuid4
 
 import numpy as np
 import pytest
-from puripuly_heart.core.managed_openrouter_release import (
+
+from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.messages import UserErrorReport
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterReleaseDiagnostics,
     ManagedOpenRouterReleaseError,
     ManagedOpenRouterUserFacingError,
 )
-
-from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.messages import UserErrorReport
 from puripuly_heart.core.orchestrator.channel_runtime import (
     ContextEntry,
     _MergeBuffer,

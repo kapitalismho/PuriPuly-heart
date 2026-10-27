@@ -4,37 +4,16 @@ import os
 
 import pytest
 
-from puripuly_heart.providers.llm.qwen import QwenLLMProvider
 from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 from tests.integration.helpers import (
     get_async_qwen_base_url,
-    get_qwen_base_url,
     integration_mark,
     require_env,
-    require_module,
     run_llm_smoke,
     suppressed_runtime_logger,
 )
 
 pytestmark = integration_mark()
-
-
-@pytest.mark.asyncio
-async def test_qwen_llm_translation_smoke() -> None:
-    api_key = require_env("ALIBABA_API_KEY")
-
-    require_module(
-        "dashscope",
-        reason="dashscope is required for this integration test; install project dependencies.",
-    )
-
-    provider = QwenLLMProvider(
-        api_key=api_key,
-        base_url=get_qwen_base_url(),
-        model=os.getenv("QWEN_LLM_MODEL", "qwen3.8-flash"),
-    )
-
-    await run_llm_smoke(provider)
 
 
 @pytest.mark.asyncio
