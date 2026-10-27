@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -21,6 +24,38 @@ from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaRuntimeOwner,
 )
 from puripuly_heart.core.local_translation.runtime_profile import GemmaRuntimePaths
+
+
+@pytest.mark.asyncio
+async def test_real_managed_child_ignores_inherited_llama_configuration(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLAMA_ARG_MODEL_URL", "http://127.0.0.1:1/remote.gguf")
+    monkeypatch.setenv("LLAMA_ARG_HF_REPO", "hostile/repo")
+    monkeypatch.setenv("LLAMA_ARG_MMPROJ_URL", "http://127.0.0.1:1/mmproj.gguf")
+    monkeypatch.setenv("LLAMA_ARG_RPC", "127.0.0.1:1")
+    monkeypatch.setenv("LLAMA_ARG_OFFLINE", "0")
+    monkeypatch.setenv("HF_TOKEN", "synthetic-token")
+    monkeypatch.setenv("APPDATA", str(tmp_path / "hostile-user-config"))
+    monkeypatch.setenv("PROGRAMDATA", str(tmp_path / "hostile-system-config"))
+    monkeypatch.setenv("PURIPULY_CHILD_SENTINEL", "preserved")
+    inherited = dict(os.environ)
+    script = """
+import json, os, pathlib
+pathlib.Path("child.json").write_text(json.dumps(dict(os.environ)))
+"""
+
+    process = await runtime_module._default_process_factory(
+        (sys.executable, "-c", script), tmp_path
+    )
+    assert await asyncio.wait_for(process.wait(), timeout=10) == 0
+
+    child = json.loads((tmp_path / "child.json").read_text())
+    assert not any(name.upper().startswith("LLAMA_ARG_") for name in child)
+    assert "HF_TOKEN" not in child
+    assert child["PURIPULY_CHILD_SENTINEL"] == "preserved"
+    if os.name == "nt":
+        assert "APPDATA" not in child
+        assert "PROGRAMDATA" not in child
+    assert dict(os.environ) == inherited
 
 
 @pytest.fixture(autouse=True)

@@ -72,6 +72,7 @@ async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatc
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     requests = []
+    controls = []
 
     async def handler(ws):
         requests.append((ws.request.path, ws.request.headers, await ws.recv()))
@@ -97,6 +98,8 @@ async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatc
                 }
             )
         )
+        for _ in range(3):
+            controls.append(json.loads(await ws.recv()))
         await ws.wait_closed()
 
     async with recording_proxy(contexts["valid"] if https_proxy else None) as (proxy, recorded):
@@ -109,7 +112,9 @@ async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatc
                     client = AsyncDeepgramClient(
                         api_key="test-key",
                         httpx_client=http_client,
-                        environment=DeepgramClientEnvironment(base=url, production=url, agent=url),
+                        environment=DeepgramClientEnvironment(
+                            base=url, production=url, agent=url, agent_rest=url
+                        ),
                     )
                     async with deepgram_listen_connect(
                         client,
@@ -125,7 +130,11 @@ async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatc
                         keyterm=["first", "second"],
                     ) as connection:
                         await connection.send_media(b"\0\0")
-                        return (await connection.recv()).channel["alternatives"][0]["transcript"]
+                        result = (await connection.recv()).channel.alternatives[0].transcript
+                        await connection.send_finalize()
+                        await connection.send_keep_alive()
+                        await connection.send_close_stream()
+                        return result
 
             assert await asyncio.wait_for(operation(), 10) == "recognized"
     path, headers, audio = requests[0]
@@ -137,6 +146,11 @@ async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatc
     assert headers["Authorization"] == "Token test-key"
     assert headers["x-deepgram-session-id"]
     assert audio == b"\0\0"
+    assert controls == [
+        {"type": "Finalize"},
+        {"type": "KeepAlive"},
+        {"type": "CloseStream"},
+    ]
     assert len(recorded) == 1
 
 

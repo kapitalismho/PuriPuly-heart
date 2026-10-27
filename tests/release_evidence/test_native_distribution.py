@@ -745,7 +745,12 @@ def test_validate_target_requires_the_deployed_python_archive(
         layout.resolve(tmp_path, key).write_bytes(b"placeholder")
     layout.resolve(tmp_path, "extension_dll_root").mkdir()
     with pytest.raises(FileNotFoundError, match="python.zip"):
-        validate_target(tmp_path, layout_path, tmp_path / "requirements.txt", tmp_path / "vc.json")
+        validate_target(
+            tmp_path,
+            layout_path,
+            tmp_path / "requirements.txt",
+            tmp_path / "vc.json",
+        )
 
 
 @pytest.mark.parametrize(

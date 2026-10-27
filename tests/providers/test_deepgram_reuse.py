@@ -90,27 +90,27 @@ def _result(
 
 
 def _installed_empty_alternatives_result(*, metadata_ack: bool):
-    from deepgram.extensions.types.sockets import ListenV1ResultsEvent
-    from deepgram.extensions.types.sockets.listen_v1_results_event import (
-        ListenV1Channel,
-        ListenV1ModelInfo,
+    from deepgram.listen.v1.types import (
+        ListenV1Results,
+        ListenV1ResultsChannel,
         ListenV1ResultsMetadata,
+        ListenV1ResultsMetadataModelInfo,
     )
 
     metadata = ListenV1ResultsMetadata(
         request_id="connection-request",
-        model_info=ListenV1ModelInfo(name="nova-3", version="1", arch="nova"),
+        model_info=ListenV1ResultsMetadataModelInfo(name="nova-3", version="1", arch="nova"),
         model_uuid="model",
         from_finalize=metadata_ack,
     )
-    return ListenV1ResultsEvent(
+    return ListenV1Results(
         type="Results",
         channel_index=[0, 1],
         duration=0.1,
         start=0.0,
         is_final=True,
         speech_final=False,
-        channel=ListenV1Channel(alternatives=[]),
+        channel=ListenV1ResultsChannel(alternatives=[]),
         metadata=metadata,
         from_finalize=not metadata_ack,
     )
@@ -550,7 +550,7 @@ async def test_installed_sdk_malformed_callback_fails_scoped_turn_and_epoch(
             assert isinstance(observations["causes"][0], json.JSONDecodeError)
         else:
             assert isinstance(observations["causes"][0], ValueError | TypeError)
-            assert observations["callbacks"][-1] == "ListenV1ResultsEvent"
+            assert observations["callbacks"][-1] == "ListenV1Results"
         safe = normalize_diagnostic(
             diagnostics,
             instance_id=uuid4().hex,

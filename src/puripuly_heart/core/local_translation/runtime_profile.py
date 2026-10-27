@@ -169,6 +169,7 @@ def build_gemma_server_command(
         threads_profile = load_or_detect_thread_profile()
     common = (
         str(executable),
+        "--offline",
         "--model",
         str(install_dir / resolved_spec.model_filename),
         "--alias",

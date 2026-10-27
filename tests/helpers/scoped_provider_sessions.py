@@ -61,27 +61,29 @@ async def _wait(predicate) -> None:
 
 
 def _deepgram_result(text: str, *, from_finalize: bool = False, is_final: bool = True):
-    from deepgram.extensions.types.sockets import ListenV1ResultsEvent
-    from deepgram.extensions.types.sockets.listen_v1_results_event import (
-        ListenV1Alternative,
-        ListenV1Channel,
-        ListenV1ModelInfo,
+    from deepgram.listen.v1.types import (
+        ListenV1Results,
+        ListenV1ResultsChannel,
+        ListenV1ResultsChannelAlternativesItem,
         ListenV1ResultsMetadata,
+        ListenV1ResultsMetadataModelInfo,
     )
 
-    return ListenV1ResultsEvent(
+    return ListenV1Results(
         type="Results",
         channel_index=[0, 1],
         duration=0.1,
         start=0.0,
         is_final=is_final,
         speech_final=False,
-        channel=ListenV1Channel(
-            alternatives=[ListenV1Alternative(transcript=text, confidence=1.0, words=[])]
+        channel=ListenV1ResultsChannel(
+            alternatives=[
+                ListenV1ResultsChannelAlternativesItem(transcript=text, confidence=1.0, words=[])
+            ]
         ),
         metadata=ListenV1ResultsMetadata(
             request_id="session-request",
-            model_info=ListenV1ModelInfo(name="nova-3", version="1", arch="nova"),
+            model_info=ListenV1ResultsMetadataModelInfo(name="nova-3", version="1", arch="nova"),
             model_uuid="model",
         ),
         from_finalize=from_finalize,

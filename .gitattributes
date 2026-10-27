@@ -1,0 +1,3 @@
+/native/**/Cargo.lock text eol=lf
+/src/puripuly_heart/data/licenses/PYTHON-*-LICENSE.txt -text
+/src/puripuly_heart/data/licenses/DART-BRIDGE-*-LICENSE.txt -text

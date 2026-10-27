@@ -19,8 +19,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PYTHON_VERSION: "3.14.7"
-  UV_VERSION: "0.9.17"
+  PYTHON_VERSION: "3.14.10"
+  UV_VERSION: "0.13.5"
   INNOSETUP_VERSION: "7.1.0"
   INNOSETUP_SHA256: "0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f"
   VULKAN_SDK_VERSION: "1.4.350.0"
@@ -39,7 +39,7 @@ jobs:
       source-sha: ${{ steps.sync.outputs.source-sha }}
     steps:
       - name: Checkout native release tag
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.tag || github.ref }}
           persist-credentials: false
@@ -104,7 +104,7 @@ jobs:
       provenance: ${{ steps.identity.outputs.provenance }}
     steps:
       - name: Checkout verified native source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.verify-version.outputs.source-sha }}
           persist-credentials: false
@@ -117,7 +117,7 @@ jobs:
           sync-args: --extra build
 
       - name: Cache pinned native inputs
-        uses: actions/cache@v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ${{ env.NATIVE_INPUT_ROOT }}
           key: native-release-inputs-${{ runner.os }}-${{ hashFiles('native/windows_host/upstream-inputs.json') }}
@@ -130,7 +130,9 @@ jobs:
             -PinnedInputRoot $env:NATIVE_INPUT_ROOT
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+        with:
+          toolchain: "1.99.1"
 
       - name: Setup Vulkan SDK
         shell: pwsh
@@ -239,7 +241,7 @@ jobs:
           "provenance=$provenance" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Upload native release artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: native-release-artifacts
           path: installer_output/native/PuriPulyHeart-Setup-${{ needs.verify-version.outputs.version }}.exe
@@ -259,18 +261,18 @@ jobs:
       RELEASE_PROVENANCE: ${{ needs.build-installer.outputs.provenance }}
     steps:
       - name: Checkout verified native source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.verify-version.outputs.source-sha }}
           persist-credentials: false
 
       - name: Setup release Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Download native release artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: native-release-artifacts
           path: native-release-artifacts
@@ -294,7 +296,7 @@ jobs:
             --provenance-json "$RELEASE_PROVENANCE"
 
       - name: Create native draft release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: ${{ env.RELEASE_TAG }}

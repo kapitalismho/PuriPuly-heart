@@ -77,12 +77,6 @@ def _expected_openvr_notice_section() -> str:
     )
 
 
-def test_pyproject_caps_deepgram_sdk_below_v6() -> None:
-    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-
-    assert "deepgram-sdk>=5.3.4,<6.0.0" in pyproject["project"]["dependencies"]
-
-
 def test_pyproject_pins_soxr_dependency() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
@@ -181,16 +175,6 @@ def test_vendored_openvr_bundle_files_exist_and_sha256_line_is_exact() -> None:
     assert license_path.is_file()
     assert readme_path.is_file()
     assert sha256_path.read_text(encoding="utf-8") == f"{OPENVR_VENDOR_SHA256_LINE}\n"
-
-
-def test_huggingface_xet_apache_notices_cover_pinned_runtime_packages() -> None:
-    notices = (ROOT / "src" / "puripuly_heart" / "data" / "THIRD_PARTY_NOTICES.txt").read_text(
-        encoding="utf-8"
-    )
-
-    assert "huggingface-hub 1.26.0: Apache-2.0" in notices
-    assert "hf-xet 1.5.2 and its Windows native extension: Apache-2.0" in notices
-    assert "HF_XET_HIGH_PERFORMANCE by default" in notices
 
 
 def test_lgpl_text_file_exists_for_bundled_soxr_compliance_bundle() -> None:

@@ -34,12 +34,12 @@ _LAYOUT_SCHEMA = "puripuly-heart/native-artifact-layout/v1"
 _MANIFEST_SCHEMA = "puripuly-heart/native-artifact-manifest/v1"
 _NATIVE_MARKER_ENVIRONMENT = {
     "implementation_name": "cpython",
-    "implementation_version": "3.14.7",
+    "implementation_version": "3.14.10",
     "os_name": "nt",
     "platform_machine": "AMD64",
     "platform_python_implementation": "CPython",
     "platform_system": "Windows",
-    "python_full_version": "3.14.7",
+    "python_full_version": "3.14.10",
     "python_version": "3.14",
     "sys_platform": "win32",
     "extra": "",
@@ -196,6 +196,72 @@ def verify_upstream_inputs(spec_path: Path, input_root: Path) -> dict[str, Any]:
             "sha256": digest,
         }
     return {"versions": spec["versions"], "inputs": verified}
+
+
+def _python_runtime_members(package_path: Path) -> dict[str, bytes]:
+    members: dict[str, bytes] = {}
+    excluded_stdlib = {
+        "test",
+        "idlelib",
+        "tkinter",
+        "turtledemo",
+        "ensurepip",
+        "pydoc_data",
+        "lib2to3",
+        "site-packages",
+        "rlcompleter.py",
+        "tabnanny.py",
+        "antigravity.py",
+        "this.py",
+        "__hello__.py",
+        "__phello__",
+    }
+    with zipfile.ZipFile(package_path) as archive:
+        for entry in archive.infolist():
+            if not entry.filename.startswith("tools/") or entry.is_dir():
+                continue
+            relative = _safe_relative(entry.filename.removeprefix("tools/"))
+            if relative.parts[0] == "Lib" and (
+                relative.parts[1] in excluded_stdlib
+                or relative.suffix.lower() in {".exe", ".dll", ".pyd"}
+            ):
+                continue
+            if relative.parts[0] in {"Lib", "DLLs"} or str(relative) in {
+                "python.exe",
+                "python3.dll",
+                "python314.dll",
+                "LICENSE.txt",
+            }:
+                members[str(relative)] = archive.read(entry)
+    return members
+
+
+def prepare_python_inputs(spec_path: Path, input_root: Path, cache_root: Path) -> dict[str, Any]:
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    version = spec["versions"]["python"]
+    package_name = f"python.{version}.nupkg"
+    package_path = input_root / package_name
+    members = _python_runtime_members(package_path)
+    runtime_dir = (
+        cache_root / "python-build" / f"v{version}-{spec['versions']['python_build_release']}"
+    )
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    runtime_path = runtime_dir / f"python-windows-for-dart-{version}.zip"
+    with zipfile.ZipFile(runtime_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, data in sorted(members.items()):
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(info, data)
+    manifest_name = f"manifest-{spec['versions']['python_build_release']}.json"
+    manifest = json.loads((input_root / manifest_name).read_text(encoding="utf-8"))
+    manifest["pythons"]["3.14"]["full_version"] = version
+    manifest["pythons"]["3.14"]["standalone_release_date"] = spec["versions"]["python_dist_release"]
+    manifest_path = cache_root / "python-build" / "puripuly-python-manifest.json"
+    _write_json(manifest_path, manifest)
+    return {
+        "runtime_archive": str(runtime_path),
+        "manifest": str(manifest_path),
+    }
 
 
 def filter_requirements(source: Path, destination: Path) -> list[str]:
@@ -495,7 +561,7 @@ def validate_target(
     soxr_runtime = verify_installed_soxr_record(site_packages)
     portaudio_runtime = verify_sounddevice_portaudio_runtime(site_packages)
     python_digest = _sha256(required_paths["python_executable"])
-    if python_digest != "4942b86a6597e5aee0128daa00050ed79bc21f6e709a78eb19cbfeb0c2f39ac9":
+    if python_digest != "d718435b892db4ad5b547d12fec61be7baa7faf7a58d857ea58053be24c7a000":
         raise ValueError("native python.exe is not the pinned official CPython executable")
     python_copies = sorted(path for path in target_root.rglob("python.exe") if path.is_file())
     if python_copies != [required_paths["python_executable"]]:
@@ -1591,6 +1657,11 @@ def _parser() -> argparse.ArgumentParser:
     verify.add_argument("--spec", type=Path, required=True)
     verify.add_argument("--input-root", type=Path, required=True)
     verify.add_argument("--output", type=Path)
+    python_inputs = commands.add_parser("prepare-python-inputs")
+    python_inputs.add_argument("--spec", type=Path, required=True)
+    python_inputs.add_argument("--input-root", type=Path, required=True)
+    python_inputs.add_argument("--cache-root", type=Path, required=True)
+    python_inputs.add_argument("--output", type=Path, required=True)
     filter_parser = commands.add_parser("filter-requirements")
     filter_parser.add_argument("source", type=Path)
     filter_parser.add_argument("destination", type=Path)
@@ -1648,6 +1719,8 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "verify-inputs":
         _write_json(args.output, verify_upstream_inputs(args.spec, args.input_root))
+    elif args.command == "prepare-python-inputs":
+        _write_json(args.output, prepare_python_inputs(args.spec, args.input_root, args.cache_root))
     elif args.command == "filter-requirements":
         filter_requirements(args.source, args.destination)
     elif args.command == "stage-product-metadata":
