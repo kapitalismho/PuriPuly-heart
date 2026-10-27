@@ -106,8 +106,6 @@ def _make_settings_view(
     store: DummySecretStore | None = None,
     settings: AppSettingsVNext | None = None,
 ):
-    monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
     store = store or DummySecretStore()
     view = settings_view.SettingsView()
@@ -901,8 +899,6 @@ def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch, settin
     settings = AppSettingsVNext()
     basic_messages: list[str] = []
 
-    monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
 
     def raise_store():

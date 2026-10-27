@@ -1964,31 +1964,6 @@ class FletDesktopRendererWindow:
             tight=True,
         )
 
-    def _build_preview_surface_backdrop(self, ft: Any, caption_surface: Any) -> Any:
-        surface = self._preview_selected_background_surface()
-        size_preset = self._preview_selected_size_preset()
-        controls: list[Any] = []
-        if surface.id == "busy":
-            controls.append(self._build_preview_busy_background(ft, size_preset))
-        controls.append(caption_surface)
-        content: Any = caption_surface
-        if len(controls) > 1:
-            content = ft.Stack(
-                controls=controls,
-                width=size_preset.window_width,
-                height=size_preset.window_height,
-                alignment=ft.Alignment.CENTER,
-            )
-        return ft.Container(
-            content=content,
-            width=size_preset.window_width,
-            height=size_preset.window_height,
-            bgcolor=surface.bgcolor,
-            padding=24,
-            border_radius=20,
-            alignment=ft.Alignment.CENTER,
-        )
-
     def _build_preview_busy_background(
         self,
         ft: Any,

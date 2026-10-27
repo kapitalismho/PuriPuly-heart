@@ -25,7 +25,6 @@ from puripuly_heart.app.wiring.wiring_translation_runtime_configuration import (
     replace_translation_runtime_enabled,
 )
 from puripuly_heart.composition.application_runtime import compose_application_runtime
-from puripuly_heart.composition.application_settings import load_application_settings
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.resolved import ResolvedOverlayConfig
 from puripuly_heart.core.clock import FakeClock
@@ -584,7 +583,7 @@ async def test_composed_app_translation_disable_rebuilds_overlay_source_primary(
         presentation=presentation,
         config_path=tmp_path / "settings.json",
     )
-    load_application_settings(settings=app._settings.settings)
+    app._settings.settings.start()
     pipeline = app._input_runtime.pipeline
     config_owner = TranslationRuntimeConfigurationOwner(
         TranslationRuntimeConfig(translation_enabled=True)

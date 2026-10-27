@@ -184,10 +184,6 @@ def get_qwen3_asr_language(code: str) -> str:
     return _language_from_map(code, _QWEN3_ASR_LANGUAGE_MAP)
 
 
-def get_qwen_audio_asr_language(code: str) -> str:
-    return _language_from_map(code, _QWEN_AUDIO_ASR_LANGUAGE_MAP)
-
-
 def qwen_audio_asr_language_hint(code: str) -> str | None:
     if not is_qwen_audio_asr_supported(code):
         return None

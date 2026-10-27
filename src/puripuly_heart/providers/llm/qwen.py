@@ -223,19 +223,6 @@ class DashScopeQwenClient:
     def __post_init__(self) -> None:
         self.model = _normalize_qwen_model(self.model)
 
-    @staticmethod
-    def _normalize_language_code(code: str) -> str:
-        if not code:
-            return "auto"
-        normalized = code.lower()
-        if normalized in {"auto"}:
-            return "auto"
-        if normalized in {"zh-cn", "zh-hans", "zh"}:
-            return "zh"
-        if normalized in {"zh-tw", "zh-hant", "zh_tw"}:
-            return "zh_tw"
-        return normalized.split("-")[0]
-
     def _build_messages(
         self,
         *,

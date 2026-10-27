@@ -4,6 +4,8 @@
 - Use `docs/architecture.md` as the system map when a task requires reasoning about how the system fits together.
 - Report suspected architecture drift introduced by your changes to the user.
 - Report any user-visible changes after completing the work.
+- When replacing an implementation, identify what it supersedes, migrate its consumers, and retire exclusive helpers, tests, exports, configuration, dependencies, resources, and instructions.
+- Justify retirement by tracing entry points and consumers, including dynamic registration, string references, packaging, and supported platform variants. Names, static warnings, and test-only references are signals, not decisions; preserve supported contracts and report unresolved usage or support questions.
 
 ## Test
 

@@ -796,30 +796,6 @@ def _managed_credential_kind_from_connection(connection: str) -> str:
     return "standard"
 
 
-def _managed_credential_kind_for_settings(settings: object) -> str:
-    return _managed_credential_kind_from_connection(settings.intent.translation.connection)
-
-
-def _managed_release_service_for_alias(
-    managed_release_service: object | None,
-    *,
-    alias_settings: object,
-) -> object | None:
-    if managed_release_service is None:
-        return None
-    from dataclasses import asdict
-    from types import SimpleNamespace
-
-    return managed_release_service_for_openrouter_config(
-        managed_release_service,
-        openrouter_config=build_openrouter_release_runtime_config_from_vnext(alias_settings),
-        managed_state=ManagedIdentityStateAdapter(
-            SimpleNamespace(**asdict(alias_settings.state.managed_connection)),
-            lambda: managed_release_service.managed_state.persist(),
-        ),
-    )
-
-
 def managed_release_service_for_openrouter_config(
     managed_release_service: object | None,
     *,

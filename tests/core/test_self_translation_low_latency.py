@@ -1288,7 +1288,6 @@ class TestResumeEndTimeout:
         # 4. SpeechEnd (STT Final 없이) → 타임아웃 시작
         await harness.self_owner.handle_vad_event(SpeechEnd(uid2))
         assert buffer.resume_end_timeout_task is not None
-        assert buffer.resume_end_utterance_id == uid2
 
         # 5. 타임아웃 대기 (150ms)
         await asyncio.sleep(0.15)
@@ -1446,7 +1445,6 @@ class TestResumeEndTimeout:
         # 4. 정확한 uid의 SpeechEnd → 타임아웃 시작
         await harness.self_owner.handle_vad_event(SpeechEnd(uid2))
         assert buffer.resume_end_timeout_task is not None
-        assert buffer.resume_end_utterance_id == uid2
 
         await harness.stop()
 

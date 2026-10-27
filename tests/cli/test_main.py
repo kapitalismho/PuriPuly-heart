@@ -96,6 +96,26 @@ def test_operation_wait_preserves_receipt_and_reports_exit(
     assert json.loads(output.out) == {"output_version": 1, **receipt}
 
 
+@pytest.mark.parametrize("status", ["accepted", "running", "unknown"])
+def test_operation_wait_rejects_invalid_terminal_status(monkeypatch, capsys, status):
+    monkeypatch.setattr(cli, "_instance", lambda _path: SimpleNamespace(instance_id="session"))
+
+    async def fake_request(_record, method, arguments=None, *, timeout):
+        return {"status": status, "terminal": True, "operation_id": "operation"}
+
+    monkeypatch.setattr(cli, "request", fake_request)
+
+    assert cli.main(["operation", "wait", "operation"]) == 3
+    output = capsys.readouterr()
+    assert json.loads(output.out) == {
+        "output_version": 1,
+        "status": status,
+        "terminal": True,
+        "operation_id": "operation",
+    }
+    assert json.loads(output.err)["error"]["code"] == "malformed_response"
+
+
 @pytest.mark.parametrize("no_wait", [False, True], ids=["wait", "no-wait"])
 def test_submission_distinguishes_acceptance_from_terminal_completion(monkeypatch, capsys, no_wait):
     record = SimpleNamespace(instance_id="session")

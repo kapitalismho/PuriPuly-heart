@@ -96,15 +96,6 @@ async def test_qwen_verify_api_key_empty_key_returns_false_without_network(monke
     )
 
 
-def test_qwen_client_normalizes_language_codes() -> None:
-    client = DashScopeQwenClient(api_key="k", model="m")
-    assert client._normalize_language_code("") == "auto"
-    assert client._normalize_language_code("auto") == "auto"
-    assert client._normalize_language_code("zh-CN") == "zh"
-    assert client._normalize_language_code("zh-Hant") == "zh_tw"
-    assert client._normalize_language_code("ko-KR") == "ko"
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("context", "expected_user_message"),

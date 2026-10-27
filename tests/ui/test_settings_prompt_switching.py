@@ -82,8 +82,6 @@ def _prompt(pending: AppSettingsVNext) -> str:
 
 
 def _make_settings_view(monkeypatch):
-    monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
     view = settings_view.SettingsView()
     view._settings_secrets = SettingsSecretsOwner(

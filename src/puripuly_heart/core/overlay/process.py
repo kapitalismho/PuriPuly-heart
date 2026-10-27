@@ -286,12 +286,6 @@ class OverlayProcessManager:
         return False
 
     @classmethod
-    def _is_bounds_vector(cls, value: object) -> bool:
-        if not isinstance(value, (list, tuple)) or len(value) != 4:
-            return False
-        return all(cls._is_finite_non_bool_number(item) for item in value)
-
-    @classmethod
     def _is_positive_canonical_bounds(cls, value: object) -> bool:
         if not isinstance(value, (list, tuple)) or len(value) != 4:
             return False

@@ -1783,14 +1783,6 @@ def _new_correlation_id(prefix: str) -> str:
     return f"{prefix}-{uuid4()}"
 
 
-def _severity_for_level(level: int) -> Severity:
-    if level >= logging.ERROR:
-        return SEVERITY_ERROR
-    if level >= logging.WARNING:
-        return SEVERITY_WARNING
-    return SEVERITY_INFO
-
-
 def _level_for_severity(severity: Severity) -> int:
     if severity == SEVERITY_ERROR:
         return logging.ERROR

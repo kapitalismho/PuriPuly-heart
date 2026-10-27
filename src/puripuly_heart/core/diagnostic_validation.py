@@ -1004,27 +1004,27 @@ def _redact_fields(
 
 def _redact_text_payload(text: str) -> tuple[str, bool]:
     redacted = text.replace("\r\n", "\n").replace("\r", "\n")
-    redacted = _redact_raw_assignment_values(
+    redacted = redact_raw_assignment_values(
         redacted,
         _PROVIDER_RESPONSE_BODY_TEXT_RE,
         PROVIDER_RESPONSE_BODY_REDACTION_MARKER,
     )
-    redacted = _redact_raw_assignment_values(
+    redacted = redact_raw_assignment_values(
         redacted,
         _BROKER_RAW_MESSAGE_TEXT_RE,
         BROKER_RAW_MESSAGE_REDACTION_MARKER,
     )
-    redacted = _redact_raw_assignment_values(
+    redacted = redact_raw_assignment_values(
         redacted,
         _LOCAL_LLM_EXTRA_BODY_TEXT_RE,
         LOCAL_LLM_EXTRA_BODY_REDACTION_MARKER,
     )
-    redacted = _redact_raw_assignment_values(
+    redacted = redact_raw_assignment_values(
         redacted,
         _UNSAFE_TEXT_PAYLOAD_TEXT_RE,
         DIAGNOSTIC_REDACTION_MARKER,
     )
-    redacted = _redact_raw_assignment_values(
+    redacted = redact_raw_assignment_values(
         redacted,
         _SENSITIVE_TOKEN_ASSIGNMENT_TEXT_RE,
         DIAGNOSTIC_REDACTION_MARKER,
@@ -1091,7 +1091,7 @@ def _text_content_reasons(text: str) -> tuple[DiagnosticValidationReason, ...]:
     return tuple(dict.fromkeys(reasons))
 
 
-def _redact_raw_assignment_values(
+def redact_raw_assignment_values(
     text: str,
     pattern: re.Pattern[str],
     marker: str,
@@ -1359,6 +1359,7 @@ __all__ = [
     "MESSAGE_PARAM_REDACTION_POLICY",
     "redact_diagnostics_for_sink",
     "redact_message_params_for_sink",
+    "redact_raw_assignment_values",
     "redact_text_for_sink",
     "redact_user_message_ref_for_sink",
     "stt_startup_failure_code",

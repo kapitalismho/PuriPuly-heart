@@ -307,21 +307,6 @@ class PeerTranslationChannelOwner:
         if len(self._retired_local_vad_ids) > 4096:
             self._retired_local_vad_ids.popitem(last=False)
 
-    def _emit_exception_summary(
-        self,
-        message: str,
-        *args: object,
-        level: int = logging.ERROR,
-    ) -> None:
-        self.diagnostics.emit(
-            RuntimeDiagnostic(
-                message=message,
-                args=args,
-                level=level,
-                safe_exceptions=True,
-            )
-        )
-
     def _emit_stt_event_loop_failure(
         self,
         exc: Exception,

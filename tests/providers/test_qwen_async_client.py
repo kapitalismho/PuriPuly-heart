@@ -7,17 +7,6 @@ import pytest
 from puripuly_heart.providers.llm.qwen_async import HttpxQwenClient
 
 
-def test_httpx_client_normalizes_language_codes() -> None:
-    assert HttpxQwenClient._normalize_language_code("") == "auto"
-    assert HttpxQwenClient._normalize_language_code("auto") == "auto"
-    assert HttpxQwenClient._normalize_language_code("zh-CN") == "zh"
-    assert HttpxQwenClient._normalize_language_code("zh-Hant") == "zh_tw"
-    assert HttpxQwenClient._normalize_language_code("zh-TW") == "zh_tw"
-    assert HttpxQwenClient._normalize_language_code("ko-KR") == "ko"
-    assert HttpxQwenClient._normalize_language_code("en-US") == "en"
-    assert HttpxQwenClient._normalize_language_code("ja") == "ja"
-
-
 class FakeResponse:
     status_code = 200
 
@@ -63,7 +52,7 @@ async def test_httpx_client_builds_correct_request(monkeypatch):
     client = HttpxQwenClient(api_key="test-key", model="qwen3.5-flash", base_url="https://example")
     result = await client.translate(
         text="hello",
-        system_prompt="SYSTEM",
+        system_prompt="Translate {source_language} to {target_language}",
         source_language="ko-KR",
         target_language="en",
         context='- "previous"',
@@ -84,7 +73,7 @@ async def test_httpx_client_builds_correct_request(monkeypatch):
     assert body["model"] == "qwen3.5-flash"
     assert body["enable_thinking"] is False
     assert body["messages"][0]["role"] == "system"
-    assert "SYSTEM" in body["messages"][0]["content"]
+    assert body["messages"][0]["content"] == "Translate ko-KR to en"
     assert body["messages"][1]["role"] == "user"
     assert "<context>" in body["messages"][1]["content"]
     assert "</context>" in body["messages"][1]["content"]

@@ -20,8 +20,6 @@ async def test_peer_provider_options_survive_composed_apply_and_reload(
     already_selected: bool,
     peer_provider: str,
 ) -> None:
-    monkeypatch.setattr(SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(SettingsView, "_load_secrets", lambda self, *args: None)
     monkeypatch.setattr(SettingsView, "update", lambda self: None)
     view = SettingsView()

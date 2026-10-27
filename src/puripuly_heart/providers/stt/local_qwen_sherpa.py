@@ -77,12 +77,6 @@ def _log_prefix(provider_id: str, stream_label: str | None) -> str:
     return prefix
 
 
-def _pcm16le_duration_ms(pcm16le_size_bytes: int, sample_rate_hz: int) -> float:
-    if pcm16le_size_bytes <= 0:
-        return 0.0
-    return _sample_count_duration_ms(pcm16le_size_bytes // 2, sample_rate_hz)
-
-
 def _sample_count_duration_ms(sample_count: int, sample_rate_hz: int) -> float:
     if sample_count <= 0 or sample_rate_hz <= 0:
         return 0.0

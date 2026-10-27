@@ -709,7 +709,7 @@ async def test_scoped_request_keeps_suffix_after_early_publication() -> None:
     assert first is not None
     first.awaiting_vad_end = False
     first.awaiting_vad_utterance_id = None
-    await harness.self_owner._commit_merge(first, reason="awaiting_vad_timeout")
+    await harness.self_owner._commit_merge(first)
 
     await harness.self_owner.handle_stt_event(
         STTProviderTurnUpdate(identity, 2, "stable", "append", "AB", contribution=contribution_b)
@@ -933,7 +933,7 @@ async def test_scoped_successor_before_real_end_uses_post_end_grace() -> None:
     assert first is not None
     first.awaiting_vad_end = False
     first.awaiting_vad_utterance_id = None
-    await harness.self_owner._commit_merge(first, reason="awaiting_vad_timeout")
+    await harness.self_owner._commit_merge(first)
     await harness.self_owner.handle_stt_event(
         STTProviderTurnUpdate(identity, 2, "stable", "append", "AB", contribution=contribution_b)
     )

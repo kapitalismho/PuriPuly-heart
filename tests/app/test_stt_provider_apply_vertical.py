@@ -593,8 +593,6 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         osc_state_publisher=lambda: None,
     )
 
-    monkeypatch.setattr(SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(SettingsView, "update", lambda self: None)
     monkeypatch.setattr(SettingsView, "_load_secrets", lambda self, *_args: None)
     settings_view = SettingsView()

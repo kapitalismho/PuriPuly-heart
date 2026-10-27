@@ -2585,7 +2585,7 @@ async def test_peer_translation_cancellation_hard_denies_active_peer_chatbox_wit
 
 
 @pytest.mark.asyncio
-async def test_peer_final_runs_owner_shutdown_cancels_and_awaits_child() -> None:
+async def test_peer_translation_shutdown_cancels_and_awaits_child() -> None:
     sink = RecordingOverlaySink()
     llm = BlockingTranslateLLMProvider()
     harness = compose_translation_test_harness(
@@ -2611,7 +2611,7 @@ async def test_peer_final_runs_owner_shutdown_cancels_and_awaits_child() -> None
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("operation", ["clear", "stop"])
-async def test_peer_final_runs_cancellation_suppression_cannot_publish_success_or_leak_tasks(
+async def test_peer_translation_cancellation_suppression_cannot_publish_success_or_leak_tasks(
     operation: str,
 ) -> None:
     sink = RecordingOverlaySink()

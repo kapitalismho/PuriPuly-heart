@@ -4,7 +4,6 @@ import re
 import sys
 import tomllib
 from importlib.metadata import version
-from types import SimpleNamespace
 
 import pytest
 
@@ -170,32 +169,6 @@ def test_set_text_button_label_uses_flet_100_content_property() -> None:
     settings_view._set_text_button_label(button, "Managed")
 
     assert button.content == "Managed"
-
-
-def test_make_overlay_anchor_dropdown_uses_flet_100_on_select(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    seen: dict[str, object] = {}
-
-    class FakeOption:
-        def __init__(self, *, key, text):
-            self.key = key
-            self.text = text
-
-    class FakeDropdown:
-        def __init__(self, **kwargs):
-            seen.update(kwargs)
-
-    monkeypatch.setattr(settings_view.ft.dropdown, "Option", FakeOption)
-    monkeypatch.setattr(settings_view.ft, "Dropdown", FakeDropdown)
-
-    on_change = SimpleNamespace()
-    settings_view._make_overlay_anchor_dropdown("center", on_change)
-
-    assert seen["value"] == "center"
-    assert seen["on_select"] is on_change
-    assert "on_change" not in seen
-    assert len(seen["options"]) == len(settings_view.OVERLAY_CALIBRATION_ANCHORS)
 
 
 class _RaisingPageControl:

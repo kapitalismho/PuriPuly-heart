@@ -228,7 +228,6 @@ from puripuly_heart.app.wiring_translation_runtime_configuration import (
     replace_translation_runtime_enabled,
 )
 from puripuly_heart.app.wiring_vrc_mic_sync import compose_vrc_mic_sync
-from puripuly_heart.composition.application_settings import load_application_settings
 from puripuly_heart.composition.application_startup import (
     ApplicationStartupAdapter,
     compose_application_startup,
@@ -2220,9 +2219,7 @@ def compose_application_runtime(
 
     startup_adapter = ApplicationStartupAdapter(
         settings=settings,
-        settings_loader=lambda: load_application_settings(
-            settings=settings,
-        ),
+        settings_loader=lambda: settings.start().settings,
         provisioning=require_provisioning(),
         gpu_state=gpu_state,
         manual_fallback=manual_fallback,
@@ -2518,9 +2515,7 @@ def compose_application_runtime(
         local_asr_evidence_sink(
             _LocalASRProductionCompositionAccess(
                 config_path=config_path,
-                settings_loader=lambda: load_application_settings(
-                    settings=settings,
-                ),
+                settings_loader=lambda: settings.start().settings,
                 runtime_initializer=initialize_local_asr_evidence,
                 components_provider=lambda: pipeline.current,
                 gpu_retry=retry_gpu_activation,

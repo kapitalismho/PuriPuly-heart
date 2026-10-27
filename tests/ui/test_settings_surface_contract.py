@@ -153,10 +153,6 @@ def test_settings_api_surface_preserves_accepted_initial_row_visibility() -> Non
 def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings_view_module.SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(
-        settings_view_module.SettingsView, "_refresh_microphones", lambda self: None
-    )
     monkeypatch.setattr(settings_view_module.SettingsView, "update", lambda self: None)
     view = settings_view_module.SettingsView()
 
@@ -248,10 +244,6 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
 def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings_view_module.SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(
-        settings_view_module.SettingsView, "_refresh_microphones", lambda self: None
-    )
     monkeypatch.setattr(settings_view_module.SettingsView, "update", lambda self: None)
     view = settings_view_module.SettingsView()
     existing_basic = view.runtime_log_basic

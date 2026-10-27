@@ -71,13 +71,6 @@ from .wiring_translation_runtime_configuration import (
 )
 
 
-def _runtime_peer_translation_enabled(owner: object) -> bool:
-    flag = getattr(owner, "peer_translation_enabled", None)
-    if callable(flag):
-        return bool(flag())
-    return False
-
-
 def project_translation_runtime_settings(
     settings: AppSettingsVNext,
 ) -> TranslationRuntimeSettingsValues:

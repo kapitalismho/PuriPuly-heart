@@ -56,9 +56,7 @@ def _load(view, settings):
 
 
 @pytest.fixture
-def view(monkeypatch):
-    monkeypatch.setattr(settings_module.SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(settings_module.SettingsView, "_refresh_microphones", lambda self: None)
+def view():
     return settings_module.SettingsView()
 
 
