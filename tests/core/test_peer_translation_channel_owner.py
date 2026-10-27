@@ -89,6 +89,68 @@ async def test_independent_peer_finals_keep_receipt_order_and_distinct_identitie
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("foreign_generation", [0, 2], ids=["stale", "not-activated"])
+async def test_peer_final_cannot_grant_output_authority_and_current_generation_progresses(
+    foreign_generation,
+) -> None:
+    events = []
+
+    async def emit(event):
+        events.append(event)
+
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=None,
+        osc=osc,
+        overlay_sink=SimpleNamespace(emit=emit, active_self_overlay_metadata=lambda: None),
+    )
+
+    async def final(generation, text):
+        identity = uuid4()
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                identity,
+                Transcript(
+                    utterance_id=identity,
+                    text=text,
+                    is_final=True,
+                    channel="peer",
+                    publication_generation=generation,
+                    source_order=1,
+                ),
+            )
+        )
+        await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
+
+    try:
+        await harness.start()
+        await final(foreign_generation, "foreign generation text")
+        assert events == []
+        assert harness.output_runtime.peer_publication_is_authorized(1, 1)
+        assert any(
+            decision.reason == "publication_generation_retired"
+            for decision in harness.output_runtime.routing_decisions
+        )
+
+        await final(1, "current generation text")
+        assert [(event.type, getattr(event, "text", None)) for event in events] == [
+            ("peer_transcript_final", "current generation text"),
+            ("utterance_closed", None),
+        ]
+        visible = []
+        while not harness.ui_events.empty():
+            event = harness.ui_events.get_nowait()
+            if event.type == UIEventType.TRANSCRIPT_FINAL:
+                visible.append(event.payload.text)
+        assert visible == ["current generation text"]
+        assert osc.messages == []
+    finally:
+        await harness.stop()
+
+
+@pytest.mark.asyncio
 async def test_peer_native_input_terminals_release_local_timing_without_binding_finals() -> None:
     harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())
     harness.output_runtime.activate_peer_generation(1)

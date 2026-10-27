@@ -1430,10 +1430,11 @@ async def test_prepare_for_translation_and_ensure_key_for_llm_start_share_single
 
 
 @pytest.mark.asyncio
-async def test_issue_uses_qwen_managed_model_from_selection_alias() -> None:
+async def test_issue_uses_configured_qwen_managed_model() -> None:
     settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
     settings.openrouter.selection_alias = OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
+    settings.openrouter.llm_model = OpenRouterLLMModel.QWEN_35_FLASH_02_23
     secrets = InMemorySecretStore()
     ensure_managed_identity_bundle(
         ManagedIdentityStateAdapter(settings, lambda _updated: None), secrets

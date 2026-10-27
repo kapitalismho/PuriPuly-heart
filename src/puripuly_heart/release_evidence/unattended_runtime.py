@@ -177,6 +177,8 @@ async def _product_process_source_probe(
                     release_inflight()
                 await consumer_task
             finally:
+                if release_inflight is not None:
+                    release_inflight()
                 await scope.close()
             facts["consumed"] = 1
         facts["dropped"] = source.queue_drop_count

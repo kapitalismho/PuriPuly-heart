@@ -7,7 +7,10 @@ from types import SimpleNamespace
 import pytest
 
 from puripuly_heart.app import wiring_runtime_pipeline as runtime_module
-from puripuly_heart.app.wiring.wiring_runtime_pipeline import compose_runtime_pipeline
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import (
+    compose_runtime_pipeline,
+    runtime_pipeline_inputs_from_vnext,
+)
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.clock import SystemClock
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
@@ -15,7 +18,6 @@ from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
     PrebuiltLocalASRProviderRuntimeFactory,
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
-from tests.helpers.runtime_pipeline import pipeline_inputs_from_vnext
 
 
 class RecordingRelease:
@@ -107,7 +109,7 @@ async def test_custom_http_pipeline_skips_managed_rebuild_and_owns_backend_close
     monkeypatch.setattr(runtime_module, "ChatboxPaginator", lambda *_a, **_k: RecordingChatbox())
 
     pipeline = await compose_runtime_pipeline(
-        inputs=pipeline_inputs_from_vnext(settings),
+        inputs=runtime_pipeline_inputs_from_vnext(settings, peer_translation_enabled=False),
         secrets=InMemorySecretStore(),
         config_path=Path("settings.json"),
         clock=SystemClock(),

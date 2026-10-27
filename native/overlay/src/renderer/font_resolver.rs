@@ -401,19 +401,6 @@ impl FontResolver {
         }
     }
 
-    #[cfg(test)]
-    pub(crate) fn resolve_order6_layout_draw_safe(
-        &self,
-        language: Option<&str>,
-        text: &str,
-    ) -> ResolvedFontStyle {
-        let _ = self;
-        Self::with_bundle_unavailable(
-            "order 6 keeps layout and draw on the same system branch until shared style propagation",
-        )
-        .resolve(language, text)
-    }
-
     pub fn style_resolution_failure_fallback(bucket: FontLanguageBucket) -> ResolvedFontStyle {
         Self::style_resolution_failure_fallback_for_bucket_locale(
             bucket,
@@ -730,9 +717,7 @@ fn is_well_formed_general_language_tag(subtags: &[&str]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        ui_language_hint_from_windows_langid, FontLanguageBucket, FontResolver, FontSource,
-    };
+    use super::ui_language_hint_from_windows_langid;
 
     #[test]
     fn windows_ui_langid_mapping_returns_only_supported_cjk_language_hints() {
@@ -757,17 +742,5 @@ mod tests {
             Some("zh-HK")
         );
         assert_eq!(ui_language_hint_from_windows_langid(0x0409), None);
-    }
-
-    #[test]
-    fn order6_layout_draw_safe_resolution_avoids_bundled_or_ui_hint_specific_styles() {
-        let resolver = FontResolver::with_bundle_available().with_ui_language_hint("ja-JP");
-        let style = resolver.resolve_order6_layout_draw_safe(None, "日本語");
-
-        assert_eq!(style.bucket, FontLanguageBucket::CjkKo);
-        assert_eq!(style.source, FontSource::SystemFont);
-        assert_eq!(style.bundled_face, None);
-        assert_eq!(style.family_name, "Malgun Gothic");
-        assert_eq!(style.locale, "ko-KR");
     }
 }

@@ -9,11 +9,16 @@ from types import SimpleNamespace
 
 import pytest
 
+from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
+    SettingsVNextCanonicalPersistenceAdapter,
+)
+from puripuly_heart.app.ports.settings_view import LocaleSettingsIntent
 from puripuly_heart.composition.headless_application import compose_headless_application
 from puripuly_heart.config.resolved import OVERLAY_TARGET_DESKTOP
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     DesktopFletOverlayPositionIntent,
+    SecretsIntent,
 )
 from puripuly_heart.config.settings_vnext.serialization import to_dict
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
@@ -21,6 +26,7 @@ from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
 
 @pytest.fixture(autouse=True)
 async def isolated_composed_logging(tmp_path, monkeypatch):
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "synthetic-desktop-passphrase")
     root = logging.getLogger()
     level = root.level
     monkeypatch.setattr(root, "handlers", list(root.handlers))
@@ -77,6 +83,8 @@ def _application(path: Path, *, desktop: bool = False, positioned: bool = False)
         settings,
         intent=replace(
             settings.intent,
+            secrets=SecretsIntent(backend="encrypted_file", encrypted_file_path="secrets.json"),
+            telemetry=replace(settings.intent.telemetry, enabled=False),
             osc=replace(settings.intent.osc, connection_mode="off"),
             overlay=replace(
                 settings.intent.overlay,
@@ -208,3 +216,33 @@ async def test_reset_commits_inactive_desktop_and_reports_failed_runtime_broadca
     assert result["status"] == "failed"
     assert result["reason"] == "desktop_broadcast_failed"
     assert [payload["command"] for payload in failing.sent] == ["set_interaction_mode"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["size", "reset"])
+async def test_runtime_desktop_commit_survives_later_unrelated_focused_edit(tmp_path, action):
+    path = tmp_path / "settings.json"
+    application, owner = _application(path, desktop=True, positioned=True)
+    before = owner.require_canonical()
+    unrelated = LocaleSettingsIntent("ja")
+    desktop = before.intent.overlay.desktop_flet
+    if action == "size":
+        size = "large" if desktop.size_preset != "large" else "tiny"
+        expected = replace(desktop, size_preset=size)
+        result = await application.set_desktop_overlay_size_preset(size)
+    else:
+        expected = replace(desktop, position=DesktopFletOverlayPositionIntent(x=None, y=None))
+        result = await application.reset_desktop_overlay_position()
+    assert result["status"] == "applied"
+    assert owner.require_canonical().intent.overlay.desktop_flet == expected
+
+    await application.apply_settings_intent(unrelated)
+
+    current = owner.require_canonical()
+    assert current.intent == replace(
+        before.intent,
+        ui=replace(before.intent.ui, locale="ja"),
+        overlay=replace(before.intent.overlay, desktop_flet=expected),
+    )
+    loaded = SettingsVNextCanonicalPersistenceAdapter().load_active(path).canonical_settings
+    assert loaded == current

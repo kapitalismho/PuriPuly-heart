@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { TRIAL_PROVIDER_POLICY } from '../src/contract';
 import { signCanonicalIssueRequest } from './test-support/ed25519';
 import { normalizedErrorEnvelope } from './test-support/errors';
 import {
@@ -20,7 +19,13 @@ interface PolicyViolationCase {
   message: string;
 }
 
-const CURATED_MANAGED_MODEL_POOL = TRIAL_PROVIDER_POLICY.managedFreeTrial.models;
+const CURATED_MANAGED_MODEL_POOL = [
+  'google/gemma-4-26b-a4b-it',
+  'google/gemma-4-31b-it',
+  'deepseek/deepseek-v4.1-flash-1017',
+  'deepseek/deepseek-v4-flash-0731',
+  'deepseek/deepseek-v4-flash',
+];
 
 describe('POST /v1/providers/openrouter/issue policy enforcement', () => {
   afterEach(() => {
@@ -37,9 +42,16 @@ describe('POST /v1/providers/openrouter/issue policy enforcement', () => {
       message: 'reason must be llm_start',
     },
     {
-      name: 'budget_usd',
+      name: 'lower budget_usd',
       overrides: {
         budget_usd: 0.06,
+      },
+      message: 'budget_usd must equal 0.07',
+    },
+    {
+      name: 'higher budget_usd',
+      overrides: {
+        budget_usd: 0.08,
       },
       message: 'budget_usd must equal 0.07',
     },
@@ -56,7 +68,7 @@ describe('POST /v1/providers/openrouter/issue policy enforcement', () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-04-08T06:00:00Z'));
 
-      mockOpenRouterManagementApi();
+      const management = mockOpenRouterManagementApi();
       const env = createTestBrokerEnv();
       const release = await createPendingReleaseSession({
         env,
@@ -86,6 +98,7 @@ describe('POST /v1/providers/openrouter/issue policy enforcement', () => {
           message: testCase.message,
         }),
       );
+      expect(management.fetchMock).not.toHaveBeenCalled();
 
       const entitlement = env.__db
         .prepare(
@@ -103,6 +116,20 @@ describe('POST /v1/providers/openrouter/issue policy enforcement', () => {
         expires_at: null,
         release_token_hash: expect.any(String),
         release_token_expires_at: release.releaseTokenExpiresAt,
+      });
+
+      const validRequest = await signCanonicalIssueRequest(release.keyPair.privateKey, {
+        ...requestBody,
+        reason: 'llm_start',
+        budget_usd: 0.07,
+        model: 'google/gemma-4-26b-a4b-it',
+      });
+      const validResponse = await postIssue(env, validRequest);
+      expect(validResponse.status).toBe(200);
+      await expect(validResponse.json()).resolves.toMatchObject({
+        managed_state: { lifecycle: 'active', managed_availability: true },
+        budget_usd: 0.07,
+        model: 'google/gemma-4-26b-a4b-it',
       });
     },
   );

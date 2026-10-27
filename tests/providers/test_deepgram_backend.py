@@ -27,6 +27,7 @@ from tests.core.test_external_network import certificates as certificates
 from tests.core.test_external_network import (
     isolated_network_environment as isolated_network_environment,
 )
+from tests.core.test_external_network import loopback_websocket_server
 from tests.helpers.scoped_provider_sessions import _deepgram_result
 from tests.providers.test_deepgram_reuse import _next, _request, _seal
 
@@ -232,7 +233,7 @@ async def test_scoped_deepgram_real_sdk_audio_control_result_reuse_and_closure(
         finally:
             closed.set()
 
-    async with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
+    async with loopback_websocket_server(handler, ssl=contexts["valid"]) as server:
         local_sdk_client(monkeypatch, f"wss://localhost:{server.sockets[0].getsockname()[1]}")
         backend = DeepgramRealtimeSTTBackend(
             api_key="synthetic-key",

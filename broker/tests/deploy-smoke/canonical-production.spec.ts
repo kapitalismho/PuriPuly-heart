@@ -59,6 +59,25 @@ describe('broker deploy smoke helpers', () => {
     });
   });
 
+  it('requires the flat challenge fingerprint salt contract and rejects missing or placeholder fields', () => {
+    expect(() => assertChallengeFingerprintSalt({
+      fingerprint_salt: { version: 7, salt: 'synthetic-ready-salt' },
+    })).not.toThrow();
+    for (const payload of [
+      {},
+      { fingerprint_salt: {} },
+      { fingerprint_salt: { current: { version: 7, salt: 'synthetic-ready-salt' } } },
+      { fingerprint_salt: { version: 7, salt: BOOTSTRAP_PLACEHOLDER } },
+      { fingerprint_salt: { version: 0, salt: 'synthetic-ready-salt' } },
+      { fingerprint_salt: { version: 1.5, salt: 'synthetic-ready-salt' } },
+      { fingerprint_salt: { version: '7', salt: 'synthetic-ready-salt' } },
+      { fingerprint_salt: { version: 7, salt: '' } },
+      { fingerprint_salt: { version: 7, salt: ' \t ' } },
+    ]) {
+      expect(() => assertChallengeFingerprintSalt(payload), JSON.stringify(payload)).toThrow(/fingerprint_salt/u);
+    }
+  });
+
   it('recognizes model-routing failures as guardrail enforcement for a disallowed model probe', () => {
     expect(
       isDisallowedModelGuardrailFailure(503, {
@@ -437,9 +456,7 @@ describeDeploySmoke('broker direct deploy smoke', () => {
     expect(typeof challenge.body.challenge).toBe('string');
     expect(typeof challenge.body.challenge_expires_at).toBe('string');
     expect(challenge.body.managed_state?.lifecycle).toBe('none');
-    expect(challenge.body.fingerprint_salt?.current?.salt).not.toBe(
-      BOOTSTRAP_PLACEHOLDER,
-    );
+    assertChallengeFingerprintSalt(challenge.body);
 
     const verifySignedAt = timestampFromHeaders(challenge.headers);
     const verifyRequest = await signCanonicalVerifyRequest(keyPair.privateKey, {
@@ -882,6 +899,24 @@ async function computeHmacSha256Hex(secret: string, value: string): Promise<stri
   return Array.from(new Uint8Array(signature), (byte) =>
     byte.toString(16).padStart(2, '0'),
   ).join('');
+}
+
+function assertChallengeFingerprintSalt(payload: unknown): void {
+  const fingerprint = readObjectField(payload, 'fingerprint_salt', 'challenge response');
+  if (
+    typeof fingerprint.version !== 'number' ||
+    !Number.isSafeInteger(fingerprint.version) ||
+    fingerprint.version < 1
+  ) {
+    throw new Error('challenge fingerprint_salt must include a positive integer version');
+  }
+  if (
+    typeof fingerprint.salt !== 'string' ||
+    fingerprint.salt.trim().length === 0 ||
+    fingerprint.salt.trim() === BOOTSTRAP_PLACEHOLDER
+  ) {
+    throw new Error('challenge fingerprint_salt must include a nonempty bootstrapped salt');
+  }
 }
 
 function readOpenRouterCurrentKeyMetadata(payload: unknown): {

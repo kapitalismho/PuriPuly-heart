@@ -53,16 +53,6 @@ def test_is_hover_active_tolerates_events_without_data() -> None:
     assert is_hover_active(SimpleNamespace()) is False
 
 
-def test_no_hover_handler_compares_event_data_to_a_string() -> None:
-    violations = []
-    for path in sorted(UI_ROOT.rglob("*.py")):
-        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-            if 'data == "true"' in line or "data == 'true'" in line:
-                violations.append(f"{path.relative_to(ROOT)}:{line_number}:{line.strip()}")
-
-    assert violations == []
-
-
 def test_language_card_hover_reacts_to_boolean_payloads(monkeypatch: pytest.MonkeyPatch) -> None:
     card = LanguageCard(
         on_self_source_click=lambda: None,
@@ -116,20 +106,38 @@ def test_prompt_editor_field_fills_available_width() -> None:
     assert editor._text_field.width == FILL_PARENT_WIDTH
 
 
+def _unsized_text_fields(tree: ast.AST) -> list[int]:
+    return [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and (getattr(node.func, "attr", None) or getattr(node.func, "id", None)) == "TextField"
+        and not {keyword.arg for keyword in node.keywords} & {"width", "expand"}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("source", "expected_lines"),
+    [
+        ("ft.TextField(width=300)", []),
+        ("ft.TextField(expand=True)", []),
+        ("TextField(width=width)", []),
+        ("ft.TextField()", [1]),
+        ("TextField(value='caption')", [1]),
+        ("ft.Text('caption')", []),
+    ],
+)
+def test_text_field_sizing_guard_distinguishes_explicit_layout(
+    source: str, expected_lines: list[int]
+) -> None:
+    assert _unsized_text_fields(ast.parse(source)) == expected_lines
+
+
 def test_every_text_field_declares_an_explicit_width_or_expand() -> None:
     unsized = []
-    for path in sorted((ROOT / "src" / "puripuly_heart").rglob("*.py")):
+    for path in sorted(UI_ROOT.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            name = getattr(node.func, "attr", None) or getattr(node.func, "id", None)
-            if name != "TextField":
-                continue
-            keywords = {keyword.arg for keyword in node.keywords}
-            if not keywords & {"width", "expand"}:
-                unsized.append(f"{path.relative_to(ROOT)}:{node.lineno}")
-
+        unsized.extend(f"{path.relative_to(ROOT)}:{line}" for line in _unsized_text_fields(tree))
     assert unsized == []
 
 

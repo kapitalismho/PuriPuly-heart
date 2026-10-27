@@ -607,8 +607,13 @@ def test_settings_capture_target_refresh_preserves_unrelated_drafts() -> None:
     view = SettingsView.__new__(SettingsView)
     baseline_settings = AppSettingsVNext()
     provider_draft = AppSettingsVNext()
-    view._settings = baseline_settings
-    view._provider_settings_draft = provider_draft
+    (
+        view._provider_snapshot,
+        view._general_snapshot,
+        view._prompt_snapshot,
+        view._overlay_snapshot,
+    ) = settings_view_surface_snapshots(baseline_settings)
+    view._provider_draft = settings_view_surface_snapshots(provider_draft)[0]
     view.has_provider_changes = True
     view.has_pending_prompt_changes = True
     view._desktop_overlay_pending_size_preset = "large"
@@ -709,8 +714,13 @@ def test_settings_capture_target_rebase_updates_all_retained_apply_sources(
     view = SettingsView.__new__(SettingsView)
     retained = with_capture_target(AppSettingsVNext(), _capture_intent(initial_target))
     draft = retained
-    view._settings = retained
-    view._provider_settings_draft = draft
+    (
+        view._provider_snapshot,
+        view._general_snapshot,
+        view._prompt_snapshot,
+        view._overlay_snapshot,
+    ) = settings_view_surface_snapshots(retained)
+    view._provider_draft = settings_view_surface_snapshots(draft)[0]
     view.has_provider_changes = True
     view.has_pending_prompt_changes = True
     view._audio_settings = SimpleNamespace(desktop_output_device=initial_target.device_name or "")

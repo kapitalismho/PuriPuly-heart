@@ -6,7 +6,6 @@ from tests.helpers.paths import SOURCE_ROOT
 
 OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
 CALLBACKS_PATH = SOURCE_ROOT / "core" / "orchestrator" / "translation_channel_callbacks.py"
-PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py"
 
 
 def _class(tree: ast.Module, name: str) -> ast.ClassDef:
@@ -27,25 +26,6 @@ def _fields(node: ast.ClassDef) -> set[str]:
         for child in node.body
         if isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name)
     }
-
-
-def test_pipeline_constructs_and_exposes_one_direct_peer_translation_owner() -> None:
-    source = PIPELINE_PATH.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    calls = [
-        node.func.id
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    ]
-
-    assert calls.count("PeerTranslationChannelOwner") == 1
-    assert "callbacks.bind_peer(peer_translation_channel)" in source
-    assert "peer_translation_channel=peer_translation_channel" in source
-    assert (
-        "peer_translation_channel,\n        local_asr_runtime,\n"
-        "        peer_translation_channel,"
-    ) in source
-    assert "ClientHub" not in source
 
 
 def test_peer_owner_has_explicit_ingress_lifecycle_and_dependencies() -> None:

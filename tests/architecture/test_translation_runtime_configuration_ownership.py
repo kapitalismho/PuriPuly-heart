@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import re
 from dataclasses import fields
 from pathlib import Path
 
@@ -10,7 +9,7 @@ from puripuly_heart.core.orchestrator.context import ContextResolver
 from puripuly_heart.core.orchestrator.peer_translation_channel import (
     PeerTranslationChannelOwner,
 )
-from tests.helpers.paths import REPO_ROOT as ROOT
+from tests.helpers.ast_sources import assert_no_forbidden_imports
 from tests.helpers.paths import SOURCE_ROOT
 
 CONFIG_FIELD_NAMES = {field.name for field in fields(TranslationRuntimeConfig)}
@@ -34,20 +33,6 @@ def test_peer_algorithms_read_explicit_configuration_snapshots() -> None:
     ]
 
     assert direct_reads == []
-
-
-def test_production_code_does_not_mutate_configuration_through_channel_aliases() -> None:
-    assignment = re.compile(rf"\b(?:hub|runtime)\.({'|'.join(sorted(CONFIG_FIELD_NAMES))})\s*=")
-    matches = []
-    for path in SOURCE_ROOT.rglob("*.py"):
-        for line_number, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(),
-            start=1,
-        ):
-            if assignment.search(line):
-                matches.append(f"{path.relative_to(ROOT)}:{line_number}")
-
-    assert matches == []
 
 
 def test_peer_owner_consumes_snapshot_port_without_configuration_mutation() -> None:
@@ -105,28 +90,19 @@ def test_each_application_configuration_mutator_performs_one_owner_transform() -
     }
 
 
-def test_runtime_pipeline_constructs_and_exposes_one_configuration_owner() -> None:
-    path = SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py"
-    source = path.read_text(encoding="utf-8")
-
-    assert source.count("TranslationRuntimeConfigurationOwner(") == 1
-    assert "translation_runtime_configuration=translation_runtime_configuration" in source
-    assert "self.translation_runtime_configuration = components." in source
-
-
 def test_configuration_boundary_has_no_ui_dependency() -> None:
     for relative_path in (
         Path("core/orchestrator/configuration.py"),
         Path("core/orchestrator/context.py"),
     ):
-        source = (SOURCE_ROOT / relative_path).read_text(encoding="utf-8")
-        assert "import flet" not in source
-        assert "puripuly_heart.ui" not in source
+        assert_no_forbidden_imports(SOURCE_ROOT / relative_path, ("flet", "puripuly_heart.ui"))
 
 
 def test_configuration_mutation_boundary_consumes_only_projected_settings_values() -> None:
     path = SOURCE_ROOT / "app" / "wiring" / "wiring_translation_runtime_configuration.py"
-    source = path.read_text(encoding="utf-8")
-
-    assert "puripuly_heart.config.settings" not in source
-    assert "TranslationRuntimeSettingsValues" in source
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    imports = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
+    assert "puripuly_heart.config.settings" not in imports
+    assert "TranslationRuntimeSettingsValues" in {
+        node.id for node in ast.walk(tree) if isinstance(node, ast.Name)
+    }

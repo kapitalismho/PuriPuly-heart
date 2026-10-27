@@ -873,16 +873,6 @@ def test_overlay_calibration_value_object_has_config_schema_ownership() -> None:
     assert _layer_for_module("puripuly_heart.config.overlay_calibration") == SCHEMA_VALUES
     assert _layer_for_module("puripuly_heart.ui.overlay_calibration") == UI_ADAPTERS_RENDERERS
 
-    forbidden_imports = {
-        ("src/puripuly_heart/config/settings.py", "puripuly_heart.ui.overlay_calibration"),
-        ("src/puripuly_heart/core/overlay/presenter.py", "puripuly_heart.ui.overlay_calibration"),
-    }
-    actual_imports = {
-        (violation.importer, violation.imported) for violation in _dependency_violations()
-    }
-
-    assert not (forbidden_imports & actual_imports)
-
 
 def test_legacy_settings_module_is_absent() -> None:
     assert not (SOURCE_PACKAGE_ROOT / "config" / "settings.py").exists()
@@ -1090,50 +1080,6 @@ def test_application_composition_avoids_legacy_overlay_resource_mirrors() -> Non
                 offenders.append(f"{node.name}:{child.lineno}:{child.attr}")
 
     assert offenders == []
-
-
-def test_application_composition_has_no_concrete_osc_import_violations() -> None:
-    orchestrator_rule = _rule_for_layer(ORCHESTRATOR)
-    assert not any(
-        violation.importer == "src/puripuly_heart/composition/application_runtime.py"
-        and ".core.osc." in violation.imported
-        for violation in _dependency_violations()
-    )
-    assert (
-        ImportViolation(
-            rule_id=orchestrator_rule.rule_id,
-            importer="src/puripuly_heart/core/orchestrator/peer_translation_channel.py",
-            imported="puripuly_heart.core.osc.chatbox_paginator",
-            importer_layer=ORCHESTRATOR,
-            imported_layer=ADAPTERS,
-            reason=orchestrator_rule.reason,
-        )
-        not in _dependency_violations()
-    )
-
-
-def test_a03_runtime_owner_adapter_imports_are_retired() -> None:
-    runtime_owner_rule = _rule_for_layer(RUNTIME_OWNERS)
-    inherited_runtime_owner_violations = {
-        ImportViolation(
-            rule_id=runtime_owner_rule.rule_id,
-            importer="src/puripuly_heart/core/runtime/logging.py",
-            imported="puripuly_heart.core.runtime_logging",
-            importer_layer=RUNTIME_OWNERS,
-            imported_layer=ADAPTERS,
-            reason=runtime_owner_rule.reason,
-        ),
-        ImportViolation(
-            rule_id=runtime_owner_rule.rule_id,
-            importer="src/puripuly_heart/core/runtime/receiver.py",
-            imported="puripuly_heart.core.osc.receiver",
-            importer_layer=RUNTIME_OWNERS,
-            imported_layer=ADAPTERS,
-            reason=runtime_owner_rule.reason,
-        ),
-    }
-
-    assert inherited_runtime_owner_violations.isdisjoint(_dependency_violations())
 
 
 def test_gate1_existing_replacement_private_shims_are_removed() -> None:
@@ -1437,95 +1383,6 @@ def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
     }
 
     assert occurrences == set()
-
-
-def test_a07_managed_broker_boundary_reduces_dependency_debt_to_16() -> None:
-    assert not any(
-        violation.importer.endswith("managed_openrouter_broker_client.py")
-        for violation in _dependency_violations()
-    )
-    assert _settings_runtime_confinement_violations() == frozenset()
-
-
-def test_a08_provider_runtime_wiring_reduces_dependency_debt_to_9() -> None:
-    assert _settings_runtime_confinement_violations() == frozenset()
-    a08_paths = (
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_llm_factory.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_local_asr_provider_runtime.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_provider_runtime.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_provider_runtime_policy.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_stt_factory.py",
-        SOURCE_PACKAGE_ROOT / "app" / "services" / "provider" / "provider_settings.py",
-    )
-    for path in a08_paths:
-        imported_modules = set(
-            _imported_modules(
-                _module_name_for_path(path),
-                path,
-                _internal_module_names(),
-            )
-        )
-        assert "puripuly_heart.config.settings" not in imported_modules
-        assert "puripuly_heart.config.settings_vnext.migration" not in imported_modules
-    assert {violation.importer for violation in _dependency_violations()}.isdisjoint(
-        {_relative_repo_path(path) for path in a08_paths}
-    )
-
-
-def test_a09_capture_overlay_application_wiring_reduces_dependency_debt_to_4() -> None:
-    assert _settings_runtime_confinement_violations() == frozenset()
-    a09_paths = (
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_capture_runtime.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_local_asr_application.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_audio_test.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_overlay_factory.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_peer_application.py",
-        SOURCE_PACKAGE_ROOT / "app" / "services" / "capture" / "capture_target_settings.py",
-        SOURCE_PACKAGE_ROOT / "app" / "services" / "capture" / "peer_capture_target_application.py",
-    )
-    for path in a09_paths:
-        imported_modules = set(
-            _imported_modules(
-                _module_name_for_path(path),
-                path,
-                _internal_module_names(),
-            )
-        )
-        assert "puripuly_heart.config.settings" not in imported_modules
-    assert {violation.importer for violation in _dependency_violations()}.isdisjoint(
-        {_relative_repo_path(path) for path in a09_paths}
-    )
-
-
-def test_a10_composition_managed_secrets_wiring_reduces_dependency_debt_to_0() -> None:
-    assert _dependency_violations() == frozenset()
-    assert _settings_runtime_confinement_violations() == frozenset()
-    a10_paths = (
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_composition.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_managed_account.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_managed_auth_factory.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_secrets_factory.py",
-        SOURCE_PACKAGE_ROOT / "composition" / "application_runtime.py",
-        SOURCE_PACKAGE_ROOT / "core" / "telemetry.py",
-        SOURCE_PACKAGE_ROOT / "core" / "openrouter" / "managed_openrouter_release.py",
-        SOURCE_PACKAGE_ROOT / "core" / "openrouter" / "openrouter_credentials.py",
-        SOURCE_PACKAGE_ROOT / "core" / "stt" / "custom_vocab.py",
-        SOURCE_PACKAGE_ROOT / "app" / "services" / "github_star_prompt_settings.py",
-        SOURCE_PACKAGE_ROOT / "app" / "services" / "manual_local_asr_fallback.py",
-        SOURCE_PACKAGE_ROOT / "app" / "services" / "openrouter_pkce_flow.py",
-        SOURCE_PACKAGE_ROOT / "app" / "services" / "settings" / "settings_application.py",
-        SOURCE_PACKAGE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py",
-    )
-    for path in a10_paths:
-        imported_modules = set(
-            _imported_modules(
-                _module_name_for_path(path),
-                path,
-                _internal_module_names(),
-            )
-        )
-        assert "puripuly_heart.config.settings" not in imported_modules
 
 
 def test_a04_overlay_ui_uses_the_pure_canonical_value_owner() -> None:

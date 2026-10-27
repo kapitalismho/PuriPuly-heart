@@ -311,6 +311,18 @@ fn overlay_state_treats_equal_revision_snapshots_as_noop() {
         blocks: vec![block("peer:4", "peer", "ignore", "", true)],
         speaker_divider: false,
     }));
+    assert_eq!(state.snapshot().revision, 4);
+    assert_eq!(state.blocks()[0].id, "self:4");
+    assert_eq!(state.blocks()[0].primary_text, "keep");
+
+    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 5,
+        blocks: vec![block("peer:5", "peer", "next", "", true)],
+        ..Default::default()
+    }));
+    assert_eq!(state.snapshot().revision, 5);
+    assert_eq!(state.blocks()[0].id, "peer:5");
+    assert_eq!(state.blocks()[0].primary_text, "next");
 }
 
 #[test]

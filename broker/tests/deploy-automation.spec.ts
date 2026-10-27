@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, sep } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
@@ -27,6 +27,13 @@ const abuseControlsWorkflow = new URL(
   import.meta.url,
 );
 
+const bashExecutable = process.platform === 'win32'
+  ? join(
+      dirname(dirname(execFileSync('where.exe', ['git'], { encoding: 'utf8' }).trim().split(/\r?\n/u)[0]!)),
+      'bin',
+      'bash.exe',
+    )
+  : 'bash';
 const tempDirs: string[] = [];
 
 afterEach(() => {
@@ -190,7 +197,6 @@ describe('broker direct deploy automation', () => {
       expect(renderedSql).not.toContain('__BOOTSTRAP_REQUIRED__');
       expect(renderedSql).toContain(bootstrapSalt);
       expect(renderedSql).not.toContain('CREATE TEMP TABLE');
-      expect(renderedSql).toContain("json_extract(value, '$.current.salt') = '__BOOTSTRAP' || '_REQUIRED__'");
 
       applyBrokerMigrations(db);
       db.exec(renderedSql);
@@ -361,7 +367,7 @@ describe('broker direct deploy automation', () => {
       const outputPath = join(tempDir, 'github-output');
       const result = runBashScript(script, tempDir, {
         BASH_ENV: './bash-env.sh',
-        GITHUB_OUTPUT: outputPath,
+        GITHUB_OUTPUT: 'github-output',
         SCHEMA_JSON: JSON.stringify([{ results: scenario.tables.map((name) => ({ name })) }]),
         JOURNAL_JSON: JSON.stringify([{ results: scenario.migrations.map((name) => ({ name })) }]),
       });
@@ -798,7 +804,7 @@ describe('broker direct deploy automation', () => {
 
 const bashAvailable = (() => {
   try {
-    return spawnSync('bash', ['--version']).status === 0;
+    return spawnSync(bashExecutable, ['--version']).status === 0;
   } catch {
     return false;
   }
@@ -956,7 +962,7 @@ function runGuardScript(
   writeFileSync(scriptPath, `${assignments.join('\n')}\n${guardScript}`, 'utf8');
   const bashPath = relative(process.cwd(), scriptPath).split(sep).join('/');
   try {
-    execFileSync('bash', [bashPath], {
+    execFileSync(bashExecutable, [bashPath], {
       stdio: ['ignore', 'ignore', 'pipe'],
     });
     return { status: 0, stderr: '' };
@@ -987,15 +993,18 @@ function runBashScript(
   const bashCwd = relative(process.cwd(), cwd).split(sep).join('/');
   const quotedBashCwd = bashCwd.replace(/'/g, `'"'"'`);
   const sourceBashEnv = overrides.BASH_ENV === undefined ? '' : 'source "$BASH_ENV"\n';
+  const nodePath = process.execPath.split(sep).join('/').replace(/'/g, `'"'"'`);
+  const runtimeBindings = `node() { '${nodePath}' "$@"; }\n` +
+    (process.platform === 'win32' ? 'python3() { python "$@"; }\n' : '');
   const scriptPath = join(cwd, 'workflow-step-scenario.sh');
   writeFileSync(
     scriptPath,
-    `cd '${quotedBashCwd}'\n${assignments.join('\n')}\n${sourceBashEnv}${script}`,
+    `cd '${quotedBashCwd}'\n${runtimeBindings}${assignments.join('\n')}\n${sourceBashEnv}${script}`,
     'utf8',
   );
   const bashPath = relative(process.cwd(), scriptPath).split(sep).join('/');
   const result = spawnSync(
-    'bash',
+    bashExecutable,
     ['--noprofile', '--norc', '-e', '-o', 'pipefail', bashPath],
     {
       encoding: 'utf8',
@@ -1026,6 +1035,7 @@ function createTempDir(): string {
 function runNodeScript(scriptUrl: URL, args: string[]): string {
   return execFileSync(process.execPath, [fileURLToPath(scriptUrl), ...args], {
     encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
 }
 

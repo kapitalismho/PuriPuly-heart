@@ -516,5 +516,34 @@ mod tests {
         assert_eq!(started.fields["audio_seconds"], 2.0);
         assert_eq!(started.fields["decode_seconds"], 0.5);
         assert_eq!(started.fields["rtf"], 0.25);
+        assert_eq!(started.fields["channel"], "self");
+        assert_eq!(started.fields["backend"], "Vulkan");
+
+        for (audio_seconds, decode_seconds) in [
+            (None, 0.5),
+            (Some(0.0), 0.5),
+            (Some(-1.0), 0.5),
+            (Some(f64::NAN), 0.5),
+            (Some(f64::INFINITY), 0.5),
+            (Some(2.0), -0.5),
+            (Some(2.0), f64::NAN),
+            (Some(2.0), f64::INFINITY),
+        ] {
+            let invalid = transcription_operation_failure(
+                "peer",
+                TranscriptionFailure {
+                    error: EngineError::DecodeFailure,
+                    audio_seconds,
+                    decode_seconds,
+                    attempt_started: true,
+                },
+            );
+            assert!(!invalid.attempt_started, "{audio_seconds:?} {decode_seconds}");
+            assert_eq!(
+                invalid.fields,
+                json!({"channel": "peer", "backend": "Vulkan"}),
+                "{audio_seconds:?} {decode_seconds}"
+            );
+        }
     }
 }

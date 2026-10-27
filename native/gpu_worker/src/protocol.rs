@@ -163,30 +163,69 @@ mod tests {
         };
         assert_eq!(valid.validate(), Ok(()));
 
-        let mut invalid = valid.clone();
-        invalid.connect_host = "0.0.0.0".to_string();
-        assert_eq!(
-            invalid.validate(),
-            Err("connect_host_not_loopback".to_string())
-        );
-
-        invalid = valid;
-        invalid.auth_token = "short".to_string();
-        assert_eq!(invalid.validate(), Err("auth_token_invalid".to_string()));
+        for host in ["0.0.0.0", "localhost", "::1", "127.0.0.2", "192.0.2.1"] {
+            let mut invalid = valid.clone();
+            invalid.connect_host = host.to_string();
+            assert_eq!(
+                invalid.validate(),
+                Err("connect_host_not_loopback".to_string()),
+                "{host}"
+            );
+        }
+        for length in [31, 257] {
+            let mut invalid = valid.clone();
+            invalid.auth_token = "a".repeat(length);
+            assert_eq!(invalid.validate(), Err("auth_token_invalid".to_string()));
+        }
+        for length in [32, 256] {
+            let mut boundary = valid.clone();
+            boundary.auth_token = "a".repeat(length);
+            assert_eq!(boundary.validate(), Ok(()), "auth token length {length}");
+        }
     }
 
     #[test]
-    fn request_rejects_contract_and_session_mismatch() {
-        let request = Request::Discover {
-            contract_version: CONTRACT_VERSION,
-            session_id: "expected-session".to_string(),
-            request_id: "discover-1".to_string(),
-        };
-        assert_eq!(request.validate_session("expected-session"), Ok(()));
-        assert_eq!(
-            request.validate_session("different-session"),
-            Err("session_mismatch".to_string())
-        );
+    fn request_rejects_contract_session_and_request_identity_mismatch() {
+        for (version, session, request_id, expected) in [
+            (
+                CONTRACT_VERSION,
+                "expected-session",
+                "discover-1".to_string(),
+                Ok(()),
+            ),
+            (
+                CONTRACT_VERSION + 1,
+                "expected-session",
+                "discover-1".to_string(),
+                Err("contract_mismatch".to_string()),
+            ),
+            (
+                CONTRACT_VERSION,
+                "different-session",
+                "discover-1".to_string(),
+                Err("session_mismatch".to_string()),
+            ),
+            (
+                CONTRACT_VERSION,
+                "expected-session",
+                String::new(),
+                Err("request_id_invalid".to_string()),
+            ),
+            (
+                CONTRACT_VERSION,
+                "expected-session",
+                "r".repeat(129),
+                Err("request_id_invalid".to_string()),
+            ),
+            (CONTRACT_VERSION, "expected-session", "r".repeat(128), Ok(())),
+        ] {
+            let request = Request::Discover {
+                contract_version: version,
+                session_id: session.to_string(),
+                request_id,
+            };
+            assert_eq!(request.validate_session("expected-session"), expected);
+        }
     }
 
     #[test]

@@ -437,7 +437,7 @@ Requires Windows x64, standard GIL-enabled CPython 3.14, and [uv](https://docs.a
 ### Setup
 
 ```powershell
-uv sync --frozen --extra dev
+uv sync --locked --extra dev
 ```
 
 ### GUI
@@ -460,10 +460,12 @@ uv run python -m puripuly_heart.main cli --help
 ### Verification
 
 ```powershell
-uv run black --check src tests
-uv run ruff check src tests
-uv run python -m pytest
+uv run --locked black --check .
+uv run --locked ruff check .
+uv run --locked python scripts/ci/check_test_selection.py
 ```
+
+Run the affected Python partition or individual failing node using the [PR verification guide](.github/CONTRIBUTING.md#pr-verification) and [workflow selections](.github/workflows/pr-ci.yml). The workflow keeps live-provider/model integrations explicitly excluded. A focused test pass does not replace wider checks or actual-application verification.
 
 [Broker development (Linux)](broker/README.md) · [VR overlay development (Windows)](native/overlay/README.md)
 

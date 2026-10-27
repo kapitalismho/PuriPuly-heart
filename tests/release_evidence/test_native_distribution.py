@@ -550,10 +550,9 @@ def test_bundle_failure_preserves_every_remaining_staged_input(
     ],
 )
 def test_manifest_rejects_inconsistent_deployed_bytecode_evidence(
-    tmp_path: Path, staged_archive_runtime: tuple[Path, Path, dict[str, object]], damage: str
+    tmp_path: Path, staged_bundled_runtime: tuple[Path, Path, dict[str, object]], damage: str
 ) -> None:
-    layout, bytecode, _ = staged_archive_runtime
-    bundled = bundle_runtime(tmp_path, layout, bytecode)
+    layout, bytecode, bundled = staged_bundled_runtime
     if damage == "archive-hash":
         bundled["archive"]["sha256"] = "0" * 64
     elif damage == "member-hash":
@@ -627,10 +626,9 @@ def test_validate_target_requires_the_deployed_python_archive(
     ],
 )
 def test_manifest_rejects_corrupt_or_ambiguous_archives(
-    tmp_path: Path, staged_archive_runtime: tuple[Path, Path, dict[str, object]], damage: str
+    tmp_path: Path, staged_bundled_runtime: tuple[Path, Path, dict[str, object]], damage: str
 ) -> None:
-    layout, bytecode, _ = staged_archive_runtime
-    bundled = bundle_runtime(tmp_path, layout, bytecode)
+    layout, bytecode, bundled = staged_bundled_runtime
     stdlib = damage.startswith("stdlib-")
     archive_path = tmp_path / bundled["stdlib_archive" if stdlib else "archive"]["path"]
     with zipfile.ZipFile(archive_path) as original:
@@ -685,7 +683,24 @@ def test_manifest_rejects_corrupt_or_ambiguous_archives(
     bytecode.write_text(json.dumps(bundled), encoding="utf-8")
     provenance = tmp_path / "provenance.json"
     provenance.write_text("{}", encoding="utf-8")
-    with pytest.raises((ValueError, FileNotFoundError)):
+    expected_error = {
+        "duplicate": "duplicate or ambiguous members",
+        "case-collision": "duplicate or ambiguous members",
+        "traversal": "normalized relative path",
+        "native": "cannot contain native modules",
+        "malformed-index": "malformed dependency index",
+        "index-traversal": "normalized relative path",
+        "index-module-alias": "invalid dependency index source",
+        "native-shadow": "differs from filesystem import precedence",
+        "package-shadow": "differs from filesystem import precedence",
+        "missing-code": "dependency index lacks archived bytecode",
+        "malformed-code": "malformed bytecode",
+        "stdlib-native": "cannot contain native modules",
+        "stdlib-malformed": "malformed bytecode",
+        "file-directory-collision": "file/directory collision",
+        "stdlib-disguised-native": "cannot contain native binaries",
+    }[damage]
+    with pytest.raises(ValueError, match=expected_error):
         create_manifest(tmp_path, layout, provenance, bytecode, tmp_path / "manifest.json")
 
 
@@ -693,10 +708,9 @@ def test_manifest_rejects_corrupt_or_ambiguous_archives(
     "damage", ["retained-source", "loose-dependency", "loose-stdlib", "loose-stdlib-resource"]
 )
 def test_manifest_rejects_source_drift_and_parallel_loose_content(
-    tmp_path: Path, staged_archive_runtime: tuple[Path, Path, dict[str, object]], damage: str
+    tmp_path: Path, staged_bundled_runtime: tuple[Path, Path, dict[str, object]], damage: str
 ) -> None:
-    layout, bytecode, _ = staged_archive_runtime
-    bundled = bundle_runtime(tmp_path, layout, bytecode)
+    layout, bytecode, bundled = staged_bundled_runtime
     if damage == "retained-source":
         (tmp_path / "site-packages/dependency.py").write_text("VALUE = 99\n", encoding="utf-8")
     else:
