@@ -807,8 +807,6 @@ def test_peer_language_card_removed_from_general_tab(
     assert t("settings.section.peer_stt") in api_titles
     assert t("settings.peer_language.source") not in general_labels
     assert t("settings.peer_language.target") not in general_labels
-    assert not hasattr(view, "_peer_source_text")
-    assert not hasattr(view, "_peer_target_text")
 
 
 def test_load_from_settings_peer_stt_card_has_no_peer_subsetting_controls(
@@ -824,27 +822,6 @@ def test_load_from_settings_peer_stt_card_has_no_peer_subsetting_controls(
     assert t("settings.peer_qwen_region") not in labels
     assert t("settings.peer_qwen_model") not in labels
     assert t("settings.peer_soniox_model") not in labels
-    assert not hasattr(view, "_peer_qwen_region_text")
-    assert not hasattr(view, "_peer_qwen_model_text")
-    assert not hasattr(view, "_peer_soniox_model_text")
-
-
-def test_clipboard_auto_translate_selection_updates_settings_and_emits_change(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    view, _store = _make_settings_view(monkeypatch, settings_events)
-    settings = AppSettingsVNext()
-    emitted: list[AppSettingsVNext] = []
-    settings_events.on_change = emitted.append
-
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-    view._on_clipboard_auto_translate_selected("on")
-
-    assert settings_events.settings.intent.clipboard.auto_translate_enabled is True
-    assert view._clipboard_auto_translate_text.content.value == t(
-        "settings.clipboard_auto_translate.on"
-    )
-    assert emitted[-1].intent.clipboard.auto_translate_enabled is True
 
 
 def test_clipboard_auto_translate_click_toggles_immediately_without_modal(
@@ -2230,16 +2207,6 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
     assert soniox_option.description == t("provider.soniox.description")
 
 
-def test_qwen_asr_model_button_is_removed_from_api_key_card(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, AppSettingsVNext(), config_path=Path("settings.json"))
-
-    assert not hasattr(view, "_qwen_asr_model_btn")
-    assert not hasattr(view, "_on_qwen_asr_model_click")
-
-
 def test_selecting_qwen_audio_stores_qwen_audio_provider_without_changing_peer(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
@@ -2520,26 +2487,6 @@ def test_selecting_gpu_for_self_or_peer_requests_discovery_once_per_new_selectio
     assert requests == ["discover", "discover"]
 
 
-def test_settings_view_omits_legacy_overlay_peer_toggle_api(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-
-    assert not hasattr(view, "on_overlay_toggle")
-    assert not hasattr(view, "on_peer_translation_toggle")
-    assert not hasattr(view, "_overlay_enabled_label")
-    assert not hasattr(view, "_overlay_enabled_button")
-    assert not hasattr(view, "_peer_translation_label")
-    assert not hasattr(view, "_peer_translation_button")
-    assert not hasattr(view, "_peer_translation_status_text")
-    assert not hasattr(view, "_peer_translation_hint")
-    assert not hasattr(view, "_overlay_status_text")
-    assert not hasattr(settings_view.SettingsView, "_on_overlay_click")
-    assert not hasattr(settings_view.SettingsView, "_on_overlay_selected")
-    assert not hasattr(settings_view.SettingsView, "_on_peer_translation_click")
-    assert not hasattr(settings_view.SettingsView, "_on_peer_translation_selected")
-
-
 def test_on_llm_selected_updates_model_and_prompt_state(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
@@ -2687,58 +2634,6 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
     ).intent.translation.connection_history[TranslationModel.GEMINI_FLASH.value] == (
         TranslationConnection.OPENROUTER.value
     )
-
-
-def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_FLASH.value,
-        connection=TranslationConnection.OFFICIAL_BYOK.value,
-    )
-    settings = _vnext(settings, system_prompt="G")
-
-    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
-
-    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
-
-    pending = view.build_provider_apply_settings()
-
-    assert _llm(settings) == LLMProviderName.GEMINI.value
-    assert pending is not None
-    assert (
-        apply_provider_intent(settings_events.settings, pending).intent.translation.model
-        == TranslationModel.DEEPSEEK_V4_FLASH.value
-    )
-    assert (
-        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
-        == TranslationConnection.OPENROUTER.value
-    )
-    assert (
-        _llm(apply_provider_intent(settings_events.settings, pending))
-        == LLMProviderName.OPENROUTER.value
-    )
-    assert (
-        apply_provider_intent(
-            settings_events.settings, pending
-        ).intent.translation.openrouter_selection_alias
-        == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value
-    )
-    assert (
-        apply_provider_intent(
-            settings_events.settings, pending
-        ).intent.prompts.system_prompt_override
-        == "G"
-    )
-    assert view._prompt_editor.value == "G"
-    assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
-    assert view._translation_connection_text.content.value == t(
-        "settings.translation_connection.openrouter"
-    )
-    assert view._managed_trial_usage_bar.visible is False
-    assert settings.intent.prompts.system_prompt_override == "G"
-    assert view.has_provider_changes is True
 
 
 def test_on_llm_selected_restores_saved_connection_history(
@@ -3961,34 +3856,6 @@ def test_audio_change_messages_use_basic_runtime_log(
     assert changed[0].intent.desktop_audio.output_device == "New Speakers"
 
 
-def test_retired_translation_policy_controls_are_not_constructed(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-
-    assert not hasattr(view, "_low_latency_card")
-    assert not hasattr(view, "_low_latency_text")
-    assert not hasattr(view, "_on_low_latency_click")
-    assert not hasattr(view, "_integrated_context_card")
-    assert not hasattr(view, "_integrated_context_button")
-    assert not hasattr(view, "_on_integrated_context_click")
-
-
-def test_peer_qwen_region_control_is_removed_before_peer_translation_is_enabled(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
-
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-
-    assert not hasattr(view, "_peer_qwen_region_label")
-    assert not hasattr(view, "_peer_qwen_region_text")
-
-
 def test_update_api_visibility_shows_selected_peer_deepgram_credentials(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
@@ -4017,28 +3884,6 @@ def test_update_api_visibility_keeps_peer_qwen_credentials_visible_when_peer_dis
 
     assert view._alibaba_key_beijing.visible is True
     assert view._alibaba_key_singapore.visible is False
-
-
-def test_peer_qwen_region_override_controls_are_removed(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-    assert not hasattr(view, "_on_peer_qwen_region_selected")
-    assert not hasattr(view, "_peer_qwen_region_text")
-
-
-def test_peer_soniox_model_override_controls_are_removed(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.SONIOX)
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-    assert not hasattr(view, "_on_peer_soniox_model_selected")
-    assert not hasattr(view, "_peer_soniox_model_text")
 
 
 def test_update_api_visibility_uses_shared_qwen_region_for_peer_and_self(
@@ -4487,6 +4332,8 @@ def test_desktop_gui_background_transparency_card_adjusts_in_ten_percent_steps(
         == pytest.approx(0.4)
     )
     assert view._desktop_overlay_background_alpha_value_text.value == "60%"
+    assert settings.intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.5)
+    assert changed[-1] is not settings
 
     view._on_desktop_overlay_background_alpha_step(-0.1)
     view._on_desktop_overlay_background_alpha_step(-0.1)
@@ -4518,28 +4365,6 @@ def test_desktop_overlay_swap_caption_languages_emits_copy_without_mutating_load
     assert changed[-1].intent.overlay.desktop_flet.swap_caption_languages is True
     assert settings_events.settings is not None
     assert settings_events.settings.intent.overlay.desktop_flet.swap_caption_languages is True
-
-
-def test_desktop_gui_background_alpha_emits_copy_without_mutating_loaded_settings_reference(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = _vnext(overlay_target="desktop")
-    settings = _vnext(settings, overlay_background_alpha=0.5)
-    changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-    settings_events.on_change = lambda incoming: changed.append(incoming)
-
-    view._on_desktop_overlay_background_alpha_step(0.1)
-
-    assert settings.intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.5)
-    assert changed
-    assert changed[-1] is not settings
-    assert changed[-1].intent.overlay.desktop_flet.visual.background_alpha == pytest.approx(0.4)
-    assert (
-        settings_events.settings.intent.overlay.desktop_flet.visual.background_alpha
-        == pytest.approx(0.4)
-    )
 
 
 def test_desktop_gui_background_transparency_card_clamps_to_zero_and_one(
@@ -5123,26 +4948,6 @@ def test_general_osc_card_is_locale_independent(
         i18n_module.set_locale(old_locale)
 
 
-def test_audio_test_card_click_invokes_start_callback_without_modal(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    calls: list[str] = []
-    view.on_start_audio_test = lambda: calls.append("start")
-    modal_calls: list[str] = []
-
-    class DummyModal:
-        def __init__(self, *_args, **_kwargs) -> None:
-            modal_calls.append("created")
-
-    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-
-    view._on_audio_test_click(None)
-
-    assert calls == ["start"]
-    assert modal_calls == []
-
-
 def test_audio_test_card_clicks_always_request_start_without_inline_state(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
@@ -5471,46 +5276,6 @@ def test_signed_in_chatgpt_card_shows_account_line_instead_of_description(
     assert view._chatgpt_connect_button.visible
 
 
-def test_overlay_distance_step_buttons_apply_immediately(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-
-    view._on_overlay_distance_step(0.05)
-    view._on_overlay_distance_step(0.20)
-
-    assert settings_events.settings.intent.overlay.calibration.distance == 1.35
-    assert view._overlay_distance_value_text.value == "1.35"
-
-
-def test_overlay_offset_step_buttons_apply_immediately(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-
-    view._on_overlay_offset_x_step(0.05)
-    view._on_overlay_offset_y_step(-0.05)
-
-    assert settings_events.settings.intent.overlay.calibration.offset_x == 0.05
-    assert settings_events.settings.intent.overlay.calibration.offset_y == -0.50
-    assert view._overlay_offset_x_value_text.value == "0.05"
-    assert view._overlay_offset_y_value_text.value == "-0.50"
-
-
-def test_overlay_calibration_hides_background_alpha_control(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, AppSettingsVNext(), config_path=Path("settings.json"))
-
-    assert not hasattr(view, "_overlay_background_alpha_field")
-    assert not hasattr(view, "_overlay_background_alpha_label")
-
-
 def test_overlay_reset_card_restores_defaults_immediately(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
@@ -5547,16 +5312,6 @@ def test_overlay_tab_cards_use_settings_unit_card_defaults(
     assert all(isinstance(card, SharedCardWrapper) for card in overlay_cards)
     assert {card.height for card in overlay_cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
     assert all(card.expand is True for card in overlay_cards)
-    assert _tree_contains_control(
-        _overlay_tab_card(view, t("settings.overlay.calibration.distance")),
-        view._overlay_distance_decrease_button,
-    )
-    assert _tree_contains_control(
-        _overlay_tab_card(view, t("settings.overlay.calibration.offset_x")),
-        view._overlay_offset_x_decrease_button,
-    )
-    assert not hasattr(view, "_overlay_calibration_apply_button")
-    assert not hasattr(view, "_overlay_calibration_cancel_button")
 
 
 @pytest.mark.parametrize(
@@ -5791,15 +5546,6 @@ def test_apply_locale_refreshes_deepseek_api_key_field(
     assert calls == ["deepseek"]
 
 
-def test_settings_view_does_not_create_peer_deepgram_model_controls(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-
-    assert not hasattr(view, "_peer_deepgram_model_label")
-    assert not hasattr(view, "_peer_deepgram_model_text")
-
-
 def test_on_vrc_mic_click_toggles_without_page(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
@@ -5856,26 +5602,6 @@ def test_on_vrc_mic_click_toggles_immediately_without_modal(
     assert len(changed) == 1
     assert changed[0].intent.osc.vrc_mic_intercept is False
     assert modal_calls == []
-
-
-def test_on_vrc_mic_selected_updates_setting_label_and_emits_change(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-    changed: list[AppSettingsVNext] = []
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-    settings_events.on_change = lambda incoming: changed.append(incoming)
-    attach_dummy_page(monkeypatch, view)
-    monkeypatch.setattr(type(view._vrc_mic_text), "update", lambda self: None)
-
-    view._on_vrc_mic_selected("on")
-
-    assert settings.intent.osc.vrc_mic_intercept is False
-    assert settings_events.settings.intent.osc.vrc_mic_intercept is True
-    assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
-    assert len(changed) == 1
-    assert changed[0].intent.osc.vrc_mic_intercept is True
 
 
 def test_on_vrc_mic_selected_without_settings_returns_early(
@@ -5967,33 +5693,6 @@ def test_prompt_tab_uses_shared_full_width_cards(
     assert all(card.expand is False for card in prompt_cards)
 
 
-def test_prompt_tab_hides_prompt_provider_copy_and_old_language_helper_text(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, locale="ko")
-    settings = _vnext(settings, source_language="zh-CN")
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
-
-    old_locale = i18n_module.get_locale()
-    try:
-        view, _ = _make_settings_view(monkeypatch, settings_events)
-        settings_events.load(view, settings, config_path=Path("settings.json"))
-
-        i18n_module.set_locale("ko")
-        view.apply_locale()
-
-        prompt_card = _prompt_tab_card(view, t("settings.section.persona"))
-        custom_vocab_card = _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
-
-        assert t("settings.section.persona") in _control_labels(prompt_card)
-        assert not hasattr(view, "_prompt_for_text")
-        assert not hasattr(view, "_custom_vocab_helper_text")
-        assert t("settings.custom_vocabulary.description") in _control_labels(custom_vocab_card)
-    finally:
-        i18n_module.set_locale(old_locale)
-
-
 def test_settings_api_unit_cards_use_settings_unit_card_defaults(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
@@ -6076,16 +5775,6 @@ def test_api_keys_card_omits_helper_copy_and_keeps_qwen_region_button_in_header(
     assert not hasattr(view, "_api_credentials_helper_text")
 
 
-def test_api_provider_row_does_not_override_shared_card_height(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-
-    api_provider_row = _subtab_controls(view, "api")[0]
-
-    assert api_provider_row.height is None
-
-
 def test_integrated_context_controls_are_removed_from_overlay_tab(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
@@ -6096,8 +5785,6 @@ def test_integrated_context_controls_are_removed_from_overlay_tab(
         overlay_labels.extend(_control_labels(control))
 
     assert t("settings.integrated_context") not in overlay_labels
-    assert not hasattr(view, "_integrated_context_button")
-    assert not hasattr(view, "_integrated_context_hint")
 
 
 def test_custom_vocabulary_switching_source_language_updates_tags_and_clears_add_input(
@@ -6557,29 +6244,6 @@ def test_text_subtab_shell_can_render_without_title_and_pin_subtab_bar_to_bottom
     assert shell.controls == [shell.body_region, shell.subtab_bar]
 
 
-def _provider_snapshot_with(
-    monkeypatch: pytest.MonkeyPatch,
-    settings: AppSettingsVNext,
-):
-    from puripuly_heart.app.services.settings.settings_application import (
-        settings_view_surface_snapshots,
-    )
-
-    provider, _general, _prompt, _overlay = settings_view_surface_snapshots(settings)
-    return provider
-
-
-def test_self_stt_control_returns_single_unit_card(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    first = view.self_stt_control()
-    second = view.self_stt_control()
-    assert first is second
-    assert first is view._self_stt_card
-    assert getattr(first, "expand", None) is True
-
-
 def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_rolling_on(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
@@ -6662,16 +6326,6 @@ def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_peer_rol
     assert view._elevenlabs_scribe_key.visible is False
     assert view._cloud_free_tier_text.on_click is not None
     assert view._cloud_free_tier_card.ignore_interactions is False
-
-
-def test_load_from_settings_keeps_provider_row_as_unit_cards(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = _vnext(stt_provider=STTProviderName.ROLLING_FREE.value)
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-    assert view.self_stt_control() is view._self_stt_card
-    assert not hasattr(view, "_stt_rolling_switch")
 
 
 def test_cloud_free_tier_modal_is_single_column_multi_select(

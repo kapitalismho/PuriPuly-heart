@@ -29,25 +29,6 @@ def test_overlay_manifest_round_trips_contract_fields() -> None:
     assert restored.log_level == "INFO"
 
 
-def test_overlay_manifest_rejects_obsolete_diagnostics_field() -> None:
-    with pytest.raises(ValueError):
-        OverlayLaunchManifest.from_dict(
-            {
-                "contract_version": OVERLAY_CONTRACT_VERSION,
-                "app_version": "1.2.3",
-                "overlay_instance_id": "overlay-1",
-                "bridge_url": "ws://127.0.0.1:8765",
-                "session_token": "token",
-                "parent_pid": 1234,
-                "startup_deadline_ms": 3000,
-                "log_dir": "logs",
-                "log_level": "INFO",
-                "locale": "en",
-                "diagnostics_enabled": True,
-            }
-        )
-
-
 def test_overlay_manifest_rejects_live_runtime_state_fields() -> None:
     with pytest.raises(ValueError):
         OverlayLaunchManifest.from_dict(

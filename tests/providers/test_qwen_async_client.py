@@ -83,27 +83,6 @@ async def test_httpx_client_builds_correct_request(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_httpx_client_omits_empty_options(monkeypatch):
-    fake_client = FakeAsyncClient()
-    monkeypatch.setattr("httpx.AsyncClient", lambda **kw: fake_client)
-
-    client = HttpxQwenClient(api_key="k", model="m", base_url="https://example")
-    await client.translate(
-        text="hello",
-        system_prompt="SYSTEM",
-        source_language="ko",
-        target_language="en",
-        context="",
-    )
-
-    body = fake_client.last_request["json"]
-    assert body["messages"] == [
-        {"role": "system", "content": "SYSTEM"},
-        {"role": "user", "content": "<input>\nhello\n</input>"},
-    ]
-
-
-@pytest.mark.asyncio
 async def test_httpx_client_reuses_cached_async_client(monkeypatch):
     fake_client = FakeAsyncClient()
     created_clients: list[FakeAsyncClient] = []

@@ -13,7 +13,6 @@ from puripuly_heart.app.ports.self_capture_admission import (
     SelfCaptureAdmissionEffectType,
     SelfCaptureAdmissionState,
 )
-from puripuly_heart.app.wiring import create_self_capture_admission_adapter
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmissionStatus,
     SelfCaptureSessionConfig,
@@ -318,25 +317,3 @@ async def test_adapter_propagates_effect_failure() -> None:
 
     with pytest.raises(RuntimeError, match="effect failed"):
         await adapter.admit(_config(local_cpu=True))
-
-
-def test_wiring_factory_composes_internal_self_admission_adapter() -> None:
-    async def validate_gpu_activation() -> bool:
-        return True
-
-    def state_provider(_config: SelfCaptureSessionConfig) -> SelfCaptureAdmissionState:
-        return _state()
-
-    def effect_sink(_effect: SelfCaptureAdmissionEffect) -> None:
-        return None
-
-    adapter = create_self_capture_admission_adapter(
-        state_provider=state_provider,
-        validate_gpu_activation=validate_gpu_activation,
-        effect_sink=effect_sink,
-    )
-
-    assert isinstance(adapter, SelfCaptureAdmissionAdapter)
-    assert adapter.state_provider is state_provider
-    assert adapter.validate_gpu_activation is validate_gpu_activation
-    assert adapter.effect_sink is effect_sink

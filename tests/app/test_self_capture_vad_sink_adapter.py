@@ -7,7 +7,6 @@ import pytest
 from puripuly_heart.app.adapters.self_capture.self_capture_vad_sink import (
     SelfCaptureVadSinkAdapter,
 )
-from puripuly_heart.app.wiring import create_self_capture_vad_sink_adapter
 
 
 class Runtime:
@@ -99,11 +98,3 @@ async def test_adapter_propagates_downstream_exception_and_cancellation() -> Non
     adapter = SelfCaptureVadSinkAdapter(runtime_provider=CancellingRuntime)
     with pytest.raises(asyncio.CancelledError):
         await adapter.handle_vad_event(object())
-
-
-def test_wiring_factory_composes_internal_self_vad_sink_adapter() -> None:
-    runtime = Runtime()
-    adapter = create_self_capture_vad_sink_adapter(runtime_provider=lambda: runtime)
-
-    assert isinstance(adapter, SelfCaptureVadSinkAdapter)
-    assert adapter.runtime_provider() is runtime

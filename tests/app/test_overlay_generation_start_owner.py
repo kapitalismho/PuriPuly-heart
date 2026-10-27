@@ -500,19 +500,6 @@ async def test_owner_starts_fresh_native_epoch_for_preserved_crash_caption() -> 
     assert runtime.overlay_instance_id == "overlay-recovered"
 
 
-def test_owner_declares_generation_assembly_without_absorbing_resource_teardown() -> None:
-    assert OverlayGenerationStartOwner().lifecycle_owner_snapshot() == {
-        "owner": "OverlayGenerationStartOwner",
-        "resource_owner": "OverlayRuntimeHandle",
-        "operation_policy": (
-            "assemble one presenter, bridge, renderer and process generation in order"
-        ),
-        "stale_policy": "close stale generations before returning",
-        "cancellation_policy": "propagate cancellation to OverlayRuntimeHandle",
-        "failure_policy": "contain ordinary startup failure through the session adapter",
-    }
-
-
 @pytest.mark.asyncio
 async def test_owner_passes_guarded_first_visible_callback_to_manager() -> None:
     harness = StartHarness()

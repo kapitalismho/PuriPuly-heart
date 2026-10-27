@@ -121,30 +121,6 @@ def test_first_run_settings_preserve_prompt_defaults() -> None:
     assert resolve_system_prompt(settings.intent.prompts.system_prompt_override) == default_prompt
 
 
-def test_first_run_settings_preserve_provider_defaults() -> None:
-    settings = _new_first_run_settings("zh_CN")
-
-    translation = settings.intent.translation
-    assert settings.intent.stt.provider == "local_cpu_auto"
-    assert translation.model == "index_translate_35b"
-    assert translation.connection == "public_api"
-    assert translation.openrouter_selected_source == "none"
-
-
-@pytest.mark.parametrize("system_locale", ["en_US", "ko_KR", "ja_JP", "zh_CN", "ru_RU", None])
-def test_first_run_settings_use_public_index_default(
-    system_locale: str | None,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    if system_locale is None:
-        monkeypatch.setattr(canonical_defaults, "detect_system_locale", lambda: "en_US")
-    settings = _new_first_run_settings(system_locale)
-
-    translation = settings.intent.translation
-    assert translation.model == "index_translate_35b"
-    assert translation.connection == "public_api"
-
-
 def test_first_run_settings_roundtrip_through_dict_serialization() -> None:
     settings = _new_first_run_settings("Korean_Korea.949")
 

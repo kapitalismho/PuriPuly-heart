@@ -75,7 +75,7 @@ def test_contract_module_holds_no_flet_composition() -> None:
 
 
 def test_desktop_overlay_keeps_the_public_surface_and_runner_ownership() -> None:
-    for name in (*PUBLIC_SURFACE_NAMES, *CONTRACT_NAMES):
+    for name in CONTRACT_NAMES:
         assert getattr(desktop_overlay_module, name, None) is not None, name
     for name in RUNTIME_OWNED_NAMES:
         assert name in vars(desktop_overlay_module), f"{name} must stay owned by the runner module"

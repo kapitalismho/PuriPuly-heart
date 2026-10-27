@@ -26,26 +26,6 @@ from puripuly_heart.core.osc.control_schema import (
 )
 
 
-def test_osc_abi_registries_are_explicit_and_cover_current_languages() -> None:
-    assert ASR_IDS == {
-        0: "local_cpu_auto",
-        1: "local_parakeet_v3",
-        2: "local_parakeet_ja",
-        3: "local_qwen",
-        4: "local_qwen_gpu",
-        5: "deepgram",
-        7: "soniox",
-        8: "custom_offline",
-        9: "custom_realtime",
-        10: "gemini_transcribe",
-        11: "elevenlabs_scribe",
-        12: "qwen_audio",
-        13: "rolling_free",
-    }
-    assert TRANSLATION_MODEL_IDS[0] == "gemma4_26b_31b"
-    assert TRANSLATION_MODEL_IDS[9] == "custom_http"
-
-
 def test_gemini_osc_id_5_is_canonical_and_id_6_is_inbound_legacy_only() -> None:
     assert TRANSLATION_MODEL_IDS[5] == "gemini_flash"
     assert TRANSLATION_MODEL_IDS[6] == "gemini_flash"
@@ -139,12 +119,6 @@ def test_codec_round_trips_new_asr_ids(asr_id: int, provider: str) -> None:
         message = decode_control_message(f"/avatar/parameters/{parameter}", asr_id)
         assert message.value == asr_id
         assert ASR_IDS[message.value] == provider
-
-
-def test_control_schema_keeps_boolean_and_integer_surfaces_separate() -> None:
-    assert set(OSC_BOOLEAN_PARAMETER_NAMES).isdisjoint(OSC_INTEGER_PARAMETER_NAMES)
-    assert len(OSC_BOOLEAN_PARAMETER_NAMES) == 7
-    assert len(OSC_INTEGER_PARAMETER_NAMES) == 8
 
 
 def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:

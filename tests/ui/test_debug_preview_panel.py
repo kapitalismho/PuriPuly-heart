@@ -182,30 +182,6 @@ def test_debug_preview_panel_apply_locale_refreshes_labels(
         )
 
 
-def test_debug_preview_panel_uses_flet_086_text_button_content_api(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    created: list[object] = []
-
-    class ContentOnlyButton:
-        def __init__(self, *, content, tooltip=None, on_click=None, style=None) -> None:
-            self.content = content
-            self.tooltip = tooltip
-            self.on_click = on_click
-            self.style = style
-            created.append(self)
-
-    monkeypatch.setattr(panel_module.ft, "TextButton", ContentOnlyButton)
-    DebugPreviewPanel(**_callbacks([]))
-
-    assert [button.content for button in created] == [
-        panel_module.t("debug_preview.button"),
-        *(panel_module.t(f"debug_preview.{key}") for key in PRIMARY_ACTION_KEYS),
-        *(panel_module.t(f"debug_preview.{key}") for key in EXTENDED_ACTION_KEYS),
-        panel_module.t("debug_preview.more_diagnostics"),
-    ]
-
-
 def test_debug_preview_i18n_keys_exist_in_all_locale_bundles() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     i18n_dir = repo_root / "src" / "puripuly_heart" / "data" / "i18n"

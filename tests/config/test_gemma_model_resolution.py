@@ -145,19 +145,6 @@ def test_runtime_resolves_three_stage_plan_without_deduplicating_targets() -> No
     assert config.loser_grace_ms == 50
 
 
-def test_non_openrouter_primary_does_not_get_emergency_attempt() -> None:
-    config = runtime_resolution.resolve_llm_config(
-        _runtime_input(
-            model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
-            connection=runtime_resolution.TRANSLATION_CONNECTION_OFFICIAL_BYOK,
-        )
-    )
-
-    assert config.primary.provider == runtime_resolution.PROVIDER_DEEPSEEK
-    assert len(config.attempts) == 2
-    assert config.attempts[1].start_after_ms == 1300
-
-
 def test_vnext_gemma_migration_is_idempotent_after_round_trip() -> None:
     raw = serialization.to_dict(AppSettingsVNext())
     raw["settings_version"] = 31

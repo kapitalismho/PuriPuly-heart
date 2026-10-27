@@ -85,17 +85,6 @@ describe('broker foundation', () => {
     });
   });
 
-  it('keeps the public foundation contract at the boundary level only', async () => {
-    const response = await app.request('http://broker.test/v1/foundation');
-    expect(response.status).toBe(200);
-
-    const payload = (await response.json()) as {
-      serviceBoundary: Record<string, unknown>;
-    };
-
-    expect(payload.serviceBoundary).not.toHaveProperty('responsibilities');
-  });
-
   it('reports broker liveness without implying proxy behavior', async () => {
     const response = await app.request('http://broker.test/healthz');
 

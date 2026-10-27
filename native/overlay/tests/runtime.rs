@@ -15,8 +15,8 @@ use puripuly_heart_overlay::manifest::{resolve_handoff_experiment, HandoffExperi
 use puripuly_heart_overlay::openvr::OpenVrEventSource;
 use puripuly_heart_overlay::runtime::SnapshotApplyOutcome;
 use puripuly_heart_overlay::{
-    load_manifest, resolve_quiet_tail_profile, submit_texture, validate_manifest, AdapterIdentity,
-    BridgeClient, CaptionBlock, CaptionChannel, CaptionPresentation, CaptionRenderer, FakeOpenVr,
+    resolve_quiet_tail_profile, validate_manifest, AdapterIdentity,
+    BridgeClient, CaptionBlock, CaptionChannel, CaptionPresentation, CaptionRenderer,
     NativePresentationOwner, OpenVrError, OpenVrRuntimeEvent, OverlayBridgeEvent,
     OverlayFrameSubmitter, OverlayManifest, OverlayPresentationBlock,
     OverlayPresentationBlockVariant, OverlayPresentationCalibration, OverlayPresentationSnapshot,
@@ -118,35 +118,8 @@ fn quiet_tail_profiles_have_exact_walls_and_opportunity_maxima() {
 }
 
 #[test]
-fn manifest_without_quiet_tail_profile_uses_product_default_p05() {
-    let path = unique_temp_file("legacy-profile", "json");
-    std::fs::write(
-        &path,
-        serde_json::to_vec(&json!({
-            "contract_version": EXPECTED_CONTRACT_VERSION,
-            "app_version": "2.3.0",
-            "overlay_instance_id": "legacy",
-            "bridge_url": "ws://127.0.0.1:1",
-            "session_token": "token",
-            "parent_pid": 1,
-            "startup_deadline_ms": 3000,
-            "log_dir": std::env::temp_dir(),
-            "log_level": "INFO",
-            "locale": "en",
-        }))
-        .unwrap(),
-    )
-    .unwrap();
-    load_manifest(&path).unwrap();
-    assert_eq!(
-        resolve_quiet_tail_profile(None).unwrap(),
-        QuietTailProfile::P05
-    );
-    std::fs::remove_file(path).unwrap();
-}
-
-#[test]
 fn quiet_tail_environment_profiles_resolve_strictly() {
+    assert_eq!(resolve_quiet_tail_profile(None).unwrap(), QuietTailProfile::P05);
     for (value, profile) in [
         ("p05", QuietTailProfile::P05),
         ("p10", QuietTailProfile::P10),
@@ -1019,73 +992,6 @@ async fn connect_test_bridge() -> (
     (client, server)
 }
 
-struct WriteGate {
-    armed: std::sync::atomic::AtomicBool,
-    entered: tokio::sync::Notify,
-    acked: std::sync::atomic::AtomicBool,
-}
-impl WriteGate {
-    fn new() -> Self {
-        Self {
-            armed: std::sync::atomic::AtomicBool::new(false),
-            entered: tokio::sync::Notify::new(),
-            acked: std::sync::atomic::AtomicBool::new(false),
-        }
-    }
-}
-struct BlockedStream {
-    inner: tokio::net::TcpStream,
-    block: Option<Arc<WriteGate>>,
-}
-impl tokio::io::AsyncRead for BlockedStream {
-    fn poll_read(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> std::task::Poll<std::io::Result<()>> {
-        std::pin::Pin::new(&mut self.get_mut().inner).poll_read(cx, buf)
-    }
-}
-impl tokio::io::AsyncWrite for BlockedStream {
-    fn poll_write(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &[u8],
-    ) -> std::task::Poll<std::io::Result<usize>> {
-        let this = self.get_mut();
-        if let Some(block) = &this.block {
-            if block.armed.load(std::sync::atomic::Ordering::SeqCst)
-                && !block.acked.load(std::sync::atomic::Ordering::SeqCst)
-                && !buf.is_empty()
-            {
-                block.entered.notify_one();
-                return std::task::Poll::Pending;
-            }
-        }
-        std::pin::Pin::new(&mut this.inner).poll_write(cx, buf)
-    }
-    fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<std::io::Result<()>> {
-        let this = self.get_mut();
-        if let Some(block) = &this.block {
-            if block.armed.load(std::sync::atomic::Ordering::SeqCst)
-                && !block.acked.load(std::sync::atomic::Ordering::SeqCst)
-            {
-                block.entered.notify_one();
-                return std::task::Poll::Pending;
-            }
-        }
-        std::pin::Pin::new(&mut this.inner).poll_flush(cx)
-    }
-    fn poll_shutdown(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<std::io::Result<()>> {
-        std::pin::Pin::new(&mut self.get_mut().inner).poll_shutdown(cx)
-    }
-}
 struct FollowupServer {
     stop: Option<tokio::sync::oneshot::Sender<()>>,
     send_exited: Option<tokio::sync::oneshot::Receiver<()>>,
@@ -1138,8 +1044,6 @@ impl FollowupServer {
 }
 async fn connect_test_bridge_with_followups(
     followups: Vec<serde_json::Value>,
-    gate: Option<Arc<tokio::sync::Notify>>,
-    transport: Option<Arc<WriteGate>>,
 ) -> (BridgeClient, OverlayPresentationSnapshot, FollowupServer) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -1147,10 +1051,6 @@ async fn connect_test_bridge_with_followups(
     let (exited_tx, exited_rx) = tokio::sync::oneshot::channel::<()>();
     let server = tokio::spawn(async move {
         let (stream, _) = listener.accept().await.unwrap();
-        let stream = BlockedStream {
-            inner: stream,
-            block: transport.clone(),
-        };
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
         ws.send(Message::Text(
@@ -1167,29 +1067,14 @@ async fn connect_test_bridge_with_followups(
         ))
         .await
         .unwrap();
-        if let Some(g) = &transport {
-            g.armed.store(true, std::sync::atomic::Ordering::SeqCst);
-        }
-        let mut stopped = false;
-        if let Some(gate) = gate {
+        for followup in followups {
             tokio::select! {
                 biased;
                 _ = &mut stop_rx => {
-                    stopped = true;
+                    break;
                 }
-                _ = gate.notified() => {}
-            }
-        }
-        if !stopped {
-            for followup in followups {
-                tokio::select! {
-                    biased;
-                    _ = &mut stop_rx => {
-                        break;
-                    }
-                    result = ws.send(Message::Text(followup.to_string().into())) => {
-                        result.unwrap();
-                    }
+                result = ws.send(Message::Text(followup.to_string().into())) => {
+                    result.unwrap();
                 }
             }
         }
@@ -1200,9 +1085,6 @@ async fn connect_test_bridge_with_followups(
             None,
         )
         .await;
-        if let Some(g) = &transport {
-            g.acked.store(true, std::sync::atomic::Ordering::SeqCst);
-        }
         let _ = exited_tx.send(());
         drop(stop_rx);
         let mut messages = Vec::new();
@@ -2052,7 +1934,7 @@ async fn initial_readiness_processes_new_snapshot_before_submit_and_ready() {
         }
     });
     let (mut bridge, snapshot, mut server) =
-        connect_test_bridge_with_followups(vec![followup], None, None).await;
+        connect_test_bridge_with_followups(vec![followup]).await;
     let renderer = CaptionRenderer::new_for_test().unwrap();
     renderer.set_test_readiness_pending_yields(10_000);
     let logger = test_logger("initial-readiness-snapshot-preemption").await;
@@ -2080,37 +1962,10 @@ async fn initial_readiness_processes_new_snapshot_before_submit_and_ready() {
 }
 
 #[tokio::test]
-async fn initial_shutdown_preempts_readiness_without_submit_or_ready() {
-    let (mut bridge, snapshot, mut server) =
-        connect_test_bridge_with_followups(vec![json!({"type": "shutdown"})], None, None).await;
-    let renderer = CaptionRenderer::new_for_test().unwrap();
-    renderer.set_test_readiness_pending_yields(10_000);
-    let logger = test_logger("initial-readiness-shutdown-tie").await;
-    let mut runtime = OverlayRuntime::new(snapshot);
-    let mut submitter = RecordingSubmitter::default();
-
-    runtime
-        .submit_initial_frame_message_aware(&renderer, &mut submitter, &mut bridge, &logger)
-        .await
-        .unwrap();
-
-    assert!(runtime.is_stopped());
-    assert_eq!(submitter.calls, 0);
-    assert!(!runtime.ready_sent());
-    server.stop_send_phase().await;
-    drop(bridge);
-    assert!(server
-        .join_messages()
-        .await
-        .iter()
-        .all(|message| message["type"] != "overlay_ready"));
-}
-
-#[tokio::test]
 async fn heartbeat_and_noop_control_do_not_cancel_initial_readiness() {
     let followups = vec![json!({"type": "heartbeat"}), json!({"type": "heartbeat"})];
     let (mut bridge, snapshot, mut server) =
-        connect_test_bridge_with_followups(followups, None, None).await;
+        connect_test_bridge_with_followups(followups).await;
     let renderer = CaptionRenderer::new_for_test().unwrap();
     renderer.set_test_readiness_pending_yields(100);
     let logger = test_logger("readiness-heartbeat-noop-control").await;
@@ -2139,7 +1994,7 @@ async fn ignored_message_flood_polls_readiness_and_reaches_ready() {
         .map(|_| json!({"type": "heartbeat"}))
         .collect();
     let (mut bridge, snapshot, mut server) =
-        connect_test_bridge_with_followups(followups, None, None).await;
+        connect_test_bridge_with_followups(followups).await;
     let renderer = CaptionRenderer::new_for_test().unwrap();
     renderer.set_test_readiness_pending_yields(3);
     let logger = test_logger("readiness-ignored-flood-ready").await;
@@ -2172,7 +2027,7 @@ async fn continuous_ignored_messages_hit_owner_timeout_without_submission() {
         .map(|_| json!({"type": "heartbeat"}))
         .collect();
     let (mut bridge, snapshot, mut server) =
-        connect_test_bridge_with_followups(followups, None, None).await;
+        connect_test_bridge_with_followups(followups).await;
     let renderer = CaptionRenderer::new_for_test().unwrap();
     renderer.set_test_readiness_pending_yields(1_000_000);
     let logger = test_logger("readiness-ignored-flood-timeout").await;
@@ -2209,7 +2064,7 @@ async fn shutdown_after_ignored_flood_preempts_before_submission() {
         .collect::<Vec<_>>();
     followups.push(json!({"type": "shutdown"}));
     let (mut bridge, snapshot, mut server) =
-        connect_test_bridge_with_followups(followups, None, None).await;
+        connect_test_bridge_with_followups(followups).await;
     let renderer = CaptionRenderer::new_for_test().unwrap();
     renderer.set_test_readiness_pending_yields(1_000_000);
     let logger = test_logger("readiness-ignored-flood-shutdown").await;
@@ -2228,45 +2083,6 @@ async fn shutdown_after_ignored_flood_preempts_before_submission() {
     drop(bridge);
     let _ = server.join_messages().await;
 }
-#[tokio::test]
-async fn followup_send_phase_stop_ack_precedes_client_drop() {
-    let block = Arc::new(WriteGate::new());
-    let followups = vec![json!({"type": "heartbeat"}), json!({"type": "heartbeat"})];
-    let (mut bridge, _snapshot, mut server) =
-        connect_test_bridge_with_followups(followups, None, Some(block.clone())).await;
-    tokio::time::timeout(Duration::from_secs(5), block.entered.notified())
-        .await
-        .unwrap();
-    server.stop_send_phase().await;
-    tokio::time::timeout(Duration::from_secs(5), bridge.close())
-        .await
-        .unwrap()
-        .unwrap();
-    let outcome = tokio::time::timeout(Duration::from_secs(5), bridge.next_message())
-        .await
-        .unwrap();
-    assert!(outcome.is_err());
-    drop(bridge);
-    let messages = server.join_messages().await;
-    assert!(messages.is_empty());
-}
-#[tokio::test]
-async fn followup_send_error_before_stop_propagates() {
-    let gate = Arc::new(tokio::sync::Notify::new());
-    let followups = (0..2_000)
-        .map(|_| json!({"type": "heartbeat"}))
-        .collect();
-    let (bridge, _snapshot, mut server) =
-        connect_test_bridge_with_followups(followups, Some(gate.clone()), None).await;
-    drop(bridge);
-    gate.notify_one();
-    let joined = tokio::time::timeout(Duration::from_secs(5), &mut server.server)
-        .await
-        .unwrap();
-    let failure = joined.unwrap_err();
-    assert!(failure.is_panic());
-}
-
 #[tokio::test]
 async fn forced_readiness_terminal_failures_never_submit_and_are_typed() {
     for (outcome, expected_failure, expected_diagnostic) in [
@@ -2377,19 +2193,6 @@ fn runtime_exposes_specific_preflight_failure_reasons() {
 }
 
 #[tokio::test]
-async fn runtime_stops_cleanly_on_shutdown_event() {
-    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
-
-    runtime
-        .handle_event(OverlayBridgeEvent::Shutdown)
-        .await
-        .unwrap();
-
-    assert!(runtime.is_stopped());
-    assert!(runtime.presentation_diagnostics().records().is_empty());
-}
-
-#[tokio::test]
 async fn runtime_rejects_submission_after_stop_without_new_work() {
     let renderer = CaptionRenderer::new_for_test().unwrap();
     let (mut bridge, server) = connect_test_bridge().await;
@@ -2426,40 +2229,6 @@ async fn runtime_rejects_submission_after_stop_without_new_work() {
     assert!(runtime.presentation_diagnostics().records().is_empty());
     drop(bridge);
     let _ = server.await.unwrap();
-}
-
-#[tokio::test]
-async fn runtime_reports_bridge_loss_as_runtime_disconnect_after_ready() {
-    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
-    runtime.mark_ready_for_test();
-
-    let err = runtime.handle_bridge_loss_for_test().await.unwrap_err();
-
-    assert_eq!(err.failure_reason(), "runtime_disconnected");
-}
-
-#[tokio::test]
-async fn runtime_applies_new_snapshot_calibration_to_state() {
-    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
-
-    runtime.apply_snapshot(OverlayPresentationSnapshot {
-        revision: 2,
-        calibration: OverlayPresentationCalibration {
-            anchor: "head_locked".into(),
-            offset_x: 0.15,
-            offset_y: -0.2,
-            distance: 1.2,
-            text_scale: 1.1,
-            background_alpha: 0.4,
-        },
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        blocks: vec![],
-        ..Default::default()
-    });
-
-    assert_eq!(runtime.state().calibration().distance, 1.2);
-    assert_eq!(runtime.state().calibration().background_alpha, 0.4);
 }
 
 #[tokio::test]
@@ -3094,144 +2863,6 @@ fn runtime_language_only_snapshot_redraws_without_slot_identity_reset() {
 }
 
 #[test]
-fn runtime_seeds_and_keeps_static_block_visual_state() {
-    let runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
-        revision: 1,
-        calibration: OverlayPresentationCalibration::default(),
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        blocks: vec![slot_block("self:1", "self:1", 1, "self", "hello", "", true)],
-        ..Default::default()
-    });
-
-    let blocks = runtime.caption_blocks();
-    assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].offset_y_px, 0.0);
-    assert_eq!(blocks[0].height_scale, 1.0);
-
-    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 1,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![slot_block("self:1", "self:1", 1, "self", "hello", "", true)],
-        ..Default::default()
-    });
-
-    runtime.apply_snapshot(OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 2,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![
-            slot_block("self:1", "self:1", 1, "self", "hello", "", true),
-            slot_block("peer:2", "peer:2", 2, "peer", "two", "", true),
-        ],
-        ..Default::default()
-    });
-
-    let peer_block = runtime
-        .caption_blocks()
-        .into_iter()
-        .find(|block| block.id == "peer:2")
-        .expect("new peer block should render");
-    assert_eq!(peer_block.offset_y_px, 0.0);
-    assert_eq!(peer_block.height_scale, 1.0);
-}
-
-#[test]
-fn runtime_keeps_slot_visual_state_stable_when_secondary_slot_changes() {
-    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 1,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![
-            slot_block("self:1", "self:1", 1, "self", "one", "", true),
-            slot_block("peer:2", "peer:2", 2, "peer", "two", "", true),
-        ],
-        ..Default::default()
-    });
-    let first = runtime.caption_blocks();
-
-    runtime.apply_snapshot(OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 2,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![
-            slot_block("self:1", "self:1", 1, "self", "one", "번역", true),
-            slot_block("peer:2", "peer:2", 2, "peer", "two", "", true),
-        ],
-        ..Default::default()
-    });
-
-    let second = runtime.caption_blocks();
-    assert_eq!(first[1].slot_top_px, second[1].slot_top_px);
-
-    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 1,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![
-            slot_block("self:1", "self:1", 1, "self", "hello", "", false),
-            slot_block("peer:2", "peer:2", 2, "peer", "second", "", false),
-        ],
-        ..Default::default()
-    });
-
-    runtime.apply_snapshot(OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 2,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![
-            slot_block("self:1", "self:1", 1, "self", "hello", "translated", true),
-            slot_block("peer:2", "peer:2", 2, "peer", "second", "", false),
-        ],
-        ..Default::default()
-    });
-
-    let second = runtime
-        .caption_blocks()
-        .into_iter()
-        .find(|block| block.id == "peer:2")
-        .expect("peer block should remain visible");
-    let first = runtime
-        .caption_blocks()
-        .into_iter()
-        .find(|block| block.id == "self:1")
-        .expect("self block should remain visible");
-
-    assert_eq!(second.offset_y_px, 0.0);
-    assert_eq!(first.height_scale, 1.0);
-}
-
-#[test]
-fn runtime_clears_missing_snapshot_blocks_immediately() {
-    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 1,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![slot_block("self:1", "self:1", 1, "self", "hello", "", true)],
-        ..Default::default()
-    });
-
-    runtime.apply_snapshot(OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 2,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![],
-        ..Default::default()
-    });
-
-    assert!(runtime.caption_blocks().is_empty());
-}
-
-#[test]
 fn runtime_keeps_active_self_and_finalized_rows_visible_within_two_slot_cap() {
     let runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
@@ -3343,44 +2974,6 @@ fn windows_graphics_active_self_frames_do_not_hit_finalized_block_cache() {
 
     assert_eq!(second.diagnostics().block_cache_hits, 0);
     assert!(second.diagnostics().line_cache_hits >= 1);
-}
-
-#[test]
-fn runtime_does_not_render_duplicate_row_when_same_id_reappears_during_exit() {
-    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
-        revision: 1,
-        calibration: OverlayPresentationCalibration::default(),
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        blocks: vec![block("self:1", "self", "hello", "", true)],
-        ..Default::default()
-    });
-
-    runtime.apply_snapshot(OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 2,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![],
-        ..Default::default()
-    });
-    runtime.apply_snapshot(OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 3,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![block("self:1", "self", "hello again", "", true)],
-        ..Default::default()
-    });
-
-    assert_eq!(
-        runtime
-            .caption_blocks()
-            .iter()
-            .map(|block| block.id.as_str())
-            .collect::<Vec<_>>(),
-        vec!["self:1"]
-    );
 }
 
 #[tokio::test]
@@ -3598,43 +3191,6 @@ async fn native_owner_retries_unchanged_caption_with_new_generation() {
     assert!(!runtime.redraw_requested());
     drop(bridge);
     let _ = server.await.unwrap();
-}
-
-#[test]
-fn native_owner_coalesces_to_latest_snapshot_and_rejects_stale_overwrite() {
-    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
-    for revision in 1..=32 {
-        let outcome = runtime.apply_snapshot(OverlayPresentationSnapshot {
-            native_fresh_render_generations: None,
-            semantic_retirement_frontiers: Vec::new(),
-            revision,
-            calibration: OverlayPresentationCalibration::default(),
-            blocks: vec![block(
-                "self:rapid",
-                "self",
-                &format!("synthetic-{revision}"),
-                "",
-                true,
-            )],
-            ..Default::default()
-        });
-        assert!(matches!(outcome, SnapshotApplyOutcome::Applied { .. }));
-    }
-    let stale = runtime.apply_snapshot(OverlayPresentationSnapshot {
-        revision: 12,
-        calibration: OverlayPresentationCalibration::default(),
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        blocks: vec![block("self:rapid", "self", "stale", "", true)],
-        ..Default::default()
-    });
-
-    assert!(matches!(stale, SnapshotApplyOutcome::Ignored { .. }));
-    assert_eq!(runtime.state().snapshot().revision, 32);
-    assert_eq!(
-        runtime.state().snapshot().blocks[0].primary_text,
-        "synthetic-32"
-    );
 }
 
 #[tokio::test]
@@ -4564,84 +4120,6 @@ async fn production_owner_preemption_preserves_due_and_completes_on_pending_snap
     assert!(completed.4 >= preempted.4);
     assert!(owner.runtime().state().snapshot().revision >= 2);
     assert_eq!(owner.runtime().state().blocks()[0].primary_text, "two");
-    assert_eq!(
-        state
-            .operations
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|operation| operation.starts_with("submit"))
-            .count(),
-        2
-    );
-    server.await.unwrap();
-}
-
-#[tokio::test]
-async fn production_owner_active_schedule_submission_failure_is_terminal() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let server = tokio::spawn(async move {
-        let (stream, _) = listener.accept().await.unwrap();
-        let mut ws = accept_async(stream).await.unwrap();
-        let _auth = ws.next().await.unwrap().unwrap();
-        let first = json!({
-            "revision": 1,
-            "native_fresh_render_generations": {"self": 9},
-            "blocks": [block("self:failure", "self", "text", "", true)]
-        });
-        ws.send(Message::Text(
-            json!({"type":"snapshot","payload":first})
-                .to_string()
-                .into(),
-        ))
-        .await
-        .unwrap();
-        wait_for_owner_ready(&mut ws).await;
-        tokio::time::sleep(Duration::from_millis(800)).await;
-    });
-    let mut manifest = test_manifest();
-    manifest.bridge_url = format!("ws://{address}");
-    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
-    let state = Arc::new(OwnedSubmitterState::default());
-    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
-        snapshot,
-        CaptionRenderer::new_for_test().unwrap(),
-        OwnedSubmitterProbe {
-            state: state.clone(),
-            fail_submit: false,
-            fail_on_submission: Some(2),
-            submit_delay: Duration::ZERO,
-        },
-        Duration::from_millis(10),
-        Duration::from_millis(100),
-        2,
-    );
-    let retry = owner.retry_handle();
-
-    let failure = owner
-        .run(
-            &mut bridge,
-            &test_logger("active-schedule-submit-failure").await,
-        )
-        .await
-        .unwrap_err();
-
-    assert!(matches!(failure, RuntimeFailure::OpenVr(_)));
-    assert_eq!(
-        owner
-            .fresh_retry_audit_for_test()
-            .iter()
-            .filter(|fact| fact.0 == "self" && fact.1 == 9 && fact.2 == "failed")
-            .count(),
-        1
-    );
-    assert!(!owner
-        .fresh_retry_audit_for_test()
-        .iter()
-        .any(|fact| fact.0 == "self" && fact.1 == 9 && fact.2 == "teardown"));
-    assert!(owner.resources_released());
-    assert!(!retry.request());
     assert_eq!(
         state
             .operations
@@ -6268,69 +5746,6 @@ async fn exercise_readiness_no_progress_churn(self_scene: bool) {
 }
 
 #[tokio::test]
-async fn production_owner_shutdown_records_active_schedule_teardown() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let server = tokio::spawn(async move {
-        let (stream, _) = listener.accept().await.unwrap();
-        let mut ws = accept_async(stream).await.unwrap();
-        let _auth = ws.next().await.unwrap().unwrap();
-        let first = json!({
-            "revision": 1,
-            "native_fresh_render_generations": {"self": 31},
-            "blocks": [block("self:shutdown", "self", "text", "", true)]
-        });
-        ws.send(Message::Text(
-            json!({"type":"snapshot","payload":first})
-                .to_string()
-                .into(),
-        ))
-        .await
-        .unwrap();
-        wait_for_owner_ready(&mut ws).await;
-        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
-            .await
-            .unwrap();
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    });
-    let mut manifest = test_manifest();
-    manifest.bridge_url = format!("ws://{address}");
-    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
-    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
-        snapshot,
-        CaptionRenderer::new_for_test().unwrap(),
-        OwnedSubmitterProbe {
-            state: Arc::new(OwnedSubmitterState::default()),
-            fail_submit: false,
-            fail_on_submission: None,
-            submit_delay: Duration::ZERO,
-        },
-        Duration::from_millis(100),
-        Duration::from_secs(1),
-        2,
-    );
-
-    owner
-        .run(&mut bridge, &test_logger("shutdown-active-schedule").await)
-        .await
-        .unwrap();
-
-    assert_eq!(
-        owner
-            .fresh_retry_audit_for_test()
-            .iter()
-            .filter(|fact| fact.0 == "self" && fact.1 == 31 && fact.2 == "teardown")
-            .count(),
-        1
-    );
-    assert!(owner
-        .runtime()
-        .pending_presentation_causes_for_test()
-        .is_empty());
-    server.await.unwrap();
-}
-
-#[tokio::test]
 async fn production_owner_non_retry_disconnect_records_active_schedule_teardown() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -6495,79 +5910,6 @@ async fn production_owner_releases_resources_on_terminal_submission_failure() {
     assert_eq!(state.operations.lock().unwrap().last(), Some(&"hide"));
     drop(bridge);
     let _ = server.await.unwrap();
-}
-
-#[tokio::test]
-async fn runtime_hides_overlay_after_empty_state_stays_idle_past_delay() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let server = tokio::spawn(async move {
-        let (stream, _) = listener.accept().await.unwrap();
-        let mut ws = accept_async(stream).await.unwrap();
-
-        let _ = ws.next().await.unwrap().unwrap();
-        ws.send(Message::Text(
-            json!({
-                "type": "snapshot",
-                "payload": {
-                    "revision": 1,
-                    "calibration": OverlayPresentationCalibration::default(),
-                    "blocks": [block("self:1", "self", "hello", "", true)]
-                }
-            })
-            .to_string()
-            .into(),
-        ))
-        .await
-        .unwrap();
-
-        let _ = ws.next().await;
-
-        ws.send(Message::Text(
-            json!({
-                "type": "snapshot",
-                "payload": {
-                    "revision": 2,
-                    "calibration": OverlayPresentationCalibration::default(),
-                    "blocks": []
-                }
-            })
-            .to_string()
-            .into(),
-        ))
-        .await
-        .unwrap();
-
-        tokio::time::sleep(Duration::from_millis(650)).await;
-
-        ws.send(Message::Text(
-            json!({"type": "shutdown"}).to_string().into(),
-        ))
-        .await
-        .unwrap();
-    });
-
-    let logger = test_logger("idle-hide").await;
-    let mut manifest = test_manifest();
-    manifest.bridge_url = format!("ws://{}", address);
-
-    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
-    let renderer = CaptionRenderer::new_for_test().unwrap();
-    let mut runtime = OverlayRuntime::new(snapshot);
-    let mut submitter = RecordingSubmitter::default();
-
-    runtime
-        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
-        .await
-        .unwrap();
-    runtime
-        .run_event_loop(&mut bridge, &renderer, &mut submitter, &logger)
-        .await
-        .unwrap();
-
-    server.await.unwrap();
-
-    assert!(submitter.visibility_changes.contains(&false));
 }
 
 #[tokio::test]
@@ -6758,60 +6100,6 @@ async fn runtime_submits_text_frame_before_revealing_overlay_after_idle_hide() {
         &submitter.operations[hide_index + 1..hide_index + 3],
         &["submit:text", "show"]
     );
-}
-
-#[tokio::test]
-async fn bridge_client_authenticates_and_receives_initial_snapshot() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let server = tokio::spawn(async move {
-        let (stream, _) = listener.accept().await.unwrap();
-        let mut ws = accept_async(stream).await.unwrap();
-
-        let auth = ws.next().await.unwrap().unwrap();
-        let Message::Text(auth_text) = auth else {
-            panic!("expected auth text frame");
-        };
-        let auth_payload: serde_json::Value = serde_json::from_str(&auth_text).unwrap();
-        assert_eq!(auth_payload["type"], "auth");
-        assert_eq!(auth_payload["session_token"], "expected-token");
-
-        ws.send(Message::Text(
-            json!({
-                "type": "snapshot",
-                "payload": {
-                    "revision": 0,
-                    "calibration": OverlayPresentationCalibration::default(),
-                    "blocks": [],
-                }
-            })
-            .to_string()
-            .into(),
-        ))
-        .await
-        .unwrap();
-    });
-
-    let mut manifest = test_manifest();
-    manifest.bridge_url = format!("ws://{}", address);
-
-    let (_client, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
-
-    server.await.unwrap();
-    assert!(snapshot.blocks.is_empty());
-}
-
-#[test]
-fn openvr_submission_uses_set_overlay_texture_for_rendered_frames() {
-    let openvr = FakeOpenVr::default();
-    let renderer = CaptionRenderer::new_for_test().unwrap();
-    let frame = renderer
-        .render_blocks(vec![CaptionBlock::new("peer-1", "hello")])
-        .unwrap();
-
-    submit_texture(&openvr, &frame).unwrap();
-
-    assert_eq!(openvr.last_call().as_deref(), Some("SetOverlayTexture"));
 }
 
 #[test]

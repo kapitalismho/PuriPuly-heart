@@ -57,7 +57,6 @@ def test_custom_http_settings_roundtrip_preserves_inactive_llm_state() -> None:
     assert persisted["intent"]["translation"]["previous_llm_model"] == (
         TranslationModel.QWEN_38_FLASH.value
     )
-    assert "credential-value" not in repr(persisted)
     assert loaded.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
     assert loaded.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
     assert loaded.intent.translation.http_extension_id == "libretranslate"

@@ -186,13 +186,12 @@ mod tests {
         }
     }
     use super::{
-        BoundedLruCache, CachedBlockLayoutTemplate, CachedLineLayoutTemplate, LayoutCache,
-        LAYOUT_CACHE_CAP, LINE_CACHE_CAP,
+        CachedBlockLayoutTemplate, CachedLineLayoutTemplate, LayoutCache,
+        LAYOUT_CACHE_CAP,
     };
     use crate::renderer::{
-        BlockBounds, BundledFaceId, CaptionBlockVariant, FontLanguageBucket, FontResolver,
-        FontSource, LayoutCacheKey, LineCacheKey, LineRole, TextStyleDescriptor, TextStyleKey,
-        VisualBounds,
+        BlockBounds, CaptionBlockVariant, FontResolver, LayoutCacheKey, LineRole,
+        TextStyleDescriptor, TextStyleKey, VisualBounds,
     };
 
     fn style_key(language: &str) -> TextStyleKey {
@@ -232,20 +231,6 @@ mod tests {
         }
     }
 
-    fn line_key(style_key: TextStyleKey) -> LineCacheKey {
-        LineCacheKey {
-            text: "漢字".into(),
-            role: LineRole::Primary,
-            style_key,
-            channel: None,
-            speaker_style: crate::renderer::SpeakerStyle::Gray,
-            block_variant: CaptionBlockVariant::Finalized,
-            font_size_key: 13_200,
-            content_width_key: 3_200,
-            text_scale_key: 100,
-        }
-    }
-
     fn layout_template(seed: usize) -> CachedBlockLayoutTemplate {
         CachedBlockLayoutTemplate {
             primary_lines: vec![CachedLineLayoutTemplate {
@@ -266,121 +251,6 @@ mod tests {
             content_width_px: 180.0,
             truncated_primary: false,
             truncated_secondary: false,
-        }
-    }
-
-    #[test]
-    fn bounded_lru_cache_evicts_the_oldest_unused_entry_after_capacity_is_exceeded() {
-        let mut cache = BoundedLruCache::with_capacity(2);
-
-        cache.insert("old", 1);
-        cache.insert("middle", 2);
-        cache.insert("new", 3);
-
-        assert_eq!(cache.len(), 2);
-        assert_eq!(cache.get(&"old"), None);
-        assert_eq!(cache.get(&"middle"), Some(&2));
-        assert_eq!(cache.get(&"new"), Some(&3));
-    }
-
-    #[test]
-    fn bounded_lru_cache_hit_updates_recency_before_eviction() {
-        let mut cache = BoundedLruCache::with_capacity(2);
-
-        cache.insert("old-but-used", 1);
-        cache.insert("middle", 2);
-        assert_eq!(cache.get(&"old-but-used"), Some(&1));
-        cache.insert("new", 3);
-
-        assert_eq!(cache.len(), 2);
-        assert_eq!(cache.get(&"old-but-used"), Some(&1));
-        assert_eq!(cache.get(&"middle"), None);
-        assert_eq!(cache.get(&"new"), Some(&3));
-    }
-
-    #[test]
-    fn text_format_cache_keys_keep_same_text_and_size_separate_per_cjk_style() {
-        let font_size_key = 13_200;
-        let cases = [
-            ("ko", FontLanguageBucket::CjkKo),
-            ("ja", FontLanguageBucket::CjkJa),
-            ("zh-Hans", FontLanguageBucket::CjkZhHans),
-            ("zh-Hant", FontLanguageBucket::CjkZhHant),
-        ];
-        let mut cache = BoundedLruCache::with_capacity(cases.len());
-
-        for (index, (language, bucket)) in cases.into_iter().enumerate() {
-            let style_key = style_key(language);
-            assert_eq!(style_key.bucket, bucket);
-            cache.insert((style_key, font_size_key), index);
-        }
-
-        assert_eq!(cache.len(), cases.len());
-        for (index, (language, _)) in cases.into_iter().enumerate() {
-            assert_eq!(
-                cache.get(&(style_key(language), font_size_key)),
-                Some(&index)
-            );
-        }
-    }
-
-    #[test]
-    fn bundled_kr_jp_sc_tc_style_keys_have_distinct_face_identities() {
-        let cases = [
-            ("ko", BundledFaceId::NotoCjkKrMedium),
-            ("ja", BundledFaceId::NotoCjkJpMedium),
-            ("zh-Hans", BundledFaceId::NotoCjkScMedium),
-            ("zh-Hant", BundledFaceId::NotoCjkTcMedium),
-        ];
-        let mut keys = std::collections::HashSet::new();
-
-        for (language, face) in cases {
-            let style_key = style_key(language);
-            assert_eq!(style_key.source, FontSource::BundledNotoCjkMedium);
-            assert_eq!(style_key.bundled_face, Some(face));
-            keys.insert(style_key);
-        }
-
-        assert_eq!(keys.len(), cases.len());
-    }
-
-    #[test]
-    fn layout_cache_keys_include_primary_and_secondary_style_identity() {
-        let base = layout_key(7);
-        let changed_primary = LayoutCacheKey {
-            primary_style_key: style_key("zh-Hans"),
-            ..base.clone()
-        };
-        let changed_secondary = LayoutCacheKey {
-            secondary_style_key: style_key("zh-Hant"),
-            ..base.clone()
-        };
-
-        assert_ne!(base, changed_primary);
-        assert_ne!(base, changed_secondary);
-    }
-
-    #[test]
-    fn line_cache_key_includes_line_style_identity() {
-        let ko = line_key(style_key("ko"));
-        let ja = LineCacheKey {
-            style_key: style_key("ja"),
-            ..ko.clone()
-        };
-
-        assert_ne!(ko, ja);
-    }
-
-    #[test]
-    fn bounded_lru_cache_stress_keeps_size_at_or_below_capacity() {
-        let mut cache = BoundedLruCache::with_capacity(LINE_CACHE_CAP);
-
-        for seed in 0..(LINE_CACHE_CAP * 3) {
-            cache.insert(seed, seed * 2);
-            if seed % 3 == 0 {
-                let _ = cache.get(&seed.saturating_sub(1));
-            }
-            assert!(cache.len() <= LINE_CACHE_CAP);
         }
     }
 

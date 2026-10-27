@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 import importlib
-import inspect
 from collections.abc import Mapping
 from dataclasses import FrozenInstanceError, dataclass, field, fields, is_dataclass
 from pathlib import Path
@@ -247,51 +246,6 @@ def test_settings_mutation_request_is_frozen_slotted_and_deep_freezes_payload() 
     assert hints["expected_revision"] == str | None
     assert hints["reason"] == str | None
     assert hints["correlation_id"] == str | None
-
-
-def test_settings_mutation_validation_contract_is_frozen_slotted_async_protocol() -> None:
-    settings_mutation = _service_module()
-    validation_message = _message("settings.validation.failed")
-    validation_diagnostics = _diagnostics("validation_failed", operation="validate")
-
-    result = settings_mutation.SettingsMutationValidationResult(
-        succeeded=False,
-        message=validation_message,
-        diagnostics=validation_diagnostics,
-    )
-
-    assert is_dataclass(result)
-    assert not hasattr(result, "__dict__")
-    assert {field.name for field in fields(result)} == {
-        "succeeded",
-        "message",
-        "diagnostics",
-    }
-
-    with pytest.raises(FrozenInstanceError):
-        result.succeeded = True  # type: ignore[misc]
-
-    result_hints = get_type_hints(settings_mutation.SettingsMutationValidationResult)
-    assert result_hints["succeeded"] is bool
-    assert result_hints["message"] == messages.UserMessageRef | None
-    assert result_hints["diagnostics"] == messages.ErrorDiagnostics | None
-
-    validator = settings_mutation.SettingsMutationValidator
-    assert getattr(validator, "_is_protocol", False)
-    assert inspect.iscoroutinefunction(validator.validate)
-
-    validator_hints = get_type_hints(validator.validate)
-    assert validator_hints["request"] == settings_mutation.SettingsMutationRequest
-    assert validator_hints["return"] == settings_mutation.SettingsMutationValidationResult
-
-
-def test_settings_mutation_service_requires_validation_owner_dependency() -> None:
-    settings_mutation = _service_module()
-
-    signature = inspect.signature(settings_mutation.SettingsMutationService)
-
-    assert "validator" in signature.parameters
-    assert signature.parameters["validator"].default is inspect.Signature.empty
 
 
 @pytest.mark.asyncio

@@ -645,50 +645,6 @@ async def test_credential_failure_and_secret_failure_log_their_stages(caplog):
 
 
 @pytest.mark.asyncio
-async def test_qq_managed_auth_recovers_pending_ack_before_new_assertion() -> None:
-    metadata = _delivery_ack_metadata()
-    state = RecordingManagedState(
-        pending_delivery_ack_source="qq",
-        pending_delivery_ack_delivery_id=metadata.delivery_id,
-        pending_delivery_ack_managed_credential_ref=metadata.managed_credential_ref,
-        pending_delivery_ack_expires_at=metadata.expires_at,
-    )
-    store = RecordingSecretStore()
-    store.values[OPENROUTER_MANAGED_QQ_API_KEY_SECRET] = RAW_MANAGED_KEY
-    store.values["openrouter_managed_qq_delivery_ack_token"] = metadata.delivery_ack_token
-    store.values[credential_binding_secret("qq")] = ManagedCredentialBinding.create(
-        source="qq",
-        installation_id=state.installation_id,
-        operation_id="delivered-op",
-        delivery_id=metadata.delivery_id,
-        managed_credential_ref=metadata.managed_credential_ref,
-        credential=RAW_MANAGED_KEY,
-    ).encode()
-    service, broker, store, state = _service(
-        _failure_result("lifetime_used"),
-        store=store,
-        state=state,
-        ack_result=broker_client.ManagedKeyDeliveryAckResult(
-            succeeded=True,
-            status="already_acknowledged",
-        ),
-    )
-
-    result = await service.authenticate(_request())
-
-    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-    assert result.diagnostics is not None
-    assert result.diagnostics.code == "qq_delivery_ack_recovered"
-    assert broker.requests == []
-    assert broker.ack_requests[0].delivery_id == metadata.delivery_id
-    assert state.pending_delivery_ack_source is None
-    assert state.pending_delivery_ack_delivery_id is None
-    assert "openrouter_managed_qq_delivery_ack_token" not in store.values
-    assert store.values[OPENROUTER_MANAGED_QQ_API_KEY_SECRET] == RAW_MANAGED_KEY
-    _assert_no_raw_values(result)
-
-
-@pytest.mark.asyncio
 async def test_qq_managed_auth_does_not_ack_or_reassert_without_local_managed_key() -> None:
     metadata = _delivery_ack_metadata()
     state = RecordingManagedState(
@@ -1311,6 +1267,10 @@ async def test_qq_managed_auth_pending_ack_takes_precedence_over_pending_operati
     assert broker.status_requests == []
     assert broker.resume_requests == []
     assert broker.ack_requests[0].delivery_id == metadata.delivery_id
+    assert state.pending_delivery_ack_source is None
+    assert state.pending_delivery_ack_delivery_id is None
+    assert "openrouter_managed_qq_delivery_ack_token" not in store.values
+    assert store.values[OPENROUTER_MANAGED_QQ_API_KEY_SECRET] == RAW_MANAGED_KEY
     assert state.pending_managed_operation_id is None
     assert state.pending_managed_operation_source is None
     assert "openrouter_managed_operation_resume_token" not in store.values

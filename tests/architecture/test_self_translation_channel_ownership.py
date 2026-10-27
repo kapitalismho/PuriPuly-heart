@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 
-from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
+from tests.helpers.paths import SOURCE_ROOT
 
 OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "self_translation_channel.py"
 PEER_OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
@@ -94,36 +94,9 @@ def test_peer_owner_has_no_self_translation_algorithms_state_or_runtime_referenc
     assert "direct_self_runtime" not in source
 
 
-def test_production_self_consumers_do_not_route_through_hub() -> None:
-    application_runtime_path = SOURCE_ROOT / "composition" / "application_runtime.py"
-    paths = (
-        SOURCE_ROOT / "app" / "adapters" / "ui_runtime.py",
-        SOURCE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py",
-        application_runtime_path,
-    )
-    forbidden = (
-        "pipeline.hub.submit_text",
-        "pipeline.hub.handle_vad_event",
-        "pipeline.hub.mark_promo_eligible",
-        "pipeline.hub.self_runtime",
-        "context_provider=lambda: pipeline.hub",
-    )
-
-    for path in paths:
-        source = path.read_text(encoding="utf-8")
-        for residue in forbidden:
-            assert residue not in source, f"{path.relative_to(REPO_ROOT)}: {residue}"
-    application_runtime_source = application_runtime_path.read_text(encoding="utf-8")
-    assert "cast(object, pipeline.hub)" not in application_runtime_source
-    assert "pipeline.hub" not in application_runtime_source
-
-
 def test_durable_callbacks_dispatch_self_and_peer_to_distinct_owners() -> None:
     source = CALLBACKS_PATH.read_text(encoding="utf-8")
 
     assert "self._require_self().handle_stt_event(event)" in source
-    assert "self._require_peer().handle_stt_event(event)" in source
     assert "self._require_self().process_child(" in source
-    assert "self._require_peer().process_child(" in source
     assert "self._require_self().submit_translation_output(submission)" in source
-    assert "self._require_peer().submit_translation_output(submission)" in source

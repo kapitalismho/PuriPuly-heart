@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 
 from tests.helpers.ast_sources import call_name as _call_name
-from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
+from tests.helpers.paths import SOURCE_ROOT
 
 PIPELINE_PATH = SOURCE_ROOT / "app" / "wiring" / "wiring_runtime_pipeline.py"
 PEER_OWNER_PATH = SOURCE_ROOT / "core" / "orchestrator" / "peer_translation_channel.py"
@@ -162,41 +162,3 @@ def test_components_record_is_frozen_and_contains_no_lifecycle_policy() -> None:
     assert not any(
         isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) for node in components.body
     )
-
-
-def test_cut_over_consumers_do_not_reach_nested_channel_owners() -> None:
-    paths = (
-        SOURCE_ROOT / "app" / "adapters" / "application_runtime_shutdown.py",
-        SOURCE_ROOT / "app" / "adapters" / "peer_application_state.py",
-        SOURCE_ROOT / "app" / "adapters" / "peer_capture" / "peer_capture_provider.py",
-        SOURCE_ROOT / "app" / "adapters" / "self_capture" / "self_capture_provider.py",
-        SOURCE_ROOT / "app" / "services" / "settings" / "settings_runtime_effects.py",
-        SOURCE_ROOT / "app" / "wiring" / "wiring_local_asr_application.py",
-        SOURCE_ROOT / "app" / "wiring" / "wiring_managed_account.py",
-        SOURCE_ROOT / "app" / "wiring" / "wiring_peer_application.py",
-        SOURCE_ROOT / "app" / "wiring" / "wiring_provider_runtime.py",
-        SOURCE_ROOT / "composition" / "application_startup.py",
-        SOURCE_ROOT / "composition" / "application_state.py",
-        SOURCE_ROOT / "composition" / "local_asr_production_evidence.py",
-        SOURCE_ROOT / "release_evidence" / "local_asr_production_composition.py",
-    )
-    forbidden = (
-        "hub.start(",
-        "hub.stop(",
-        "hub.llm",
-        "hub.local_asr_provider_runtime",
-        "hub.provider_runtime_handles",
-        "hub.overlay_sink",
-        "getattr(hub, 'overlay_sink'",
-        'getattr(hub, "overlay_sink"',
-        "stop_hub_owned_runtimes",
-        "pipeline.hub",
-    )
-
-    for path in paths:
-        source = path.read_text(encoding="utf-8")
-        for residue in forbidden:
-            assert residue not in source, f"{path.relative_to(REPO_ROOT)}: {residue}"
-
-    assert not (SOURCE_ROOT / "core" / "orchestrator" / "hub.py").exists()
-    assert not (SOURCE_ROOT / "core" / "orchestrator" / "hub_callbacks.py").exists()

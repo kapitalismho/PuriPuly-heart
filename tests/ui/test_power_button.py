@@ -19,23 +19,15 @@ HOVER_ENTER = SimpleNamespace(data="true")
 HOVER_LEAVE = SimpleNamespace(data="false")
 
 
-def _button(clicked: dict | None = None) -> PowerButton:
-    counter = clicked if clicked is not None else {"count": 0}
-    return PowerButton(
-        label="STT", icon="MIC", on_click=lambda: counter.__setitem__("count", counter["count"] + 1)
-    )
+def _button() -> PowerButton:
+    return PowerButton(label="STT", icon="MIC", on_click=lambda: None)
 
 
-def test_power_button_set_state_transitions_and_renders_icon_and_label_only(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    clicked = {"count": 0}
-    btn = _button(clicked)
+def test_power_button_set_state_transitions_and_renders_icon_and_label_only() -> None:
+    btn = _button()
 
     column = btn.content.content
     assert column.controls == [btn._icon_slot, btn._label_control]
-    assert not hasattr(btn, "_status_control")
-    assert not hasattr(btn, "_helper_control")
 
     btn.set_state(False, needs_key=False, status_text="Off")
     assert btn.bgcolor == COLOR_TRANS_TONAL

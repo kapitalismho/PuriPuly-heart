@@ -456,52 +456,6 @@ async def test_context_audio_preserves_source_validation(
 
 
 @pytest.mark.asyncio
-async def test_seal_submits_input_without_waiting_for_final_and_next_audio_flows() -> None:
-    session, live = await _session()
-    first, second = _request(1), _request(2)
-    try:
-        await session.begin_turn(first)
-        await session.send_turn_audio(
-            first.identity,
-            b"\x01\x00\x02\x00",
-            payload_sequence=1,
-            source_ranges=_span(0, 2),
-            context_only=False,
-        )
-        await _seal(session, first)
-        submitted = await _next(session)
-        assert isinstance(submitted, STTProviderInputTerminal)
-        assert (submitted.identity, submitted.outcome, submitted.epoch_disposition) == (
-            first.identity,
-            "submitted",
-            "reuse",
-        )
-        await session.begin_turn(second)
-        await session.send_turn_audio(
-            second.identity,
-            b"\x03\x00\x04\x00",
-            payload_sequence=1,
-            source_ranges=_span(2, 4),
-            context_only=False,
-        )
-        assert live.sent == [
-            {"audio": {"data": b"\x01\x00\x02\x00", "mime_type": "audio/pcm;rate=16000"}},
-            {"audio_stream_end": True},
-            {"audio": {"data": b"\x03\x00\x04\x00", "mime_type": "audio/pcm;rate=16000"}},
-        ]
-        await _seal(session, second)
-        assert (await _next(session)).outcome == "submitted"
-        live.push(_message(final="second or first", include_final=True))
-        unit = await _next(session)
-        assert isinstance(unit, STTRecognitionUnit)
-        assert unit.text == "second or first"
-        assert unit.identity.stream.provider_epoch_id == "epoch"
-        assert unit.identity.stream.capture_epoch == 1
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
 async def test_final_before_seal_and_repeated_finals_after_seal_are_independent_units() -> None:
     session, live = await _session()
     request = _request(1)

@@ -49,12 +49,6 @@ from puripuly_heart.app.services.settings.settings_application import (
     materialize_provider_apply_intent,
     settings_view_surface_snapshots,
 )
-
-
-def _canonical_settings(settings: object) -> object:
-    return settings
-
-
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
@@ -114,7 +108,7 @@ class UiApplicationRuntimeStub:
         return merge(captured) if callable(merge) else captured
 
     def _compatibility_settings(self):
-        return _canonical_settings(getattr(self._backend, "settings", None))
+        return getattr(self._backend, "settings", None)
 
     def general_snapshot(self):
         settings = self._compatibility_settings()
@@ -308,7 +302,7 @@ class UiApplicationStateRuntimeStub:
 
     @property
     def compatibility_settings(self) -> object | None:
-        return _canonical_settings(getattr(self._backend, "settings", None))
+        return getattr(self._backend, "settings", None)
 
     @property
     def translation_enabled(self) -> bool:

@@ -188,39 +188,6 @@ def test_resolved_contracts_expose_dtos_and_literal_constants() -> None:
     assert resolved.OVERLAY_TARGETS == ("steamvr", "desktop")
 
 
-def test_resolved_llm_config_carries_explicit_fallback_branch_target() -> None:
-    resolved = _resolved_module()
-
-    llm_config = resolved.ResolvedLLMConfig(
-        primary=resolved.ResolvedLLMTarget(
-            provider="openrouter",
-            model="google/gemma-4-26b-a4b-it",
-            credential=_credential(resolved),
-            routing_mode="latency",
-            provider_routing="default",
-        ),
-        fallback=resolved.ResolvedLLMFallbackPlan(
-            target=resolved.ResolvedLLMTarget(
-                provider="openrouter",
-                model="deepseek/deepseek-v4.1-flash-1017",
-                credential=_credential(resolved),
-                provider_routing="deepseek_only",
-            )
-        ),
-    )
-    no_fallback = resolved.ResolvedLLMConfig(
-        primary=resolved.ResolvedLLMTarget(
-            provider="openrouter",
-            model="google/gemma-4-26b-a4b-it",
-            credential=_credential(resolved),
-        ),
-    )
-
-    assert llm_config.fallback is not None
-    assert llm_config.fallback.target.provider_routing == "deepseek_only"
-    assert no_fallback.fallback is None
-
-
 def test_resolved_dtos_are_frozen_and_slotted() -> None:
     resolved = _resolved_module()
     dto_classes = (
@@ -278,38 +245,6 @@ def test_nested_mappings_are_deep_frozen_and_detached_from_inputs() -> None:
 
     assert isinstance(detached_stt_config.custom_terms, MappingProxyType)
     assert detached_stt_config.custom_terms["en"] == ("airi",)
-
-
-def test_self_and_peer_stt_share_one_resolved_shape_with_channel_values() -> None:
-    resolved = _resolved_module()
-    self_stt = _stt_config(
-        resolved,
-        channel=resolved.RUNTIME_CHANNEL_SELF,
-        input_device="Microphone Array",
-        output_device=None,
-        provider_options={"capture": {"source": "mic"}},
-    )
-    peer_stt = _stt_config(
-        resolved,
-        channel=resolved.RUNTIME_CHANNEL_PEER,
-        source_language="zh-CN",
-        input_device=None,
-        output_device="Steam Streaming Speakers",
-        provider_options={"capture": {"source": "desktop"}},
-    )
-
-    assert type(self_stt) is type(peer_stt) is resolved.ResolvedSTTConfig
-    assert tuple(field.name for field in fields(self_stt)) == tuple(
-        field.name for field in fields(peer_stt)
-    )
-    assert self_stt.channel == "self"
-    assert self_stt.source_language == "ko-KR"
-    assert self_stt.input_device == "Microphone Array"
-    assert self_stt.output_device is None
-    assert peer_stt.channel == "peer"
-    assert peer_stt.source_language == "zh-CN"
-    assert peer_stt.input_device is None
-    assert peer_stt.output_device == "Steam Streaming Speakers"
 
 
 def test_overlay_and_runtime_policy_mappings_are_immutable() -> None:

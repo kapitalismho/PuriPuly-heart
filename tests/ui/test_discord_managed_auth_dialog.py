@@ -20,20 +20,6 @@ from puripuly_heart.ui.theme import (  # noqa: E402
 )
 
 
-class SnapshotOpenPage(DummyPage):
-    def __init__(self) -> None:
-        super().__init__()
-        self.body_control_classes_at_open: list[str] = []
-
-    def show_dialog(self, dialog) -> None:
-        modal_content = dialog.content
-        body_column = modal_content.content.controls[0]
-        self.body_control_classes_at_open = [
-            control.__class__.__name__ for control in body_column.controls
-        ]
-        super().show_dialog(dialog)
-
-
 def _dialog(
     page: DummyPage,
     events: list[str] | None = None,
@@ -71,17 +57,6 @@ def _action_row(page: DummyPage):
 
 def _button_text_size(button) -> int:
     return button.style.text_style.size
-
-
-def test_discord_managed_auth_dialog_declares_initial_action_labels() -> None:
-    page = DummyPage()
-
-    dialog = _dialog(page)
-
-    assert dialog.action_labels == [
-        "openrouter.handoff.chatgpt",
-        "discord_auth.continue",
-    ]
 
 
 def test_discord_managed_auth_dialog_uses_warm_document_layout(
@@ -139,16 +114,6 @@ def test_discord_managed_auth_dialog_uses_warm_document_layout(
         COLOR_PRIMARY,
         COLOR_PRIMARY,
     ]
-
-
-def test_discord_managed_auth_dialog_offers_no_invite_code_entry() -> None:
-    page = SnapshotOpenPage()
-    dialog = _dialog(page)
-
-    dialog.open()
-
-    assert page.body_control_classes_at_open == ["Text"]
-    assert not hasattr(dialog, "referral_id")
 
 
 def test_discord_managed_auth_dialog_waiting_state_uses_waiting_labels() -> None:

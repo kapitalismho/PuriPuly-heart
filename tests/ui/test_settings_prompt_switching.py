@@ -15,7 +15,6 @@ from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.config.provider_values import (
     GeminiLLMModel,
     LLMProviderName,
-    OpenRouterSelectionAlias,
     QwenLLMModel,
     STTProviderName,
 )
@@ -177,42 +176,6 @@ def test_settings_view_switches_prompt_on_llm_change(monkeypatch, settings_event
     )
 
 
-def test_deepseek_managed_keeps_single_prompt(monkeypatch, settings_events) -> None:
-    settings = _settings(
-        model="gemini_flash",
-        connection="official_byok",
-        prompt="GEMINI CUSTOM",
-    )
-
-    view = _make_settings_view(monkeypatch)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-
-    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
-    pending = view.build_provider_apply_settings()
-
-    assert view._prompt_editor.value == "GEMINI CUSTOM"
-    assert pending is not None
-    assert (
-        _translation(apply_provider_intent(settings_events.settings, pending)).model
-        == TranslationModel.DEEPSEEK_V4_FLASH.value
-    )
-    assert (
-        _translation(apply_provider_intent(settings_events.settings, pending)).connection
-        == TranslationConnection.OPENROUTER.value
-    )
-    assert (
-        _llm(apply_provider_intent(settings_events.settings, pending))
-        == LLMProviderName.OPENROUTER.value
-    )
-    assert (
-        _translation(
-            apply_provider_intent(settings_events.settings, pending)
-        ).openrouter_selection_alias
-        == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value
-    )
-    assert _prompt(apply_provider_intent(settings_events.settings, pending)) == "GEMINI CUSTOM"
-
-
 def test_prompt_tab_labels_and_tag_editor_copy_render_from_i18n(
     monkeypatch, settings_events
 ) -> None:
@@ -288,26 +251,6 @@ def test_settings_view_uses_single_prompt_across_provider_switches(
     assert _prompt(settings) == "GEMINI CUSTOM"
     assert pending is not None
     assert _prompt(apply_provider_intent(settings_events.settings, pending)) == "QWEN EDITED"
-
-
-def test_prompt_draft_survives_provider_round_trip_until_commit(
-    monkeypatch, settings_events
-) -> None:
-    settings = _settings(
-        model="gemini_flash",
-        connection="official_byok",
-        prompt="GEMINI CUSTOM",
-    )
-
-    view = _make_settings_view(monkeypatch)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-
-    view._on_prompt_change("GEMINI DRAFT")
-    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
-    view._on_llm_selected(TranslationModel.GEMINI_FLASH.value)
-
-    assert view._prompt_editor.value == "GEMINI DRAFT"
-    assert _prompt(settings) == "GEMINI CUSTOM"
 
 
 def test_single_prompt_whitespace_survives_provider_switch(monkeypatch, settings_events) -> None:

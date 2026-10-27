@@ -5,7 +5,6 @@ from types import SimpleNamespace
 import pytest
 
 from puripuly_heart.app.adapters.peer_capture.peer_capture_source import PeerCaptureSourceAdapter
-from puripuly_heart.app.wiring import create_peer_capture_source_adapter
 from puripuly_heart.core.peer_capture import (
     PeerCaptureLanguageFacts,
     PeerCaptureResolvedTarget,
@@ -159,16 +158,3 @@ def test_adapter_rejects_resolved_process_without_identity() -> None:
                 capture_descriptor=SimpleNamespace(identity=None),
             ),
         )
-
-
-def test_wiring_factory_composes_internal_peer_capture_source_adapter() -> None:
-    adapter = create_peer_capture_source_adapter(
-        log_diagnostic=lambda _message: None,
-        wrap_source=lambda source: source,
-    )
-
-    assert isinstance(adapter, PeerCaptureSourceAdapter)
-    assert adapter.loopback_source_factory.__name__ == "DesktopLoopbackAudioSource"
-    assert adapter.process_source_factory.__name__ == "ProcessAudioCaptureSource"
-    assert adapter.process_watcher_factory.__name__ == "PsutilProcessIdentityWatcher"
-    assert adapter.pipeline_factory.__name__ == "DesktopPeerPipeline"

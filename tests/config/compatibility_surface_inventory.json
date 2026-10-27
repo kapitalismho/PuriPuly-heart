@@ -57,7 +57,7 @@
         "src/puripuly_heart/core/local_asr/local_stt_assets.py::LOCAL_STT_INSTALLED_MANIFEST_FILENAME"
       ],
       "fixture_or_guard_refs": [
-        "tests/config/test_settings_vnext_schema.py::test_vnext_schema_represents_current_intent_and_state_leaves",
+        "tests/config/test_settings_vnext_migration_serialization.py::test_current_vnext_dict_reads_and_serializes_idempotently",
         "tests/config/test_local_stt_assets.py",
         "tests/core/test_local_stt_runtime_installer.py"
       ],
@@ -105,8 +105,6 @@
       "fixture_or_guard_refs": [
         "tests/config/test_public_compatibility_surfaces.py::test_provider_runtime_public_config_snapshot_matches_resolved_contracts",
         "tests/config/test_runtime_resolution.py::test_legacy_openrouter_selection_aliases_normalize_before_resolved_runtime",
-        "tests/config/test_runtime_resolution.py::test_old_openrouter_credential_source_keys_normalize_through_settings_to_resolved_dto",
-        "tests/config/test_runtime_resolution.py::test_runtime_resolution_resolved_llm_path_has_no_legacy_alias_literals",
         "tests/app/test_wiring_providers.py",
         "tests/config/test_config_and_secrets.py::test_luna_supports_chatgpt_plan_first_then_byok_connections"
       ],

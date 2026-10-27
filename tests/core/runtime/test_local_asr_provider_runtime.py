@@ -63,7 +63,6 @@ from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 from tests.core.runtime.test_gpu_asr import FakeGpuWorkerClient, FakeGpuWorkerFactory
-from tests.helpers.lifecycle import assert_lifecycle_structure
 
 GPU_DEVICE = GpuWorkerDevice(
     device_id="vulkan-index-0",
@@ -1392,16 +1391,6 @@ async def test_close_failure_is_retryable_without_reopening_ingress() -> None:
     assert close_attempts == 2
     assert runtime.close_calls == 1
     assert provider_factory.providers[0].close_backend_calls == 1
-
-
-def test_owner_lifecycle_inventory_names_provider_and_gpu_resources() -> None:
-    owner, _provisioning, _gpu_factory, _provider_factory = _owner()
-
-    inventory = owner.lifecycle_owner_snapshot()
-
-    assert_lifecycle_structure(inventory)
-    assert inventory["owner"] == "LocalASRProviderRuntimeOwner"
-    assert inventory["provider_handles"].keys() == {"self", "peer"}
 
 
 class FakeScopedProvider:

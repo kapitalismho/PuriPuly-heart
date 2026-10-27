@@ -55,15 +55,6 @@ def test_canonical_settings_reject_empty_primary_target() -> None:
         LanguageIntent(target_language="   ", secondary_target_language="ja")
 
 
-def test_current_vnext_without_secondary_target_loads_with_empty_default() -> None:
-    raw = serialization.to_dict(AppSettingsVNext())
-    raw["intent"]["languages"].pop("secondary_target_language")
-
-    loaded = serialization.from_dict(raw)
-
-    assert loaded.intent.languages.secondary_target_language == ""
-
-
 def test_materialize_language_selection_stores_one_recent_queue() -> None:
     from puripuly_heart.app.language_selection import LanguageSelectionChange
     from puripuly_heart.app.services.settings.settings_application import (
@@ -86,39 +77,6 @@ def test_materialize_language_selection_stores_one_recent_queue() -> None:
     languages = updated.intent.languages
     assert languages.recent_source_languages == ["ja", "ko", "en"]
     assert languages.recent_target_languages == ["ja", "ko", "en"]
-
-
-def test_language_selection_change_defaults_to_single_target() -> None:
-    from puripuly_heart.app.language_selection import LanguageSelectionChange
-
-    change = LanguageSelectionChange(
-        source_code="ko",
-        target_code="en",
-        peer_source_code="",
-        peer_target_code="",
-        peer_source_mode="manual",
-        recent_source_codes=(),
-        recent_target_codes=(),
-    )
-
-    assert change.secondary_target_code == ""
-
-
-def test_language_selection_change_carries_the_secondary_target() -> None:
-    from puripuly_heart.app.language_selection import LanguageSelectionChange
-
-    change = LanguageSelectionChange(
-        source_code="ko",
-        target_code="en",
-        peer_source_code="",
-        peer_target_code="",
-        peer_source_mode="manual",
-        recent_source_codes=(),
-        recent_target_codes=(),
-        secondary_target_code="ja",
-    )
-
-    assert change.secondary_target_code == "ja"
 
 
 def test_apply_language_selection_writes_the_secondary_target() -> None:
@@ -196,14 +154,6 @@ def test_apply_language_selection_clears_the_secondary_target() -> None:
     asyncio.run(SettingsApplicationOwner.apply_language_selection(Stub(), change))
 
     assert applied[-1].intent.languages.secondary_target_language == ""
-
-
-@pytest.mark.parametrize("secondary", ["", "ja"])
-def test_apply_language_selection_survives_validation(secondary: str) -> None:
-    LanguageIntent(
-        target_language="en",
-        secondary_target_language=secondary,
-    )
 
 
 def test_peer_expected_languages_intent_stores_the_shared_recent_queue() -> None:

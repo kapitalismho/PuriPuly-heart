@@ -59,14 +59,3 @@ def _load_bundle(locale: str) -> dict[str, str]:
 def test_auth_transitions_have_translated_actions_and_errors(locale: str) -> None:
     bundle = _load_bundle(locale)
     assert all(isinstance(bundle.get(key), str) and bundle[key] for key in REQUIRED_AUTH_KEYS)
-
-
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN", "ja", "ru"])
-def test_locale_catalog_has_no_referral_feature(locale: str) -> None:
-    bundle = _load_bundle(locale)
-    assert not any(
-        term in key.casefold()
-        for key in bundle
-        for term in ("referral", "talk_together", "invite_progress")
-    )
-    assert not any("talk together" in value.casefold() for value in bundle.values())

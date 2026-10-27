@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import numpy as np
-
 from puripuly_heart.domain.models import OSCMessage
 
 
@@ -53,7 +51,3 @@ class RecordingOscQueue:
 
     def process_due(self) -> None:
         self.process_due_calls += 1
-
-
-def samples(value: float, n: int = 512) -> np.ndarray:
-    return np.full((n,), value, dtype=np.float32)

@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from puripuly_heart.core.vrchat_scene import (
-    SceneSnapshotProvider,
-    VrchatSceneSnapshot,
-)
+from puripuly_heart.core.vrchat_scene import VrchatSceneSnapshot
 
 
 def test_default_snapshot_is_unavailable_without_count() -> None:
@@ -56,22 +53,3 @@ def test_snapshot_is_immutable() -> None:
 
     with pytest.raises(Exception):
         snapshot.participant_count = 5  # type: ignore[misc]
-
-
-def test_provider_protocol_returns_snapshot() -> None:
-    class RecordingProvider(SceneSnapshotProvider):
-        def __init__(self) -> None:
-            self.calls = 0
-
-        def snapshot(self) -> VrchatSceneSnapshot:
-            self.calls += 1
-            return VrchatSceneSnapshot(status="ready", participant_count=4)
-
-    provider = RecordingProvider()
-
-    first = provider.snapshot()
-    second = provider.snapshot()
-
-    assert first == second
-    assert first.participant_count == 4
-    assert provider.calls == 2

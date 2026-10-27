@@ -34,7 +34,3 @@ def _load_fixture(name: str) -> dict[str, Any]:
 
 def maximal_v24_settings_fixture() -> dict[str, Any]:
     return _load_fixture("maximal_v24_settings.json")
-
-
-def legacy_compatibility_settings_fixture() -> dict[str, Any]:
-    return _load_fixture("legacy_compatibility_settings.json")
