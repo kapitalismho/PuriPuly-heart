@@ -3373,6 +3373,7 @@ async def test_shared_budget_counts_old_local_retention_against_new_scoped_engin
     )
     old_session = ControlledScopedSession()
     old_session.terminal_on_seal = ("empty", "")
+    old_events: list[STTProviderTurnEvent] = []
     old_engine = ScopedRecognitionEngine(
         channel="self",
         session_factory=lambda _settings, _epoch: asyncio.sleep(
@@ -3382,6 +3383,7 @@ async def test_shared_budget_counts_old_local_retention_against_new_scoped_engin
         watchdog_resolver=lambda _settings: watchdogs(),
         retention_profile_resolver=lambda _settings: profile,
     )
+    old_engine.bind_event_sink(old_events.append)
     new_session = ControlledScopedSession()
     new_terminals: list[STTProviderTurnTerminal] = []
     new_engine = ScopedRecognitionEngine(
@@ -3413,6 +3415,11 @@ async def test_shared_budget_counts_old_local_retention_against_new_scoped_engin
     await wait_until(lambda: budget.used_bytes == 0)
     await new_engine.close()
     await old_engine.close()
+    assert [
+        (event.identity, event.outcome)
+        for event in old_events
+        if isinstance(event, STTProviderTurnTerminal)
+    ] == [(old_session.requests[0].identity, "empty")]
 
 
 @pytest.mark.asyncio
@@ -3438,6 +3445,7 @@ async def test_streaming_scoped_engine_releases_native_copy_after_each_write() -
     )
     session = ControlledScopedSession()
     session.terminal_on_seal = ("empty", "")
+    emitted: list[STTProviderTurnEvent] = []
     engine = ScopedRecognitionEngine(
         channel="self",
         session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
@@ -3449,6 +3457,7 @@ async def test_streaming_scoped_engine_releases_native_copy_after_each_write() -
             retained_bytes_per_sample=4,
         ),
     )
+    engine.bind_event_sink(emitted.append)
 
     await engine.handle_owned_vad_event(start)
     assert budget.used_bytes == 24
@@ -3457,6 +3466,11 @@ async def test_streaming_scoped_engine_releases_native_copy_after_each_write() -
     assert budget.used_bytes == 0
     await engine.handle_owned_vad_event(end)
     await engine.close()
+    assert [
+        (event.identity, event.outcome)
+        for event in emitted
+        if isinstance(event, STTProviderTurnTerminal)
+    ] == [(session.requests[0].identity, "empty")]
 
 
 @pytest.mark.asyncio
@@ -3907,6 +3921,7 @@ async def test_stream_recovery_connection_failure_exhausts_once_not_on_every_fra
     session = ControlledStreamSession()
     opens = 0
     failures: list[Exception] = []
+    emitted: list[STTProviderTurnEvent] = []
 
     async def factory(_settings, _epoch):
         nonlocal opens
@@ -3921,6 +3936,7 @@ async def test_stream_recovery_connection_failure_exhausts_once_not_on_every_fra
         watchdog_resolver=lambda _: watchdogs(write_timeout_s=0.01),
         terminal_failure_sink=failures.append,
     )
+    engine.bind_event_sink(emitted.append)
     try:
         await engine.handle_owned_vad_event(start)
         session.send_gate.clear()
@@ -3933,6 +3949,11 @@ async def test_stream_recovery_connection_failure_exhausts_once_not_on_every_fra
         assert failures[0].channel == engine.channel
     finally:
         await engine.close()
+    assert [
+        (event.identity, event.outcome)
+        for event in emitted
+        if isinstance(event, STTProviderInputTerminal)
+    ] == [(session.requests[0].identity, "cancelled")]
 
 
 @pytest.mark.asyncio
@@ -3957,6 +3978,7 @@ async def test_inflight_stream_recovery_cannot_revive_invalidated_capture(
     start, _, end = segment_events(ledger, start_sample=0, now=100)
     clock = ControlledMonotonicClock(value=100)
     sessions = [ControlledStreamSession(), ControlledStreamSession()]
+    emitted: list[STTProviderTurnEvent] = []
     opening = asyncio.Event()
     release = asyncio.Event()
     capture_current = True
@@ -3980,6 +4002,7 @@ async def test_inflight_stream_recovery_cannot_revive_invalidated_capture(
         monotonic_clock=clock.now,
         sleep=sleep,
     )
+    engine.bind_event_sink(emitted.append)
     try:
         await engine.handle_owned_vad_event(start)
         if recovery == "normal_idle":
@@ -4026,6 +4049,12 @@ async def test_inflight_stream_recovery_cannot_revive_invalidated_capture(
     finally:
         release.set()
         await engine.close()
+    expected_outcome = "cancelled" if recovery == "write_failure" else "submitted"
+    assert [
+        (event.identity, event.outcome)
+        for event in emitted
+        if isinstance(event, STTProviderInputTerminal)
+    ] == [(sessions[0].requests[0].identity, expected_outcome)]
 
 
 @pytest.mark.asyncio
@@ -4050,6 +4079,7 @@ async def test_continuous_stream_recovery_waits_for_physical_cleanup_and_stops_i
     session = QuarantinedStreamSession()
     opens = 0
     failures: list[Exception] = []
+    emitted: list[STTProviderTurnEvent] = []
 
     async def factory(_settings, _epoch):
         nonlocal opens
@@ -4062,6 +4092,7 @@ async def test_continuous_stream_recovery_waits_for_physical_cleanup_and_stops_i
         watchdog_resolver=lambda _: watchdogs(write_timeout_s=0.01, readiness_timeout_s=0.01),
         terminal_failure_sink=failures.append,
     )
+    engine.bind_event_sink(emitted.append)
     try:
         await engine.handle_owned_vad_event(start)
         session.send_gate.clear()
@@ -4079,6 +4110,11 @@ async def test_continuous_stream_recovery_waits_for_physical_cleanup_and_stops_i
     finally:
         session.release.set()
         await engine.close()
+    assert [
+        (event.identity, event.outcome)
+        for event in emitted
+        if isinstance(event, STTProviderInputTerminal)
+    ] == [(session.requests[0].identity, "cancelled")]
 
 
 @pytest.mark.asyncio
@@ -4088,6 +4124,7 @@ async def test_independent_scoped_context_deduplicates_seen_audio_and_retains_in
     ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
     first, _, end = segment_events(ledger, start_sample=0, now=0)
     session = ControlledStreamSession()
+    emitted: list[STTProviderTurnEvent] = []
 
     async def factory(_settings, _epoch):
         return session
@@ -4097,6 +4134,7 @@ async def test_independent_scoped_context_deduplicates_seen_audio_and_retains_in
         channel="self",
         watchdog_resolver=lambda _: watchdogs(),
     )
+    engine.bind_event_sink(emitted.append)
     try:
         await engine.handle_owned_vad_event(first)
         await engine.handle_stream_input(stream_input(ledger, 6, 10))
@@ -4119,6 +4157,14 @@ async def test_independent_scoped_context_deduplicates_seen_audio_and_retains_in
         ] == [(0, 2), (2, 6), (6, 10), (10, 14)]
     finally:
         await engine.close()
+    assert [
+        (event.identity, event.outcome)
+        for event in emitted
+        if isinstance(event, STTProviderInputTerminal)
+    ] == [
+        (session.requests[0].identity, "submitted"),
+        (session.requests[1].identity, "cancelled"),
+    ]
 
 
 @pytest.mark.asyncio
@@ -4834,6 +4880,7 @@ async def test_successful_resume_context_does_not_admit_newly_stale_onset(
     ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
     clock = ControlledMonotonicClock(value=100)
     sessions: list[ControlledStreamSession] = []
+    emitted: list[STTProviderTurnEvent] = []
 
     async def factory(_settings, _epoch):
         session = ControlledStreamSession()
@@ -4849,6 +4896,7 @@ async def test_successful_resume_context_does_not_admit_newly_stale_onset(
         monotonic_clock=clock.now,
         sleep=clock.sleep,
     )
+    engine.bind_event_sink(emitted.append)
     runtime = SimpleNamespace(
         segment_ledger=ledger,
         _current_stream_capture_epoch=None,
@@ -4929,3 +4977,8 @@ async def test_successful_resume_context_does_not_admit_newly_stale_onset(
             session.send_gate.set()
         await guard.abort()
         await engine.close()
+    assert [
+        (event.identity, event.outcome)
+        for event in emitted
+        if isinstance(event, STTProviderInputTerminal)
+    ] == [(sessions[0].requests[0].identity, "submitted")]

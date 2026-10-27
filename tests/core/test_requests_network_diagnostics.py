@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import datetime
 import ssl
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
-from threading import Thread
 
 import pytest
 import requests
@@ -14,6 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
+from tests.core.test_external_network import http_server
 
 
 def test_real_requests_certificate_failures_preserve_distinct_codes(tmp_path: Path) -> None:
@@ -85,21 +85,15 @@ def test_real_requests_certificate_failures_preserve_distinct_codes(tmp_path: Pa
         def log_message(self, *args: object) -> None:
             pass
 
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(cert_path, key_path)
-    server.socket = context.wrap_socket(server.socket, server_side=True)
-    thread = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
-    thread.start()
     persisted = []
-    try:
+    with http_server(context, handler=Handler) as port:
         with requests.Session() as session:
             session.trust_env = False
             for verify in (True, str(ca_path)):
                 with pytest.raises(requests.exceptions.SSLError) as caught:
-                    session.get(
-                        f"https://localhost:{server.server_port}/", verify=verify, timeout=3
-                    )
+                    session.get(f"https://localhost:{port}/", verify=verify, timeout=3)
                 failure = caught.value
                 failure.connection_diagnostics = {
                     "transport": "https",
@@ -122,8 +116,3 @@ def test_real_requests_certificate_failures_preserve_distinct_codes(tmp_path: Pa
         assert "localhost" not in content
         assert "wrong.example" not in content
         assert str(tmp_path) not in content
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=5)
-        assert not thread.is_alive()

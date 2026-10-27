@@ -1441,11 +1441,11 @@ class FakeFletWindow:
 
     async def close(self) -> None:
         self.close_calls += 1
-        self._app.closed.set()
+        await self._app.shutdown()
 
     async def destroy(self) -> None:
         self.destroy_calls += 1
-        self._app.closed.set()
+        await self._app.shutdown()
 
     async def wait_until_ready_to_show(self) -> None:
         self.ready_wait_calls += 1
@@ -1519,13 +1519,28 @@ class FakeFletApp:
         self.closed = asyncio.Event()
         self.page = FakeFletPage(self)
         self.targets: list[Any] = []
+        self._page_handler_task: asyncio.Task[Any] | None = None
 
     async def run(self, target: Any) -> None:
         self.targets.append(target)
-        result = target(self.page)
-        if inspect.isawaitable(result):
-            await result
+        self._page_handler_task = asyncio.current_task()
+        try:
+            result = target(self.page)
+            if inspect.isawaitable(result):
+                await result
+        except asyncio.CancelledError:
+            if not self.closed.is_set():
+                raise
+        finally:
+            self._page_handler_task = None
         await self.closed.wait()
+
+    async def shutdown(self) -> None:
+        self.closed.set()
+        task = self._page_handler_task
+        if task is not None and task is not asyncio.current_task() and not task.done():
+            task.cancel()
+            await task
 
 
 class FakeWindowEvent:
@@ -3134,6 +3149,7 @@ async def test_desktop_overlay_wait_until_ready_timeout_reports_page_configured_
 
 @pytest.mark.asyncio
 async def test_desktop_overlay_startup_timeout_after_page_exists_reports_phase() -> None:
+    tasks_before = asyncio.all_tasks()
     app = FakeFletApp()
 
     async def hang_ready() -> None:
@@ -3152,7 +3168,17 @@ async def test_desktop_overlay_startup_timeout_after_page_exists_reports_phase()
         await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
 
     assert window.startup_phase == "page_configured"
+    runner_task = window._app_task
+    assert runner_task is not None
     await window.close()
+
+    assert app.closed.is_set()
+    assert app.page.window.close_calls == 1
+    assert app.page.window.destroy_calls == 0
+    assert runner_task.done()
+    assert not runner_task.cancelled()
+    assert runner_task.exception() is None
+    assert asyncio.all_tasks() == tasks_before
 
 
 @pytest.mark.asyncio

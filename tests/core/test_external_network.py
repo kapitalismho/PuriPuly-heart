@@ -10,6 +10,7 @@ import ssl
 import threading
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from datetime import datetime, timedelta, timezone
+from functools import cache
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
@@ -41,8 +42,8 @@ def isolated_network_environment(monkeypatch):
     monkeypatch.setattr(external_network, "_windows_proxy_settings", lambda: ({}, ""))
 
 
-@pytest.fixture
-def certificates(tmp_path):
+@cache
+def _certificate_material():
     now = datetime.now(timezone.utc)
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "network test root")])
@@ -61,9 +62,7 @@ def certificates(tmp_path):
         .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
         .sign(key, hashes.SHA256())
     )
-    root_path = tmp_path / "root.pem"
-    root_path.write_bytes(root.public_bytes(serialization.Encoding.PEM))
-    contexts = {}
+    leaf_material = []
     for variant in ("valid", "expired"):
         leaf_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         expiry = now - timedelta(hours=1) if variant == "expired" else now + timedelta(days=1)
@@ -82,23 +81,38 @@ def certificates(tmp_path):
             )
             .sign(key, hashes.SHA256())
         )
-        cert_path, key_path = tmp_path / f"{variant}.pem", tmp_path / f"{variant}.key"
-        cert_path.write_bytes(leaf.public_bytes(serialization.Encoding.PEM))
-        key_path.write_bytes(
-            leaf_key.private_bytes(
-                serialization.Encoding.PEM,
-                serialization.PrivateFormat.PKCS8,
-                serialization.NoEncryption(),
+        leaf_material.append(
+            (
+                variant,
+                leaf.public_bytes(serialization.Encoding.PEM),
+                leaf_key.private_bytes(
+                    serialization.Encoding.PEM,
+                    serialization.PrivateFormat.PKCS8,
+                    serialization.NoEncryption(),
+                ),
             )
         )
+    canonical_name = name.public_bytes()[2:]
+    ca_hash = int.from_bytes(hashlib.sha1(canonical_name).digest()[:4], "little")
+    return root.public_bytes(serialization.Encoding.PEM), f"{ca_hash:08x}.0", tuple(leaf_material)
+
+
+@pytest.fixture
+def certificates(tmp_path):
+    root_pem, ca_filename, leaf_material = _certificate_material()
+    root_path = tmp_path / "root.pem"
+    root_path.write_bytes(root_pem)
+    contexts = {}
+    for variant, cert_pem, key_pem in leaf_material:
+        cert_path, key_path = tmp_path / f"{variant}.pem", tmp_path / f"{variant}.key"
+        cert_path.write_bytes(cert_pem)
+        key_path.write_bytes(key_pem)
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.load_cert_chain(cert_path, key_path)
         contexts[variant] = context
-    canonical_name = name.public_bytes()[2:]
     ca_dir = tmp_path / "ca"
     ca_dir.mkdir()
-    ca_hash = int.from_bytes(hashlib.sha1(canonical_name).digest()[:4], "little")
-    (ca_dir / f"{ca_hash:08x}.0").write_bytes(root_path.read_bytes())
+    (ca_dir / ca_filename).write_bytes(root_pem)
     return root_path, ca_dir, contexts
 
 
@@ -658,7 +672,17 @@ async def test_header_and_body_stalls_keep_selected_route_and_tls(
     server = await asyncio.start_server(
         respond, "127.0.0.1", 0, ssl=contexts["valid"] if secure else None
     )
+    servers = [server]
     try:
+        if socket.has_ipv6:
+            servers.append(
+                await asyncio.start_server(
+                    respond,
+                    "::1",
+                    server.sockets[0].getsockname()[1],
+                    ssl=contexts["valid"] if secure else None,
+                )
+            )
         scheme = "https" if secure else "http"
         url = f"{scheme}://localhost:{server.sockets[0].getsockname()[1]}"
         timeout = httpx.Timeout(2.0, read=0.1)
@@ -686,8 +710,10 @@ async def test_header_and_body_stalls_keep_selected_route_and_tls(
             assert fields["http_status"] == 200
     finally:
         release.set()
-        server.close()
-        await server.wait_closed()
+        for current in servers:
+            current.close()
+        for current in servers:
+            await current.wait_closed()
         await asyncio.gather(*connections)
 
 

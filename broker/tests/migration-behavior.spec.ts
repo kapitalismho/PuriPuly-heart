@@ -1131,42 +1131,49 @@ describe('broker migration behavior', () => {
       },
     ];
 
-    for (const testCase of cases) {
-      withMigratedDatabase((db) => {
-        const runtimeAccepted = validatePublicInput(testCase.field, testCase.value) === null;
-        const insertInstallation = db.prepare(
-          `INSERT INTO installations (
-            installation_id,
-            device_public_key,
-            hardware_hash,
-            hardware_hash_salt_version,
-            app_version,
-            challenge,
-            challenge_expires_at,
-            challenge_salt_version
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        );
-
-        let sqlAccepted = true;
+    withMigratedDatabase((db) => {
+      for (const testCase of cases) {
+        db.exec('SAVEPOINT public_input_sample');
         try {
-          insertInstallation.run(
-            testCase.field === 'installation_id' ? testCase.value : 'install-aligned',
-            `device-${testCase.field}`,
-            testCase.field === 'hardware_hash' ? testCase.value : null,
-            testCase.field === 'hardware_hash' ? 7 : null,
-            testCase.field === 'app_version' ? testCase.value : '1.0.0',
-            'aligned-challenge',
-            '2026-04-08T06:05:00.000Z',
-            7,
+          const runtimeAccepted = validatePublicInput(testCase.field, testCase.value) === null;
+          const insertInstallation = db.prepare(
+            `INSERT INTO installations (
+              installation_id,
+              device_public_key,
+              hardware_hash,
+              hardware_hash_salt_version,
+              app_version,
+              challenge,
+              challenge_expires_at,
+              challenge_salt_version
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           );
-        } catch {
-          sqlAccepted = false;
-        }
 
-        expect(runtimeAccepted).toBe(testCase.accepted);
-        expect(sqlAccepted).toBe(testCase.accepted);
-      });
-    }
+          let sqlAccepted = true;
+          try {
+            insertInstallation.run(
+              testCase.field === 'installation_id' ? testCase.value : 'install-aligned',
+              `device-${testCase.field}`,
+              testCase.field === 'hardware_hash' ? testCase.value : null,
+              testCase.field === 'hardware_hash' ? 7 : null,
+              testCase.field === 'app_version' ? testCase.value : '1.0.0',
+              'aligned-challenge',
+              '2026-04-08T06:05:00.000Z',
+              7,
+            );
+          } catch {
+            sqlAccepted = false;
+          }
+
+          expect(runtimeAccepted).toBe(testCase.accepted);
+          expect(sqlAccepted).toBe(testCase.accepted);
+        } finally {
+          db.exec('ROLLBACK TO public_input_sample');
+          db.exec('RELEASE public_input_sample');
+        }
+        expect(db.prepare('SELECT installation_id FROM installations').all()).toEqual([]);
+      }
+    });
   });
 
   it('enforces release-session all-or-none fields, unique release token hashes, and cascades entitlement deletion', () => {

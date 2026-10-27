@@ -22,11 +22,19 @@ runs:
       uses: actions/setup-python@v7
       with:
         python-version: ${{ inputs.python-version }}
-        cache: pip
-        cache-dependency-path: uv.lock
 
-    - name: Install pinned uv and sync lockfile
+    - name: Install pinned uv
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+      with:
+        version: ${{ inputs.uv-version }}
+        python-version: ${{ inputs.python-version }}
+        enable-cache: "false"
+        cache-local-path: ${{ runner.temp }}/uv-cache
+
+    - name: Sync lockfile
       shell: bash
-      run: |
-        python -m pip install --upgrade pip "uv==${{ inputs.uv-version }}"
-        uv sync ${{ inputs.sync-args }} --${{ inputs.lock-mode }}
+      run: uv sync ${{ inputs.sync-args }} --${{ inputs.lock-mode }}
+
+    - name: Report runner processors
+      shell: bash
+      run: python -c "import os; print(f'Runner CPUs = {os.cpu_count()}, process CPUs = {os.process_cpu_count()}')"

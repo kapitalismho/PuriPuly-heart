@@ -39,7 +39,17 @@ jobs:
       - name: Ruff check
         run: uv run --locked ruff check .
 
+      - name: Cache Black results
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/black-cache
+          key: black-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('uv.lock', 'pyproject.toml') }}-${{ github.sha }}
+          restore-keys: |
+            black-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('uv.lock', 'pyproject.toml') }}-
+
       - name: Black check
+        env:
+          BLACK_CACHE_DIR: ${{ runner.temp }}/black-cache
         run: uv run --locked black --check .
 
       - name: Check Python test selection
@@ -61,7 +71,7 @@ jobs:
           lock-mode: locked
 
       - name: Run contract tests
-        run: uv run --locked pytest -ra --junitxml=contract-results.xml tests/domain tests/config tests/core
+        run: uv run --locked pytest -ra --numprocesses=2 --dist=loadfile --max-worker-restart=0 --capture=fd --junitxml=contract-results.xml tests/domain tests/config tests/core
 
       - name: Upload contract results
         if: always()
@@ -80,7 +90,7 @@ jobs:
           - name: Architecture
             pytest-args: tests/architecture
           - name: Runtime
-            pytest-args: tests/app
+            pytest-args: --numprocesses=2 --dist=loadfile --max-worker-restart=0 --capture=fd tests/app
           - name: Providers
             pytest-args: tests/providers
           - name: UI
@@ -90,8 +100,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - name: Setup UV environment
         uses: ./.github/actions/setup-uv-environment
@@ -156,33 +164,35 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Configure short Cargo target
+        id: overlay-target
+        shell: pwsh
+        run: |
+          $target = Join-Path $env:RUNNER_TEMP 'ovt'
+          $relative = [System.IO.Path]::GetRelativePath((Join-Path $PWD 'native/overlay'), $target)
+          "CARGO_TARGET_DIR=$target" >> $env:GITHUB_ENV
+          "relative-target=$relative" >> $env:GITHUB_OUTPUT
+
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: native/overlay
-          cache-targets: "false"
+          prefix-key: v1-overlay-target
+          workspaces: native/overlay -> ${{ steps.overlay-target.outputs.relative-target }}
+          cache-targets: "true"
 
       - name: Cargo check
-        env:
-          CARGO_TARGET_DIR: ${{ runner.temp }}/ovt
         run: cargo check --locked --manifest-path native/overlay/Cargo.toml
 
       - name: Cargo test deterministic
-        env:
-          CARGO_TARGET_DIR: ${{ runner.temp }}/ovt
         run: cargo test --locked --manifest-path native/overlay/Cargo.toml -- --skip windows_graphics_
 
       - name: Assemble graphics test font resources
-        env:
-          CARGO_TARGET_DIR: ${{ runner.temp }}/ovt
         run: |
           $fontDir = Join-Path $env:CARGO_TARGET_DIR 'debug/deps/puripuly_heart/data/fonts'
           New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
           Copy-Item -LiteralPath 'src/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc' -Destination $fontDir -Force
 
       - name: Cargo test graphics
-        env:
-          CARGO_TARGET_DIR: ${{ runner.temp }}/ovt
         run: cargo test --locked --manifest-path native/overlay/Cargo.toml windows_graphics_ -- --test-threads=1
 
       - name: Run overlay integration tests

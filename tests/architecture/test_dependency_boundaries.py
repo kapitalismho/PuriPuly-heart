@@ -533,7 +533,10 @@ def _imported_modules(
     importer_module: str,
     importer_path: Path,
     internal_modules: frozenset[str],
+    layer_roots: frozenset[str] | None = None,
 ) -> Iterator[str]:
+    if layer_roots is None:
+        layer_roots = _layer_root_module_names()
     tree = ast.parse(importer_path.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -554,18 +557,23 @@ def _imported_modules(
 
         for alias in node.names:
             candidate = f"{module}.{alias.name}"
-            if candidate in internal_modules or candidate in _layer_root_module_names():
+            if candidate in internal_modules or candidate in layer_roots:
                 yield candidate
             else:
                 yield module
 
 
-def _layer_for_module(module: str) -> str | None:
+def _layer_for_module(
+    module: str,
+    layer_prefixes: tuple[tuple[str, str], ...] | None = None,
+) -> str | None:
     for external_module, layer in EXTERNAL_MODULE_LAYERS.items():
         if module == external_module or module.startswith(f"{external_module}."):
             return layer
 
-    for prefix, layer in _layer_prefixes_by_specificity():
+    if layer_prefixes is None:
+        layer_prefixes = _layer_prefixes_by_specificity()
+    for prefix, layer in layer_prefixes:
         if module == prefix or module.startswith(f"{prefix}."):
             return layer
 
@@ -591,15 +599,17 @@ def _relative_repo_path(path: Path) -> str:
 def _dependency_violations() -> frozenset[ImportViolation]:
     source_paths = _dependency_source_paths()
     internal_modules = _internal_module_names(source_paths)
+    layer_roots = _layer_root_module_names()
+    layer_prefixes = _layer_prefixes_by_specificity()
     violations: set[ImportViolation] = set()
 
     for importer_path in source_paths:
         importer_module = _module_name_for_path(importer_path)
-        importer_layer = _layer_for_module(importer_module)
+        importer_layer = _layer_for_module(importer_module, layer_prefixes)
         for imported_module in sorted(
-            set(_imported_modules(importer_module, importer_path, internal_modules))
+            set(_imported_modules(importer_module, importer_path, internal_modules, layer_roots))
         ):
-            imported_layer = _layer_for_module(imported_module)
+            imported_layer = _layer_for_module(imported_module, layer_prefixes)
             if (
                 (
                     importer_module == f"{PACKAGE_NAME}.core"
@@ -1426,12 +1436,14 @@ def test_r00_retires_stable_profile_import_and_secret_copy_surfaces() -> None:
         "import_stable_settings_if_missing",
         "is_legacy_shape_dict",
     }
-    occurrences = {
-        (path.relative_to(REPO_ROOT).as_posix(), symbol)
-        for path in SOURCE_PACKAGE_ROOT.rglob("*.py")
-        for symbol in forbidden
-        if symbol in path.read_text(encoding="utf-8")
-    }
+    occurrences: set[tuple[str, str]] = set()
+    for path in SOURCE_PACKAGE_ROOT.rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        occurrences.update(
+            (path.relative_to(REPO_ROOT).as_posix(), symbol)
+            for symbol in forbidden
+            if symbol in source
+        )
 
     assert occurrences == set()
 
@@ -1442,12 +1454,15 @@ def test_a04_overlay_ui_uses_the_pure_canonical_value_owner() -> None:
         SOURCE_PACKAGE_ROOT / "ui" / "desktop_overlay_surface" / "contract.py",
         SOURCE_PACKAGE_ROOT / "ui" / "desktop_overlay_surface" / "renderer.py",
     )
+    internal_modules = _internal_module_names()
+    layer_roots = _layer_root_module_names()
     for path in owned_paths:
         imported_modules = set(
             _imported_modules(
                 _module_name_for_path(path),
                 path,
-                _internal_module_names(),
+                internal_modules,
+                layer_roots,
             )
         )
         assert "puripuly_heart.config.settings" not in imported_modules
