@@ -353,9 +353,15 @@ def _failure_leaves(failure: BaseException) -> list[BaseException]:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("port", [False, True], ids=["http-thread", "huggingface-port"])
 @pytest.mark.parametrize("async_callback", [False, True], ids=["sync", "async"])
+@pytest.mark.parametrize("grouped_observer", [False, True], ids=["ordinary", "mixed-group"])
 @pytest.mark.parametrize("cancel_during_settlement", [False, True], ids=["drain", "cancel-drain"])
 async def test_status_failure_keeps_download_staging_and_lease_until_settled_then_allows_retry(
-    tmp_path: Path, held_http_download, port, async_callback, cancel_during_settlement
+    tmp_path: Path,
+    held_http_download,
+    port,
+    async_callback,
+    cancel_during_settlement,
+    grouped_observer,
 ) -> None:
     held, base_url = held_http_download
     downloader = _HeldDownloader(held.payload) if port else None
@@ -371,6 +377,11 @@ async def test_status_failure_keeps_download_staging_and_lease_until_settled_the
         if async_callback
         else RuntimeError("observer failed")
     )
+    if grouped_observer:
+        observer_failure = BaseExceptionGroup(
+            "observer failure group",
+            (asyncio.CancelledError(), observer_failure),
+        )
     statuses = []
     failed = asyncio.Event()
 
@@ -595,6 +606,32 @@ async def test_cancellation_drains_admitted_work_before_cleanup_and_retry(
     finally:
         release.set()
         await asyncio.gather(installation, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("control_flow", [SystemExit, KeyboardInterrupt])
+async def test_control_flow_observer_failure_is_not_source_fallback(
+    tmp_path: Path, control_flow
+) -> None:
+    manifest = _held_manifest("http://127.0.0.1:1", port=True)
+    downloader = _HeldDownloader(b"synthetic-model")
+    failure = BaseExceptionGroup("control flow", (ValueError("observer"), control_flow()))
+
+    def on_status(_update):
+        raise failure
+
+    with pytest.raises(BaseExceptionGroup) as caught:
+        await ensure_local_stt_installed(
+            locale="en",
+            model_root=tmp_path,
+            manifest=manifest,
+            on_status=on_status,
+            huggingface_downloader=downloader,
+        )
+    assert caught.value is failure
+    assert downloader.requests == []
+    assert not list(tmp_path.glob(f"{manifest.install_dirname}.staging-*"))
+    _assert_lease_available(tmp_path)
 
 
 @pytest.mark.asyncio

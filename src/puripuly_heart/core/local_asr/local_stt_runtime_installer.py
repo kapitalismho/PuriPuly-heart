@@ -215,7 +215,13 @@ async def _emit_status(
         )
         if inspect.isawaitable(result):
             await result
-    except Exception as exc:
+    except BaseException as exc:
+        if not isinstance(exc, (Exception, BaseExceptionGroup)):
+            raise
+        if isinstance(exc, BaseExceptionGroup):
+            _, fatal = exc.split((Exception, asyncio.CancelledError))
+            if fatal is not None:
+                raise
         raise _StatusCallbackError(
             "Local STT installation status callback failed",
             failure_code="status_callback_failed",
@@ -797,6 +803,14 @@ async def _ensure_local_stt_installed_with_lease(
                 f"source={source_label} cause={type(exc).__name__}",
                 level=logging.WARNING,
             )
+        except BaseException as exc:
+            await _cleanup_failed_download(
+                download_task,
+                staging_dir=staging_dir,
+                cancel_event=cancel_event,
+                primary_failure=exc,
+            )
+            raise
 
     await _emit_status(on_status, "download_failed", percent=None)
     code = getattr(last_error, "failure_code", "unknown")
