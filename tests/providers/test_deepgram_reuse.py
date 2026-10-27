@@ -389,10 +389,16 @@ class _InstalledSdkWire:
         return self
 
     async def __anext__(self):
-        return await self.messages.get()
+        message = await self.messages.get()
+        if message is None:
+            raise StopAsyncIteration
+        return message
 
     async def send(self, payload):
         self.writes.append(payload)
+
+    async def close(self):
+        self.messages.put_nowait(None)
 
 
 def _installed_callback_payload(channel, *, finalize=False):
@@ -558,6 +564,7 @@ async def test_installed_sdk_malformed_callback_fails_scoped_turn_and_epoch(
         assert "PRIVATE_" not in json.dumps(safe)
         assert session._scoped_drain_task is None
     finally:
+        await wire.close()
         await session.close()
 
 
@@ -628,4 +635,5 @@ async def test_installed_sdk_valid_callbacks_preserve_empty_and_cancellation_sem
         assert ended.reason == "cancelled"
         assert ended.failure_diagnostics is None
     finally:
+        await wire.close()
         await session.close()

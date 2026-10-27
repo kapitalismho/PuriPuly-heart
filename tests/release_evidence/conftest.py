@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from puripuly_heart.release_evidence.native_distribution import (
+    bundle_runtime,
     compile_runtime,
     stage_product_metadata,
 )
@@ -106,6 +107,29 @@ def staged_archive_runtime(
     tmp_path: Path, compiled_archive_runtime: tuple[Path, Path]
 ) -> tuple[Path, Path, dict[str, object]]:
     source, layout = compiled_archive_runtime
+    shutil.copytree(source, tmp_path, dirs_exist_ok=True)
+    bytecode = tmp_path / "bytecode.json"
+    return layout, bytecode, json.loads(bytecode.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="session")
+def bundled_archive_runtime(
+    tmp_path_factory: pytest.TempPathFactory,
+    compiled_archive_runtime: tuple[Path, Path],
+) -> tuple[Path, Path]:
+    source, layout = compiled_archive_runtime
+    target = tmp_path_factory.mktemp("native-bundled-runtime")
+    shutil.copytree(source, target, dirs_exist_ok=True)
+    bytecode = target / "bytecode.json"
+    bytecode.write_text(json.dumps(bundle_runtime(target, layout, bytecode)), encoding="utf-8")
+    return target, layout
+
+
+@pytest.fixture
+def staged_bundled_runtime(
+    tmp_path: Path, bundled_archive_runtime: tuple[Path, Path]
+) -> tuple[Path, Path, dict[str, object]]:
+    source, layout = bundled_archive_runtime
     shutil.copytree(source, tmp_path, dirs_exist_ok=True)
     bytecode = tmp_path / "bytecode.json"
     return layout, bytecode, json.loads(bytecode.read_text(encoding="utf-8"))

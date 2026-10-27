@@ -156,23 +156,7 @@ def test_peer_owner_has_no_mutable_translation_configuration_fields() -> None:
     assert "translation_runtime_configuration" not in owner_fields
 
 
-def test_translation_fixture_compatibility_access_delegates_to_the_owner() -> None:
-    owner = TranslationRuntimeConfigurationOwner()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=FakeOsc(),
-        translation_runtime_configuration=owner,
-    )
-
-    harness.replace_configuration(source_language="ja")
-
-    assert harness.configuration.snapshot().value.source_language == "ja"
-    assert owner.snapshot().revision == 1
-    assert owner.snapshot().value.source_language == "ja"
-
-
-def test_fixture_configuration_update_is_linearizable_with_owner_updates() -> None:
+def test_owner_transforms_are_linearizable_with_concurrent_updates() -> None:
     barrier = Barrier(2)
 
     class CoordinatedOwner(TranslationRuntimeConfigurationOwner):
@@ -181,23 +165,17 @@ def test_fixture_configuration_update_is_linearizable_with_owner_updates() -> No
             return super().transform(transformer)
 
     owner = CoordinatedOwner()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=FakeOsc(),
-        translation_runtime_configuration=owner,
-    )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        compatibility_future = executor.submit(
-            harness.replace_configuration,
-            source_language="ja",
+        source_future = executor.submit(
+            owner.transform,
+            lambda value: replace(value, source_language="ja"),
         )
         owner_future = executor.submit(
             owner.transform,
             lambda value: replace(value, translation_enabled=False),
         )
-        compatibility_future.result()
+        source_future.result()
         owner_future.result()
 
     snapshot = owner.snapshot()
@@ -258,7 +236,7 @@ async def test_translation_turn_submit_parent_captures_the_configuration_revisio
 
 
 @pytest.mark.asyncio
-async def test_translation_fixture_captures_configuration_when_the_turn_is_created() -> None:
+async def test_self_owner_captures_configuration_when_the_turn_is_created() -> None:
     owner = TranslationRuntimeConfigurationOwner(TranslationRuntimeConfig(target_language="en"))
     harness = compose_translation_test_harness(
         stt=None,

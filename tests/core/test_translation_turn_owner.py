@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
-from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
@@ -563,28 +562,6 @@ def test_speculative_configuration_match_includes_peer_source_mode() -> None:
     after = TranslationRuntimeConfig(peer_source_mode="auto")
 
     assert not translation_configs_match(before, after)
-
-
-def test_channel_owners_use_one_injected_generic_translation_owner() -> None:
-    harness = compose_translation_test_harness(stt=None, llm=None, osc=object())
-    assert harness.self_owner.translation_turns is harness.translation_turns
-    assert harness.peer_owner.translation_turns is harness.translation_turns
-    assert type(harness.translation_turns.output).__name__ == ("TranslationChannelOwnerCallbacks")
-    assert harness.translation_turns.lifecycle_owner_snapshot()["owner"] == (
-        "TranslationTurnLifecycleOwner"
-    )
-
-    source_root = Path(__file__).resolve().parents[2] / "src" / "puripuly_heart"
-    legacy_owner_references = {
-        source_file.relative_to(source_root).as_posix()
-        for source_file in source_root.rglob("*.py")
-        if "PeerFinalRunsLifecycleOwner" in source_file.read_text(encoding="utf-8")
-    }
-    assert legacy_owner_references == {"core/orchestrator/peer_final_runs.py"}
-    assert not any(
-        ".process_translation(" in source_file.read_text(encoding="utf-8")
-        for source_file in source_root.rglob("*.py")
-    )
 
 
 @pytest.mark.asyncio

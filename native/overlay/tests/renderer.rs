@@ -9,8 +9,7 @@ use puripuly_heart_overlay::{
     CaptionPresentation, CaptionRenderer, DamageBand, FontFallbackReason, FontLanguageBucket,
     FontResolver, FontSource, FontWeight, OverlayPlacementPolicy, OverlayPresentationBlock,
     OverlayPresentationBlockVariant, OverlayPresentationCalibration, OverlayPresentationSnapshot,
-    OverlayRuntime, OverlayState, PresentationBackend, ReadinessCancellation, ReadinessOutcome,
-    RenderedFrame,
+    OverlayRuntime, PresentationBackend, ReadinessCancellation, ReadinessOutcome, RenderedFrame,
 };
 fn assert_close(actual: f32, expected: f32) {
     assert!(
@@ -842,127 +841,22 @@ fn renderer_uses_slot_top_px_instead_of_stacking_input_order() {
     assert_eq!(layout.visible_blocks[1].bounds.top_px, 40.0);
 }
 
-#[test]
-fn renderer_active_peer_with_state_generated_slots_does_not_overlap_next_row() {
-    let mut state = OverlayState::default();
-    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
+fn assert_source_only_peer_does_not_overlap_next_row(
+    variant: OverlayPresentationBlockVariant,
+    expected_variant: CaptionBlockVariant,
+    source: &str,
+) {
+    let runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
         revision: 1,
-        calibration: OverlayPresentationCalibration::default(),
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        blocks: vec![
-            OverlayPresentationBlock {
-                id: "peer:active".into(),
-                occupant_key: "peer:turn-1".into(),
-                appearance_seq: 1,
-                channel: "peer".into(),
-                block_variant: OverlayPresentationBlockVariant::ActivePeer,
-                primary_text: String::new(),
-                secondary_text: "Can you hear me?".into(),
-                secondary_enabled: true,
-                primary_language: None,
-                secondary_language: None,
-                update_id: None,
-                origin_wall_clock_ms: None,
-                session_scope: None,
-                ..Default::default()
-            },
-            OverlayPresentationBlock {
-                id: "self:final".into(),
-                occupant_key: "self:final".into(),
-                appearance_seq: 2,
-                channel: "self".into(),
-                block_variant: OverlayPresentationBlockVariant::Finalized,
-                primary_text: "hello".into(),
-                secondary_text: "안녕".into(),
-                secondary_enabled: true,
-                primary_language: None,
-                secondary_language: None,
-                update_id: None,
-                origin_wall_clock_ms: None,
-                session_scope: None,
-                ..Default::default()
-            },
-        ],
-        ..Default::default()
-    }));
-
-    let caption_blocks = state
-        .scene()
-        .slots()
-        .iter()
-        .flatten()
-        .map(|slot| {
-            let channel = if slot.channel == "peer" {
-                CaptionChannel::PeerChannel
-            } else {
-                CaptionChannel::SelfChannel
-            };
-            let variant = match slot.block_variant {
-                OverlayPresentationBlockVariant::ActiveSelf => CaptionBlockVariant::ActiveSelf,
-                OverlayPresentationBlockVariant::ActivePeer => CaptionBlockVariant::ActivePeer,
-                OverlayPresentationBlockVariant::Finalized => CaptionBlockVariant::Finalized,
-            };
-            CaptionBlock::new(slot.id.clone(), slot.primary_text.clone())
-                .with_variant(variant)
-                .with_channel(channel)
-                .with_secondary_text(slot.secondary_text.clone(), slot.secondary_enabled)
-                .with_slot(slot.slot_index, slot.anchor_top_px)
-        })
-        .collect::<Vec<_>>();
-
-    let result = CaptionLayoutPolicy::default().layout_blocks(caption_blocks, 3840, 1024);
-
-    let peer = result
-        .visible_blocks
-        .iter()
-        .find(|block| block.id == "peer:active")
-        .unwrap();
-    let self_block = result
-        .visible_blocks
-        .iter()
-        .find(|block| block.id == "self:final")
-        .unwrap();
-
-    assert_eq!(peer.block_variant, CaptionBlockVariant::ActivePeer);
-    assert_eq!(peer.channel, Some(CaptionChannel::PeerChannel));
-    assert!(peer.primary_lines.iter().all(|line| line.text.is_empty()));
-    assert_eq!(
-        peer.secondary_line.as_ref().map(|line| line.text.as_str()),
-        Some("Can you hear me?")
-    );
-    assert!(peer.secondary_reserved);
-    assert!(
-        peer.bounds.bottom_px <= self_block.bounds.top_px,
-        "peer bounds {:?} should not overlap next row {:?}",
-        peer.bounds,
-        self_block.bounds
-    );
-}
-
-#[test]
-fn renderer_source_only_peer_finalized_with_state_generated_slots_does_not_overlap_next_row() {
-    let mut state = OverlayState::default();
-    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
-        revision: 1,
-        calibration: OverlayPresentationCalibration::default(),
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![
             OverlayPresentationBlock {
                 id: "peer:source-only".into(),
-                occupant_key: "peer:turn-2".into(),
+                occupant_key: "peer:turn".into(),
                 appearance_seq: 1,
                 channel: "peer".into(),
-                block_variant: OverlayPresentationBlockVariant::Finalized,
-                primary_text: String::new(),
-                secondary_text: "translation unavailable, showing original source text".into(),
+                block_variant: variant,
+                secondary_text: source.into(),
                 secondary_enabled: true,
-                primary_language: None,
-                secondary_language: None,
-                update_id: None,
-                origin_wall_clock_ms: None,
-                session_scope: None,
                 ..Default::default()
             },
             OverlayPresentationBlock {
@@ -974,43 +868,14 @@ fn renderer_source_only_peer_finalized_with_state_generated_slots_does_not_overl
                 primary_text: "hello".into(),
                 secondary_text: "안녕".into(),
                 secondary_enabled: true,
-                primary_language: None,
-                secondary_language: None,
-                update_id: None,
-                origin_wall_clock_ms: None,
-                session_scope: None,
                 ..Default::default()
             },
         ],
         ..Default::default()
-    }));
-
-    let caption_blocks = state
-        .scene()
-        .slots()
-        .iter()
-        .flatten()
-        .map(|slot| {
-            let channel = if slot.channel == "peer" {
-                CaptionChannel::PeerChannel
-            } else {
-                CaptionChannel::SelfChannel
-            };
-            let variant = match slot.block_variant {
-                OverlayPresentationBlockVariant::ActiveSelf => CaptionBlockVariant::ActiveSelf,
-                OverlayPresentationBlockVariant::ActivePeer => CaptionBlockVariant::ActivePeer,
-                OverlayPresentationBlockVariant::Finalized => CaptionBlockVariant::Finalized,
-            };
-            CaptionBlock::new(slot.id.clone(), slot.primary_text.clone())
-                .with_variant(variant)
-                .with_channel(channel)
-                .with_secondary_text(slot.secondary_text.clone(), slot.secondary_enabled)
-                .with_slot(slot.slot_index, slot.anchor_top_px)
-        })
-        .collect::<Vec<_>>();
-
-    let result = CaptionLayoutPolicy::default().layout_blocks(caption_blocks, 3840, 1024);
-
+    });
+    let result =
+        CaptionLayoutPolicy::default().layout_blocks(runtime.caption_blocks(), 3840, 1024);
+    assert_eq!(result.visible_blocks.len(), 2);
     let peer = result
         .visible_blocks
         .iter()
@@ -1022,19 +887,37 @@ fn renderer_source_only_peer_finalized_with_state_generated_slots_does_not_overl
         .find(|block| block.id == "self:final")
         .unwrap();
 
-    assert_eq!(peer.block_variant, CaptionBlockVariant::Finalized);
+    assert_eq!(peer.block_variant, expected_variant);
     assert_eq!(peer.channel, Some(CaptionChannel::PeerChannel));
     assert!(peer.primary_lines.iter().all(|line| line.text.is_empty()));
     assert_eq!(
         peer.secondary_line.as_ref().map(|line| line.text.as_str()),
-        Some("translation unavailable, showing original source text")
+        Some(source)
     );
     assert!(peer.secondary_reserved);
     assert!(
         peer.bounds.bottom_px <= self_block.bounds.top_px,
-        "peer source-only bounds {:?} should not overlap next row {:?}",
+        "{expected_variant:?} peer bounds {:?} should not overlap next row {:?}",
         peer.bounds,
         self_block.bounds
+    );
+}
+
+#[test]
+fn renderer_active_peer_with_state_generated_slots_does_not_overlap_next_row() {
+    assert_source_only_peer_does_not_overlap_next_row(
+        OverlayPresentationBlockVariant::ActivePeer,
+        CaptionBlockVariant::ActivePeer,
+        "Can you hear me?",
+    );
+}
+
+#[test]
+fn renderer_source_only_peer_finalized_with_state_generated_slots_does_not_overlap_next_row() {
+    assert_source_only_peer_does_not_overlap_next_row(
+        OverlayPresentationBlockVariant::Finalized,
+        CaptionBlockVariant::Finalized,
+        "translation unavailable, showing original source text",
     );
 }
 

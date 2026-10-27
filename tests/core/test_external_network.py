@@ -8,7 +8,7 @@ import os
 import socket
 import ssl
 import threading
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
@@ -103,7 +103,7 @@ def certificates(tmp_path):
 
 
 @contextmanager
-def http_server(context=None, *, ipv6=False, requests=None):
+def http_server(context=None, *, ipv6=None, requests=None, handler=None):
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             if requests is not None:
@@ -116,19 +116,22 @@ def http_server(context=None, *, ipv6=False, requests=None):
         def log_message(self, *args):
             pass
 
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    handler = handler or Handler
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     servers = [server]
-    if ipv6:
+    if ipv6 is True or (ipv6 is None and socket.has_ipv6):
 
         class IPv6Server(ThreadingHTTPServer):
             address_family = socket.AF_INET6
 
-        servers.append(IPv6Server(("::1", server.server_address[1]), Handler))
+        servers.append(IPv6Server(("::1", server.server_address[1]), handler))
     threads = []
     for current in servers:
         if context is not None:
             current.socket = context.wrap_socket(current.socket, server_side=True)
-        thread = threading.Thread(target=current.serve_forever, daemon=True)
+        thread = threading.Thread(
+            target=current.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+        )
         thread.start()
         threads.append(thread)
     try:
@@ -139,6 +142,16 @@ def http_server(context=None, *, ipv6=False, requests=None):
             current.server_close()
         for thread in threads:
             thread.join()
+
+
+@asynccontextmanager
+async def loopback_websocket_server(handler, **options):
+    async with AsyncExitStack() as stack:
+        server = await stack.enter_async_context(serve(handler, "127.0.0.1", 0, **options))
+        if socket.has_ipv6:
+            port = server.sockets[0].getsockname()[1]
+            await stack.enter_async_context(serve(handler, "::1", port, **options))
+        yield server
 
 
 @asynccontextmanager
@@ -215,12 +228,21 @@ async def recording_proxy(context=None, *, socks=False):
         task.add_done_callback(tasks.discard)
 
     server = await asyncio.start_server(accept, "127.0.0.1", 0, ssl=context)
+    servers = [server]
     try:
+        if socket.has_ipv6:
+            servers.append(
+                await asyncio.start_server(
+                    accept, "::1", server.sockets[0].getsockname()[1], ssl=context
+                )
+            )
         scheme = "socks5" if socks else "https" if context is not None else "http"
         yield f"{scheme}://localhost:{server.sockets[0].getsockname()[1]}", requests
     finally:
-        server.close()
-        await server.wait_closed()
+        for listener in servers:
+            listener.close()
+        for listener in servers:
+            await listener.wait_closed()
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -280,7 +302,7 @@ async def test_explicit_ca_https_and_wss(certificates, monkeypatch, directory):
         async with network_clients.external_async_client() as client:
             assert (await client.get(f"https://localhost:{port}")).text == "ok"
         assert await asyncio.to_thread(lambda: _sync_get(f"https://localhost:{port}")) == "ok"
-    async with serve(echo, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
+    async with loopback_websocket_server(echo, ssl=contexts["valid"]) as server:
         async with network_clients.external_websocket_connect(
             f"wss://localhost:{server.sockets[0].getsockname()[1]}",
             additional_headers={"Authorization": TEST_AUTHORIZATION},
@@ -350,7 +372,7 @@ async def test_https_wss_proxy_parity(certificates, monkeypatch, https_proxy, pr
                     return session.get(f"https://localhost:{port}").text
 
             assert await asyncio.to_thread(request) == "ok"
-        async with serve(echo, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
+        async with loopback_websocket_server(echo, ssl=contexts["valid"]) as server:
             url = f"wss://localhost:{server.sockets[0].getsockname()[1]}"
             async with network_clients.external_websocket_connect(
                 url, additional_headers={"Authorization": TEST_AUTHORIZATION}
@@ -376,7 +398,7 @@ async def test_no_proxy_bypasses_both_transports(certificates, monkeypatch):
     with http_server(contexts["valid"]) as port:
         async with network_clients.external_async_client() as client:
             assert (await client.get(f"https://localhost:{port}")).status_code == 200
-    async with serve(echo, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
+    async with loopback_websocket_server(echo, ssl=contexts["valid"]) as server:
         async with network_clients.external_websocket_connect(
             f"wss://localhost:{server.sockets[0].getsockname()[1]}",
             additional_headers={"Authorization": TEST_AUTHORIZATION},
@@ -416,7 +438,7 @@ async def test_socks5_http_and_async_websocket_routes(certificates, monkeypatch)
                     return session.get(url).text
 
             assert await asyncio.to_thread(request) == "ok"
-        async with serve(echo, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
+        async with loopback_websocket_server(echo, ssl=contexts["valid"]) as server:
             url = f"wss://localhost:{server.sockets[0].getsockname()[1]}"
             async with network_clients.external_websocket_connect(
                 url, additional_headers={"Authorization": TEST_AUTHORIZATION}
@@ -766,19 +788,13 @@ async def test_actual_broker_oauth_start_retains_proxy_tls_rate_limit_and_valid_
         def log_message(self, *args):
             pass
 
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    server.socket = contexts["valid"].wrap_socket(server.socket, server_side=True)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
+    with http_server(contexts["valid"], handler=Handler) as port:
         async with recording_proxy(
             contexts["valid"] if proxy_scheme == "https" else None,
             socks=proxy_scheme == "socks5",
         ) as (proxy, recorded):
             monkeypatch.setenv("HTTPS_PROXY", proxy)
-            client = HttpManagedOpenRouterBrokerClient(
-                f"https://localhost:{server.server_address[1]}"
-            )
+            client = HttpManagedOpenRouterBrokerClient(f"https://localhost:{port}")
             kwargs = {
                 "installation_id": "synthetic-installation",
                 "device_public_key": "synthetic-device",
@@ -807,7 +823,3 @@ async def test_actual_broker_oauth_start_retains_proxy_tls_rate_limit_and_valid_
                 )
             finally:
                 await client.close()
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join()

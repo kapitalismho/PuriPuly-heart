@@ -3,9 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
-from puripuly_heart.config.llm_profiles import get_openrouter_llm_profile
 from puripuly_heart.config.provider_values import OpenRouterCredentialSource
-from puripuly_heart.config.settings_vnext import compat, serialization
+from puripuly_heart.config.settings_vnext import compat
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 
@@ -71,14 +70,15 @@ def canonical_settings(settings: ReleaseSettings) -> AppSettingsVNext:
         openrouter_selected_source=source_value,
     )
     alias_value = _value(settings.openrouter.selection_alias)
-    if alias_value and alias_value != "none":
-        profile = get_openrouter_llm_profile(alias_value)
-        if profile is not None:
-            translation = replace(
-                translation,
-                openrouter_selection_alias=alias_value,
-                openrouter_model=profile.openrouter_model,
-            )
+    translation = replace(
+        translation,
+        openrouter_selection_alias=(
+            translation.openrouter_selection_alias
+            if alias_value in {None, "", "none"}
+            else alias_value
+        ),
+        openrouter_model=_value(settings.openrouter.llm_model) or translation.openrouter_model,
+    )
     identity = settings.managed_identity
     return replace(
         current,
@@ -121,7 +121,3 @@ def load_release_settings(path: Path) -> ReleaseSettings:
         ),
         managed_identity=ManagedIdentityBag(**asdict(identity)),
     )
-
-
-def serialize_release_settings(settings: ReleaseSettings) -> dict[str, object]:
-    return serialization.to_dict(canonical_settings(settings))

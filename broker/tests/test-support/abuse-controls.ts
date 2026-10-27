@@ -268,7 +268,7 @@ export function readAbuseControls(env: TestBrokerEnv): StoredAbuseControls {
     throw new Error('missing broker_config row: abuse_controls');
   }
 
-  return normalizeAbuseControls(JSON.parse(row.value) as unknown);
+  return JSON.parse(row.value) as StoredAbuseControls;
 }
 
 export function updateAbuseControls(
@@ -297,7 +297,7 @@ export function readAbuseRuntimeState(env: TestBrokerEnv): StoredAbuseRuntimeSta
     throw new Error('missing broker_config row: abuse_runtime_state');
   }
 
-  return normalizeAbuseRuntimeState(JSON.parse(row.value) as unknown);
+  return JSON.parse(row.value) as StoredAbuseRuntimeState;
 }
 
 export function updateAbuseRuntimeState(
@@ -394,74 +394,6 @@ export function insertSubjectHook(
       input.reason ?? null,
       input.expires_at ?? null,
     );
-}
-
-function normalizeAbuseControls(value: unknown): StoredAbuseControls {
-  const normalized = cloneJson(TEST_DEFAULT_ABUSE_CONTROLS);
-  if (!isRecord(value)) {
-    return normalized;
-  }
-
-  assignRecord(normalized, value);
-  assignRecord(normalized.trialChallenge, value.trialChallenge);
-  assignRecord(normalized.trialChallengeVerify, value.trialChallengeVerify);
-  assignRecord(normalized.openrouterIssue, value.openrouterIssue);
-  assignRecord(normalized.trialStatus, value.trialStatus);
-  assignRecord(normalized.discordAuthStartIp, value.discordAuthStartIp);
-  assignRecord(
-    normalized.discordAuthStartInstallation,
-    value.discordAuthStartInstallation,
-  );
-  assignRecord(normalized.discordOpenrouterIssueIp, value.discordOpenrouterIssueIp);
-  assignRecord(
-    normalized.discordOpenrouterIssueInstallation,
-    value.discordOpenrouterIssueInstallation,
-  );
-  assignRecord(normalized.qqAuthAssertIp, value.qqAuthAssertIp);
-  assignRecord(normalized.pendingDiscordOAuthSessions, value.pendingDiscordOAuthSessions);
-  assignRecord(normalized.newActiveEntitlementsPerDay, value.newActiveEntitlementsPerDay);
-  assignRecord(normalized.immediateAlerts, value.immediateAlerts);
-  normalized.immediateAlerts = {
-    warning: normalized.immediateAlerts.warning,
-    brake: normalized.immediateAlerts.brake,
-  };
-  assignRecord(normalized.retention, value.retention);
-  assignRecord(normalized.dailyReport, value.dailyReport);
-
-  return normalized;
-}
-
-function normalizeAbuseRuntimeState(value: unknown): StoredAbuseRuntimeState {
-  const normalized = cloneJson(TEST_DEFAULT_ABUSE_RUNTIME_STATE);
-  if (!isRecord(value)) {
-    return normalized;
-  }
-
-  assignRecord(normalized, value);
-  assignRecord(normalized.brake, value.brake);
-  assignRecord(normalized.alertLatches, value.alertLatches);
-  normalized.alertLatches = {
-    warning: normalized.alertLatches.warning,
-    warningObservedAt: normalized.alertLatches.warningObservedAt,
-  };
-  assignRecord(normalized.dailyReport, value.dailyReport);
-  return normalized;
-}
-
-function assignRecord<T extends object>(target: T, source: unknown): void {
-  if (!isRecord(source)) {
-    return;
-  }
-
-  Object.assign(target, source);
-}
-
-function cloneJson<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export async function stableIpHookValue(

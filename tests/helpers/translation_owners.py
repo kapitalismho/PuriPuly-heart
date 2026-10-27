@@ -10,6 +10,7 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
 )
 
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import RuntimePipelineResourceOwner
 from puripuly_heart.core.audio.ownership import (
     AudioSegmentSettingsSnapshot,
     OwnedVadEvent,
@@ -101,10 +102,9 @@ def owned_peer_speech_end(
 
 
 class _PeerFinalTestAdmission:
-    __slots__ = ("_output_runtime", "_parent_source_orders", "_source_order")
+    __slots__ = ("_parent_source_orders", "_source_order")
 
-    def __init__(self, output_runtime: OutputRuntime) -> None:
-        self._output_runtime = output_runtime
+    def __init__(self) -> None:
         self._parent_source_orders: dict[UUID, int] = {}
         self._source_order = 0
 
@@ -125,7 +125,6 @@ class _PeerFinalTestAdmission:
                 publication_generation=generation,
                 source_order=source_order,
             )
-        self._output_runtime.activate_peer_generation(generation)
         return transcript
 
 
@@ -153,6 +152,7 @@ class TranslationOwnersTestHarness:
         "_stt_sessions",
         "_started",
         "_peer_test_admission",
+        "_resources",
     )
 
     def __init__(
@@ -186,6 +186,22 @@ class TranslationOwnersTestHarness:
         object.__setattr__(self, "_stt_sessions", stt_sessions)
         object.__setattr__(self, "_started", False)
         object.__setattr__(self, "_peer_test_admission", peer_test_admission)
+        object.__setattr__(
+            self,
+            "_resources",
+            RuntimePipelineResourceOwner(
+                output_runtime=output_runtime,
+                self_runtime=self_owner.runtime,
+                peer_runtime=peer_owner.runtime,
+                self_translation_channel=self_owner,
+                peer_translation_channel=peer_owner,
+                translation_turns=peer_owner.translation_turns,
+                local_asr_runtime=local_asr_runtime,
+                llm_runtime=llm_runtime,
+                self_ingress_open=True,
+                peer_ingress_open=True,
+            ),
+        )
 
     @property
     def self_owner(self) -> SelfTranslationChannelOwner:
@@ -252,8 +268,8 @@ class TranslationOwnersTestHarness:
         return self._self_owner.clock
 
     @property
-    def started(self) -> bool:
-        return self._started
+    def resources(self) -> RuntimePipelineResourceOwner:
+        return self._resources
 
     def replace_configuration(self, **changes: object) -> None:
         self._translation_runtime_configuration.transform(
@@ -267,12 +283,10 @@ class TranslationOwnersTestHarness:
         self._peer_owner.diagnostics.clock = clock
         self._peer_owner.translation_requests.set_clock(clock)
 
-    def set_started_for_test(self, started: bool) -> None:
-        object.__setattr__(self, "_started", started)
-
     def replace_translation_turn_owner_for_test(self, owner: object) -> None:
         self._self_owner.translation_turns = owner
         self._peer_owner.translation_turns = owner
+        self._resources.translation_turns = owner
 
     async def dispatch_stt_event(self, event: object) -> None:
         if isinstance(event, STTFinalEvent) and event.channel == "peer":
@@ -442,10 +456,6 @@ class TranslationOwnersTestHarness:
             return
         await self._peer_owner.clear_language_runtime_state(channel=channel)
 
-    async def reset_runtime_state(self) -> None:
-        await self._self_owner.runtime.reset_runtime_state()
-        await self._peer_owner.reset_provider_channel("peer")
-
     def clear_context(self) -> None:
         self._self_owner.translation_requests.clear_context()
 
@@ -521,52 +531,17 @@ class TranslationOwnersTestHarness:
         return runtime.get_or_create_bundle(utterance_id)
 
     async def start(self, *, auto_flush_osc: bool = False) -> None:
-        if self._started:
-            return
-        await self._output_runtime.start(auto_flush_chatbox=auto_flush_osc)
-        await self._self_owner.open_ingress()
-        await self._peer_owner.open_ingress()
-        await self._peer_owner.translation_turns.open_channel_ingress("self")
-        await self._peer_owner.translation_turns.open_channel_ingress("peer")
-        await self._peer_owner.translation_turns.start()
-        await self._local_asr_runtime.start()
+        callbacks = self._resources.start_callbacks
+        await callbacks.start_output(auto_flush_osc)
+        await callbacks.open_self_ingress()
+        await callbacks.open_peer_ingress()
+        await callbacks.start_translation_turns()
+        await callbacks.start_local_asr()
         object.__setattr__(self, "_started", True)
 
     async def stop(self) -> None:
-        failures: list[BaseException] = []
-        was_started = self._started
         object.__setattr__(self, "_started", False)
-        for callback in (
-            self._self_owner.close_ingress,
-            self._peer_owner.close_ingress,
-            lambda: self._peer_owner.translation_turns.close_channel_ingress("self"),
-            lambda: self._peer_owner.translation_turns.close_channel_ingress("peer"),
-            self._peer_owner.translation_turns.close,
-            self._output_runtime.close,
-        ):
-            try:
-                await callback()
-            except BaseException as exc:
-                failures.append(exc)
-        if was_started:
-            for callback in (
-                self._output_projection.reset_overlay_preview,
-                self._self_owner.close,
-                self._peer_owner.close,
-            ):
-                try:
-                    await callback()
-                except BaseException as exc:
-                    failures.append(exc)
-        for callback in (
-            self._local_asr_runtime.close,
-            self._llm_runtime.close,
-        ):
-            try:
-                await callback()
-            except BaseException as exc:
-                failures.append(exc)
-        _raise_failures(failures)
+        await self._resources.close()
 
     def has_stt_provider(self, channel: str) -> bool:
         return self._local_asr_runtime.snapshot.channel_for(channel).provider_id is not None
@@ -710,7 +685,7 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
         clock=clock,
         overlay_sink=overlay_sink,
     )
-    peer_test_admission = _PeerFinalTestAdmission(output_runtime)
+    peer_test_admission = _PeerFinalTestAdmission()
 
     async def peer_test_event_handler(event: object) -> None:
         await _dispatch_peer_test_provider_event(callbacks, peer_test_admission, event)
@@ -796,6 +771,7 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
     )
     callbacks.bind_self(self_owner)
     callbacks.bind_peer(peer_owner)
+    output_runtime.activate_peer_generation(1)
     return TranslationOwnersTestHarness(
         peer_owner=peer_owner,
         self_owner=self_owner,
@@ -809,19 +785,6 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
         stt_sessions=stt_sessions,
         peer_test_admission=peer_test_admission,
     )
-
-
-def _raise_failures(failures: list[BaseException]) -> None:
-    if not failures:
-        return
-    if len(failures) == 1:
-        raise failures[0]
-    if all(isinstance(failure, Exception) for failure in failures):
-        raise ExceptionGroup(
-            "translation-owner test lifecycle cleanup failed",
-            [failure for failure in failures if isinstance(failure, Exception)],
-        )
-    raise BaseExceptionGroup("translation-owner test lifecycle cleanup failed", failures)
 
 
 __all__ = ["TranslationOwnersTestHarness", "compose_translation_test_harness"]

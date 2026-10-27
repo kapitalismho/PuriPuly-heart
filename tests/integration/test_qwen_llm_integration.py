@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from uuid import uuid4
 
 import pytest
 
@@ -35,16 +34,7 @@ async def test_qwen_llm_translation_smoke() -> None:
         model=os.getenv("QWEN_LLM_MODEL", "qwen3.8-flash"),
     )
 
-    translation = await provider.translate(
-        utterance_id=uuid4(),
-        text="안녕하세요",
-        system_prompt="Translate from ${sourceName} to ${targetName}.",
-        source_language="ko",
-        target_language="en",
-        context="",
-    )
-
-    assert translation.text
+    await run_llm_smoke(provider)
 
 
 @pytest.mark.asyncio

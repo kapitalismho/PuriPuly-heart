@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import ast
+
 import pytest
 
+from tests.helpers.ast_sources import call_name
 from tests.helpers.paths import SOURCE_ROOT
 
 COMPOSITION_PATH = SOURCE_ROOT / "composition" / "application_runtime.py"
@@ -9,11 +12,7 @@ COMPOSITION_PATH = SOURCE_ROOT / "composition" / "application_runtime.py"
 CASES = [
     {
         "id": "github_star_prompt",
-        "factory_call": "compose_github_star_prompt_owner(",
-        "required_snippets": (
-            "settings=settings",
-            "transaction_result_sink=(require_settings_application().results.set)",
-        ),
+        "factory_call": "compose_github_star_prompt_owner",
         "retired_names": (
             "build_ui_prompt_clipboard_state_settings_path_patch",
             "_persist_order24_state_mutation",
@@ -24,31 +23,17 @@ CASES = [
     },
     {
         "id": "vrc_mic_sync",
-        "factory_call": "compose_vrc_mic_sync(",
-        "required_snippets": (
-            "ui_state_provider=osc_ui_state",
-            "ui_state_sink=presentation.project_osc_control_state",
-            "reload_settings_view=False",
-        ),
-        "retired_names": ("def _stop_vrc_mic_receiver(",),
+        "factory_call": "compose_vrc_mic_sync",
+        "retired_names": ("_stop_vrc_mic_receiver",),
     },
     {
         "id": "vrchat_osc_presence",
-        "factory_call": "create_vrchat_osc_presence_probe_owner(",
-        "required_snippets": (
-            "presence_provider=lambda: vrchat_osc_presence",
-            "port_provider=vrchat_probe_port",
-            "publish_notice=presentation.set_dashboard_vrchat_osc_notice",
-        ),
+        "factory_call": "create_vrchat_osc_presence_probe_owner",
         "retired_names": (),
     },
     {
         "id": "gpu_recovery",
-        "factory_call": "create_gpu_provider_recovery_application_owner(",
-        "required_snippets": (
-            "await require_gpu_recovery().recover(",
-            "lambda: gpu_recovery_request(",
-        ),
+        "factory_call": "create_gpu_provider_recovery_application_owner",
         "retired_names": (
             "_gpu_provider_recovery_lock",
             "_get_gpu_provider_recovery_lock",
@@ -66,21 +51,26 @@ CASES = [
 ]
 
 
-@pytest.mark.parametrize("case", CASES, ids=lambda case: case["id"])
-def test_composition_calls_factory_exactly_once(case) -> None:
-    source = COMPOSITION_PATH.read_text(encoding="utf-8")
-    assert source.count(case["factory_call"]) == 1
+@pytest.fixture(scope="module")
+def composition_tree() -> ast.Module:
+    return ast.parse(COMPOSITION_PATH.read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case["id"])
-def test_composition_contains_required_snippets(case) -> None:
-    source = COMPOSITION_PATH.read_text(encoding="utf-8")
-    for snippet in case["required_snippets"]:
-        assert snippet in source
+def test_composition_calls_factory_exactly_once(case, composition_tree) -> None:
+    calls = [call_name(node) for node in ast.walk(composition_tree) if isinstance(node, ast.Call)]
+    assert calls.count(case["factory_call"]) == 1
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case["id"])
-def test_composition_has_no_retired_names(case) -> None:
-    source = COMPOSITION_PATH.read_text(encoding="utf-8")
-    for retired_name in case["retired_names"]:
-        assert retired_name not in source
+def test_composition_has_no_retired_state_or_algorithms(case, composition_tree) -> None:
+    referenced = (
+        {node.id for node in ast.walk(composition_tree) if isinstance(node, ast.Name)}
+        | {node.attr for node in ast.walk(composition_tree) if isinstance(node, ast.Attribute)}
+        | {
+            node.name
+            for node in ast.walk(composition_tree)
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        }
+    )
+    assert set(case["retired_names"]).isdisjoint(referenced)

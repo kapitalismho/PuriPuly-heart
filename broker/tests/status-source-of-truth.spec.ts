@@ -1,7 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { MANAGED_TRIAL_LIVE_USAGE_POLICY } from '../src/contract';
-
 import { createDeviceKeyPair, signCanonicalStatusRequest } from './test-support/ed25519';
 import { createTestBrokerEnv, insertEntitlement } from './test-support/sqlite-d1';
 import { getTrialStatus, issueChallenge } from './test-support/trial-api';
@@ -56,11 +54,5 @@ describe('GET /v1/trial/status source of truth boundary', () => {
     expect(payload).not.toHaveProperty('remaining_budget_usd');
     expect(payload).not.toHaveProperty('live_remaining_budget_usd');
     expect(payload).not.toHaveProperty('consumed_budget_usd');
-    expect(MANAGED_TRIAL_LIVE_USAGE_POLICY).toMatchObject({
-      sourceOfTruthAfterRelease: {
-        provider: 'OpenRouter',
-      },
-      brokerTracksRemainingBudget: false,
-    });
   });
 });

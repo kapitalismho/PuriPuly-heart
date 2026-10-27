@@ -364,16 +364,6 @@ class FixedStartTransition:
         return self.status
 
 
-class SuccessfulStartTransition:
-    async def begin_start(self, execution_factory) -> str:
-        execution = execution_factory()
-        if not await execution.teardown():
-            return "teardown_failed"
-        runtime = execution.create_runtime()
-        execution.on_starting(runtime, execution.resolve_target())
-        return "started"
-
-
 class RaisingStartTransition:
     async def begin_start(self, _execution_factory) -> str:
         raise RuntimeError("fallback start failed")
@@ -648,8 +638,22 @@ async def test_retry_every_enable_policy_retries_configured_steamvr_after_disabl
     assert owner.effective_target_for_start() == "steamvr"
 
 
-async def test_caption_disable_keeps_listen_intent_and_capture_demand() -> None:
+@pytest.fixture
+async def pending_peer_overlay(monkeypatch):
+    async def pending_start(self, runtime):
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(OverlayApplicationOwner, "run_start", pending_start)
     harness = PeerOverlayHarness()
+    try:
+        yield harness
+    finally:
+        harness.refresh_error = None
+        await harness.overlay.close()
+
+
+async def test_caption_disable_keeps_listen_intent_and_capture_demand(pending_peer_overlay) -> None:
+    harness = pending_peer_overlay
     await harness.activate_peer()
     harness.capture_runtime.activate_capture()
     harness.peer.sync_effective_flags()
@@ -664,7 +668,6 @@ async def test_caption_disable_keeps_listen_intent_and_capture_demand() -> None:
     assert all(desired for desired, _stop_mode in harness.capture_runtime.policy_calls)
     assert harness.capture_runtime.close_calls == 0
     assert harness.peer.snapshot().desired_active is True
-    harness.overlay._transition_owner = cast(object, SuccessfulStartTransition())
     await harness.overlay.set_enabled(True)
 
     assert harness.overlay.state == "starting"
@@ -702,11 +705,12 @@ async def test_fallback_task_creation_failure_terminates_real_peer_activation() 
     assert harness.overlay.fallback_owner.task is None
 
 
-async def test_fallback_starts_before_peer_refresh_failure_without_hiding_peer_state() -> None:
-    harness = PeerOverlayHarness()
+async def test_fallback_starts_before_peer_refresh_failure_without_hiding_peer_state(
+    pending_peer_overlay,
+) -> None:
+    harness = pending_peer_overlay
     await harness.activate_peer()
     harness.refresh_error = RuntimeError("peer refresh failed")
-    harness.overlay._transition_owner = cast(object, SuccessfulStartTransition())
 
     await harness.overlay.handle_start_failure("steamvr_not_running")
     fallback_task = harness.overlay.fallback_owner.task
@@ -718,10 +722,11 @@ async def test_fallback_starts_before_peer_refresh_failure_without_hiding_peer_s
     assert harness.peer.snapshot().activation_starting is True
 
 
-async def test_successful_fallback_keeps_real_peer_starting_until_capture_effective() -> None:
-    harness = PeerOverlayHarness()
+async def test_successful_fallback_keeps_real_peer_starting_until_capture_effective(
+    pending_peer_overlay,
+) -> None:
+    harness = pending_peer_overlay
     await harness.activate_peer()
-    harness.overlay._transition_owner = cast(object, SuccessfulStartTransition())
 
     await harness.overlay.handle_start_failure("steamvr_not_running")
     fallback_task = harness.overlay.fallback_owner.task
@@ -732,12 +737,8 @@ async def test_successful_fallback_keeps_real_peer_starting_until_capture_effect
     assert harness.states == [("starting", None)]
     assert harness.peer_surface_states == ["starting"]
 
-    harness.peer.bind_runtime(
-        cast(
-            object,
-            SimpleNamespace(snapshot=SimpleNamespace(effective_active=True)),
-        )
-    )
+    harness.capture_runtime.activate_capture()
+    harness.peer.sync_effective_flags()
     harness.overlay.mark_connected()
 
     assert harness.peer.snapshot().activation_starting is False

@@ -20,8 +20,6 @@ use crate::manifest::{
     validate_manifest, HandoffExperiment, OverlayManifest, QuietTailProfile,
     EXPECTED_CONTRACT_VERSION,
 };
-#[cfg(test)]
-use crate::openvr::OpenVrError;
 use crate::openvr::{
     perform_startup_preflight, OpenVrEventClass, OpenVrOverlay, OpenVrRuntimeEvent,
     OpenVrStartupPreflightError, OverlayFrameSubmitter, SpatialReanchorOutcome,
@@ -1595,17 +1593,6 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         }
     }
 
-    #[cfg(test)]
-    fn finish_initial_reconcile(
-        &mut self,
-        result: Result<(), RuntimeFailure>,
-    ) -> Result<(), RuntimeFailure> {
-        if result.is_err() {
-            let _ = self.teardown();
-        }
-        result
-    }
-
     fn channel_generation(&self, channel: FreshRetryChannel) -> Option<u64> {
         let generations = self
             .runtime
@@ -2775,20 +2762,6 @@ fn startup_error_from_renderer(error: crate::renderer::CaptionRenderError) -> St
     StartupError::RendererInit(error.to_string())
 }
 
-#[cfg(test)]
-fn prepare_openvr_runtime<T, P, F>(
-    overlay_instance_id: &str,
-    preflight: P,
-    overlay_factory: F,
-) -> Result<T, StartupError>
-where
-    P: FnOnce() -> Result<(), OpenVrStartupPreflightError>,
-    F: FnOnce(&str) -> Result<T, OpenVrError>,
-{
-    preflight().map_err(startup_error_from_preflight)?;
-    overlay_factory(overlay_instance_id).map_err(startup_error_from_openvr)
-}
-
 async fn initialize_and_connect_runtime<R>(
     manifest: &OverlayManifest,
     initialize: impl Future<Output = Result<R, StartupError>>,
@@ -2876,10 +2849,10 @@ fn caption_block_for_strip(strip: &OverlaySlot) -> CaptionBlock {
 #[cfg(test)]
 mod tests {
     use super::{
-        initialize_and_connect_runtime, prepare_openvr_runtime, startup_error_from_runtime_failure,
-        FrameCycleOutcome, FreshRetryChannel, NativeFreshSchedule, NativePresentationOwner,
-        OverlayRuntime, RetainedFrame, RuntimeFailure, SnapshotApplyOutcome, StartupError,
-        NATIVE_FRESH_AUDIT_CAPACITY, NATIVE_FRESH_RETRY_MAX_COMPLETED,
+        initialize_and_connect_runtime, startup_error_from_runtime_failure, FrameCycleOutcome,
+        FreshRetryChannel, NativeFreshSchedule, NativePresentationOwner, OverlayRuntime,
+        RetainedFrame, RuntimeFailure, SnapshotApplyOutcome, StartupError, NATIVE_FRESH_AUDIT_CAPACITY,
+        NATIVE_FRESH_RETRY_MAX_COMPLETED,
     };
     use crate::bridge::{BridgeClient, BridgeIncoming};
     use crate::logging::OverlayLogger;
@@ -2910,8 +2883,7 @@ mod tests {
         );
     }
     use crate::openvr::{
-        FakeOpenVr, OpenVrError, OpenVrRuntimeEvent, OpenVrStartupPreflightError,
-        OverlayFrameSubmitter, SpatialReanchorOutcome,
+        FakeOpenVr, OpenVrError, OpenVrRuntimeEvent, OverlayFrameSubmitter, SpatialReanchorOutcome,
     };
     use crate::presentation::{
         AdapterIdentity, PresentationBackend, PresentationCause, PresentationCauseChannel,
@@ -2927,7 +2899,6 @@ mod tests {
     };
     use futures_util::{SinkExt, StreamExt};
     use serde_json::json;
-    use std::cell::Cell;
     use std::io;
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
@@ -3311,7 +3282,7 @@ mod tests {
         let output = std::process::Command::new("uv")
             .args([
                 "run",
-                "--frozen",
+                "--locked",
                 "python",
                 "-m",
                 "tests.helpers.overlay_active_freshness",
@@ -3604,23 +3575,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn initial_reconcile_failure_path_releases_owner_resources_and_handle() {
-        let mut owner = NativePresentationOwner::new(
-            OverlayPresentationSnapshot::default(),
-            CaptionRenderer::new_for_test().unwrap(),
-            FakeOpenVr::default(),
-        );
-        let retry = owner.retry_handle();
-
-        let result = owner.finish_initial_reconcile(Err(RuntimeFailure::Bridge(
-            "injected reconcile logging failure".into(),
-        )));
-
-        assert!(matches!(result, Err(RuntimeFailure::Bridge(_))));
-        assert!(owner.resources_released());
-        assert!(!retry.request());
-    }
     use std::io::Write;
     use std::time::Duration;
     use tokio::time::Instant;
@@ -4560,37 +4514,6 @@ mod tests {
             String::from_utf8(stdout.contents()).unwrap(),
             "[overlay][WARN] drain_marker\n",
         );
-    }
-
-    #[test]
-    fn prepare_openvr_runtime_orders_preflight_before_overlay_factory() {
-        let overlay_factory_calls = Cell::new(0);
-
-        let result = prepare_openvr_runtime(
-            "overlay-test",
-            || Err(OpenVrStartupPreflightError::SteamVrNotRunning),
-            |_| {
-                overlay_factory_calls.set(overlay_factory_calls.get() + 1);
-                Ok(())
-            },
-        );
-
-        assert_eq!(result, Err(StartupError::SteamVrNotRunning));
-        assert_eq!(overlay_factory_calls.get(), 0);
-
-        let overlay_factory_calls = Cell::new(0);
-
-        let result = prepare_openvr_runtime(
-            "overlay-test",
-            || Ok(()),
-            |_| {
-                overlay_factory_calls.set(overlay_factory_calls.get() + 1);
-                Ok::<_, OpenVrError>("overlay-ready")
-            },
-        );
-
-        assert_eq!(result, Ok("overlay-ready"));
-        assert_eq!(overlay_factory_calls.get(), 1);
     }
 
     #[test]

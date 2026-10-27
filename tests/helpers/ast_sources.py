@@ -105,11 +105,10 @@ def assert_no_forbidden_imports(path: Path, forbidden_prefixes: tuple[str, ...])
     }
 
 
-def find_constructions(class_name: str, root: Path) -> list[str]:
-    results: list[str] = []
-    for source_file in sorted(root.rglob("*.py")):
-        tree = ast.parse(source_file.read_text(encoding="utf-8"))
+def find_constructions(class_names: tuple[str, ...], root: Path) -> dict[str, list[str]]:
+    results: dict[str, list[str]] = {name: [] for name in class_names}
+    for module, tree in first_party_ast_sources(root, (".",)):
         for node in ast.walk(tree):
-            if isinstance(node, ast.Call) and call_name(node) == class_name:
-                results.append(source_file.relative_to(root).as_posix())
+            if isinstance(node, ast.Call) and (name := call_name(node)) in results:
+                results[name].append(module)
     return results

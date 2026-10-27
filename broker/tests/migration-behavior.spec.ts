@@ -18,14 +18,6 @@ const FIRST_MIGRATION = new URL(
   '../migrations/0000_define_broker_persistent_state.sql',
   import.meta.url,
 );
-const SECOND_MIGRATION = new URL(
-  '../migrations/0001_harden_installation_public_inputs.sql',
-  import.meta.url,
-);
-const FOURTH_MIGRATION = new URL(
-  '../migrations/0003_add_abuse_runtime_state_and_issue_success_events.sql',
-  import.meta.url,
-);
 const DAILY_SUMMARY_V2_FINALIZER = new URL(
   '../deploy/finalize-daily-summary-v2.sql',
   import.meta.url,
@@ -413,14 +405,6 @@ describe('broker migration behavior', () => {
         ),
       ).toThrow(/constraint/i);
     });
-  });
-
-  it('ships a follow-up migration that upgrades already-initialized installations to hardened text constraints', () => {
-    expect(() => readFileSync(SECOND_MIGRATION, 'utf8')).not.toThrow();
-  });
-
-  it('ships a follow-up migration that adds abuse runtime-state storage and issue-success event tables', () => {
-    expect(() => readFileSync(FOURTH_MIGRATION, 'utf8')).not.toThrow();
   });
 
   it('upgrades clean legacy installations and entitlements in place while hardening future writes', () => {

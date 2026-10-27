@@ -6,13 +6,11 @@ import json
 import os
 import socket
 import sys
-import threading
 from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 
 import httpx
 import pytest
-from websockets.asyncio.server import serve
 from websockets.exceptions import SecurityError
 
 from puripuly_heart.core import external_network, network_clients, updater
@@ -27,7 +25,11 @@ from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (
 from puripuly_heart.core.network_diagnostics import safe_transport_fields
 from puripuly_heart.core.network_requests import ExternalRequestsSession
 from tests.core.test_external_network import certificates as certificates
-from tests.core.test_external_network import http_server, recording_proxy
+from tests.core.test_external_network import (
+    http_server,
+    loopback_websocket_server,
+    recording_proxy,
+)
 from tests.core.test_external_network import (
     isolated_network_environment as isolated_network_environment,
 )
@@ -71,7 +73,7 @@ async def test_bare_proxy_address_relays_httpx_requests_and_websocket(certificat
                     return client.get(url, timeout=5).text
 
             assert await asyncio.to_thread(request) == "ok"
-        async with serve(echo, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
+        async with loopback_websocket_server(echo, ssl=contexts["valid"]) as server:
             async with network_clients.external_websocket_connect(
                 f"wss://localhost:{server.sockets[0].getsockname()[1]}"
             ) as ws:
@@ -118,7 +120,7 @@ async def test_websocket_redirect_reselects_snapshot_and_proxy_tls(
         recording_proxy(contexts["valid"]) as (tls_proxy, tls_recorded),
         recording_proxy() as (http_proxy, http_recorded),
     ):
-        async with serve(target, "127.0.0.1", 0, ssl=contexts["valid"]) as target_server:
+        async with loopback_websocket_server(target, ssl=contexts["valid"]) as target_server:
             target_port = target_server.sockets[0].getsockname()[1]
             target_url = f"wss://localhost:{target_port}/destination"
 
@@ -131,10 +133,8 @@ async def test_websocket_redirect_reselects_snapshot_and_proxy_tls(
                 pytest.fail("Redirect source must not finish a websocket handshake")
 
             upgraded = transition in ("tls_to_http", "http_to_tls")
-            async with serve(
+            async with loopback_websocket_server(
                 unexpected,
-                "127.0.0.1",
-                0,
                 ssl=None if upgraded else contexts["valid"],
                 process_request=redirect,
             ) as source_server:
@@ -190,8 +190,8 @@ async def test_websocket_redirect_retains_tls_downgrade_rejection(certificates, 
         async def unused(ws):
             pass
 
-        async with serve(
-            unused, "127.0.0.1", 0, ssl=contexts["valid"], process_request=redirect
+        async with loopback_websocket_server(
+            unused, ssl=contexts["valid"], process_request=redirect
         ) as source:
             with pytest.raises(SecurityError, match="non-secure"):
                 await network_clients.external_websocket_connect(
@@ -278,17 +278,8 @@ def huggingface_file_server(context=None):
         def log_message(self, *args):
             pass
 
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    if context is not None:
-        server.socket = context.wrap_socket(server.socket, server_side=True)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"{'https' if context else 'http'}://localhost:{server.server_port}", payload, requests
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join()
+    with http_server(context, handler=Handler) as port:
+        yield f"{'https' if context else 'http'}://localhost:{port}", payload, requests
 
 
 @pytest.mark.parametrize(

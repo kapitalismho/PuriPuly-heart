@@ -106,7 +106,20 @@ def test_qwen_client_normalizes_language_codes() -> None:
 
 
 @pytest.mark.asyncio
-async def test_qwen_client_translates_with_options(monkeypatch):
+@pytest.mark.parametrize(
+    ("context", "expected_user_message"),
+    [
+        pytest.param("", "<input>\nhello\n</input>", id="without-context"),
+        pytest.param(
+            '- "이전 문장"',
+            '<context>\n- "이전 문장"\n</context>\n\n<input>\nhello\n</input>',
+            id="with-context",
+        ),
+    ],
+)
+async def test_qwen_client_translates_with_options(
+    monkeypatch, context: str, expected_user_message: str
+):
     calls: dict[str, object] = {}
 
     class FakeResponse:
@@ -131,18 +144,14 @@ async def test_qwen_client_translates_with_options(monkeypatch):
         system_prompt="Translate naturally",
         source_language="ko-KR",
         target_language="en",
-        context='- "이전 문장"',
+        context=context,
     )
 
     assert result == "OK"
-    messages = calls["messages"]
-    assert messages[0]["role"] == "system"
-    assert "Translate naturally" in messages[0]["content"]
-    assert messages[1]["role"] == "user"
-    assert "<context>" in messages[1]["content"]
-    assert "</context>" in messages[1]["content"]
-    assert "<input>\nhello\n</input>" in messages[1]["content"]
-    assert "Input: hello" not in messages[1]["content"]
+    assert calls["messages"] == [
+        {"role": "system", "content": "Translate naturally"},
+        {"role": "user", "content": expected_user_message},
+    ]
 
 
 @pytest.mark.asyncio
