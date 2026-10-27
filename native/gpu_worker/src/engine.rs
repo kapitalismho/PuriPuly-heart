@@ -112,7 +112,6 @@ impl EngineError {
 pub struct GpuEngine {
     model: Option<Model>,
     session: Option<Session>,
-    selected_device: Option<VulkanDevice>,
 }
 
 const DISCOVERY_ATTEMPTS: u32 = 8;
@@ -198,7 +197,6 @@ impl GpuEngine {
             .map_err(map_warmup_error)?;
         let warmup_seconds = warmup_started.elapsed().as_secs_f64();
         progress("ready", 1.0);
-        self.selected_device = Some(selected_device.clone());
         self.model = Some(model);
         self.session = Some(session);
         Ok(ActivationResult {
@@ -260,7 +258,6 @@ impl GpuEngine {
     pub fn unload(&mut self) {
         self.session = None;
         self.model = None;
-        self.selected_device = None;
     }
 }
 

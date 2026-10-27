@@ -79,7 +79,8 @@ impl QuietTailProfile {
 
 pub const EXPECTED_CONTRACT_VERSION: u32 = 16;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OverlayManifest {
     pub contract_version: u32,
     pub app_version: String,
@@ -91,40 +92,6 @@ pub struct OverlayManifest {
     pub log_dir: String,
     pub log_level: String,
     pub locale: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct OverlayManifestSerde {
-    contract_version: u32,
-    app_version: String,
-    overlay_instance_id: String,
-    bridge_url: String,
-    session_token: String,
-    parent_pid: u32,
-    startup_deadline_ms: u32,
-    log_dir: String,
-    log_level: String,
-    locale: String,
-}
-
-impl TryFrom<OverlayManifestSerde> for OverlayManifest {
-    type Error = StartupError;
-
-    fn try_from(raw: OverlayManifestSerde) -> Result<Self, Self::Error> {
-        Ok(Self {
-            contract_version: raw.contract_version,
-            app_version: raw.app_version,
-            overlay_instance_id: raw.overlay_instance_id,
-            bridge_url: raw.bridge_url,
-            session_token: raw.session_token,
-            parent_pid: raw.parent_pid,
-            startup_deadline_ms: raw.startup_deadline_ms,
-            log_dir: raw.log_dir,
-            log_level: raw.log_level,
-            locale: raw.locale,
-        })
-    }
 }
 
 pub fn resolve_quiet_tail_profile_from_env() -> Result<QuietTailProfile, StartupError> {
@@ -182,9 +149,7 @@ pub fn resolve_handoff_experiment(
 pub fn load_manifest(path: impl AsRef<Path>) -> Result<OverlayManifest, StartupError> {
     let content =
         std::fs::read_to_string(path).map_err(|error| StartupError::Manifest(error.to_string()))?;
-    let manifest: OverlayManifestSerde = serde_json::from_str(&content)
-        .map_err(|error| StartupError::Manifest(error.to_string()))?;
-    manifest.try_into()
+    serde_json::from_str(&content).map_err(|error| StartupError::Manifest(error.to_string()))
 }
 
 pub fn validate_manifest(manifest: &OverlayManifest) -> Result<(), StartupError> {

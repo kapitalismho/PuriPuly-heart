@@ -195,6 +195,9 @@ class DefaultOverlayProcessRunner:
             candidate = overlay_root / relative_path
             if candidate.exists():
                 source_paths.append(candidate)
+        shared_version_source = overlay_root.parent / "windows_version.rs"
+        if shared_version_source.exists():
+            source_paths.append(shared_version_source)
 
         source_root = overlay_root / "src"
         if source_root.exists():
