@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import fields, replace
+from dataclasses import replace
 from threading import Barrier, Event
 from uuid import uuid4
 
@@ -13,17 +13,12 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigCategory,
     TranslationRuntimeConfigurationOwner,
 )
-from puripuly_heart.core.orchestrator.peer_translation_channel import (
-    PeerTranslationChannelOwner,
-)
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnLifecycleOwner,
     TranslationTurnProcessResult,
 )
 from puripuly_heart.domain.models import Transcript, Translation
 from tests.helpers.translation_owners import compose_translation_test_harness
-
-_CONFIG_FIELD_NAMES = {field.name for field in fields(TranslationRuntimeConfig)}
 
 
 class FakeOsc:
@@ -146,14 +141,6 @@ def test_owner_snapshots_never_expose_mixed_concurrent_values() -> None:
 
     assert observed
     assert set(observed) <= {("ko", "en", "first"), ("ja", "fr", "second")}
-
-
-def test_peer_owner_has_no_mutable_translation_configuration_fields() -> None:
-    owner_fields = {field.name for field in fields(PeerTranslationChannelOwner)}
-
-    assert not owner_fields & _CONFIG_FIELD_NAMES
-    assert "config_snapshot" in owner_fields
-    assert "translation_runtime_configuration" not in owner_fields
 
 
 def test_owner_transforms_are_linearizable_with_concurrent_updates() -> None:

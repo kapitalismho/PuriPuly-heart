@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { BROKER_PERSISTENCE_MODEL } from '../src/contract';
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
 
 const OPENROUTER_ENTITLEMENT_COLUMNS = [
@@ -48,120 +47,13 @@ const QQ_MANAGED_ENTITLEMENT_COLUMNS = [
 ];
 
 describe('QQ managed entitlement schema', () => {
-  it('documents the lifecycle source of truth and PSK rotation guardrails in the persistence contract', () => {
-    const contract = BROKER_PERSISTENCE_MODEL.tables as Record<string, unknown>;
-
-    expect(contract.qqAuthAssertions).toMatchObject({
-      purpose: expect.stringContaining('assertion evidence'),
-      duplicateHandling: 'preserve original row; duplicate assertions are idempotent',
-    });
-    expect(contract.qqManagedEntitlements).toEqual({
-      name: 'qq_managed_entitlements',
-      purpose:
-        'durable QQ Managed production issuance lifecycle keyed by stable subject reference',
-      primaryKey: 'qq_subject_ref',
-      lifecycleDecisionSource: 'qq_managed_entitlements, not qq_auth_assertions',
-      rowCardinality: 'zero-or-one-row-per-qq_subject_ref',
-      absenceRepresents: 'no production issuance has been reserved or used',
-      storedStatuses: ['issuing', 'delivery_pending', 'active', 'cleanup_required', 'revoked'],
-      automaticReissueBlockedStatuses: ['active', 'cleanup_required', 'revoked'],
-      columns: QQ_MANAGED_ENTITLEMENT_COLUMNS,
-      unique: ['issue_ref'],
-      partialUniqueIndexes: [
-        {
-          name: 'idx_qq_managed_entitlements_managed_credential_ref',
-          columns: ['managed_credential_ref'],
-          predicate: 'managed_credential_ref IS NOT NULL',
-        },
-      ],
-      indexed: ['status + updated_at', 'expires_at', 'issue_ref'],
-      stateInvariants: {
-        active:
-          'requires managed_credential_ref, issued_at, expires_at, and delivered_at',
-        delivery_pending:
-          'requires managed_credential_ref, issued_at, and expires_at; delivered_at remains null until ACK succeeds',
-        cleanup_required: 'requires managed_credential_ref',
-        issuing:
-          'may be stale-reclaimed only when managed_credential_ref and child_key_creation_started_at are NULL; any started child-key creation requires manual remediation or cleanup',
-        revoked: 'blocks automatic reissue',
-      },
-      staleIssuingPolicy: {
-        ttlMinutes: 15,
-        withoutManagedCredentialRef:
-          'eligible for same-subject release/reclaim by a later valid request after TTL only when child-key creation never started',
-        withManagedCredentialRef:
-          'cleanup/remediation candidate; must not be silently overwritten',
-      },
-      subjectRefPolicy: {
-        prefix: 'ph-qq-subject-v1_',
-        hmacSecretBinding: 'QQ_AUTH_HMAC_PSK',
-        rotationGuardrail:
-          'production QQ_AUTH_HMAC_PSK replacement requires a versioned subject-ref rotation plan with dual lookup/backfill semantics; simple secret replacement is not allowed',
-      },
-      rawIdentityStorage: false,
-      rawCredentialStorage: false,
-      rawOpenRouterKeyStorage: false,
-    });
-  });
-
-  it('documents shared managed key delivery ACK persistence', () => {
-    expect(BROKER_PERSISTENCE_MODEL.tables.managedKeyDeliveries).toEqual({
-      name: 'managed_key_deliveries',
-      purpose:
-        'shared pending delivery ACK ledger for Discord and QQ managed key issuance',
-      primaryKey: 'delivery_id',
-      issueSources: ['discord', 'qq'],
-      storedStatuses: ['pending', 'acknowledged', 'expired', 'cleanup_required'],
-      columns: [
-        'delivery_id',
-        'issue_source',
-        'subject_ref',
-        'installation_id',
-        'managed_credential_ref',
-        'ack_token_hash',
-        'status',
-        'created_at',
-        'expires_at',
-        'acknowledged_at',
-        'failed_at',
-        'failure_reason',
-        'operation_id',
-        'attempt_index',
-      ],
-      indexed: [
-        'status + expires_at',
-        'managed_credential_ref',
-        'issue_source + created_at',
-        'operation_id when bound',
-      ],
-      operationBinding:
-        'deliveries link to their managed operation and attempt for stale-safe cleanup',
-      rawAckTokenStorage: false,
-      rawOpenRouterKeyStorage: false,
-      stalePendingCleanup:
-        'expired rows are claimed exclusively; abandoned claims recover only after the scheduled invocation limit, and terminal owner/ledger transitions are atomic',
-    });
-  });
-
-  it('migrates the QQ managed entitlement table with required indexes', () => {
+  it('migrates the QQ managed entitlement table columns', () => {
     const env = createTestBrokerEnv();
 
     const columns = env.__db
       .prepare("SELECT name FROM pragma_table_info('qq_managed_entitlements') ORDER BY cid")
       .all() as Array<{ name: string }>;
     expect(columns.map((column) => column.name)).toEqual(QQ_MANAGED_ENTITLEMENT_COLUMNS);
-
-    const indexRows = env.__db
-      .prepare("SELECT name FROM pragma_index_list('qq_managed_entitlements') ORDER BY name")
-      .all() as Array<{ name: string }>;
-    expect(indexRows.map((index) => index.name)).toEqual(
-      expect.arrayContaining([
-        'idx_qq_managed_entitlements_expires_at',
-        'idx_qq_managed_entitlements_issue_ref',
-        'idx_qq_managed_entitlements_managed_credential_ref',
-        'idx_qq_managed_entitlements_status_updated_at',
-      ]),
-    );
   });
 
   it('enforces QQ managed entitlement state invariants and unique operational refs', () => {

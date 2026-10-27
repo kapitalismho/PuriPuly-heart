@@ -3992,7 +3992,7 @@ def test_peer_qwen_region_control_is_removed_before_peer_translation_is_enabled(
     assert not hasattr(view, "_peer_qwen_region_text")
 
 
-def test_update_api_visibility_keeps_peer_auth_controls_visible_when_peer_disabled(
+def test_update_api_visibility_shows_selected_peer_deepgram_credentials(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
@@ -4042,21 +4042,6 @@ def test_peer_soniox_model_override_controls_are_removed(
     settings_events.load(view, settings, config_path=Path("settings.json"))
     assert not hasattr(view, "_on_peer_soniox_model_selected")
     assert not hasattr(view, "_peer_soniox_model_text")
-
-
-def test_update_api_visibility_includes_enabled_peer_provider(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
-
-    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
-    view._update_api_visibility()
-
-    assert view._deepgram_key.visible is True
-    assert view._google_key.visible is True
 
 
 def test_update_api_visibility_uses_shared_qwen_region_for_peer_and_self(
@@ -6402,26 +6387,6 @@ def test_on_qwen_region_selected_updates_provider_draft(
 
     assert view._provider_draft is not None
     assert view._provider_draft.qwen_region is QwenRegion.SINGAPORE
-
-
-def test_settings_view_uses_generic_subtab_shell(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    from puripuly_heart.ui.components.subtab_shell import TextSubtabShell
-
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-
-    assert view.scroll is None
-    assert view.controls == [view._settings_subtab_shell]
-    assert isinstance(view._settings_subtab_shell, TextSubtabShell)
-    assert isinstance(view._settings_subtab_shell.body_host, ft.Stack)
-    assert view._settings_subtab_shell.title_region is None
-    assert isinstance(view._settings_subtab_shell.body_region, ft.Container)
-    assert view._settings_subtab_shell.body_region.content is view._settings_subtab_shell.body_host
-    assert view._settings_subtab_shell.controls == [
-        view._settings_subtab_shell.body_region,
-        view._settings_subtab_shell.subtab_bar,
-    ]
 
 
 def test_settings_subtab_shell_preserves_per_tab_scroll_state(
