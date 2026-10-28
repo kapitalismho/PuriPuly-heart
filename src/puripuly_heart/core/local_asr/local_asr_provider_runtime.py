@@ -8,12 +8,12 @@ from typing import Literal, Protocol
 import numpy as np
 
 from puripuly_heart.config.resolved import ResolvedSTTConfig
-from puripuly_heart.core.audio.ownership import OwnedStreamInput, OwnedVadEvent
-from puripuly_heart.core.gpu_worker import (
-    GpuWorkerActivation,
-    GpuWorkerDevice,
-    GpuWorkerTranscription,
+from puripuly_heart.core.asr_worker import (
+    ASRWorkerActivation,
+    ASRWorkerDevice,
+    ASRWorkerTranscription,
 )
+from puripuly_heart.core.audio.ownership import OwnedStreamInput, OwnedVadEvent
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.stt.backend import STTProviderTurnEvent
@@ -145,7 +145,7 @@ class ProviderRuntimeChannelSnapshot:
 @dataclass(frozen=True, slots=True)
 class ProviderRuntimeGpuSnapshot:
     phase: ProviderRuntimeGpuPhase
-    devices: tuple[GpuWorkerDevice, ...]
+    devices: tuple[ASRWorkerDevice, ...]
     active_channels: frozenset[ProviderRuntimeChannel]
     pending_count: int
     worker_pid: int | None
@@ -226,7 +226,7 @@ class ProviderGpuRuntimePort(Protocol):
     @property
     def startup_cleanup_snapshot(self) -> Mapping[str, object]: ...
 
-    async def discover_devices(self) -> tuple[GpuWorkerDevice, ...]: ...
+    async def discover_devices(self) -> tuple[ASRWorkerDevice, ...]: ...
 
     async def activate_channel(
         self,
@@ -238,9 +238,9 @@ class ProviderGpuRuntimePort(Protocol):
         device_id: str,
         operation_id: str | None = None,
         request_id: str | None = None,
-    ) -> GpuWorkerActivation: ...
+    ) -> ASRWorkerActivation: ...
 
-    async def retry(self) -> GpuWorkerActivation: ...
+    async def retry(self) -> ASRWorkerActivation: ...
 
     async def submit(
         self,
@@ -249,7 +249,7 @@ class ProviderGpuRuntimePort(Protocol):
         *,
         speech_end_at: float,
         language_hint: str | None = None,
-    ) -> GpuWorkerTranscription: ...
+    ) -> ASRWorkerTranscription: ...
 
     async def deactivate_channel(
         self, channel: ProviderRuntimeChannel, *, owner: object

@@ -75,8 +75,8 @@ def build_parser() -> argparse.ArgumentParser:
     verify_desktop_repro.add_argument("--output-dir", type=Path, required=True)
 
     sub.add_parser(
-        "local-qwen-runtime-check",
-        help="Verify the Local Qwen Windows runtime DLL directory",
+        "local-sherpa-runtime-check",
+        help="Verify the Local sherpa Windows runtime DLL directory",
     )
     sub.add_parser(
         "soxr-runtime-check",
@@ -131,8 +131,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_local_qwen_runtime_check() -> int:
-    from puripuly_heart.app.local_qwen_runtime_check import run_local_qwen_runtime_check as run
+def run_local_sherpa_runtime_check() -> int:
+    from puripuly_heart.app.local_sherpa_runtime_check import run_local_sherpa_runtime_check as run
 
     return run()
 
@@ -448,8 +448,8 @@ def main(argv: list[str] | None = None) -> int:
                 runtime_logging_sinks=logging_sinks,
             )
 
-        if args.command == "local-qwen-runtime-check":
-            return run_local_qwen_runtime_check()
+        if args.command == "local-sherpa-runtime-check":
+            return run_local_sherpa_runtime_check()
 
         if args.command == "soxr-runtime-check":
             return run_soxr_runtime_check()

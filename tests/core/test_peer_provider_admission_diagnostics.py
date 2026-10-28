@@ -130,7 +130,7 @@ async def test_peer_application_convergence_preserves_exact_native_cause(transit
 
     native = stt_failure_report(
         ConnectionError("PRIVATE_PEER_CONVERGENCE"),
-        provider="local_qwen",
+        provider="local_fun_asr_mlt_nano",
         channel="peer",
         operation="provider_build",
     ).diagnostics

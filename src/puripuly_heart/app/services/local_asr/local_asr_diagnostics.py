@@ -74,6 +74,12 @@ def _channel_label(channel: object) -> str:
 def _model_label(model_id: object) -> str:
     token = _safe_token(model_id, "")
     normalized = token.casefold()
+    if "orukeet" in normalized:
+        return "Orukeet"
+    if "fun-asr-mlt" in normalized:
+        return "Fun-ASR-MLT-Nano"
+    if "fun-asr-nano" in normalized:
+        return "Fun-ASR-Nano"
     if "parakeet" in normalized:
         return "Parakeet"
     if "qwen" in normalized:
@@ -176,7 +182,7 @@ class LocalASRDiagnosticsOwner:
         elif diagnostic.event == "worker_recovery_started":
             cause = _failure_cause(diagnostic.failure_code, "decode failure")
             self.basic_log_sink(
-                "Local ASR worker restarting " f"(cause={cause}; utterance retry=false)",
+                f"Local ASR worker restarting (cause={cause}; utterance retry=false)",
                 logging.WARNING,
             )
         elif diagnostic.event == "worker_recovery_ready":
@@ -303,7 +309,7 @@ class LocalASRDiagnosticsOwner:
 
         if outcome_token == "ready":
             message = (
-                f"{_channel_label(channel)} recognition model ready " f"({_model_label(model_id)})"
+                f"{_channel_label(channel)} recognition model ready ({_model_label(model_id)})"
             )
             level = logging.INFO
         elif outcome_token == "failed":
@@ -315,7 +321,7 @@ class LocalASRDiagnosticsOwner:
             level = logging.ERROR
         else:
             message = (
-                f"{_channel_label(channel)} recognition model update " f"({_model_label(model_id)})"
+                f"{_channel_label(channel)} recognition model update ({_model_label(model_id)})"
             )
             level = logging.INFO
         self.basic_log_sink(message, level)

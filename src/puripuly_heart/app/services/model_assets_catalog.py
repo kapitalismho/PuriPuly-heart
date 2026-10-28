@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 
 from puripuly_heart.core.local_asr.local_stt_assets import (
+    FUN_ASR_MLT_NANO_MODEL_ID,
+    FUN_ASR_NANO_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
-    LOCAL_STT_MODEL_ID,
+    ORUKEET_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
-    PARAKEET_V3_MODEL_ID,
     load_local_stt_asset_manifest,
 )
 from puripuly_heart.core.local_translation.assets import e4b_gemma_spec, gemma_26b_spec
@@ -24,9 +25,10 @@ class ModelAssetChoice:
 def model_asset_choices() -> tuple[ModelAssetChoice, ...]:
     choices = []
     for model_id, name, key in (
-        (LOCAL_STT_MODEL_ID, "Qwen3 ASR 0.6B", "qwen_cpu"),
+        (ORUKEET_MODEL_ID, "Orukeet Q8_0", "orukeet"),
+        (FUN_ASR_NANO_MODEL_ID, "Fun-ASR-Nano-2512 Q8_0", "fun_asr_nano"),
+        (FUN_ASR_MLT_NANO_MODEL_ID, "Fun-ASR-MLT-Nano-2512 Q8_0", "fun_asr_mlt_nano"),
         (LOCAL_QWEN_GPU_MODEL_ID, "Qwen3 ASR 1.7B Q6_K", "qwen_gpu"),
-        (PARAKEET_V3_MODEL_ID, "Parakeet TDT 0.6B v3", "parakeet"),
         (PARAKEET_JAPANESE_MODEL_ID, "Parakeet TDT/CTC 0.6B", "parakeet_ja"),
     ):
         manifest = load_local_stt_asset_manifest(model_id)

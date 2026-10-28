@@ -15,7 +15,6 @@ from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
 from puripuly_heart.app.ports.settings_repository import SettingsCommitRequest
 from puripuly_heart.app.ports.settings_runtime_effects import SettingsRuntimeTransition
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.app.services.manual_local_asr_fallback import ManualLocalASRFallbackOwner
 from puripuly_heart.app.services.settings.settings_application import SettingsApplicationOwner
 from puripuly_heart.app.services.settings.settings_projection import SettingsProjectionOwner
 from puripuly_heart.app.services.settings.settings_runtime_effects import (
@@ -433,12 +432,7 @@ async def test_runtime_failure_compensation_preserves_overlapping_managed_commit
         settings=owner,
         projection=projection,
         runtime_effects=effects,
-        manual_fallback=ManualLocalASRFallbackOwner(),
-        cpu_auto_available=lambda: True,
-        inspect_cpu=lambda: None,
-        fallback_sink=lambda *args: None,
         sync_ui=lambda: None,
-        fallback_log_sink=lambda *args: None,
         mutation_service_provider=lambda: None,
         consume_superseded_settings=lambda settings: False,
         active_local_asr_change=lambda *args: False,

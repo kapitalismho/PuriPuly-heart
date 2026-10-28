@@ -87,11 +87,11 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 ---
 
 ## 翻译比较
-![语音识别与翻译完整流程的每句平均错误惩罚图表。韩语→英语/日语/中文（简体），216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是 PuriPuly 中可用的组合：Gemini Transcribe → Luna (0.676)、Soniox STT → Luna (0.942)、Qwen ASR 1.7B → Gemma 26B (1.024)、Gemini Transcribe → Gemma 26B (1.084)、Soniox STT → Gemma 26B (1.293)、Qwen ASR 0.6B → Gemma 26B (2.374)。橙色柱状图是外部基线：Qwen 3.8 Live Translate (2.108)、Gemini 3.5 Live Translate (3.754)、Soniox Translate (4.989)。评估模型：Gemini 3.7 Flash。](../images/performance/1.png)
+![语音识别与翻译完整流程的每句平均错误惩罚图表。韩语→英语/日语/中文（简体），216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是基准测试时的 PuriPuly 配置：Gemini Transcribe → Luna (0.676)、Soniox STT → Luna (0.942)、Qwen ASR 1.7B → Gemma 26B (1.024)、Gemini Transcribe → Gemma 26B (1.084)、Soniox STT → Gemma 26B (1.293)、Qwen ASR 0.6B → Gemma 26B (2.374)。橙色柱状图是外部基线：Qwen 3.8 Live Translate (2.108)、Gemini 3.5 Live Translate (3.754)、Soniox Translate (4.989)。评估模型：Gemini 3.7 Flash。](../images/performance/1.png)
 
 ![每句平均错误惩罚图表。韩语→英语/日语/中文（简体），216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是 PuriPuly 中可用的模型：GPT-6 luna (0.130)、Gemma 4 26B A4B (0.387)、DeepSeek-V4 Flash 0731 (0.571)、Gemma 4 E4B QAT Q4 (1.577)。橙色柱状图是外部基线：Qwen 3.8 Live Translate (1.392)、Papago (2.699)、Gemini 3.5 Translate (2.991)、Soniox Translate (3.473)、DeepL (3.914)、Google Translation (5.731)。Qwen 3.8、Gemini 3.5 和 Soniox 仅选取字符错误率（CER）不超过 5% 的结果。评估模型：Gemini 3.7 Flash。](../images/performance/2.png)
 
-- 蓝色柱状图是PuriPuly中可用的模型。
+- 蓝色柱状图代表基准测试时的 PuriPuly 配置。CPU Qwen3-ASR 0.6B 此后已移除；其结果不代表下方替代模型的性能。
 - 我们使用微软的 Gemba MQM 框架进行实验。
 - 为贴近真实对话环境，采用了多轮对话设置。
 - 完整实验结果请参阅[此处](https://github.com/kapitalismho/korean-llm-context-translation-benchmark)。
@@ -168,11 +168,16 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 
 | 模型 | 运行环境 | 量化 |
 |---|---|---|
-| Parakeet TDT 0.6B v3 | CPU | INT8 |
+| Orukeet（英语） | CPU | Q8_0 |
+| Fun-ASR-Nano-2512（中文） | CPU | Q8_0 |
+| Fun-ASR-MLT-Nano-2512（韩语） | CPU | Q8_0 |
 | Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
-| Qwen3-ASR 0.6B | CPU | INT8 |
 | Qwen3-ASR 1.7B | GPU | Q6_K |
 | OpenAI 兼容 API | — | — |
+
+CPU 自动选择仅支持英语、中文、韩语和日语。Orukeet 与 Fun-ASR 使用 transcribe.cpp；日语继续使用 sherpa-onnx。每个活动的 transcribe.cpp CPU 通道独立持有 Model/Session，使用两个推理线程，Talk/Listen 同时运行时为 2+2；不预加载非活动通道。GPU ASR 的独立通道 Session 共享唯一常驻 Model，推理按顺序执行。切换模型时也先释放旧 Model，再加载新模型。
+
+Windows 安装程序会准备全部四个 CPU ASR 模型，并在需要时单独下载；CPU 自动选择需要四个模型均已就绪。旧 Parakeet v3 选择迁移为 Orukeet，CPU Qwen0.6 迁移为 CPU 自动选择。设置以可恢复方式保存后，启动流程仅清理已识别的旧模型文件，失败的清理会在下次启动时重试。无法识别的文件及日语/GPU 模型保持不变。
 
 **LLM**
 

@@ -404,7 +404,7 @@ _COMPONENTS = frozenset(
         "application_notification",
         "output_runtime",
         "osc_control",
-        "gpu_worker",
+        "asr_worker",
         "overlay_process",
         "overlay_bridge",
         "provider_verifier",

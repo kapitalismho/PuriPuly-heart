@@ -247,6 +247,7 @@ class SettingsOwner:
     _publication_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _publications: deque[_SettingsCommit] = field(default_factory=deque, repr=False)
     _publishing: bool = False
+    _started: bool = field(default=False, init=False, repr=False)
 
     def require_canonical(self) -> AppSettingsVNext:
         if self.canonical is None:
@@ -293,6 +294,12 @@ class SettingsOwner:
         self._peer_translation_enabled = bool(enabled)
 
     def start(self) -> SettingsOwnerStartResult:
+        if self._started:
+            return SettingsOwnerStartResult(
+                settings=self.require_committed(),
+                migrated=False,
+                backup_path=None,
+            )
         if self.commit_listener is not None and self._commit_loop is None:
             try:
                 self._commit_loop = asyncio.get_running_loop()
@@ -302,16 +309,18 @@ class SettingsOwner:
         if not self.path.exists():
             self.canonical = new_settings_for_first_run()
             self.persistence.persist(self.path, self.canonical)
-            loaded = self.persistence.load_active(self.path)
+            loaded = self.persistence.load_active(self.path, startup=True)
             self.canonical = loaded.canonical_settings
+            self._started = True
             self._publish_commit(copy.deepcopy(self.canonical))
             return SettingsOwnerStartResult(
                 settings=self.canonical,
                 migrated=False,
                 backup_path=None,
             )
-        loaded = self.persistence.load_active(self.path)
+        loaded = self.persistence.load_active(self.path, startup=True)
         self.canonical = loaded.canonical_settings
+        self._started = True
         self._publish_commit(copy.deepcopy(self.canonical))
         return SettingsOwnerStartResult(
             settings=self.canonical,

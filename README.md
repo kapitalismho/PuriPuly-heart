@@ -87,11 +87,11 @@ It works in many environments, including VRChat and Discord.
 ---
 
 ## Translation Comparison
-![Mean error penalty per sentence for the full speech recognition and translation pipeline. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are combinations available in PuriPuly: Gemini Transcribe → Luna (0.676), Soniox STT → Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). Orange bars are external baselines: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). Judge model: Gemini 3.7 Flash.](docs/images/performance/1.png)
+![Mean error penalty per sentence for the full speech recognition and translation pipeline. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are the benchmarked PuriPuly configurations: Gemini Transcribe → Luna (0.676), Soniox STT → Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). Orange bars are external baselines: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). Judge model: Gemini 3.7 Flash.](docs/images/performance/1.png)
 
 ![Mean error penalty per sentence. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are models available in PuriPuly: GPT-6 luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). Orange bars are external baselines: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Only results with a character error rate (CER) of 5% or less were selected for Qwen 3.8, Gemini 3.5, and Soniox. Judge model: Gemini 3.7 Flash.](docs/images/performance/2.png)
 
-- The blue bars are the models available in PuriPuly.
+- Blue bars show PuriPuly configurations at the time of the benchmark. CPU Qwen3-ASR 0.6B has since been retired; its result does not measure the replacement models below.
 - We ran the experiment using Microsoft's Gemba MQM framework.
 - It was set up as a multi-turn environment to better resemble real conversation.
 - For the full results, see [here](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
@@ -167,11 +167,16 @@ GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Ar
 
 | Model | Runtime | Quantization |
 |---|---|---|
-| Parakeet TDT 0.6B v3 | CPU | INT8 |
+| Orukeet (English) | CPU | Q8_0 |
+| Fun-ASR-Nano-2512 (Chinese) | CPU | Q8_0 |
+| Fun-ASR-MLT-Nano-2512 (Korean) | CPU | Q8_0 |
 | Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
-| Qwen3-ASR 0.6B | CPU | INT8 |
 | Qwen3-ASR 1.7B | GPU | Q6_K |
 | OpenAI-compatible API | — | — |
+
+CPU Auto supports only English, Chinese, Korean and Japanese. Orukeet and Fun-ASR use transcribe.cpp; Japanese keeps sherpa-onnx. Each active transcribe.cpp CPU channel owns a Model/Session with two inference threads (2+2 for Talk and Listen), without preloading inactive channels. GPU ASR shares one resident Model between independent channel Sessions and serializes inference. Replacement releases the previous GPU Model before loading another.
+
+Windows Setup prepares all four CPU ASR models, downloading them separately when needed; CPU Auto requires all four ready. Old Parakeet v3 selections migrate to Orukeet, and CPU Qwen0.6 selections migrate to CPU Auto. Startup removes recognized retired assets only after recoverable settings persistence; blocked cleanup retries later. Unrecognized files and Japanese/GPU assets are preserved.
 
 
 **LLM**

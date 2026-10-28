@@ -18,7 +18,7 @@ from puripuly_heart.app.services.local_asr.local_asr_gpu_provisioning import (
     LocalASRGpuProvisioningState,
 )
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
-    GpuWorkerDevice,
+    ASRWorkerDevice,
     LocalASRProviderRuntimePort,
     LocalASRProviderRuntimeSnapshot,
 )
@@ -41,7 +41,7 @@ class GpuRuntimeInteractionState:
 @dataclass(frozen=True, slots=True)
 class GpuRuntimeInteractionSnapshot:
     ui_state: str | None
-    devices: tuple[GpuWorkerDevice, ...]
+    devices: tuple[ASRWorkerDevice, ...]
     discovery_attempted: bool
     discovery_failed: bool
     discovery_failure_state: str | None
@@ -80,7 +80,7 @@ class GpuRuntimeInteractionOwner:
         repr=False,
     )
     _ui_state: str | None = field(init=False, default=None, repr=False)
-    _devices: tuple[GpuWorkerDevice, ...] = field(init=False, default=(), repr=False)
+    _devices: tuple[ASRWorkerDevice, ...] = field(init=False, default=(), repr=False)
     _discovery_attempted: bool = field(init=False, default=False, repr=False)
     _discovery_failed: bool = field(init=False, default=False, repr=False)
     _discovery_failure_state: str | None = field(init=False, default=None, repr=False)
@@ -117,7 +117,7 @@ class GpuRuntimeInteractionOwner:
             pending_channels=self._pending_channels,
         )
 
-    async def preload_saved_device_discovery(self) -> tuple[GpuWorkerDevice, ...]:
+    async def preload_saved_device_discovery(self) -> tuple[ASRWorkerDevice, ...]:
         if not self.state_provider().selected_provider_requires_model:
             return ()
         return await self.ensure_device_discovery(origin="startup")
@@ -152,7 +152,7 @@ class GpuRuntimeInteractionOwner:
         *,
         force: bool = False,
         origin: str = "settings",
-    ) -> tuple[GpuWorkerDevice, ...]:
+    ) -> tuple[ASRWorkerDevice, ...]:
         self._discovery_origin = origin
         self.set_ui_state("discovering", origin=origin)
         snapshot = await self.runtime_provider().discover_gpu(force=force)

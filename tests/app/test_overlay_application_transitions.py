@@ -220,7 +220,6 @@ class PeerOverlayHarness:
                 enabled,
             ),
             overlay_intent_sink=lambda _enabled: None,
-            persist_manual_fallback=lambda: True,
             ensure_local_ready=self.ensure_local_ready,
             clear_cpu_pending=lambda: None,
             clear_gpu_pending=lambda: None,

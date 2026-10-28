@@ -209,9 +209,9 @@ class RuntimeHarness:
         values = {field: enabled}
         if self.collateral and enabled:
             if field == "self_capture":
-                values["self_asr"] = "local_parakeet_v3"
+                values["self_asr"] = "local_orukeet"
             if field == "peer_capture":
-                values.update(peer_asr="local_parakeet_v3", captions=True)
+                values.update(peer_asr="local_orukeet", captions=True)
         self.state = replace(self.state, **values)
         self.integration.publish_delta()
         return True

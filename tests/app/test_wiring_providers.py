@@ -20,7 +20,6 @@ from puripuly_heart.app.wiring import (
     build_peer_stt_provider_signature,
     build_peer_stt_provider_signature_from_vnext,
     build_self_stt_runtime_signature,
-    build_self_stt_runtime_signature_from_vnext,
     create_llm_provider_from_resolved_config,
     resolve_peer_stt_config,
     resolve_peer_stt_runtime_config_from_vnext,
@@ -114,7 +113,6 @@ def assert_bounded_concurrency(provider: SemaphoreLLMProvider, limit: int) -> No
     assert probe.max_active == limit
 
 
-from puripuly_heart.core.local_asr.local_stt_assets import default_local_stt_model_dir
 from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterLLMProvider,
     ManagedOpenRouterReleaseService,
@@ -127,12 +125,6 @@ from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMPr
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
-from puripuly_heart.providers.stt.local_cpu import LocalCPUAutoSTTBackend
-from puripuly_heart.providers.stt.local_parakeet_sherpa import (
-    LocalParakeetJapaneseSherpaSTTBackend,
-    LocalParakeetV3SherpaSTTBackend,
-)
-from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
 from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 
@@ -1193,70 +1185,6 @@ def test_create_stt_backend_from_resolved_soniox_falls_back_to_realtime_v5_model
     assert backend.model == "stt-rt-v5"
 
 
-def test_create_stt_backend_from_resolved_local_qwen_uses_channel_language_and_no_secret() -> None:
-    resolved = _resolved_stt_config(
-        provider="local_qwen",
-        source_language="zh-CN",
-        model=None,
-        credential_reference=None,
-    )
-    secrets = InMemorySecretStore()
-
-    backend = wiring_module.create_stt_backend_from_resolved_config(resolved, secrets=secrets)
-
-    assert isinstance(backend, LocalQwenSherpaSTTBackend)
-    assert backend.model_dir == default_local_stt_model_dir()
-    assert backend.sample_rate_hz == 16000
-    assert backend.stream_label == "self"
-    assert backend.language_hint == "zh"
-
-
-@pytest.mark.parametrize(
-    ("provider", "backend_type"),
-    [
-        ("local_parakeet_v3", LocalParakeetV3SherpaSTTBackend),
-        ("local_parakeet_ja", LocalParakeetJapaneseSherpaSTTBackend),
-    ],
-)
-def test_create_stt_backend_from_resolved_direct_parakeet_provider(
-    provider: str,
-    backend_type: type,
-) -> None:
-    resolved = _resolved_stt_config(
-        provider=provider,
-        source_language="ja",
-        model=None,
-        credential_reference=None,
-    )
-
-    backend = wiring_module.create_stt_backend_from_resolved_config(
-        resolved,
-        secrets=InMemorySecretStore(),
-    )
-
-    assert isinstance(backend, backend_type)
-    assert backend.sample_rate_hz == 16000
-    assert backend.stream_label == "self"
-
-
-def test_create_stt_backend_from_resolved_cpu_auto_provider() -> None:
-    resolved = _resolved_stt_config(
-        provider="local_cpu_auto",
-        source_language="ja",
-        model=None,
-        credential_reference=None,
-    )
-
-    backend = wiring_module.create_stt_backend_from_resolved_config(
-        resolved,
-        secrets=InMemorySecretStore(),
-    )
-
-    assert isinstance(backend, LocalCPUAutoSTTBackend)
-    assert backend.source_language == "ja"
-    assert backend.stream_label == "self"
-
-
 def test_create_stt_backend_from_resolved_gpu_provider_fails_without_cpu_fallback() -> None:
     resolved = _resolved_stt_config(
         provider="local_qwen_gpu",
@@ -1391,24 +1319,6 @@ def test_create_stt_backend_deepgram_passes_effective_custom_terms() -> None:
     assert list(backend.keyterms) == ["Puripuly", "VRChat"]
 
 
-def test_create_stt_backend_local_qwen_passes_language_hint_without_hotwords() -> None:
-    settings = _vnext(
-        stt_provider="local_qwen",
-        source_language="ko-KR",
-        custom_vocabulary_enabled=True,
-        custom_terms={
-            "ko": ["Puripuly", "VRChat, Japan", *[f"term-{i:02d}" for i in range(20)]],
-        },
-    )
-    secrets = InMemorySecretStore()
-
-    backend = create_stt_backend(settings, secrets=secrets)
-
-    assert isinstance(backend, LocalQwenSherpaSTTBackend)
-    assert getattr(backend, "language_hint", None) == "ko"
-    assert getattr(backend, "hotwords", ()) == ()
-
-
 def test_create_stt_backend_rejects_invalid_compatibility_provider() -> None:
     settings = AppSettingsVNext()
     settings = replace(
@@ -1521,39 +1431,6 @@ def test_create_peer_stt_backend_uses_shared_qwen_region_for_endpoint_and_secret
     assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "peer-qwen"
     assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
-
-
-def test_self_stt_runtime_signature_from_vnext_matches_bag_restart_fields() -> None:
-    cases = (
-        _vnext(
-            stt_provider="deepgram",
-            custom_vocabulary_enabled=True,
-            custom_terms={"ko": [" Puripuly ", "a,b", "VRChat"]},
-        ),
-        _vnext(
-            stt_provider="local_qwen",
-            custom_vocabulary_enabled=True,
-            custom_terms={"ko": [f"term{i}, extra" for i in range(20)]},
-        ),
-        _vnext(
-            stt_provider="local_qwen_gpu",
-            custom_vocabulary_enabled=True,
-            custom_terms={"ko": ["gpu-term"]},
-        ),
-        _vnext(
-            stt_provider="soniox",
-            custom_vocabulary_enabled=True,
-            custom_terms={"ko": ["soniox-term"]},
-        ),
-        _vnext(stt_provider="qwen_audio", qwen_region="beijing"),
-        _vnext(stt_provider="qwen_audio", qwen_region="singapore"),
-        _vnext(stt_provider="custom"),
-    )
-    for settings in cases:
-        canonical = settings
-        assert build_self_stt_runtime_signature_from_vnext(
-            canonical
-        ) == build_self_stt_runtime_signature(canonical)
 
 
 def test_build_peer_stt_provider_signature_includes_backend_affecting_values() -> None:
@@ -1922,25 +1799,6 @@ def test_peer_stt_provider_signature_tracks_qwen_audio_language_hints() -> None:
     assert build_peer_stt_provider_signature_from_vnext(
         auto_settings
     ) != build_peer_stt_provider_signature_from_vnext(manual_settings)
-
-
-def test_create_peer_stt_backend_local_qwen_uses_peer_language_without_hotwords() -> None:
-    settings = _vnext(
-        peer_stt_provider="local_qwen",
-        source_language="ko",
-        peer_source_language="zh-CN",
-        custom_vocabulary_enabled=True,
-        custom_terms={
-            "zh-CN": ["airi", "shinano", *[f"term-{i:02d}" for i in range(20)]],
-        },
-    )
-    secrets = InMemorySecretStore()
-
-    backend = create_peer_stt_backend(settings, secrets=secrets)
-
-    assert isinstance(backend, LocalQwenSherpaSTTBackend)
-    assert getattr(backend, "language_hint", None) == "zh"
-    assert getattr(backend, "hotwords", ()) == ()
 
 
 def test_resolve_peer_stt_config_uses_shared_soniox_endpoint_keepalive_and_trailing_silence() -> (

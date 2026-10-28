@@ -56,35 +56,11 @@ def test_local_asr_status_renders_text_and_tone(status: str, expected_text: str,
     assert notice.action is None
 
 
-def test_local_asr_download_progress_uses_percent_variants() -> None:
-    targeted = local_asr_capture_notice(
-        status="downloading", percent=42, model_id="qwen3-asr-0.6b-int8-sherpa"
-    )
-    assert targeted is not None
-    assert targeted.text == (
-        "i18n:dashboard.local_stt_notice_downloading_progress_model:"
-        "model=i18n:local_stt.model.qwen3-asr-0.6b-int8-sherpa,percent=42"
-    )
-
-    without_percent = local_asr_capture_notice(
-        status="downloading", model_id="qwen3-asr-0.6b-int8-sherpa"
-    )
-    assert without_percent is not None
-    assert without_percent.text.startswith("i18n:dashboard.local_stt_notice_downloading_model:")
-
-
 def test_local_asr_unknown_model_falls_back_to_the_model_id() -> None:
     notice = local_asr_capture_notice(status="missing", model_id="mystery-model")
 
     assert notice is not None
     assert notice.text == "i18n:dashboard.local_stt_notice_missing_model:model=mystery-model"
-
-
-def test_local_asr_model_is_ignored_for_non_model_statuses() -> None:
-    notice = local_asr_capture_notice(status="self_loading", model_id="qwen3-asr-0.6b-int8-sherpa")
-
-    assert notice is not None
-    assert notice.text == "i18n:dashboard.local_stt_notice_self_loading"
 
 
 def test_no_gpu_notice_without_notice_or_for_unknown_status() -> None:

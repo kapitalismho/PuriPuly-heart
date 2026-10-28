@@ -11,9 +11,6 @@ from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRProvisioningSnapshot,
 )
 from puripuly_heart.core.local_asr.local_stt_assets import (
-    LOCAL_STT_MODEL_ID,
-    PARAKEET_JAPANESE_MODEL_ID,
-    PARAKEET_V3_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )
 from puripuly_heart.core.self_capture import SelfCaptureSessionState
@@ -21,22 +18,13 @@ from puripuly_heart.core.self_capture import SelfCaptureSessionState
 
 def _ready_provisioning() -> LocalASRProvisioningSnapshot:
     return LocalASRProvisioningSnapshot(
-        models=(
+        models=tuple(
             LocalASRModelProvisioningState(
-                model_id=PARAKEET_V3_MODEL_ID,
+                model_id=model_id,
                 backend="cpu",
                 integrity="ready",
-            ),
-            LocalASRModelProvisioningState(
-                model_id=PARAKEET_JAPANESE_MODEL_ID,
-                backend="cpu",
-                integrity="ready",
-            ),
-            LocalASRModelProvisioningState(
-                model_id=LOCAL_STT_MODEL_ID,
-                backend="cpu",
-                integrity="ready",
-            ),
+            )
+            for model_id in REQUIRED_CPU_LOCAL_STT_MODEL_IDS
         ),
         required_cpu_model_ids=REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
         gpu_model_id="gpu",
@@ -46,7 +34,7 @@ def _ready_provisioning() -> LocalASRProvisioningSnapshot:
 def _settings() -> LocalASRApplicationSettings:
     return LocalASRApplicationSettings(
         locale="en",
-        self_provider="local_qwen",
+        self_provider="local_fun_asr_mlt_nano",
         peer_provider="deepgram",
         self_source_language="ko",
         peer_source_language="en",

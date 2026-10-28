@@ -17,7 +17,7 @@ from puripuly_heart.core.peer_capture import (
 
 def _config(*, local_provider: bool) -> PeerCaptureSessionConfig:
     return PeerCaptureSessionConfig(
-        provider_id="local_qwen" if local_provider else "soniox",
+        provider_id="local_fun_asr_mlt_nano" if local_provider else "soniox",
         provider_signature=("provider",),
         runtime_signature=("runtime",),
         capture_signature=("capture",),

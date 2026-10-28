@@ -239,9 +239,10 @@ _CUSTOM_VOCAB_DELIMITER_RE = re.compile(r"\s+")
 _STT_UI_PROVIDERS = (
     STTProviderName.DEEPGRAM,
     STTProviderName.LOCAL_CPU_AUTO,
-    STTProviderName.LOCAL_PARAKEET_V3,
+    STTProviderName.LOCAL_ORUKEET,
+    STTProviderName.LOCAL_FUN_ASR_NANO,
+    STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
     STTProviderName.LOCAL_PARAKEET_JAPANESE,
-    STTProviderName.LOCAL_QWEN,
     STTProviderName.LOCAL_QWEN_GPU,
     STTProviderName.ROLLING_FREE,
     STTProviderName.ELEVENLABS_SCRIBE,
@@ -278,9 +279,10 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.CUSTOM_OFFLINE: "settings.stt.section.custom",
     STTProviderName.CUSTOM_REALTIME: "settings.stt.section.custom",
     STTProviderName.LOCAL_QWEN_GPU: "settings.stt.section.gpu_inference",
-    STTProviderName.LOCAL_PARAKEET_V3: "settings.stt.section.cpu_inference",
+    STTProviderName.LOCAL_ORUKEET: "settings.stt.section.cpu_inference",
+    STTProviderName.LOCAL_FUN_ASR_NANO: "settings.stt.section.cpu_inference",
+    STTProviderName.LOCAL_FUN_ASR_MLT_NANO: "settings.stt.section.cpu_inference",
     STTProviderName.LOCAL_PARAKEET_JAPANESE: "settings.stt.section.cpu_inference",
-    STTProviderName.LOCAL_QWEN: "settings.stt.section.cpu_inference",
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.INDEX_TRANSLATE_35B: "provider.index_translate_35b",
@@ -298,9 +300,10 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
 _LOCAL_STT_PROVIDERS = frozenset(
     {
         STTProviderName.LOCAL_CPU_AUTO,
-        STTProviderName.LOCAL_PARAKEET_V3,
+        STTProviderName.LOCAL_ORUKEET,
+        STTProviderName.LOCAL_FUN_ASR_NANO,
+        STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
         STTProviderName.LOCAL_PARAKEET_JAPANESE,
-        STTProviderName.LOCAL_QWEN,
         STTProviderName.LOCAL_QWEN_GPU,
     }
 )
@@ -3269,11 +3272,12 @@ class SettingsView(ft.Column):
             provider == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available
         )
         description = t(f"provider.{provider.value}.description", default="")
+        if auto_unavailable:
+            description = f"{description} {t('local_stt.cpu_auto_install_hint')}".strip()
         return OptionItem(
             value=provider.value,
             label=provider_label(provider.value).replace("\n", " "),
             description=description,
-            disabled=auto_unavailable,
         )
 
     def _classified_stt_option_item(self, provider: STTProviderName) -> OptionItem:
@@ -4233,8 +4237,6 @@ class SettingsView(ft.Column):
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
         selected = STTProviderName(value)
-        if selected == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available:
-            return
         if self._display_stt_choice(current_settings) == selected:
             return
         old_provider = current_settings.stt_provider.value
@@ -4261,13 +4263,11 @@ class SettingsView(ft.Column):
 
         source_lang = self._current_source_language()
         selection = resolve_local_asr_selection(selected.value, source_lang)
-        if selection.fallback_applied:
-            self._show_stt_selection_notice(t("local_stt.language_fallback_qwen"))
-        elif not selection.supported:
+        if not selection.supported:
             self._show_stt_selection_notice(t("local_stt.language_unsupported"))
         warning = (
             None
-            if selection.fallback_applied or not selection.supported
+            if not selection.supported
             else get_stt_compatibility_warning(
                 source_lang,
                 selected.value,
@@ -4317,8 +4317,6 @@ class SettingsView(ft.Column):
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
         selected = STTProviderName(value)
-        if selected == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available:
-            return
         if self._display_stt_choice(current_settings, peer=True) == selected:
             return
         draft = self._ensure_provider_settings_draft()
@@ -4341,9 +4339,7 @@ class SettingsView(ft.Column):
                 else "en"
             ),
         )
-        if selection.fallback_applied:
-            self._show_stt_selection_notice(t("local_stt.language_fallback_qwen"))
-        elif not selection.supported:
+        if not selection.supported:
             self._show_stt_selection_notice(t("local_stt.language_unsupported"))
         self._sync_stt_provider_labels(self._provider_draft)
         self._update_api_visibility()

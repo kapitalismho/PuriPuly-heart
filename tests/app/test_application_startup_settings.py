@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from puripuly_heart.app.services.manual_local_asr_fallback import ManualLocalASRFallbackOwner
 from puripuly_heart.composition.application_startup import ApplicationStartupAdapter
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
@@ -59,11 +58,9 @@ def _startup_adapter(
         settings_loader=lambda: settings,
         provisioning=provisioning,
         gpu_state=lambda: SimpleNamespace(selected_provider_requires_model=False),
-        manual_fallback=ManualLocalASRFallbackOwner(),
         calibration=Mock(),
         presentation=presentation if presentation is not None else Mock(),
         sync_presentation=lambda: None,
-        notify_fallback=lambda *_args: None,
         runtime_logging=Mock(),
         initial_llm_binding_sink=lambda _settings, _provider: None,
         pipeline_launcher=Mock(),
@@ -89,26 +86,6 @@ def _with_main_input_first_launch_completed(settings: AppSettingsVNext) -> AppSe
             main_input_hint=replace(settings.state.main_input_hint, first_launch_completed=True),
         ),
     )
-
-
-@pytest.mark.asyncio
-async def test_startup_restores_pre_fallback_canonical_when_persist_fails() -> None:
-    original = replace(
-        AppSettingsVNext(),
-        intent=replace(
-            AppSettingsVNext().intent,
-            stt=replace(AppSettingsVNext().intent.stt, provider="local_parakeet_v3"),
-            peer_stt=replace(AppSettingsVNext().intent.peer_stt, provider="local_parakeet_ja"),
-        ),
-    )
-    owner = _FailingPersistOwner(original)
-    adapter = _startup_adapter(owner, original)
-
-    state = await adapter.prepare_startup_settings()
-
-    assert state.settings is original
-    assert state.settings.intent.stt.provider == "local_parakeet_v3"
-    assert state.fallback_channels == ()
 
 
 @pytest.mark.asyncio

@@ -109,7 +109,7 @@ def test_release_surface_rejects_missing_extra_and_duplicate_assets(asset_names)
 def native_release_inputs(tmp_path: Path) -> tuple[dict[str, Path], Path]:
     names = {
         "main-executable": "PuriPulyHeart.exe",
-        "gpu-worker-executable": "PuriPulyHeartGpuWorker.exe",
+        "asr-worker-executable": "PuriPulyHeartASRWorker.exe",
         "overlay-executable": "PuriPulyHeartOverlay.exe",
         "installer": INSTALLER_EXE,
     }
@@ -131,8 +131,22 @@ def native_release_inputs(tmp_path: Path) -> tuple[dict[str, Path], Path]:
 def _identity_cli(tmp_path: Path, arguments: list[str]) -> subprocess.CompletedProcess[str]:
     environment = dict(os.environ)
     environment["LOCALAPPDATA"] = str(tmp_path / "profile")
+    bootstrap = (
+        "import runpy, sys; "
+        "sys.path.insert(0, sys.argv.pop(1)); "
+        "runpy.run_module(sys.argv.pop(1), run_name='__main__', alter_sys=True)"
+    )
     return subprocess.run(
-        [sys.executable, "-I", "-B", "-m", identity.__name__, *arguments],
+        [
+            sys.executable,
+            "-I",
+            "-B",
+            "-c",
+            bootstrap,
+            str(Path(identity.__file__).resolve().parents[2]),
+            identity.__name__,
+            *arguments,
+        ],
         cwd=tmp_path,
         env=environment,
         capture_output=True,
@@ -156,8 +170,8 @@ def _build_arguments(paths: dict[str, Path], provenance_path: Path) -> list[str]
         "local",
         "--main-exe",
         str(paths["main-executable"]),
-        "--gpu-worker-exe",
-        str(paths["gpu-worker-executable"]),
+        "--asr-worker-exe",
+        str(paths["asr-worker-executable"]),
         "--overlay-exe",
         str(paths["overlay-executable"]),
         "--installer",
@@ -256,7 +270,7 @@ def test_verify_build_cli_rejects_wrong_pe_metadata_without_emitting_provenance(
 ) -> None:
     paths, provenance_path = native_release_inputs
     write_pe(
-        paths["gpu-worker-executable"],
+        paths["asr-worker-executable"],
         version=version,
         metadata={"ProductName": product, "ProductVersion": VERSION},
     )
@@ -265,7 +279,7 @@ def test_verify_build_cli_rejects_wrong_pe_metadata_without_emitting_provenance(
 
     assert rejected.returncode != 0
     assert error in rejected.stderr
-    assert paths["gpu-worker-executable"].name in rejected.stderr
+    assert paths["asr-worker-executable"].name in rejected.stderr
     assert not provenance_path.exists()
 
 

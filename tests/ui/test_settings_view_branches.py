@@ -268,14 +268,15 @@ def test_settings_rejects_malformed_osc_ports_without_mutating_snapshot() -> Non
     assert view._general_snapshot == general
 
 
-def test_cpu_auto_option_is_disabled_until_all_models_are_available(
+def test_cpu_auto_remains_selectable_with_install_guidance_when_models_are_missing(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     view, _store = _make_settings_view(monkeypatch, settings_events)
 
     unavailable = view._stt_option_item(STTProviderName.LOCAL_CPU_AUTO)
-    assert unavailable.disabled is True
-    assert unavailable.description == t("provider.local_cpu_auto.description")
+    assert unavailable.disabled is False
+    assert t("local_stt.cpu_auto_install_hint") in unavailable.description
+    assert view._peer_stt_option_item(STTProviderName.LOCAL_CPU_AUTO).disabled is False
 
     view.set_local_cpu_auto_available(True)
     available = view._stt_option_item(STTProviderName.LOCAL_CPU_AUTO)
@@ -1307,12 +1308,12 @@ def test_translation_connection_selected_repaints_managed_key_card_immediately(
     assert "api_body" in updates
 
 
-def test_update_api_visibility_treats_peer_local_qwen_as_local_provider(
+def test_update_api_visibility_treats_peer_mlt_as_local_provider(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.LOCAL_QWEN)
+    settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_FUN_ASR_MLT_NANO)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.LOCAL_FUN_ASR_MLT_NANO)
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
 
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
@@ -2130,7 +2131,7 @@ def test_on_peer_stt_selected_updates_provider_and_pipeline_flags(
     assert changed == []
 
 
-def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
+def test_peer_stt_mlt_option_is_selectable_with_provider_description(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
@@ -2166,25 +2167,23 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
     view._on_peer_stt_click(None)
 
     options = captured["options"]
-    local_qwen_option = next(
-        option for option in options if option.value == STTProviderName.LOCAL_QWEN.value
+    mlt_option = next(
+        option for option in options if option.value == STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value
     )
 
     assert captured["title"] == t("settings.section.peer_stt")
     assert captured["show_description"] is True
     assert captured["two_column"] is True
     assert captured["left_column_sections"] == 2
-    assert local_qwen_option.label == "Qwen3 ASR 0.6B"
-    assert local_qwen_option.disabled is False
-    assert all(
-        option.disabled == (option.value == STTProviderName.LOCAL_CPU_AUTO.value)
-        for option in options
-    )
+    assert mlt_option.description == t("provider.local_fun_asr_mlt_nano.description")
+    assert mlt_option.disabled is False
+    assert all(not option.disabled for option in options)
     assert {option.value for option in options} == {
         STTProviderName.LOCAL_CPU_AUTO.value,
-        STTProviderName.LOCAL_PARAKEET_V3.value,
+        STTProviderName.LOCAL_ORUKEET.value,
+        STTProviderName.LOCAL_FUN_ASR_NANO.value,
         STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
-        STTProviderName.LOCAL_QWEN.value,
+        STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value,
         STTProviderName.LOCAL_QWEN_GPU.value,
         STTProviderName.ROLLING_FREE.value,
         STTProviderName.DEEPGRAM.value,
@@ -2254,7 +2253,7 @@ def test_selecting_peer_qwen_audio_does_not_change_self(
     assert view._stt_text.content.value == t("provider.local_cpu_auto")
 
 
-def test_peer_stt_local_qwen_choice_can_be_persisted(
+def test_peer_stt_mlt_choice_can_be_persisted(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
@@ -2262,7 +2261,7 @@ def test_peer_stt_local_qwen_choice_can_be_persisted(
     view, _ = _make_settings_view(monkeypatch, settings_events)
     settings_events.load(view, settings, config_path=Path("settings.json"))
 
-    view._on_peer_stt_selected(STTProviderName.LOCAL_QWEN.value)
+    view._on_peer_stt_selected(STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value)
 
     pending = view.build_provider_apply_settings()
 
@@ -2270,11 +2269,11 @@ def test_peer_stt_local_qwen_choice_can_be_persisted(
     assert pending is not None
     assert (
         apply_provider_intent(settings_events.settings, pending).intent.peer_stt.provider
-        == STTProviderName.LOCAL_QWEN.value
+        == STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value
     )
     assert view.has_provider_changes is True
 
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.LOCAL_QWEN)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.LOCAL_FUN_ASR_MLT_NANO)
     settings_events.load(view, settings, config_path=Path("settings.json"))
 
     normalized_pending = view.build_provider_apply_settings()
@@ -2282,7 +2281,7 @@ def test_peer_stt_local_qwen_choice_can_be_persisted(
     assert normalized_pending is not None
     assert (
         apply_provider_intent(settings_events.settings, normalized_pending).intent.peer_stt.provider
-        == STTProviderName.LOCAL_QWEN.value
+        == STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value
     )
 
 
@@ -2351,7 +2350,7 @@ def test_local_model_row_repaints_for_cpu_and_gpu_local_models_and_collapses_for
     assert view._gpu_device_row.visible is False
     assert view._http_extension_host.visible is False
 
-    for provider in (STTProviderName.LOCAL_QWEN, STTProviderName.LOCAL_QWEN_GPU):
+    for provider in (STTProviderName.LOCAL_FUN_ASR_MLT_NANO, STTProviderName.LOCAL_QWEN_GPU):
         repainted.clear()
         view._on_stt_selected(provider.value)
 
@@ -2409,7 +2408,7 @@ def test_gpu_card_shows_split_labels_when_asr_and_gemma_use_different_devices(
         == "Vulkan1"
     )
 
-    view._on_stt_selected(STTProviderName.LOCAL_QWEN.value)
+    view._on_stt_selected(STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value)
 
     assert view._gpu_device_row.visible is True
     assert view._gpu_device_text.content.value == "NVIDIA GeForce RTX 4070"
@@ -3860,7 +3859,7 @@ def test_update_api_visibility_shows_selected_peer_deepgram_credentials(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
+    settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_FUN_ASR_MLT_NANO)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
 
@@ -3876,7 +3875,7 @@ def test_update_api_visibility_keeps_peer_qwen_credentials_visible_when_peer_dis
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
+    settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_FUN_ASR_MLT_NANO)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
@@ -3923,7 +3922,7 @@ def test_on_peer_stt_selected_refreshes_api_visibility_and_redraws_immediately(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
+    settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_FUN_ASR_MLT_NANO)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
 
     view, _ = _make_settings_view(monkeypatch, settings_events)
@@ -5420,11 +5419,11 @@ def test_prompt_change_only_updates_draft_until_commit(
     assert changed == []
 
 
-def test_prompt_commit_preserves_peer_local_qwen_before_emit(
+def test_prompt_commit_preserves_peer_mlt_before_emit(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.LOCAL_QWEN)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.LOCAL_FUN_ASR_MLT_NANO)
     changed: list[AppSettingsVNext] = []
     view, _ = _make_settings_view(monkeypatch, settings_events)
     settings_events.load(view, settings, config_path=Path("settings.json"))
@@ -5435,8 +5434,8 @@ def test_prompt_commit_preserves_peer_local_qwen_before_emit(
 
     assert changed
     assert changed[-1] is not settings
-    assert changed[-1].intent.peer_stt.provider == STTProviderName.LOCAL_QWEN.value
-    assert settings.intent.peer_stt.provider == STTProviderName.LOCAL_QWEN.value
+    assert changed[-1].intent.peer_stt.provider == STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value
+    assert settings.intent.peer_stt.provider == STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value
     assert changed[-1].intent.prompts.system_prompt_override == "custom prompt"
 
 

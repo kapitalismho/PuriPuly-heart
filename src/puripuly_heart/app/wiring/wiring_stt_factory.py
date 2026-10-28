@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from puripuly_heart.app.adapters.asr_worker_process import DefaultASRWorkerProcessFactory
 from puripuly_heart.app.services.local_asr.local_asr_selection import (
     LOCAL_CPU_PROVIDERS,
     resolve_local_asr_selection,
@@ -43,9 +44,10 @@ from puripuly_heart.config.runtime_resolution import (
     STT_PROVIDER_ELEVENLABS_SCRIBE,
     STT_PROVIDER_GEMINI_TRANSCRIBE,
     STT_PROVIDER_LOCAL_CPU_AUTO,
+    STT_PROVIDER_LOCAL_FUN_ASR_MLT_NANO,
+    STT_PROVIDER_LOCAL_FUN_ASR_NANO,
+    STT_PROVIDER_LOCAL_ORUKEET,
     STT_PROVIDER_LOCAL_PARAKEET_JAPANESE,
-    STT_PROVIDER_LOCAL_PARAKEET_V3,
-    STT_PROVIDER_LOCAL_QWEN,
     STT_PROVIDER_LOCAL_QWEN_GPU,
     STT_PROVIDER_QWEN_AUDIO,
     STT_PROVIDER_ROLLING_FREE,
@@ -56,14 +58,15 @@ from puripuly_heart.config.runtime_resolution import (
     resolve_stt_config as resolve_stt_runtime_config,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.asr_worker import ASRWorkerProcessFactoryPort
 from puripuly_heart.core.language import get_local_qwen_language_hint
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.local_asr.local_stt_assets import (
+    FUN_ASR_MLT_NANO_MODEL_ID,
+    FUN_ASR_NANO_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
-    LOCAL_STT_MODEL_ID,
+    ORUKEET_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
-    PARAKEET_V3_MODEL_ID,
-    default_local_stt_model_dir,
 )
 from puripuly_heart.core.peer_capture import (
     PeerCaptureLanguageFacts,
@@ -71,12 +74,10 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureTargetIntent,
 )
 from puripuly_heart.core.runtime.gpu_asr import SharedGpuASRRuntime
+from puripuly_heart.core.runtime.local_asr_lifecycle import LOCAL_ASR_IDLE_RELEASE_SECONDS
 from puripuly_heart.core.runtime.local_asr_transition import (
     LocalASRSessionOptions,
     LocalASRTransitionRequest,
-)
-from puripuly_heart.core.runtime.local_qwen_lifecycle import (
-    LOCAL_QWEN_IDLE_RELEASE_SECONDS,
 )
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
 from puripuly_heart.core.storage.secrets import SecretStore
@@ -89,7 +90,6 @@ from puripuly_heart.core.stt.custom import (
 from puripuly_heart.core.stt.custom_vocab import (
     CustomVocabularyRuntimeConfig,
     get_effective_custom_terms,
-    get_effective_local_qwen_hotwords,
 )
 from puripuly_heart.core.stt.rolling import RollingMemberBinding, RollingProviderDefinition
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
@@ -99,9 +99,10 @@ from .wiring_secrets_factory import require_secret
 
 logger = logging.getLogger(__name__)
 _LOCAL_CPU_MODEL_BY_PROVIDER = {
-    STT_PROVIDER_LOCAL_PARAKEET_V3: PARAKEET_V3_MODEL_ID,
+    STT_PROVIDER_LOCAL_ORUKEET: ORUKEET_MODEL_ID,
+    STT_PROVIDER_LOCAL_FUN_ASR_NANO: FUN_ASR_NANO_MODEL_ID,
+    STT_PROVIDER_LOCAL_FUN_ASR_MLT_NANO: FUN_ASR_MLT_NANO_MODEL_ID,
     STT_PROVIDER_LOCAL_PARAKEET_JAPANESE: PARAKEET_JAPANESE_MODEL_ID,
-    STT_PROVIDER_LOCAL_QWEN: LOCAL_STT_MODEL_ID,
 }
 
 
@@ -444,10 +445,6 @@ def _self_stt_custom_vocabulary_signature_for_provider(
 ) -> tuple[bool, tuple[str, ...]]:
     provider_value = provider.value if isinstance(provider, STTProviderName) else str(provider)
     config = CustomVocabularyRuntimeConfig(enabled=enabled, terms=terms)
-    if provider_value == STTProviderName.LOCAL_QWEN.value:
-        if provider_identity:
-            return False, ()
-        return enabled, tuple(get_effective_local_qwen_hotwords(config, source_language))
     if provider_value in {
         STTProviderName.DEEPGRAM.value,
         STTProviderName.SONIOX.value,
@@ -613,9 +610,9 @@ def build_self_capture_session_config_from_vnext(
         local_cpu=runtime_provider in LOCAL_CPU_PROVIDERS,
         local_gpu=runtime_provider == STTProviderName.LOCAL_QWEN_GPU.value,
         release_backend_after=(
-            LOCAL_QWEN_IDLE_RELEASE_SECONDS if runtime_provider in LOCAL_CPU_PROVIDERS else None
+            LOCAL_ASR_IDLE_RELEASE_SECONDS if runtime_provider in LOCAL_CPU_PROVIDERS else None
         ),
-        warmup=runtime_provider != STTProviderName.LOCAL_QWEN.value,
+        warmup=True,
         provider_context=resolved,
         model_id=transition.model_id if transition is not None else resolved.model,
         gpu_device_id=stt.gpu_device_id,
@@ -782,11 +779,6 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         intent.stt.custom.model if is_custom_stt_provider(provider) else None,
         custom_extra_signature,
         custom_stt_secret_generation() if is_custom_stt_provider(provider) else None,
-        (
-            str(default_local_stt_model_dir())
-            if provider == STTProviderName.LOCAL_QWEN.value
-            else None
-        ),
         intent.stt.gpu_device_id if provider == STTProviderName.LOCAL_QWEN_GPU.value else None,
         custom_vocab_enabled,
         custom_terms,
@@ -1096,6 +1088,8 @@ def create_stt_backend_from_resolved_config(
     gpu_model_path: Path | None = None,
     gpu_device_id: str = "auto",
     basic_log_sink: Callable[[str, int], None] | None = None,
+    asr_process_factory: ASRWorkerProcessFactoryPort | None = None,
+    cpu_model_root: Path | None = None,
 ) -> STTBackend:
     stream_label = config.channel
     keyterms = _resolved_stt_keyterms(config)
@@ -1105,9 +1099,10 @@ def create_stt_backend_from_resolved_config(
 
         return LocalCPUAutoSTTBackend(
             source_language=config.source_language,
+            model_root=cpu_model_root,
             sample_rate_hz=config.sample_rate_hz,
             stream_label=stream_label,
-            hotwords=keyterms,
+            process_factory=asr_process_factory or DefaultASRWorkerProcessFactory(),
             attempt_log_sink=basic_log_sink,
         )
     if config.provider in _LOCAL_CPU_MODEL_BY_PROVIDER:
@@ -1115,10 +1110,11 @@ def create_stt_backend_from_resolved_config(
 
         return create_local_cpu_backend(
             _LOCAL_CPU_MODEL_BY_PROVIDER[config.provider],
+            model_root=cpu_model_root,
             source_language=config.source_language,
             sample_rate_hz=config.sample_rate_hz,
             stream_label=stream_label,
-            hotwords=() if config.provider == STT_PROVIDER_LOCAL_QWEN else keyterms,
+            process_factory=asr_process_factory or DefaultASRWorkerProcessFactory(),
             attempt_log_sink=basic_log_sink,
         )
     if config.provider == STT_PROVIDER_LOCAL_QWEN_GPU:
@@ -1376,9 +1372,10 @@ def resolve_peer_stt_config(settings: AppSettingsVNext) -> ResolvedPeerSTTConfig
 
     if provider in {
         STTProviderName.LOCAL_CPU_AUTO,
-        STTProviderName.LOCAL_PARAKEET_V3,
+        STTProviderName.LOCAL_ORUKEET,
+        STTProviderName.LOCAL_FUN_ASR_NANO,
+        STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
         STTProviderName.LOCAL_PARAKEET_JAPANESE,
-        STTProviderName.LOCAL_QWEN,
         STTProviderName.LOCAL_QWEN_GPU,
     }:
         return ResolvedPeerSTTConfig(
@@ -1547,11 +1544,12 @@ def build_peer_capture_session_config_from_vnext(
         provider_context=backend,
         local_provider=local_provider,
         release_backend_after=(
-            LOCAL_QWEN_IDLE_RELEASE_SECONDS
-            if backend.provider == STTProviderName.LOCAL_QWEN.value
+            LOCAL_ASR_IDLE_RELEASE_SECONDS
+            if backend.provider in LOCAL_CPU_PROVIDERS
+            and backend.provider != STT_PROVIDER_LOCAL_PARAKEET_JAPANESE
             else None
         ),
-        warmup=backend.provider != STTProviderName.LOCAL_QWEN.value,
+        warmup=True,
         gpu_device_id=settings.intent.stt.gpu_device_id,
     )
 

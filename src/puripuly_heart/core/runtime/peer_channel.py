@@ -72,9 +72,10 @@ from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 _LOCAL_ASR_PROVIDERS = frozenset(
     {
         "local_cpu_auto",
-        "local_parakeet_v3",
+        "local_orukeet",
+        "local_fun_asr_nano",
+        "local_fun_asr_mlt_nano",
         "local_parakeet_ja",
-        "local_qwen",
         "local_qwen_gpu",
     }
 )
@@ -1176,7 +1177,13 @@ class PeerCaptureSessionOwner:
                     release_mode: Literal["dormant", "abort"] = (
                         "dormant"
                         if stop_mode == "retain"
-                        and config.provider_id == "local_qwen"
+                        and config.provider_id
+                        in {
+                            "local_cpu_auto",
+                            "local_orukeet",
+                            "local_fun_asr_nano",
+                            "local_fun_asr_mlt_nano",
+                        }
                         and self._provider_signature == config.provider_signature
                         else "abort"
                     )

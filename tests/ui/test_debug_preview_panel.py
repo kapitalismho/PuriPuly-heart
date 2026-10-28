@@ -26,7 +26,6 @@ PRIMARY_ACTION_KEYS = [
     "qq_auth_translation_gated",
     "discord_callback_page",
     "founder_letter",
-    "local_qwen_hallucination_modal",
     "github_star_snackbar",
     "foundation_primitives",
     "http_extension_form",

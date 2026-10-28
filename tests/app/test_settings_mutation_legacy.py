@@ -279,7 +279,7 @@ async def test_order22_path_validator_accepts_only_stt_language_audio_paths() ->
     request = settings_mutation.SettingsMutationRequest(
         values={
             "intent.stt.provider": "soniox",
-            "intent.peer_stt.provider": "local_qwen",
+            "intent.peer_stt.provider": "local_fun_asr_mlt_nano",
             "intent.languages.source_language": "ja",
             "intent.languages.secondary_target_language": "fr",
             "intent.audio.input_device": "Headset Mic",

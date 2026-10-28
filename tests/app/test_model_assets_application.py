@@ -6,27 +6,16 @@ from types import SimpleNamespace
 import pytest
 
 from puripuly_heart.app.services.model_assets import ModelAssetsApplication, ModelAssetsError
-from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice, model_asset_choices
+from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice
 from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
-    LOCAL_STT_MODEL_ID,
+    ORUKEET_MODEL_ID,
     load_local_stt_asset_manifest,
 )
 
-
-def test_model_manager_names_drop_runtime_suffixes_and_place_qwen_gpu_second() -> None:
-    choices = model_asset_choices()
-    asr = [choice.name for choice in choices if choice.purpose == "asr"]
-    assert asr[:2] == ["Qwen3 ASR 0.6B", "Qwen3 ASR 1.7B Q6_K"]
-    assert [choice.name for choice in choices if choice.purpose == "translation"][0] == (
-        "Gemma 4 E4B"
-    )
-    assert all("·" not in choice.name and "+ MTP" not in choice.name for choice in choices)
-
-
 GEMMA_ID = "gemma-test"
 CHOICES = (
-    ModelAssetChoice(LOCAL_STT_MODEL_ID, "Qwen CPU", "d.qwen", "asr", 10),
+    ModelAssetChoice(ORUKEET_MODEL_ID, "Orukeet", "d.qwen", "asr", 10),
     ModelAssetChoice(LOCAL_QWEN_GPU_MODEL_ID, "Qwen GPU", "d.gpu", "asr", 20),
     ModelAssetChoice(
         GEMMA_ID,
@@ -116,7 +105,7 @@ async def test_entries_report_disk_integrity_without_touching_owners(tmp_path) -
 
     entries = {entry.model_id: entry for entry in await service.refresh()}
 
-    assert entries[LOCAL_STT_MODEL_ID].status == "missing"
+    assert entries[ORUKEET_MODEL_ID].status == "missing"
     assert entries[GEMMA_ID].status == "invalid"
     assert entries[GEMMA_ID].required_files == ("model.gguf", "draft.gguf")
     assert provisioning.requests == []
@@ -134,7 +123,7 @@ async def test_asr_download_uses_locale_order_reports_progress_and_changes_no_se
     assert _status(service, LOCAL_QWEN_GPU_MODEL_ID) == "downloading"
     assert service.entry(LOCAL_QWEN_GPU_MODEL_ID).progress_percent == 42
     with pytest.raises(ModelAssetsError) as busy:
-        await service.download(LOCAL_STT_MODEL_ID)
+        await service.download(ORUKEET_MODEL_ID)
     assert busy.value.failure_code == "task_busy"
 
     provisioning.release.set()
@@ -152,18 +141,18 @@ async def test_failure_is_recorded_on_the_entry_and_cleared_by_the_next_attempt(
     provisioning.release.set()
     provisioning.result = SimpleNamespace(
         cancelled=False,
-        failed_model_ids=(LOCAL_STT_MODEL_ID,),
+        failed_model_ids=(ORUKEET_MODEL_ID,),
         failure_codes=("connection_failed",),
     )
 
     with pytest.raises(ModelAssetsError) as caught:
-        await service.download(LOCAL_STT_MODEL_ID)
+        await service.download(ORUKEET_MODEL_ID)
 
     assert caught.value.failure_code == "connection_failed"
-    assert service.entry(LOCAL_STT_MODEL_ID).failure_code == "connection_failed"
+    assert service.entry(ORUKEET_MODEL_ID).failure_code == "connection_failed"
     provisioning.result = SimpleNamespace(cancelled=False, failed_model_ids=(), failure_codes=())
-    await service.download(LOCAL_STT_MODEL_ID)
-    assert service.entry(LOCAL_STT_MODEL_ID).failure_code is None
+    await service.download(ORUKEET_MODEL_ID)
+    assert service.entry(ORUKEET_MODEL_ID).failure_code is None
 
 
 @pytest.mark.asyncio
@@ -171,16 +160,16 @@ async def test_cancel_targets_the_model_assets_origin_and_is_not_reported_as_fai
     tmp_path,
 ) -> None:
     service, provisioning, _gemma = _service(tmp_path)
-    task = asyncio.create_task(service.download(LOCAL_STT_MODEL_ID))
+    task = asyncio.create_task(service.download(ORUKEET_MODEL_ID))
     await provisioning.started.wait()
 
-    assert await service.cancel(LOCAL_STT_MODEL_ID) is True
+    assert await service.cancel(ORUKEET_MODEL_ID) is True
     with pytest.raises(ModelAssetsError) as caught:
         await task
 
     assert caught.value.failure_code == "cancelled"
     assert provisioning.cancelled == [("cpu", "model_assets")]
-    assert service.entry(LOCAL_STT_MODEL_ID).failure_code is None
+    assert service.entry(ORUKEET_MODEL_ID).failure_code is None
     assert not service.busy
 
 
@@ -188,10 +177,10 @@ async def test_cancel_targets_the_model_assets_origin_and_is_not_reported_as_fai
 async def test_delete_refuses_models_in_use_and_otherwise_uses_the_owning_backend(
     tmp_path,
 ) -> None:
-    service, provisioning, gemma = _service(tmp_path, active=frozenset({LOCAL_STT_MODEL_ID}))
+    service, provisioning, gemma = _service(tmp_path, active=frozenset({ORUKEET_MODEL_ID}))
 
     with pytest.raises(ModelAssetsError) as caught:
-        await service.delete(LOCAL_STT_MODEL_ID)
+        await service.delete(ORUKEET_MODEL_ID)
     assert caught.value.failure_code == "model_in_use"
     assert provisioning.deleted == []
 
@@ -237,6 +226,6 @@ async def test_installed_asr_model_on_disk_is_reported_installed(tmp_path, monke
 
     await service.refresh()
 
-    manifest = load_local_stt_asset_manifest(LOCAL_STT_MODEL_ID)
+    manifest = load_local_stt_asset_manifest(ORUKEET_MODEL_ID)
     assert tmp_path / manifest.install_dirname in seen
-    assert _status(service, LOCAL_STT_MODEL_ID) == "installed"
+    assert _status(service, ORUKEET_MODEL_ID) == "installed"

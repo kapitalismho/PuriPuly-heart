@@ -48,13 +48,15 @@ The draft-release job installs the pinned `PYTHON_VERSION` before running releas
 
 SHA-256 and provenance verification remain inside the pipeline; provenance passes between jobs through job outputs rather than downloadable JSON files. Required third-party licenses and corresponding-source bundles remain embedded in the installer. Successful reruns remove non-installer attachments from the selected release.
 
+Both native build entry points generate `native-asr-models.iss` from the final staged ASR manifests and current settings schema, then pass `/DLocalASRModelsInclude` to Inno Setup. The [build-time emitter](../src/puripuly_heart/release_evidence/local_asr_installer.py) is the authority for that include; do not reintroduce hardcoded model pins or a separate installer schema version. Setup prepares the four required CPU ASR models through the [production installer include](../installer/local-asr.iss), using the same pinned primary/mirror bytes and provisioning lease as the application.
+
 Before creating a tag, commit matching versions in:
 
 - `pyproject.toml`
 - `src/puripuly_heart/__init__.py`
-- `installer.iss`
+- `installer/application-identity.iss`
 - `native/overlay/Cargo.toml`
-- `native/gpu_worker/Cargo.toml`
+- `native/asr_worker/Cargo.toml`
 
 Tag the commit containing the workflow changes and version updates, then push that tag:
 

@@ -63,7 +63,11 @@ from puripuly_heart.app.services.canonical_settings_persistence import canonical
 from puripuly_heart.app.services.capture.peer_capture_target_application import (
     PeerCaptureTargetUnavailable,
 )
-from puripuly_heart.config.provider_values import QwenRegion, STTProviderName
+from puripuly_heart.config.provider_values import (
+    QwenRegion,
+    STTProviderName,
+    normalize_stt_provider,
+)
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import (
     TranslationConnection,
@@ -2729,7 +2733,7 @@ class ApplicationControlOwner:
     async def _apply_provider(self, args: dict) -> object:
         edits = []
         if "channel" in args:
-            provider = STTProviderName(args["provider"])
+            provider = STTProviderName(normalize_stt_provider(args["provider"]))
             channel = args["channel"]
             if channel not in ("self", "peer", "both"):
                 raise InvalidArgumentsError("invalid provider channel")
@@ -2741,7 +2745,7 @@ class ApplicationControlOwner:
         else:
             for channel in ("self", "peer"):
                 if channel in args:
-                    provider = STTProviderName(args[channel])
+                    provider = STTProviderName(normalize_stt_provider(args[channel]))
                     edits.append(
                         (SelfSttProviderEdit if channel == "self" else PeerSttProviderEdit)(
                             provider
@@ -2980,7 +2984,7 @@ class ApplicationControlOwner:
             else:
                 if key in {"stt.provider", "peer_stt.provider"}:
                     edit = (SelfSttProviderEdit if key == "stt.provider" else PeerSttProviderEdit)(
-                        STTProviderName(value)
+                        STTProviderName(normalize_stt_provider(value))
                     )
                 elif key == "stt.cloud_free_tier_providers":
                     edit = CloudFreeTierProvidersEdit(
@@ -3303,7 +3307,9 @@ def _validate_calibration_args(args: dict) -> None:
 
 
 def _validate_stt_provider(value: object) -> None:
-    if type(value) is not str or value not in {item.value for item in STTProviderName}:
+    if type(value) is not str or normalize_stt_provider(value) not in {
+        item.value for item in STTProviderName
+    }:
         raise InvalidArgumentsError("unsupported STT provider")
 
 
@@ -3373,7 +3379,7 @@ def _validate_settings_field(
     if name == "locale":
         valid = value in locale_choices
     elif name in {"stt.provider", "peer_stt.provider"}:
-        valid = value in {item.value for item in STTProviderName}
+        valid = normalize_stt_provider(value) in {item.value for item in STTProviderName}
     elif name == "stt.cloud_free_tier_providers":
         allowed = {item.value for item in CLOUD_FREE_TIER_STT_PROVIDERS}
         valid = bool(value) and len(value) == len(set(value)) and set(value) <= allowed

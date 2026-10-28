@@ -26,7 +26,7 @@ EXPECTED_FAULT_SIGNATURES = {
         "Capture logs show one muted channel; VAD may miss speech after mono mixdown."
     ),
     "capture_attenuate_40db": (
-        "Capture RMS and VAD-input RMS drop sharply; VAD may miss or local_qwen may decode "
+        "Capture RMS and VAD-input RMS drop sharply; VAD may miss or local ASR may decode "
         "garbage."
     ),
     "capture_near_silence_noise": (
@@ -37,7 +37,7 @@ EXPECTED_FAULT_SIGNATURES = {
         "sensitivity."
     ),
     "stt_input_low_snr_vad_pass": (
-        "VAD can start from real capture while STT-input and local_qwen logs show injected "
+        "VAD can start from real capture while STT-input and local ASR logs show injected "
         "low-SNR audio."
     ),
 }

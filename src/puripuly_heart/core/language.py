@@ -426,11 +426,5 @@ def get_stt_compatibility_warning(
     if stt_provider == "qwen_audio":
         if not is_qwen_audio_asr_supported(code) and is_deepgram_supported(code):
             return SttCompatibilityWarning("warning.qwen_suggest_deepgram", lang_code)
-    elif (
-        stt_provider == "local_qwen"
-        and not is_qwen3_asr_supported(code)
-        and is_deepgram_supported(code)
-    ):
-        return SttCompatibilityWarning("warning.qwen_suggest_deepgram", lang_code)
 
     return None

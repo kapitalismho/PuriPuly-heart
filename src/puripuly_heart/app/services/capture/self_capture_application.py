@@ -37,7 +37,6 @@ class SelfCaptureApplicationOwner:
     runtime_available: Callable[[], bool]
     capture_owner: Callable[[], SelfCaptureSessionOwner]
     capture_owner_if_created: Callable[[], SelfCaptureSessionOwner | None]
-    persist_manual_fallback: Callable[[], bool]
     reset_local_pending: Callable[[], None]
     clear_gpu_pending: Callable[[], None]
     overlay_state_provider: Callable[[], str]
@@ -54,9 +53,6 @@ class SelfCaptureApplicationOwner:
     force_immediate: bool = False
 
     async def set_enabled(self, enabled: bool, *, force_immediate: bool = False) -> None:
-        if enabled and not self.persist_manual_fallback():
-            self.dashboard_enabled_sink(False)
-            return
         self.force_immediate = force_immediate
         if not enabled:
             self.reset_local_pending()

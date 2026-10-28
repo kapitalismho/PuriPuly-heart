@@ -24,7 +24,7 @@ uv run python -m puripuly_heart.main cli --config C:\work\puripuly-dev.json app 
 uv run python -m puripuly_heart.main cli --config C:\work\puripuly-dev.json app stop
 ```
 
-- Use the same `--config` path for host and clients. It identifies canonical settings-file ownership; omission selects the user's normal settings. Use isolated synthetic settings for probes, not a live user's configuration.
+- Use the same `--config` path for host and clients. It identifies canonical settings-file ownership; omission selects the user's normal settings. Use isolated synthetic settings for probes, not a live user's configuration. A separate settings path alone does not isolate model, secret-store or other writable runtime roots.
 - Only one host may own that settings identity. `app start` defaults to foreground; `--background` outlives the launching terminal. Ordinary no-command application launch still opens the GUI.
 - `app list` lists current-user instances. `app discover` and `app status` target the selected settings identity; `app restart --background` replaces that host.
 - Queries and mutations never start a missing host implicitly: `instance_not_found` requires an explicit start. A PID is observation, not control identity; the CLI never kills by PID.
@@ -123,6 +123,19 @@ Get-Content -Raw .\message.txt | puripuly.exe text submit --stdin
 ```
 
 The receipt provides admission and turn identities with `output_delivery: unobserved`. Correlate subsequent translation events and destination evidence; the bounded typing-completion wait is not an output acknowledgment.
+
+### Local Speech Recognition
+
+Use current `settings choices` and `models status`; retired CPU models are not installable choices. CPU Auto routes English to Orukeet, Chinese to standard Fun-ASR-Nano, Korean to Fun-ASR-MLT-Nano, and Japanese to Parakeet CTC. Other languages are explicitly unsupported on these CPU paths; they do not silently switch to cloud, GPU or the retired providers. Auto requires all four current CPU models installed.
+
+- Each active transcribe.cpp CPU channel owns its native Model/Session and requests two inference threads. Talk and Listen can compute concurrently with 2+2 threads, including on the same checkpoint, without preloading an inactive channel. This is not a total process-thread cap.
+- GPU ASR keeps one resident Model shared by independent channel Sessions and serializes inference. Switching drains and frees the old Model before loading its replacement; it never preloads a second GPU Model.
+- Channel stops or changes revoke that channel's results and retain started native work until settlement. Another channel's unrelated resource remains owned. An admitted stop is not proof of native cleanup.
+- Legacy settings and control input `local_parakeet_v3` normalize to `local_orukeet`; `local_qwen` normalizes to `local_cpu_auto`. Queries, saved settings and choices use canonical values. See [OSC numeric compatibility](vrchat-osc.md#asr-ids) for legacy numeric inputs.
+- Only initial application startup, after successful recoverable canonical settings loading, removes recognized retired CPU assets and their known residue before constructing native providers. Ordinary settings reloads or telemetry verification do not authorize deletion. Locked/deferred cleanup retries on a later application startup. Unknown contents, reparse targets, Japanese/GPU assets and settings backups are preserved.
+- Replacement downloads use pinned sizes and SHA-256 with the normal staged installer. The derived `hf_mirror` source serves the same files through `hf-mirror.net`; source reachability is distinct from recognition readiness.
+
+Exact model/source pins live in the [ASR asset registry](../src/puripuly_heart/core/local_asr/local_stt_assets.py) and its packaged manifests. Model license terms, including Orukeet CC BY-SA 4.0 and the FunASR model agreement, are in the [third-party notices](../src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt).
 
 ### Managed Local Translation
 

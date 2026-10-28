@@ -627,7 +627,7 @@ pathlib.Path(sys.argv[2]).write_text(json.dumps({'type': 'complete', 'path': str
         assert result["SSL_CERT_FILE"] == str(root)
     if policy_case == "proxy_normalized":
         assert result["HTTP_PROXY"] == "http://all.invalid:8888"
-        assert result["HTTPS_PROXY"] == os.environ["HTTPS_PROXY"]
+        assert result["HTTPS_PROXY"] == "http://lower.invalid:8888"
         assert result["NO_PROXY"] == ","
 
 

@@ -231,7 +231,7 @@ async def test_detached_scope_and_explicit_generations_cannot_inherit_stale_oper
             "degraded",
         ),
         (
-            "gpu_worker",
+            "asr_worker",
             "process_lifecycle",
             "worker_transport_closed_with_error",
             "writer_close",
