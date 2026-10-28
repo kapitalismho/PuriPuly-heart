@@ -26,7 +26,7 @@
   #error MyAppDataDirName must be one safe LocalApplicationData child directory name without traversal, roots, or separators.
 #endif
 #define MyAppDataRoot "{localappdata}\" + MyAppDataDirName
-#define MyAppVersion "2.9.1"
+#define MyAppVersion "2.10.0"
 #define MyAppPublisher "salee"
 #define MyAppURL "https://github.com/kapitalismho/PuriPuly-heart"
 #ifndef MyAppExeName
