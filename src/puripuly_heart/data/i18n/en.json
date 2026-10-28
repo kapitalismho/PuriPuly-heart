@@ -83,7 +83,6 @@
   "settings.google_api_key": "Gemini API Key",
   "settings.openrouter_api_key": "OpenRouter API Key",
   "settings.openai_api_key": "OpenAI API Key",
-  "settings.openai_verification_charge": "Verification sends a small GPT-6 luna request and may incur an API charge.",
   "settings.deepseek_api_key": "DeepSeek API Key",
   "settings.openrouter_authenticate": "Authenticate with OpenRouter",
   "settings.openrouter_authenticated": "OpenRouter authentication is complete.",

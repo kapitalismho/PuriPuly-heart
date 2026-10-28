@@ -83,7 +83,6 @@
   "settings.google_api_key": "Gemini API 키",
   "settings.openrouter_api_key": "OpenRouter API 키",
   "settings.openai_api_key": "OpenAI API 키",
-  "settings.openai_verification_charge": "인증 시 GPT-6 luna로 소량의 요청을 전송하며 API 요금이 발생할 수 있어요.",
   "settings.deepseek_api_key": "DeepSeek API 키",
   "settings.openrouter_authenticate": "OpenRouter로 인증하기",
   "settings.openrouter_authenticated": "OpenRouter 인증이 완료되었어요.",

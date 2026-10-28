@@ -1146,12 +1146,6 @@ class SettingsView(ft.Column):
                 self.show_snackbar(msg, bg) if self.show_snackbar else None
             ),
         )
-        self._openai_verification_notice = ft.Text(
-            t("settings.openai_verification_charge"),
-            size=15,
-            color=COLOR_SECONDARY,
-            max_lines=2,
-        )
         self._openrouter_pkce_button = self._build_action_button(
             t("settings.openrouter_authenticate"),
             self._on_openrouter_pkce_click,
@@ -1329,11 +1323,6 @@ class SettingsView(ft.Column):
         api_header = ft.Row(
             controls=[
                 self._api_title,
-                ft.Container(
-                    content=self._openai_verification_notice,
-                    expand=True,
-                    padding=ft.Padding.symmetric(horizontal=12),
-                ),
                 self._api_guide_btn,
                 self._qwen_region_btn,
             ],
@@ -4144,7 +4133,6 @@ class SettingsView(ft.Column):
                 not is_custom_http and llm == LLMProviderName.CHATGPT
             )
             self._sync_chatgpt_account_card()
-        self._openai_verification_notice.visible = self._openai_key.visible
         self._deepseek_key.visible = bool(not is_custom_http and llm == LLMProviderName.DEEPSEEK)
         self._sync_openrouter_pkce_button_state(settings)
         self._translation_connection_row.visible = not is_custom_http
@@ -6753,7 +6741,6 @@ class SettingsView(ft.Column):
         self._managed_trial_usage_bar.apply_locale()
         self._openrouter_key.apply_locale()
         self._openai_key.apply_locale()
-        self._openai_verification_notice.value = t("settings.openai_verification_charge")
         self._deepseek_key.apply_locale()
         self._alibaba_key_beijing.apply_locale()
         self._alibaba_key_singapore.apply_locale()

@@ -3129,7 +3129,6 @@ def test_luna_ui_selection_switches_applicable_keys_and_restores_connection(
     assert view._openrouter_pkce_button_row.visible
     assert not view._chatgpt_account_card.visible
     assert not view._openai_key.visible
-    assert not view._openai_verification_notice.visible
 
     view._on_translation_connection_selected(TranslationConnection.OFFICIAL_BYOK.value)
     direct = view.build_provider_apply_settings()
@@ -3153,7 +3152,6 @@ def test_luna_ui_selection_switches_applicable_keys_and_restores_connection(
         == "none"
     )
     assert view._openai_key.visible
-    assert view._openai_verification_notice.visible
     assert not view._openrouter_key.visible
     assert not view._openrouter_pkce_button_row.visible
 
