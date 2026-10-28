@@ -2131,7 +2131,7 @@ def test_on_peer_stt_selected_updates_provider_and_pipeline_flags(
     assert changed == []
 
 
-def test_peer_stt_mlt_option_is_selectable_with_provider_description(
+def test_peer_stt_mlt_option_is_selectable(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
@@ -2175,7 +2175,7 @@ def test_peer_stt_mlt_option_is_selectable_with_provider_description(
     assert captured["show_description"] is True
     assert captured["two_column"] is True
     assert captured["left_column_sections"] == 2
-    assert mlt_option.description == t("provider.local_fun_asr_mlt_nano.description")
+    assert mlt_option.description == ""
     assert mlt_option.disabled is False
     assert all(not option.disabled for option in options)
     assert {option.value for option in options} == {
