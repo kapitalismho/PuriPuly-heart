@@ -2226,7 +2226,7 @@ async def test_soniox_error_before_configuration_send_prioritizes_structured_fai
             event_sink=emitted.append,
             terminal_failure_sink=failures.append,
             watchdog_resolver=lambda _settings: watchdogs(
-                connect_retry_base_s=0.8, connect_retry_max_s=1.6
+                readiness_timeout_s=2, connect_retry_base_s=0.8, connect_retry_max_s=1.6
             ),
             sleep=sleep,
         )
@@ -2629,7 +2629,7 @@ async def test_idle_retirement_reopens_only_for_demand() -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "provider_id",
-    ["custom_offline", "local_cpu_auto", "local_parakeet_v3", "local_qwen_gpu"],
+    ["custom_offline", "local_cpu_auto", "local_orukeet", "local_qwen_gpu"],
 )
 async def test_disabled_session_lifetime_keeps_healthy_session_past_180s(
     provider_id: str,

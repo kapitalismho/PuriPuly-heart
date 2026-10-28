@@ -1601,8 +1601,8 @@ async def test_soniox_failure_metadata_survives_file_sink_without_external_conte
     ("stage", "code", "exception_class"),
     [
         ("readiness", "provider_readiness_unavailable", "ProviderReadinessError"),
-        ("provider_build", "worker_process_exited", "GpuWorkerClosedError"),
-        ("provider_warmup", "heartbeat_timeout", "GpuWorkerRequestError"),
+        ("provider_build", "worker_process_exited", "ASRWorkerClosedError"),
+        ("provider_warmup", "heartbeat_timeout", "ASRWorkerRequestError"),
         ("provider_warmup", "model_missing", "GpuASRManualRetryRequired"),
         ("ingress", "gpu_not_ready", "SelfCaptureIngressError"),
         ("ingress", "self_channel_inactive", "SelfCaptureIngressError"),

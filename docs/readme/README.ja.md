@@ -86,11 +86,11 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 ---
 
 ## 翻訳比較
-![音声認識と翻訳を組み合わせた全体パイプラインの文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できる組み合わせ：Gemini Transcribe → Luna (0.676)、Soniox STT → Luna (0.942)、Qwen ASR 1.7B → Gemma 26B (1.024)、Gemini Transcribe → Gemma 26B (1.084)、Soniox STT → Gemma 26B (1.293)、Qwen ASR 0.6B → Gemma 26B (2.374)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (2.108)、Gemini 3.5 Live Translate (3.754)、Soniox Translate (4.989)。評価モデル：Gemini 3.7 Flash。](../images/performance/1.png)
+![音声認識と翻訳を組み合わせた全体パイプラインの文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はベンチマーク時のPuriPuly構成：Gemini Transcribe → Luna (0.676)、Soniox STT → Luna (0.942)、Qwen ASR 1.7B → Gemma 26B (1.024)、Gemini Transcribe → Gemma 26B (1.084)、Soniox STT → Gemma 26B (1.293)、Qwen ASR 0.6B → Gemma 26B (2.374)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (2.108)、Gemini 3.5 Live Translate (3.754)、Soniox Translate (4.989)。評価モデル：Gemini 3.7 Flash。](../images/performance/1.png)
 
 ![文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：GPT-6 luna (0.130)、Gemma 4 26B A4B (0.387)、DeepSeek-V4 Flash 0731 (0.571)、Gemma 4 E4B QAT Q4 (1.577)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (1.392)、Papago (2.699)、Gemini 3.5 Translate (2.991)、Soniox Translate (3.473)、DeepL (3.914)、Google Translation (5.731)。Qwen 3.8、Gemini 3.5、Sonioxは文字誤り率（CER）が5%以下の結果のみを選別。評価モデル：Gemini 3.7 Flash。](../images/performance/2.png)
 
-- 青い棒グラフはPuriPulyで使用できるモデルです。
+- 青い棒はベンチマーク時のPuriPuly構成です。CPU Qwen3-ASR 0.6Bはその後廃止されており、その結果は以下の新モデルを測定したものではありません。
 - マイクロソフトのGemba MQMフレームワークを使って実験しました。
 - 実際の会話に近づけるため、マルチターン環境で構成しました。
 - 全体の実験結果は[こちら](https://github.com/kapitalismho/korean-llm-context-translation-benchmark)を参照してください。
@@ -167,11 +167,16 @@ GPU推論はVulkanを使用しています。RadeonでもArcでも、ベンダ�
 
 | モデル | 実行環境 | 量子化 |
 |---|---|---|
-| Parakeet TDT 0.6B v3 | CPU | INT8 |
+| Orukeet（英語） | CPU | Q8_0 |
+| Fun-ASR-Nano-2512（中国語） | CPU | Q8_0 |
+| Fun-ASR-MLT-Nano-2512（韓国語） | CPU | Q8_0 |
 | Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
-| Qwen3-ASR 0.6B | CPU | INT8 |
 | Qwen3-ASR 1.7B | GPU | Q6_K |
 | OpenAI互換API | — | — |
+
+CPU自動選択は英語・中国語・韓国語・日本語のみ対応します。OrukeetとFun-ASRはtranscribe.cpp、日本語は引き続きsherpa-onnxを使用します。稼働中のtranscribe.cpp CPUチャネルごとに独立したModel/Sessionと推論スレッド2本を使用し、Talk/Listen同時稼働時は2+2です。非稼働チャネルは事前ロードしません。GPU ASRはチャネル別Sessionで常駐Modelを1つだけ共有し、推論を直列化します。モデル変更時も旧Modelの解放後に新モデルをロードします。
+
+WindowsセットアップはCPU ASRモデル4つを準備し、必要な場合は別途ダウンロードします。CPU自動選択には4つすべてが必要です。旧Parakeet v3の選択はOrukeetへ、CPU Qwen0.6はCPU自動選択へ移行します。復旧可能な設定保存後、起動時に識別済みの旧資産のみを削除し、失敗した削除は次回起動時に再試行します。識別できないファイルと日本語/GPUモデルは保持します。
 
 **LLM**
 

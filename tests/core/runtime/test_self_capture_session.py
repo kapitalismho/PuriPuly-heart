@@ -2114,7 +2114,7 @@ async def test_failed_provider_mutation_preserves_startup_failure_identity(
         SelfCaptureProviderMutationStatus.FAILED,
         reason="worker_process_exited",
         failure_code="worker_process_exited",
-        failure_type="GpuWorkerClosedError",
+        failure_type="ASRWorkerClosedError",
         failure_stage=stage,
     )
     try:

@@ -86,9 +86,9 @@
 | ID | Provider |
 | ---: | --- |
 | 0 | Auto Select (CPU Inference) |
-| 1 | Parakeet TDT 0.6B v3 |
+| 1 | Orukeet (English) |
 | 2 | Parakeet TDT-CTC 0.6B (ja) |
-| 3 | Qwen3 ASR 0.6B |
+| 3 | Legacy CPU Qwen input → Auto Select (CPU Inference) |
 | 4 | Qwen3 ASR 1.7B |
 | 5 | Deepgram |
 | 7 | Soniox |
@@ -98,9 +98,12 @@
 | 11 | ElevenLabs Scribe |
 | 12 | Qwen Audio 3.1 ASR Flash Streaming |
 | 13 | Free cloud ASR auto-selection (ElevenLabs Scribe → Gemini → Deepgram) |
+| 14 | Fun-ASR-Nano-2512 (Chinese) |
+| 15 | Fun-ASR-MLT-Nano-2512 (Korean) |
 
 - Used by: `PuriPuly_SelfASR`, `PuriPuly_PeerASR`
 - ID `6` is retired and rejected as an unknown ASR value. Qwen Audio uses ID `12`.
+- Legacy ID `3` is accepted as input but publishes canonical Auto ID `0`. ID `1` now selects Orukeet rather than retired Parakeet v3. The retired CPU providers are not advertised or restored as fallbacks.
 
 ### Translation model IDs
 

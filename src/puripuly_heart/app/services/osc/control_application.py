@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 
 from puripuly_heart.app.ports.osc_control import OscControlApplicationPort
+from puripuly_heart.config.provider_values import normalize_stt_provider
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import (
     TranslationModel,
@@ -121,6 +122,7 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         )
 
     async def set_self_asr(self, provider: str) -> object:
+        provider = normalize_stt_provider(provider)
         current = self.settings_provider()
         if current is not None and current.intent.stt.provider == provider:
             return True
@@ -135,6 +137,7 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         )
 
     async def set_peer_asr(self, provider: str) -> object:
+        provider = normalize_stt_provider(provider)
         current = self.settings_provider()
         if current is not None and current.intent.peer_stt.provider == provider:
             return True

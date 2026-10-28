@@ -939,7 +939,7 @@ async def test_control_overlay_receipts_preserve_owner_outcomes_and_captured_tra
 
 @pytest.mark.asyncio
 async def test_gpu_discovery_receipt_follows_owner_snapshot(offline):
-    from puripuly_heart.core.gpu_worker import GpuWorkerDevice
+    from puripuly_heart.core.asr_worker import ASRWorkerDevice
     from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
         LocalASRProviderRuntimeSnapshot,
         ProviderRuntimeGpuSnapshot,
@@ -951,7 +951,7 @@ async def test_gpu_discovery_receipt_follows_owner_snapshot(offline):
         control = app.control()
         control.bind_instance("offline-gpu")
         owner = control.gpu()
-        device = GpuWorkerDevice("gpu:0", 0, "isolated", "fake GPU", "discrete", 1024, 512)
+        device = ASRWorkerDevice("gpu:0", 0, "isolated", "fake GPU", "discrete", 1024, 512)
         phase = "unsupported"
 
         async def discover_gpu(*, force):

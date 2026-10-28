@@ -25,6 +25,7 @@ from puripuly_heart.config.llm_profiles import (
     normalize_legacy_openrouter_model,
     openrouter_alias_for_fields,
 )
+from puripuly_heart.config.provider_values import normalize_stt_provider
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_MANAGED,
     CREDENTIAL_SOURCE_NONE,
@@ -241,9 +242,10 @@ CREDENTIAL_REF_SONIOX_STT: Final = "soniox:stt"
 CREDENTIAL_REF_CUSTOM_STT: Final = "custom:stt"
 
 STT_PROVIDER_LOCAL_CPU_AUTO: Final = "local_cpu_auto"
-STT_PROVIDER_LOCAL_PARAKEET_V3: Final = "local_parakeet_v3"
+STT_PROVIDER_LOCAL_ORUKEET: Final = "local_orukeet"
+STT_PROVIDER_LOCAL_FUN_ASR_NANO: Final = "local_fun_asr_nano"
+STT_PROVIDER_LOCAL_FUN_ASR_MLT_NANO: Final = "local_fun_asr_mlt_nano"
 STT_PROVIDER_LOCAL_PARAKEET_JAPANESE: Final = "local_parakeet_ja"
-STT_PROVIDER_LOCAL_QWEN: Final = "local_qwen"
 STT_PROVIDER_LOCAL_QWEN_GPU: Final = "local_qwen_gpu"
 STT_PROVIDER_DEEPGRAM: Final = "deepgram"
 STT_PROVIDER_GEMINI_TRANSCRIBE: Final = "gemini_transcribe"
@@ -261,9 +263,10 @@ STT_CUSTOM_PROVIDERS: Final[tuple[str, ...]] = (
 )
 STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_LOCAL_CPU_AUTO,
-    STT_PROVIDER_LOCAL_PARAKEET_V3,
+    STT_PROVIDER_LOCAL_ORUKEET,
+    STT_PROVIDER_LOCAL_FUN_ASR_NANO,
+    STT_PROVIDER_LOCAL_FUN_ASR_MLT_NANO,
     STT_PROVIDER_LOCAL_PARAKEET_JAPANESE,
-    STT_PROVIDER_LOCAL_QWEN,
     STT_PROVIDER_LOCAL_QWEN_GPU,
     STT_PROVIDER_DEEPGRAM,
     STT_PROVIDER_ELEVENLABS_SCRIBE,
@@ -802,7 +805,7 @@ class STTRuntimeIntent:
             default=RUNTIME_CHANNEL_SELF,
         )
         provider = _normalize_allowed(
-            self.provider,
+            normalize_stt_provider(self.provider),
             allowed=STT_PROVIDERS,
             default=STT_PROVIDER_LOCAL_CPU_AUTO,
         )
@@ -1818,8 +1821,9 @@ __all__ = [
     "STT_PROVIDER_GEMINI_TRANSCRIBE",
     "STT_PROVIDER_LOCAL_CPU_AUTO",
     "STT_PROVIDER_LOCAL_PARAKEET_JAPANESE",
-    "STT_PROVIDER_LOCAL_PARAKEET_V3",
-    "STT_PROVIDER_LOCAL_QWEN",
+    "STT_PROVIDER_LOCAL_ORUKEET",
+    "STT_PROVIDER_LOCAL_FUN_ASR_NANO",
+    "STT_PROVIDER_LOCAL_FUN_ASR_MLT_NANO",
     "STT_PROVIDER_LOCAL_QWEN_GPU",
     "PEER_AUTO_DETECTION_STT_PROVIDERS",
     "STT_PROVIDER_QWEN_AUDIO",

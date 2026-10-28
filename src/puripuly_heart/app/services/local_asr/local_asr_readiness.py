@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Literal
 
+from puripuly_heart.core.asr_worker import ASRWorkerRequestError
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     ProviderRuntimeChannelSnapshot,
 )
@@ -15,7 +16,6 @@ from puripuly_heart.core.local_asr.local_asr_provisioning import (
 )
 from puripuly_heart.core.local_asr.local_stt_assets import (
     LocalParakeetSherpaLoadError,
-    LocalQwenSherpaLoadError,
     LocalSTTManifestInvalidError,
     LocalSTTModelMissingError,
 )
@@ -26,7 +26,6 @@ from .local_asr_cpu_repair import (
     LocalASRCpuRepairRequest,
 )
 from .local_asr_selection import (
-    LOCAL_CPU_AUTO_PROVIDER,
     LOCAL_CPU_PROVIDERS,
     local_asr_status_for_provider,
     required_local_asr_model_ids,
@@ -64,7 +63,6 @@ class LocalASRReadinessState:
 LocalASRReadinessStateProvider = Callable[[], LocalASRReadinessState]
 LocalASRReadinessEffectSink = Callable[[LocalASRReadinessEffect], None]
 LocalASRReadinessAsyncEffect = Callable[[], Awaitable[None]]
-LocalASRReadinessFallback = Callable[[str], bool]
 LocalASRReadinessProviderAvailable = Callable[[], bool]
 LocalASRReadinessChannelProvider = Callable[
     [],
@@ -88,7 +86,6 @@ class LocalASRReadinessOwner:
     self_channel_provider: LocalASRReadinessChannelProvider = field(repr=False)
     rebuild_self_provider: LocalASRReadinessAsyncEffect = field(repr=False)
     probe_self_provider: LocalASRReadinessAsyncEffect = field(repr=False)
-    persist_manual_fallback: LocalASRReadinessFallback = field(repr=False)
     validate_gpu_activation: LocalASRReadinessGpuValidator = field(repr=False)
     gpu_state_provider: LocalASRReadinessGpuStateProvider = field(repr=False)
     retain_gpu_pending: LocalASRReadinessGpuPendingSink = field(repr=False)
@@ -183,16 +180,25 @@ class LocalASRReadinessOwner:
                 return False
             required_model_ids = required_local_asr_model_ids(current_state.self_provider)
             snapshot = await self.provisioning_provider().inspect_cpu(required_model_ids)
-            current_state = self.state_provider()
-            if current_state.self_provider == LOCAL_CPU_AUTO_PROVIDER:
-                if not self.persist_manual_fallback("self"):
-                    return False
-                await self.rebuild_self_provider()
-                return await self.ensure_self_ready(activation_generation=activation_generation)
             return self._request_repair(
                 self._snapshot_unavailable_status(snapshot, required_model_ids),
                 channel="self",
                 model_ids=snapshot.unavailable_model_ids(required_model_ids),
+                activation_generation=activation_generation,
+            )
+        except ASRWorkerRequestError as exc:
+            if exc.code not in {"model_missing", "model_invalid"}:
+                raise
+            self._log_load_failure(decision.model_id, load_started_at, exc)
+            if exc.code == "model_invalid" and decision.model_id is not None:
+                await self.provisioning_provider().report_model_validation_failure(
+                    decision.model_id,
+                    failure_type=type(exc).__name__,
+                )
+            return self._request_repair(
+                "missing" if exc.code == "model_missing" else "invalid",
+                channel="self",
+                model_ids=((decision.model_id,) if decision.model_id is not None else None),
                 activation_generation=activation_generation,
             )
         except LocalSTTModelMissingError as exc:
@@ -209,7 +215,6 @@ class LocalASRReadinessOwner:
             )
         except (
             LocalSTTManifestInvalidError,
-            LocalQwenSherpaLoadError,
             LocalParakeetSherpaLoadError,
         ) as exc:
             self._log_load_failure(
@@ -352,7 +357,6 @@ __all__ = [
     "LocalASRReadinessEffect",
     "LocalASRReadinessEffectSink",
     "LocalASRReadinessEffectType",
-    "LocalASRReadinessFallback",
     "LocalASRReadinessGpuPendingSink",
     "LocalASRReadinessGpuStateProvider",
     "LocalASRReadinessGpuValidator",

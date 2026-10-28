@@ -107,7 +107,6 @@ async def test_actual_self_vad_intent_prepares_paused_owner_then_restores_captur
         "_vad_sink",
     ):
         setattr(owner, field, getattr(synthetic, field))
-    app._input_runtime.self_capture.persist_manual_fallback = lambda: True
     await app.apply_settings_intent(SelfVadSettingsIntent(speech_threshold=0.45))
     await app.set_stt_enabled(True)
     assert owner.snapshot.desired_active

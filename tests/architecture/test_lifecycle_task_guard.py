@@ -52,9 +52,9 @@ TASK_CREATION_REVIEWS = (
         family=ASYNCIO_TASK,
     ),
     *_reviews(
-        "app/adapters/gpu_worker_process.py",
-        {"_DefaultGpuWorkerClient.close": 1, "_DefaultGpuWorkerClient._close_writer_resource": 1},
-        "GPU worker client retains close and writer-close tasks; shielded close or force-close owns terminal resource cleanup",
+        "app/adapters/asr_worker_process.py",
+        {"_DefaultASRWorkerClient.close": 1, "_DefaultASRWorkerClient._close_writer_resource": 1},
+        "ASR worker client retains close and writer-close tasks; shielded close or force-close owns terminal resource cleanup",
     ),
     *_reviews(
         "app/services/application_control.py",
@@ -467,9 +467,9 @@ TASK_CREATION_REVIEWS = (
         "Local GPU STT sessions own transcription and submission tasks in an explicit set and cancel or gather tasks during stop and close",
     ),
     *_reviews(
-        "providers/stt/local_qwen_sherpa.py",
-        {"_LocalQwenSherpaSession.seal_turn": 1},
-        "Local Qwen Sherpa session retains per-job decode watchdogs and cancels plus gathers the watchdog set on close",
+        "providers/stt/local_session.py",
+        {"LocalOfflineSTTSession.seal_turn": 1},
+        "Local offline session retains per-job decode watchdogs and cancels plus gathers the watchdog set on close",
     ),
     *_reviews(
         "providers/stt/qwen_audio.py",

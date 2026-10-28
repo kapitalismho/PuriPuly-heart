@@ -149,27 +149,27 @@ def test_require_optional_module_skips_missing_local_runtime_dependency() -> Non
     assert "local runtime dependency is unavailable" in str(excinfo.value)
 
 
-def test_require_local_qwen_model_assets_skips_missing_model_dir(tmp_path: Path) -> None:
+def test_require_local_parakeet_model_assets_skips_missing_model_dir(tmp_path: Path) -> None:
     missing_model_dir = tmp_path / "missing-model"
 
     with pytest.raises(pytest.skip.Exception) as excinfo:
-        helpers.require_local_qwen_model_assets(missing_model_dir)
+        helpers.require_local_parakeet_model_assets(missing_model_dir)
 
     reason = str(excinfo.value)
-    assert "local Qwen STT model assets are unavailable" in reason
+    assert "Japanese Parakeet STT model assets are unavailable" in reason
     assert str(missing_model_dir) not in reason
 
 
-def test_skip_if_local_qwen_runtime_unavailable_converts_load_error_to_skip() -> None:
-    from puripuly_heart.core.local_asr.local_stt_assets import LocalQwenSherpaLoadError
+def test_skip_if_local_sherpa_runtime_unavailable_converts_load_error_to_skip() -> None:
+    from puripuly_heart.core.local_asr.local_stt_assets import LocalParakeetSherpaLoadError
 
     with pytest.raises(pytest.skip.Exception) as excinfo:
-        helpers.skip_if_local_qwen_runtime_unavailable(
-            LocalQwenSherpaLoadError("raw backend bootstrap failure")
+        helpers.skip_if_local_sherpa_runtime_unavailable(
+            LocalParakeetSherpaLoadError("raw backend bootstrap failure")
         )
 
     reason = str(excinfo.value)
-    assert "local Qwen Sherpa runtime is unavailable" in reason
+    assert "Japanese Parakeet Sherpa runtime is unavailable" in reason
     assert "raw backend bootstrap failure" not in reason
 
 

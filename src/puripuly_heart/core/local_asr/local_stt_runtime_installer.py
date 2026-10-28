@@ -26,7 +26,7 @@ from puripuly_heart.core.runtime_logging import emit_basic_log
 
 from .local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
-    LOCAL_STT_MODEL_ID,
+    ORUKEET_MODEL_ID,
     InstalledLocalSTTManifest,
     LocalSTTAssetError,
     LocalSTTAssetManifest,
@@ -519,7 +519,7 @@ async def _download_huggingface_xet_source_into_staging(
             model_id=manifest.model_id,
             engine=manifest.engine,
             install_dirname=manifest.install_dirname,
-            selected_source=source_name,
+            selected_source="hf_mirror" if endpoint == HF_MIRROR_ENDPOINT else source_name,
             selected_revision=source.revision,
         )
         (staging_dir / manifest.installed_manifest_filename).write_text(
@@ -615,6 +615,14 @@ async def ensure_local_stt_installed(
     cancel_event: threading.Event | None = None,
     huggingface_downloader: HuggingFaceDownloadPort | None = None,
 ) -> InstalledLocalSTTManifest:
+    from .retired_cpu_assets import RETIRED_CPU_ASR_MODEL_IDS
+
+    if model_id in RETIRED_CPU_ASR_MODEL_IDS or (
+        manifest is not None and manifest.model_id in RETIRED_CPU_ASR_MODEL_IDS
+    ):
+        raise LocalSTTRuntimeInstallError(
+            "Retired local ASR models cannot be installed", failure_code="retired_model"
+        )
     resolved_root = (model_root or default_local_stt_model_root()).resolve()
     cancellation = cancel_event or threading.Event()
     _raise_if_cancelled(cancellation)
@@ -674,7 +682,7 @@ async def _ensure_local_stt_installed_with_lease(
         raise LocalSTTRuntimeInstallError(
             "runtime local STT model_id does not match the supplied manifest"
         )
-    resolved_manifest = manifest or load_local_stt_asset_manifest(model_id or LOCAL_STT_MODEL_ID)
+    resolved_manifest = manifest or load_local_stt_asset_manifest(model_id or ORUKEET_MODEL_ID)
     resolved_root = model_root or default_local_stt_model_root()
     install_dir = resolved_root / resolved_manifest.install_dirname
     total_bytes = sum(asset.size_bytes or 0 for asset in resolved_manifest.files)

@@ -230,7 +230,7 @@ def make_config(
         vad_hangover_ms=900,
         vad_pre_roll_ms=500,
         local_provider=provider_id.startswith("local_"),
-        release_backend_after=600.0 if provider_id == "local_qwen" else None,
+        release_backend_after=600.0 if provider_id == "local_fun_asr_mlt_nano" else None,
     )
 
 
@@ -2852,7 +2852,7 @@ async def test_disabled_enabled_and_release_are_owned() -> None:
 
 async def test_prepared_local_provider_is_reused_when_capture_starts() -> None:
     owner, admission, resolver, provider, sources, _sink = make_owner()
-    config = make_config(provider_id="local_qwen")
+    config = make_config(provider_id="local_fun_asr_mlt_nano")
 
     prepared = await owner.prepare_provider(config)
 
@@ -2862,12 +2862,12 @@ async def test_prepared_local_provider_is_reused_when_capture_starts() -> None:
     assert admission.calls == []
     assert resolver.calls == []
     assert sources == []
-    assert provider.requests == [("local_qwen", True)]
+    assert provider.requests == [("local_fun_asr_mlt_nano", True)]
 
     started = await owner.apply_intent(config, enabled=True)
 
     assert started.state is PeerCaptureSessionState.RUNNING
-    assert provider.requests == [("local_qwen", True)]
+    assert provider.requests == [("local_fun_asr_mlt_nano", True)]
     assert provider.start_calls == 1
     assert admission.calls == [config]
     assert resolver.calls == [config.capture_target]
@@ -3560,7 +3560,7 @@ async def test_scoped_reconfiguration_handoff_retires_previous_callback() -> Non
 
 async def test_retained_local_provider_callback_remains_current_after_restart() -> None:
     owner, _admission, _resolver, provider, _sources, _sink = make_owner()
-    config = make_config(provider_id="local_qwen")
+    config = make_config(provider_id="local_fun_asr_mlt_nano")
     await owner.apply_intent(config, enabled=True)
     retained_terminal = provider.terminal_handlers[-1]
 

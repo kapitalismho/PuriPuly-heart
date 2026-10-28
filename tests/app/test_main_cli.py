@@ -393,23 +393,23 @@ def test_main_default_gui_passes_debug_ui_preview_flag(monkeypatch, tmp_path) ->
     assert calls["debug_ui_preview"] is True
 
 
-def test_main_local_qwen_runtime_check_dispatches_runner(monkeypatch, tmp_path) -> None:
+def test_main_local_sherpa_runtime_check_dispatches_runner(monkeypatch, tmp_path) -> None:
     calls: dict[str, object] = {}
 
-    def fake_run_local_qwen_runtime_check() -> int:
+    def fake_run_local_sherpa_runtime_check() -> int:
         calls["called"] = True
         return 0
 
     monkeypatch.setattr(
         main_module,
-        "run_local_qwen_runtime_check",
-        fake_run_local_qwen_runtime_check,
+        "run_local_sherpa_runtime_check",
+        fake_run_local_sherpa_runtime_check,
         raising=False,
     )
 
     config_path = tmp_path / "settings.json"
     try:
-        result = main_module.main(["--config", str(config_path), "local-qwen-runtime-check"])
+        result = main_module.main(["--config", str(config_path), "local-sherpa-runtime-check"])
     except SystemExit as exc:  # pragma: no cover - red phase guard
         pytest.fail(f"unexpected SystemExit: {exc}")
 
@@ -749,20 +749,20 @@ def test_run_soxr_runtime_check_writes_json_report_when_env_var_is_set(
     assert payload["loaded_sibling_dll_path"] == str(runtime_paths.sibling_dll_path)
 
 
-def test_run_local_qwen_runtime_check_imports_sherpa_onnx_and_offline_recognizer_before_reporting_success(
+def test_run_local_sherpa_runtime_check_imports_sherpa_onnx_and_offline_recognizer_before_reporting_success(
     monkeypatch, capsys, tmp_path
 ) -> None:
     try:
         runtime_check_module = importlib.import_module(
-            "puripuly_heart.app.local_qwen_runtime_check"
+            "puripuly_heart.app.local_sherpa_runtime_check"
         )
     except ModuleNotFoundError:  # pragma: no cover - red phase guard
-        pytest.fail("local_qwen_runtime_check module is missing")
+        pytest.fail("local_sherpa_runtime_check module is missing")
 
     monkeypatch.setattr(runtime_check_module.sys, "platform", "win32", raising=False)
     monkeypatch.setattr(
-        runtime_check_module.local_qwen_runtime,
-        "ensure_local_qwen_windows_runtime",
+        runtime_check_module.local_sherpa_runtime,
+        "ensure_local_sherpa_windows_runtime",
         lambda: tmp_path,
     )
 
@@ -780,58 +780,58 @@ def test_run_local_qwen_runtime_check_imports_sherpa_onnx_and_offline_recognizer
 
     monkeypatch.setattr(runtime_check_module.importlib, "import_module", fake_import_module)
 
-    result = runtime_check_module.run_local_qwen_runtime_check()
+    result = runtime_check_module.run_local_sherpa_runtime_check()
 
     assert result == 0
     assert imported_modules == ["sherpa_onnx", "sherpa_onnx.offline_recognizer"]
-    assert capsys.readouterr().out.strip() == f"local_qwen_runtime_dir={tmp_path}"
+    assert capsys.readouterr().out.strip() == f"local_sherpa_runtime_dir={tmp_path}"
 
 
-def test_run_local_qwen_runtime_check_rejects_non_windows(monkeypatch, capsys) -> None:
-    runtime_check_module = importlib.import_module("puripuly_heart.app.local_qwen_runtime_check")
+def test_run_local_sherpa_runtime_check_rejects_non_windows(monkeypatch, capsys) -> None:
+    runtime_check_module = importlib.import_module("puripuly_heart.app.local_sherpa_runtime_check")
 
     monkeypatch.setattr(runtime_check_module, "sys", ModuleType("sys"), raising=False)
     monkeypatch.setattr(runtime_check_module.sys, "platform", "linux", raising=False)
 
-    result = runtime_check_module.run_local_qwen_runtime_check()
+    result = runtime_check_module.run_local_sherpa_runtime_check()
 
     assert result == 2
     assert capsys.readouterr().out.strip() == (
-        "Error: local-qwen-runtime-check is only supported on Windows"
+        "Error: local-sherpa-runtime-check is only supported on Windows"
     )
 
 
-def test_run_local_qwen_runtime_check_reports_bootstrap_failure(monkeypatch, capsys) -> None:
-    runtime_check_module = importlib.import_module("puripuly_heart.app.local_qwen_runtime_check")
-    runtime_error = importlib.import_module("puripuly_heart.core.local_asr.local_qwen_runtime")
+def test_run_local_sherpa_runtime_check_reports_bootstrap_failure(monkeypatch, capsys) -> None:
+    runtime_check_module = importlib.import_module("puripuly_heart.app.local_sherpa_runtime_check")
+    runtime_error = importlib.import_module("puripuly_heart.core.local_asr.local_sherpa_runtime")
 
     monkeypatch.setattr(runtime_check_module, "sys", ModuleType("sys"), raising=False)
     monkeypatch.setattr(runtime_check_module.sys, "platform", "win32", raising=False)
 
     def raise_bootstrap_error() -> None:
-        raise runtime_error.LocalQwenRuntimeBootstrapError("missing runtime dlls")
+        raise runtime_error.LocalSherpaRuntimeBootstrapError("missing runtime dlls")
 
     monkeypatch.setattr(
-        runtime_check_module.local_qwen_runtime,
-        "ensure_local_qwen_windows_runtime",
+        runtime_check_module.local_sherpa_runtime,
+        "ensure_local_sherpa_windows_runtime",
         raise_bootstrap_error,
     )
 
-    result = runtime_check_module.run_local_qwen_runtime_check()
+    result = runtime_check_module.run_local_sherpa_runtime_check()
 
     assert result == 2
     assert capsys.readouterr().out.strip() == (
-        "Error: failed to verify Local Qwen Windows runtime DLL directory: missing runtime dlls"
+        "Error: failed to verify Local sherpa Windows runtime DLL directory: missing runtime dlls"
     )
 
 
-def test_run_local_qwen_runtime_check_reports_bootstrap_failure_after_runtime_module_reload(
+def test_run_local_sherpa_runtime_check_reports_bootstrap_failure_after_runtime_module_reload(
     monkeypatch, capsys, tmp_path
 ) -> None:
     runtime_check_module = importlib.reload(
-        importlib.import_module("puripuly_heart.app.local_qwen_runtime_check")
+        importlib.import_module("puripuly_heart.app.local_sherpa_runtime_check")
     )
-    runtime_module = importlib.import_module("puripuly_heart.core.local_asr.local_qwen_runtime")
+    runtime_module = importlib.import_module("puripuly_heart.core.local_asr.local_sherpa_runtime")
 
     runtime_module = importlib.reload(runtime_module)
 
@@ -841,31 +841,31 @@ def test_run_local_qwen_runtime_check_reports_bootstrap_failure_after_runtime_mo
 
     missing_runtime_dir = tmp_path / "missing-runtime"
     monkeypatch.setattr(
-        runtime_module, "resolve_local_qwen_runtime_dir", lambda: missing_runtime_dir
+        runtime_module, "resolve_local_sherpa_runtime_dir", lambda: missing_runtime_dir
     )
 
     try:
-        result = runtime_check_module.run_local_qwen_runtime_check()
+        result = runtime_check_module.run_local_sherpa_runtime_check()
     finally:
         importlib.reload(runtime_check_module)
 
     assert result == 2
     assert capsys.readouterr().out.strip() == (
-        "Error: failed to verify Local Qwen Windows runtime DLL directory: "
-        f"local qwen runtime directory does not exist: {missing_runtime_dir}"
+        "Error: failed to verify Local sherpa Windows runtime DLL directory: "
+        f"local sherpa runtime directory does not exist: {missing_runtime_dir}"
     )
 
 
-def test_run_local_qwen_runtime_check_reports_sherpa_onnx_import_failure(
+def test_run_local_sherpa_runtime_check_reports_sherpa_onnx_import_failure(
     monkeypatch, capsys, tmp_path
 ) -> None:
-    runtime_check_module = importlib.import_module("puripuly_heart.app.local_qwen_runtime_check")
+    runtime_check_module = importlib.import_module("puripuly_heart.app.local_sherpa_runtime_check")
 
     monkeypatch.setattr(runtime_check_module, "sys", ModuleType("sys"), raising=False)
     monkeypatch.setattr(runtime_check_module.sys, "platform", "win32", raising=False)
     monkeypatch.setattr(
-        runtime_check_module.local_qwen_runtime,
-        "ensure_local_qwen_windows_runtime",
+        runtime_check_module.local_sherpa_runtime,
+        "ensure_local_sherpa_windows_runtime",
         lambda: tmp_path,
     )
     real_import_module = runtime_check_module.importlib.import_module
@@ -879,7 +879,7 @@ def test_run_local_qwen_runtime_check_reports_sherpa_onnx_import_failure(
 
     monkeypatch.setattr(runtime_check_module.importlib, "import_module", fake_import_module)
 
-    result = runtime_check_module.run_local_qwen_runtime_check()
+    result = runtime_check_module.run_local_sherpa_runtime_check()
 
     assert result == 2
     assert capsys.readouterr().out.strip() == (

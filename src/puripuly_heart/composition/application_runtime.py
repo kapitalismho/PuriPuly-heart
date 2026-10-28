@@ -103,14 +103,10 @@ from puripuly_heart.app.services.local_asr.local_asr_gpu_provisioning import (
 )
 from puripuly_heart.app.services.local_asr.local_asr_selection import (
     LOCAL_CPU_PROVIDERS,
-    resolve_local_asr_selection,
 )
 from puripuly_heart.app.services.managed_gemma_translation import (
     ManagedGemmaTranslationOwner,
     ManagedGemmaTranslationSnapshot,
-)
-from puripuly_heart.app.services.manual_local_asr_fallback import (
-    ManualLocalASRFallbackOwner,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.model_assets import ModelAssetsApplication
@@ -489,7 +485,6 @@ def compose_application_runtime(
     control_events = ControlEvents()
     signatures = ProviderRuntimeSignatures(http_extensions=http_extensions)
     effects_state = SettingsRuntimeEffectsState()
-    manual_fallback = ManualLocalASRFallbackOwner()
     event_bridge: UIEventBridgePort | None = None
     bridge_task = None
     overlay: OverlayApplicationOwner | None = None
@@ -827,9 +822,6 @@ def compose_application_runtime(
                 ),
                 overlay_provider=require_overlay,
                 ingress_frozen=lambda: ingress.frozen,
-                persist_manual_fallback=lambda: (
-                    require_settings_application().persist_manual_fallback(channel="peer")
-                ),
                 ensure_local_ready=lambda generation: require_local_asr().ensure_peer_ready(
                     activation_generation=generation,
                 ),
@@ -1046,11 +1038,6 @@ def compose_application_runtime(
                 ),
                 resume_self=resume_self_after_cpu_repair,
                 resume_peer=resume_peer_after_cpu_repair,
-                persist_manual_fallback=lambda channel: (
-                    require_settings_application().persist_manual_fallback(
-                        channel=cast(Literal["self", "peer"], channel)
-                    )
-                ),
                 load_log_sink=require_local_asr_diagnostics().log_load_result,
             )
         return local_asr
@@ -1141,9 +1128,6 @@ def compose_application_runtime(
                 runtime_available=lambda: pipeline.self_translation_channel is not None,
                 capture_owner=lambda: require_runtime_components().self_capture_owner(),
                 capture_owner_if_created=lambda: pipeline.self_capture,
-                persist_manual_fallback=lambda: (
-                    require_settings_application().persist_manual_fallback(channel="self")
-                ),
                 reset_local_pending=lambda: require_local_asr().cpu_repair.reset_self(),
                 clear_gpu_pending=lambda: require_gpu().clear_pending("self"),
                 overlay_state_provider=lambda: require_overlay().snapshot.state,
@@ -1364,31 +1348,6 @@ def compose_application_runtime(
                 presentation.set_settings_overlay_calibration(require_calibration().current)
         refresh_overlay_presentation()
 
-    def log_manual_fallbacks(
-        previous,
-        normalized,
-        channels: tuple[str, ...],
-    ) -> None:
-        previous_canonical = settings.project(previous, authoritative=True)
-        normalized_canonical = settings.project(normalized, authoritative=True)
-        for channel in channels:
-            if channel == "self":
-                requested = previous_canonical.intent.stt.provider
-                actual = normalized_canonical.intent.stt.provider
-                source_language = normalized_canonical.intent.languages.source_language
-            else:
-                requested = previous_canonical.intent.peer_stt.provider
-                actual = normalized_canonical.intent.peer_stt.provider
-                languages = normalized_canonical.intent.languages
-                source_language = languages.peer_source_language or languages.source_language
-            decision = resolve_local_asr_selection(actual, source_language)
-            log_basic(
-                "[LocalASR][Selection] "
-                f"channel={channel} requested={requested} actual={actual} "
-                f"model={decision.model_id or 'unknown'} "
-                "reason=preferred_model_unavailable"
-            )
-
     def active_local_asr_change(
         base: AppSettingsVNext,
         next_value: AppSettingsVNext,
@@ -1453,20 +1412,7 @@ def compose_application_runtime(
                     ),
                     rebuild_managed_gemma=lambda: provider_runtime.llm_rebuild.rebuild(),
                 ),
-                manual_fallback=manual_fallback,
-                cpu_auto_available=lambda: require_provisioning().snapshot.cpu_auto_available,
-                inspect_cpu=require_provisioning().inspect_cpu,
-                fallback_sink=lambda channels, installation_fallback: (
-                    show_short_message(
-                        "local_stt.installation_fallback_qwen"
-                        if installation_fallback
-                        else "local_stt.language_fallback_qwen"
-                    )
-                    if channels
-                    else None
-                ),
                 sync_ui=sync_ui_from_settings,
-                fallback_log_sink=log_manual_fallbacks,
                 mutation_service_provider=lambda: None,
                 consume_superseded_settings=signatures.consume_superseded,
                 active_local_asr_change=active_local_asr_change,
@@ -1742,8 +1688,8 @@ def compose_application_runtime(
             refresh_self=lambda: (
                 require_runtime_components().provider_runtime.effects.refresh_self_stt(canonical)
             ),
-            refresh_peer=lambda: (
-                require_runtime_components().provider_runtime.effects.refresh_peer(canonical)
+            refresh_peer=lambda: require_runtime_components().provider_runtime.effects.refresh_peer(
+                canonical
             ),
             should_refresh_self=bool(plan is not None and plan.should_refresh_self_stt),
             should_refresh_peer=bool(plan is not None and plan.should_refresh_peer),
@@ -2225,11 +2171,9 @@ def compose_application_runtime(
         settings_loader=lambda: settings.start().settings,
         provisioning=require_provisioning(),
         gpu_state=gpu_state,
-        manual_fallback=manual_fallback,
         calibration=require_calibration(),
         presentation=presentation,
         sync_presentation=sync_ui_from_settings,
-        notify_fallback=require_settings_application().notify_fallback,
         runtime_logging=runtime_logging,
         initial_llm_binding_sink=record_initial_llm_binding,
         pipeline_launcher=pipeline_launcher,

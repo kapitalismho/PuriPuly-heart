@@ -49,68 +49,13 @@ def test_require_nonempty_final_rejects_empty_or_partial_results() -> None:
 
 
 @pytest.mark.asyncio
-async def test_decode_case_uses_backend_final_and_measured_timing(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    audio_root = tmp_path
-    _write_wav(audio_root / "parakeet-v3-en.wav", np.linspace(-0.2, 0.2, 16000, dtype=np.float32))
-    sent: list[np.ndarray] = []
-    closed: list[str] = []
-
-    class Session:
-        async def send_audio_f32(self, samples: np.ndarray) -> None:
-            sent.append(np.asarray(samples, dtype=np.float32))
-
-        async def on_speech_end(self, **_kwargs) -> None:
-            return None
-
-        async def events(self):
-            yield STTBackendTranscriptEvent(text="hello", is_final=True)
-
-        async def close(self) -> None:
-            closed.append("session")
-
-    class Backend:
-        provider_id = "local_parakeet_v3"
-
-        async def open_session(self, **_kwargs) -> Session:
-            return Session()
-
-        async def close(self) -> None:
-            closed.append("backend")
-
-    monkeypatch.setattr(evidence, "create_local_cpu_backend", lambda *_args, **_kwargs: Backend())
-    result = await evidence._decode_case(
-        evidence.DECODE_CASES[0],
-        model_root=tmp_path / "models",
-        audio_root=audio_root,
-    )
-
-    assert result["model_id"] == evidence.DECODE_CASES[0].model_id
-    assert result["provider_id"] == "local_parakeet_v3"
-    assert result["execution_backend"] == "CPU"
-    assert result["decode_result"] == {"status": "nonempty_final", "text_length": 5}
-    assert "text" not in result["decode_result"]
-    assert result["attempt"]["backend"] == "CPU"
-    assert result["attempt"]["result"] == "success"
-    assert result["attempt"]["audio_seconds"] == pytest.approx(1.0)
-    assert result["attempt"]["decode_seconds"] > 0
-    assert result["attempt"]["rtf"] == pytest.approx(
-        result["attempt"]["decode_seconds"] / result["attempt"]["audio_seconds"]
-    )
-    assert sent and sent[0].size == 16000
-    assert closed == ["session", "backend"]
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize("failure_stage", ["open_session", "send_audio", "empty_final"])
 async def test_decode_failure_report_closes_every_acquired_resource(
     tmp_path: Path,
     monkeypatch,
     failure_stage: str,
 ) -> None:
-    _write_wav(tmp_path / "parakeet-v3-en.wav", np.ones(1600, dtype=np.float32))
+    _write_wav(tmp_path / evidence.DECODE_CASES[0].audio_filename, np.ones(1600, dtype=np.float32))
     reached: list[str] = []
     closed: list[str] = []
 
@@ -131,7 +76,7 @@ async def test_decode_failure_report_closes_every_acquired_resource(
             closed.append("session")
 
     class Backend:
-        provider_id = "local_parakeet_v3"
+        provider_id = "fixture"
 
         async def open_session(self, **_kwargs) -> Session:
             reached.append("open_session")

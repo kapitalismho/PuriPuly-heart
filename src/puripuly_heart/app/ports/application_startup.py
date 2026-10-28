@@ -10,8 +10,6 @@ from puripuly_heart.core.messages import ErrorDiagnostics
 @dataclass(frozen=True, slots=True)
 class ApplicationStartupState:
     settings: AppSettingsVNext
-    fallback_channels: tuple[str, ...]
-    installation_fallback: bool
     main_input_first_launch: bool = False
 
 

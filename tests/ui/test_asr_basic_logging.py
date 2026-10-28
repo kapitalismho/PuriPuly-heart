@@ -102,7 +102,7 @@ def test_cpu_transition_logs_only_actual_terminal_results() -> None:
     owner.transition_diagnostic(
         {
             "channel": "peer",
-            "actual_provider": "local_parakeet_v3",
+            "actual_provider": "local_orukeet",
             "model_id": "parakeet-v3",
             "load_ms": 1250,
             "outcome": "applied",
@@ -111,7 +111,7 @@ def test_cpu_transition_logs_only_actual_terminal_results() -> None:
     owner.transition_diagnostic(
         {
             "channel": "self",
-            "actual_provider": "local_qwen",
+            "actual_provider": "local_fun_asr_mlt_nano",
             "model_id": "qwen",
             "load_ms": 300,
             "outcome": "failed",
@@ -121,7 +121,7 @@ def test_cpu_transition_logs_only_actual_terminal_results() -> None:
     owner.transition_diagnostic(
         {
             "channel": "self",
-            "actual_provider": "local_qwen",
+            "actual_provider": "local_fun_asr_mlt_nano",
             "model_id": "qwen",
             "load_ms": 100,
             "outcome": "superseded",

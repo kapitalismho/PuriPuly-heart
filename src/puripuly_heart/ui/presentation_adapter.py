@@ -496,13 +496,6 @@ class FletUiPresentationAdapter:
             return True
         return False
 
-    def show_local_qwen_hallucination_dialog(self) -> bool:
-        callback = getattr(self._app, "show_local_qwen_hallucination_dialog", None)
-        if callable(callback):
-            callback()
-            return True
-        return False
-
     async def close_after_launch_tasks(self) -> None:
         callback = getattr(self._app, "close_after_launch_tasks", None)
         if callable(callback):

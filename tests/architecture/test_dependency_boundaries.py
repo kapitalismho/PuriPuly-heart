@@ -227,7 +227,6 @@ LAYER_RULES = (
             "puripuly_heart.app.services.canonical_settings_persistence",
             "puripuly_heart.app.services.capture.capture_target_settings",
             "puripuly_heart.app.services.github_star_prompt_settings",
-            "puripuly_heart.app.services.manual_local_asr_fallback",
             "puripuly_heart.app.services.openrouter_pkce_flow",
             "puripuly_heart.app.services.capture.peer_capture_target_application",
             "puripuly_heart.app.services.provider.provider_settings",

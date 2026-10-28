@@ -739,7 +739,7 @@ def test_validate_target_requires_the_deployed_python_archive(
         "console_executable",
         "python_executable",
         "overlay_executable",
-        "gpu_worker_executable",
+        "asr_worker_executable",
         "openvr_dll",
     ):
         layout.resolve(tmp_path, key).write_bytes(b"placeholder")

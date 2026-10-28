@@ -73,7 +73,6 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
         ),
         show_qq_managed_auth_dialog=lambda: events.append(("qq",)),
         show_founder_letter_dialog=lambda: events.append(("founder",)),
-        show_local_qwen_hallucination_dialog=lambda: events.append(("qwen",)),
     )
     adapter = FletUiPresentationAdapter(host)
 
@@ -104,7 +103,6 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
     adapter.on_desktop_overlay_state_changed("connected", interaction_mode="locked")
     adapter.show_qq_managed_auth_dialog()
     adapter.show_founder_letter_dialog()
-    adapter.show_local_qwen_hallucination_dialog()
 
     assert events == [
         ("settings-overlay-contract", host.overlay_peer_contract),
@@ -118,7 +116,6 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
         ("desktop-overlay", ("connected",), {"interaction_mode": "locked"}),
         ("qq",),
         ("founder",),
-        ("qwen",),
     ]
     assert not hasattr(adapter, "controller")
     assert not hasattr(adapter, "hub")

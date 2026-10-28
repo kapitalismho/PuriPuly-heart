@@ -46,7 +46,6 @@ class DebugPreviewPanel(ft.Container):
         on_qq_auth_translation_gated: Callable[[], None],
         on_discord_callback_page: Callable[[], None],
         on_founder_letter: Callable[[], None],
-        on_local_qwen_hallucination_modal: Callable[[], None],
         on_github_star_snackbar: Callable[[], None],
         on_foundation_primitives: Callable[[], None],
         on_http_extension_form: Callable[[], None] | None = None,
@@ -89,11 +88,6 @@ class DebugPreviewPanel(ft.Container):
                 on_discord_callback_page,
             ),
             _PreviewAction("founder_letter", "debug_preview.founder_letter", on_founder_letter),
-            _PreviewAction(
-                "local_qwen_hallucination_modal",
-                "debug_preview.local_qwen_hallucination_modal",
-                on_local_qwen_hallucination_modal,
-            ),
             _PreviewAction(
                 "github_star_snackbar",
                 "debug_preview.github_star_snackbar",

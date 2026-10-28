@@ -1,0 +1,25 @@
+{
+  "manifest_version": 1,
+  "installed_manifest_version": 1,
+  "model_id": "orukeet-q8-0-transcribe-cpu",
+  "engine": "transcribe.cpp-cpu",
+  "license": "CC-BY-SA-4.0",
+  "upstream_repo": "oruk/orukeet",
+  "install_dirname": "orukeet-q8-0-transcribe-cpu",
+  "installed_manifest_filename": "installed-manifest.json",
+  "sources": {
+    "huggingface": {
+      "name": "huggingface",
+      "repo_id": "oruk/orukeet",
+      "revision": "b59c13a733fce5cf193230d0fa317ee7f145a108",
+      "download_url_template": "https://huggingface.co/oruk/orukeet/resolve/b59c13a733fce5cf193230d0fa317ee7f145a108/{path}"
+    }
+  },
+  "files": [
+    {
+      "relative_path": "transcribe-cpp/orukeet-Q8_0.gguf",
+      "sha256": "cad2f52ac91cad829279422301989687c2cf02e19157352ed25ea501b90dbb7e",
+      "size_bytes": 739508608
+    }
+  ]
+}

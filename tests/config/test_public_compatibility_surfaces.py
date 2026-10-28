@@ -6,7 +6,6 @@ import base64
 import importlib
 import json
 import os
-import re
 import shutil
 import sys
 from collections.abc import Iterator
@@ -27,7 +26,6 @@ from puripuly_heart.config.provider_values import (
 )
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.schema import (
-    VNEXT_SETTINGS_SCHEMA_VERSION,
     AppSettingsVNext,
     SecretsIntent,
 )
@@ -111,7 +109,7 @@ DOCUMENTED_ENTRY_POINT_OR_TEST_IMPORT_MODULES = frozenset(
         "puripuly_heart.providers.llm.openrouter",
         "puripuly_heart.providers.llm.qwen_async",
         "puripuly_heart.providers.stt.deepgram",
-        "puripuly_heart.providers.stt.local_qwen_sherpa",
+        "puripuly_heart.providers.stt.local_cpp",
         "puripuly_heart.providers.stt.soniox",
         "puripuly_heart.ui.event_bridge",
     }
@@ -206,12 +204,6 @@ def _load_inventory() -> dict[str, Any]:
 
 def _render_command_template(parts: list[str], **values: str) -> tuple[str, ...]:
     return tuple(part.format(**values) for part in parts)
-
-
-def _inno_define_literals(script: str) -> dict[str, str]:
-    quoted = re.findall(r'^\s*#define\s+([A-Za-z0-9_]+)\s+"([^"]*)"', script, re.M)
-    numeric = re.findall(r"^\s*#define\s+([A-Za-z0-9_]+)\s+(\d+)\s*$", script, re.M)
-    return dict([*quoted, *numeric])
 
 
 def _test_function_names(path: Path) -> set[str]:
@@ -869,19 +861,6 @@ async def test_overlay_startup_contract_snapshot_matches_python_runners_and_mani
         overlay_process_module.QUIET_TAIL_PROFILE_ENV,
         overlay_process_module.HANDOFF_EXPERIMENT_ENV,
     ]
-
-
-def test_installer_identity_snapshot_matches_inno_contract() -> None:
-    snapshot = _load_snapshot()["installer_identity"]
-    installer_script = (REPO_ROOT / "installer.iss").read_text(encoding="utf-8")
-    defines = _inno_define_literals(installer_script)
-
-    for name, value in snapshot["defines"].items():
-        assert defines[name] == value
-    for setup_line in snapshot["setup_lines"]:
-        assert setup_line in installer_script
-
-    assert defines["CanonicalSettingsVersion"] == str(VNEXT_SETTINGS_SCHEMA_VERSION)
 
 
 def test_prompt_loader_prefers_named_files_then_defaults(

@@ -1051,7 +1051,6 @@ def test_debug_preview_panel_includes_github_star_snackbar_action() -> None:
         on_qq_auth_recoverable_error=noop,
         on_qq_auth_translation_gated=noop,
         on_peer_translation_eula=noop,
-        on_local_qwen_hallucination_modal=noop,
         on_foundation_primitives=noop,
         on_display_turn_cycle=noop,
         on_github_star_snackbar=lambda: invoked.append("github-star"),

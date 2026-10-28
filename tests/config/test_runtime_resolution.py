@@ -356,23 +356,28 @@ def test_stt_runtime_intent_normalizes_legacy_vad_floor_for_both_channels(
 
 
 @pytest.mark.parametrize(
-    "provider",
+    ("provider", "expected_provider"),
     [
-        "local_cpu_auto",
-        "local_parakeet_v3",
-        "local_parakeet_ja",
-        "local_qwen",
-        "local_qwen_gpu",
+        ("local_cpu_auto", "local_cpu_auto"),
+        ("local_orukeet", "local_orukeet"),
+        ("local_fun_asr_nano", "local_fun_asr_nano"),
+        ("local_fun_asr_mlt_nano", "local_fun_asr_mlt_nano"),
+        ("local_parakeet_ja", "local_parakeet_ja"),
+        ("local_qwen_gpu", "local_qwen_gpu"),
+        ("local_parakeet_v3", "local_orukeet"),
+        ("local_qwen", "local_cpu_auto"),
     ],
 )
-def test_stt_runtime_resolution_preserves_local_provider_identity(provider: str) -> None:
+def test_stt_runtime_resolution_emits_canonical_local_provider_identity(
+    provider: str, expected_provider: str
+) -> None:
     runtime_resolution = _runtime_resolution_module()
 
     config = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(provider=provider)
     )
 
-    assert config.provider == provider
+    assert config.provider == expected_provider
     assert config.credential.source == "none"
     assert config.credential.required is False
 

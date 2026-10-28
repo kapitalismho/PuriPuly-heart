@@ -9,24 +9,21 @@ from typing import Literal
 from puripuly_heart.config import paths
 from puripuly_heart.runtime_layout import current_runtime_layout
 
-LOCAL_STT_MODEL_ID = "qwen3-asr-0.6b-int8-sherpa"
-LOCAL_STT_ENGINE = "sherpa-onnx"
-LOCAL_STT_INSTALL_DIRNAME = "qwen3-asr-0.6b-int8-sherpa"
+ORUKEET_MODEL_ID = "orukeet-q8-0-transcribe-cpu"
+FUN_ASR_NANO_MODEL_ID = "fun-asr-nano-2512-q8-0-transcribe-cpu"
+FUN_ASR_MLT_NANO_MODEL_ID = "fun-asr-mlt-nano-2512-q8-0-transcribe-cpu"
 LOCAL_STT_INSTALLED_MANIFEST_FILENAME = "installed-manifest.json"
-LOCAL_STT_MANIFEST_RELATIVE_PATH = f"data/models/{LOCAL_STT_INSTALL_DIRNAME}.manifest.json"
-PARAKEET_V3_MODEL_ID = "parakeet-tdt-0.6b-v3-int8-sherpa"
 PARAKEET_JAPANESE_MODEL_ID = "parakeet-tdt-ctc-0.6b-ja-int8-sherpa"
 LOCAL_QWEN_GPU_MODEL_ID = "qwen3-asr-1.7b-q6-k-transcribe-vulkan"
 REQUIRED_CPU_LOCAL_STT_MODEL_IDS = (
-    PARAKEET_V3_MODEL_ID,
+    ORUKEET_MODEL_ID,
+    FUN_ASR_NANO_MODEL_ID,
+    FUN_ASR_MLT_NANO_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
-    LOCAL_STT_MODEL_ID,
 )
 LOCAL_STT_MANIFEST_RELATIVE_PATHS = {
-    LOCAL_STT_MODEL_ID: LOCAL_STT_MANIFEST_RELATIVE_PATH,
-    PARAKEET_V3_MODEL_ID: f"data/models/{PARAKEET_V3_MODEL_ID}.manifest.json",
-    PARAKEET_JAPANESE_MODEL_ID: f"data/models/{PARAKEET_JAPANESE_MODEL_ID}.manifest.json",
-    LOCAL_QWEN_GPU_MODEL_ID: f"data/models/{LOCAL_QWEN_GPU_MODEL_ID}.manifest.json",
+    model_id: f"data/models/{model_id}.manifest.json"
+    for model_id in (*REQUIRED_CPU_LOCAL_STT_MODEL_IDS, LOCAL_QWEN_GPU_MODEL_ID)
 }
 
 
@@ -40,10 +37,6 @@ class LocalSTTModelMissingError(LocalSTTAssetError):
 
 class LocalSTTManifestInvalidError(LocalSTTAssetError):
     """Raised when the installed local STT manifest or files are invalid."""
-
-
-class LocalQwenSherpaLoadError(RuntimeError):
-    """Raised when the local sherpa recognizer cannot be initialized."""
 
 
 class LocalParakeetSherpaLoadError(RuntimeError):
@@ -231,7 +224,7 @@ def default_local_stt_model_root() -> Path:
     return paths.default_models_dir()
 
 
-def default_local_stt_model_dir(model_id: str = LOCAL_STT_MODEL_ID) -> Path:
+def default_local_stt_model_dir(model_id: str = ORUKEET_MODEL_ID) -> Path:
     manifest_relative_path = LOCAL_STT_MANIFEST_RELATIVE_PATHS.get(model_id)
     if manifest_relative_path is None:
         raise LocalSTTManifestInvalidError(f"unknown local STT model_id: {model_id}")
@@ -245,14 +238,16 @@ def default_local_stt_installed_manifest_path(model_dir: Path | None = None) -> 
     return resolved_model_dir / LOCAL_STT_INSTALLED_MANIFEST_FILENAME
 
 
-def default_local_stt_source_for_locale(locale: str | None) -> str:
-    normalized = (locale or "").strip().replace("_", "-").lower()
-    if normalized in {"zh-cn", "zh-hk", "zh-hant-hk"}:
-        return "modelscope"
-    return "huggingface"
+def default_local_stt_source_for_locale(
+    locale: str | None, *, manifest: LocalSTTAssetManifest | None = None
+) -> str:
+    from puripuly_heart.core.model_download_sources import model_download_source_candidates
+
+    resolved_manifest = manifest or load_local_stt_asset_manifest()
+    return model_download_source_candidates(tuple(resolved_manifest.sources), locale=locale)[0]
 
 
-def load_local_stt_asset_manifest(model_id: str = LOCAL_STT_MODEL_ID) -> LocalSTTAssetManifest:
+def load_local_stt_asset_manifest(model_id: str = ORUKEET_MODEL_ID) -> LocalSTTAssetManifest:
     manifest_relative_path = LOCAL_STT_MANIFEST_RELATIVE_PATHS.get(model_id)
     if manifest_relative_path is None:
         raise LocalSTTManifestInvalidError(f"unknown local STT model_id: {model_id}")
@@ -300,6 +295,8 @@ def _load_installed_local_stt_manifest(
     if installed.install_dirname != manifest.install_dirname:
         raise LocalSTTManifestInvalidError("installed manifest install_dirname does not match")
     expected_source = manifest.sources.get(installed.selected_source)
+    if expected_source is None and installed.selected_source == "hf_mirror":
+        expected_source = manifest.sources.get("huggingface")
     if expected_source is None:
         raise LocalSTTManifestInvalidError("installed manifest selected_source is unsupported")
     if installed.selected_revision != expected_source.revision:

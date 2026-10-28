@@ -13,8 +13,6 @@ from puripuly_heart.core.audio.diagnostics import (
 )
 from puripuly_heart.core.stt.notifications import FinalTranscriptSuppressedNotification
 
-LOCAL_QWEN_HALLUCINATION_GUIDANCE_TRIGGER_COUNT = 2
-
 
 @dataclass(slots=True)
 class AudioDiagnosticsApplicationOwner:
@@ -22,8 +20,6 @@ class AudioDiagnosticsApplicationOwner:
     runtime_logging: ApplicationRuntimeLoggingOwner
     capture_fault_profile: str = field(init=False, default="none")
     stt_fault_profile: str = field(init=False, default="none")
-    local_qwen_hallucination_detection_count: int = field(init=False, default=0)
-    local_qwen_hallucination_modal_shown: bool = field(init=False, default=False)
     _capture_adapter: CaptureDiagnosticsAdapter | None = field(
         init=False,
         default=None,
@@ -43,32 +39,6 @@ class AudioDiagnosticsApplicationOwner:
             f"channel={notification.channel} "
             f"utterance_id={str(notification.utterance_id)[:8]}"
         )
-        if notification.stt_provider_name.value == "local_qwen":
-            self.record_local_qwen_hallucination_guidance_detection(notification)
-
-    def record_local_qwen_hallucination_guidance_detection(
-        self,
-        notification: FinalTranscriptSuppressedNotification,
-    ) -> None:
-        self.local_qwen_hallucination_detection_count += 1
-        count = self.local_qwen_hallucination_detection_count
-        self.runtime_logging.emit_diagnostic(
-            "[STT][SuppressedFinalNotification] "
-            f"local_qwen_guidance count={count} "
-            f"channel={notification.channel} "
-            f"modal_shown={self.local_qwen_hallucination_modal_shown}"
-        )
-        if count < LOCAL_QWEN_HALLUCINATION_GUIDANCE_TRIGGER_COUNT:
-            return
-        if self.local_qwen_hallucination_modal_shown:
-            return
-        if not self.presentation.show_local_qwen_hallucination_dialog():
-            self.runtime_logging.emit_diagnostic(
-                "[STT][SuppressedFinalNotification] "
-                f"local_qwen_guidance count={count} guidance_modal=unavailable"
-            )
-            return
-        self.local_qwen_hallucination_modal_shown = True
 
     def cycle_capture_fault_profile(self) -> str:
         if not self.debug_allowed():
@@ -131,5 +101,4 @@ class AudioDiagnosticsApplicationOwner:
 
 __all__ = [
     "AudioDiagnosticsApplicationOwner",
-    "LOCAL_QWEN_HALLUCINATION_GUIDANCE_TRIGGER_COUNT",
 ]

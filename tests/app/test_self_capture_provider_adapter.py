@@ -69,7 +69,7 @@ class RecordingRuntime:
         self.handoff_result = SimpleNamespace(
             status="failed",
             failure_code="worker_process_exited",
-            failure_type="GpuWorkerClosedError",
+            failure_type="ASRWorkerClosedError",
             failure_stage="provider_warmup",
             failure_diagnostics=None,
         )
@@ -143,7 +143,7 @@ async def test_mutations_forward_terminal_failure_owner_and_map_results() -> Non
     assert handed_off.status is SelfCaptureProviderMutationStatus.FAILED
     assert handed_off.reason == "worker_process_exited"
     assert handed_off.failure_code == "worker_process_exited"
-    assert handed_off.failure_type == "GpuWorkerClosedError"
+    assert handed_off.failure_type == "ASRWorkerClosedError"
     assert handed_off.failure_stage == "provider_warmup"
     assert runtime.calls == [
         ("reset", "self"),

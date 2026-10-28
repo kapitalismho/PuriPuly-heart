@@ -104,6 +104,12 @@ def test_state_publisher_uses_translation_selection_ids(
 @pytest.mark.parametrize(
     ("provider", "expected_id"),
     [
+        (STTProviderName.LOCAL_CPU_AUTO, 0),
+        (STTProviderName.LOCAL_ORUKEET, 1),
+        (STTProviderName.LOCAL_PARAKEET_JAPANESE, 2),
+        (STTProviderName.LOCAL_QWEN_GPU, 4),
+        (STTProviderName.LOCAL_FUN_ASR_NANO, 14),
+        (STTProviderName.LOCAL_FUN_ASR_MLT_NANO, 15),
         (STTProviderName.CUSTOM_OFFLINE, 8),
         (STTProviderName.CUSTOM_REALTIME, 9),
         (STTProviderName.CUSTOM, 8),
@@ -135,6 +141,12 @@ def test_state_publisher_publishes_custom_asr_ids(
 @pytest.mark.parametrize(
     ("provider", "expected_id"),
     [
+        (STTProviderName.LOCAL_CPU_AUTO, 0),
+        (STTProviderName.LOCAL_ORUKEET, 1),
+        (STTProviderName.LOCAL_PARAKEET_JAPANESE, 2),
+        (STTProviderName.LOCAL_QWEN_GPU, 4),
+        (STTProviderName.LOCAL_FUN_ASR_NANO, 14),
+        (STTProviderName.LOCAL_FUN_ASR_MLT_NANO, 15),
         (STTProviderName.GEMINI_TRANSCRIBE, 10),
         (STTProviderName.ELEVENLABS_SCRIBE, 11),
         (STTProviderName.QWEN_AUDIO, 12),

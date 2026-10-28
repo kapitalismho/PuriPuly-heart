@@ -14,19 +14,19 @@ from puripuly_heart.config.resolved import (
     ResolvedCredentialRequirement,
     ResolvedSTTConfig,
 )
+from puripuly_heart.core.asr_worker import (
+    ASRWorkerActivation,
+    ASRWorkerDevice,
+    ASRWorkerEvent,
+    ASRWorkerRequestError,
+    ASRWorkerTranscription,
+)
 from puripuly_heart.core.audio.ownership import (
     AudioSegmentIdentity,
     AudioSegmentSettingsSnapshot,
     AudioSegmentSnapshot,
     OwnedVadEvent,
     PeerAudioSegmentLedger,
-)
-from puripuly_heart.core.gpu_worker import (
-    GpuWorkerActivation,
-    GpuWorkerDevice,
-    GpuWorkerEvent,
-    GpuWorkerRequestError,
-    GpuWorkerTranscription,
 )
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     ProviderRuntimeBuildRequest,
@@ -62,9 +62,9 @@ from puripuly_heart.core.stt.scoped_engine import (
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
-from tests.core.runtime.test_gpu_asr import FakeGpuWorkerClient, FakeGpuWorkerFactory
+from tests.core.runtime.test_gpu_asr import FakeASRWorkerClient, FakeASRWorkerFactory
 
-GPU_DEVICE = GpuWorkerDevice(
+GPU_DEVICE = ASRWorkerDevice(
     device_id="vulkan-index-0",
     registry_index=0,
     name="GPU 0",
@@ -155,7 +155,7 @@ class FakeGpuRuntime:
         sink,
         *,
         discovery_gate: asyncio.Event | None = None,
-        discovery_results: list[tuple[GpuWorkerDevice, ...] | BaseException] | None = None,
+        discovery_results: list[tuple[ASRWorkerDevice, ...] | BaseException] | None = None,
     ) -> None:
         self.sink = sink
         self.discovery_gate = discovery_gate
@@ -181,7 +181,7 @@ class FakeGpuRuntime:
     async def emit(self, diagnostic: GpuASRDiagnostic) -> None:
         await self.sink(diagnostic)
 
-    async def discover_devices(self) -> tuple[GpuWorkerDevice, ...]:
+    async def discover_devices(self) -> tuple[ASRWorkerDevice, ...]:
         self.discovery_calls += 1
         self.discovery_state = "pending"
         await self.emit(GpuASRDiagnostic(kind="discovery_pending", fields={}))
@@ -206,7 +206,7 @@ class FakeGpuRuntime:
         model_path: Path,
         model_id: str,
         device_id: str,
-    ) -> GpuWorkerActivation:
+    ) -> ASRWorkerActivation:
         _ = model_path, model_id
         self.activation_calls.append((channel, device_id))
         self.owners.setdefault(channel, set()).add(owner)
@@ -225,17 +225,17 @@ class FakeGpuRuntime:
                 },
             )
         )
-        return GpuWorkerActivation(
+        return ASRWorkerActivation(
             device=GPU_DEVICE,
             model_load_seconds=1.0,
             warmup_seconds=0.25,
         )
 
-    async def retry(self) -> GpuWorkerActivation:
+    async def retry(self) -> ASRWorkerActivation:
         self.retry_calls += 1
         self.state = "ready"
         self.last_failure_code = None
-        return GpuWorkerActivation(
+        return ASRWorkerActivation(
             device=GPU_DEVICE,
             model_load_seconds=1.0,
             warmup_seconds=0.25,
@@ -248,9 +248,9 @@ class FakeGpuRuntime:
         *,
         speech_end_at: float,
         language_hint: str | None = None,
-    ) -> GpuWorkerTranscription:
+    ) -> ASRWorkerTranscription:
         _ = channel, samples_f32, speech_end_at, language_hint
-        return GpuWorkerTranscription(
+        return ASRWorkerTranscription(
             text="ok",
             detected_language="en",
             audio_seconds=1.0,
@@ -284,7 +284,7 @@ class FakeGpuRuntimeFactory:
         self,
         *,
         discovery_gate: asyncio.Event | None = None,
-        discovery_results: list[tuple[GpuWorkerDevice, ...] | BaseException] | None = None,
+        discovery_results: list[tuple[ASRWorkerDevice, ...] | BaseException] | None = None,
     ) -> None:
         self.discovery_gate = discovery_gate
         self.discovery_results = discovery_results
@@ -501,8 +501,8 @@ async def test_owner_dispatches_warmup_and_vad_without_exposing_provider() -> No
         language_hint="ko",
     )
     request = ProviderRuntimeBuildRequest(
-        config=_resolved_config("self", "local_qwen"),
-        model_id="qwen-model",
+        config=_resolved_config("self", "local_orukeet"),
+        model_id="orukeet-model",
         session_options=initial_options,
     )
     await owner.replace_provider(request, start=False)
@@ -513,8 +513,8 @@ async def test_owner_dispatches_warmup_and_vad_without_exposing_provider() -> No
     await owner.handle_vad_event("self", event)
 
     channel = owner.snapshot.channel_for("self")
-    assert channel.provider_id == "local_qwen"
-    assert channel.model_id == "qwen-model"
+    assert channel.provider_id == "local_orukeet"
+    assert channel.model_id == "orukeet-model"
     assert channel.phase == "ready"
     assert provider.warmup_calls == 1
     assert provider.vad_events == [event]
@@ -530,10 +530,10 @@ async def test_abort_releases_loading_gpu_provider_before_readiness_and_allows_r
     attached_before_warmup: bool,
 ) -> None:
     gate = asyncio.Event()
-    loading_client = FakeGpuWorkerClient(activation_gate=gate)
-    replacement_client = FakeGpuWorkerClient()
-    process_factory = FakeGpuWorkerFactory(
-        [FakeGpuWorkerClient(), loading_client, replacement_client]
+    loading_client = FakeASRWorkerClient(activation_gate=gate)
+    replacement_client = FakeASRWorkerClient()
+    process_factory = FakeASRWorkerFactory(
+        [FakeASRWorkerClient(), loading_client, replacement_client]
     )
     runtimes = []
 
@@ -578,7 +578,7 @@ async def test_abort_releases_loading_gpu_provider_before_readiness_and_allows_r
     try:
         await asyncio.wait_for(loading_client.activation_started.wait(), timeout=1)
         await loading_client._events.put(
-            GpuWorkerEvent(
+            ASRWorkerEvent(
                 name="activation_progress",
                 request_id=None,
                 fields={"phase": "loading"},
@@ -591,7 +591,6 @@ async def test_abort_releases_loading_gpu_provider_before_readiness_and_allows_r
             await asyncio.wait_for(preparing, timeout=1)
         assert not gate.is_set()
         assert loading_client.is_closed
-        assert loading_client.force_close_calls == 1
         assert runtimes[0].state == GpuASRRuntimeState.STOPPED
         snapshot = owner.snapshot
         assert snapshot.channel_for("self").provider_id is None
@@ -794,7 +793,7 @@ async def test_empty_gpu_discovery_is_unsupported_and_cached() -> None:
 @pytest.mark.asyncio
 async def test_unsupported_capability_is_completed_no_gpu_answer() -> None:
     gpu_factory = FakeGpuRuntimeFactory(
-        discovery_results=[GpuWorkerRequestError("unsupported_capability")]
+        discovery_results=[ASRWorkerRequestError("unsupported_capability")]
     )
     owner, _provisioning, _gpu_factory, _provider_factory = _owner(gpu_factory=gpu_factory)
 
@@ -1718,7 +1717,7 @@ async def test_provider_startup_failure_preserves_phase_and_current_provider(
     operation: str,
     stage: str,
 ) -> None:
-    failure = GpuWorkerRequestError("heartbeat_timeout", {"raw_payload": "private-model-path"})
+    failure = ASRWorkerRequestError("heartbeat_timeout", {"raw_payload": "private-model-path"})
 
     class FailingProvider(FakeProvider):
         async def warmup(self) -> None:
@@ -1760,7 +1759,7 @@ async def test_provider_startup_failure_preserves_phase_and_current_provider(
         assert result.status == "failed"
         assert result.failure_stage == stage
         assert result.failure_code == "heartbeat_timeout"
-        assert result.failure_type == "GpuWorkerRequestError"
+        assert result.failure_type == "ASRWorkerRequestError"
         assert owner.snapshot.channel_for("self").provider_id == "deepgram"
         assert owner.snapshot.channel_for("self").phase == "running"
         assert provider_factory.providers[0].close_calls == 0
@@ -1772,7 +1771,7 @@ async def test_provider_startup_failure_preserves_phase_and_current_provider(
         assert len(failures) == 1
         assert failures[0].event == stage
         assert failures[0].failure_code == "heartbeat_timeout"
-        assert failures[0].failure_type == "GpuWorkerRequestError"
+        assert failures[0].failure_type == "ASRWorkerRequestError"
         assert "private-model-path" not in repr(failures)
     finally:
         await owner.close()

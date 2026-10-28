@@ -27,7 +27,7 @@ from puripuly_heart.core.overlay.openvr_vendor import (
     validate_openvr_runtime_dll,
     validate_vendored_openvr_bundle,
 )
-from puripuly_heart.release_evidence.gpu_worker_distribution import validate_gpu_worker_runtime
+from puripuly_heart.release_evidence.asr_worker_distribution import validate_asr_worker_runtime
 from puripuly_heart.release_evidence.native_pe import stage_vc_runtime, validate_pe_dependencies
 
 _LAYOUT_SCHEMA = "puripuly-heart/native-artifact-layout/v1"
@@ -105,9 +105,9 @@ class NativeArtifactLayout:
             "soxr_runtime_root",
             "soxr_compliance_root",
             "llama_runtime_root",
-            "local_qwen_runtime_root",
+            "local_sherpa_runtime_root",
             "overlay_executable",
-            "gpu_worker_executable",
+            "asr_worker_executable",
             "openvr_dll",
             "artifact_manifest",
         }
@@ -537,14 +537,14 @@ def validate_target(
             "stdlib_archive",
             "extension_dll_root",
             "overlay_executable",
-            "gpu_worker_executable",
+            "asr_worker_executable",
             "openvr_dll",
         )
     }
     missing = sorted(str(path) for path in required_paths.values() if not path.exists())
     if missing:
         raise FileNotFoundError(f"native artifact is incomplete: {missing}")
-    gpu_worker_runtime = validate_gpu_worker_runtime(required_paths["gpu_worker_executable"].parent)
+    asr_worker_runtime = validate_asr_worker_runtime(required_paths["asr_worker_executable"].parent)
     python_archive = _validate_python_archive(target_root, layout)
     site_packages = required_paths["dependency_root"]
     dependencies = validate_dependencies(site_packages, requirements_path)
@@ -573,7 +573,7 @@ def validate_target(
         "soxr_runtime": soxr_runtime,
         "python_archive": python_archive,
         "portaudio_runtime": portaudio_runtime,
-        "gpu_worker_runtime": gpu_worker_runtime,
+        "asr_worker_runtime": asr_worker_runtime,
         "pe_dependencies": pe_dependencies,
         "paths": {
             key: str(value.relative_to(target_root)) for key, value in required_paths.items()

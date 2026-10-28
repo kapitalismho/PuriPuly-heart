@@ -308,7 +308,7 @@ def _peer_settings(provider: str) -> AppSettingsVNext:
 async def test_local_scope_change_and_capture_restart_replace_engines_without_losing_recognition() -> (
     None
 ):
-    settings = _settings(STTProviderName.LOCAL_QWEN.value)
+    settings = _settings(STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value)
     settings_holder = {"settings": settings}
     runtime_factory = _RuntimeFactory()
     runtime_factory.provider_factory.terminal_text = "recognized"
@@ -479,7 +479,6 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         runtime_available=lambda: True,
         capture_owner=lambda: capture_owner,
         capture_owner_if_created=lambda: capture_owner,
-        persist_manual_fallback=lambda: True,
         reset_local_pending=lambda: None,
         clear_gpu_pending=lambda: None,
         overlay_state_provider=lambda: "off",

@@ -128,7 +128,7 @@ def _stt_config(
     return resolved.ResolvedSTTConfig(
         channel=channel,
         source_language=source_language,
-        provider="local_qwen" if channel == resolved.RUNTIME_CHANNEL_SELF else "soniox",
+        provider="local_fun_asr_mlt_nano" if channel == resolved.RUNTIME_CHANNEL_SELF else "soniox",
         model="stt-model",
         endpoint="wss://example.invalid/stt",
         region="beijing",

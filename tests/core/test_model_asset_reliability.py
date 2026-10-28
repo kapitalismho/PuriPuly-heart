@@ -13,7 +13,12 @@ from puripuly_heart.app.services.model_assets import ModelAssetsApplication, Mod
 from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.local_asr import local_stt_runtime_installer as installer
-from puripuly_heart.core.local_asr.local_stt_assets import load_local_stt_asset_manifest
+from puripuly_heart.core.local_asr.local_stt_assets import (
+    LOCAL_QWEN_GPU_MODEL_ID,
+    ORUKEET_MODEL_ID,
+    REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
+    load_local_stt_asset_manifest,
+)
 from puripuly_heart.core.local_asr.local_stt_download_port import (
     HuggingFaceDownloadProgress,
     LocalSTTDownloadPortCancelled,
@@ -28,12 +33,7 @@ from tests.core.runtime.test_local_asr_provisioning import (
     _owner,
 )
 
-ASR_IDS = (
-    "qwen3-asr-0.6b-int8-sherpa",
-    "qwen3-asr-1.7b-q6-k-transcribe-vulkan",
-    "parakeet-tdt-0.6b-v3-int8-sherpa",
-    "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
-)
+ASR_IDS = (*REQUIRED_CPU_LOCAL_STT_MODEL_IDS, LOCAL_QWEN_GPU_MODEL_ID)
 SOURCE_ERRORS = (
     "download_failed",
     "download_timeout",
@@ -59,7 +59,7 @@ async def test_every_asr_mirror_uses_guarded_range_and_preserves_registered_pins
             for asset in original.files
         ),
     )
-    requests, downloads, updates = [], [], []
+    requests, updates = [], []
 
     def respond(request):
         requests.append(request)
@@ -76,7 +76,6 @@ async def test_every_asr_mirror_uses_guarded_range_and_preserves_registered_pins
 
     class PublicDownloader:
         async def download(self, request, *, cancel_event, on_progress):
-            downloads.append(request)
             request.local_dir.mkdir(parents=True, exist_ok=True)
             return download_public_file(
                 {
@@ -108,16 +107,16 @@ async def test_every_asr_mirror_uses_guarded_range_and_preserves_registered_pins
         assert len(requests) == 1
     else:
         installed = await installer.ensure_local_stt_installed(**arguments)
-        selected = "hf_mirror" if "hf_mirror" in original.sources else "huggingface"
-        source = original.sources[selected]
+        source_name = "hf_mirror" if "hf_mirror" in original.sources else "huggingface"
+        source = original.sources[source_name]
         assert installed.selected_revision == source.revision
-        assert installed.selected_source == selected
-        assert len(downloads) == len(original.files)
-        for request, asset in zip(downloads, original.files):
-            assert request.endpoint == "https://hf-mirror.net"
-            assert request.repo_id == source.repo_id
-            assert request.revision == source.revision
-            assert request.remote_path == asset.remote_path_for_source(selected)
+        assert installed.selected_source == "hf_mirror"
+        assert [str(request.url) for request in requests] == [
+            f"https://hf-mirror.net/{source.repo_id}/resolve/{source.revision}/"
+            f"{asset.remote_path_for_source(source_name)}"
+            for asset in original.files
+        ]
+        for asset in original.files:
             assert (tmp_path / manifest.install_dirname / asset.relative_path).read_bytes() == data
         assert updates[-1].status == "ready"
         installer.validate_local_stt_install(tmp_path / manifest.install_dirname, manifest=manifest)
@@ -547,7 +546,7 @@ async def test_cancelled_deletion_retains_real_lease_until_worker_settles(
 
     else:
         owner = _owner(MutableProvisioningBackend(_all_states()), model_root=tmp_path)
-        model_id = ASR_IDS[0]
+        model_id = ORUKEET_MODEL_ID
         install = tmp_path / load_local_stt_asset_manifest(model_id).install_dirname
 
         def operation():

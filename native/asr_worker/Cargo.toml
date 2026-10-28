@@ -1,0 +1,28 @@
+[package]
+name = "puripuly-heart-asr-worker"
+version = "2.9.1"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+build = "build.rs"
+
+[lib]
+name = "puripuly_heart_asr_worker"
+path = "src/lib.rs"
+
+[[bin]]
+name = "PuriPulyHeartASRWorker"
+path = "src/main.rs"
+
+[dependencies]
+hound = "3.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "sync", "time"] }
+transcribe-cpp = { git = "https://github.com/handy-computer/transcribe.cpp", rev = "8facde6fcd8fb9caa585a5788ab450df6e8ec7db", default-features = false, features = ["vulkan", "dynamic-backends"] }
+
+[dev-dependencies]
+tempfile = "3"
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "3"
+serde_json = "1"

@@ -548,7 +548,7 @@ def _build_parser() -> argparse.ArgumentParser:
     build_parser.add_argument("--run-id", default="")
     build_parser.add_argument("--run-attempt", default="")
     build_parser.add_argument("--main-exe", type=Path, required=True)
-    build_parser.add_argument("--gpu-worker-exe", type=Path, required=True)
+    build_parser.add_argument("--asr-worker-exe", type=Path, required=True)
     build_parser.add_argument("--overlay-exe", type=Path, required=True)
     build_parser.add_argument("--installer", type=Path, required=True)
     build_parser.add_argument("--soxr-bundle", type=Path, default=None)
@@ -593,7 +593,7 @@ def _run_verify_build(arguments: argparse.Namespace) -> dict[str, object]:
         arguments.main_exe, expected_version=expected_version
     )
     gpu_metadata = verify_pe_product_metadata(
-        arguments.gpu_worker_exe, expected_version=expected_version
+        arguments.asr_worker_exe, expected_version=expected_version
     )
     overlay_metadata = verify_pe_product_metadata(
         arguments.overlay_exe, expected_version=expected_version
@@ -603,7 +603,7 @@ def _run_verify_build(arguments: argparse.Namespace) -> dict[str, object]:
     )
     candidates: list[tuple[str, Path, dict[str, str]]] = [
         ("main-executable", Path(arguments.main_exe), main_metadata),
-        ("gpu-worker-executable", Path(arguments.gpu_worker_exe), gpu_metadata),
+        ("asr-worker-executable", Path(arguments.asr_worker_exe), gpu_metadata),
         ("overlay-executable", Path(arguments.overlay_exe), overlay_metadata),
         ("installer", Path(arguments.installer), installer_metadata),
     ]
