@@ -13,14 +13,17 @@ from puripuly_heart.config.alibaba_connection import AlibabaRegionalSettings, no
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.prompts import normalize_system_prompt_override
-from puripuly_heart.config.provider_values import normalize_cloud_free_tier_providers
+from puripuly_heart.config.provider_values import (
+    normalize_cloud_free_tier_providers,
+    normalize_stt_provider,
+)
 from puripuly_heart.config.resolved import normalize_legacy_vad_onset_threshold
 from puripuly_heart.core.translation_policy import (
     FIXED_TRANSLATION_POLICY,
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 53
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 54
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -406,6 +409,7 @@ class STTIntent:
     custom: CustomSTTIntent = field(default_factory=CustomSTTIntent)
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "provider", normalize_stt_provider(self.provider))
         device_id = self.gpu_device_id if isinstance(self.gpu_device_id, str) else "auto"
         object.__setattr__(self, "gpu_device_id", device_id.strip() or "auto")
         object.__setattr__(
@@ -426,6 +430,9 @@ class STTIntent:
 @dataclass(frozen=True, slots=True)
 class PeerSTTIntent:
     provider: str = "local_cpu_auto"
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "provider", normalize_stt_provider(self.provider))
 
 
 @dataclass(frozen=True, slots=True)

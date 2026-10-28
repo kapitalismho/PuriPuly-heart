@@ -348,7 +348,7 @@ company = "salee"
     Invoke-Checked -FilePath $cargoCommand -ArgumentList @(
         "build", "--manifest-path", (Join-Path $repoRoot "native\overlay\Cargo.toml"), "--locked", "--release", "--bin", "PuriPulyHeartOverlay", "--target-dir", $overlayTarget
     ) -WorkingDirectory $repoRoot
-    & (Join-Path $PSScriptRoot "build-gpu-worker-release.ps1") -TargetDir $gpuTarget -OutputDir $artifactRoot
+    & (Join-Path $PSScriptRoot "build-asr-worker-release.ps1") -TargetDir $gpuTarget -OutputDir $artifactRoot
     Copy-Item -LiteralPath (Join-Path $overlayTarget "release\PuriPulyHeartOverlay.exe") -Destination $artifactRoot -Force
     Copy-Item -LiteralPath (Join-Path $repoRoot "third_party\openvr\win64\openvr_api.dll") -Destination $artifactRoot -Force
     $cmakeCommand = (Get-Command cmake -ErrorAction Stop).Source
@@ -367,11 +367,11 @@ company = "salee"
     ) -WorkingDirectory $repoRoot
     Copy-Tree -Source $llamaRoot -Destination (Join-Path $artifactRoot "_runtime\llama.cpp-b11537")
     Copy-Tree -Source (Join-Path $repoRoot "third_party\llama.cpp") -Destination (Join-Path $artifactRoot "third_party\llama.cpp")
-    $localQwenRoot = Join-Path $artifactRoot "_runtime\local_qwen"
-    New-Item -ItemType Directory -Path $localQwenRoot -Force | Out-Null
+    $localSherpaRoot = Join-Path $artifactRoot "_runtime\local_qwen"
+    New-Item -ItemType Directory -Path $localSherpaRoot -Force | Out-Null
     foreach ($dll in @("onnxruntime.dll", "onnxruntime_providers_shared.dll")) {
         $source = Resolve-OneFile -Root (Join-Path $artifactRoot "site-packages\onnxruntime") -Name $dll
-        Copy-Item -LiteralPath $source -Destination $localQwenRoot -Force
+        Copy-Item -LiteralPath $source -Destination $localSherpaRoot -Force
     }
 
     Copy-Tree -Source (Join-Path $soxrRoot "source-bundle") -Destination (Join-Path $artifactRoot "third_party\soxr")
@@ -433,11 +433,16 @@ company = "salee"
         "--output", (Join-Path $artifactRoot "native-artifact-manifest.json")
     ) -WorkingDirectory $repoRoot
     $cleanupIncludePath = Join-Path (Split-Path -Parent $OutputDir) "native-installer-cleanup.iss"
+    $asrModelsIncludePath = Join-Path (Split-Path -Parent $OutputDir) "native-asr-models.iss"
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(
         "-m", "puripuly_heart.release_evidence.native_installer_cleanup",
         "--legacy-manifest", (Join-Path $repoRoot "native\windows_host\legacy-pyinstaller-v2.7.0.json"),
         "--native-manifest", (Join-Path $artifactRoot "native-artifact-manifest.json"),
         "--output", $cleanupIncludePath
+    ) -WorkingDirectory $repoRoot
+    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
+        "-m", "puripuly_heart.release_evidence.local_asr_installer",
+        "--output", $asrModelsIncludePath
     ) -WorkingDirectory $repoRoot
 
     Remove-Item -LiteralPath $OutputDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -454,3 +459,4 @@ company = "salee"
 Write-Host "Experimental native artifact: $OutputDir"
 Write-Host "Build evidence: $evidenceRoot"
 Write-Host "Native installer cleanup include: $cleanupIncludePath"
+Write-Host "Native installer ASR models include: $asrModelsIncludePath"

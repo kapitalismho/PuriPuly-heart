@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -143,26 +144,6 @@ def test_capture_target_persistence_rejects_absent_file_migration_failure_withou
     assert not path.exists()
 
 
-def test_capture_target_persistence_loads_existing_file_once(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    path = tmp_path / "settings.json"
-    save_vnext_settings(path, AppSettingsVNext())
-    original_load = persistence_adapter.load_vnext_settings
-    loads: list[Path] = []
-
-    def counted_load(incoming: Path):
-        loads.append(incoming)
-        return original_load(incoming)
-
-    monkeypatch.setattr(persistence_adapter, "load_vnext_settings", counted_load)
-
-    persist_desktop_audio_capture_target(path, _process_target())
-
-    assert loads == [path]
-
-
 def test_capture_target_persist_failure_does_not_change_persisted_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -186,3 +167,39 @@ def test_capture_target_persist_failure_does_not_change_persisted_state(
     assert raised.value.status == "save_failed"
     assert "raw persist failure" not in str(raised.value)
     assert path.read_bytes() == original_bytes
+
+
+def test_capture_target_edit_does_not_authorize_retired_asset_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from puripuly_heart.app.services.canonical_settings_persistence import compose_settings_owner
+    from puripuly_heart.core.local_asr import retired_cpu_assets
+
+    path = tmp_path / "settings.json"
+    save_vnext_settings(path, AppSettingsVNext())
+    root = tmp_path / "models"
+    monkeypatch.setattr(retired_cpu_assets, "default_local_stt_model_root", lambda: root)
+    model_id = "qwen3-asr-0.6b-int8-sherpa"
+    directory = root / model_id
+    directory.mkdir(parents=True)
+    (directory / "installed-manifest.json").write_text(
+        json.dumps(
+            {
+                "manifest_version": 1,
+                "model_id": model_id,
+                "engine": "sherpa-onnx",
+                "install_dirname": model_id,
+            }
+        ),
+        encoding="utf-8",
+    )
+    payload = directory / "decoder.int8.onnx"
+    payload.write_bytes(b"protected-until-startup")
+
+    saved = persist_desktop_audio_capture_target(path, _process_target())
+
+    assert saved.intent.desktop_audio.capture_target.kind == "process"
+    assert payload.read_bytes() == b"protected-until-startup"
+    started = compose_settings_owner(path).start()
+    assert started.settings.intent.desktop_audio.capture_target.kind == "process"
+    assert not directory.exists()

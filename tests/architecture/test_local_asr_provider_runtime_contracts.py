@@ -3,8 +3,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from puripuly_heart.app.ports import gpu_worker as compatibility_gpu_worker
-from puripuly_heart.core import gpu_worker as owning_gpu_worker
 from tests.helpers.ast_sources import imported_modules as _imported_modules
 from tests.helpers.paths import SOURCE_ROOT
 
@@ -31,26 +29,15 @@ def _defined_function_names(source_file: Path) -> set[str]:
     }
 
 
-def test_gpu_worker_contract_has_core_owner_and_app_compatibility_reexport() -> None:
-    exported = (
-        "GpuWorkerActivation",
-        "GpuWorkerClientPort",
-        "GpuWorkerClosedError",
-        "GpuWorkerDevice",
-        "GpuWorkerError",
-        "GpuWorkerEvent",
-        "GpuWorkerMode",
-        "GpuWorkerProcessFactoryPort",
-        "GpuWorkerRequestError",
-        "GpuWorkerTranscription",
-    )
-
-    for name in exported:
-        assert getattr(compatibility_gpu_worker, name) is getattr(owning_gpu_worker, name)
-
-    gpu_runtime_imports = _imported_modules(SOURCE_ROOT / "core" / "runtime" / "gpu_asr.py")
-    assert "puripuly_heart.core.gpu_worker" in gpu_runtime_imports
-    assert "puripuly_heart.app.ports.gpu_worker" not in gpu_runtime_imports
+def test_native_asr_contract_and_consumers_do_not_depend_on_app_adapters() -> None:
+    for relative_path in (
+        "core/asr_worker.py",
+        "core/runtime/gpu_asr.py",
+        "providers/stt/local_cpp.py",
+    ):
+        imports = _imported_modules(SOURCE_ROOT / relative_path)
+        assert not any(module.startswith("puripuly_heart.app") for module in imports)
+        assert not any(module.startswith("puripuly_heart.ui") for module in imports)
 
 
 def test_provider_runtime_contract_and_owner_do_not_import_ui_hub_or_app_layers() -> None:

@@ -13,7 +13,7 @@ This notice file focuses on components that are bundled, shipped, installed, or 
 
 The technical metadata review performed for the AGPL transition found no obvious license blocker to licensing PuriPuly Heart's own code under AGPL-3.0-or-later. This is a repository metadata review, not legal advice.
 
-Notable shipped/runtime license families include MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, LGPL-2.1-or-later, SIL Open Font License 1.1, and CC-BY-4.0.
+Notable shipped/runtime license families include MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, LGPL-2.1-or-later, SIL Open Font License 1.1, CC-BY-4.0, CC-BY-SA-4.0, and the FunASR Model Open Source License Agreement v1.1.
 
 Runtime/bundled notice-sensitive components:
 - huggingface-hub 2.3.0: Apache-2.0.
@@ -31,7 +31,7 @@ Runtime/bundled notice-sensitive components:
 - sounddevice 0.5.5: releases retain its standard PortAudio runtime and upstream license metadata, but intentionally omit the ASIO-only DLL. `SD_ENABLE_ASIO=1` is unsupported in this distribution.
 - OpenVR runtime DLL: BSD-3-Clause.
 - llama.cpp CPU and Vulkan runtime: MIT.
-- Native Rust overlay/GPU worker dependencies and the Rust standard library retain their upstream licenses. Supplemental aggregate notices are not bundled.
+- Native Rust overlay/ASR worker dependencies and the Rust standard library retain their upstream licenses. Supplemental aggregate notices are not bundled.
 - Noto Sans CJK Medium TTC: SIL Open Font License 1.1.
 - Silero VAD ONNX model: MIT.
 - Smart Turn v3.2 CPU ONNX model: BSD-2-Clause.
@@ -54,6 +54,8 @@ For package-managed dependencies, the authoritative license texts are distribute
 - LGPL-2.1-or-later: source-tree copy at src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt; installed release copy in third_party\soxr\ next to the LGPL source bundle.
 - SIL Open Font License 1.1: included below for bundled fonts.
 - CC-BY-4.0: https://creativecommons.org/licenses/by/4.0/legalcode.en
+- CC-BY-SA-4.0: https://creativecommons.org/licenses/by-sa/4.0/legalcode.en
+- FunASR Model Open Source License Agreement v1.1: pinned model-specific sources are listed below; this is not Apache-2.0.
 
 ----
 
@@ -67,6 +69,18 @@ Bundled LLVM OpenMP runtime (libomp.dll): Apache-2.0 WITH LLVM-exception.
 The complete upstream LICENSE-LLVM-OpenMP, including its additional legacy notices, is installed alongside libomp.dll in each llama.cpp backend directory.
 
 Windows releases contain the pinned llama.cpp server runtime required for managed local translation. The application installer does not contain Gemma model weights. The complete llama.cpp license is installed at third_party/llama.cpp/LICENSE.
+
+----
+
+transcribe.cpp CPU and Vulkan ASR runtime
+Source: https://github.com/handy-computer/transcribe.cpp/tree/8facde6fcd8fb9caa585a5788ab450df6e8ec7db
+Rust bindings and native source version: 0.4.1
+License: MIT
+
+The authenticated native ASR worker bundles matching transcribe.cpp and ggml
+dynamic backends. CPU channels use independent workers; GPU channels share one
+resident Model. Model weights are downloaded separately and retain the model
+licenses below, independently of the runtime's MIT license.
 
 ----
 
@@ -146,22 +160,48 @@ File-integrity checks do not repair TLS validation.
 
 ----
 
-Qwen3-ASR local model assets
-Official upstream sources: https://huggingface.co/Qwen/Qwen3-ASR-0.6B , https://github.com/QwenLM/Qwen3-ASR
-Manifest mirror sources used by the app: https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25 , https://modelscope.cn/models/zengshuishui/Qwen3-ASR-onnx
-License: Apache-2.0
+Orukeet Q8_0 local CPU model asset (English)
+Model source and authors: https://huggingface.co/oruk/orukeet ; Oruk AI
+Base model: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3 ; NVIDIA
+License for selected Orukeet weights and fitted Gabor kernels: CC-BY-SA-4.0
+Pinned model revision: b59c13a733fce5cf193230d0fa317ee7f145a108
+Selected export: transcribe-cpp/orukeet-Q8_0.gguf
+License: https://huggingface.co/oruk/orukeet/blob/b59c13a733fce5cf193230d0fa317ee7f145a108/LICENSE-WEIGHTS
+Attribution notice: https://huggingface.co/oruk/orukeet/blob/b59c13a733fce5cf193230d0fa317ee7f145a108/NOTICE.md
 
-Provenance chain verified 2026-08-20 (all links Apache-2.0):
-Qwen3-ASR official (Qwen/Qwen3-ASR-0.6B, Apache-2.0)
-  -> sherpa-onnx ONNX conversion (Wasser1462/Qwen3-ASR-onnx, Apache-2.0)
-  -> ModelScope source (zengshuishui/Qwen3-ASR-onnx, Apache-2.0, pinned revision de9e449eb376dcb472c1ce8141fbae8d524fabbd)
-  -> HF mirror used by the app (csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25, pinned revision 68818b2313fe77bd06f6a7c5068ff3ef59d02b8a)
-  -> PuriPuly manifest (exact SHA-256 pins)
-  -> local execution
+Orukeet is an adaptation of NVIDIA Parakeet TDT 0.6B v3. NVIDIA retains copyright
+in its base model and upstream work, distributed under CC BY 4.0. Oruk AI's r3
+adaptation is CC BY-SA 4.0, with attribution and applicable ShareAlike
+requirements. PuriPuly downloads the transcribe.cpp-compatible export without
+retraining or modifying the selected file. This is not the retired sherpa-onnx
+Parakeet v3 export, nor the incompatible root NeMo-Speech.cpp GGUF export.
 
-The mirror's own README states the files are downloaded from the ModelScope source above, and the conversion uses the official sherpa-onnx export scripts (https://github.com/Wasser1462/Qwen3-ASR-onnx, https://k2-fsa.github.io/sherpa/onnx/qwen3-asr/export.html). The local Qwen3-ASR-0.6B model is a default local CPU STT model; the app manifest identifies pinned downloadable ONNX/tokenizer assets for local ASR setup.
+----
 
-The pinned decoder is the April 7, 2026 correction for abnormal x64 recognition output (https://github.com/k2-fsa/sherpa-onnx/issues/3473). Its SHA-256 is 4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771; the encoder, convolution frontend, and tokenizer files are unchanged.
+Fun-ASR-Nano-2512 and Fun-ASR-MLT-Nano-2512 Q8_0 local CPU model assets
+Model sources and authors: https://huggingface.co/FunAudioLLM/Fun-ASR-Nano-2512 , https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512 ; FunAudioLLM / Alibaba Group
+Copyright (C) [2023-2028] [Alibaba Group]. All rights reserved.
+License: FunASR Model Open Source License Agreement, Version 1.1
+Standard Nano export: https://huggingface.co/handy-computer/fun-asr-nano-2512-gguf/tree/3f66330195d91d51e9a70703bd21e570bdb19d75
+MLT export: https://huggingface.co/handy-computer/fun-asr-mlt-nano-2512-gguf/tree/08f28dadd984030331802b2f9fbd9ecac97bf834
+Standard Nano license and notice: https://huggingface.co/handy-computer/fun-asr-nano-2512-gguf/blob/3f66330195d91d51e9a70703bd21e570bdb19d75/LICENSE , https://huggingface.co/handy-computer/fun-asr-nano-2512-gguf/blob/3f66330195d91d51e9a70703bd21e570bdb19d75/NOTICE
+MLT license and notice: https://huggingface.co/handy-computer/fun-asr-mlt-nano-2512-gguf/blob/08f28dadd984030331802b2f9fbd9ecac97bf834/LICENSE , https://huggingface.co/handy-computer/fun-asr-mlt-nano-2512-gguf/blob/08f28dadd984030331802b2f9fbd9ecac97bf834/NOTICE
+
+The model agreement requires source and author attribution and retention of
+the model names. The embedded GGUF metadata's Apache-2.0 field conflicts with
+the pinned upstream model LICENSE and is not the governing model license.
+
+Modifications: handy-computer converted Fun-ASR-Nano-2512 at commit a7088d6 and
+Fun-ASR-MLT-Nano-2512 at commit cf67a93 to GGUF for transcribe.cpp. Conversion
+repackages the weights, renaming and re-laying-out tensors; Q8_0 also stores
+them at reduced numeric precision. The weights were not retrained or fine-tuned.
+PuriPuly uses standard Nano for Chinese and MLT for Korean without modifying
+these selected exports.
+
+The selected GGUF weights are not embedded in the installer. Setup downloads
+the required four-model CPU catalog; the app also supports managed repair or
+reinstall. The existing hf-mirror.net source uses the same pinned paths, file
+sizes and SHA-256 integrity contracts as the primary Hugging Face source.
 
 ----
 
@@ -175,13 +215,13 @@ The local GPU Qwen ASR GGUF model is not committed directly to this repository. 
 
 ----
 
-NVIDIA Parakeet TDT model assets
-Official upstream sources: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3 , https://huggingface.co/nvidia/parakeet-tdt_ctc-0.6b-ja
-Manifest mirror sources used by the app: https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8 , https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8
+NVIDIA Parakeet Japanese CTC model assets
+Official upstream source: https://huggingface.co/nvidia/parakeet-tdt_ctc-0.6b-ja
+Manifest mirror source used by the app: https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8
 Additional HTTPS distribution mirror: https://hf-mirror.net/ . The application and Setup use the original pinned repository revisions and unchanged file size/SHA-256 contracts through this endpoint. Mirror downloads use direct HTTPS rather than the Hugging Face SDK.
 License: CC-BY-4.0
 
-The local Parakeet models are the default local CPU STT models. The app manifests identify pinned downloadable ONNX assets for local ASR setup. NVIDIA Parakeet model assets are governed by the Creative Commons Attribution 4.0 International license. The mirror or converted assets referenced by the manifests may not expose complete license metadata, so pinned mirror provenance and license metadata must be verified before release.
+The Japanese Parakeet CTC CPU path retains its pinned downloadable ONNX assets and CC BY 4.0 attribution to NVIDIA. The retired multilingual sherpa-onnx Parakeet v3 bundle is no longer installed or used as a fallback; Orukeet's distinct provenance and license are recorded above.
 
 ----
 

@@ -152,6 +152,15 @@ class LocalDecodeCoordinator:
         self._ensure_reaper()
         return job
 
+    def discard_pending(self, sequence: int) -> bool:
+        for job in self._queue:
+            if job.sequence == sequence:
+                self._queue.remove(job)
+                self._queued_audio_ms = max(0.0, self._queued_audio_ms - job.audio_ms)
+                self._update_backlog_warning()
+                return True
+        return False
+
     async def stop(self) -> None:
         self._accepting = False
         if self._closed:

@@ -512,7 +512,7 @@ def test_dashboard_public_setters_update_components(monkeypatch: pytest.MonkeyPa
     view.set_stt_enabled(False)
     view.set_translation_needs_key(True, update_ui=True)
     view.set_stt_needs_key(True, update_ui=True)
-    view.set_local_stt_notice_model("qwen3-asr-0.6b-int8-sherpa")
+    view.set_local_stt_notice_model("fun-asr-mlt-nano-2512-q8-0-transcribe-cpu")
     view.set_local_stt_notice("missing")
     view.set_managed_auth_pending(True)
     view.set_display_text("src", language_code="ko")
@@ -526,7 +526,7 @@ def test_dashboard_public_setters_update_components(monkeypatch: pytest.MonkeyPa
     assert view.display_card.notice_calls[-1] == (
         dashboard_module.t(
             "dashboard.local_stt_notice_missing_model",
-            model=dashboard_module.t("local_stt.model.qwen3-asr-0.6b-int8-sherpa"),
+            model=dashboard_module.t("local_stt.model.fun-asr-mlt-nano-2512-q8-0-transcribe-cpu"),
         ),
         "warning",
     )
@@ -617,7 +617,7 @@ def test_dashboard_projects_osc_state_without_emitting_intents(
             baseline.intent,
             peer_stt=replace(
                 baseline.intent.peer_stt,
-                provider=STTProviderName.LOCAL_PARAKEET_V3.value,
+                provider=STTProviderName.LOCAL_ORUKEET.value,
             ),
         ),
     )
@@ -888,14 +888,14 @@ def test_dashboard_managed_auth_pending_restores_local_stt_notice_when_cleared(
 ) -> None:
     view = _make_dashboard(monkeypatch)
 
-    view.set_local_stt_notice_model("qwen3-asr-0.6b-int8-sherpa")
+    view.set_local_stt_notice_model("fun-asr-mlt-nano-2512-q8-0-transcribe-cpu")
     view.set_local_stt_notice("missing")
     view.set_managed_auth_pending(True)
     view.set_managed_auth_pending(False)
 
     missing_notice = dashboard_module.t(
         "dashboard.local_stt_notice_missing_model",
-        model=dashboard_module.t("local_stt.model.qwen3-asr-0.6b-int8-sherpa"),
+        model=dashboard_module.t("local_stt.model.fun-asr-mlt-nano-2512-q8-0-transcribe-cpu"),
     )
     assert view.display_card.notice_calls == [
         (None, None),
@@ -1556,13 +1556,13 @@ def test_dashboard_local_stt_notice_can_change_and_clear_without_touching_displa
 ) -> None:
     view = _make_dashboard(monkeypatch)
 
-    view.set_local_stt_notice_model("qwen3-asr-0.6b-int8-sherpa")
+    view.set_local_stt_notice_model("fun-asr-mlt-nano-2512-q8-0-transcribe-cpu")
     view.set_local_stt_notice("missing")
     view.set_display_text("hello", language_code="ko")
     view.set_local_stt_notice("downloading", percent=63)
     view.set_local_stt_notice(None)
 
-    model_label = dashboard_module.t("local_stt.model.qwen3-asr-0.6b-int8-sherpa")
+    model_label = dashboard_module.t("local_stt.model.fun-asr-mlt-nano-2512-q8-0-transcribe-cpu")
     assert view.display_card.display_calls == [("hello", False, "font-ko")]
     assert view.display_card.notice_calls == [
         (None, None),

@@ -118,7 +118,9 @@ def test_second_process_cleanup_cannot_disturb_active_provisioning_lease(
     child_environment = os.environ.copy()
     source_root = Path(__file__).resolve().parents[2] / "src"
     child_environment["PYTHONPATH"] = os.pathsep.join(
-        part for part in (str(source_root), child_environment.get("PYTHONPATH", "")) if part
+        part
+        for part in (str(source_root), *sys.path, child_environment.get("PYTHONPATH", ""))
+        if part
     )
     process = subprocess.Popen(
         [sys.executable, "-c", script, str(tmp_path), str(ready), str(release)],
@@ -188,7 +190,7 @@ def _build_manifest(
     modelscope_url: str,
     model_bytes: bytes,
     token_bytes: bytes,
-    model_id: str = "qwen3-asr-0.6b-int8-sherpa",
+    model_id: str = "test-model",
 ) -> LocalSTTAssetManifest:
     return LocalSTTAssetManifest(
         manifest_version=1,
@@ -864,15 +866,7 @@ async def test_http_mirror_selection_respects_locale_and_explicit_preference(
     )
     manifest = replace(
         manifest,
-        sources={
-            "huggingface": manifest.sources["huggingface"],
-            "hf_mirror": LocalSTTAssetSource(
-                name="hf_mirror",
-                revision="hf-rev-1",
-                repo_id="example/repo",
-                download_url_template="https://hf-mirror.net/example/repo/resolve/hf-rev-1/{path}",
-            ),
-        },
+        sources={"huggingface": replace(manifest.sources["huggingface"], repo_id="example/repo")},
     )
     model_root = temp_dir / "appdata" / "models"
     downloader = _MirrorDownloader(base_url)
@@ -1262,6 +1256,66 @@ async def test_ensure_local_stt_installed_redownloads_structurally_valid_but_che
     assert installed.selected_source == "huggingface"
     assert (install_dir / "model.int8.onnx").read_bytes() == model_bytes
     assert (install_dir / "tokenizer" / "tokens.txt").read_bytes() == token_bytes
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "retired",
+    ["qwen3-asr-0.6b-int8-sherpa", "parakeet-tdt-0.6b-v3-int8-sherpa"],
+)
+async def test_retired_install_admission_rejects_even_an_injected_manifest(tmp_path, retired):
+    manifest = _build_manifest(
+        huggingface_url="https://example.invalid",
+        modelscope_url="https://example.invalid",
+        model_bytes=b"model",
+        token_bytes=b"tokens",
+        model_id=retired,
+    )
+    with pytest.raises(LocalSTTRuntimeInstallError) as rejected:
+        await ensure_local_stt_installed(model_id=retired, model_root=tmp_path, manifest=manifest)
+    assert rejected.value.failure_code == "retired_model"
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_failed_full_hash_replacement_preserves_previously_valid_install(
+    temp_dir, file_server
+):
+    from puripuly_heart.core.local_asr.local_stt_assets import validate_local_stt_install
+
+    source, url = file_server
+    (source / "tokenizer").mkdir()
+    (source / "model.int8.onnx").write_bytes(b"good-model")
+    (source / "tokenizer" / "tokens.txt").write_bytes(b"tokens")
+    original = _build_manifest(
+        huggingface_url=url,
+        modelscope_url=f"{url}/missing",
+        model_bytes=b"good-model",
+        token_bytes=b"tokens",
+    )
+    root = temp_dir / "models"
+    before = await ensure_local_stt_installed(
+        manifest=original, model_root=root, preferred_source="huggingface"
+    )
+    replacement = replace(
+        original,
+        sources={"huggingface": replace(original.sources["huggingface"], revision="next-revision")},
+    )
+    (source / "model.int8.onnx").write_bytes(b"evil-model")
+    with pytest.raises(LocalSTTRuntimeInstallError) as failed:
+        await ensure_local_stt_installed(
+            manifest=replacement, model_root=root, preferred_source="huggingface"
+        )
+    assert failed.value.failure_code == "checksum_failed"
+    assert validate_local_stt_install(root / original.install_dirname, manifest=original) == before
+    assert (
+        inspect_local_stt_install_state(
+            root / original.install_dirname, manifest=original, verify_checksums=True
+        ).status
+        == "ready"
+    )
+    assert list(root.glob(f"{original.install_dirname}.staging-*")) == []
+    assert not (root / f"{original.install_dirname}.backup").exists()
 
 
 @pytest.mark.asyncio

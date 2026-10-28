@@ -14,7 +14,7 @@ import puripuly_heart.app.wiring.wiring_local_asr_provider_runtime as runtime_wi
 from puripuly_heart.app.adapters.self_capture.self_capture_provider import (
     SelfCaptureProviderAdapter,
 )
-from puripuly_heart.app.ports.gpu_worker import GpuWorkerRequestError
+from puripuly_heart.app.ports.asr_worker import ASRWorkerRequestError
 from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
     SharedSTTProviderFactory,
@@ -58,8 +58,8 @@ from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.providers.stt.custom import _OfflineOpenAITranscriptionSession
 from tests.core.runtime.test_gpu_asr import (
     DEVICE,
-    FakeGpuWorkerClient,
-    FakeGpuWorkerFactory,
+    FakeASRWorkerClient,
+    FakeASRWorkerFactory,
 )
 from tests.core.runtime.test_local_asr_provider_runtime import (
     FakeProvisioningPort,
@@ -217,12 +217,6 @@ async def test_managed_provider_factory_uses_scoped_projection_for_both_channels
     assert callable(basic_log_sink)
     basic_log_sink("measured CPU attempt", 20)
     assert runtime_logging.basic[-1] == ("measured CPU attempt", 20)
-    assert calls[0][1] == {
-        "secrets": factory.secrets,
-        "gpu_runtime": gpu_runtime,
-        "gpu_model_path": Path("gpu.gguf"),
-        "gpu_device_id": "vk:2",
-    }
     assert isinstance(peer_provider, ScopedRecognitionEngine)
     assert peer_provider.scoped_settings_scope == (
         "deepgram",
@@ -650,9 +644,9 @@ def _gpu_build_request(channel: str, *, warmup: bool) -> ProviderRuntimeBuildReq
 
 def _production_gpu_owner(
     tmp_path: Path,
-    client: FakeGpuWorkerClient,
-) -> tuple[LocalASRProviderRuntimeOwner, FakeGpuWorkerFactory, asyncio.Queue, asyncio.Queue]:
-    worker_factory = FakeGpuWorkerFactory([FakeGpuWorkerClient(), client])
+    client: FakeASRWorkerClient,
+) -> tuple[LocalASRProviderRuntimeOwner, FakeASRWorkerFactory, asyncio.Queue, asyncio.Queue]:
+    worker_factory = FakeASRWorkerFactory([FakeASRWorkerClient(), client])
     self_events = asyncio.Queue()
     peer_events = asyncio.Queue()
     owner = LocalASRProviderRuntimeOwner(
@@ -695,7 +689,7 @@ async def test_production_self_ingress_prepares_gpu_before_first_speech(
     tmp_path: Path,
     peer_active: bool,
 ) -> None:
-    client = FakeGpuWorkerClient()
+    client = FakeASRWorkerClient()
     owner, workers, self_events, peer_events = _production_gpu_owner(tmp_path, client)
     adapter = SelfCaptureProviderAdapter(owner, None)
     config = SelfCaptureSessionConfig(
@@ -763,7 +757,7 @@ async def test_production_self_ingress_prepares_gpu_before_first_speech(
 async def test_production_peer_without_warmup_stays_lazy_until_requested(
     tmp_path: Path,
 ) -> None:
-    client = FakeGpuWorkerClient()
+    client = FakeASRWorkerClient()
     owner, workers, _self_events, _peer_events = _production_gpu_owner(tmp_path, client)
     try:
         await owner.start()
@@ -787,7 +781,7 @@ async def test_production_peer_without_warmup_stays_lazy_until_requested(
 async def test_production_failed_gpu_preparation_discards_backend_resources(
     tmp_path: Path,
 ) -> None:
-    client = FakeGpuWorkerClient(activation_error=GpuWorkerRequestError("model_missing"))
+    client = FakeASRWorkerClient(activation_error=ASRWorkerRequestError("model_missing"))
     owner, workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
     try:
         await owner.start()
@@ -814,7 +808,7 @@ async def test_production_failed_gpu_preparation_discards_backend_resources(
 async def test_production_cancelled_gpu_preparation_discards_backend_resources(
     tmp_path: Path,
 ) -> None:
-    client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
+    client = FakeASRWorkerClient(activation_gate=asyncio.Event())
     owner, workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
     await owner.start()
     building = asyncio.create_task(
@@ -842,7 +836,7 @@ async def test_production_cancelled_gpu_preparation_discards_backend_resources(
 async def test_scoped_gpu_warmup_cannot_revive_closing_or_closed_engine(
     tmp_path: Path,
 ) -> None:
-    client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
+    client = FakeASRWorkerClient(activation_gate=asyncio.Event())
     owner, _workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
     await owner.start()
     result = await owner.replace_provider(
@@ -885,7 +879,7 @@ async def test_scoped_gpu_warmup_cannot_revive_closing_or_closed_engine(
 async def test_production_same_channel_replacement_survives_retired_backend_close(
     tmp_path: Path,
 ) -> None:
-    client = FakeGpuWorkerClient()
+    client = FakeASRWorkerClient()
     owner, workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
     try:
         await owner.start()
@@ -926,7 +920,7 @@ async def test_production_same_channel_replacement_survives_retired_backend_clos
 async def test_production_cancelled_same_channel_candidate_preserves_live_preparation(
     tmp_path: Path,
 ) -> None:
-    client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
+    client = FakeASRWorkerClient(activation_gate=asyncio.Event())
     owner, workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
     await owner.start()
     request = _gpu_build_request("self", warmup=False)
@@ -1007,7 +1001,7 @@ async def test_cpu_backend_preparation_drains_without_constructing_cancelled_pro
         gpu_model_path=None,
     )
     request = replace(
-        _gpu_build_request("self", warmup=False), config=_resolved_config("self", "local_qwen")
+        _gpu_build_request("self", warmup=False), config=_resolved_config("self", "local_orukeet")
     )
     task = asyncio.create_task(factory.create(request, gpu_runtime=object()))
     try:
@@ -1031,7 +1025,7 @@ async def test_cpu_backend_preparation_drains_without_constructing_cancelled_pro
                 await asyncio.wait_for(task, 1)
         else:
             provider = await asyncio.wait_for(task, 1)
-            assert provider.accepted_settings_scope[0] == "local_qwen"
+            assert provider.accepted_settings_scope[0] == "local_orukeet"
             assert construction_threads == [loop_thread]
             await provider.close_backend()
         assert finished.is_set()

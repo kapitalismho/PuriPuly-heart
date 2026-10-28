@@ -8,10 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.lifecycle import start_lifecycle_task
 from puripuly_heart.release_evidence.unattended_runtime import (
-    QWEN_BASELINE_METRICS,
-    QWEN_STAGES,
+    PROCESS_BASELINE_METRICS,
     REQUIRED_STAGES,
     ProductSourceProbeError,
     _active_peer_publication_gate,
@@ -24,7 +23,6 @@ from puripuly_heart.release_evidence.unattended_runtime import (
     map_process_report,
     new_report,
     run_deterministic,
-    run_local_qwen,
     validate_report,
 )
 
@@ -187,109 +185,6 @@ async def test_scoped_task_failure_keeps_original_error_and_records_safe_diagnos
 
 
 @pytest.mark.asyncio
-async def test_qwen_cancellation_while_decode_blocked_closes_backend_source_and_scopes(
-    tmp_path: Path, monkeypatch
-) -> None:
-    from puripuly_heart.core.audio.process_source import ProcessAudioCaptureSource
-    from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
-    from puripuly_heart.release_evidence import unattended_runtime as evidence
-
-    closed = {"backend": 0, "source": 0, "scope": 0}
-    supersede_started = asyncio.Event()
-    decode_settled = threading.Event()
-    events = []
-    release_decode = []
-
-    monkeypatch.setattr(
-        "puripuly_heart.core.local_asr.local_stt_assets.validate_local_stt_runtime_ready",
-        lambda _path: None,
-    )
-
-    async def ensure(self):
-        self._recognizer = object()
-        return self._recognizer
-
-    def decode(self, recognizer, samples):
-        decode_settled.set()
-        return ""
-
-    original_backend_close = LocalQwenSherpaSTTBackend.close
-    original_source_close = ProcessAudioCaptureSource.close
-    original_scope_close = LifecycleScope.close
-    original_probe = evidence._product_process_source_probe
-
-    async def close_backend(self):
-        assert decode_settled.is_set()
-        await original_backend_close(self)
-        assert self._recognizer is None
-        closed["backend"] += 1
-        events.append("backend-closed")
-
-    async def close_source(self):
-        await original_source_close(self)
-        closed["source"] += 1
-        events.append("source-closed")
-
-    async def close_scope(self):
-        await original_scope_close(self)
-        closed["scope"] += 1
-
-    async def observe_probe(*args, **kwargs):
-        release = kwargs["release_inflight"]
-        release_decode.append(release)
-
-        def observed_release():
-            events.append("decode-released")
-            release()
-
-        kwargs["release_inflight"] = observed_release
-        return await original_probe(*args, **kwargs)
-
-    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure)
-    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_decode_f32_sync", decode)
-    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "close", close_backend)
-    monkeypatch.setattr(ProcessAudioCaptureSource, "close", close_source)
-    monkeypatch.setattr(LifecycleScope, "close", close_scope)
-    monkeypatch.setattr(evidence, "_product_process_source_probe", observe_probe)
-
-    async def publish() -> None:
-        pytest.fail("Cancellation must not publish the blocked decode")
-
-    async def blocked_supersede() -> None:
-        supersede_started.set()
-        await asyncio.Event().wait()
-
-    async def publication_gate():
-        return (
-            publish,
-            blocked_supersede,
-            type("Runtime", (), {"loop_task": None})(),
-            {"generation_before": 0, "attempted": 0, "published": 0},
-        )
-
-    monkeypatch.setattr(evidence, "_active_peer_publication_gate", publication_gate)
-    task = asyncio.create_task(run_local_qwen(tmp_path))
-    try:
-        await asyncio.wait_for(supersede_started.wait(), timeout=2.0)
-        assert not decode_settled.is_set()
-        task.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await asyncio.wait_for(asyncio.shield(task), timeout=1.0)
-    finally:
-        for release in release_decode:
-            release()
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
-
-    assert decode_settled.is_set()
-    assert events.index("decode-released") < events.index("source-closed")
-    assert events.index("source-closed") < events.index("backend-closed")
-    assert closed["backend"] == 1
-    assert closed["source"] == 1
-    assert closed["scope"] >= 1
-
-
-@pytest.mark.asyncio
 async def test_peer_generation_probe_uses_runtime_sink_and_suppresses_publication() -> None:
     facts = await _peer_generation_probe()
 
@@ -358,16 +253,16 @@ def test_process_malformed_security_and_provenance_are_failed(mutation: str) -> 
     assert report["status"] == "failed"
 
 
-def test_qwen_schema_and_passed_fact_validation() -> None:
-    report = new_report("local_qwen")
-    assert set(REQUIRED_STAGES + QWEN_STAGES) <= report["stages"].keys()
-    report["stages"]["load"] = {"status": "passed", "classification": "bad", "facts": {}}
+def test_report_schema_and_passed_fact_validation() -> None:
+    report = new_report("process_capture")
+    assert set(REQUIRED_STAGES) <= report["stages"].keys()
+    report["stages"]["activation"] = {"status": "passed", "classification": "bad", "facts": {}}
     with pytest.raises(ValueError, match="no facts"):
         validate_report(report)
 
 
-def test_qwen_stale_schema_requires_observed_facts_for_pass() -> None:
-    report = new_report("local_qwen")
+def test_stale_schema_requires_observed_facts_for_pass() -> None:
+    report = new_report("process_capture")
     report["stages"]["stale_result"] = {
         "status": "passed",
         "classification": "benchmark_generation_gate_observed",
@@ -385,12 +280,7 @@ def test_qwen_stale_schema_requires_observed_facts_for_pass() -> None:
 
 
 def _comparable_report() -> dict[str, object]:
-    report = new_report("local_qwen")
-    report["stages"]["load"]["facts"] = {"milliseconds": 100.0}
-    report["stages"]["inference"]["facts"] = {"max_milliseconds": 200.0}
-    report["stages"]["rtf"]["facts"] = {"max_value": 0.2}
-    report["stages"]["rss"]["facts"] = {"delta_bytes": 1000}
-    return report
+    return map_process_report(_native_pass(), 0, _probe())
 
 
 def test_baseline_requires_approval_identity_and_every_metric_without_mutation() -> None:
@@ -398,7 +288,12 @@ def test_baseline_requires_approval_identity_and_every_metric_without_mutation()
     baseline = {
         "approved": True,
         "identity": {"environment": report["environment"], "model": report["model"]},
-        "metrics": {"load_ms": 100, "inference_ms": 200, "rtf": 0.2, "rss_delta_bytes": 1000},
+        "metrics": {
+            "cold_enumeration_ms": 3.0,
+            "warm_enumeration_ms": 1.0,
+            "activation_ms": 250.0,
+            "peak_rss_bytes": 200,
+        },
     }
     original = copy.deepcopy(baseline)
 
@@ -408,7 +303,7 @@ def test_baseline_requires_approval_identity_and_every_metric_without_mutation()
     incompatible["identity"]["environment"] = {}
     assert compare_baseline(report, incompatible)["status"] == "incompatible"
     incomplete = copy.deepcopy(baseline)
-    del incomplete["metrics"][QWEN_BASELINE_METRICS[-1]]
+    del incomplete["metrics"][PROCESS_BASELINE_METRICS[-1]]
     assert compare_baseline(report, incomplete)["status"] == "not_comparable"
     assert compare_baseline(report, baseline)["status"] == "passed"
     assert baseline == original

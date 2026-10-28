@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from puripuly_heart.core.asr_worker import ASRWorkerRequestError
 from puripuly_heart.core.diagnostic_validation import stt_startup_failure_code
 from puripuly_heart.core.error_messages import stt_failure_report
-from puripuly_heart.core.gpu_worker import GpuWorkerRequestError
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.network_diagnostics import transport_exception_chain
 from puripuly_heart.core.stt.backend import STTProviderTurnIdentity
@@ -174,7 +174,7 @@ def recognition_failure_diagnostics(
     fields.pop("channel", None)
     if isinstance(exception, BaseException):
         for item in transport_exception_chain(exception):
-            if isinstance(item, GpuWorkerRequestError):
+            if isinstance(item, ASRWorkerRequestError):
                 native_code = stt_startup_failure_code(item.code)
                 if native_code not in {"none", "unclassified"}:
                     fields["native_classification"] = native_code

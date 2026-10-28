@@ -10,6 +10,10 @@ Download `{{INSTALLER_EXE}}` from the Assets section below, then run it.
 
 
 ## Change logs
+- CPU speech recognition now uses Orukeet for English, Fun-ASR-Nano for Chinese, and Fun-ASR-MLT-Nano for Korean. Japanese Parakeet CTC remains available. CPU Auto supports these four languages.
+- Talk and Listen use independent transcribe.cpp CPU Model/Session instances with two inference threads each. GPU ASR keeps one shared resident Model, separate channel Sessions and serialized inference, including safe model replacement.
+- Old CPU provider selections migrate automatically. Recognized retired Qwen0.6/Parakeet v3 assets are cleaned after recoverable settings migration; blocked deletion retries on later starts without removing unknown or Japanese/GPU assets.
+- The replacement CPU models support pinned, integrity-checked downloads from Hugging Face and the same-byte China mirror.
 - The window stays responsive during startup, including the first Windows process scan. Closing the window during startup also drains pending preparation safely.
 - Gemini speech recognition preserves eligible pre-roll when resuming a stream after an idle period.
 - From the second launch, the message input shows a randomly selected prompt or usage tip. Changing the interface language keeps the selected tip.

@@ -1,0 +1,25 @@
+{
+  "manifest_version": 1,
+  "installed_manifest_version": 1,
+  "model_id": "fun-asr-nano-2512-q8-0-transcribe-cpu",
+  "engine": "transcribe.cpp-cpu",
+  "license": "FunASR Model Open Source License Agreement v1.1",
+  "upstream_repo": "handy-computer/fun-asr-nano-2512-gguf",
+  "install_dirname": "fun-asr-nano-2512-q8-0-transcribe-cpu",
+  "installed_manifest_filename": "installed-manifest.json",
+  "sources": {
+    "huggingface": {
+      "name": "huggingface",
+      "repo_id": "handy-computer/fun-asr-nano-2512-gguf",
+      "revision": "3f66330195d91d51e9a70703bd21e570bdb19d75",
+      "download_url_template": "https://huggingface.co/handy-computer/fun-asr-nano-2512-gguf/resolve/3f66330195d91d51e9a70703bd21e570bdb19d75/{path}"
+    }
+  },
+  "files": [
+    {
+      "relative_path": "Fun-ASR-Nano-2512-Q8_0.gguf",
+      "sha256": "ae53d84740fafc1ed5ab1703a3dde994926a2be3ea8bf0ec40588dfea44a245f",
+      "size_bytes": 891271072
+    }
+  ]
+}

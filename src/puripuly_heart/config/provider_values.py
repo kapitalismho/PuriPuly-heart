@@ -45,9 +45,10 @@ LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS = frozenset(
 
 class STTProviderName(str, Enum):
     LOCAL_CPU_AUTO = "local_cpu_auto"
-    LOCAL_PARAKEET_V3 = "local_parakeet_v3"
+    LOCAL_ORUKEET = "local_orukeet"
+    LOCAL_FUN_ASR_NANO = "local_fun_asr_nano"
+    LOCAL_FUN_ASR_MLT_NANO = "local_fun_asr_mlt_nano"
     LOCAL_PARAKEET_JAPANESE = "local_parakeet_ja"
-    LOCAL_QWEN = "local_qwen"
     LOCAL_QWEN_GPU = "local_qwen_gpu"
     DEEPGRAM = "deepgram"
     GEMINI_TRANSCRIBE = "gemini_transcribe"
@@ -58,6 +59,14 @@ class STTProviderName(str, Enum):
     CUSTOM = "custom"
     CUSTOM_OFFLINE = "custom_offline"
     CUSTOM_REALTIME = "custom_realtime"
+
+
+def normalize_stt_provider(value: str) -> str:
+    if value == "local_parakeet_v3":
+        return "local_orukeet"
+    if value == "local_qwen":
+        return "local_cpu_auto"
+    return value
 
 
 CLOUD_FREE_TIER_STT_PROVIDERS: tuple[STTProviderName, ...] = (

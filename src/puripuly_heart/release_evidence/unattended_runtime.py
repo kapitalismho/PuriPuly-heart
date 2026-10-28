@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import gc
 import hashlib
 import json
 import os
 import platform
 import re
 import sys
-import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,9 +29,7 @@ REQUIRED_STAGES = (
     "stale_result",
     "cleanup",
 )
-QWEN_STAGES = ("load", "inference", "rtf", "recognizer_count", "queue_drop", "rss")
 NATIVE_PROCESS_SCHEMA = "puripuly-heart/windows-process-isolation/v1"
-QWEN_BASELINE_METRICS = ("load_ms", "inference_ms", "rtf", "rss_delta_bytes")
 PROCESS_BASELINE_METRICS = (
     "cold_enumeration_ms",
     "warm_enumeration_ms",
@@ -416,7 +412,7 @@ def model_identity(model_dir: Path | None) -> dict[str, Any] | None:
 
 
 def new_report(target: str, model_dir: Path | None = None) -> dict[str, Any]:
-    names = REQUIRED_STAGES + (QWEN_STAGES if target == "local_qwen" else ())
+    names = REQUIRED_STAGES
     return {
         "schema": SCHEMA,
         "target": target,
@@ -431,7 +427,7 @@ def new_report(target: str, model_dir: Path | None = None) -> dict[str, Any]:
 def validate_report(report: dict[str, Any]) -> None:
     if report.get("schema") != SCHEMA or report.get("status") not in STATUSES:
         raise ValueError("invalid evidence envelope")
-    required = REQUIRED_STAGES + (QWEN_STAGES if report.get("target") == "local_qwen" else ())
+    required = REQUIRED_STAGES
     stages = report.get("stages")
     if not isinstance(stages, dict) or set(required) - set(stages):
         raise ValueError("incomplete evidence stages")
@@ -449,23 +445,13 @@ def validate_report(report: dict[str, Any]) -> None:
 
 def _metrics(report: dict[str, Any]) -> tuple[tuple[str, ...], dict[str, float]]:
     stages = report["stages"]
-    if report["target"] == "process_capture":
-        values = {
-            "cold_enumeration_ms": stages["cold_enumeration"]["facts"].get("milliseconds"),
-            "warm_enumeration_ms": stages["warm_enumeration"]["facts"].get("milliseconds"),
-            "activation_ms": stages["activation"]["facts"].get("milliseconds"),
-            "peak_rss_bytes": stages["thread"]["facts"].get("peak_rss_bytes"),
-        }
-        return PROCESS_BASELINE_METRICS, {
-            key: float(value) for key, value in values.items() if isinstance(value, (int, float))
-        }
     values = {
-        "load_ms": stages["load"]["facts"].get("milliseconds"),
-        "inference_ms": stages["inference"]["facts"].get("max_milliseconds"),
-        "rtf": stages["rtf"]["facts"].get("max_value"),
-        "rss_delta_bytes": stages["rss"]["facts"].get("delta_bytes"),
+        "cold_enumeration_ms": stages["cold_enumeration"]["facts"].get("milliseconds"),
+        "warm_enumeration_ms": stages["warm_enumeration"]["facts"].get("milliseconds"),
+        "activation_ms": stages["activation"]["facts"].get("milliseconds"),
+        "peak_rss_bytes": stages["thread"]["facts"].get("peak_rss_bytes"),
     }
-    return QWEN_BASELINE_METRICS, {
+    return PROCESS_BASELINE_METRICS, {
         key: float(value) for key, value in values.items() if isinstance(value, (int, float))
     }
 
@@ -507,10 +493,7 @@ def _finalize(report: dict[str, Any]) -> None:
     report["status"] = (
         "failed" if "failed" in statuses else "blocked" if "blocked" in statuses else "passed"
     )
-    if (
-        report["target"] in {"local_qwen", "process_capture"}
-        and report["baseline"]["status"] != "passed"
-    ):
+    if report["target"] == "process_capture" and report["baseline"]["status"] != "passed":
         if report["baseline"]["status"] == "regressed":
             report["status"] = "failed"
         elif report["status"] == "passed":
@@ -567,234 +550,6 @@ async def run_deterministic() -> dict[str, Any]:
             "passed", "resources_released", queue_size=queue.qsize(), tasks=remaining_tasks
         ),
     }
-    _finalize(report)
-    return report
-
-
-async def run_local_qwen(model_dir: Path) -> dict[str, Any]:
-    report = new_report("local_qwen", model_dir)
-    stages = report["stages"]
-    try:
-        from puripuly_heart.core.local_asr.local_stt_assets import (
-            LocalQwenSherpaLoadError,
-            LocalSTTManifestInvalidError,
-            LocalSTTModelMissingError,
-            validate_local_stt_runtime_ready,
-        )
-
-        known_prerequisites = (
-            LocalQwenSherpaLoadError,
-            LocalSTTManifestInvalidError,
-            LocalSTTModelMissingError,
-            ImportError,
-        )
-        await asyncio.to_thread(validate_local_stt_runtime_ready, model_dir)
-        import psutil
-
-        from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
-    except Exception as exc:
-        known = "known_prerequisites" in locals() and isinstance(exc, known_prerequisites)
-        status = "blocked" if known else "failed"
-        stages["prerequisites"] = _stage(
-            status, _safe_classification("prerequisite", exc), known=known
-        )
-        _finalize(report)
-        return report
-
-    stages["prerequisites"] = _stage("passed", "installed_model_ready", manifest=report["model"])
-    stages["cold_enumeration"] = _stage("passed", "model_resolved", identity=report["model"])
-    stages["warm_enumeration"] = _stage("passed", "model_identity_stable", identity=report["model"])
-    creation = {"count": 0}
-    decode_gate_started = threading.Event()
-    decode_gate_release = threading.Event()
-    decode_gate_active = {"value": False}
-
-    class ObservedBackend(LocalQwenSherpaSTTBackend):
-        def _create_recognizer(self) -> object:
-            recognizer = super()._create_recognizer()
-            creation["count"] += 1
-            return recognizer
-
-        def _decode_f32_sync(self, recognizer: object, samples_f32: np.ndarray) -> str:
-            if decode_gate_active["value"]:
-                decode_gate_started.set()
-                if not decode_gate_release.wait(timeout=10.0):
-                    raise TimeoutError("correlated_decode_gate_timeout")
-            return super()._decode_f32_sync(recognizer, samples_f32)
-
-    backend = ObservedBackend(model_dir=model_dir)
-    process = psutil.Process()
-    rss_before = process.memory_info().rss
-    threads_before = process.num_threads()
-    cancellation: asyncio.CancelledError | None = None
-    try:
-        started = time.perf_counter()
-        await backend._ensure_recognizer()
-        load_ms = (time.perf_counter() - started) * 1000.0
-        stages["load"] = _stage("passed", "recognizer_loaded", milliseconds=load_ms)
-        stages["activation"] = _stage(
-            "passed", "recognizer_active", recognizer_present=backend._recognizer is not None
-        )
-        fixture = np.zeros(16000, dtype=np.float32)
-        correlation_id = "local-qwen-source-generation-1"
-        publish, supersede, peer_runtime, peer_facts = await _active_peer_publication_gate()
-
-        async def correlated_consumer(samples: np.ndarray) -> None:
-            decode_gate_active["value"] = True
-            try:
-                await backend.decode_f32(samples)
-                await publish()
-            finally:
-                decode_gate_active["value"] = False
-
-        source_probe = await _product_process_source_probe(
-            correlated_consumer,
-            wait_inflight=lambda: asyncio.to_thread(decode_gate_started.wait, 10.0),
-            supersede=supersede,
-            release_inflight=decode_gate_release.set,
-        )
-
-        decode_generation = 1
-
-        async def timed_decode(generation: int) -> tuple[int, float, float]:
-            submitted_at = time.perf_counter()
-            async with backend._decode_lock:
-                entered_at = time.perf_counter()
-                recognizer = await backend._ensure_recognizer()
-                await asyncio.to_thread(backend._decode_f32_sync, recognizer, fixture)
-            completed_at = time.perf_counter()
-            wait_ms = (entered_at - submitted_at) * 1000.0
-            decode_ms = (completed_at - entered_at) * 1000.0
-            return generation, wait_ms, decode_ms
-
-        scope = _evidence_scope("evidence-qwen-decodes")
-        try:
-            decode_tasks = [
-                start_lifecycle_task(scope, timed_decode(decode_generation), name="decode-first"),
-                start_lifecycle_task(scope, timed_decode(decode_generation), name="decode-second"),
-            ]
-            await asyncio.sleep(0)
-            decode_generation += 1
-            await asyncio.gather(*decode_tasks)
-        finally:
-            await scope.close()
-        decoded = [task.result() for task in decode_tasks]
-        stale_rejected = sum(generation != decode_generation for generation, _, _ in decoded)
-        waits = [wait_ms for _, wait_ms, _ in decoded]
-        decodes = [decode_ms for _, _, decode_ms in decoded]
-        stages["inference"] = _stage(
-            "passed",
-            "back_to_back_completed",
-            decode_milliseconds=decodes,
-            max_milliseconds=max(decodes),
-        )
-        stages["rtf"] = _stage(
-            "passed",
-            "measured",
-            values=[value / 1000.0 for value in decodes],
-            max_value=max(decodes) / 1000.0,
-        )
-        create_count = creation["count"]
-        stages["recognizer_count"] = _stage(
-            "passed" if create_count == 1 else "failed", "factory_observed", value=create_count
-        )
-        stages["queue"] = _stage(
-            "passed",
-            "product_bounded_source_and_decode_lock_observed",
-            submitted=source_probe["submitted"],
-            completed=len(decoded),
-            wait_milliseconds=waits,
-            lock_waiters_after=len(backend._decode_lock._waiters or ()),
-            correlation_id=correlation_id,
-        )
-        stages["queue_drop"] = _stage(
-            "passed" if source_probe["dropped"] > 0 else "failed",
-            "product_source_queue_drop_count",
-            submitted=source_probe["submitted"],
-            dropped=source_probe["dropped"],
-            correlation_id=correlation_id,
-        )
-        stages["stale_result"] = _stage(
-            "passed" if peer_facts["published"] == 0 and peer_facts["attempted"] == 1 else "failed",
-            "peer_runtime_generation_sink_observed",
-            decode_completions=len(decode_tasks),
-            harness_rejected=stale_rejected,
-            correlated_source_submissions=source_probe["submitted"],
-            overlap_observed=source_probe["overlap_observed"],
-            attempted=peer_facts["attempted"],
-            published=peer_facts["published"],
-            product_rejected=peer_facts["attempted"] - peer_facts["published"],
-            generation_before=peer_facts["generation_before"],
-            generation_after=peer_facts["generation_after"],
-            correlation_id=correlation_id,
-        )
-        stages["thread"] = _stage(
-            "passed",
-            "thread_counts_observed",
-            before=threads_before,
-            after_decode=process.num_threads(),
-        )
-        rss_after = process.memory_info().rss
-        stages["rss"] = _stage(
-            "passed",
-            "measured",
-            before_bytes=rss_before,
-            after_bytes=rss_after,
-            delta_bytes=max(0, rss_after - rss_before),
-        )
-    except asyncio.CancelledError as exc:
-        cancellation = exc
-    except Exception as exc:
-        pending = next(
-            (name for name in ("load", "inference") if stages[name]["status"] == "blocked"),
-            "inference",
-        )
-        stages[pending] = _stage("failed", _safe_classification("runtime", exc), stage=pending)
-        if isinstance(exc, ProductSourceProbeError):
-            stages["cleanup"] = _stage(
-                "failed",
-                f"product_source_{exc.stage}_failed",
-                **exc.facts,
-            )
-    try:
-        await backend.close()
-        gc.collect()
-        await asyncio.sleep(0)
-        released = backend._recognizer is None
-        harness_reference_released = "recognizer" not in locals()
-        threads_after = process.num_threads()
-        source_released = "source_probe" in locals() and all(
-            source_probe[key]
-            for key in ("source_closed", "capture_closed", "watch_closed", "queue_closed")
-        )
-        peer_released = "peer_runtime" in locals() and peer_runtime.loop_task is None
-        resources_released = (
-            released and harness_reference_released and source_released and peer_released
-        )
-        if stages["cleanup"]["status"] != "failed":
-            stages["cleanup"] = _stage(
-                "passed" if resources_released else "failed",
-                "backend_close_observed",
-                recognizer_released=released,
-                harness_strong_reference=harness_reference_released is False,
-                threads_before=threads_before,
-                threads_after=threads_after,
-                rss_after_bytes=process.memory_info().rss,
-                source_released=source_released,
-                peer_loop_task_released=peer_released,
-            )
-        else:
-            stages["cleanup"]["facts"].update(
-                recognizer_released=released,
-                source_released=source_released,
-                peer_loop_task_released=peer_released,
-            )
-    except Exception as exc:
-        stages["cleanup"] = _stage(
-            "failed", _safe_classification("cleanup", exc), recognizer_released=False
-        )
-    if cancellation is not None:
-        raise cancellation
     _finalize(report)
     return report
 
@@ -1115,8 +870,6 @@ async def execute(args: argparse.Namespace) -> dict[str, Any]:
     try:
         if args.target == "deterministic":
             report = await run_deterministic()
-        elif args.target == "local-qwen":
-            report = await run_local_qwen(args.model_dir)
         else:
             report = await run_process(args.evidence, args.thresholds)
         baseline = None
@@ -1133,7 +886,7 @@ async def execute(args: argparse.Namespace) -> dict[str, Any]:
                 report["baseline"] = compare_baseline(
                     report, baseline, allowance=args.regression_allowance
                 )
-        elif report["target"] in {"local_qwen", "process_capture"}:
+        elif report["target"] == "process_capture":
             report["baseline"] = compare_baseline(report, None, allowance=args.regression_allowance)
         _finalize(report)
     except Exception as exc:
@@ -1148,11 +901,8 @@ async def execute(args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--target", choices=("deterministic", "process-capture", "local-qwen"), required=True
-    )
+    parser.add_argument("--target", choices=("deterministic", "process-capture"), required=True)
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument("--model-dir", type=Path)
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--regression-allowance", type=float, default=0.10)
     parser.add_argument(
@@ -1161,10 +911,6 @@ def main() -> int:
         default=Path("scripts/release/windows-process-isolation-thresholds.json"),
     )
     args = parser.parse_args()
-    if args.target == "local-qwen" and args.model_dir is None:
-        from puripuly_heart.core.local_asr.local_stt_assets import default_local_stt_model_dir
-
-        args.model_dir = default_local_stt_model_dir()
     report = asyncio.run(execute(args))
     return 0 if report["status"] == "passed" else 2 if report["status"] == "blocked" else 1
 

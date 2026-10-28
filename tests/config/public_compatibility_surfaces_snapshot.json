@@ -364,7 +364,7 @@
       "tests/ui/test_i18n_key_usage.py::test_i18n_bundles_share_the_same_keys"
     ],
     "packaging": [
-      "tests/config/test_public_compatibility_surfaces.py::test_installer_identity_snapshot_matches_inno_contract"
+      "tests/release_evidence/test_local_asr_installer.py::test_compiled_identity_and_current_schema_telemetry_reader"
     ]
   },
   "blockers": []

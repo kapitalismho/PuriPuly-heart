@@ -108,7 +108,6 @@ def compose_local_asr_application(
     rebuild_self_provider: Callable[[], Awaitable[None]],
     resume_self: Callable[[], Awaitable[bool]],
     resume_peer: Callable[[], Awaitable[None]],
-    persist_manual_fallback: Callable[[str], bool],
     load_log_sink: Callable[..., None],
 ) -> LocalASRApplicationRuntime:
     def self_provider_available() -> bool:
@@ -187,7 +186,6 @@ def compose_local_asr_application(
         self_channel_provider=self_channel_provider,
         rebuild_self_provider=rebuild_self_provider,
         probe_self_provider=probe_self_provider,
-        persist_manual_fallback=persist_manual_fallback,
         validate_gpu_activation=validate_gpu_activation,
         gpu_state_provider=gpu_state_provider,
         retain_gpu_pending=retain_gpu_pending,

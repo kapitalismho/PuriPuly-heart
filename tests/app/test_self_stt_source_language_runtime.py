@@ -205,7 +205,6 @@ def _application_owner(
         runtime_available=lambda: True,
         capture_owner=lambda: session,
         capture_owner_if_created=lambda: session,
-        persist_manual_fallback=lambda: True,
         reset_local_pending=lambda: None,
         clear_gpu_pending=lambda: None,
         overlay_state_provider=lambda: "off",
@@ -274,14 +273,21 @@ def test_cloud_source_language_is_owned_by_self_provider_identity(
 
 
 @pytest.mark.parametrize(
-    "provider",
-    (STTProviderName.LOCAL_QWEN, STTProviderName.LOCAL_QWEN_GPU),
+    ("provider", "first_language", "second_language"),
+    (
+        (STTProviderName.LOCAL_ORUKEET, "en", "en-US"),
+        (STTProviderName.LOCAL_FUN_ASR_NANO, "zh-CN", "zh-TW"),
+        (STTProviderName.LOCAL_FUN_ASR_MLT_NANO, "ko", "ko-KR"),
+        (STTProviderName.LOCAL_QWEN_GPU, "ko", "ja"),
+    ),
 )
 def test_local_source_language_is_owned_by_session_options(
     provider: STTProviderName,
+    first_language: str,
+    second_language: str,
 ) -> None:
-    korean = _settings(provider, "ko")
-    japanese = _settings(provider, "ja")
+    korean = _settings(provider, first_language)
+    japanese = _settings(provider, second_language)
     korean_config = build_self_capture_session_config(korean)
     japanese_config = build_self_capture_session_config(japanese)
 
@@ -289,19 +295,14 @@ def test_local_source_language_is_owned_by_session_options(
     assert korean_config.session_options is not None
     assert japanese_config.session_options is not None
     assert korean_config.session_options != japanese_config.session_options
-    assert japanese_config.session_options.source_language == "ja"
+    assert japanese_config.session_options.source_language == second_language
 
 
 def test_local_cpu_auto_model_identity_changes_with_source_language() -> None:
     english = _settings(STTProviderName.LOCAL_CPU_AUTO, "en")
     japanese = _settings(STTProviderName.LOCAL_CPU_AUTO, "ja")
-    korean = _settings(STTProviderName.LOCAL_QWEN, "ko")
-    japanese_qwen = _settings(STTProviderName.LOCAL_QWEN, "ja")
 
     assert build_self_stt_provider_signature(english) != build_self_stt_provider_signature(japanese)
-    assert build_self_stt_provider_signature(korean) == build_self_stt_provider_signature(
-        japanese_qwen
-    )
 
 
 @pytest.mark.parametrize(
@@ -334,10 +335,12 @@ def test_qwen_audio_capture_provider_identity_matches_runtime_provider() -> None
 
 
 def test_custom_vocabulary_does_not_change_unsupported_provider_signature() -> None:
-    initial = _with_custom_terms(_settings(STTProviderName.LOCAL_QWEN, "ko"), {"ko": ["Puripuly"]})
+    initial = _with_custom_terms(
+        _settings(STTProviderName.LOCAL_FUN_ASR_MLT_NANO, "ko"), {"ko": ["Puripuly"]}
+    )
     updated = _with_custom_terms(initial, {"ko": ["Puripuly", "VRChat"]})
 
-    assert build_self_stt_runtime_signature(updated) != build_self_stt_runtime_signature(initial)
+    assert build_self_stt_runtime_signature(updated) == build_self_stt_runtime_signature(initial)
     assert build_self_stt_provider_signature(updated) == build_self_stt_provider_signature(initial)
 
 
@@ -552,8 +555,8 @@ async def test_running_cloud_source_language_change_handoffs_new_backend() -> No
 
 @pytest.mark.asyncio
 async def test_running_local_source_language_change_handoffs_scoped_backend() -> None:
-    korean = _settings(STTProviderName.LOCAL_QWEN, "ko")
-    japanese = _settings(STTProviderName.LOCAL_QWEN, "ja")
+    korean = _settings(STTProviderName.LOCAL_QWEN_GPU, "ko")
+    japanese = _settings(STTProviderName.LOCAL_QWEN_GPU, "ja")
     settings_holder = {"settings": korean}
     provider = _RecordingProvider()
     owner = _build_owner(provider, settings_holder)
@@ -638,7 +641,7 @@ async def test_replace_provider_hot_cloud_language_change_uses_application_path(
 
 @pytest.mark.parametrize(
     "provider_name",
-    [STTProviderName.DEEPGRAM, STTProviderName.LOCAL_QWEN],
+    [STTProviderName.DEEPGRAM, STTProviderName.LOCAL_CPU_AUTO],
 )
 @pytest.mark.asyncio
 async def test_failed_scoped_language_handoff_does_not_look_applied(

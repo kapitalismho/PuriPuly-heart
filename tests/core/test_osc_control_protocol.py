@@ -186,9 +186,9 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
     )
     assert dict(ASR_IDS) == {
         0: "local_cpu_auto",
-        1: "local_parakeet_v3",
+        1: "local_orukeet",
         2: "local_parakeet_ja",
-        3: "local_qwen",
+        3: "local_cpu_auto",
         4: "local_qwen_gpu",
         5: "deepgram",
         7: "soniox",
@@ -198,6 +198,8 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         11: "elevenlabs_scribe",
         12: "qwen_audio",
         13: "rolling_free",
+        14: "local_fun_asr_nano",
+        15: "local_fun_asr_mlt_nano",
     }
     assert dict(TRANSLATION_MODEL_IDS) == {
         0: "gemma4_26b_31b",

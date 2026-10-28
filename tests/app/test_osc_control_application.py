@@ -547,7 +547,7 @@ async def test_asr_controls_skip_apply_when_provider_matches() -> None:
     assert (await application.set_self_asr("local_parakeet_v3")) is True
 
     assert applied == 1
-    assert current.intent.stt.provider == "local_parakeet_v3"
+    assert current.intent.stt.provider == "local_orukeet"
     assert current.intent.peer_stt.provider == "soniox"
 
 

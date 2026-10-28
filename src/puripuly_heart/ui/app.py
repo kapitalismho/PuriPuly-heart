@@ -55,9 +55,6 @@ from puripuly_heart.ui.components.chatgpt_auth_dialog import ChatGptAuthDialog
 from puripuly_heart.ui.components.debug_preview_panel import DebugPreviewPanel
 from puripuly_heart.ui.components.discord_managed_auth_dialog import DiscordManagedAuthDialog
 from puripuly_heart.ui.components.founder_letter_dialog import FounderLetterDialog
-from puripuly_heart.ui.components.local_qwen_hallucination_dialog import (
-    LocalQwenHallucinationDialog,
-)
 from puripuly_heart.ui.components.model_assets_dialog import ModelAssetsDialog
 from puripuly_heart.ui.components.peer_translation_eula_dialog import PeerTranslationEulaDialog
 from puripuly_heart.ui.components.qq_managed_auth_dialog import QqManagedAuthDialog
@@ -531,7 +528,6 @@ class TranslatorApp:
             on_qq_auth_translation_gated=self._preview_qq_auth_translation_gated,
             on_discord_callback_page=self._preview_discord_callback_page,
             on_founder_letter=self._preview_founder_letter,
-            on_local_qwen_hallucination_modal=self._preview_local_qwen_hallucination_modal,
             on_github_star_snackbar=self._preview_github_star_snackbar,
             on_foundation_primitives=self._preview_foundation_primitives,
             on_http_extension_form=self._preview_http_extension_form,
@@ -890,9 +886,6 @@ class TranslatorApp:
     def _preview_peer_translation_eula(self) -> None:
         self._show_peer_translation_eula(self._debug_preview_noop)
 
-    def _preview_local_qwen_hallucination_modal(self) -> None:
-        self.show_local_qwen_hallucination_dialog()
-
     def _preview_capture_fault_cycle(self) -> None:
         profile = self.application.cycle_debug_capture_fault_profile()
         self._show_snackbar(
@@ -974,17 +967,6 @@ class TranslatorApp:
 
     def _on_telemetry_enabled_change(self, enabled: bool) -> None:
         self._telemetry_reporting_owner().apply_telemetry_enabled(enabled)
-
-    def show_local_qwen_hallucination_dialog(self) -> None:
-        dialog = LocalQwenHallucinationDialog(
-            self.page,
-            on_open_guide=self._open_local_qwen_guide,
-        )
-        self._local_qwen_hallucination_dialog = dialog
-        dialog.open()
-
-    def _open_local_qwen_guide(self) -> None:
-        webbrowser.open(founder_readme_url_for_locale(get_locale()))
 
     def _open_api_keys_guide(self) -> None:
         webbrowser.open(founder_readme_url_for_locale(get_locale()))

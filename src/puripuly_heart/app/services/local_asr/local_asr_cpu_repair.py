@@ -10,7 +10,7 @@ from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRInstallResult,
     LocalASRProvisioningPort,
 )
-from puripuly_heart.core.local_asr.local_stt_assets import LOCAL_STT_MODEL_ID
+from puripuly_heart.core.local_asr.local_stt_assets import REQUIRED_CPU_LOCAL_STT_MODEL_IDS
 
 LocalASRCpuRepairChannel = Literal["self", "peer"]
 
@@ -195,7 +195,7 @@ class LocalASRCpuRepairOwner:
         provisioning = self.provisioning_provider()
         if provisioning.snapshot.activity_for("cpu") is not None:
             return False
-        requested_model_ids = model_ids or (LOCAL_STT_MODEL_ID,)
+        requested_model_ids = model_ids or REQUIRED_CPU_LOCAL_STT_MODEL_IDS
         try:
             provisioning.start_install(
                 LocalASRInstallRequest(

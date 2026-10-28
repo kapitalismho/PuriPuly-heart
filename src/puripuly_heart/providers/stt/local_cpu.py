@@ -8,11 +8,12 @@ from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 
-from puripuly_heart.core.language import get_local_qwen_language_hint
+from puripuly_heart.core.asr_worker import ASRWorkerProcessFactoryPort
 from puripuly_heart.core.local_asr.local_stt_assets import (
-    LOCAL_STT_MODEL_ID,
+    FUN_ASR_MLT_NANO_MODEL_ID,
+    FUN_ASR_NANO_MODEL_ID,
+    ORUKEET_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
-    PARAKEET_V3_MODEL_ID,
     LocalSTTAssetManifest,
     default_local_stt_model_root,
     load_local_stt_asset_manifest,
@@ -30,28 +31,22 @@ from puripuly_heart.core.stt.backend import (
     STTBackendSession,
     STTSessionProjection,
 )
-from puripuly_heart.providers.stt.local_qwen_sherpa import (
-    LOCAL_ASR_PENDING_TTL_S,
-    LocalQwenSherpaSTTBackend,
-)
+from puripuly_heart.providers.stt.local_session import LOCAL_ASR_PENDING_TTL_S
 
 LocalCPUBackendFactory = Callable[..., STTBackend]
 
 
 def local_cpu_backend_type(model_id: str) -> type[STTBackend]:
-    if model_id == LOCAL_STT_MODEL_ID:
-        return LocalQwenSherpaSTTBackend
-    if model_id in {PARAKEET_V3_MODEL_ID, PARAKEET_JAPANESE_MODEL_ID}:
+    if model_id in {ORUKEET_MODEL_ID, FUN_ASR_NANO_MODEL_ID, FUN_ASR_MLT_NANO_MODEL_ID}:
+        from puripuly_heart.providers.stt.local_cpp import LocalCppSTTBackend
+
+        return LocalCppSTTBackend
+    if model_id == PARAKEET_JAPANESE_MODEL_ID:
         from puripuly_heart.providers.stt.local_parakeet_sherpa import (
             LocalParakeetJapaneseSherpaSTTBackend,
-            LocalParakeetV3SherpaSTTBackend,
         )
 
-        return (
-            LocalParakeetV3SherpaSTTBackend
-            if model_id == PARAKEET_V3_MODEL_ID
-            else LocalParakeetJapaneseSherpaSTTBackend
-        )
+        return LocalParakeetJapaneseSherpaSTTBackend
     raise ValueError(f"Unsupported local CPU model: {model_id}")
 
 
@@ -62,7 +57,7 @@ def create_local_cpu_backend(
     source_language: str,
     sample_rate_hz: int,
     stream_label: str | None,
-    hotwords: tuple[str, ...] = (),
+    process_factory: ASRWorkerProcessFactoryPort | None = None,
     pending_ttl_s: float = LOCAL_ASR_PENDING_TTL_S,
     decode_clock: Callable[[], float] = time.perf_counter,
     queue_clock: Callable[[], float] = time.monotonic,
@@ -78,13 +73,21 @@ def create_local_cpu_backend(
         "pending_ttl_s": pending_ttl_s,
         "decode_clock": decode_clock,
         "queue_clock": queue_clock,
+        "attempt_log_sink": attempt_log_sink,
     }
-    if model_id == LOCAL_STT_MODEL_ID:
+    if model_id != PARAKEET_JAPANESE_MODEL_ID:
         return backend_type(
             **common,
-            language_hint=get_local_qwen_language_hint(source_language),
-            hotwords=hotwords,
-            attempt_log_sink=attempt_log_sink,
+            model_id=model_id,
+            provider_id={
+                ORUKEET_MODEL_ID: "local_orukeet",
+                FUN_ASR_NANO_MODEL_ID: "local_fun_asr_nano",
+                FUN_ASR_MLT_NANO_MODEL_ID: "local_fun_asr_mlt_nano",
+            }[model_id],
+            language_hint=(
+                None if model_id == ORUKEET_MODEL_ID else source_language.split("-")[0].lower()
+            ),
+            process_factory=process_factory,
         )
     return backend_type(**common)
 
@@ -95,7 +98,7 @@ class LocalCPUAutoSTTBackend(STTBackend):
     sample_rate_hz: int = 16000
     stream_label: str | None = None
     model_root: Path | None = None
-    hotwords: tuple[str, ...] = ()
+    process_factory: ASRWorkerProcessFactoryPort | None = field(default=None, repr=False)
     pending_ttl_s: float = LOCAL_ASR_PENDING_TTL_S
     decode_clock: Callable[[], float] = field(default_factory=lambda: time.perf_counter)
     queue_clock: Callable[[], float] = field(default_factory=lambda: time.monotonic)
@@ -206,7 +209,7 @@ class LocalCPUAutoSTTBackend(STTBackend):
             source_language=self.source_language,
             sample_rate_hz=self.sample_rate_hz,
             stream_label=self.stream_label,
-            hotwords=self.hotwords,
+            process_factory=self.process_factory,
             pending_ttl_s=self.pending_ttl_s,
             decode_clock=self.decode_clock,
             queue_clock=self.queue_clock,

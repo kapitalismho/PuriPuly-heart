@@ -166,14 +166,14 @@ function Assert-NativeInstalledRuntime {
     )
     $version = Invoke-Headless -RuntimeRoot $RuntimeRoot -StateRoot $StateRoot -ArgumentList @("--version")
     if ($version -ne $appVersion) { throw "$Label runtime version mismatch: $version" }
-    foreach ($command in @("gui-startup-check", "local-qwen-runtime-check", "hf-xet-runtime-check")) {
+    foreach ($command in @("gui-startup-check", "local-sherpa-runtime-check", "hf-xet-runtime-check")) {
         Write-Host (Invoke-Headless -RuntimeRoot $RuntimeRoot -StateRoot $StateRoot -ArgumentList @($command))
     }
     [void](Invoke-IsolatedProcess -FilePath (Join-Path $RuntimeRoot "PuriPulyHeartOverlay.exe") `
         -ArgumentList @("--check-startup-contract") -StateRoot $StateRoot)
-    $gpu = Invoke-IsolatedProcess -FilePath (Join-Path $RuntimeRoot "PuriPulyHeartGpuWorker.exe") `
+    $gpu = Invoke-IsolatedProcess -FilePath (Join-Path $RuntimeRoot "PuriPulyHeartASRWorker.exe") `
         -ArgumentList @("--version") -StateRoot $StateRoot
-    if ($gpu.Output -ne $appVersion) { throw "$Label GPU worker version mismatch." }
+    if ($gpu.Output -ne $appVersion) { throw "$Label ASR worker version mismatch." }
     $reportPath = Join-Path $StateRoot "$Label-soxr.json"
     $soxrCheck = "import os,sys; os.environ['PURIPULY_HEART_SOXR_RUNTIME_REPORT_PATH']=sys.argv[1]; from puripuly_heart.app.soxr_runtime_check import run_soxr_runtime_check; raise SystemExit(run_soxr_runtime_check())"
     [void](Invoke-IsolatedProcess -FilePath (Join-Path $RuntimeRoot "python.exe") `
@@ -320,7 +320,7 @@ function Invoke-InstallerLifecycle {
             "/DMyAppDirName=$defaultDirectoryName",
             "/DInstallerSmokeAppDataRoot=$($data.Replace('\', '/'))",
             "/DSkipLocalSttProvisioning=1", "/DMyPackagedAppDir=$OutputDir",
-            "/DNativeCleanupInclude=$cleanupInclude", "/O$state", (Join-Path $repoRoot "installer.iss")
+            "/DNativeCleanupInclude=$cleanupInclude", "/DLocalASRModelsInclude=$asrModelsInclude", "/O$state", (Join-Path $repoRoot "installer.iss")
         )
         $negativeCases = @(
             @{ name = "checkout"; directory = $checkoutTarget; marker = "Installer smoke build refused an install directory inside a repository checkout" },
@@ -473,6 +473,7 @@ try {
     }
     $installerPath = Join-Path $InstallerOutputDir "PuriPulyHeart-Setup-$appVersion.exe"
     $cleanupInclude = Join-Path (Split-Path -Parent $OutputDir) "native-installer-cleanup.iss"
+    $asrModelsInclude = Join-Path (Split-Path -Parent $OutputDir) "native-asr-models.iss"
     $evidenceRoot = Join-Path $BuildRoot "evidence"
     if (-not $SkipNativeBuild) {
         Invoke-Checked -FilePath (Join-Path $PSHOME "pwsh.exe") -ArgumentList @(
@@ -505,7 +506,7 @@ try {
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(
         "-c", $metadataCheck, $appVersion, $hostExe,
         (Join-Path $OutputDir "PuriPulyHeartOverlay.exe"),
-        (Join-Path $OutputDir "PuriPulyHeartGpuWorker.exe")
+        (Join-Path $OutputDir "PuriPulyHeartASRWorker.exe")
     )
     New-Item -ItemType Directory -Path $smokeRoot | Out-Null
     Assert-NativeInstalledRuntime -RuntimeRoot $OutputDir -StateRoot $smokeRoot -Label "packaged"
@@ -521,11 +522,16 @@ try {
         "--native-manifest", (Join-Path $OutputDir "native-artifact-manifest.json"),
         "--output", $cleanupInclude
     )
+    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
+        "-m", "puripuly_heart.release_evidence.local_asr_installer",
+        "--output", $asrModelsInclude
+    )
     New-Item -ItemType Directory -Path $InstallerOutputDir -Force | Out-Null
     Invoke-Checked -FilePath $iscc -ArgumentList @(
         "/DMyPackagedAppDir=$OutputDir",
         "/DMyStagedOverlayDir=$OutputDir",
         "/DNativeCleanupInclude=$cleanupInclude",
+        "/DLocalASRModelsInclude=$asrModelsInclude",
         "/O$InstallerOutputDir",
         (Join-Path $repoRoot "installer.iss")
     )

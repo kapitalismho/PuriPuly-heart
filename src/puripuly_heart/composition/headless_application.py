@@ -304,10 +304,6 @@ class HeadlessApplicationPresentation:
     def show_founder_letter_dialog(self) -> bool:
         return False
 
-    def show_local_qwen_hallucination_dialog(self) -> bool:
-        self._remember("model_action_required", "local_qwen_consent")
-        return False
-
     async def close_after_launch_tasks(self) -> None:
         tasks = tuple(self.tasks)
         for task in tasks:

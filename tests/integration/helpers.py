@@ -217,35 +217,43 @@ def get_async_qwen_base_url() -> str:
     return to_async_qwen_base_url(get_qwen_base_url())
 
 
-def get_local_qwen_stt_model_dir() -> Path:
-    model_dir = os.getenv("LOCAL_QWEN_STT_MODEL_DIR")
+def get_local_parakeet_stt_model_dir() -> Path:
+    model_dir = os.getenv("LOCAL_PARAKEET_STT_MODEL_DIR")
     if model_dir:
         return Path(model_dir)
-    from puripuly_heart.core.local_asr.local_stt_assets import default_local_stt_model_dir
-
-    return default_local_stt_model_dir()
-
-
-def require_local_qwen_model_assets(model_dir: str | Path | None = None) -> Path:
-    resolved = Path(model_dir) if model_dir is not None else get_local_qwen_stt_model_dir()
     from puripuly_heart.core.local_asr.local_stt_assets import (
+        PARAKEET_JAPANESE_MODEL_ID,
+        default_local_stt_model_dir,
+    )
+
+    return default_local_stt_model_dir(PARAKEET_JAPANESE_MODEL_ID)
+
+
+def require_local_parakeet_model_assets(model_dir: str | Path | None = None) -> Path:
+    resolved = Path(model_dir) if model_dir is not None else get_local_parakeet_stt_model_dir()
+    from puripuly_heart.core.local_asr.local_stt_assets import (
+        PARAKEET_JAPANESE_MODEL_ID,
         LocalSTTManifestInvalidError,
         LocalSTTModelMissingError,
+        load_local_stt_asset_manifest,
         validate_local_stt_runtime_ready,
     )
 
     try:
-        validate_local_stt_runtime_ready(resolved)
+        validate_local_stt_runtime_ready(
+            resolved,
+            manifest=load_local_stt_asset_manifest(PARAKEET_JAPANESE_MODEL_ID),
+        )
     except LocalSTTManifestInvalidError, LocalSTTModelMissingError:
-        pytest.skip("local Qwen STT model assets are unavailable")
+        pytest.skip("Japanese Parakeet STT model assets are unavailable")
     return resolved
 
 
-def skip_if_local_qwen_runtime_unavailable(exc: BaseException) -> None:
-    from puripuly_heart.core.local_asr.local_stt_assets import LocalQwenSherpaLoadError
+def skip_if_local_sherpa_runtime_unavailable(exc: BaseException) -> None:
+    from puripuly_heart.core.local_asr.local_stt_assets import LocalParakeetSherpaLoadError
 
-    if isinstance(exc, LocalQwenSherpaLoadError):
-        pytest.skip("local Qwen Sherpa runtime is unavailable")
+    if isinstance(exc, LocalParakeetSherpaLoadError):
+        pytest.skip("Japanese Parakeet Sherpa runtime is unavailable")
     raise exc
 
 

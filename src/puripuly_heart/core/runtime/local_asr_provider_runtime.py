@@ -98,12 +98,12 @@ class LocalASRProviderRuntimeOwner:
         "_scope",
         "pending provider handoffs",
         "retired providers and event drains",
-        "authenticated GPU worker and model residency",
+        "authenticated per-channel CPU workers and shared GPU model residency",
     )
     stop_ingress = "reject new provider, discovery, activation, handoff, and retry commands"
     shutdown_policy = (
         "cancel and await owner operations, close Self and Peer providers, then close the shared "
-        "GPU runtime with bounded worker termination"
+        "GPU runtime after started native operations settle"
     )
     late_callback_rule = "provider generations reject stale events and GPU-runtime generations reject late diagnostics"
 

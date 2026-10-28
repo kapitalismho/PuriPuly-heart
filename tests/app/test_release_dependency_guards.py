@@ -324,24 +324,101 @@ def test_shared_setup_action_preserves_release_default_and_rejects_stale_pr_lock
         assert "lockfile" in invoked.stderr and "--locked" in invoked.stderr
 
 
-def test_installer_script_embeds_local_stt_manifest_assets_for_inno_download() -> None:
-    script = (ROOT / "installer.iss").read_text(encoding="utf-8")
+@pytest.mark.parametrize("mismatch", [None, "tag", "identity-version"])
+def test_native_release_version_gate_reads_identity_include_and_rejects_mismatches(
+    tmp_path: Path, mismatch: str | None
+) -> None:
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/release-native.yml").read_text(encoding="utf-8")
+    )
+    step = next(
+        step for step in workflow["jobs"]["verify-version"]["steps"] if step.get("id") == "sync"
+    )
+    gate = tmp_path / "native-version-gate.py"
+    gate.write_text("\n".join(step["run"].strip().splitlines()[1:-1]) + "\n", encoding="utf-8")
+    checkout = tmp_path / "checkout"
+    for relative in (
+        "pyproject.toml",
+        "native/overlay/Cargo.toml",
+        "native/asr_worker/Cargo.toml",
+        "src/puripuly_heart/__init__.py",
+        "installer.iss",
+        "installer/application-identity.iss",
+    ):
+        destination = checkout / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / relative, destination)
+    version = tomllib.loads((checkout / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+        "version"
+    ]
+    parts = version.split(".")
+    different_version = ".".join([*parts[:-1], str(int(parts[-1]) + 1)])
+    if mismatch == "identity-version":
+        identity = checkout / "installer/application-identity.iss"
+        identity.write_text(
+            identity.read_text(encoding="utf-8").replace(
+                f'#define MyAppVersion "{version}"',
+                f'#define MyAppVersion "{different_version}"',
+                1,
+            ),
+            encoding="utf-8",
+        )
+    tag = f"v{different_version if mismatch == 'tag' else version}"
+    output = tmp_path / "github-output.txt"
+    environment = dict(os.environ, TAG_NAME=tag, GITHUB_OUTPUT=str(output))
+    bootstrap = """
+import os
+import runpy
+import sys
+from unittest.mock import patch
 
-    assert "HuggingFaceLocalSttUrl" in script
-    assert "ModelScopeLocalSttUrl" in script
-    for manifest_path in sorted((ROOT / "src/puripuly_heart/data/models").glob("*.manifest.json")):
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if manifest["engine"] == "transcribe.cpp-vulkan":
-            assert manifest["model_id"] not in script
-            continue
-        assert manifest["model_id"] in script
-        assert manifest["install_dirname"] in script
-        for source in manifest["sources"].values():
-            assert source["revision"] in script
-        for asset in manifest["files"]:
-            assert asset["relative_path"] in script
-            assert asset["sha256"] in script
-            assert str(asset["size_bytes"]) in script
+def git_identity(arguments, **kwargs):
+    expected = (
+        ["git", "rev-parse", "HEAD"],
+        ["git", "rev-parse", "--verify", f"refs/tags/{os.environ['TAG_NAME']}^{{commit}}"],
+    )
+    if arguments not in expected:
+        raise AssertionError(f"Unexpected external command: {arguments!r}")
+    return "a" * 40 + "\\n"
+
+with patch("subprocess.check_output", side_effect=git_identity):
+    runpy.run_path(sys.argv[1], run_name="__main__")
+"""
+    completed = subprocess.run(
+        [sys.executable, "-I", "-B", "-c", bootstrap, str(gate)],
+        cwd=checkout,
+        env=environment,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=30,
+    )
+    print(
+        json.dumps(
+            {
+                "mismatch": mismatch,
+                "exit_code": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+            }
+        )
+    )
+    if mismatch is None:
+        assert completed.returncode == 0, completed.stderr
+        assert dict(
+            line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines()
+        ) == {
+            "version": version,
+            "tag": tag,
+            "source-sha": "a" * 40,
+        }
+    else:
+        assert completed.returncode != 0
+        assert "Version mismatch" in completed.stderr
+        if mismatch == "identity-version":
+            assert "installer/application-identity.iss" in completed.stderr
+        assert not output.exists()
 
 
 def test_chinese_installer_language_files_use_matching_message_keys() -> None:

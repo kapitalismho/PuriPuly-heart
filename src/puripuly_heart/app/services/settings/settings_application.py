@@ -69,10 +69,6 @@ from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationState,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.app.services.manual_local_asr_fallback import (
-    ManualLocalASRFallbackOwner,
-    ManualLocalASRFallbackPlan,
-)
 from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState
 from puripuly_heart.app.services.provider.provider_runtime_apply import (
     NoopRuntimeApply,
@@ -159,12 +155,6 @@ class StrictSettingsSaveFailed(Exception):
 
 SettingsMutationServiceProvider = Callable[[], SettingsMutationService | None]
 SettingsPredicate = Callable[[AppSettingsVNext, AppSettingsVNext], bool]
-SettingsAsyncEffect = Callable[[], Awaitable[None]]
-SettingsFallbackSink = Callable[[tuple[str, ...], bool], None]
-SettingsFallbackLogSink = Callable[
-    [object, object, tuple[str, ...]],
-    None,
-]
 
 
 def _settings_mutation_committed(result: TransactionResult) -> bool:
@@ -886,12 +876,7 @@ class SettingsApplicationOwner:
     settings: SettingsOwner
     projection: SettingsProjectionOwner
     runtime_effects: SettingsRuntimeEffectsPort[AppSettingsVNext]
-    manual_fallback: ManualLocalASRFallbackOwner
-    cpu_auto_available: Callable[[], bool]
-    inspect_cpu: SettingsAsyncEffect
-    fallback_sink: SettingsFallbackSink
     sync_ui: Callable[[], None]
-    fallback_log_sink: SettingsFallbackLogSink
     mutation_service_provider: SettingsMutationServiceProvider
     consume_superseded_settings: Callable[[AppSettingsVNext], bool]
     active_local_asr_change: SettingsPredicate
@@ -910,56 +895,6 @@ class SettingsApplicationOwner:
         if current is not None:
             self.settings.normalize_compatibility(current)
         self.settings.normalize_compatibility(next_settings)
-        fallback_channels: tuple[str, ...] = ()
-        installation_fallback = False
-        normalization_channels = self.manual_fallback.normalization_channels(
-            current=(
-                self.manual_fallback.state(
-                    current,
-                    cpu_auto_available=self.cpu_auto_available(),
-                )
-                if current is not None
-                else None
-            ),
-            pending=self.manual_fallback.state(
-                next_settings,
-                cpu_auto_available=self.cpu_auto_available(),
-            ),
-        )
-        if normalization_channels:
-            await self.inspect_cpu()
-            fallback_plan = self.manual_fallback.plan(
-                self.manual_fallback.state(
-                    next_settings,
-                    cpu_auto_available=self.cpu_auto_available(),
-                )
-            )
-            fallback_channels = tuple(
-                channel
-                for channel in fallback_plan.fallback_channels
-                if channel in normalization_channels
-            )
-            if fallback_channels:
-                next_settings = self.manual_fallback.apply(
-                    next_settings,
-                    ManualLocalASRFallbackPlan(
-                        self_provider=(
-                            fallback_plan.self_provider
-                            if "self" in fallback_channels
-                            else next_settings.intent.stt.provider
-                        ),
-                        peer_provider=(
-                            fallback_plan.peer_provider
-                            if "peer" in fallback_channels
-                            else next_settings.intent.peer_stt.provider
-                        ),
-                        fallback_channels=fallback_channels,
-                        installation_fallback=bool(
-                            fallback_plan.installation_fallback and fallback_channels
-                        ),
-                    ),
-                )
-            installation_fallback = bool(fallback_plan.installation_fallback and fallback_channels)
         provider_plan = None
         if (
             self.provider_runtime is not None
@@ -982,7 +917,6 @@ class SettingsApplicationOwner:
                 next_settings,
                 reload_settings_view=reload_settings_view,
             ):
-                self.fallback_sink(fallback_channels, installation_fallback)
                 self._emit_apply_result()
                 return (
                     self.results.current is not None
@@ -994,7 +928,6 @@ class SettingsApplicationOwner:
             reload_settings_view=reload_settings_view,
             provider_plan=provider_plan,
         )
-        self.fallback_sink(fallback_channels, installation_fallback)
         if applied:
             self._emit_apply_result()
         return (
@@ -1057,55 +990,6 @@ class SettingsApplicationOwner:
                         ),
                     )
                 )
-
-    def notify_fallback(
-        self,
-        channels: tuple[str, ...],
-        installation_fallback: bool,
-    ) -> None:
-        self.fallback_sink(channels, installation_fallback)
-
-    def persist_manual_fallback(self, *, channel: str | None = None) -> bool:
-        previous = self.settings.canonical
-        if previous is None:
-            return False
-        plan = self.manual_fallback.plan(
-            self.manual_fallback.state(
-                previous,
-                cpu_auto_available=self.cpu_auto_available(),
-            ),
-            channel=channel,
-        )
-        if not plan.changed:
-            return True
-        normalized = self.manual_fallback.apply(previous, plan)
-        try:
-            normalized = self.settings.commit_delta(previous, normalized)
-        except Exception:
-            self._set_result(
-                TransactionResult(
-                    status="settings_commit_failed",
-                    message=None,
-                    diagnostics=self.settings.last_failure,
-                    secondary_diagnostics=(
-                        *self.settings.persistence_secondary_diagnostics,
-                        *self.settings.notification_diagnostics,
-                    ),
-                    secondary_omitted_count=self.settings.persistence_secondary_omitted_count,
-                )
-            )
-            return False
-        self.sync_ui()
-        self.fallback_sink(
-            plan.fallback_channels,
-            plan.installation_fallback,
-        )
-        self.fallback_log_sink(
-            previous,
-            normalized,
-            plan.fallback_channels,
-        )
-        return True
 
     async def apply_direct(
         self,

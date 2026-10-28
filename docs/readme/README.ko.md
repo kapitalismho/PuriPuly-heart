@@ -94,11 +94,11 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 
 ## 번역 품질 비교
 
-![음성 인식과 번역을 결합한 전체 파이프라인의 문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 PuriPuly에서 사용할 수 있는 조합: Gemini Transcribe → Luna (0.676), Soniox STT → Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). 평가 모델: Gemini 3.7 Flash.](../images/performance/1.png)
+![음성 인식과 번역을 결합한 전체 파이프라인의 문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 벤치마크 당시 PuriPuly의 구성: Gemini Transcribe → Luna (0.676), Soniox STT → Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). 평가 모델: Gemini 3.7 Flash.](../images/performance/1.png)
 
 ![문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 PuriPuly에서 사용할 수 있는 모델: GPT-6 luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Qwen 3.8, Gemini 3.5, Soniox는 문자 오류율(CER) 5% 이하인 결과만 선별. 평가 모델: Gemini 3.7 Flash.](../images/performance/2.png)
 
-- 파란색 막대 그래프들이 PuriPuly에서 사용할 수 있는 모델이에요.
+- 파란색 막대는 벤치마크 당시 PuriPuly의 구성이에요. CPU Qwen3-ASR 0.6B는 이후 제거되었으며, 해당 수치는 아래의 새 모델을 측정한 결과가 아니에요.
 - 마이크로소프트의 Gemba MQM 프레임워크를 사용해서 실험했어요.
 - 실제 대화 환경과 가깝게 맥락을 포함한 멀티턴 환경으로 구성했어요.
 - 전체 실험 결과는 [여기](https://github.com/kapitalismho/korean-llm-context-translation-benchmark)를 참조해주세요.
@@ -186,11 +186,16 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 
 | 모델                         | 실행 환경 | 양자화  |
 | -------------------------- | ----- | ---- |
-| Parakeet TDT 0.6B v3       | CPU   | INT8 |
+| Orukeet (영어) | CPU | Q8_0 |
+| Fun-ASR-Nano-2512 (중국어) | CPU | Q8_0 |
+| Fun-ASR-MLT-Nano-2512 (한국어) | CPU | Q8_0 |
 | Parakeet TDT-CTC 0.6B (ja) | CPU   | INT8 |
-| Qwen3-ASR 0.6B             | CPU   | INT8 |
 | Qwen3-ASR 1.7B             | GPU   | Q6_K |
 | OpenAI 호환 API              | —     | —    |
+
+CPU 자동 선택은 영어·중국어·한국어·일본어만 지원해요. Orukeet과 Fun-ASR는 transcribe.cpp를 사용하고, 일본어는 sherpa-onnx를 유지해요. 활성 transcribe.cpp CPU 채널마다 Model/Session과 추론 스레드 2개를 사용하며, Talk/Listen 동시 실행 시 2+2로 동작해요. 비활성 채널은 미리 로드하지 않아요. GPU ASR는 채널별 Session이 상주 Model 하나를 공유하며 순차 추론하고, 모델 변경 시에도 기존 Model을 해제한 뒤 새 모델을 로드해요.
+
+Windows 설치 프로그램은 CPU ASR 모델 4개를 준비하며, 필요하면 별도로 다운로드해요. CPU 자동 선택에는 4개가 모두 필요해요. 기존 Parakeet v3 선택은 Orukeet으로, CPU Qwen0.6 선택은 CPU 자동 선택으로 이전해요. 설정을 복구 가능한 방식으로 저장한 뒤 시작 시 식별된 구형 모델 파일만 정리하며, 실패한 정리는 다음 시작 때 재시도해요. 식별되지 않은 파일과 일본어/GPU 모델은 보존해요.
 
 
 **LLM**

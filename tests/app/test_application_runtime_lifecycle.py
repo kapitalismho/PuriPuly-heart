@@ -291,7 +291,9 @@ async def test_runtime_shutdown_graph_preserves_order_and_logging_last_after_fai
     assert LIFECYCLE_SHUTDOWN_PHASE_ORDER[-1] == SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS
 
 
-def _real_startup_logging_owner(tmp_path) -> tuple[
+def _real_startup_logging_owner(
+    tmp_path,
+) -> tuple[
     ApplicationRuntimeLoggingOwner,
     RuntimeLoggingService,
     SessionRuntimeLoggingService,
@@ -388,7 +390,7 @@ async def test_startup_diagnostics_bracket_completed_application_start() -> None
     class Settings:
         async def prepare_startup_settings(self) -> ApplicationStartupState:
             events.append("settings")
-            return ApplicationStartupState(object(), (), False)
+            return ApplicationStartupState(settings=object())
 
     class Presentation:
         def apply_startup_presentation(self, state: ApplicationStartupState) -> None:
@@ -468,8 +470,6 @@ async def test_startup_partial_allocation_failure_runs_boundary_cleanup(
             events.append("settings")
             return ApplicationStartupState(
                 settings=object(),
-                fallback_channels=(),
-                installation_fallback=False,
             )
 
     class Presentation:
@@ -567,7 +567,7 @@ async def test_shutdown_cancels_and_drains_startup_before_runtime_teardown(cance
             finished.set()
 
     async def settings():
-        return ApplicationStartupState(AppSettingsVNext(), (), False)
+        return ApplicationStartupState(settings=AppSettingsVNext())
 
     async def launch(_state):
         await run_owned_thread_call(prepare)

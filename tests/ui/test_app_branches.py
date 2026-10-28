@@ -1400,7 +1400,6 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_qq_auth_translation_gated",
         "on_discord_callback_page",
         "on_founder_letter",
-        "on_local_qwen_hallucination_modal",
         "on_github_star_snackbar",
         "on_foundation_primitives",
         "on_http_extension_form",
@@ -1492,50 +1491,6 @@ def test_debug_preview_http_extension_form_writes_demo_extension_and_selects_it(
     assert extension_values == ["debug_demo", "debug_demo"]
 
 
-def test_debug_preview_local_qwen_modal_opens_production_dialog_without_state_or_side_effects(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    controller = SimpleNamespace(
-        _local_qwen_hallucination_detection_count=1,
-        _local_qwen_hallucination_modal_shown=False,
-    )
-    captured: dict[str, object] = {}
-
-    class FakeLocalQwenHallucinationDialog:
-        def __init__(self, page, *, on_open_guide):
-            captured["page"] = page
-            captured["on_open_guide"] = on_open_guide
-
-        def open(self) -> None:
-            captured["opened"] = True
-
-    monkeypatch.setattr(
-        app_module,
-        "LocalQwenHallucinationDialog",
-        FakeLocalQwenHallucinationDialog,
-    )
-    monkeypatch.setattr(
-        app_module.webbrowser,
-        "open",
-        lambda *_args, **_kwargs: pytest.fail("debug modal preview must not open external URLs"),
-    )
-
-    app._preview_local_qwen_hallucination_modal()
-
-    assert captured["page"] is app.page
-    assert captured["opened"] is True
-    assert getattr(captured["on_open_guide"], "__self__", None) is app
-    assert (
-        getattr(captured["on_open_guide"], "__func__", None) is TranslatorApp._open_local_qwen_guide
-    )
-    assert app._local_qwen_hallucination_dialog.__class__ is FakeLocalQwenHallucinationDialog
-    assert controller._local_qwen_hallucination_detection_count == 1
-    assert controller._local_qwen_hallucination_modal_shown is False
-    assert app.page.tasks == []
-
-
 def test_debug_preview_panel_wires_audio_fault_actions(monkeypatch) -> None:
     _patch_app_construction(monkeypatch)
     captured_kwargs: dict[str, object] = {}
@@ -1607,70 +1562,6 @@ def test_debug_audio_fault_actions_do_not_call_persistence_or_providers(monkeypa
     app._preview_stt_fault_cycle()
     app._preview_audio_fault_clear()
 
-    assert forbidden_calls == []
-
-
-def test_local_qwen_guidance_modal_open_guide_opens_github_api_key_guide_safely(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _patch_app_construction(monkeypatch)
-
-    class FakeBottomNavBar(ft.Container):
-        def __init__(self, on_change):
-            super().__init__()
-            self._on_change = on_change
-            self._selected = 0
-            self.visual_updates = 0
-
-        def _update_visuals(self) -> None:
-            self.visual_updates += 1
-
-    monkeypatch.setattr(app_module, "BottomNavBar", FakeBottomNavBar)
-    forbidden_calls: list[str] = []
-    opened_urls: list[str] = []
-    monkeypatch.setattr(
-        ConstructionDummyController,
-        "_save_settings",
-        lambda self: forbidden_calls.append("save_settings"),
-    )
-    monkeypatch.setattr(
-        ConstructionDummyController,
-        "persist_settings",
-        lambda self: forbidden_calls.append("persist_settings"),
-    )
-    monkeypatch.setattr(
-        app_module.webbrowser,
-        "open",
-        lambda url, *args, **kwargs: opened_urls.append(url),
-    )
-    monkeypatch.setattr(app_module, "get_locale", lambda: "ko")
-
-    page = DummyPage()
-    app = TranslatorApp(
-        page,
-        config_path=Path("settings.json"),
-        application_factory=_construction_application_factory,
-    )
-    monkeypatch.setattr(app.content_area, "update", lambda: None)
-    backend = _construction_backends[-1]
-    backend.apply_settings = lambda *args, **kwargs: forbidden_calls.append("apply_settings")
-    backend.apply_providers = lambda *args, **kwargs: forbidden_calls.append("apply_providers")
-    app.view_settings.has_provider_changes = True
-
-    app.show_local_qwen_hallucination_dialog()
-
-    dialog = app._local_qwen_hallucination_dialog
-    opened_dialog = page.opened[-1]
-    assert opened_dialog is dialog._dialog
-
-    dialog._dialog_result.primary_button.on_click(None)
-
-    assert page.closed == [opened_dialog]
-    assert opened_urls == [app_module.founder_readme_url_for_locale("ko")]
-    assert app.content_area.content is not app.view_settings
-    assert app.bottom_nav._selected == 0
-    assert app.bottom_nav.visual_updates == 0
-    assert page.tasks == []
     assert forbidden_calls == []
 
 

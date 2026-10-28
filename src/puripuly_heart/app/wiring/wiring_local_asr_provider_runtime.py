@@ -9,13 +9,14 @@ from functools import partial
 from pathlib import Path
 from typing import cast
 
-from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory
+from puripuly_heart.app.adapters.asr_worker_process import DefaultASRWorkerProcessFactory
 from puripuly_heart.app.services.local_asr.local_asr_selection import LOCAL_CPU_PROVIDERS
 from puripuly_heart.config.provider_values import (
     STTProviderName,
     custom_stt_selection_for_provider,
     is_custom_stt_provider,
 )
+from puripuly_heart.core.asr_worker import ASRWorkerProcessFactoryPort
 from puripuly_heart.core.audio.listen_delivery import (
     LISTEN_RETAINED_SEGMENT_SLOTS,
     ListenDeliveryController,
@@ -81,9 +82,10 @@ _ACTUAL_DEGRADATION_REASONS = frozenset(
 _LOCAL_PROVIDER_IDS = frozenset(
     {
         STTProviderName.LOCAL_CPU_AUTO.value,
-        STTProviderName.LOCAL_PARAKEET_V3.value,
+        STTProviderName.LOCAL_ORUKEET.value,
         STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
-        STTProviderName.LOCAL_QWEN.value,
+        STTProviderName.LOCAL_FUN_ASR_NANO.value,
+        STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value,
         STTProviderName.LOCAL_QWEN_GPU.value,
     }
 )
@@ -129,6 +131,8 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
     runtime_logging: SessionRuntimeLoggingService | None = None
     fault_profile_provider: FaultProfileProvider | None = None
     event_ingress_observer: Callable[..., object] | None = None
+    asr_process_factory: ASRWorkerProcessFactoryPort | None = None
+    cpu_model_root: Path | None = None
 
     async def create(
         self,
@@ -160,6 +164,8 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
             gpu_runtime=cast(SharedGpuASRRuntime, gpu_runtime),
             gpu_model_path=gpu_model_path,
             gpu_device_id=request.gpu_device_id,
+            asr_process_factory=self.asr_process_factory,
+            cpu_model_root=self.cpu_model_root,
             basic_log_sink=(
                 None
                 if self.runtime_logging is None
@@ -329,9 +335,10 @@ def _recognition_retention_profile(
         provider_id
         in {
             STTProviderName.LOCAL_CPU_AUTO.value,
-            STTProviderName.LOCAL_PARAKEET_V3.value,
+            STTProviderName.LOCAL_ORUKEET.value,
             STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
-            STTProviderName.LOCAL_QWEN.value,
+            STTProviderName.LOCAL_FUN_ASR_NANO.value,
+            STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value,
             STTProviderName.LOCAL_QWEN_GPU.value,
         }
         or custom_offline
@@ -345,9 +352,10 @@ def _recognition_retention_profile(
             if provider_id
             in {
                 STTProviderName.LOCAL_CPU_AUTO.value,
-                STTProviderName.LOCAL_PARAKEET_V3.value,
+                STTProviderName.LOCAL_ORUKEET.value,
                 STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
-                STTProviderName.LOCAL_QWEN.value,
+                STTProviderName.LOCAL_FUN_ASR_NANO.value,
+                STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value,
                 STTProviderName.LOCAL_QWEN_GPU.value,
             }
             else 2
@@ -378,7 +386,7 @@ class LocalASRProviderRuntimeFactory:
         return LocalASRProviderRuntimeOwner(
             provider_factory=self.provider_factory,
             gpu_runtime_factory=lambda diagnostic_sink: SharedGpuASRRuntime(
-                process_factory=DefaultGpuWorkerProcessFactory(),
+                process_factory=DefaultASRWorkerProcessFactory(),
                 clock=self.clock,
                 diagnostic_sink=diagnostic_sink,
             ),
