@@ -170,6 +170,24 @@ async def test_provider_runtime_owner_caches_only_after_self_runtime_converges()
 
 
 @pytest.mark.asyncio
+async def test_unchanged_provider_signatures_do_not_rebuild_or_log_another_transition() -> None:
+    events: list[str] = []
+    owner = _runtime_owner(
+        events=events,
+        state=ProviderRuntimeState(True, True, True, True, True, True),
+        current="profile",
+        cache=(("self", "profile"), ("peer", "profile", None), ("llm", "profile")),
+    )
+    owner.gpu_restart_decision = lambda _current, _next: False
+
+    plan = owner.build_plan("profile", force_rebuild_llm=False)
+    await owner.apply("profile", plan)
+
+    assert plan == ProviderRuntimeApplyPlan(False, False, False)
+    assert events == ["common", "signatures"]
+
+
+@pytest.mark.asyncio
 async def test_provider_runtime_owner_applies_channel_effects_in_order() -> None:
     events: list[str] = []
     owner = _runtime_owner(
@@ -344,15 +362,21 @@ async def test_llm_factory_failure_preserves_requested_stt_replacement(
 async def test_llm_provider_rebuild_owner_delivers_success_projection_and_usage_refresh() -> None:
     events: list[object] = []
     provider = object()
+    replacement_started = asyncio.Event()
+    replacement_finished = asyncio.Event()
 
     async def replace(value: object | None) -> None:
         events.append(("replace", value))
+        replacement_started.set()
+        await replacement_finished.wait()
 
     owner = LlmProviderRebuildOwner(
         context_provider=lambda: LlmProviderRebuildContext(
             settings="settings",
             replace_provider=replace,
             requires_secret=True,
+            selection=("openai", "gpt_6_luna", "official_byok"),
+            previous_selection=("gemini", "gemini_flash", "official_byok"),
         ),
         provider_factory=lambda settings: (
             events.append(("create", settings)),
@@ -366,16 +390,31 @@ async def test_llm_provider_rebuild_owner_delivers_success_projection_and_usage_
         retry_sink=lambda: events.append("retry"),
     )
 
-    await owner.rebuild()
+    rebuilding = asyncio.create_task(owner.rebuild())
+    await replacement_started.wait()
+    assert not any(event[0] == "success" for event in events)
+    replacement_finished.set()
+    assert await rebuilding
 
-    assert events == [
+    assert events[:4] == [
         ("create", "settings"),
         ("replace", provider),
         ("signatures", "settings"),
         ("needs_key", False),
-        "usage",
-        ("success", "[Settings] LLM provider rebuilt successfully"),
     ]
+    assert events[-1] == "usage"
+    assert events[4][0] == "success"
+    fields = dict(token.split("=", 1) for token in events[4][1].split()[2:])
+    assert fields == {
+        "channel": "self,peer",
+        "previous_provider": "gemini",
+        "provider": "openai",
+        "previous_model": "gemini_flash",
+        "model": "gpt_6_luna",
+        "previous_connection": "official_byok",
+        "connection": "official_byok",
+        "outcome": "applied",
+    }
 
 
 @pytest.mark.asyncio
@@ -515,6 +554,7 @@ async def test_llm_success_identity_is_retained_when_later_usage_refresh_fails()
     handle = ProviderRuntimeHandle(name="llm", provider=None)
     signatures = []
     retries = []
+    messages = []
 
     async def replace(value):
         await handle.replace_provider(value, start=False)
@@ -529,12 +569,13 @@ async def test_llm_success_identity_is_retained_when_later_usage_refresh_fails()
             settings="requested-profile",
             replace_provider=replace,
             requires_secret=False,
+            selection=("openai", "gpt_6_luna", "official_byok"),
         ),
         provider_factory=lambda _settings: provider,
         availability_sink=lambda _value: None,
         usage_refresh=fail_usage,
         failure_sink=lambda _message: None,
-        success_sink=lambda _message: None,
+        success_sink=messages.append,
         signature_sink=signatures.append,
         retry_sink=lambda: retries.append(True),
     )
@@ -542,12 +583,17 @@ async def test_llm_success_identity_is_retained_when_later_usage_refresh_fails()
         await owner.rebuild()
     assert signatures == ["requested-profile"]
     assert retries == []
+    assert len(messages) == 1
+    fields = dict(token.split("=", 1) for token in messages[0].split()[2:])
+    assert fields["model"] == "gpt_6_luna"
+    assert fields["outcome"] == "applied"
 
 
 @pytest.mark.asyncio
 async def test_llm_replace_failure_invalidates_identity_before_propagating() -> None:
     signatures = ["previous-profile"]
     original = RuntimeError("controlled replacement failure")
+    messages = []
 
     async def fail_replace(_provider):
         raise original
@@ -565,7 +611,7 @@ async def test_llm_replace_failure_invalidates_identity_before_propagating() -> 
         availability_sink=lambda _value: None,
         usage_refresh=unexpected_usage,
         failure_sink=lambda _message: None,
-        success_sink=lambda _message: None,
+        success_sink=messages.append,
         signature_sink=signatures.append,
         retry_sink=lambda: signatures.append("retry-required"),
     )
@@ -573,3 +619,4 @@ async def test_llm_replace_failure_invalidates_identity_before_propagating() -> 
         await owner.rebuild()
     assert failure.value is original
     assert signatures == ["previous-profile", "retry-required"]
+    assert messages == []

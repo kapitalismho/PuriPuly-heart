@@ -121,12 +121,23 @@ class ProviderRuntimeSignatures:
     last_self_runtime: tuple[object, ...] | None = None
     last_self_provider: tuple[object, ...] | None = None
     last_llm_provider: tuple[object, ...] | None = None
+    last_llm_selection: tuple[str, str, str] | None = None
     superseded_settings_ids: set[int] = field(default_factory=set)
 
     def sync_llm(self, canonical: AppSettingsVNext) -> None:
         self.last_llm_provider = build_llm_provider_signature(
             canonical,
             http_extensions=self.http_extensions,
+        )
+        translation = canonical.intent.translation
+        self.last_llm_selection = (
+            (
+                "custom_http"
+                if translation.model == "custom_http"
+                else provider_llm_for_translation(translation.model, translation.connection)
+            ),
+            translation.model,
+            translation.connection,
         )
 
     def sync_stt(
@@ -210,7 +221,6 @@ class ProviderRuntimeEffects:
     self_availability: Callable[[SelfCaptureSessionSnapshot], bool]
     gpu_recovery: Callable[[AppSettingsVNext, ProviderRuntimeApplyPlan], Awaitable[None]]
     failure_sink: Callable[[str], None]
-    success_sink: Callable[[str], None]
 
     def state(self, settings: AppSettingsVNext) -> ProviderRuntimeState:
         llm_runtime = self.llm_runtime_provider()
@@ -357,8 +367,6 @@ class ProviderRuntimeEffects:
         self.self_state_sink(snapshot)
         if not self.self_availability(snapshot):
             self.failure_sink("STT backend not available")
-            return
-        self.success_sink("[Settings] STT provider replacement completed successfully")
 
 
 @dataclass(frozen=True, slots=True)
@@ -441,7 +449,6 @@ def compose_provider_runtime(
         self_availability=self_availability,
         gpu_recovery=gpu_recovery,
         failure_sink=failure_sink,
-        success_sink=success_sink,
     )
 
     def llm_context(current: object | None) -> LlmProviderRebuildContext | None:
@@ -464,6 +471,14 @@ def compose_provider_runtime(
             ),
             resource_label=(
                 "Translation backend" if translation.model == "custom_http" else "LLM provider"
+            ),
+            selection=(
+                "custom_http" if translation.model == "custom_http" else provider_llm,
+                translation.model,
+                translation.connection,
+            ),
+            previous_selection=(
+                signature_state.last_llm_selection if runtime.provider is not None else None
             ),
         )
 

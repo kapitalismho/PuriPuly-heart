@@ -1359,11 +1359,20 @@ class TranslationOutputProjectionOwner:
                 diagnostic_only=True,
             )
         )
-        if decision.reason == "status_promoted":
-            retire = decision.metadata.get("reused_preview_send") is True
-        else:
-            retire = decision.reason not in {"first_page_sent", "output_send_failed"}
-        if retire:
+        if (
+            decision.reason == "status_promoted"
+            and decision.metadata.get("reused_preview_send") is True
+        ):
+            self.diagnostics.record_output_latency_stage(
+                LatencyStageDiagnostic(
+                    channel="self",
+                    utterance_id=UUID(decision.publication_id),
+                    stage="self_chatbox_final_accepted",
+                    overwrite=False,
+                )
+            )
+            return
+        if decision.reason not in {"status_promoted", "first_page_sent", "output_send_failed"}:
             self.diagnostics.abandon_pending_latency_output("self", UUID(decision.publication_id))
 
     async def project_self_turn(
@@ -1375,6 +1384,11 @@ class TranslationOutputProjectionOwner:
     ) -> None:
         key = (snapshot.turn_generation, snapshot.turn_order)
         parent_utterance_id = snapshot.utterance_id
+        if snapshot.status != "active" and (
+            snapshot.status != "complete" or not snapshot.source_closed
+        ):
+            self.diagnostics.abandon_pending_latency_output("self", snapshot.utterance_id)
+            self.diagnostics.clear_latency_timeline("self", snapshot.utterance_id)
         await self._project_self_caption(snapshot, config_snapshot)
         current = self._self_presentation_authority
         if current is None or current.order_watermark is None or key > current.order_watermark:

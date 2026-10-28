@@ -6,10 +6,16 @@ from types import SimpleNamespace
 from typing import Literal
 from uuid import uuid4
 
+import numpy as np
 import pytest
 
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
-from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
+from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+    PeerAudioSegmentLedger,
+)
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.messages import UserErrorReport
 from puripuly_heart.core.orchestrator.channel_runtime import ContextEntry
@@ -28,9 +34,11 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
+    STTSessionProjection,
     STTTextContribution,
 )
-from puripuly_heart.core.vad.gating import SpeechEnd
+from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.domain.events import (
     STTFinalEvent,
     STTSessionState,
@@ -39,6 +47,7 @@ from puripuly_heart.domain.events import (
 )
 from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity
+from puripuly_heart.providers.stt.local_session import LocalOfflineSTTBackend
 from tests.core.test_self_translation_low_latency import (
     BlockingLLMProvider,
     FakeLLMProvider,
@@ -1275,3 +1284,143 @@ def test_self_owner_requires_self_runtime() -> None:
             diagnostics=owner.diagnostics,
             clock=owner.clock,
         )
+
+
+@pytest.mark.asyncio
+async def test_local_scoped_final_preserves_capture_timing_through_preview_acceptance(
+    monkeypatch, tmp_path
+) -> None:
+    clock = FakeClock(_now=12.0)
+    logging, log_stream = _make_runtime_logging_capture()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(sender=sender, clock=clock)
+    settings = AudioSegmentSettingsSnapshot(
+        provider_id="local_orukeet",
+        provider_signature=("synthetic-local",),
+        runtime_signature=("synthetic-local",),
+        source_mode="manual",
+        source_language="en",
+        expected_languages=("en",),
+        target_sample_rate_hz=16000,
+        vad_speech_threshold=0.6,
+        vad_hangover_ms=600,
+        vad_pre_roll_ms=0,
+    )
+    backend = LocalOfflineSTTBackend(
+        model_dir=tmp_path,
+        model_id="synthetic-local",
+        provider_id=settings.provider_id,
+        stream_label="self",
+        decode_clock=clock.now,
+        queue_clock=clock.now,
+    )
+    backend._recognizer = object()
+
+    async def decode(_backend, samples):
+        assert samples.size == 16000
+        clock.advance(0.25)
+        return "captured source"
+
+    monkeypatch.setattr(LocalOfflineSTTBackend, "decode_f32", decode)
+
+    async def session_factory(_settings, epoch):
+        return await backend.open_session(projection=STTSessionProjection("scoped", epoch))
+
+    engine = ScopedRecognitionEngine(
+        session_factory=session_factory,
+        channel="self",
+        accepted_settings_scope=(
+            settings.provider_id,
+            settings.provider_signature,
+            settings.runtime_signature,
+        ),
+        monotonic_clock=clock.now,
+        backend_close=backend.close,
+    )
+    llm = BlockingLLMProvider(response_text="translated")
+    harness = compose_translation_test_harness(
+        stt=engine,
+        llm=llm,
+        osc=paginator,
+        clock=clock,
+        runtime_logging=logging,
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=60_000,
+    )
+    paginator.stage_recorder = harness.translation_diagnostics.record_chatbox_stage
+    preview_ready = asyncio.Event()
+    original = harness.translation_turns.on_draft_updated
+    assert original is not None
+
+    async def observe(snapshot, request):
+        await original(snapshot, request)
+        if snapshot.status == "active" and any(
+            target.translation is not None for target in snapshot.targets
+        ):
+            preview_ready.set()
+
+    harness.translation_turns.on_draft_updated = observe
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings)
+    segment_id = uuid4()
+    capture = AudioCaptureSpan(
+        1,
+        1,
+        16000,
+        0,
+        16000,
+        9.0,
+        10.0,
+        normalized_sample_rate_hz=16000,
+        normalized_start_sample=0,
+        normalized_end_sample=16000,
+    )
+    start = ledger.observe_vad_event(
+        SpeechStart(
+            segment_id,
+            pre_roll=np.empty(0, dtype=np.float32),
+            chunk=np.ones(16000, dtype=np.float32),
+            chunk_capture=(capture,),
+        ),
+        now_monotonic_s=9.0,
+    )
+    end = ledger.observe_vad_event(
+        SpeechEnd(segment_id, trailing_silence_ms=600),
+        now_monotonic_s=11.0,
+    )
+    try:
+        await harness.start()
+        await harness.self_owner.handle_vad_event(start)
+        await harness.self_owner.handle_vad_event(end)
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        buffer = harness.self_owner.merge_buffer
+        assert buffer is not None
+        clock.advance(0.75)
+        llm.release.set()
+        await asyncio.wait_for(preview_ready.wait(), timeout=1.0)
+        assert sender.sent == ["captured source (translated)"]
+        assert not any(
+            message.startswith("[Basic][Latency]") for message in _runtime_log_messages(log_stream)
+        )
+        clock.advance(2.0)
+        harness.self_owner._cancel_finalize_wait(buffer)
+        await harness.self_owner._commit_merge(buffer)
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+        summaries = [
+            message
+            for message in _runtime_log_messages(log_stream)
+            if message.startswith("[Basic][Latency]")
+        ]
+        assert len(summaries) == 1
+        fields = dict(field.split("=", 1) for field in summaries[0].split()[1:])
+        assert fields == {
+            "channel": "self",
+            "endpoint": "chatbox_final_accepted",
+            "last_speech_to_chatbox_final_accepted_ms": "5600",
+        }
+        assert sender.sent == ["captured source (translated)"]
+        assert not harness.translation_diagnostics.snapshot().timeline_keys
+    finally:
+        llm.release.set()
+        await harness.stop()
+        await engine.close_backend()
+        logging.close()

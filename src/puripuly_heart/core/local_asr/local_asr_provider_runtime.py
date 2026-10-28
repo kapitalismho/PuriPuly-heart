@@ -187,6 +187,10 @@ class ProviderRuntimeDiagnostic:
     queue_wait_seconds: float | None = None
     worker_exit_code: int | None = None
     failure_diagnostics: ErrorDiagnostics | None = None
+    previous_provider_id: str | None = None
+    previous_model_id: str | None = None
+    source_language: str | None = None
+    previous_source_language: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

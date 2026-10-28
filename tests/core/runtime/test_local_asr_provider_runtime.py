@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -37,7 +37,11 @@ from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRModelProvisioningState,
     LocalASRProvisioningSnapshot,
 )
-from puripuly_heart.core.local_asr.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
+from puripuly_heart.core.local_asr.local_stt_assets import (
+    FUN_ASR_MLT_NANO_MODEL_ID,
+    LOCAL_QWEN_GPU_MODEL_ID,
+    ORUKEET_MODEL_ID,
+)
 from puripuly_heart.core.runtime.gpu_asr import (
     GpuASRDiagnostic,
     GpuASRRuntimeState,
@@ -465,6 +469,51 @@ async def test_owner_constructs_replaces_and_closes_each_provider() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize("mutation", ["replace_provider", "handoff_provider"])
+async def test_model_replacement_reports_completed_old_new_identity_without_eager_load(
+    channel: str, mutation: str
+) -> None:
+    observed = []
+    owner, _provisioning, _gpu_factory, provider_factory = _owner(diagnostic_sink=observed.append)
+    first = ProviderRuntimeBuildRequest(
+        config=replace(_resolved_config(channel, "local_cpu_auto"), source_language="en"),
+        model_id=ORUKEET_MODEL_ID,
+    )
+    second = ProviderRuntimeBuildRequest(
+        config=replace(_resolved_config(channel, "local_cpu_auto"), source_language="ko"),
+        model_id=FUN_ASR_MLT_NANO_MODEL_ID,
+    )
+    try:
+        await owner.replace_provider(first, start=False)
+        observed.clear()
+        result = await getattr(owner, mutation)(second, start=False)
+
+        assert result.status == "applied"
+        assert owner.snapshot.channel_for(channel).model_id == FUN_ASR_MLT_NANO_MODEL_ID
+        assert len(observed) == 1
+        diagnostic = observed[0]
+        assert diagnostic.channel == channel
+        assert diagnostic.previous_provider_id == diagnostic.provider_id == "local_cpu_auto"
+        assert diagnostic.previous_model_id == ORUKEET_MODEL_ID
+        assert diagnostic.model_id == FUN_ASR_MLT_NANO_MODEL_ID
+        assert diagnostic.previous_source_language == "en"
+        assert diagnostic.source_language == "ko"
+        assert diagnostic.outcome == "applied"
+        assert all(provider.warmup_calls == 0 for provider in provider_factory.providers)
+
+        observed.clear()
+        provider_factory.fail_next = True
+        failed = await getattr(owner, mutation)(first, start=False)
+
+        assert failed.status == "failed"
+        assert owner.snapshot.channel_for(channel).model_id == FUN_ASR_MLT_NANO_MODEL_ID
+        assert not any(diagnostic.outcome == "applied" for diagnostic in observed)
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_generic_handoff_waits_for_channel_boundary_commit() -> None:
     owner, _provisioning, _gpu_factory, provider_factory = _owner()
     old_request = ProviderRuntimeBuildRequest(config=_resolved_config("self", "deepgram"))
@@ -480,6 +529,10 @@ async def test_generic_handoff_waits_for_channel_boundary_commit() -> None:
 
     assert handoff.done() is False
     assert owner.snapshot.channel_for("self").provider_id == "deepgram"
+    assert not any(
+        diagnostic.event == "provider_handoff" and diagnostic.outcome == "applied"
+        for diagnostic in owner.diagnostics
+    )
 
     await owner.commit_handoff("self")
     result = await handoff
@@ -487,6 +540,12 @@ async def test_generic_handoff_waits_for_channel_boundary_commit() -> None:
     assert result.status == "applied"
     assert result.previous_provider_id == "deepgram"
     assert owner.snapshot.channel_for("self").provider_id == "soniox"
+    transitions = [
+        diagnostic for diagnostic in owner.diagnostics if diagnostic.event == "provider_handoff"
+    ]
+    assert len(transitions) == 1
+    assert transitions[0].previous_provider_id == "deepgram"
+    assert transitions[0].provider_id == "soniox"
     await _wait_until(lambda: old_provider.close_backend_calls == 1)
 
     await owner.close()

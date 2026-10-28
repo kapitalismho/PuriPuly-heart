@@ -177,6 +177,11 @@ LATENCY_TRACE_POINT_CONTRACTS: dict[str, LatencyTracePointContract] = {
         timing_semantics="Recorded after the first self chatbox page is successfully handed to the OSC UDP sender.",
         acceptance_expectation="This is a software send observation, not a VRChat or physical display acknowledgement.",
     ),
+    "self_chatbox_final_accepted": LatencyTracePointContract(
+        name="self_chatbox_final_accepted",
+        timing_semantics="Recorded when the chatbox owner accepts a final promotion of an already-sent identical preview.",
+        acceptance_expectation="Measure final acceptance, not the earlier preview send or a new UDP transmission; no remote or physical display acknowledgement is implied.",
+    ),
     "peer_overlay_applied": LatencyTracePointContract(
         name="peer_overlay_applied",
         timing_semantics="Recorded when the peer presenter returns an applied application receipt after logical pacing.",
@@ -219,11 +224,11 @@ class RealtimeLogHandler(logging.Handler):
 
 ObservabilityRunner = Callable[[Awaitable[None]], None]
 _OUTPUT_STAGE_TOKENS = {
-    "decision": frozenset({"accepted", "waiting"}),
+    "decision": frozenset({"waiting"}),
     "route": frozenset({"subtitle_overlay"}),
-    "reason": frozenset({"accepted_handoff", "logical_pacing_wait"}),
-    "stage": frozenset({"admission_accepted", "logical_pacing"}),
-    "outcome": frozenset({"pending", "waiting"}),
+    "reason": frozenset({"logical_pacing_wait"}),
+    "stage": frozenset({"logical_pacing"}),
+    "outcome": frozenset({"waiting"}),
     "physical_ack": frozenset({"false"}),
     "wait_reason": frozenset({"replacement_gate", "protected_rows"}),
 }
@@ -1409,6 +1414,10 @@ class SessionRuntimeLoggingService:
                 stage="destination_delivery",
             )
             return
+        if decision.decision == "published":
+            if decision.route == "subtitle_overlay" and decision.reason == "logical_pacing_wait":
+                self.emit_diagnostic(_format_output_routing_decision(decision))
+            return
         if (
             decision.decision == "denied"
             and decision.route == "self_chatbox"
@@ -1424,19 +1433,13 @@ class SessionRuntimeLoggingService:
             "stale_retired",
             "stale",
             "preview_superseded",
+            "output_superseded",
             "destination_replaced",
             "cancelled_local",
             "output_runtime_closing",
         }:
             return
-        if (
-            decision.decision == "published"
-            and decision.route == "subtitle_overlay"
-            and decision.reason in {"accepted_handoff", "logical_pacing_wait"}
-        ):
-            self.emit_diagnostic(_format_output_routing_decision(decision))
-            return
-        self.emit_basic(_format_output_routing_decision(decision))
+        self.emit_basic(_format_output_routing_decision(decision), level=logging.WARNING)
 
     async def observe_output_routing(self, decision: OutputRoutingDecision) -> None:
         self.record_output_routing_decision(decision)
@@ -1935,13 +1938,8 @@ def _redact_observability_fields_for_sink(
 
 
 def _format_output_routing_decision(decision: OutputRoutingDecision) -> str:
-    intermediate = decision.decision == "published" and decision.reason in {
-        "accepted_handoff",
-        "logical_pacing_wait",
-    }
-    status: str = decision.decision
-    if intermediate:
-        status = "waiting" if decision.reason == "logical_pacing_wait" else "accepted"
+    intermediate = decision.decision == "published" and decision.reason == "logical_pacing_wait"
+    status = "waiting" if intermediate else decision.decision
     parts = [
         "[Output] destination_stage" if intermediate else "[Output] destination_result",
         f"decision={status}",

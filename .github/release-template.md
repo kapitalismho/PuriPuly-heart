@@ -19,6 +19,7 @@ Download `{{INSTALLER_EXE}}` from the Assets section below, then run it.
 - Gemini speech recognition preserves eligible pre-roll when resuming a stream after an idle period.
 - From the second launch, the message input shows a randomly selected prompt or usage tip. Changing the interface language keeps the selected tip.
 - Local translation models now share one Local section in the model picker. The GPT-6 luna description also clarifies that it can use a ChatGPT plan.
+- ASR logs identify applied provider and model selections, final latency remains visible when an already-sent preview becomes final, and routine Output success messages no longer flood the logs.
 
 ---
 **If PuriPuly has made your world a bit wider,

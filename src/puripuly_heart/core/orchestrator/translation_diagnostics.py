@@ -27,6 +27,7 @@ from puripuly_heart.domain.models import ChannelId
 
 _LATENCY_SUMMARY_OUTPUT_STAGES = (
     ("self", "self_chatbox_send", "chatbox_send"),
+    ("self", "self_chatbox_final_accepted", "chatbox_final_accepted"),
     ("peer", "peer_overlay_applied", "overlay_applied"),
 )
 

@@ -402,6 +402,11 @@ class LocalASRProviderRuntimeOwner:
                 )
             channel = request.channel
             previous_provider_id = self._provider_ids[channel]
+            previous_model_id = self._model_ids[channel]
+            previous_request = self._last_requests.get(channel)
+            previous_source_language = (
+                previous_request.config.source_language if previous_request is not None else None
+            )
             provider, failure_code, failure_type, failure_stage, failure_diagnostics = (
                 await self._build_provider(
                     request,
@@ -438,6 +443,9 @@ class LocalASRProviderRuntimeOwner:
                     event="provider_replace",
                     request=request,
                     exc=exc,
+                    previous_provider_id=previous_provider_id,
+                    previous_model_id=previous_model_id,
+                    previous_source_language=previous_source_language,
                 )
                 await self._publish_state()
                 return self._failed_result(
@@ -459,6 +467,11 @@ class LocalASRProviderRuntimeOwner:
                     outcome="applied",
                     channel=channel,
                     provider_id=request.provider_id,
+                    previous_provider_id=previous_provider_id,
+                    previous_model_id=previous_model_id,
+                    model_id=request.model_id,
+                    source_language=request.config.source_language,
+                    previous_source_language=previous_source_language,
                     phase=self._channel_phases[channel],
                 )
             )
@@ -549,6 +562,11 @@ class LocalASRProviderRuntimeOwner:
                 )
             channel = request.channel
             previous_provider_id = self._provider_ids[channel]
+            previous_model_id = self._model_ids[channel]
+            previous_request = self._last_requests.get(channel)
+            previous_source_language = (
+                previous_request.config.source_language if previous_request is not None else None
+            )
             provider, failure_code, failure_type, failure_stage, failure_diagnostics = (
                 await self._build_provider(
                     request,
@@ -590,6 +608,9 @@ class LocalASRProviderRuntimeOwner:
                     event="provider_handoff",
                     request=request,
                     exc=exc,
+                    previous_provider_id=previous_provider_id,
+                    previous_model_id=previous_model_id,
+                    previous_source_language=previous_source_language,
                 )
                 await self._discard_pending_candidate(
                     channel, provider, primary_failure=failure_diagnostics
@@ -618,6 +639,11 @@ class LocalASRProviderRuntimeOwner:
                     outcome="applied",
                     channel=channel,
                     provider_id=request.provider_id,
+                    previous_provider_id=previous_provider_id,
+                    previous_model_id=previous_model_id,
+                    model_id=request.model_id,
+                    source_language=request.config.source_language,
+                    previous_source_language=previous_source_language,
                     phase=self._channel_phases[channel],
                 )
             )
@@ -1321,6 +1347,13 @@ class LocalASRProviderRuntimeOwner:
                 event=failure_stage,
                 request=request,
                 exc=exc,
+                previous_provider_id=self._provider_ids[channel],
+                previous_model_id=self._model_ids[channel],
+                previous_source_language=(
+                    self._last_requests[channel].config.source_language
+                    if channel in self._last_requests
+                    else None
+                ),
             )
             if provider is not None:
                 try:
@@ -1516,6 +1549,9 @@ class LocalASRProviderRuntimeOwner:
         event: str,
         request: ProviderRuntimeBuildRequest,
         exc: Exception,
+        previous_provider_id: str | None,
+        previous_model_id: str | None,
+        previous_source_language: str | None,
     ) -> ErrorDiagnostics:
         diagnostics = replace(
             recognition_failure_diagnostics(
@@ -1536,6 +1572,11 @@ class LocalASRProviderRuntimeOwner:
                 outcome="failed",
                 channel=request.channel,
                 provider_id=request.provider_id,
+                previous_provider_id=previous_provider_id,
+                previous_model_id=previous_model_id,
+                model_id=request.model_id,
+                source_language=request.config.source_language,
+                previous_source_language=previous_source_language,
                 phase=self._channel_phases[request.channel],
                 failure_code=_optional_string(getattr(exc, "code", None)),
                 failure_type=type(exc).__name__,

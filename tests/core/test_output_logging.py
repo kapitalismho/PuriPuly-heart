@@ -5,6 +5,7 @@ import io
 import json
 import logging
 import socket
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -13,6 +14,7 @@ from pythonosc.osc_message import OscMessage
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
+from puripuly_heart.core.orchestrator.translation_output_projection import TranslationUiMessageQueue
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
 from puripuly_heart.core.overlay.sink import (
@@ -22,6 +24,7 @@ from puripuly_heart.core.overlay.sink import (
 )
 from puripuly_heart.core.runtime.output import OutputRuntime
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks, SessionRuntimeLoggingService
+from puripuly_heart.domain.events import SelfTurnPresentation, UIEvent, UIEventType
 from tests.helpers.fakes import FakeSender, RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
 
@@ -142,12 +145,8 @@ async def test_manual_typing_has_no_publications_but_submission_reaches_udp_and_
         assert decision.publication_id == str(publication_id)
         assert decision.metadata["stage"] == "paginator_handoff"
         assert decision.metadata["physical_ack"] is False
-        for rendered in (live.getvalue(), log_file.read_text(encoding="utf-8")):
-            assert len(rendered.splitlines()) == 1
-            assert str(publication_id) in rendered
-            assert "paginator_handoff" in rendered
-            assert "physical_ack=false" in rendered
-            assert "synthetic manual message" not in rendered
+        assert live.getvalue() == ""
+        assert log_file.read_text(encoding="utf-8") == ""
     finally:
         await typing.release()
         await output.close()
@@ -196,6 +195,60 @@ async def test_failed_udp_typing_is_visible_without_false_publication_and_retrie
 
 
 @pytest.mark.asyncio
+async def test_self_turn_updates_deliver_latest_state_without_routine_output_logs(output_logs):
+    service, live, log_file = output_logs
+    output = OutputRuntime(
+        chatbox=ChatboxPaginator(sender=FakeSender(), clock=FakeClock(), runtime_logging=service),
+        routing_observer=service.record_output_routing_decision,
+    )
+    queue = asyncio.Queue(maxsize=1)
+    messages = TranslationUiMessageQueue(queue, output)
+    initial = SelfTurnPresentation(
+        utterance_id=uuid4(),
+        turn_generation=1,
+        turn_order=1,
+        revision=1,
+        source_revision=1,
+        source_text="synthetic private speech",
+        source_language="en",
+        source_closed=False,
+        status="active",
+        targets=(),
+        created_at=0.0,
+    )
+    final = replace(initial, revision=3, source_closed=True, status="complete")
+    try:
+        for snapshot in (initial, replace(initial, revision=2), final):
+            await messages.publish(
+                UIEvent(
+                    UIEventType.SELF_TURN_UPDATED,
+                    utterance_id=snapshot.utterance_id,
+                    payload=snapshot,
+                    source="Mic",
+                )
+            )
+        first = queue.get_nowait()
+        queue.task_done()
+        assert first.payload == initial
+        await messages.wait_for_idle()
+        delivered = queue.get_nowait()
+        queue.task_done()
+        assert delivered.payload == final
+        assert queue.empty()
+        assert [decision.reason for decision in output.routing_decisions] == [
+            "ui_queue_submitted",
+            "accepted_handoff",
+            "output_superseded",
+            "accepted_handoff",
+            "ui_queue_submitted",
+        ]
+        assert live.getvalue() == ""
+        assert log_file.read_text(encoding="utf-8") == ""
+    finally:
+        await output.close()
+
+
+@pytest.mark.asyncio
 async def test_normal_policy_decisions_remain_owned_without_rendered_noise(output_logs):
     service, live, log_file = output_logs
     clock = FakeClock()
@@ -239,9 +292,8 @@ async def test_normal_policy_decisions_remain_owned_without_rendered_noise(outpu
         "activation_notice_disabled",
         "destination_unconfigured",
     ]
-    for rendered in (live.getvalue(), log_file.read_text(encoding="utf-8")):
-        assert len(rendered.splitlines()) == 1
-        assert str(publication_id) in rendered
+    assert live.getvalue() == ""
+    assert log_file.read_text(encoding="utf-8") == ""
 
     class RejectingSink:
         async def emit(self, event):
@@ -264,7 +316,7 @@ async def test_normal_policy_decisions_remain_owned_without_rendered_noise(outpu
 
 
 @pytest.mark.asyncio
-async def test_peer_overlay_wait_is_file_only_and_terminal_application_remains_live(output_logs):
+async def test_peer_overlay_wait_is_file_only_and_success_stays_in_delivery_history(output_logs):
     service, live, log_file = output_logs
     started, release = asyncio.Event(), asyncio.Event()
 
@@ -297,10 +349,9 @@ async def test_peer_overlay_wait_is_file_only_and_terminal_application_remains_l
         await asyncio.wait_for(started.wait(), timeout=1)
         assert live.getvalue() == ""
         pending_file = log_file.read_text(encoding="utf-8")
-        assert len(pending_file.splitlines()) == 2
-        assert "admission_accepted" in pending_file
-        assert "logical_pacing" in pending_file
-        assert "decision=published" not in pending_file
+        assert len(pending_file.splitlines()) == 1
+        assert "logical_pacing_wait" in pending_file
+        assert "accepted_handoff" not in pending_file
 
         release.set()
         await output.wait_for_peer_output_idle()
@@ -309,10 +360,10 @@ async def test_peer_overlay_wait_is_file_only_and_terminal_application_remains_l
             "logical_pacing_wait",
             "application_applied",
         ]
-        assert len(live.getvalue().splitlines()) == 1
-        assert "application_applied" in live.getvalue()
-        assert "physical_ack=false" in live.getvalue()
-        assert len(log_file.read_text(encoding="utf-8").splitlines()) == 3
+        applied = output.routing_decisions[-1]
+        assert applied.metadata["physical_ack"] is False
+        assert live.getvalue() == ""
+        assert log_file.read_text(encoding="utf-8") == pending_file
     finally:
         release.set()
         await output.close()

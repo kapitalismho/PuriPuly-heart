@@ -22,6 +22,7 @@ from puripuly_heart.app.services.clipboard_auto_translation import (
 )
 from puripuly_heart.app.services.github_star_prompt import GithubStarPromptOwner
 from puripuly_heart.app.services.gpu_runtime_interaction import GpuRuntimeInteractionOwner
+from puripuly_heart.app.services.local_asr.local_asr_diagnostics import LocalASRDiagnosticsOwner
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
 from puripuly_heart.app.services.overlay.overlay_application import (
     OverlayApplicationOwner,
@@ -107,6 +108,7 @@ class SettingsRuntimeEffectsAdapter:
         settings: SettingsOwner,
         presentation: UiPresentationPort,
         runtime_logging: ApplicationRuntimeLoggingOwner,
+        asr_diagnostics: LocalASRDiagnosticsOwner,
         pipeline: RuntimePipelineHandle,
         runtime_signatures: ProviderRuntimeSignatures,
         audio_test: AudioTestRuntime,
@@ -130,6 +132,7 @@ class SettingsRuntimeEffectsAdapter:
         self._settings = settings
         self._presentation = presentation
         self._runtime_logging = runtime_logging
+        self._asr_diagnostics = asr_diagnostics
         self._pipeline = pipeline
         self._runtime_signatures = runtime_signatures
         self._audio_test = audio_test
@@ -618,6 +621,29 @@ class SettingsRuntimeEffectsAdapter:
             )
 
         self._sync_stt_signatures(settings)
+        if transition.source_language_changed:
+            selected = build_self_capture_session_config_from_vnext(canonical)
+            self._asr_diagnostics.selection_applied(
+                channel="self",
+                provider_id=selected.provider_id,
+                model_id=selected.model_id,
+                source_language=canonical.intent.languages.source_language,
+            )
+        if (
+            transition.effective_peer_source_changed
+            and next_peer_activation_requested
+            and self._pipeline.peer_translation_channel is not None
+        ):
+            selected_peer = build_peer_capture_session_config_from_vnext(canonical)
+            self._asr_diagnostics.selection_applied(
+                channel="peer",
+                provider_id=selected_peer.provider_id,
+                model_id=selected_peer.model_id,
+                source_language=self._effective_peer_language(
+                    canonical.intent.languages.source_language,
+                    canonical.intent.languages.peer_source_language,
+                ),
+            )
 
         if reload_settings_view and (
             transition.source_language_changed

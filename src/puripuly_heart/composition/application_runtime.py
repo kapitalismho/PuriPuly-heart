@@ -1389,6 +1389,7 @@ def compose_application_runtime(
                     settings=settings,
                     presentation=presentation,
                     runtime_logging=runtime_logging,
+                    asr_diagnostics=require_local_asr_diagnostics(),
                     pipeline=pipeline,
                     runtime_signatures=signatures,
                     audio_test=require_audio_test(),
