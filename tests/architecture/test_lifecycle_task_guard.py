@@ -192,10 +192,9 @@ TASK_CREATION_REVIEWS = (
     *_reviews(
         "core/local_translation/provisioning.py",
         {
-            "LocalGemmaDownloadAdapter.validate_inputs": 1,
             "LocalGemmaDownloadAdapter.download": 1,
         },
-        "The local Gemma adapter shield-awaits each validation or copy worker; cancellation signals and gathers it before the owning installation releases staging resources",
+        "The local Gemma adapter shield-awaits its copy worker; cancellation signals and gathers it before the owning installation releases staging resources",
     ),
     *_reviews(
         "core/local_translation/runtime.py",

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import threading
 from collections.abc import Callable
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -696,6 +698,135 @@ async def test_asset_import_uses_requested_profile_and_reuses_only_verified_inst
         assert caught.value.failure_code == "missing_file"
     finally:
         await owner.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancellation", ["once", "repeated", "close"])
+async def test_cancelled_local_import_retains_reader_and_lease_until_settled(
+    tmp_path, monkeypatch, cancellation
+) -> None:
+    content = b"synthetic-model"
+    pinned = assets.gemma_26b_spec()
+    spec = replace(
+        pinned,
+        assets=(
+            assets.GemmaAsset(
+                pinned.model_filename, len(content), hashlib.sha256(content).hexdigest()
+            ),
+        ),
+    )
+    monkeypatch.setattr(assets, "gemma_26b_spec", lambda: spec)
+    model_root = tmp_path / "models"
+    monkeypatch.setattr(assets, "default_models_dir", lambda: model_root)
+    source = tmp_path / spec.model_filename
+    source.write_bytes(content)
+    loop = asyncio.get_running_loop()
+    read_started = asyncio.Event()
+    release_read = threading.Event()
+    readers = []
+    real_open = Path.open
+
+    class GatedReader:
+        def __init__(self, reader):
+            self.reader = reader
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return self.reader.__exit__(*args)
+
+        def read(self, size):
+            loop.call_soon_threadsafe(read_started.set)
+            if not release_read.wait(timeout=10):
+                raise TimeoutError("Import reader was not released")
+            return self.reader.read(size)
+
+    def gated_open(path, mode="r", *args, **kwargs):
+        reader = real_open(path, mode, *args, **kwargs)
+        if path == source and mode == "rb":
+            readers.append(reader)
+            return GatedReader(reader)
+        return reader
+
+    monkeypatch.setattr(Path, "open", gated_open)
+    runtime = RecordingRuntime(lambda **kwargs: _readiness(str(kwargs["backend"])))
+    owner = ManagedGemmaTranslationOwner(runtime=runtime)
+    baseline_tasks = asyncio.all_tasks()
+    statuses = []
+    operation = asyncio.create_task(
+        owner.install_assets(
+            source="local", model_id=spec.model_id, files=(source,), on_status=statuses.append
+        )
+    )
+    closing = None
+    try:
+        await asyncio.wait_for(read_started.wait(), timeout=3)
+        assert owner.cancel_assets(spec.model_id)
+        await asyncio.sleep(0)
+        if cancellation == "repeated":
+            assert owner.cancel_assets(spec.model_id)
+            await asyncio.sleep(0)
+            assert owner.cancel_assets(spec.model_id)
+        elif cancellation == "close":
+            closing = asyncio.create_task(owner.close())
+        watched = (operation,) if closing is None else (operation, closing)
+        done, _ = await asyncio.wait(watched, timeout=0.05)
+        assert not done
+        assert len(readers) == 1 and not readers[0].closed
+        lease = provisioning.LocalSTTProvisioningLease.acquire(model_root=model_root, wait=False)
+        if lease is not None:
+            lease.close()
+        assert lease is None
+        assert runtime.close_count == 0
+        assert owner.snapshot.state != "closed"
+        if closing is None:
+            with pytest.raises(provisioning.GemmaProvisioningError) as caught:
+                await owner.install_assets(source="local", model_id=spec.model_id, files=(source,))
+            assert caught.value.failure_code == "task_busy"
+
+        release_read.set()
+        with pytest.raises(GemmaProvisioningCancelled):
+            await asyncio.wait_for(operation, timeout=3)
+        if closing is not None:
+            await asyncio.wait_for(closing, timeout=3)
+            assert owner.snapshot.state == "closed"
+            assert runtime.close_count == 1
+        assert all(reader.closed for reader in readers)
+        assert not assets.default_gemma_install_dir(spec).exists()
+        assert not tuple(model_root.glob("*.staging-*"))
+        assert all(status.state != "ready" for status in statuses)
+        assert not owner.cancel_assets(spec.model_id)
+        lease = provisioning.LocalSTTProvisioningLease.acquire(model_root=model_root, wait=False)
+        assert lease is not None
+        lease.close()
+    finally:
+        release_read.set()
+        await asyncio.wait_for(
+            asyncio.gather(
+                operation, *((closing,) if closing is not None else ()), return_exceptions=True
+            ),
+            timeout=3,
+        )
+        await owner.close()
+
+    statuses.clear()
+    fresh_owner = ManagedGemmaTranslationOwner(runtime=RecordingRuntime(lambda **_kwargs: None))
+    try:
+        installed = await fresh_owner.install_assets(
+            source="local", model_id=spec.model_id, files=(source,), on_status=statuses.append
+        )
+        assert installed == assets.InstalledGemmaManifest.expected(spec)
+        assert (
+            assets.validate_gemma_install(assets.default_gemma_install_dir(spec), spec=spec)
+            == installed
+        )
+        assert statuses[-1].state == "ready"
+        assert all(reader.closed for reader in readers)
+    finally:
+        await fresh_owner.close()
+    await asyncio.sleep(0)
+    assert not (asyncio.all_tasks() - baseline_tasks)
 
 
 def test_model_manager_catalog_includes_current_translation_profiles() -> None:
