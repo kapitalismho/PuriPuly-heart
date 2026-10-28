@@ -160,7 +160,7 @@ File-integrity checks do not repair TLS validation.
 
 ----
 
-Orukeet Q8_0 local CPU model asset (English)
+Orukeet Q8_0 local CPU model asset (25 languages)
 Model source and authors: https://huggingface.co/oruk/orukeet ; Oruk AI
 Base model: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3 ; NVIDIA
 License for selected Orukeet weights and fitted Gabor kernels: CC-BY-SA-4.0

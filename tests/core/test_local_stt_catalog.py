@@ -65,14 +65,88 @@ def _write_install(root: Path, manifest: LocalSTTAssetManifest, payload: bytes) 
     )
 
 
-@pytest.mark.parametrize(("language", "model_id"), ROUTES)
-def test_cpu_auto_routes_only_approved_target(language: str, model_id: str) -> None:
+@pytest.mark.parametrize(
+    ("language", "model_id"),
+    ROUTES
+    + tuple(
+        (language, ORUKEET_MODEL_ID)
+        for language in (
+            "bg",
+            "hr",
+            "cs",
+            "da",
+            "nl",
+            "et",
+            "fi",
+            "fr",
+            "de",
+            "el",
+            "hu",
+            "it",
+            "lv",
+            "lt",
+            "mt",
+            "pl",
+            "pt",
+            "ro",
+            "ru",
+            "sk",
+            "sl",
+            "es",
+            "sv",
+            "uk",
+        )
+    )
+    + tuple(
+        (language, FUN_ASR_MLT_NANO_MODEL_ID)
+        for language in ("vi", "id", "th", "ms", "tl", "ar", "hi", "ga", "yue")
+    ),
+)
+def test_cpu_auto_preserves_primary_routes_and_prefers_orukeet_for_shared_languages(
+    language: str, model_id: str
+) -> None:
     assert resolve_cpu_auto_model(language) == model_id
     assert local_cpu_model_supports_language(model_id, language)
-    for other_language, _ in ROUTES:
-        assert local_cpu_model_supports_language(model_id, other_language) == (
-            other_language == language
-        )
+
+
+@pytest.mark.parametrize(
+    "language",
+    [
+        "zh",
+        "en",
+        "yue",
+        "ja",
+        "ko",
+        "vi",
+        "id",
+        "th",
+        "ms",
+        "tl",
+        "ar",
+        "hi",
+        "bg",
+        "hr",
+        "cs",
+        "da",
+        "nl",
+        "et",
+        "fi",
+        "el",
+        "hu",
+        "ga",
+        "lv",
+        "lt",
+        "mt",
+        "pl",
+        "pt",
+        "ro",
+        "sk",
+        "sl",
+        "sv",
+    ],
+)
+def test_mlt_support_is_independent_of_cpu_auto_priority(language: str) -> None:
+    assert local_cpu_model_supports_language(FUN_ASR_MLT_NANO_MODEL_ID, language)
 
 
 @pytest.mark.parametrize(
@@ -82,6 +156,9 @@ def test_cpu_auto_routes_only_approved_target(language: str, model_id: str) -> N
         ("zh-Hant-HK", FUN_ASR_NANO_MODEL_ID),
         ("ko_KR", FUN_ASR_MLT_NANO_MODEL_ID),
         ("ja-JP", PARAKEET_JAPANESE_MODEL_ID),
+        ("pt_BR", ORUKEET_MODEL_ID),
+        (" VI_vn ", FUN_ASR_MLT_NANO_MODEL_ID),
+        ("yue-HK", FUN_ASR_MLT_NANO_MODEL_ID),
     ),
 )
 def test_regional_language_canonicalization_preserves_target_route(language, model_id) -> None:
@@ -89,8 +166,8 @@ def test_regional_language_canonicalization_preserves_target_route(language, mod
     assert local_cpu_model_supports_language(model_id, language)
 
 
-@pytest.mark.parametrize("language", ["de", "fr", "ru", "yue", "ca", "auto", "", "unknown"])
-def test_non_target_languages_have_no_hidden_fallback(language: str) -> None:
+@pytest.mark.parametrize("language", ["ca", "no", "tr", "auto", "", "unknown"])
+def test_unsupported_languages_have_no_hidden_fallback(language: str) -> None:
     with pytest.raises(LocalSTTUnsupportedLanguageError):
         resolve_cpu_auto_model(language)
     assert all(not local_cpu_model_supports_language(model_id, language) for _, model_id in ROUTES)

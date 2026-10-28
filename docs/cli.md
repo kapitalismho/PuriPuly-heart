@@ -126,7 +126,16 @@ The receipt provides admission and turn identities with `output_delivery: unobse
 
 ### Local Speech Recognition
 
-Use current `settings choices` and `models status`; retired CPU models are not installable choices. CPU Auto routes English to Orukeet, Chinese to standard Fun-ASR-Nano, Korean to Fun-ASR-MLT-Nano, and Japanese to Parakeet CTC. Other languages are explicitly unsupported on these CPU paths; they do not silently switch to cloud, GPU or the retired providers. Auto requires all four current CPU models installed.
+Use current `settings choices` and `models status`; retired CPU models are not installable choices. CPU Auto considers all supported languages of [Orukeet](https://huggingface.co/oruk/orukeet) (25) and [Fun-ASR-MLT-Nano](https://github.com/handy-computer/transcribe.cpp/blob/8facde6fcd8fb9caa585a5788ab450df6e8ec7db/docs/models/fun-asr-nano.md#choosing-a-variant) (31). It routes by the configured source language, not automatic spoken-language detection, with this priority:
+
+| Selected CPU model | Source language codes |
+| --- | --- |
+| Standard Fun-ASR-Nano | `zh`, including `zh-CN` and `zh-TW` |
+| Parakeet Japanese CTC | `ja` |
+| Orukeet | `bg`, `hr`, `cs`, `da`, `nl`, `en`, `et`, `fi`, `fr`, `de`, `el`, `hu`, `it`, `lv`, `lt`, `mt`, `pl`, `pt`, `ro`, `ru`, `sk`, `sl`, `es`, `sv`, `uk` |
+| Fun-ASR-MLT-Nano | `ko`, `vi`, `id`, `th`, `ms`, `tl`, `ar`, `hi`, `ga`, `yue` |
+
+English, Chinese and Japanese retain their existing routes; Orukeet wins the other overlaps. Direct MLT selection supports its full 31-language scope, including English, Chinese, Japanese and languages routed to Orukeet by Auto. Regional codes are normalized to their base language. The combined routing contract covers 37 base language codes; this does not add languages to the application's language picker. Languages outside that scope remain explicitly unsupported, without silently switching to cloud, GPU or retired providers. Auto still requires all four current CPU models installed.
 
 - Each active transcribe.cpp CPU channel owns its native Model/Session and requests two inference threads. Talk and Listen can compute concurrently with 2+2 threads, including on the same checkpoint, without preloading an inactive channel. This is not a total process-thread cap.
 - GPU ASR keeps one resident Model shared by independent channel Sessions and serializes inference. Switching drains and frees the old Model before loading its replacement; it never preloads a second GPU Model.

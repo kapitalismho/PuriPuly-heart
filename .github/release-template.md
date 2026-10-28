@@ -10,7 +10,8 @@ Download `{{INSTALLER_EXE}}` from the Assets section below, then run it.
 
 
 ## Change logs
-- CPU speech recognition now uses Orukeet for English, Fun-ASR-Nano for Chinese, and Fun-ASR-MLT-Nano for Korean. Japanese Parakeet CTC remains available. CPU Auto supports these four languages.
+- CPU speech recognition now uses Orukeet for English, Fun-ASR-Nano for Chinese, and Fun-ASR-MLT-Nano for Korean. Japanese Parakeet CTC remains available.
+- Fixed CPU Auto's multilingual routing regression: all 25 Orukeet languages and all 31 Fun-ASR-MLT-Nano languages are considered. English, Chinese and Japanese keep their existing models; Orukeet wins other overlaps, covering 37 language codes in total.
 - Talk and Listen use independent transcribe.cpp CPU Model/Session instances with two inference threads each. GPU ASR keeps one shared resident Model, separate channel Sessions and serialized inference, including safe model replacement.
 - Old CPU provider selections migrate automatically. Recognized retired Qwen0.6/Parakeet v3 assets are cleaned after recoverable settings migration; blocked deletion retries on later starts without removing unknown or Japanese/GPU assets.
 - The replacement CPU models support pinned, integrity-checked downloads from Hugging Face and the same-byte China mirror.

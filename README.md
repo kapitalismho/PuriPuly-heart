@@ -167,14 +167,14 @@ GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Ar
 
 | Model | Runtime | Quantization |
 |---|---|---|
-| Orukeet (English) | CPU | Q8_0 |
-| Fun-ASR-Nano-2512 (Chinese) | CPU | Q8_0 |
-| Fun-ASR-MLT-Nano-2512 (Korean) | CPU | Q8_0 |
+| Orukeet | CPU | Q8_0 |
+| Fun-ASR-Nano-2512 | CPU | Q8_0 |
+| Fun-ASR-MLT-Nano-2512 | CPU | Q8_0 |
 | Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
 | Qwen3-ASR 1.7B | GPU | Q6_K |
 | OpenAI-compatible API | — | — |
 
-CPU Auto supports only English, Chinese, Korean and Japanese. Orukeet and Fun-ASR use transcribe.cpp; Japanese keeps sherpa-onnx. Each active transcribe.cpp CPU channel owns a Model/Session with two inference threads (2+2 for Talk and Listen), without preloading inactive channels. GPU ASR shares one resident Model between independent channel Sessions and serializes inference. Replacement releases the previous GPU Model before loading another.
+CPU Auto considers all 25 Orukeet languages and all 31 Fun-ASR-MLT-Nano languages. Chinese keeps standard Fun-ASR-Nano, Japanese keeps Parakeet CTC, and English and other languages supported by both multilingual models prefer Orukeet. See the [language routing contract](docs/cli.md#local-speech-recognition) for the full mapping. Orukeet and Fun-ASR use transcribe.cpp; Japanese keeps sherpa-onnx. Each active transcribe.cpp CPU channel owns a Model/Session with two inference threads (2+2 for Talk and Listen), without preloading inactive channels. GPU ASR shares one resident Model between independent channel Sessions and serializes inference. Replacement releases the previous GPU Model before loading another.
 
 Windows Setup prepares all four CPU ASR models, downloading them separately when needed; CPU Auto requires all four ready. Old Parakeet v3 selections migrate to Orukeet, and CPU Qwen0.6 selections migrate to CPU Auto. Startup removes recognized retired assets only after recoverable settings persistence; blocked cleanup retries later. Unrecognized files and Japanese/GPU assets are preserved.
 

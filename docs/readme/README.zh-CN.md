@@ -168,14 +168,14 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 
 | 模型 | 运行环境 | 量化 |
 |---|---|---|
-| Orukeet（英语） | CPU | Q8_0 |
-| Fun-ASR-Nano-2512（中文） | CPU | Q8_0 |
-| Fun-ASR-MLT-Nano-2512（韩语） | CPU | Q8_0 |
+| Orukeet | CPU | Q8_0 |
+| Fun-ASR-Nano-2512 | CPU | Q8_0 |
+| Fun-ASR-MLT-Nano-2512 | CPU | Q8_0 |
 | Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
 | Qwen3-ASR 1.7B | GPU | Q6_K |
 | OpenAI 兼容 API | — | — |
 
-CPU 自动选择仅支持英语、中文、韩语和日语。Orukeet 与 Fun-ASR 使用 transcribe.cpp；日语继续使用 sherpa-onnx。每个活动的 transcribe.cpp CPU 通道独立持有 Model/Session，使用两个推理线程，Talk/Listen 同时运行时为 2+2；不预加载非活动通道。GPU ASR 的独立通道 Session 共享唯一常驻 Model，推理按顺序执行。切换模型时也先释放旧 Model，再加载新模型。
+CPU 自动选择会考虑 Orukeet 支持的全部 25 种语言和 Fun-ASR-MLT-Nano 支持的全部 31 种语言。中文仍使用标准 Fun-ASR-Nano，日语仍使用 Parakeet CTC；英语和两种多语言模型共同支持的语言优先使用 Orukeet。完整映射请参阅[语言路由契约](../cli.md#local-speech-recognition)。Orukeet 与 Fun-ASR 使用 transcribe.cpp；日语继续使用 sherpa-onnx。每个活动的 transcribe.cpp CPU 通道独立持有 Model/Session，使用两个推理线程，Talk/Listen 同时运行时为 2+2；不预加载非活动通道。GPU ASR 的独立通道 Session 共享唯一常驻 Model，推理按顺序执行。切换模型时也先释放旧 Model，再加载新模型。
 
 Windows 安装程序会准备全部四个 CPU ASR 模型，并在需要时单独下载；CPU 自动选择需要四个模型均已就绪。旧 Parakeet v3 选择迁移为 Orukeet，CPU Qwen0.6 迁移为 CPU 自动选择。设置以可恢复方式保存后，启动流程仅清理已识别的旧模型文件，失败的清理会在下次启动时重试。无法识别的文件及日语/GPU 模型保持不变。
 

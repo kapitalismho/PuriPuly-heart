@@ -22,6 +22,9 @@ from puripuly_heart.core.local_asr.local_stt_assets import (
         ("zh_CN", FUN_ASR_NANO_MODEL_ID),
         ("ko-KR", FUN_ASR_MLT_NANO_MODEL_ID),
         ("ja-JP", PARAKEET_JAPANESE_MODEL_ID),
+        ("fr-FR", ORUKEET_MODEL_ID),
+        ("vi-VN", FUN_ASR_MLT_NANO_MODEL_ID),
+        ("pt-BR", ORUKEET_MODEL_ID),
     ],
 )
 def test_cpu_auto_routes_only_the_selected_language_model(language: str, model_id: str) -> None:
@@ -38,15 +41,20 @@ def test_cpu_auto_routes_only_the_selected_language_model(language: str, model_i
     ("provider", "language", "model_id", "supported"),
     [
         ("local_orukeet", "en", ORUKEET_MODEL_ID, True),
-        ("local_orukeet", "fr", ORUKEET_MODEL_ID, False),
+        ("local_orukeet", "fr", ORUKEET_MODEL_ID, True),
         ("local_orukeet", "ko", ORUKEET_MODEL_ID, False),
         ("local_fun_asr_nano", "zh-TW", FUN_ASR_NANO_MODEL_ID, True),
         ("local_fun_asr_nano", "en", FUN_ASR_NANO_MODEL_ID, False),
         ("local_fun_asr_mlt_nano", "ko", FUN_ASR_MLT_NANO_MODEL_ID, True),
-        ("local_fun_asr_mlt_nano", "zh", FUN_ASR_MLT_NANO_MODEL_ID, False),
+        ("local_fun_asr_mlt_nano", "zh", FUN_ASR_MLT_NANO_MODEL_ID, True),
+        ("local_fun_asr_mlt_nano", "en", FUN_ASR_MLT_NANO_MODEL_ID, True),
+        ("local_fun_asr_mlt_nano", "ja", FUN_ASR_MLT_NANO_MODEL_ID, True),
+        ("local_fun_asr_mlt_nano", "vi", FUN_ASR_MLT_NANO_MODEL_ID, True),
+        ("local_fun_asr_mlt_nano", "fr", FUN_ASR_MLT_NANO_MODEL_ID, False),
         ("local_parakeet_ja", "ja", PARAKEET_JAPANESE_MODEL_ID, True),
         ("local_parakeet_ja", "en", PARAKEET_JAPANESE_MODEL_ID, False),
-        ("local_cpu_auto", "fr", None, False),
+        ("local_cpu_auto", "fr", ORUKEET_MODEL_ID, True),
+        ("local_cpu_auto", "ca", None, False),
         ("deepgram", "fr", None, True),
     ],
 )

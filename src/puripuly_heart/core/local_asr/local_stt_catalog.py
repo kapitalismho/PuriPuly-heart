@@ -17,10 +17,79 @@ from .local_stt_assets import (
     load_local_stt_asset_manifest,
 )
 
-ORUKEET_SUPPORTED_LANGUAGE_CODES = frozenset({"en"})
+ORUKEET_SUPPORTED_LANGUAGE_CODES = frozenset(
+    {
+        "bg",
+        "hr",
+        "cs",
+        "da",
+        "nl",
+        "en",
+        "et",
+        "fi",
+        "fr",
+        "de",
+        "el",
+        "hu",
+        "it",
+        "lv",
+        "lt",
+        "mt",
+        "pl",
+        "pt",
+        "ro",
+        "ru",
+        "sk",
+        "sl",
+        "es",
+        "sv",
+        "uk",
+    }
+)
 FUN_ASR_NANO_SUPPORTED_LANGUAGE_CODES = frozenset({"zh"})
-FUN_ASR_MLT_NANO_SUPPORTED_LANGUAGE_CODES = frozenset({"ko"})
+FUN_ASR_MLT_NANO_SUPPORTED_LANGUAGE_CODES = frozenset(
+    {
+        "zh",
+        "en",
+        "yue",
+        "ja",
+        "ko",
+        "vi",
+        "id",
+        "th",
+        "ms",
+        "tl",
+        "ar",
+        "hi",
+        "bg",
+        "hr",
+        "cs",
+        "da",
+        "nl",
+        "et",
+        "fi",
+        "el",
+        "hu",
+        "ga",
+        "lv",
+        "lt",
+        "mt",
+        "pl",
+        "pt",
+        "ro",
+        "sk",
+        "sl",
+        "sv",
+    }
+)
 PARAKEET_JAPANESE_SUPPORTED_LANGUAGE_CODES = frozenset({"ja"})
+
+_CPU_AUTO_MODEL_PRIORITY = (
+    FUN_ASR_NANO_MODEL_ID,
+    PARAKEET_JAPANESE_MODEL_ID,
+    ORUKEET_MODEL_ID,
+    FUN_ASR_MLT_NANO_MODEL_ID,
+)
 
 
 class LocalSTTUnsupportedLanguageError(ValueError):
@@ -112,8 +181,8 @@ def local_cpu_model_supports_language(model_id: str, language_code: str) -> bool
 
 def resolve_cpu_auto_model(language_code: str) -> str:
     canonical_code = canonical_local_stt_language_code(language_code)
-    for model_id, contract in LOCAL_CPU_MODEL_CONTRACTS.items():
-        if canonical_code in contract.supported_language_codes:
+    for model_id in _CPU_AUTO_MODEL_PRIORITY:
+        if canonical_code in LOCAL_CPU_MODEL_CONTRACTS[model_id].supported_language_codes:
             return model_id
     raise LocalSTTUnsupportedLanguageError(
         f"CPU Auto does not support source language: {language_code}"

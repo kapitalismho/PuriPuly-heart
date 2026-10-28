@@ -86,7 +86,7 @@
 | ID | Provider |
 | ---: | --- |
 | 0 | Auto Select (CPU Inference) |
-| 1 | Orukeet (English) |
+| 1 | Orukeet (25 languages) |
 | 2 | Parakeet TDT-CTC 0.6B (ja) |
 | 3 | Legacy CPU Qwen input → Auto Select (CPU Inference) |
 | 4 | Qwen3 ASR 1.7B |
@@ -99,7 +99,7 @@
 | 12 | Qwen Audio 3.1 ASR Flash Streaming |
 | 13 | Free cloud ASR auto-selection (ElevenLabs Scribe → Gemini → Deepgram) |
 | 14 | Fun-ASR-Nano-2512 (Chinese) |
-| 15 | Fun-ASR-MLT-Nano-2512 (Korean) |
+| 15 | Fun-ASR-MLT-Nano-2512 (31 languages) |
 
 - Used by: `PuriPuly_SelfASR`, `PuriPuly_PeerASR`
 - ID `6` is retired and rejected as an unknown ASR value. Qwen Audio uses ID `12`.

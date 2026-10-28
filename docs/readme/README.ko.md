@@ -186,14 +186,14 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 
 | 모델                         | 실행 환경 | 양자화  |
 | -------------------------- | ----- | ---- |
-| Orukeet (영어) | CPU | Q8_0 |
-| Fun-ASR-Nano-2512 (중국어) | CPU | Q8_0 |
-| Fun-ASR-MLT-Nano-2512 (한국어) | CPU | Q8_0 |
+| Orukeet | CPU | Q8_0 |
+| Fun-ASR-Nano-2512 | CPU | Q8_0 |
+| Fun-ASR-MLT-Nano-2512 | CPU | Q8_0 |
 | Parakeet TDT-CTC 0.6B (ja) | CPU   | INT8 |
 | Qwen3-ASR 1.7B             | GPU   | Q6_K |
 | OpenAI 호환 API              | —     | —    |
 
-CPU 자동 선택은 영어·중국어·한국어·일본어만 지원해요. Orukeet과 Fun-ASR는 transcribe.cpp를 사용하고, 일본어는 sherpa-onnx를 유지해요. 활성 transcribe.cpp CPU 채널마다 Model/Session과 추론 스레드 2개를 사용하며, Talk/Listen 동시 실행 시 2+2로 동작해요. 비활성 채널은 미리 로드하지 않아요. GPU ASR는 채널별 Session이 상주 Model 하나를 공유하며 순차 추론하고, 모델 변경 시에도 기존 Model을 해제한 뒤 새 모델을 로드해요.
+CPU 자동 선택은 Orukeet의 25개 언어와 Fun-ASR-MLT-Nano의 31개 언어를 모두 고려해요. 중국어는 표준 Fun-ASR-Nano, 일본어는 Parakeet CTC를 유지하며, 영어와 두 다국어 모델이 공통으로 지원하는 언어는 Orukeet을 우선해요. 전체 매핑은 [언어 라우팅 계약](../cli.md#local-speech-recognition)을 참고하세요. Orukeet과 Fun-ASR는 transcribe.cpp를 사용하고, 일본어는 sherpa-onnx를 유지해요. 활성 transcribe.cpp CPU 채널마다 Model/Session과 추론 스레드 2개를 사용하며, Talk/Listen 동시 실행 시 2+2로 동작해요. 비활성 채널은 미리 로드하지 않아요. GPU ASR는 채널별 Session이 상주 Model 하나를 공유하며 순차 추론하고, 모델 변경 시에도 기존 Model을 해제한 뒤 새 모델을 로드해요.
 
 Windows 설치 프로그램은 CPU ASR 모델 4개를 준비하며, 필요하면 별도로 다운로드해요. CPU 자동 선택에는 4개가 모두 필요해요. 기존 Parakeet v3 선택은 Orukeet으로, CPU Qwen0.6 선택은 CPU 자동 선택으로 이전해요. 설정을 복구 가능한 방식으로 저장한 뒤 시작 시 식별된 구형 모델 파일만 정리하며, 실패한 정리는 다음 시작 때 재시도해요. 식별되지 않은 파일과 일본어/GPU 모델은 보존해요.
 

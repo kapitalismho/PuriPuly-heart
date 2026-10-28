@@ -66,7 +66,7 @@ async def test_cpu_readiness_preserves_selection_and_only_repairs_asset_failures
         runtime_available=True,
         self_provider="local_cpu_auto",
         peer_provider="local_cpu_auto",
-        self_source_language="fr" if outcome == "unsupported" else "ko-KR",
+        self_source_language="ca" if outcome == "unsupported" else "ko-KR",
         peer_source_language="en",
         self_desired=True,
         peer_requested=False,
@@ -126,7 +126,7 @@ async def test_cpu_readiness_preserves_selection_and_only_repairs_asset_failures
         assert await owner.ensure_self_ready(activation_generation=1) is (outcome == "ready")
 
     assert state.self_provider == "local_cpu_auto"
-    assert state.self_source_language == ("fr" if outcome == "unsupported" else "ko-KR")
+    assert state.self_source_language == ("ca" if outcome == "unsupported" else "ko-KR")
     if outcome in {"model_missing", "model_invalid"}:
         assert len(provisioning.installs) == 1
         assert provisioning.installs[0].model_ids == (FUN_ASR_MLT_NANO_MODEL_ID,)
