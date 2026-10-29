@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import wave
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +30,7 @@ class NativeWorker:
         self.cancelled = []
         self.activation = None
         self.events = asyncio.Queue()
+        self.audio = []
 
     async def activate(self, **options):
         self.activation = options
@@ -37,6 +39,13 @@ class NativeWorker:
     async def transcribe(self, *, request_id, channel, audio_path, language_hint=None):
         assert audio_path.is_file()
         assert channel == self.activation["channel"]
+        with wave.open(str(audio_path), "rb") as wav:
+            self.audio.append(
+                (
+                    wav.getparams(),
+                    np.frombuffer(wav.readframes(wav.getnframes()), dtype="<i2").copy(),
+                )
+            )
         self.calls += 1
         self.running = True
         self.started.set()
@@ -82,6 +91,50 @@ def backend(tmp_path, channel, factory, monkeypatch):
     )
     monkeypatch.setattr(instance, "_validate_runtime_assets", lambda: None)
     return instance
+
+
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_cpu_worker_receives_ordered_mono_16khz_pcm16_signal(
+    tmp_path: Path, monkeypatch, channel: str
+):
+    factory = WorkerFactory()
+    provider = backend(tmp_path, channel, factory, monkeypatch)
+    signals = [
+        np.array([-1.0, 0.25, -0.75, 0.0, 1.0, -0.125, 0.75], dtype=np.float32),
+        np.array([0.5, -0.25, 0.125, -0.5, 0.0], dtype=np.float32),
+    ]
+    expected_pcm = [
+        [-32768, 8192, -24576, 0, 32767, -4096, 24576],
+        [16384, -8192, 4096, -16384, 0],
+    ]
+    first = asyncio.create_task(provider.decode_f32(signals[0]))
+    while not factory.workers:
+        await asyncio.sleep(0)
+    worker = factory.workers[0]
+    worker.finish.set()
+    try:
+        assert await first == "completed speech"
+        assert await provider.decode_f32(signals[1]) == "completed speech"
+    finally:
+        await provider.close()
+    assert len(worker.audio) == len(expected_pcm)
+    for turn, ((params, samples), expected) in enumerate(
+        zip(worker.audio, expected_pcm, strict=True)
+    ):
+        assert (params.nchannels, params.framerate, params.sampwidth, params.comptype) == (
+            1,
+            16000,
+            2,
+            "NONE",
+        )
+        assert params.nframes == len(expected)
+        np.testing.assert_allclose(
+            samples,
+            expected,
+            rtol=0,
+            atol=1,
+            err_msg=f"CPU worker staged WAV signal mismatch: channel={channel}, turn={turn}",
+        )
 
 
 async def test_cpu_channels_load_lazily_and_remain_independent_during_stop(
