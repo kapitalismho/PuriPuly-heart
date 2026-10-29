@@ -31,7 +31,8 @@ foreach ($name in ($names | Sort-Object -Unique)) {
 }
 Push-Location $repoRoot
 try {
-    $env:TRANSCRIBE_CMAKE_ARGS = "-DTRANSCRIBE_USE_SYSTEM_BLAS=OFF -DTRANSCRIBE_USE_OPENMP=OFF -DCMAKE_SUPPRESS_REGENERATION=ON"
+    $languagePatch = (Join-Path $repoRoot "native/asr_worker/cmake/funasr-language.cmake").Replace("\", "/")
+    $env:TRANSCRIBE_CMAKE_ARGS = "-DTRANSCRIBE_USE_SYSTEM_BLAS=OFF -DTRANSCRIBE_USE_OPENMP=OFF -DCMAKE_SUPPRESS_REGENERATION=ON -DCMAKE_PROJECT_transcribe_INCLUDE=`"$languagePatch`""
     $env:CMAKE_GENERATOR = "Visual Studio 17 2022"
     $env:CMAKE_PREFIX_PATH = $env:VULKAN_SDK
     $env:RUSTFLAGS = "-C target-cpu=x86-64"

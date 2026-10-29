@@ -24,6 +24,21 @@ fn record_runtime_sources(output: &std::path::Path) {
         env::var_os("DEP_TRANSCRIBE_CPP_LIB_DIR")
             .expect("transcribe library directory is required"),
     );
+    let language_patch = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("cmake/funasr_language.h");
+    let installed_language_patch = lib_dir
+        .parent()
+        .expect("transcribe install prefix must exist")
+        .join("share/puripuly-asr/funasr_language.h");
+    assert_eq!(
+        std::fs::read(&installed_language_patch)
+            .expect("FunASR language patch is required; use scripts/ci/build-asr-worker-release.ps1"),
+        std::fs::read(&language_patch).expect("FunASR language mapping must exist"),
+        "FunASR language patch is stale; rebuild the ASR worker runtime"
+    );
+    println!("cargo:rerun-if-changed={}", language_patch.display());
+    println!("cargo:rerun-if-changed={}", installed_language_patch.display());
+    println!("cargo:rerun-if-changed=cmake/funasr-language.cmake");
     let link_manifest = lib_dir.join("transcribe-link.json");
     let manifest: serde_json::Value = serde_json::from_slice(
         &std::fs::read(&link_manifest).expect("transcribe link manifest must exist"),

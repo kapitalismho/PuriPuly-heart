@@ -82,6 +82,11 @@ dynamic backends. CPU channels use independent workers; GPU channels share one
 resident Model. Model weights are downloaded separately and retain the model
 licenses below, independently of the runtime's MIT license.
 
+Modifications: PuriPuly applies a build-time Fun-ASR prompt overlay that maps
+validated ISO language codes to the checkpoint's documented Chinese language
+names. The overlay is maintained in native/asr_worker/cmake and is compiled
+into transcribe.dll. It does not modify the downloaded model weights.
+
 ----
 
 Gemma 4 E4B local translation model assets
