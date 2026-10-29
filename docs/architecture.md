@@ -72,7 +72,6 @@ Contracts: [audio ownership](../src/puripuly_heart/core/audio/ownership.py), [au
 - Canonical sherpa code and layout keys retain the existing physical `_runtime/local_qwen` directory for the ONNX Runtime DLLs still needed by Japanese CTC. This is current shared-runtime storage, not a retired CPU provider or weight bundle. No second cache path, legacy provider alias, or guessed-hash deletion is introduced.
 - GPU ASR retains one shared worker and exactly one resident native Model, with independent channel Sessions and serialized compute. Replacement drains work and releases the previous Model before loading another. Releasing one channel must preserve the other channel's lease and Session.
 - Channel generations fence cancelled or replaced results. Started native work remains owned until settlement; requesting cancellation does not authorize early Model/Session destruction.
-- CPU activation and transcription calls own and drain their foreground requests through settlement; handled request outcomes remain with their callers rather than becoming backend-cleanup diagnostics. The backend lifecycle scope owns background work and reports unexpected background failures separately.
 - The [asset catalog](../src/puripuly_heart/core/local_asr/local_stt_catalog.py) owns language routing and readiness. CPU Auto requires its four current CPU assets; unsupported languages and missing assets do not select a retired, cloud or GPU fallback. The [CLI contract](cli.md#local-speech-recognition) describes migration and control behavior.
 
 
