@@ -13,6 +13,144 @@ from puripuly_heart.ui.components.settings.api_key_verification_controller impor
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status", "code", "param", "category", "message_key"),
+    [
+        (400, "unsupported_value", "max_completion_tokens", "invalid_response", "request_rejected"),
+        (400, "model_not_found", "model", "invalid_response", "model_unavailable"),
+        (401, "invalid_api_key", None, "auth", "authentication_rejected"),
+        (401, "model_not_found", "model", "auth", "authentication_rejected"),
+        (403, "permission_denied", "model", "auth", "permission_denied"),
+        (404, "model_not_found", "model", "invalid_response", "model_unavailable"),
+        (429, "insufficient_quota", None, "quota", "quota"),
+        (429, "rate_limit_exceeded", None, "rate_limit", "rate_limit"),
+        (503, "server_error", None, "service_unavailable", "service_unavailable"),
+    ],
+)
+async def test_openai_verification_displays_typed_failure_and_retains_only_safe_details(
+    monkeypatch, caplog, status, code, param, category, message_key
+) -> None:
+    import httpx
+
+    from puripuly_heart.app.adapters.provider_verifier import ProviderVerifierAdapter
+    from puripuly_heart.app.services.provider.provider_credential_verification import (
+        ProviderCredentialVerificationInteractionOwner,
+        ProviderCredentialVerificationOwner,
+    )
+    from puripuly_heart.core import network_clients
+    from puripuly_heart.core.diagnostic_validation import validate_diagnostics_for_sink
+    from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE, normalize_diagnostic
+    from puripuly_heart.ui.i18n import t
+
+    private = "sk-synthetic-private-key-not-for-output"
+    transport = httpx.MockTransport(
+        lambda _request: httpx.Response(
+            status,
+            json={
+                "error": {
+                    "code": code,
+                    "type": "invalid_request_error",
+                    "param": param,
+                    "message": f"Private upstream message containing {private}",
+                }
+            },
+        )
+    )
+    monkeypatch.setattr(
+        network_clients,
+        "external_async_client",
+        lambda **kwargs: httpx.AsyncClient(transport=transport, **kwargs),
+    )
+    interaction = ProviderCredentialVerificationInteractionOwner(
+        verification_owner=ProviderCredentialVerificationOwner(verifier=ProviderVerifierAdapter()),
+        selected_model_provider=lambda _provider: "gpt-6-luna",
+    )
+    shown = []
+    field = ApiKeyField(
+        "settings.openai_api_key",
+        "openai_api_key",
+        "openai",
+        on_verify=interaction.verify,
+        show_snackbar=lambda message, _color: shown.append(message),
+    )
+    field.value = private
+    field._handle_blur(None)
+    await field._run_verification()
+
+    assert field.controller.status == "error"
+    assert field.controller.last_verified_hash == ""
+    assert shown == [t("snackbar.verification_failed", message=t(f"error.openai.{message_key}"))]
+    failures = [
+        getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+        for record in caplog.records
+        if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+    ]
+    assert len(failures) == 1
+    failure = failures[0]
+    assert failure.status_code == status
+    assert failure.category == category
+    assert failure.operation == "key_verification"
+    assert failure.fields["openai_error_code"] == code
+    assert failure.fields["openai_error_param"] == (param or "unknown")
+    assert failure.fields["openai_error_type"] == "invalid_request_error"
+    assert validate_diagnostics_for_sink(failure, "persisted_logs").status == "accepted"
+    retained = normalize_diagnostic(
+        failure, instance_id=None, severity="error", disposition="failed"
+    )
+    assert retained["fields"]["openai_error_code"] == code
+    assert retained["fields"]["openai_error_param"] == (param or "unknown")
+    assert retained["detail"]["rejected_fields"] == 0
+    assert private not in repr(retained) + repr(shown) + caplog.text
+    assert "Private upstream message" not in repr(retained) + repr(shown) + caplog.text
+
+
+@pytest.mark.asyncio
+async def test_openai_verification_can_recover_after_a_rejected_request(monkeypatch) -> None:
+    import httpx
+
+    from puripuly_heart.app.adapters.provider_verifier import ProviderVerifierAdapter
+    from puripuly_heart.app.services.provider.provider_credential_verification import (
+        ProviderCredentialVerificationInteractionOwner,
+        ProviderCredentialVerificationOwner,
+    )
+    from puripuly_heart.core import network_clients
+
+    responses = iter(
+        [
+            httpx.Response(400, json={"error": {"code": "invalid_value", "param": "temperature"}}),
+            httpx.Response(200, json={"choices": [{"finish_reason": "length"}]}),
+        ]
+    )
+    monkeypatch.setattr(
+        network_clients,
+        "external_async_client",
+        lambda **kwargs: httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _request: next(responses)), **kwargs
+        ),
+    )
+    interaction = ProviderCredentialVerificationInteractionOwner(
+        verification_owner=ProviderCredentialVerificationOwner(verifier=ProviderVerifierAdapter()),
+        selected_model_provider=lambda _provider: "gpt-6-luna",
+    )
+    field = ApiKeyField(
+        "settings.openai_api_key", "openai_api_key", "openai", on_verify=interaction.verify
+    )
+    field.value = "synthetic-key"
+
+    field._handle_blur(None)
+    await field._run_verification()
+    assert field.controller.status == "error"
+    assert field.controller.last_verified_hash == ""
+
+    field._handle_blur(None)
+    await field._run_verification()
+    assert field.controller.status == "success"
+    assert field.controller.last_verified_hash == ApiKeyVerificationController.key_hash(
+        "synthetic-key"
+    )
+
+
+@pytest.mark.asyncio
 async def test_api_key_field_default_status_mode_verifies_saved_value() -> None:
     saved: list[tuple[str, str]] = []
     verified: list[tuple[str, str]] = []

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 from uuid import UUID
 
@@ -10,10 +10,11 @@ import httpx
 
 from puripuly_heart.config.runtime_resolution import OPENAI_MODEL_GPT_6_LUNA
 from puripuly_heart.core import network_clients
+from puripuly_heart.core.diagnostic_validation import OPENAI_FAILURE_ENUM_FIELDS
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
-from puripuly_heart.providers.llm.error_details import LLMResponseError, record_probe_failure
+from puripuly_heart.providers.llm.error_details import LLMResponseError
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
@@ -23,8 +24,48 @@ _OPENAI_BASE_URL = "https://api.openai.com/v1"
 class OpenAIResponseError(LLMResponseError):
     diagnostic_provider = "openai"
 
-    def __init__(self, status_code: int) -> None:
-        super().__init__("OpenAI request failed", provider="openai", status_code=status_code)
+    def __init__(
+        self,
+        status_code: int,
+        *,
+        operation: str = "translate",
+        error: object = None,
+    ) -> None:
+        details = error if isinstance(error, dict) else {}
+        fields = {}
+        for field_name, allowed in OPENAI_FAILURE_ENUM_FIELDS.items():
+            value = details.get(field_name.removeprefix("openai_error_"))
+            fields[field_name] = value if type(value) is str and value in allowed else "unknown"
+        super().__init__(
+            "OpenAI request failed",
+            provider="openai",
+            status_code=status_code,
+            operation=operation,
+            diagnostic_category=(
+                "quota"
+                if fields["openai_error_code"]
+                in {"insufficient_quota", "billing_hard_limit_reached"}
+                else "unknown"
+            ),
+        )
+        self.failure_diagnostics = replace(
+            self.failure_diagnostics,
+            fields={**self.failure_diagnostics.fields, **fields},
+        )
+
+    @classmethod
+    def from_response(
+        cls, response: httpx.Response, *, operation: str = "translate"
+    ) -> OpenAIResponseError:
+        try:
+            data = response.json()
+        except ValueError:
+            data = None
+        return cls(
+            response.status_code,
+            operation=operation,
+            error=data.get("error") if isinstance(data, dict) else None,
+        )
 
 
 def _build_system_prompt(
@@ -163,28 +204,24 @@ class OpenAILLMProvider:
     ) -> bool:
         if not api_key:
             return False
-        try:
-            async with network_clients.external_async_client(timeout=10.0) as client:
-                response = await client.post(
-                    f"{_OPENAI_BASE_URL}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": model,
-                        "messages": [{"role": "user", "content": "Reply with OK."}],
-                        "reasoning_effort": "none",
-                        "temperature": 0.6,
-                        "max_completion_tokens": 1,
-                    },
-                )
-                if response.status_code != 200:
-                    record_probe_failure(None, provider="openai", status_code=response.status_code)
-                return response.status_code == 200
-        except Exception as exc:
-            record_probe_failure(exc, provider="openai")
-            return False
+        async with network_clients.external_async_client(timeout=10.0) as client:
+            response = await client.post(
+                f"{_OPENAI_BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": "Reply with OK."}],
+                    "reasoning_effort": "none",
+                    "temperature": 0.6,
+                    "max_completion_tokens": 16,
+                },
+            )
+            if response.status_code != 200:
+                raise OpenAIResponseError.from_response(response, operation="key_verification")
+            return True
 
 
 @dataclass(slots=True)
@@ -294,9 +331,7 @@ class HttpxOpenAIClient:
             json=request_body,
         )
         if response.status_code != 200:
-            error = OpenAIResponseError(response.status_code)
-
-            raise error
+            raise OpenAIResponseError.from_response(response)
 
         try:
             data = response.json()

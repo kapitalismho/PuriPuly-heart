@@ -18,6 +18,7 @@ from uuid import uuid4
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.diagnostic_codes import is_supported_diagnostic_code
 from puripuly_heart.core.diagnostic_validation import (
+    OPENAI_FAILURE_ENUM_FIELDS,
     QWEN_FAILURE_ENUM_FIELDS,
     QWEN_FAILURE_NUMERIC_FIELDS,
     stt_startup_failure_code,
@@ -153,6 +154,7 @@ _ID_FIELDS = frozenset(
 )
 _ENUM_FIELDS = {
     **TRANSPORT_ENUM_FIELDS,
+    **OPENAI_FAILURE_ENUM_FIELDS,
     **QWEN_FAILURE_ENUM_FIELDS,
     **{key: frozenset(values) for key, values in QQ_ENUM_FIELDS.items()},
     "channel": frozenset({"self", "peer"}),

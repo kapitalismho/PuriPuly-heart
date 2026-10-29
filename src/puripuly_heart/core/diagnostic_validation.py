@@ -74,6 +74,56 @@ QWEN_FAILURE_ENUM_FIELDS: Final = MappingProxyType(
 )
 QWEN_FAILURE_NUMERIC_FIELDS: Final = ("ws_close_code", "idle_ms")
 
+OPENAI_FAILURE_ENUM_FIELDS: Final = MappingProxyType(
+    {
+        "openai_error_code": frozenset(
+            {
+                "unknown",
+                "invalid_api_key",
+                "invalid_parameter",
+                "invalid_value",
+                "unsupported_parameter",
+                "unsupported_value",
+                "model_not_found",
+                "context_length_exceeded",
+                "insufficient_quota",
+                "billing_hard_limit_reached",
+                "rate_limit_exceeded",
+                "permission_denied",
+                "account_deactivated",
+                "server_error",
+            }
+        ),
+        "openai_error_type": frozenset(
+            {
+                "unknown",
+                "invalid_request_error",
+                "authentication_error",
+                "permission_error",
+                "rate_limit_error",
+                "insufficient_quota",
+                "server_error",
+            }
+        ),
+        "openai_error_param": frozenset(
+            {
+                "unknown",
+                "model",
+                "messages",
+                "messages[0].role",
+                "messages[0].content",
+                "messages[0].content[0].prompt_cache_breakpoint",
+                "reasoning_effort",
+                "temperature",
+                "max_completion_tokens",
+                "prompt_cache_options",
+                "prompt_cache_options.mode",
+                "prompt_cache_options.ttl",
+            }
+        ),
+    }
+)
+
 DiagnosticSink: TypeAlias = Literal[
     "dashboard",
     "snackbar",
@@ -899,6 +949,9 @@ def _field_shape_reasons(
                 reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSUPPORTED_FIELD_TYPE)
         elif key in QWEN_FAILURE_ENUM_FIELDS:
             if type(value) is not str or value not in QWEN_FAILURE_ENUM_FIELDS[key]:
+                reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSUPPORTED_FIELD_TYPE)
+        elif key in OPENAI_FAILURE_ENUM_FIELDS:
+            if type(value) is not str or value not in OPENAI_FAILURE_ENUM_FIELDS[key]:
                 reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSUPPORTED_FIELD_TYPE)
         elif key in TRANSPORT_NUMERIC_FIELDS and type(value) is not int:
             reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSUPPORTED_FIELD_TYPE)

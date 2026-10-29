@@ -92,7 +92,7 @@ def provider_failure_report(
     provider: str,
     operation: str,
 ) -> UserErrorReport:
-    return _failure_report(
+    report = _failure_report(
         exc,
         surface="provider",
         message_key="provider.failure",
@@ -101,6 +101,35 @@ def provider_failure_report(
         operation=operation,
         extra_fields={},
     )
+    if report.diagnostics.fields.get("provider") == "openai":
+        return replace(
+            report,
+            message=replace(
+                report.message,
+                key=_openai_message_key(report.diagnostics),
+            ),
+        )
+    return report
+
+
+def _openai_message_key(diagnostics: ErrorDiagnostics) -> str:
+    if diagnostics.status_code in (400, 422):
+        if diagnostics.fields.get("openai_error_code") == "model_not_found":
+            return "error.openai.model_unavailable"
+        return "error.openai.request_rejected"
+    if diagnostics.status_code == 401:
+        return "error.openai.authentication_rejected"
+    if diagnostics.status_code == 403:
+        return "error.openai.permission_denied"
+    if diagnostics.status_code == 404:
+        return "error.openai.model_unavailable"
+    return {
+        "quota": "error.openai.quota",
+        "rate_limit": "error.openai.rate_limit",
+        "service_unavailable": "error.openai.service_unavailable",
+        "timeout": "error.network_timeout",
+        "network": "error.network_error",
+    }.get(diagnostics.category, "error.openai.request_failed")
 
 
 def openrouter_auth_failure_report(
@@ -206,6 +235,9 @@ def format_error_report_for_log(
         "managed_code",
         "managed_error_class",
         "managed_subcode",
+        "openai_error_code",
+        "openai_error_type",
+        "openai_error_param",
         *TRANSPORT_FIELD_KEYS,
     ):
         value = diagnostics.fields.get(key)
