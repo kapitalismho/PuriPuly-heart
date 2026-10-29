@@ -12,7 +12,11 @@ from uuid import uuid4
 
 import numpy as np
 
-from puripuly_heart.core.asr_worker import ASRWorkerClientPort, ASRWorkerProcessFactoryPort
+from puripuly_heart.core.asr_worker import (
+    ASRWorkerClientPort,
+    ASRWorkerClosedError,
+    ASRWorkerProcessFactoryPort,
+)
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr.local_stt_assets import (
     ORUKEET_MODEL_ID,
@@ -53,25 +57,26 @@ class LocalCppSTTBackend(LocalOfflineSTTBackend):
         await self._scope.close()
 
     async def _settle(self, awaitable: Awaitable[_T], *, request_id: str | None = None) -> _T:
-        task = start_lifecycle_task(self._scope, awaitable, name=request_id or "activation")
+        task = asyncio.ensure_future(awaitable)
         try:
             return await asyncio.shield(task)
         except asyncio.CancelledError:
-            client = cast(ASRWorkerClientPort | None, self._recognizer)
-            if client is not None and request_id is not None:
-                with contextlib.suppress(Exception):
-                    await client.cancel(request_id)
-            while not task.done():
+            draining = asyncio.ensure_future(self._cancel_and_drain(task, request_id=request_id))
+            while not draining.done():
                 try:
-                    await asyncio.shield(task)
+                    await asyncio.shield(draining)
                 except asyncio.CancelledError:
                     continue
-                except Exception:
-                    break
-            if task.done() and not task.cancelled():
-                with contextlib.suppress(Exception):
-                    task.result()
+            draining.result()
             raise
+
+    async def _cancel_and_drain(self, task: asyncio.Future[_T], *, request_id: str | None) -> None:
+        client = cast(ASRWorkerClientPort | None, self._recognizer)
+        if client is not None and request_id is not None:
+            with contextlib.suppress(Exception):
+                await client.cancel(request_id)
+        with contextlib.suppress(Exception):
+            await task
 
     async def _load_resource(self) -> object:
         assert self.process_factory is not None
@@ -97,7 +102,7 @@ class LocalCppSTTBackend(LocalOfflineSTTBackend):
         try:
             while True:
                 await client.next_event()
-        except Exception:
+        except ASRWorkerClosedError:
             return
 
     async def _close_resource(self, resource: object) -> None:

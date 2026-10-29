@@ -211,6 +211,9 @@ for raw in reader:
             }
         )
         if target == active_request_id:
+            if gate := os.environ.get("FAKE_ASR_WORKER_BLOCK_CANCEL"):
+                while not Path(gate).is_file():
+                    time.sleep(0.01)
             send(
                 {
                     "type": "response",

@@ -458,6 +458,12 @@ TASK_CREATION_REVIEWS = (
         classification="legacy_exception",
     ),
     *_reviews(
+        "providers/stt/local_cpp.py",
+        {"LocalCppSTTBackend._settle": 2},
+        "CPU request calls retain and shield their operation and cancellation-drain tasks; load/decode locks prevent resource release until both settle despite repeated cancellation",
+        family=ASYNCIO_ENSURE_FUTURE,
+    ),
+    *_reviews(
         "providers/stt/local_gpu.py",
         {
             "_LocalGpuSTTSession.seal_turn": 1,
