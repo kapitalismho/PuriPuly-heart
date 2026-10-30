@@ -472,6 +472,8 @@ uv run --locked python scripts/ci/check_test_selection.py
 
 Run the affected Python partition or individual failing node using the [PR verification guide](.github/CONTRIBUTING.md#pr-verification) and [workflow selections](.github/workflows/pr-ci.yml). The workflow keeps live-provider/model integrations explicitly excluded. A focused test pass does not replace wider checks or actual-application verification.
 
+For controlled CPU activation/transcription outcomes and process cleanup without installed models or live services, run `uv run --locked pytest -ra tests/providers/test_local_cpp_backend.py tests/providers/test_local_cpu_backends.py tests/providers/test_local_session.py tests/app/test_asr_worker_process.py`. These checks use an authenticated synthetic child, not native inference.
+
 PR CI uses the Python and uv versions pinned in its workflow and keeps six independently reproducible Python partitions. Contracts and Runtime use two file-grouped pytest workers, capture stdout/stderr for failure diagnosis, and do not restart failed workers. Other Python partitions remain serial. Reproduce a reported node serially with `uv run --locked pytest -ra <nodeid>` when live output is useful.
 
 Every job still performs locked installation and its complete declared checks. uv uses a same-volume temporary cache without remote persistence; measured restore/save costs exceeded download savings. Lint reuses Black's content-aware cache but always runs `black --check`. Native checks reuse dependency builds at the short Windows target path and still stage fonts and run both deterministic and serial graphics checks on every run.
