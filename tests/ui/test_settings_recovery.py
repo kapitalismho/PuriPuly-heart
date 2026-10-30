@@ -15,6 +15,7 @@ from puripuly_heart.app.ports.settings_view import (
 from puripuly_heart.app.services.settings.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
+from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import TransactionResult
 from puripuly_heart.ui.app import TranslatorApp
@@ -272,4 +273,164 @@ async def test_new_successful_change_rechecks_existing_runtime_failure():
     recovery.submit(latest)
     await recovery.drain()
     assert calls[-2:] == [latest, None]
+    assert recovery.phase == "idle"
+
+
+@pytest.mark.parametrize("merged", [False, True])
+@pytest.mark.parametrize("replacement", ["committed prompt", "newer prompt"])
+async def test_prompt_reversion_supersedes_failed_autosave_through_editor(
+    monkeypatch, tmp_path, merged, replacement
+):
+    from dataclasses import replace
+
+    from puripuly_heart.ui.views.settings import SettingsView
+    from tests.app.test_settings_application_owner import FakeRuntimeEffects
+    from tests.app.test_settings_apply_recovery import persistent_application
+
+    monkeypatch.setattr(SettingsView, "_load_secrets", lambda *args: None)
+    boundary, settings = persistent_application(tmp_path, FakeRuntimeEffects([]))
+    boundary._provider._backend.apply_providers = boundary._settings.application.apply
+    current = settings.require_committed()
+    initial = replace(
+        current,
+        intent=replace(
+            current.intent,
+            prompts=replace(current.intent.prompts, system_prompt_override="committed prompt"),
+        ),
+    )
+    settings.commit_delta(current, initial)
+    boundary._settings.projection.remember_all(settings.canonical)
+    view = SettingsView()
+    boundary._settings.projection.presentation = SimpleNamespace(
+        render_settings=lambda **kwargs: view.load_from_settings(**kwargs)
+    )
+    boundary.refresh_settings_projection()
+    ui = TranslatorApp.__new__(TranslatorApp)
+    ui._ui_application = boundary
+    ui.view_settings = view
+    workers = []
+    ui._run_page_task = workers.append
+    view.on_prompt_apply_settings = ui._on_prompt_apply_settings
+    view.on_pending_prompt_changed = ui._on_pending_prompt_changed
+    attempts = []
+    persist = settings.persistence.persist
+    failures_left = 1
+
+    def persist_with_one_failure(*args, **kwargs):
+        nonlocal failures_left
+        if failures_left:
+            failures_left -= 1
+            raise OSError("controlled storage fault")
+        return persist(*args, **kwargs)
+
+    monkeypatch.setattr(settings.persistence, "persist", persist_with_one_failure)
+
+    def edit_and_blur(text):
+        editor = view._prompt_editor
+        editor._text_field.value = text
+        editor._handle_change(None)
+        editor._handle_blur(None)
+
+    async def apply(intent):
+        attempts.append(intent)
+        return await boundary.apply_settings_change(intent)
+
+    async def retry_delay(_delay):
+        edit_and_blur(replacement)
+
+    recovery = SettingsRecovery(
+        apply, ui._on_settings_committed, lambda _: None, retry_delays=(0,), sleep=retry_delay
+    )
+    ui._settings_recovery = recovery
+    edit_and_blur("discarded prompt")
+    if merged:
+        recovery.submit(ProviderApplyIntent((SonioxSpeakerDiarizationEdit(False),)))
+    await workers[0]()
+    assert (
+        load_vnext_settings(settings.path).settings.intent.prompts.system_prompt_override
+        == replacement
+    )
+    assert view._prompt_editor.value == replacement
+    assert recovery.phase == "idle"
+    if merged:
+        assert settings.require_committed().intent.stt.soniox.enable_speaker_diarization is False
+
+
+def test_unchanged_prompt_blur_does_not_start_autosave(monkeypatch, tmp_path):
+    from puripuly_heart.app.services.settings.settings_application import (
+        settings_view_surface_snapshots,
+    )
+    from puripuly_heart.ui.views.settings import SettingsView
+
+    monkeypatch.setattr(SettingsView, "_load_secrets", lambda *args: None)
+    view = SettingsView()
+    provider, general, prompt, overlay = settings_view_surface_snapshots(AppSettingsVNext())
+    view.load_from_settings(
+        provider=provider,
+        general=general,
+        prompt=prompt,
+        overlay=overlay,
+        config_path=tmp_path / "settings.json",
+    )
+    ui = TranslatorApp.__new__(TranslatorApp)
+    workers = []
+    ui._queue_settings_mutation_task = workers.append
+    view.on_prompt_apply_settings = ui._on_prompt_apply_settings
+    view.on_pending_prompt_changed = ui._on_pending_prompt_changed
+    view._prompt_editor._handle_blur(None)
+    assert workers == []
+    assert getattr(ui, "_settings_recovery", None) is None
+
+
+async def test_repeated_compensation_retains_edit_and_reports_reverted_state():
+    intent = LocaleSettingsIntent("ja")
+    attempts = []
+    phases = []
+
+    async def apply(value):
+        attempts.append(value)
+        return SettingsApplyOutcome(saved=False, applied=False, reverted=True)
+
+    recovery = SettingsRecovery(
+        apply, lambda _: pytest.fail("reverted edit acknowledged"), phases.append, retry_delays=(0,)
+    )
+    recovery.submit(intent)
+    await recovery.drain()
+    assert attempts == [intent, intent]
+    assert "retrying_reverted" in phases
+    assert recovery.phase == "reverted_failed"
+    assert recovery.has_pending
+
+
+@pytest.mark.parametrize("merged", [False, True])
+async def test_prompt_reversion_during_inflight_apply_is_saved_after_stale_completion(merged):
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    prompt = "committed"
+    calls = []
+
+    async def apply(intent):
+        nonlocal prompt
+        calls.append(intent)
+        if len(calls) == 1:
+            entered.set()
+            await release.wait()
+        prompt = (
+            intent.value
+            if isinstance(intent, PromptApplyIntent)
+            else next(edit.value for edit in intent.edits if isinstance(edit, SystemPromptEdit))
+        )
+        return SettingsApplyOutcome(saved=True, applied=True)
+
+    recovery = SettingsRecovery(apply, lambda _: None, lambda _: None)
+    recovery.submit(PromptApplyIntent("discarded"))
+    if merged:
+        recovery.submit(ProviderApplyIntent((SonioxSpeakerDiarizationEdit(False),)))
+    task = asyncio.create_task(recovery.drain())
+    await entered.wait()
+    assert recovery.replace_pending_prompt(PromptApplyIntent("committed"))
+    release.set()
+    await task
+    assert prompt == "committed"
+    assert len(calls) == 2
     assert recovery.phase == "idle"

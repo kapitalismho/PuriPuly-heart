@@ -621,6 +621,8 @@
   "settings.mutation.operation_failed": "操作失败，请重试此操作。",
   "settings.recovery.saving": "正在保存并应用设置…",
   "settings.recovery.applying": "正在应用已保存的设置…",
+  "settings.recovery.retrying_reverted": "设置应用失败，已恢复原设置，正在重试…",
+  "settings.recovery.reverted_failed": "设置应用失败，已恢复原设置。更改已保留，请重试。",
   "settings.recovery.retrying_save": "设置保存失败，正在自动重试…",
   "settings.recovery.retrying_apply": "设置已保存但尚未生效，正在自动重试…",
   "settings.recovery.save_failed": "设置保存失败，更改已保留。请重试。",

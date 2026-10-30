@@ -299,6 +299,7 @@ class TranslatorApp:
             ),
             prompt=SettingsPromptIntents(
                 prompt_apply_settings=self._on_prompt_apply_settings,
+                pending_prompt_changed=self._on_pending_prompt_changed,
             ),
             overlay=SettingsOverlayIntents(
                 desktop_overlay_lock_change=self._on_desktop_overlay_lock_change,
@@ -1558,6 +1559,11 @@ class TranslatorApp:
 
     def _on_prompt_apply_settings(self, intent: PromptApplyIntent) -> None:
         self._queue_settings_apply(intent)
+
+    def _on_pending_prompt_changed(self, intent: PromptApplyIntent) -> None:
+        recovery = getattr(self, "_settings_recovery", None)
+        if recovery is not None and recovery.replace_pending_prompt(intent):
+            self._queue_settings_mutation_task(recovery.drain)
 
     def _on_providers_changed(self) -> None:
         view_settings = getattr(self, "view_settings", None)

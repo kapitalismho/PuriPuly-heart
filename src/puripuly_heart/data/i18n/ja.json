@@ -621,6 +621,8 @@
   "settings.mutation.operation_failed": "操作に失敗しました。もう一度お試しください。",
   "settings.recovery.saving": "設定を保存して適用しています…",
   "settings.recovery.applying": "保存済みの設定を適用しています…",
+  "settings.recovery.retrying_reverted": "設定の適用に失敗したため元の設定に戻しました。再試行しています…",
+  "settings.recovery.reverted_failed": "設定の適用に失敗したため元の設定に戻しました。変更内容は保持されています。再試行してください。",
   "settings.recovery.retrying_save": "設定を保存できませんでした。自動で再試行しています…",
   "settings.recovery.retrying_apply": "設定は保存済みですが、まだ適用されていません。自動で再試行しています…",
   "settings.recovery.save_failed": "設定を保存できませんでした。変更内容は保持されています。再試行してください。",

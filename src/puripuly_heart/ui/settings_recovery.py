@@ -84,6 +84,29 @@ class SettingsRecovery:
         for key, pending in tuple(self._pending.items()):
             self._pending[key] = replace(pending, attempts=0, delay=None)
 
+    def replace_pending_prompt(self, intent: PromptApplyIntent) -> bool:
+        if self._closed:
+            return False
+        prompt = self._pending.get(PromptApplyIntent)
+        if prompt is not None:
+            previous = prompt.intent.value
+        else:
+            provider = self._pending.get(ProviderApplyIntent)
+            if provider is None:
+                return False
+            previous = next(
+                (
+                    edit.value
+                    for edit in provider.intent.edits
+                    if isinstance(edit, SystemPromptEdit)
+                ),
+                None,
+            )
+        if previous is None or previous == intent.value:
+            return False
+        self.submit(intent)
+        return True
+
     def stop(self) -> None:
         self._closed = True
         self._pending.clear()
@@ -104,7 +127,11 @@ class SettingsRecovery:
                     return
                 key, pending = min(candidates, key=lambda item: item[1].delay is not None)
                 if pending.delay is not None:
-                    self._set_phase("retrying_apply" if pending.intent is None else "retrying_save")
+                    self._set_phase(
+                        "retrying_reverted"
+                        if pending.result is not None and pending.result.reverted
+                        else "retrying_apply" if pending.intent is None else "retrying_save"
+                    )
                     delay = pending.delay
                     pending.delay = None
                     await self._sleep(delay)
@@ -143,7 +170,11 @@ class SettingsRecovery:
             (
                 "unknown_failed"
                 if pending.result is None or pending.result.saved is None
-                else "apply_failed" if pending.result.saved else "save_failed"
+                else (
+                    "reverted_failed"
+                    if pending.result.reverted
+                    else "apply_failed" if pending.result.saved else "save_failed"
+                )
             )
             for pending in self._pending.values()
         }

@@ -838,6 +838,7 @@ class ConstructionDummySettingsView(ft.Container):
         self.on_apply_loopback_capture_option = general.apply_loopback_capture_option
         self.on_loopback_capture_summary = general.loopback_capture_summary
         self.on_prompt_apply_settings = prompt.prompt_apply_settings
+        self.on_pending_prompt_changed = prompt.pending_prompt_changed
         self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
         self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
         self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
@@ -961,6 +962,7 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     )
     assert app.view_settings.on_verify_api_key == app._on_verify_api_key
     assert app.view_settings.on_prompt_apply_settings == app._on_prompt_apply_settings
+    assert app.view_settings.on_pending_prompt_changed == app._on_pending_prompt_changed
     assert app.view_settings.on_start_audio_test == app._on_start_audio_test
     assert app.view_settings.on_desktop_overlay_lock_change == (app._on_desktop_overlay_lock_change)
     assert app.view_settings.on_desktop_overlay_size_change == (app._on_desktop_overlay_size_change)

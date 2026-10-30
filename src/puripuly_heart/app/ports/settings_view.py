@@ -25,6 +25,7 @@ class SettingsApplyOutcome:
     saved: bool | None
     applied: bool
     transaction: TransactionResult | None = None
+    reverted: bool = False
 
 
 @dataclass(frozen=True, slots=True)

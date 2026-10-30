@@ -621,6 +621,8 @@
   "settings.mutation.operation_failed": "작업에 실패했어요. 다시 시도해 주세요.",
   "settings.recovery.saving": "설정을 저장하고 적용하는 중이에요…",
   "settings.recovery.applying": "저장된 설정을 적용하는 중이에요…",
+  "settings.recovery.retrying_reverted": "설정 적용에 실패해 이전 설정으로 복원했어요. 다시 시도하고 있어요…",
+  "settings.recovery.reverted_failed": "설정 적용에 실패해 이전 설정으로 복원했어요. 변경 내용은 유지돼요. 다시 시도해 주세요.",
   "settings.recovery.retrying_save": "설정을 저장하지 못했어요. 자동으로 다시 시도하고 있어요…",
   "settings.recovery.retrying_apply": "설정은 저장됐지만 아직 적용되지 않았어요. 자동으로 다시 시도하고 있어요…",
   "settings.recovery.save_failed": "설정을 저장하지 못했어요. 변경 내용은 유지돼요. 다시 시도해 주세요.",

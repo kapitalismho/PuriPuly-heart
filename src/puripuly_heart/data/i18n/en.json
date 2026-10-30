@@ -621,6 +621,8 @@
   "settings.mutation.operation_failed": "The operation failed. Please try it again.",
   "settings.recovery.saving": "Saving and applying settings…",
   "settings.recovery.applying": "Applying saved settings…",
+  "settings.recovery.retrying_reverted": "Applying settings failed. Previous settings were restored. Retrying…",
+  "settings.recovery.reverted_failed": "Applying settings failed. Previous settings were restored. Your changes are retained; please retry.",
   "settings.recovery.retrying_save": "Could not save settings. Retrying automatically…",
   "settings.recovery.retrying_apply": "Settings saved but not yet active. Retrying automatically…",
   "settings.recovery.save_failed": "Could not save settings. Your edits are retained. Retry when ready.",

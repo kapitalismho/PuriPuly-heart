@@ -1161,6 +1161,7 @@ class SettingsApplicationOwner:
         reload_settings_view: bool = True,
     ) -> None:
         restored = await self.settings.commit_delta_async(committed_settings, base_settings)
+        self.results.mark_settings_reverted()
         await self.apply_direct(
             restored,
             persist=False,

@@ -971,6 +971,10 @@ class UiApplicationBoundary:
                 raw = False
             result = scope.current
         await self._publish_osc_state()
+        if scope.reverted:
+            return SettingsApplyOutcome(
+                saved=False, applied=False, transaction=result, reverted=True
+            )
         if result is None:
             return SettingsApplyOutcome(
                 saved=True if raw is True or intent is None else None,

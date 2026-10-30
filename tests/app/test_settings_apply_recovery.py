@@ -265,3 +265,128 @@ async def test_capture_target_change_reports_saved_and_applied_separately(
     assert result.saved is (failure != "save")
     assert result.applied is (failure is None)
     assert settings.peer_translation_enabled() is True
+
+
+@pytest.mark.parametrize("active", [False, True])
+async def test_transient_local_asr_failure_preserves_requested_change_after_compensation(
+    tmp_path, active
+):
+    from puripuly_heart.app.language_selection import LanguageSelectionChange
+    from puripuly_heart.app.services.settings.settings_application import (
+        materialize_language_selection,
+    )
+    from puripuly_heart.composition.ui_application import compose_ui_application
+    from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+
+    composed = compose_ui_application(
+        presentation=FletUiPresentationAdapter(SimpleNamespace(debug_ui_preview=False)),
+        config_path=tmp_path / "composition.json",
+    )
+    predicate = composed._settings.application.active_local_asr_change
+    closure = dict(
+        zip(predicate.__code__.co_freevars, (cell.cell_contents for cell in predicate.__closure__))
+    )
+    closure["pipeline"].self_capture = SimpleNamespace(
+        snapshot=SimpleNamespace(desired_active=active)
+    )
+
+    class TransientFailure(FakeRuntimeEffects):
+        async def apply_after_persist(self, transition, **kwargs):
+            self.events.append("runtime")
+            if self.events.count("runtime") == 1:
+                raise RuntimeError("controlled capture apply failure")
+
+    app, settings = persistent_application(tmp_path / "settings", TransientFailure([]))
+    app._settings.application.active_local_asr_change = predicate
+    original = settings.require_committed()
+    language = original.intent.languages
+    intent = LanguageSelectionChange(
+        source_code="ja",
+        target_code=language.target_language,
+        secondary_target_code=language.secondary_target_language,
+        peer_source_code=language.peer_source_language,
+        peer_target_code=language.peer_target_language,
+        peer_source_mode=language.peer_source_mode,
+        recent_source_codes=(),
+        recent_target_codes=(),
+    )
+    assert predicate(original, materialize_language_selection(original, intent)) is active
+    attempts = []
+    committed = []
+
+    async def apply(value):
+        result = await app.apply_settings_change(value)
+        attempts.append((value, result.saved, result.applied))
+        return result
+
+    recovery = SettingsRecovery(apply, committed.append, lambda _: None, retry_delays=(0,))
+    recovery.submit(intent)
+    await recovery.drain()
+    assert load_vnext_settings(settings.path).settings.intent.languages.source_language == "ja"
+    assert attempts == [(intent, not active, False), (intent if active else None, True, True)]
+    assert committed == [intent]
+    assert recovery.phase == "idle"
+    assert not recovery.has_pending
+    assert settings.peer_translation_enabled()
+
+
+async def test_failed_compensation_keeps_saved_intent_for_runtime_retry(tmp_path, monkeypatch):
+    from puripuly_heart.app.ports.settings_view import (
+        AudioSettingsIntent,
+        DesktopAudioOutputSettingsIntent,
+    )
+
+    app, settings = persistent_application(
+        tmp_path, FakeRuntimeEffects([], RuntimeError("controlled runtime failure"))
+    )
+    app._settings.application.active_local_asr_change = lambda *_: True
+    original_commit = type(settings).commit_delta_async
+
+    async def fail_rollback(owner, base, next_settings):
+        if next_settings.intent.desktop_audio.output_device == "":
+            raise OSError("controlled rollback storage failure")
+        return await original_commit(owner, base, next_settings)
+
+    monkeypatch.setattr(type(settings), "commit_delta_async", fail_rollback)
+    result = await app.apply_settings_change(
+        AudioSettingsIntent((DesktopAudioOutputSettingsIntent("Synthetic output"),))
+    )
+    assert result.saved is True
+    assert result.applied is False
+    assert not result.reverted
+    assert (
+        load_vnext_settings(settings.path).settings.intent.desktop_audio.output_device
+        == "Synthetic output"
+    )
+
+
+async def test_reverted_outcome_is_scoped_to_the_current_attempt():
+    results = SettingsTransactionResultOwner()
+    attempts = 0
+
+    async def apply_settings(_settings):
+        nonlocal attempts
+        attempts += 1
+        results.set(
+            TransactionResult(
+                (
+                    "settings_commit_success_runtime_degraded"
+                    if attempts == 1
+                    else "settings_commit_success_runtime_applied"
+                ),
+                None,
+                None,
+            )
+        )
+        if attempts == 1:
+            results.mark_settings_reverted()
+        return True
+
+    app = compose_test_ui_application_boundary(
+        SimpleNamespace(settings=AppSettingsVNext(), apply_settings=apply_settings)
+    )
+    app._settings_results = results
+    first = await app.apply_settings_change(LocaleSettingsIntent("ja"))
+    second = await app.apply_settings_change(LocaleSettingsIntent("ja"))
+    assert first.reverted and first.saved is False and first.applied is False
+    assert not second.reverted and second.saved is True and second.applied is True
