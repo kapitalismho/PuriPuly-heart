@@ -29,7 +29,7 @@ def model_asset_choices() -> tuple[ModelAssetChoice, ...]:
         (FUN_ASR_NANO_MODEL_ID, "Fun-ASR-Nano-2512 Q8_0", "fun_asr_nano"),
         (FUN_ASR_MLT_NANO_MODEL_ID, "Fun-ASR-MLT-Nano-2512 Q8_0", "fun_asr_mlt_nano"),
         (LOCAL_QWEN_GPU_MODEL_ID, "Qwen3 ASR 1.7B Q6_K", "qwen_gpu"),
-        (PARAKEET_JAPANESE_MODEL_ID, "Parakeet TDT/CTC 0.6B", "parakeet_ja"),
+        (PARAKEET_JAPANESE_MODEL_ID, "Parakeet TDT/CTC 0.6B Japanese INT8", "parakeet_ja"),
     ):
         manifest = load_local_stt_asset_manifest(model_id)
         choices.append(
@@ -42,8 +42,8 @@ def model_asset_choices() -> tuple[ModelAssetChoice, ...]:
             )
         )
     for spec, name, key in (
-        (e4b_gemma_spec(), "Gemma 4 E4B", "gemma_e4b"),
-        (gemma_26b_spec(), "Gemma 4 26B A4B", "gemma_26b"),
+        (e4b_gemma_spec(), "Gemma 4 E4B QAT UD Q4 K XL", "gemma_e4b"),
+        (gemma_26b_spec(), "Gemma 4 26B A4B QAT UD Q4 K XL", "gemma_26b"),
     ):
         choices.append(
             ModelAssetChoice(

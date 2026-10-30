@@ -1323,6 +1323,7 @@ class SettingsView(ft.Column):
         api_header = ft.Row(
             controls=[
                 self._api_title,
+                ft.Container(expand=True),
                 self._api_guide_btn,
                 self._qwen_region_btn,
             ],

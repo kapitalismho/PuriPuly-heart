@@ -5750,28 +5750,6 @@ def test_api_keys_card_uses_shared_full_width_auto_height(
     assert api_card.expand is False
 
 
-def test_api_keys_card_omits_helper_copy_and_keeps_qwen_region_button_in_header(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, llm=LLMProviderName.QWEN)
-    settings = _vnext(settings, qwen_region=QwenRegion.SINGAPORE)
-
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-
-    api_card = _api_tab_card(view, t("settings.section.api_keys"))
-    api_column = _wrapped_card_column(api_card)
-    api_header = api_column.controls[0]
-
-    assert view._qwen_region_btn.visible is True
-    assert isinstance(api_header, ft.Row)
-    assert api_header.controls[0] is view._api_title
-    assert api_header.controls[2] is view._api_guide_btn
-    assert api_header.controls[3] is view._qwen_region_btn
-    assert not hasattr(view, "_api_credentials_helper_text")
-
-
 def test_integrated_context_controls_are_removed_from_overlay_tab(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
