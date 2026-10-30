@@ -432,6 +432,52 @@ async def test_handled_native_cpu_outcomes_close_cleanly_and_allow_replacement(
     assert not asyncio.all_tasks() - existing_tasks
 
 
+async def test_handled_native_cpu_activation_failure_is_not_replayed_during_close(
+    tmp_path: Path, monkeypatch
+):
+    existing_tasks = asyncio.all_tasks()
+    for name in tuple(os.environ):
+        if name.startswith("FAKE_ASR_WORKER_"):
+            monkeypatch.delenv(name)
+    monkeypatch.setenv("FAKE_ASR_WORKER_ACTIVATION_FAILURE", "1")
+    factory = DefaultASRWorkerProcessFactory(
+        executable_path=Path(__file__).parents[1] / "fixtures" / "fake_asr_worker.py",
+        command_prefix=(sys.executable,),
+        heartbeat_timeout_s=5,
+    )
+    client_type = asr_worker_process_module._DefaultASRWorkerClient
+    activate = client_type.activate
+    clients = []
+    request_errors = []
+
+    async def observe_activate(client, **kwargs):
+        clients.append(client)
+        try:
+            return await activate(client, **kwargs)
+        except ASRWorkerRequestError as exc:
+            request_errors.append(exc)
+            raise
+
+    monkeypatch.setattr(client_type, "activate", observe_activate)
+    provider = backend(tmp_path, "self", factory, monkeypatch)
+    try:
+        with pytest.raises(ASRWorkerRequestError) as error:
+            await asyncio.wait_for(provider.open_session(), timeout=5)
+        assert len(clients) == 1
+        assert len(request_errors) == 1
+        assert error.value is request_errors[0]
+        assert error.value.code == "out_of_memory"
+        assert error.value.attempt_started is False
+        assert error.value.fields == {}
+        await asyncio.wait_for(provider.close(), timeout=5)
+        _assert_native_closed(provider, clients[0], [], factory)
+    finally:
+        await asyncio.wait_for(provider.close(), timeout=5)
+        await factory.close_pending_startups()
+    await asyncio.sleep(0)
+    assert not asyncio.all_tasks() - existing_tasks
+
+
 async def test_native_cpu_resource_cleanup_failure_remains_owned_and_retryable(
     tmp_path: Path, monkeypatch
 ):
