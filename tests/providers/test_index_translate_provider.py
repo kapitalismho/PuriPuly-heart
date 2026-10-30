@@ -346,9 +346,7 @@ async def test_tls_policy_preparation_is_off_loop_and_settled_before_close(
 
 
 @pytest.mark.parametrize("budget", [0, -1, True])
-async def test_invalid_output_budget_reports_limit_without_dispatch(
-    transport_factory, budget
-):
+async def test_invalid_output_budget_reports_limit_without_dispatch(transport_factory, budget):
     clients, *_ = transport_factory(lambda request: pytest.fail("Unexpected HTTP dispatch"))
     provider = index_translate.IndexTranslateProvider()
     try:
