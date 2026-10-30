@@ -409,8 +409,7 @@ async def test_soniox_documented_unkeyed_tokens_reuse_epoch_and_detect_idle_ambi
             }
         )
     )
-    assert (await _next(session)).text == "same "
-    assert (await _next(session)).text == "text"
+    assert (await _next(session)).text == "same text"
     terminal_a = await _next(session)
     assert (terminal_a.text, terminal_a.epoch_disposition) == ("same text", "reuse")
 
@@ -1033,7 +1032,10 @@ async def test_each_concrete_streaming_protocol_serves_self_and_peer_concurrentl
 
 
 @pytest.mark.asyncio
-async def test_real_soniox_shared_engine_preserves_trailing_token_separator() -> None:
+@pytest.mark.parametrize("separate_responses", [False, True])
+async def test_real_soniox_shared_engine_preserves_trailing_token_separator(
+    separate_responses: bool,
+) -> None:
     sessions: list[_SonioxSession] = []
     sockets: list[_FakeSonioxWebSocket] = []
     emitted: list[object] = []
@@ -1118,31 +1120,30 @@ async def test_real_soniox_shared_engine_preserves_trailing_token_separator() ->
         if isinstance(payload, str) and payload and json.loads(payload).get("type") == "finalize"
     )
     assert sockets[0].sent[finalize_index - 1] == bytes(16000 * 200 // 1000 * 2)
-    sockets[0].push(
-        json.dumps(
-            {
-                "tokens": [
-                    {"text": "same ", "is_final": True, "end_ms": 100, "language": "en"},
-                    {"text": "世界", "is_final": True, "end_ms": 200, "language": "ja"},
-                    {"text": "<fin>", "is_final": True},
-                ]
-            }
-        )
-    )
+    tokens = [
+        {"text": "same ", "is_final": True, "end_ms": 100, "language": "en"},
+        {"text": "世界", "is_final": True, "end_ms": 200, "language": "ja"},
+        {"text": "<fin>", "is_final": True},
+    ]
+    for batch in ([tokens[:1], tokens[1:]] if separate_responses else [tokens]):
+        sockets[0].push(json.dumps({"tokens": batch}))
     await end_task
 
     updates = [event for event in emitted if isinstance(event, STTProviderTurnUpdate)]
     terminal = next(event for event in emitted if isinstance(event, STTProviderTurnTerminal))
-    assert [event.text for event in updates] == ["same", "same 世界"]
-    assert [
-        (item.contribution_id, item.text_start, item.text_end)
-        for item in terminal.included_contributions
-    ] == [
-        (f"{terminal.identity.provider_turn_id}:1", 0, 4),
-        (f"{terminal.identity.provider_turn_id}:2", 4, 7),
-    ]
-    assert consumption.consume(updates[0]) == "same"
-    assert consumption.consume(terminal) == " 世界"
+    assert [event.text for event in updates] == (
+        ["same", "same 世界"] if separate_responses else ["same 世界"]
+    )
+    contributions = terminal.included_contributions
+    assert contributions[0].text_start == 0
+    assert contributions[-1].text_end == len(terminal.text)
+    assert all(
+        left.text_end == right.text_start for left, right in zip(contributions, contributions[1:])
+    )
+    consumed = [consumption.consume(update) for update in updates]
+    consumed.append(consumption.consume(terminal))
+    assert "".join(consumed) == "same 世界"
+    assert consumption.consume(terminal) == ""
     assert terminal.text == "same 世界"
     assert "".join(run.text for run in terminal.final_language_runs) == terminal.text
     await engine.close()

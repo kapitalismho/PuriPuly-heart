@@ -499,6 +499,7 @@ class _SonioxSession(STTBackendSession):
                 if message is None:
                     return
                 self._handle_message(message)
+                await asyncio.sleep(0)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -587,6 +588,11 @@ class _SonioxSession(STTBackendSession):
                 )
             return
 
+        scoped_tokens: list[_FinalToken] = []
+        request_id = data.get("request_id")
+        provenance = STTNativeProvenance(
+            native_request_id=str(request_id) if request_id is not None else None,
+        )
         for token in tokens:
             if not isinstance(token, dict):
                 if self._event_projection.is_scoped:
@@ -603,6 +609,10 @@ class _SonioxSession(STTBackendSession):
                 continue
             if text == "<fin>":
                 if self._event_projection.is_scoped:
+                    self._emit_scoped_tokens(scoped_tokens, provenance)
+                    scoped_tokens.clear()
+                    if self._event_projection.retired:
+                        return
                     self._resolve_scoped_fin(data)
                     if self._event_projection.retired:
                         return
@@ -657,55 +667,38 @@ class _SonioxSession(STTBackendSession):
                 attribution_state=attribution_state,
             )
             self._pending_tokens.append(final_token)
-            self._emit_scoped_token(final_token, token, data)
+            if self._event_projection.active_identity is not None:
+                if not scoped_tokens:
+                    self._scoped_provenance.append(provenance)
+                self._scoped_tokens.append(final_token)
+                scoped_tokens.append(final_token)
+
+        self._emit_scoped_tokens(scoped_tokens, provenance)
 
         if data.get("finished") is True and self._event_projection.is_scoped:
             self._scoped_transport_failure("soniox_stream_finished", orderly=True)
             self._stopped = True
 
-    def _emit_scoped_token(
+    def _emit_scoped_tokens(
         self,
-        final_token: _FinalToken,
-        token: dict[str, Any],
-        message: dict[str, Any],
+        tokens: list[_FinalToken],
+        provenance: STTNativeProvenance,
     ) -> None:
         identity = self._event_projection.active_identity
-        if identity is None:
+        if identity is None or not tokens:
             return
-        request_id = message.get("request_id")
-        provenance = STTNativeProvenance(
-            native_request_id=str(request_id) if request_id is not None else None,
-        )
-        self._scoped_tokens.append(final_token)
-        self._scoped_provenance.append(provenance)
         sequence = self._event_projection.next_update_sequence(identity)
         if sequence is None:
             return
-        runs = ()
-        if self.enable_language_identification:
-            runs = (FinalLanguageRun(text=final_token.text, language=final_token.language),)
-        speaker_runs = ()
-        if self.enable_speaker_diarization:
-            speaker_runs = (
-                FinalSpeakerRun(
-                    text=final_token.text,
-                    speaker_id=final_token.speaker_id,
-                    session_scope=self.speaker_session_scope,
-                    source_start_ms=final_token.start_ms,
-                    source_end_ms=final_token.end_ms,
-                    source="soniox",
-                    attribution_state=final_token.attribution_state,
-                ),
-            )
         self._event_projection.put_update(
             STTProviderTurnUpdate(
                 identity=identity,
                 sequence=sequence,
                 stability="stable",
                 assembly="append",
-                text=final_token.text,
-                final_language_runs=runs,
-                final_speaker_runs=speaker_runs,
+                text="".join(token.text for token in tokens),
+                final_language_runs=self._language_runs_for_tokens(tokens),
+                final_speaker_runs=self._speaker_runs_for_tokens(tokens),
                 provenance=provenance,
             )
         )
