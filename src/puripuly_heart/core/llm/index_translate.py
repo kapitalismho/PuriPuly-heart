@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-from puripuly_heart.core.llm.fallback_racing import LLMProviderRaceError
 from puripuly_heart.core.messages import DiagnosticCategory
 
 
@@ -46,13 +45,3 @@ class IndexRequestLimitError(IndexTranslateError):
         status_code: int | None = None,
     ) -> None:
         super().__init__(reason, status_code=status_code)
-
-
-def is_index_service_failure(exception: BaseException) -> bool:
-    if isinstance(exception, IndexServiceUnavailableError):
-        return True
-    if isinstance(exception, LLMProviderRaceError):
-        return bool(exception.errors) and all(
-            is_index_service_failure(error) for error in exception.errors
-        )
-    return False

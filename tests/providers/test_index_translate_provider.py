@@ -16,7 +16,6 @@ from puripuly_heart.core.llm.index_translate import (
     IndexRequestLimitError,
     IndexServiceUnavailableError,
     IndexTranslateError,
-    is_index_service_failure,
 )
 from puripuly_heart.providers.llm import index_translate
 from puripuly_heart.providers.llm.messages import build_translation_user_message
@@ -193,7 +192,7 @@ async def test_invalid_terminal_responses_never_become_subtitles(transport_facto
             await provider.translate(**_kwargs())
         assert failure.value.reason == "invalid_response"
         assert len(calls) == 1
-        assert is_index_service_failure(failure.value)
+        assert failure.value.status_code is None
     finally:
         await provider.close()
 
@@ -225,6 +224,7 @@ async def test_http_service_failure_is_typed_without_retry_or_response_text(
     try:
         with pytest.raises(IndexServiceUnavailableError) as failure:
             await provider.check_availability()
+        assert failure.value.reason == "http_status"
         assert failure.value.status_code == status
         assert "private server body" not in str(failure.value)
         assert len(calls) == 1
@@ -233,39 +233,43 @@ async def test_http_service_failure_is_typed_without_retry_or_response_text(
 
 
 @pytest.mark.parametrize(
-    ("status", "data", "expected_type", "reason"),
+    ("status", "data", "expected_type", "reason", "expected_status_code"),
     [
-        (413, {}, IndexRequestLimitError, "input_limit"),
-        (400, {}, IndexTranslateError, "invalid_request"),
-        (422, {}, IndexTranslateError, "invalid_request"),
+        (413, {}, IndexRequestLimitError, "input_limit", 413),
+        (400, {}, IndexTranslateError, "invalid_request", 400),
+        (422, {}, IndexTranslateError, "invalid_request", 422),
         (
             200,
             _completion("partial", finish_reason="length"),
             IndexRequestLimitError,
             "output_limit",
+            None,
         ),
     ],
 )
-async def test_request_limits_do_not_establish_service_failure(
-    transport_factory, status, data, expected_type, reason
+async def test_request_errors_preserve_type_reason_and_status(
+    transport_factory, status, data, expected_type, reason, expected_status_code
 ):
     transport_factory(lambda request: httpx.Response(status, json=data))
     provider = index_translate.IndexTranslateProvider()
     try:
         with pytest.raises(expected_type) as failure:
             await provider.translate(**_kwargs())
+        assert type(failure.value) is expected_type
         assert failure.value.reason == reason
-        assert not is_index_service_failure(failure.value)
+        assert failure.value.status_code == expected_status_code
     finally:
         await provider.close()
 
 
-async def test_malformed_json_is_classified(transport_factory):
+async def test_malformed_json_reports_invalid_response(transport_factory):
     transport_factory(lambda request: httpx.Response(200, text="not json"))
     provider = index_translate.IndexTranslateProvider()
     try:
-        with pytest.raises(IndexServiceUnavailableError, match="invalid_response"):
+        with pytest.raises(IndexServiceUnavailableError) as failure:
             await provider.translate(**_kwargs())
+        assert failure.value.reason == "invalid_response"
+        assert failure.value.status_code is None
     finally:
         await provider.close()
 
@@ -342,7 +346,7 @@ async def test_tls_policy_preparation_is_off_loop_and_settled_before_close(
 
 
 @pytest.mark.parametrize("budget", [0, -1, True])
-async def test_invalid_output_budget_does_not_dispatch_or_mark_service_unavailable(
+async def test_invalid_output_budget_reports_limit_without_dispatch(
     transport_factory, budget
 ):
     clients, *_ = transport_factory(lambda request: pytest.fail("Unexpected HTTP dispatch"))
@@ -350,14 +354,15 @@ async def test_invalid_output_budget_does_not_dispatch_or_mark_service_unavailab
     try:
         with pytest.raises(IndexRequestLimitError) as failure:
             await provider.translate(**_kwargs(max_output_tokens=budget))
-        assert not is_index_service_failure(failure.value)
+        assert failure.value.reason == "output_limit"
+        assert failure.value.status_code is None
         assert clients == []
     finally:
         await provider.close()
 
 
 @pytest.mark.parametrize("error_type", [httpx.ConnectError, httpx.ReadTimeout])
-async def test_transport_failures_are_classified_without_adapter_retry(
+async def test_transport_failures_preserve_reason_without_adapter_retry(
     transport_factory, error_type
 ):
     calls = []
@@ -374,6 +379,7 @@ async def test_transport_failures_are_classified_without_adapter_retry(
         assert failure.value.reason == (
             "timeout" if error_type is httpx.ReadTimeout else "transport"
         )
+        assert failure.value.status_code is None
         assert "private transport detail" not in str(failure.value)
         assert len(calls) == 1
     finally:

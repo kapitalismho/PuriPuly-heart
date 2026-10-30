@@ -316,7 +316,6 @@ class TranslationRequestOwner:
     presentation: TranslationRequestPresentationPort = field(repr=False)
     clock: Clock
     scene_provider: SceneSnapshotProvider | None = None
-    settled_failure_sink: Callable[[BaseException], None] | None = None
 
     def __post_init__(self) -> None:
         warm_prompt_cache()
@@ -638,10 +637,8 @@ class TranslationRequestOwner:
                             ),
                         )
                     )
-                except Exception as exc:
+                except Exception:
                     self._raise_if_stale_provider_request(backend, generation)
-                    if request.record_latency and self.settled_failure_sink is not None:
-                        self.settled_failure_sink(exc)
                     raise
                 self._raise_if_stale_provider_request(backend, generation)
                 if request.record_latency:
@@ -849,15 +846,6 @@ class TranslationRequestOwner:
             )
             if not request.prestarted:
                 await self._publish_failure(request, self._translation_error_payload(exc, report))
-            if (
-                self.settled_failure_sink is not None
-                and (not request.prestarted or terminal_failure is None)
-                and self.provider_runtime.is_current_provider_generation(
-                    provider=backend, generation=generation
-                )
-                and not (cancellation_requested is not None and cancellation_requested())
-            ):
-                self.settled_failure_sink(exc)
             return self._result(
                 request,
                 "failed",

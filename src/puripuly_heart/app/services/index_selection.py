@@ -5,7 +5,6 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.llm.index_translate import is_index_service_failure
 from puripuly_heart.core.messages import ErrorDiagnostics, TransactionResult
 
 _INDEX_SELECTION = ("index_translate_35b", "public_api")
@@ -59,7 +58,6 @@ class IndexSelectionOwner:
     _started: bool = field(init=False, default=False)
     _stopped: bool = field(init=False, default=False)
     _committing: bool = field(init=False, default=False)
-    _request_failure: BaseException | None = field(init=False, default=None, repr=False)
 
     def start(self) -> None:
         if self._stopped:
@@ -89,24 +87,23 @@ class IndexSelectionOwner:
             if self._work_task is not None:
                 self._work_task.cancel()
             self.transition_result = None
-            self._request_failure = None
         self.availability = "unselected"
         if selection == _INDEX_SELECTION:
             self._authority_generation = self.generation
             self.availability = "pending"
             self._task = self._schedule()
 
-    def _schedule(self, exception: BaseException | None = None) -> asyncio.Task[None]:
+    def _schedule(self) -> asyncio.Task[None]:
         task = asyncio.create_task(
-            self._run_owned(self.generation, exception), name=f"index-selection-{self.generation}"
+            self._run_owned(self.generation), name=f"index-selection-{self.generation}"
         )
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
         return task
 
-    async def _run_owned(self, generation: int, exception: BaseException | None) -> None:
+    async def _run_owned(self, generation: int) -> None:
         work = asyncio.create_task(
-            self._check(generation) if exception is None else self._fallback(generation, exception),
+            self._check(generation),
             name=f"index-selection-work-{generation}",
         )
         self._work_task = work
@@ -223,25 +220,7 @@ class IndexSelectionOwner:
                 await self._fallback(generation, exc)
         else:
             if self._current(generation):
-                if self._request_failure is not None:
-                    await self._fallback(generation, self._request_failure)
-                else:
-                    self.availability = "available"
-
-    def request_failed(self, exception: BaseException) -> None:
-        self.selection_changed(self.settings_provider())
-        if (
-            self._stopped
-            or self._selection != _INDEX_SELECTION
-            or not is_index_service_failure(exception)
-            or self.availability not in {"available", "pending"}
-        ):
-            return
-        if self._task is not None and not self._task.done():
-            self._request_failure = exception
-            return
-        self.availability = "pending"
-        self._task = self._schedule(exception)
+                self.availability = "available"
 
     async def _fallback(self, generation: int, exception: BaseException) -> None:
         if not self._current(generation):

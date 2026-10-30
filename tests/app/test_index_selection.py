@@ -16,10 +16,7 @@ from puripuly_heart.app.services.index_selection import (
 from puripuly_heart.app.wiring import wiring_index_selection as wiring
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.llm.index_translate import (
-    IndexRequestLimitError,
-    IndexServiceUnavailableError,
-)
+from puripuly_heart.core.llm.index_translate import IndexServiceUnavailableError
 from puripuly_heart.core.messages import TransactionResult
 from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
@@ -289,7 +286,7 @@ async def test_failed_save_has_no_switched_toast_and_degraded_commit_is_not_read
 
 
 @pytest.mark.asyncio
-async def test_reselection_creates_new_probe_and_only_settled_service_failure_transitions(tmp_path):
+async def test_reselection_creates_new_probe(tmp_path):
     probes = []
 
     async def probe():
@@ -298,9 +295,6 @@ async def test_reselection_creates_new_probe_and_only_settled_service_failure_tr
     harness = make_owner(tmp_path, probe)
     owner = harness.owner
     assert await owner.prepare_enable() is True
-    owner.request_failed(asyncio.CancelledError())
-    owner.request_failed(IndexRequestLimitError("output_limit"))
-    await asyncio.sleep(0)
     assert harness.commits == []
     away = wiring.gemma_fallback_settings(harness.settings.canonical, "managed")
     owner.selection_changed(away)
@@ -308,12 +302,8 @@ async def test_reselection_creates_new_probe_and_only_settled_service_failure_tr
     owner.selection_changed(harness.settings.canonical)
     assert await owner.prepare_enable() is True
     assert len(probes) == 2
-    failure = IndexServiceUnavailableError("timeout")
-    owner.request_failed(failure)
-    owner.request_failed(failure)
-    assert await owner.prepare_enable() is True
-    assert harness.commits == ["managed"]
-    assert len(probes) == 2
+    assert harness.commits == []
+    assert harness.messages == []
     await owner.close()
 
 

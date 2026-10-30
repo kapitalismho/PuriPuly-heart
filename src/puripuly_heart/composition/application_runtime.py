@@ -2078,7 +2078,6 @@ def compose_application_runtime(
     def install_pipeline(components: RuntimePipelineComponents) -> None:
         replace_translation_runtime_enabled(components.translation_runtime_configuration, False)
         pipeline.install(components)
-        components.translation_requests.settled_failure_sink = index_selection.request_failed
         index_selection.start()
         llm_connection_readiness.sync()
 

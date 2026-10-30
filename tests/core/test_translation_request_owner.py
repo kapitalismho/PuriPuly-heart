@@ -11,6 +11,7 @@ import pytest
 
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
 from puripuly_heart.core.http_extensions import parse_http_extension
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime
@@ -36,6 +37,7 @@ from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.stt.backend import STTProviderTurnIdentity, STTProviderTurnTerminal
 from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
 from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackend
+from puripuly_heart.domain.events import UIEventType
 from puripuly_heart.domain.models import ChannelId, FinalLanguageRun, Transcript, Translation
 from puripuly_heart.providers.extensions.http_extension_backend import (
     HttpExtensionTranslationBackend,
@@ -827,10 +829,11 @@ async def test_process_keeps_prepared_context_when_translation_unavailable() -> 
 
 
 @pytest.mark.asyncio
-async def test_process_contains_stale_provider_completion_without_output_error() -> None:
-    old_provider = BlockingProvider()
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_process_contains_stale_provider_completion_without_output_error(channel) -> None:
+    old_provider = BlockingProvider(failure=RuntimeError("retired provider secret"))
     fixture = build_owner(old_provider)
-    task = asyncio.create_task(fixture.owner.process(process_request(fixture)))
+    task = asyncio.create_task(fixture.owner.process(process_request(fixture, channel=channel)))
     await old_provider.entered.wait()
     await fixture.provider_runtime.replace_provider(
         LlmTranslationBackend(RecordingProvider()),
@@ -860,109 +863,82 @@ async def test_process_rejects_unsupported_self_language_with_safe_error() -> No
 
 
 @pytest.mark.asyncio
-async def test_process_preserves_cancellation_after_provider_completion() -> None:
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_process_preserves_cancellation_after_provider_completion(channel) -> None:
     fixture = build_owner(RecordingProvider())
 
     with pytest.raises(asyncio.CancelledError):
         await fixture.owner.process(
-            process_request(fixture),
+            process_request(fixture, channel=channel),
             cancellation_requested=lambda: True,
         )
 
+    assert fixture.presentation.messages == []
+
 
 @pytest.mark.asyncio
-async def test_process_contains_provider_failure_and_publishes_safe_error() -> None:
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_process_contains_provider_failure_and_publishes_safe_error(channel, caplog) -> None:
     fixture = build_owner(RecordingProvider(failure=RuntimeError("secret detail")))
 
-    result = await fixture.owner.process(process_request(fixture))
+    request = process_request(fixture, channel=channel)
+    result = await fixture.owner.process(request)
 
     assert result.outcome == "failed"
     assert result.output is not None
     assert result.output.failure_code == "provider_error"
     assert len(fixture.presentation.messages) == 1
-    assert fixture.presentation.messages[0].runtime_log_handled is True
+    message = fixture.presentation.messages[0]
+    assert message.event_type == UIEventType.ERROR
+    assert message.channel == channel
+    assert message.utterance_id == request.utterance_id
+    assert message.runtime_log_handled is True
+    assert message.payload.message.key == "provider.failure"
+    assert message.payload.diagnostics == result.failure_diagnostics
+    assert result.output.failure_diagnostics == result.failure_diagnostics
+    assert "secret detail" not in repr(message.payload)
+    diagnostics = [
+        getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+        for record in caplog.records
+        if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+    ]
+    assert diagnostics == [result.failure_diagnostics]
+    assert "secret detail" not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("record_latency", [False, True])
+async def test_direct_provider_failure_is_rethrown_without_publishing_error(record_latency) -> None:
+    from puripuly_heart.core.llm.index_translate import IndexServiceUnavailableError
+
+    failure = IndexServiceUnavailableError("timeout")
+    provider = RecordingProvider(failure=failure)
+    fixture = build_owner(provider)
+
+    with pytest.raises(IndexServiceUnavailableError) as raised:
+        await fixture.owner.translate(
+            DirectTranslationRequest(
+                utterance_id=uuid4(), text="synthetic", record_latency=record_latency
+            )
+        )
+
+    assert raised.value is failure
+    assert len(provider.calls) == 1
+    assert fixture.presentation.messages == []
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("channel", ["self", "peer"])
-async def test_service_failure_hook_runs_after_provider_call_settles(channel) -> None:
+async def test_index_prestarted_failure_is_consumed_once_at_final_admission(channel, caplog) -> None:
     from puripuly_heart.core.llm.index_translate import IndexServiceUnavailableError
 
-    active = False
-    failure = IndexServiceUnavailableError("transport")
-
-    class Provider(RecordingProvider):
-        async def translate(self, **kwargs):
-            nonlocal active
-            active = True
-            try:
-                raise failure
-            finally:
-                active = False
-
-    fixture = build_owner(Provider())
-    observed = []
-
-    def settled(exception):
-        assert active is False
-        observed.append(exception)
-
-    fixture.owner.settled_failure_sink = settled
-    result = await fixture.owner.process(process_request(fixture, channel=channel))
-    assert result.outcome == "failed"
-    assert result.output.channel == channel
-    assert observed == [failure]
-
-
-@pytest.mark.asyncio
-async def test_cancelled_or_retired_request_does_not_notify_service_failure() -> None:
-    from puripuly_heart.core.llm.index_translate import IndexServiceUnavailableError
-
-    failure = IndexServiceUnavailableError("transport")
-    fixture = build_owner(RecordingProvider(failure=failure))
-    observed = []
-    fixture.owner.settled_failure_sink = observed.append
-    result = await fixture.owner.process(
-        process_request(fixture), cancellation_requested=lambda: True
-    )
-    assert result.outcome == "failed"
-    assert observed == []
-
-    async def retire_while_presenting(_message):
-        await fixture.provider_runtime.replace_provider(
-            LlmTranslationBackend(RecordingProvider()), start=False
-        )
-
-    fixture.presentation.publish_ui = retire_while_presenting
-    result = await fixture.owner.process(process_request(fixture))
-    assert result.outcome == "failed"
-    assert observed == []
-
-
-@pytest.mark.asyncio
-async def test_speculative_direct_failure_does_not_authorize_fallback() -> None:
-    from puripuly_heart.core.llm.index_translate import IndexServiceUnavailableError
-
-    fixture = build_owner(RecordingProvider(failure=IndexServiceUnavailableError("timeout")))
-    observed = []
-    fixture.owner.settled_failure_sink = observed.append
-    with pytest.raises(IndexServiceUnavailableError):
-        await fixture.owner.translate(
-            DirectTranslationRequest(utterance_id=uuid4(), text="synthetic", record_latency=False)
-        )
-    assert observed == []
-
-
-@pytest.mark.asyncio
-async def test_index_prestarted_failure_is_consumed_once_at_final_admission() -> None:
-    failure = RuntimeError("terminal Index request")
+    failure = IndexServiceUnavailableError("http_status", status_code=503)
+    failure.__cause__ = RuntimeError("secret terminal Index request")
     provider = RecordingProvider(failure=failure)
     fixture = build_owner(
         SemaphoreLLMProvider(provider, asyncio.Semaphore(1), provider_name="index_translate")
     )
-    observed = []
-    fixture.owner.settled_failure_sink = observed.append
-    request = process_request(fixture)
+    request = process_request(fixture, channel=channel)
 
     prestarted = await fixture.owner.process(
         replace(
@@ -972,20 +948,43 @@ async def test_index_prestarted_failure_is_consumed_once_at_final_admission() ->
 
     assert prestarted.outcome == "failed"
     assert prestarted.terminal_failure is not None
-    assert observed == []
+    assert prestarted.terminal_failure.exception is failure
+    assert len(provider.calls) == 1
     assert fixture.presentation.messages == []
+    caplog.clear()
 
     final = await fixture.owner.process(
         replace(request, terminal_failure=prestarted.terminal_failure)
     )
 
     assert final.outcome == "failed"
+    assert final.output is not None
     assert final.output.failure_code == "provider_error"
     assert final.terminal_failure is None
     assert len(provider.calls) == 1
-    assert observed == [failure]
     assert len(fixture.presentation.messages) == 1
-    assert [entry.text for entry in fixture.self_runtime.translation_history] == [
+    message = fixture.presentation.messages[0]
+    assert message.event_type == UIEventType.ERROR
+    assert message.channel == channel
+    assert message.utterance_id == request.utterance_id
+    assert message.runtime_log_handled is True
+    report = message.payload
+    assert report.message.key == "provider.failure"
+    assert report.diagnostics.category == "service_unavailable"
+    assert report.diagnostics.status_code == 503
+    assert report.diagnostics.channel == channel
+    assert report.diagnostics == final.failure_diagnostics
+    assert final.output.failure_diagnostics == final.failure_diagnostics
+    assert "secret terminal Index request" not in repr(report)
+    diagnostics = [
+        getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+        for record in caplog.records
+        if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+    ]
+    assert diagnostics == [final.failure_diagnostics]
+    assert "secret terminal Index request" not in caplog.text
+    runtime = fixture.owner.runtime_for_channel(channel)
+    assert [entry.text for entry in runtime.translation_history] == [
         "request",
         "request",
     ]
@@ -1009,8 +1008,6 @@ async def test_terminal_index_failure_does_not_consume_changed_request(change) -
     fixture = build_owner(
         SemaphoreLLMProvider(provider, asyncio.Semaphore(1), provider_name="index_translate")
     )
-    observed = []
-    fixture.owner.settled_failure_sink = observed.append
     request = process_request(fixture)
     prestarted = await fixture.owner.process(
         replace(
@@ -1050,30 +1047,4 @@ async def test_terminal_index_failure_does_not_consume_changed_request(change) -
     assert result.outcome == "translated"
     assert result.output.translation.text == "translated"
     assert len(provider.calls) == 2
-    assert observed == []
     assert fixture.presentation.messages == []
-
-
-@pytest.mark.asyncio
-async def test_cancelled_final_index_failure_does_not_notify_fallback() -> None:
-    provider = RecordingProvider(failure=RuntimeError("terminal request"))
-    fixture = build_owner(
-        SemaphoreLLMProvider(provider, asyncio.Semaphore(1), provider_name="index_translate")
-    )
-    observed = []
-    fixture.owner.settled_failure_sink = observed.append
-    request = process_request(fixture)
-    prestarted = await fixture.owner.process(
-        replace(
-            request, prestarted=True, expected_provider_generation=fixture.owner.provider_generation
-        )
-    )
-
-    result = await fixture.owner.process(
-        replace(request, terminal_failure=prestarted.terminal_failure),
-        cancellation_requested=lambda: True,
-    )
-
-    assert result.outcome == "failed"
-    assert len(provider.calls) == 1
-    assert observed == []
