@@ -182,7 +182,9 @@ async def test_unchanged_speculative_result_keeps_one_index_request_budget(
                 413 if duplicate_outcome == "request_limit" else 503
             )
             assert report.diagnostics.category == (
-                "invalid_response" if duplicate_outcome == "request_limit" else "service_unavailable"
+                "invalid_response"
+                if duplicate_outcome == "request_limit"
+                else "service_unavailable"
             )
             assert failure_diagnostics(caplog) == [report.diagnostics]
         assert [entry.text for entry in harness.self_runtime.translation_history] == [

@@ -929,7 +929,9 @@ async def test_direct_provider_failure_is_rethrown_without_publishing_error(reco
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("channel", ["self", "peer"])
-async def test_index_prestarted_failure_is_consumed_once_at_final_admission(channel, caplog) -> None:
+async def test_index_prestarted_failure_is_consumed_once_at_final_admission(
+    channel, caplog
+) -> None:
     from puripuly_heart.core.llm.index_translate import IndexServiceUnavailableError
 
     failure = IndexServiceUnavailableError("http_status", status_code=503)
