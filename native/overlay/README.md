@@ -1,6 +1,6 @@
 # Native Overlay
 
-Windows Rust runtime for SteamVR subtitles. Python owns logical captions and child-process lifecycle; native code owns OpenVR presentation. The Desktop overlay is a separate renderer using the shared Python caption boundary.
+Windows Rust runtime for SteamVR captions and a separate photo process. Python owns application policy and child-process lifecycle; native code owns OpenVR presentation and photo pixel work. The Desktop caption overlay remains a separate renderer using the shared Python caption boundary.
 
 This guide covers ownership, cross-language contracts, and build/verification entry points. Protocol versions, timing constants, layout values, cache mechanics, and regression details belong in the [owning implementation](#source-map). See the [architecture](../../docs/architecture.md) for the wider output path and the [CLI guide](../../docs/cli.md) for application controls.
 
@@ -10,9 +10,11 @@ This guide covers ownership, cross-language contracts, and build/verification en
 | --- | --- |
 | Python presenter | Caption identity, publication order, speaker style, visible content, expiry, and replacement snapshots |
 | Python runtime and bridge | Target selection, process supervision, authenticated sessions, snapshot delivery, readiness observation, and bounded recovery |
-| Native runtime | Accepting ordered snapshots, rendering, GPU readiness, OpenVR submission, spatial placement, and presentation retries |
+| Native caption runtime | Accepting ordered caption snapshots, rendering, GPU readiness, OpenVR submission, spatial placement, and presentation retries |
+| Python photo owner | Passive capture, route eligibility, pull authorization, provider requests, retention, and independent photo supervision |
+| Native photo runtime | Photo-session/surface ownership, cumulative block state, and off-loop source decoding/send-JPEG preparation |
 
-Python and native must agree on the manifest, protocol, and advertised execution capabilities. Treat changes as a shared-boundary cutover, not independent renderer upgrades. Current contracts live in the Python [protocol](../../src/puripuly_heart/core/overlay/protocol.py) and [manifest](../../src/puripuly_heart/core/overlay/manifest.py), with native validation in [bridge](src/bridge.rs) and [manifest](src/manifest.rs).
+Python and native must agree on the manifest, protocol, and advertised execution capabilities. Treat changes as a shared-boundary cutover, not independent renderer upgrades. Caption contracts live in the Python [protocol](../../src/puripuly_heart/core/overlay/protocol.py) and [manifest](../../src/puripuly_heart/core/overlay/manifest.py), with native validation in [bridge](src/bridge.rs) and [manifest](src/manifest.rs). Photo uses a separate [manifest](src/photo/manifest.rs) and [authenticated bridge](../../src/puripuly_heart/core/photo/bridge.py).
 
 ## Caption and Presentation Contracts
 
@@ -37,6 +39,17 @@ Python and native must agree on the manifest, protocol, and advertised execution
 - Fitting does not alter full caption strings, persisted settings, or Python-owned lifetime. VR surface growth accommodates calibration while stable slot geometry keeps long captions from moving neighboring captions.
 - Layout/composition caches reuse compatible visual work, not publication authority. Cache hits still draw the current frame, remove stale damage, and follow producer-readiness and retry requirements.
 - Placement reuse applies only after complete success on the current OpenVR handle. Changes, recreation, or failed application require placement to be applied again; spatial reanchoring remains independent.
+
+## Photo Runtime Boundary
+
+- The same executable runs the photo role in a separate OS process using `--role photo --config <photo-manifest>`. Role dispatch precedes caption resource initialization. Caption OFF, photo failures, and photo animation do not share caption process lifetime or presentation-retry progress.
+- Each photo process has an independent authenticated loopback bridge, instance identity and generation. Its OpenVR session owns distinct icon/photo handles; releasing one surface does not shut down the other.
+- Python opens an image-only provider connection at the first photo-file signal. No image leaves the PC before a valid pull. Luna uses the existing Sign in with ChatGPT session; Google uses the existing AI Studio credential owner. Neither transport borrows the speech connection pool.
+- A valid pull authorizes native source decoding, Lanczos fit/letterbox and JPEG encoding on the owned image worker. The worker returns completed private source/JPEG paths, original dimensions and the precise send transform. Python reads/base64-serializes the JPEG. A brief incomplete-file wait ends in explicit failure; process loss during preparation does not create a new job-resumption system.
+- A prepared JPEG survives the permitted provider retry independently of renderer recovery. Reopening retained state does not send another request. Retry clears failed-attempt blocks; the request budget, expiry and terminal-error policy belong to the [Python lifecycle](../../src/puripuly_heart/core/photo/lifecycle.py).
+- Full snapshots retain all current-attempt blocks. Geometry is floating-point original-photo `x0,y0,x1,y1`, not Google normalized coordinates or display-composite pixels. Bbox-ready permits candidate-region preparation; source-ready supplies physical source line count; block-complete supplies the full translation and keep-original decision. Erase/type/composition work belongs to [#340](https://github.com/kapitalismho/PuriPuly-heart/issues/340); this boundary does not claim all erase cost is hidden.
+- The explicit `probe` backend exercises real native preparation, cumulative state and reverse pull delivery without OpenVR. It reports receipt, not drawing or physical HMD visibility. It is not a production fallback, final wrist interaction, or Python product OCR entry point. Real temporary VR interaction belongs to [#341](https://github.com/kapitalismho/PuriPuly-heart/issues/341); final UI remains last.
+- Native preparation stages, connection time, actual request send, first text, first completed block and stream completion are separate measurements. None is a headset-display timestamp. First-drawn-block feedback requires a real drawing report and is not replayed during renderer recovery.
 
 ## Build and Verification
 
@@ -76,6 +89,8 @@ For behavior, protocol, or startup changes, complete Rust checks, a Windows rele
 | Logical captions and visual projection | [Presenter](../../src/puripuly_heart/core/overlay/presenter.py), [projection](../../src/puripuly_heart/core/overlay/presenter_projection.py) |
 | Process/session ownership and readiness | [Python runtime](../../src/puripuly_heart/core/runtime/overlay.py), [process supervisor](../../src/puripuly_heart/core/overlay/process.py), [bridge](../../src/puripuly_heart/core/overlay/bridge.py) |
 | Native lifecycle and accepted state | [Runtime](src/runtime.rs), [state](src/state.rs) |
+| Photo capture, requests and child supervision | [Application owner](../../src/puripuly_heart/app/services/photo_application.py), [lifecycle](../../src/puripuly_heart/core/photo/lifecycle.py), [process supervisor](../../src/puripuly_heart/core/photo/process.py) |
+| Photo native state, preparation and image handoff | [Photo runtime](src/photo/runtime.rs), [state](src/photo/state.rs), [preparation](src/photo/prepare.rs), [image boundary](src/photo/image.rs) |
 | Retry ownership and execution evidence | [Retry episodes](src/retry_episode.rs), [frame cycle](src/frame_cycle.rs), [diagnostics](src/runtime_diagnostics.rs) |
 | Rendering, fitting, and spatial placement | [Renderer](src/renderer/), [spatial policy](src/spatial_policy.rs), [OpenVR](src/openvr.rs) |
 | Desktop renderer | [Desktop overlay](../../src/puripuly_heart/ui/desktop_overlay.py) |

@@ -75,6 +75,7 @@ def _startup_adapter(
         start_event_bridge=lambda _bridge: None,
         wait_for_event_bridge=AsyncMock(),
         sync_clipboard=AsyncMock(),
+        start_photo=AsyncMock(),
     )
 
 

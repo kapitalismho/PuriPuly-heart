@@ -3,7 +3,12 @@ use std::collections::VecDeque;
 use std::ffi::c_void;
 #[cfg(any(windows, test))]
 use std::ffi::{CStr, CString};
+#[cfg(windows)]
+use std::rc::Rc;
 
+#[cfg(all(windows, test))]
+#[path = "openvr_session_tests.rs"]
+mod session_tests;
 use thiserror::Error;
 #[cfg(windows)]
 use windows::core::Interface;
@@ -561,6 +566,26 @@ pub struct OpenVrOverlay {
 }
 
 impl OpenVrOverlay {
+    pub fn in_session(
+        session: &OpenVrSession,
+        surface_identity: &str,
+    ) -> Result<Self, OpenVrError> {
+        #[cfg(windows)]
+        {
+            Ok(Self {
+                backend: OpenVrBackend::Windows(WindowsOpenVrOverlay::in_session(
+                    session.inner.clone(),
+                    surface_identity,
+                )?),
+            })
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = (session, surface_identity);
+            Err(OpenVrError::Init("OpenVR requires Windows".into()))
+        }
+    }
+
     pub fn new(overlay_instance_id: &str) -> Result<Self, OpenVrError> {
         Ok(Self {
             backend: OpenVrBackend::new(overlay_instance_id)?,
@@ -603,6 +628,76 @@ impl OverlayFrameSubmitter for OpenVrOverlay {
 
     fn sample_frame_timing(&self) -> Option<FrameTimingSample> {
         self.backend.sample_frame_timing()
+    }
+}
+
+impl OverlayTextureSubmitter for OpenVrOverlay {
+    fn set_overlay_texture(&self, texture_handle: *mut c_void) -> Result<(), OpenVrError> {
+        match &self.backend {
+            #[cfg(windows)]
+            OpenVrBackend::Windows(overlay) => overlay.set_overlay_texture(texture_handle),
+            #[cfg(not(windows))]
+            OpenVrBackend::Test(overlay) => overlay.set_overlay_texture(texture_handle),
+        }
+    }
+}
+
+pub struct OpenVrSession {
+    #[cfg(windows)]
+    inner: Rc<WindowsOpenVrSession>,
+}
+
+impl OpenVrSession {
+    pub fn new() -> Result<Self, OpenVrError> {
+        #[cfg(windows)]
+        {
+            Ok(Self {
+                inner: Rc::new(WindowsOpenVrSession::new()?),
+            })
+        }
+        #[cfg(not(windows))]
+        {
+            Err(OpenVrError::Init("OpenVR requires Windows".into()))
+        }
+    }
+}
+
+#[cfg(windows)]
+struct OpenVrRuntimeLease {
+    shutdown: fn(),
+}
+
+#[cfg(windows)]
+impl Drop for OpenVrRuntimeLease {
+    fn drop(&mut self) {
+        (self.shutdown)();
+    }
+}
+
+#[cfg(windows)]
+struct WindowsOpenVrSession {
+    overlay_api: *mut openvr_sys::VR_IVROverlay_FnTable,
+    system_api: *mut openvr_sys::VR_IVRSystem_FnTable,
+    compositor_api: Option<*mut openvr_sys::VR_IVRCompositor_FnTable>,
+    output_adapter: OpenVrOutputAdapter,
+    _runtime: OpenVrRuntimeLease,
+}
+
+#[cfg(windows)]
+impl WindowsOpenVrSession {
+    fn new() -> Result<Self, OpenVrError> {
+        let runtime = initialize_overlay_runtime()?;
+        let overlay_api = initialize_overlay_api()?;
+        let system_api = initialize_system_api()?;
+        let compositor_api = initialize_compositor_api().ok();
+        let output_adapter = identify_openvr_output_adapter(unsafe { &*system_api })?;
+        Ok(Self {
+            overlay_api,
+            system_api,
+            compositor_api,
+            output_adapter,
+            _runtime: runtime,
+        })
     }
 }
 
@@ -765,23 +860,23 @@ struct WindowsOpenVrOverlay {
     applied_placement_policy: Option<OverlayPlacementPolicy>,
     visible: bool,
     output_adapter: OpenVrOutputAdapter,
+    _session: Rc<WindowsOpenVrSession>,
 }
 
 #[cfg(windows)]
 impl WindowsOpenVrOverlay {
     fn new(overlay_instance_id: &str) -> Result<Self, OpenVrError> {
-        let overlay_api = initialize_overlay_api()?;
-        let system_api = initialize_system_api()?;
-        let compositor_api = initialize_compositor_api().ok();
-        let output_adapter = match identify_openvr_output_adapter(unsafe { &*system_api }) {
-            Ok(adapter) => adapter,
-            Err(error) => {
-                unsafe {
-                    openvr_sys::VR_ShutdownInternal();
-                }
-                return Err(error);
-            }
-        };
+        Self::in_session(Rc::new(WindowsOpenVrSession::new()?), overlay_instance_id)
+    }
+
+    fn in_session(
+        session: Rc<WindowsOpenVrSession>,
+        overlay_instance_id: &str,
+    ) -> Result<Self, OpenVrError> {
+        let overlay_api = session.overlay_api;
+        let system_api = session.system_api;
+        let compositor_api = session.compositor_api;
+        let output_adapter = session.output_adapter.clone();
         let overlay_handle = create_overlay_handle(overlay_api, overlay_instance_id)?;
 
         let mut instance = Self {
@@ -793,6 +888,7 @@ impl WindowsOpenVrOverlay {
             applied_placement_policy: None,
             visible: false,
             output_adapter,
+            _session: session,
         };
         instance.configure_overlay()?;
         Ok(instance)
@@ -1224,14 +1320,11 @@ impl Drop for WindowsOpenVrOverlay {
                 destroy_overlay(self.overlay_handle);
             }
         }
-        unsafe {
-            openvr_sys::VR_ShutdownInternal();
-        }
     }
 }
 
 #[cfg(windows)]
-fn initialize_overlay_api() -> Result<*mut openvr_sys::VR_IVROverlay_FnTable, OpenVrError> {
+fn initialize_overlay_runtime() -> Result<OpenVrRuntimeLease, OpenVrError> {
     let mut init_error = openvr_sys::EVRInitError_VRInitError_None;
     unsafe {
         openvr_sys::VR_InitInternal(
@@ -1245,16 +1338,26 @@ fn initialize_overlay_api() -> Result<*mut openvr_sys::VR_IVROverlay_FnTable, Op
             vr_init_error_name(init_error)
         )));
     }
+    Ok(OpenVrRuntimeLease {
+        shutdown: shutdown_overlay_runtime,
+    })
+}
 
+#[cfg(windows)]
+fn shutdown_overlay_runtime() {
+    unsafe {
+        openvr_sys::VR_ShutdownInternal();
+    }
+}
+
+#[cfg(windows)]
+fn initialize_overlay_api() -> Result<*mut openvr_sys::VR_IVROverlay_FnTable, OpenVrError> {
     let overlay_interface_version = fn_table_interface_version(openvr_sys::IVROverlay_Version)?;
     let mut interface_error = openvr_sys::EVRInitError_VRInitError_None;
     let overlay_api = unsafe {
         openvr_sys::VR_GetGenericInterface(overlay_interface_version.as_ptr(), &mut interface_error)
     };
     if interface_error != openvr_sys::EVRInitError_VRInitError_None || overlay_api == 0 {
-        unsafe {
-            openvr_sys::VR_ShutdownInternal();
-        }
         return Err(OpenVrError::Init(format!(
             "VR_GetGenericInterface failed: {}",
             vr_init_error_name(interface_error)
@@ -1272,9 +1375,6 @@ fn initialize_system_api() -> Result<*mut openvr_sys::VR_IVRSystem_FnTable, Open
         openvr_sys::VR_GetGenericInterface(system_interface_version.as_ptr(), &mut interface_error)
     };
     if interface_error != openvr_sys::EVRInitError_VRInitError_None || system_api == 0 {
-        unsafe {
-            openvr_sys::VR_ShutdownInternal();
-        }
         return Err(OpenVrError::Init(format!(
             "VR_GetGenericInterface failed: {}",
             vr_init_error_name(interface_error)
@@ -1337,9 +1437,6 @@ fn create_overlay_handle(
         )
     };
     if error != openvr_sys::EVROverlayError_VROverlayError_None {
-        unsafe {
-            openvr_sys::VR_ShutdownInternal();
-        }
         return Err(OpenVrError::Init(format!(
             "CreateOverlay failed: {}",
             overlay_error_name(unsafe { &*overlay_api }, error)
@@ -2014,7 +2111,6 @@ mod tests {
         );
         assert!(openvr.poll_runtime_events(1).is_empty());
     }
-
 }
 
 #[cfg(all(test, windows))]

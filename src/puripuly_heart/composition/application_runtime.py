@@ -15,6 +15,7 @@ from puripuly_heart.app.adapters.application_runtime_shutdown import (
 )
 from puripuly_heart.app.adapters.local_asr_application import LocalASRApplicationSettings
 from puripuly_heart.app.adapters.peer_application_state import PeerApplicationSettings
+from puripuly_heart.app.adapters.photo_provider import PhotoProviderAdapter
 from puripuly_heart.app.adapters.system_directory_opener import SystemDirectoryOpener
 from puripuly_heart.app.adapters.ui_runtime import (
     UiAudioTestRuntimeAdapter,
@@ -119,6 +120,7 @@ from puripuly_heart.app.services.overlay.overlay_application import (
 from puripuly_heart.app.services.overlay.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
 )
+from puripuly_heart.app.services.photo_application import PhotoApplicationOwner
 from puripuly_heart.app.services.provider.provider_credential_verification import (
     ProviderCredentialVerificationInteractionOwner,
 )
@@ -1823,6 +1825,46 @@ def compose_application_runtime(
         ),
     )
 
+    photo_provider = PhotoProviderAdapter(
+        session=chatgpt_session,
+        secret_store=create_settings_secret_store,
+    )
+
+    def photo_diagnostic(stage: str, fields: dict) -> None:
+        if "model" in fields and fields["model"] not in {
+            "gpt-6-luna",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
+        }:
+            fields = {**fields, "model": "unknown"}
+        values = " ".join(
+            f"{key}={value:.3f}" if isinstance(value, float) else f"{key}={value}"
+            for key, value in fields.items()
+            if key
+            in {
+                "photo_id",
+                "attempt_id",
+                "block_id",
+                "duration_ms",
+                "model",
+                "failure_code",
+                "generation",
+                "pid",
+            }
+            and isinstance(value, (str, int, float))
+        )
+        runtime_logging.emit_diagnostic(f"[Photo] {stage} {values}")
+
+    photo_owner = PhotoApplicationOwner(
+        resolve_route=photo_provider.resolve_route,
+        target_language=lambda: (
+            settings.canonical.intent.languages.target_language
+            if settings.canonical is not None
+            else "ko"
+        ),
+        diagnostic=photo_diagnostic,
+    )
+
     def translation_runtime_enabled() -> bool:
         owner = pipeline.translation_runtime_configuration
         return owner.snapshot().value.translation_enabled if owner is not None else False
@@ -2188,6 +2230,7 @@ def compose_application_runtime(
         start_event_bridge=start_event_bridge,
         wait_for_event_bridge=wait_for_event_bridge,
         sync_clipboard=sync_clipboard,
+        start_photo=photo_owner.start,
     )
     startup = compose_application_startup(startup_adapter)
 
@@ -2409,6 +2452,18 @@ def compose_application_runtime(
     settings.observe_commits(control._publish_committed)
     application.register_application_shutdown_callbacks(
         (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="PhotoApplicationOwner",
+                callback_name="stop_ingress",
+                callback=photo_owner.stop_ingress,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="PhotoApplicationOwner",
+                callback_name="close",
+                callback=photo_owner.close,
+            ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
                 owner_name="ApplicationControlOwner",

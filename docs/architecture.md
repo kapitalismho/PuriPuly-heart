@@ -32,6 +32,7 @@ Paths below are navigation entry points, not an exhaustive class inventory.
 | Local models | Asset operations; managed translation server and model lifecycle | [Model assets](../src/puripuly_heart/app/services/model_assets.py), [Gemma runtime](../src/puripuly_heart/core/local_translation/runtime.py) |
 | Output | Routing, independent destination delivery, and delivery history | [Output runtime](../src/puripuly_heart/core/runtime/output.py), [translation projection](../src/puripuly_heart/core/orchestrator/translation_output_projection.py) |
 | Overlays | Target selection, logical captions, child lifecycle, and native rendering | [Application owner](../src/puripuly_heart/app/services/overlay/overlay_application.py), [Python runtime](../src/puripuly_heart/core/runtime/overlay.py), [native runtime](../native/overlay/src/runtime.rs) |
+| Photo translation | Passive photo capture, pull authorization, retained requests, and an independent native photo child | [Application owner](../src/puripuly_heart/app/services/photo_application.py), [photo lifecycle](../src/puripuly_heart/core/photo/lifecycle.py), [native photo role](../native/overlay/src/photo/) |
 | Accounts | Managed authentication/credentials; separate ChatGPT session | [Managed wiring](../src/puripuly_heart/app/wiring/wiring_managed_account.py), [ChatGPT owner](../src/puripuly_heart/app/services/chatgpt_account.py) |
 | VRChat integration | OSC control/state; independent scene-context observation | [OSC runtime](../src/puripuly_heart/app/services/osc/control_runtime.py), [scene owner](../src/puripuly_heart/core/vrchat_scene_service.py) |
 | Diagnostics | Console/file/Logs delivery and bounded current-instance evidence | [Logging service](../src/puripuly_heart/app/services/application_runtime_logging.py) |
@@ -93,6 +94,17 @@ Behavior: [turn lifecycle](../tests/core/test_translation_turn_owner.py), [reque
 - The VRChat scene owner survives pipeline rebuilds and has no audio, VAD, or OSC dependency. Only trusted, sanitized population context reaches translation; names/raw logs stay local, and custom HTTP extensions receive no scene data.
 
 Behavior: [output runtime](../tests/core/runtime/test_output_runtime.py), [caption policy](../tests/core/test_self_caption_policy.py), [overlay presenter](../tests/core/test_overlay_presenter.py). Protocols: [native overlays](../native/overlay/README.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](http-extensions.md).
+
+### Isolated photo requests
+
+- The photo application owner is a sibling of the caption owner, not an output destination or caption setting. It owns passive capture, route eligibility, authorization, request attempts, retention and child cleanup. Photo renderer recovery cannot restart a model request or satisfy caption freshness.
+- Photo providers reuse the existing ChatGPT session and secret/network owners through dedicated image connections. Luna uses Sign in with ChatGPT, not an OpenAI API key. Image requests do not lease speech connections or speech admission capacity.
+- After an authorized pull, the native photo worker decodes the selected source and prepares the send JPEG off its render/input loop. Python reads and serializes the completed JPEG; it does not perform pixel preparation. Private files and source-coordinate metadata cross the text bridge rather than pixel buffers or credentials.
+- Photo snapshots contain every completed block for the current attempt. Photo, attempt and renderer identities fence late work; snapshot coalescing does not discard independent blocks. Validated bbox, complete source and complete translation are distinct preparation stages.
+- The native photo process owns one OpenVR session across independent surface handles. Native composition consumes the decoded-source boundary; no photo model is initialized by caption startup. The standalone probe is temporary tooling, not Python product OCR UI or proof of headset presentation.
+
+Contracts: [photo bridge](../src/puripuly_heart/core/photo/bridge.py), [provider adapters](../src/puripuly_heart/providers/photo.py), [native ownership and verification](../native/overlay/README.md#photo-runtime-boundary). Product sequencing and image-composition obligations remain in [#338](https://github.com/kapitalismho/PuriPuly-heart/issues/338) and its child issues.
+
 
 ## Settings and Credentials
 

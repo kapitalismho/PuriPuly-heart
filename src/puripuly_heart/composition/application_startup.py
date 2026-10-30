@@ -51,6 +51,7 @@ class ApplicationStartupAdapter:
     start_event_bridge: Callable[[UIEventBridgePort], None]
     wait_for_event_bridge: Callable[[], Awaitable[None]]
     sync_clipboard: Callable[[], Awaitable[None]]
+    start_photo: Callable[[], Awaitable[None]]
 
     async def prepare_startup_settings(self) -> ApplicationStartupState:
         loaded_settings = self.settings_loader()
@@ -118,6 +119,7 @@ class ApplicationStartupAdapter:
         self.presentation.attach_runtime_log_sink(self.runtime_logging)
 
     async def launch_startup_runtime(self, state: ApplicationStartupState) -> None:
+        await self.start_photo()
         settings = state.settings
         launch_settings = self.settings.project(settings, authoritative=self.settings.authoritative)
         components = await self.pipeline_launcher.launch(

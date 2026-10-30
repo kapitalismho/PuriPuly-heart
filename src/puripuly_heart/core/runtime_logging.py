@@ -68,6 +68,7 @@ from puripuly_heart.core.observability import (
     RealtimeLogSink,
 )
 from puripuly_heart.core.output.models import OutputRoutingDecision
+from puripuly_heart.core.photo.protocol import PHOTO_FAILURE_CODES
 from puripuly_heart.core.runtime.logging import (
     LIVE_AUDIENCE_BASIC,
     LIVE_AUDIENCE_RECORD_ATTRIBUTE,
@@ -265,6 +266,68 @@ class _DiagnosticIngressHandler(logging.Handler):
                 self.owner._diagnostic_history.rejected_records += 1
 
 
+def _is_photo_metadata_text(message: str) -> bool:
+    tokens = message.split()
+    if not 2 <= len(tokens) <= 9 or tokens[0] not in {
+        "connection",
+        "preparation",
+        "decode",
+        "resize",
+        "jpeg",
+        "request_sent",
+        "ttft",
+        "bbox_ready",
+        "source_ready",
+        "block_complete",
+        "first_block",
+        "total",
+        "request_failed",
+        "failed",
+        "cleanup_failed",
+        "process_started",
+        "process_failed",
+        "capture_unavailable",
+    }:
+        return False
+    seen: set[str] = set()
+    for token in tokens[1:]:
+        if "=" not in token:
+            return False
+        key, value = token.split("=", 1)
+        if key in seen:
+            return False
+        seen.add(key)
+        if key == "photo_id":
+            valid = re.fullmatch(
+                r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", value
+            )
+        elif key in {"attempt_id", "block_id", "generation", "pid"}:
+            valid = re.fullmatch(r"[0-9]{1,20}", value)
+        elif key == "duration_ms":
+            valid = re.fullmatch(r"[0-9]{1,12}(?:\.[0-9]{1,3})?", value)
+        elif key == "model":
+            valid = value in {
+                "gpt-6-luna",
+                "gemini-3.5-flash-lite",
+                "gemini-3.1-flash-lite",
+                "unknown",
+            }
+        elif key == "failure_code":
+            valid = value in PHOTO_FAILURE_CODES or value in {
+                "photo_connection_close_failed",
+                "photo_child_start_failed",
+                "photo_child_disconnected",
+                "photo_child_exited",
+                "photo_child_unavailable",
+                "photo_capture_unavailable",
+            }
+        else:
+            return False
+        if not valid:
+            return False
+    return True
+
+
 def _is_metadata_only_text(message: str) -> bool:
     if len(message) > 4096 or "\n" in message or "\r" in message:
         return False
@@ -274,6 +337,8 @@ def _is_metadata_only_text(message: str) -> bool:
     if prefix is None:
         return False
     tags = re.findall(r"\[([A-Za-z][A-Za-z0-9_-]*)\]", message[: prefix.end()])
+    if tags == ["Photo"]:
+        return _is_photo_metadata_text(message[prefix.end() :])
     if any(
         tag
         not in {
