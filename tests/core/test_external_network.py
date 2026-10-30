@@ -368,6 +368,136 @@ def test_proxy_override_and_common_bypass():
     )
 
 
+def test_proxy_policy_refreshes_environment_and_preserves_explicit_overrides(monkeypatch):
+    system = {"https": "http://system.invalid:8080"}
+    bypass = ""
+    monkeypatch.setattr(external_network, "_windows_proxy_settings", lambda: (system, bypass))
+    live = ProxyPolicy()
+    snapshot = live.snapshot()
+    fixed = ProxyPolicy(environment={}, system=system, system_bypass="")
+    explicit_bypass = ProxyPolicy(environment={}, system_bypass="fixed.example")
+    assert live.route("https://api.example").url == "http://system.invalid:8080"
+
+    monkeypatch.setenv("HTTPS_PROXY", "env.invalid:9090")
+    assert live.route("https://api.example").url == "http://env.invalid:9090"
+    monkeypatch.setenv("NO_PROXY", "api.example")
+    assert live.route("https://api.example").source == "bypass"
+    monkeypatch.delenv("HTTPS_PROXY")
+    monkeypatch.delenv("NO_PROXY")
+    system["https"] = "http://new-system.invalid:8080"
+    bypass = "api.example"
+    assert live.route("https://api.example").source == "bypass"
+    assert fixed.route("https://api.example").url == "http://system.invalid:8080"
+    assert snapshot.route("https://api.example").url == "http://system.invalid:8080"
+    assert explicit_bypass.route("https://api.example").url == "http://new-system.invalid:8080"
+    assert explicit_bypass.route("https://fixed.example").source == "bypass"
+
+
+@pytest.mark.parametrize("kind", ["async", "sync", "requests", "genai"])
+@pytest.mark.parametrize("secure", [False, True])
+async def test_existing_clients_follow_system_proxy_changes(
+    certificates, monkeypatch, kind, secure
+):
+    root, _, contexts = certificates
+    monkeypatch.setenv("SSL_CERT_FILE", str(root))
+    monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(root))
+    system = {}
+    bypass = ""
+    monkeypatch.setattr(external_network, "_windows_proxy_settings", lambda: (system, bypass))
+    with http_server(contexts["valid"] if secure else None) as port:
+        async with (
+            recording_proxy() as (first, first_requests),
+            recording_proxy() as (
+                second,
+                second_requests,
+            ),
+        ):
+            system.update(http=first, https=first)
+            sync_client = None
+            if kind == "async":
+                client = network_clients.external_async_client(timeout=2)
+            elif kind == "sync":
+                client = network_clients.external_client(timeout=2)
+            elif kind == "requests":
+                client = ExternalRequestsSession()
+            else:
+                options = network_clients.genai_http_options()
+                client = options["httpx_async_client"]
+                sync_client = options["httpx_client"]
+            url = f"{'https' if secure else 'http'}://localhost:{port}/"
+
+            async def request():
+                if kind in ("async", "genai"):
+                    response = await client.get(url, timeout=2)
+                else:
+                    response = await asyncio.to_thread(client.get, url, timeout=2)
+                assert response.status_code == 200
+                assert response.text == "ok"
+
+            try:
+                await request()
+                assert len(first_requests) == 1
+                system.update(http=second, https=second)
+                await request()
+                assert len(first_requests) == 1
+                assert len(second_requests) == 1
+                system.clear()
+                await request()
+                system.update(http=first, https=first)
+                bypass = "localhost"
+                await request()
+                assert len(first_requests) == len(second_requests) == 1
+                bypass = ""
+                await request()
+                assert len(first_requests) == 2
+                assert len(second_requests) == 1
+            finally:
+                if kind in ("async", "genai"):
+                    await client.aclose()
+                else:
+                    await asyncio.to_thread(client.close)
+                if sync_client is not None:
+                    await asyncio.to_thread(sync_client.close)
+
+
+async def test_proxy_change_preserves_inflight_response(monkeypatch):
+    finish = threading.Event()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            if self.path == "/slow":
+                finish.wait(5)
+            self.wfile.write(b"ok")
+
+        def log_message(self, *args):
+            pass
+
+    system = {}
+    monkeypatch.setattr(external_network, "_windows_proxy_settings", lambda: (system, ""))
+    with http_server(handler=Handler) as port:
+        async with (
+            recording_proxy() as (first, first_requests),
+            recording_proxy() as (
+                second,
+                second_requests,
+            ),
+        ):
+            system["http"] = first
+            async with network_clients.external_async_client(timeout=2) as client:
+                try:
+                    async with client.stream("GET", f"http://localhost:{port}/slow") as slow:
+                        system["http"] = second
+                        assert (await client.get(f"http://localhost:{port}/fast")).text == "ok"
+                        finish.set()
+                        assert await slow.aread() == b"ok"
+                    assert len(first_requests) == len(second_requests) == 1
+                finally:
+                    finish.set()
+
+
 @pytest.mark.parametrize("directory", [False, True])
 async def test_explicit_ca_https_and_wss(certificates, monkeypatch, directory):
     root, ca_dir, contexts = certificates

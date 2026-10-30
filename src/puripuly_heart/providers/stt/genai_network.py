@@ -33,11 +33,12 @@ class _LiveRedirectGuard(ClientConnection):
 def configure_live_network(client: Any, http_options: Any) -> None:
     transport = http_options.httpx_client._transport
     url = client._api_client._websocket_base_url()
-    route = transport.policy.route(url)
+    policy = transport.policy.snapshot()
+    route = policy.route(url)
     contexts = client._api_client._websocket_ssl_ctx
     contexts["ssl"] = transport.tls.context
     contexts["proxy"] = route.url
-    contexts["create_connection"] = partial(_LiveRedirectGuard, policy=transport.policy)
+    contexts["create_connection"] = partial(_LiveRedirectGuard, policy=policy)
     if route.url and route.url.startswith("https:"):
         contexts["proxy_ssl"] = transport.tls.context
     client._puripuly_live_network = (url, transport.tls, route)
