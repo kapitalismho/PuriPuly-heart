@@ -25,6 +25,7 @@ from puripuly_heart.app.services.peer_application import (
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import LocalASRProviderRuntimePort
+from puripuly_heart.core.messages import TransactionResult
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
 )
@@ -72,6 +73,7 @@ def compose_peer_application(
     stop_audio_test: Callable[[], Awaitable[None]],
     translation_demand_sink: Callable[[], Awaitable[None]] | None = None,
     mutation_settled: Callable[[], None] | None = None,
+    transaction_result_sink: Callable[[TransactionResult], None] | None = None,
 ) -> PeerApplicationRuntime:
     state = PeerApplicationStateAdapter(
         settings_provider=settings_provider,
@@ -134,6 +136,7 @@ def compose_peer_application(
         settings_presentation_sink=settings_presentation_sink,
         warning_reset=lambda: setattr(owner, "process_warning_reason", None),
         stop_audio_test=stop_audio_test,
+        transaction_result_sink=transaction_result_sink,
     )
     return PeerApplicationRuntime(
         state=state,

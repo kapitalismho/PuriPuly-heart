@@ -669,21 +669,22 @@ async def test_close_after_launch_tasks_cancels_app_active_day_retry() -> None:
     assert owner._retry_task_handle is None
 
 
-def test_translator_app_telemetry_binding_delegates_to_owner() -> None:
+def test_translator_app_telemetry_change_uses_settings_recovery() -> None:
+    from puripuly_heart.app.ports.settings_view import TelemetrySettingsIntent
+
     app = TranslatorApp.__new__(TranslatorApp)
     calls: list[object] = []
 
     class _Owner:
-        def apply_telemetry_enabled(self, enabled: bool) -> None:
-            calls.append(("apply", enabled))
-
         def schedule_app_active_day_report(self) -> None:
             calls.append(("schedule",))
 
     app._telemetry_reporting = _Owner()
+    app._queue_settings_apply = calls.append
     app._on_telemetry_enabled_change(True)
+    app._on_telemetry_enabled_change(None)
     app._schedule_app_active_day_report()
-    assert calls == [("apply", True), ("schedule",)]
+    assert calls == [TelemetrySettingsIntent(True), ("schedule",)]
 
 
 @pytest.mark.asyncio
@@ -1681,7 +1682,13 @@ def test_translator_app_4x3_window_keeps_shell_navigation_usable(
     monkeypatch.setattr(app.content_area, "update", lambda: None)
 
     assert app.content_area.padding == app_module.APP_CONTENT_PADDING
-    assert app.layout.controls == [app.title_bar, app.content_area, app.bottom_nav]
+    assert app.layout.controls == [
+        app.title_bar,
+        app._settings_status,
+        app.content_area,
+        app.bottom_nav,
+    ]
+    assert app._settings_status.visible is False
     assert app.content_area.content is app.view_dashboard
 
     app._on_nav_change(1)

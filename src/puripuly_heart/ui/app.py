@@ -19,9 +19,11 @@ from puripuly_heart.app.ports.chatgpt_account import (
 )
 from puripuly_heart.app.ports.settings_view import (
     ImmediateSettingsIntent,
+    LoopbackCaptureSettingsIntent,
     OpenRouterPkceTarget,
     PromptApplyIntent,
-    TranslationSelectionEdit,
+    ProviderApplyIntent,
+    TelemetrySettingsIntent,
 )
 from puripuly_heart.app.ports.ui_application import (
     UiApplicationFactoryPort,
@@ -63,6 +65,7 @@ from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
     DashboardTranslationIntents,
 )
+from puripuly_heart.ui.flet_runtime import is_control_mounted
 from puripuly_heart.ui.fonts import (
     font_for_language,
     register_ui_fonts,
@@ -89,6 +92,7 @@ from puripuly_heart.ui.settings.contract import (
     SettingsProviderIntents,
     SettingsSurfaceIntents,
 )
+from puripuly_heart.ui.settings_recovery import SettingsRecovery
 from puripuly_heart.ui.shell.contract import AppShellSlots
 from puripuly_heart.ui.shell.renderer import compose_app_shell
 from puripuly_heart.ui.theme import (
@@ -415,6 +419,9 @@ class TranslatorApp:
     def _freeze_ui_ingress(self) -> None:
         self._shutting_down = True
         self._settings_mutation_queue = []
+        recovery = getattr(self, "_settings_recovery", None)
+        if recovery is not None:
+            recovery.stop()
 
     async def _on_page_lifecycle_end(self, _event=None) -> None:
         await self.shutdown()
@@ -505,6 +512,7 @@ class TranslatorApp:
                 bottom_nav=self.bottom_nav,
                 content_padding=APP_CONTENT_PADDING,
                 debug_panel=self.debug_preview_panel,
+                settings_status=self._build_settings_status(),
             )
         )
         self.content_area = shell.content_area
@@ -966,7 +974,8 @@ class TranslatorApp:
         dialog.open()
 
     def _on_telemetry_enabled_change(self, enabled: bool) -> None:
-        self._telemetry_reporting_owner().apply_telemetry_enabled(enabled)
+        if isinstance(enabled, bool):
+            self._queue_settings_apply(TelemetrySettingsIntent(enabled))
 
     def _open_api_keys_guide(self) -> None:
         webbrowser.open(founder_readme_url_for_locale(get_locale()))
@@ -1014,7 +1023,7 @@ class TranslatorApp:
                             result = await next_task()
                         if result is False:
                             self._show_snackbar(
-                                t("settings.mutation.failed_pending"), COLOR_WARNING
+                                t("settings.mutation.operation_failed"), COLOR_WARNING
                             )
                     except Exception as exc:
                         emit_failure(
@@ -1036,7 +1045,7 @@ class TranslatorApp:
                         )
                         try:
                             self._show_snackbar(
-                                t("settings.mutation.failed_pending"), COLOR_WARNING
+                                t("settings.mutation.operation_failed"), COLOR_WARNING
                             )
                         except Exception:
                             pass
@@ -1044,6 +1053,69 @@ class TranslatorApp:
                 self._settings_mutation_worker_active = False
 
         self._run_page_task(_worker)
+
+    def _ensure_settings_recovery(self) -> SettingsRecovery:
+        recovery = getattr(self, "_settings_recovery", None)
+        if recovery is None:
+            recovery = SettingsRecovery(
+                self.application.apply_settings_change,
+                self._on_settings_committed,
+                self._update_settings_status,
+            )
+            self._settings_recovery = recovery
+        return recovery
+
+    def _queue_settings_apply(self, intent: object) -> None:
+        if getattr(self, "_shutting_down", False):
+            return
+        recovery = self._ensure_settings_recovery()
+        recovery.submit(intent)
+        self._queue_settings_mutation_task(recovery.drain)
+
+    def _retry_failed_settings(self, _event=None) -> None:
+        recovery = self._ensure_settings_recovery()
+        recovery.retry()
+        self._queue_settings_mutation_task(recovery.drain)
+
+    def _on_settings_committed(self, intent: object) -> None:
+        view = getattr(self, "view_settings", None)
+        if isinstance(intent, ProviderApplyIntent) and view is not None:
+            view.acknowledge_provider_apply_settings(intent)
+            consume = getattr(view, "consume_alibaba_key_verification", None)
+            verification = consume() if callable(consume) else None
+            if verification is not None:
+                self._run_page_task(verification)
+        elif isinstance(intent, PromptApplyIntent) and view is not None:
+            view.acknowledge_prompt_apply_settings(intent)
+        self.application.refresh_settings_projection()
+        self._sync_audio_test_dialog_if_stopped()
+
+    def _build_settings_status(self) -> ft.Container:
+        self._settings_status_text = ft.Text(expand=True, size=12)
+        self._settings_retry_button = ft.TextButton(
+            t("settings.recovery.retry"), on_click=self._retry_failed_settings
+        )
+        self._settings_status = ft.Container(
+            content=ft.Row([self._settings_status_text, self._settings_retry_button]),
+            padding=ft.Padding.symmetric(horizontal=16, vertical=6),
+            visible=False,
+        )
+        return self._settings_status
+
+    def _update_settings_status(self, phase: str) -> None:
+        status = getattr(self, "_settings_status", None)
+        if status is None:
+            return
+        status.visible = phase != "idle"
+        if phase != "idle":
+            self._settings_status_text.value = t(f"settings.recovery.{phase}")
+        failed = phase.endswith("_failed")
+        self._settings_status_text.color = COLOR_WARNING if failed else COLOR_PRIMARY
+        self._settings_retry_button.content = t("settings.recovery.retry")
+        self._settings_retry_button.visible = failed
+        self._settings_retry_button.disabled = not failed
+        if is_control_mounted(status):
+            status.update()
 
     def _content_padding_for_index(self, index: int) -> int | ft.Padding:
         if index == 1:
@@ -1064,26 +1136,11 @@ class TranslatorApp:
             if self.view_settings.has_provider_changes:
                 pending_settings = self.view_settings.build_provider_apply_settings()
                 if pending_settings is not None:
-
-                    async def _task():
-                        result = await self.application.apply_provider_intent(pending_settings)
-                        if result:
-                            self.view_settings.acknowledge_provider_apply_settings(pending_settings)
-                            self.application.refresh_settings_projection()
-                        return bool(result)
-
-                    self._queue_settings_mutation_task(_task)
+                    self._queue_settings_apply(pending_settings)
             elif getattr(self.view_settings, "has_pending_prompt_changes", False):
                 pending = PromptApplyIntent(self.view_settings._prompt_editor.value)
 
-                async def _task():
-                    result = await self.application.apply_prompt_intent(pending)
-                    if result:
-                        self.view_settings.acknowledge_prompt_apply_settings(pending)
-                        self.application.refresh_settings_projection()
-                    return bool(result)
-
-                self._queue_settings_mutation_task(_task)
+                self._queue_settings_apply(pending)
 
         if index == 0:
             self.content_area.content = self.view_dashboard
@@ -1386,10 +1443,7 @@ class TranslatorApp:
         self._queue_settings_mutation_task(_task)
 
     def _on_apply_loopback_capture_option(self, value: str) -> None:
-        async def _task():
-            await self.application.apply_loopback_capture_option(value)
-
-        self._queue_settings_mutation_task(_task)
+        self._queue_settings_apply(LoopbackCaptureSettingsIntent(value))
 
     def _on_gpu_discovery_requested(self) -> None:
         self._run_page_task(self.application.ensure_gpu_device_discovery)
@@ -1425,16 +1479,14 @@ class TranslatorApp:
             self._mark_launch_high_priority_feedback_shown("stt_compatibility", snackbar)
             self.page.show_dialog(snackbar)
 
-        async def _task():
-            await self.application.on_dashboard_language_change(change)
-
-        self._queue_settings_mutation_task(_task)
+        self._queue_settings_apply(change)
 
     def _on_settings_changed(self, intent: ImmediateSettingsIntent) -> None:
         async def _task():
-            await self.application.apply_settings_intent(intent)
+            await self._ensure_settings_recovery().drain()
             self._sync_audio_test_dialog_if_stopped()
 
+        self._ensure_settings_recovery().submit(intent)
         self._queue_settings_mutation_task(_task)
 
     def _on_start_audio_test(self) -> None:
@@ -1505,14 +1557,7 @@ class TranslatorApp:
         self._close_audio_test_dialog()
 
     def _on_prompt_apply_settings(self, intent: PromptApplyIntent) -> None:
-        async def _task():
-            result = await self.application.apply_prompt_intent(intent)
-            if result:
-                self.view_settings.acknowledge_prompt_apply_settings(intent)
-                self.application.refresh_settings_projection()
-            return bool(result)
-
-        self._queue_settings_mutation_task(_task)
+        self._queue_settings_apply(intent)
 
     def _on_providers_changed(self) -> None:
         view_settings = getattr(self, "view_settings", None)
@@ -1520,7 +1565,6 @@ class TranslatorApp:
             view_settings, "consume_immediate_provider_apply_settings", None
         )
         pending_intent = consume_immediate() if callable(consume_immediate) else None
-        focused_intent = pending_intent
         consume_http_extension_runtime_reload = getattr(
             view_settings,
             "consume_http_extension_runtime_reload",
@@ -1532,14 +1576,7 @@ class TranslatorApp:
             else False
         )
         if pending_intent is None and runtime_reload:
-
-            async def _runtime_only_task():
-                await self.application.apply_providers(
-                    persist_settings=False,
-                    refresh_ui=False,
-                )
-
-            self._queue_settings_mutation_task(_runtime_only_task)
+            self._queue_settings_apply(None)
             return
 
         build_provider_apply_settings = getattr(
@@ -1554,46 +1591,7 @@ class TranslatorApp:
         if pending_intent is not None:
             self._log_basic("[Settings] Applying staged provider intent")
 
-        async def _task():
-            if pending_intent is None:
-                await self.application.apply_providers()
-                return
-            result = await self.application.apply_provider_intent(pending_intent)
-            if not result and focused_intent is not None:
-                committed = self.application.compatibility_settings()
-                selection_edit = next(
-                    (
-                        edit
-                        for edit in focused_intent.edits
-                        if isinstance(edit, TranslationSelectionEdit)
-                    ),
-                    None,
-                )
-                if (
-                    committed is not None
-                    and selection_edit is not None
-                    and committed.intent.translation.model == selection_edit.selection.model.value
-                    and committed.intent.translation.connection
-                    == selection_edit.selection.connection.value
-                ):
-                    view_settings.acknowledge_provider_apply_settings(focused_intent)
-                    self.application.refresh_settings_projection()
-            if result:
-                view_settings.acknowledge_provider_apply_settings(pending_intent)
-                self.application.refresh_settings_projection()
-                consume_alibaba_key_verification = getattr(
-                    view_settings, "consume_alibaba_key_verification", None
-                )
-                verification = (
-                    consume_alibaba_key_verification()
-                    if callable(consume_alibaba_key_verification)
-                    else None
-                )
-                if verification is not None:
-                    self._run_page_task(verification)
-            return bool(result)
-
-        self._queue_settings_mutation_task(_task)
+        self._queue_settings_apply(pending_intent)
 
     def _on_local_llm_secret_changed(self) -> None:
         async def _task():
