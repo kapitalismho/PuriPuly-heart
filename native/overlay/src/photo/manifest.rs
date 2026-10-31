@@ -25,6 +25,8 @@ pub struct PhotoManifest {
     pub backend: PhotoBackend,
     #[serde(default)]
     pub image: PhotoImageConfig,
+    #[serde(default)]
+    pub interaction: super::interaction::TemporaryInteractionConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -126,6 +128,7 @@ impl PhotoManifest {
             return Err(PhotoError::Manifest);
         }
         self.image.validate()?;
+        self.interaction.validate()?;
         Ok(())
     }
 }

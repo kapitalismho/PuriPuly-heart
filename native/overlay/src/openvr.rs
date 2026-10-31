@@ -595,6 +595,60 @@ impl OpenVrOverlay {
     pub fn output_adapter(&self) -> OpenVrOutputAdapter {
         self.backend.output_adapter()
     }
+
+    pub fn set_tracked_presentation(
+        &mut self,
+        device: u32,
+        transform: [[f32; 4]; 3],
+        width: f32,
+        alpha: f32,
+    ) -> Result<(), OpenVrError> {
+        #[cfg(windows)]
+        {
+            let OpenVrBackend::Windows(overlay) = &mut self.backend;
+            let presentation = (device, transform, width, alpha);
+            if overlay.tracked_presentation == Some(presentation) {
+                return Ok(());
+            }
+            overlay.tracked_presentation = None;
+            let api = overlay.overlay_api();
+            let set_transform =
+                api.SetOverlayTransformTrackedDeviceRelative
+                    .ok_or_else(missing_overlay_method(
+                        "SetOverlayTransformTrackedDeviceRelative",
+                    ))?;
+            let set_width = api
+                .SetOverlayWidthInMeters
+                .ok_or_else(missing_overlay_method("SetOverlayWidthInMeters"))?;
+            let set_alpha = api
+                .SetOverlayAlpha
+                .ok_or_else(missing_overlay_method("SetOverlayAlpha"))?;
+            let mut matrix = openvr_sys::HmdMatrix34_t { m: transform };
+            for (name, error) in unsafe {
+                [
+                    (
+                        "SetOverlayTransformTrackedDeviceRelative",
+                        set_transform(overlay.overlay_handle, device, &mut matrix),
+                    ),
+                    (
+                        "SetOverlayWidthInMeters",
+                        set_width(overlay.overlay_handle, width),
+                    ),
+                    ("SetOverlayAlpha", set_alpha(overlay.overlay_handle, alpha)),
+                ]
+            } {
+                map_overlay_submit_error(api, name, error)?;
+            }
+            overlay.applied_placement_policy = None;
+            overlay.tracked_presentation = Some(presentation);
+            Ok(())
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = (device, transform, width, alpha);
+            Err(OpenVrError::Init("OpenVR requires Windows".into()))
+        }
+    }
 }
 
 impl OverlayFrameSubmitter for OpenVrOverlay {
@@ -642,6 +696,22 @@ impl OverlayTextureSubmitter for OpenVrOverlay {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrackedHand {
+    Left,
+    Right,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct LegacyVrInput {
+    pub head: [[f32; 4]; 3],
+    pub left: [[f32; 4]; 3],
+    pub right: [[f32; 4]; 3],
+    pub left_index: u32,
+    pub right_index: u32,
+    pub grip: bool,
+}
+
 pub struct OpenVrSession {
     #[cfg(windows)]
     inner: Rc<WindowsOpenVrSession>,
@@ -658,6 +728,43 @@ impl OpenVrSession {
         #[cfg(not(windows))]
         {
             Err(OpenVrError::Init("OpenVR requires Windows".into()))
+        }
+    }
+
+    pub fn legacy_input(&self) -> Option<LegacyVrInput> {
+        #[cfg(windows)]
+        {
+            self.inner.legacy_input()
+        }
+        #[cfg(not(windows))]
+        {
+            None
+        }
+    }
+
+    pub fn pulse(&self, hand: TrackedHand) -> bool {
+        #[cfg(windows)]
+        {
+            let api = unsafe { &*self.inner.system_api };
+            let Some(input) = self.inner.legacy_input() else {
+                return false;
+            };
+            let index = match hand {
+                TrackedHand::Left => input.left_index,
+                TrackedHand::Right => input.right_index,
+            };
+            let Some(pulse) = api.TriggerHapticPulse else {
+                return false;
+            };
+            unsafe {
+                pulse(index, 0, 900);
+            }
+            true
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = hand;
+            false
         }
     }
 }
@@ -697,6 +804,60 @@ impl WindowsOpenVrSession {
             compositor_api,
             output_adapter,
             _runtime: runtime,
+        })
+    }
+
+    fn legacy_input(&self) -> Option<LegacyVrInput> {
+        let api = unsafe { &*self.system_api };
+        if api
+            .IsInputAvailable
+            .is_some_and(|available| !unsafe { available() })
+        {
+            return None;
+        }
+        let role = api.GetTrackedDeviceIndexForControllerRole?;
+        let left_index =
+            unsafe { role(openvr_sys::ETrackedControllerRole_TrackedControllerRole_LeftHand) };
+        let right_index =
+            unsafe { role(openvr_sys::ETrackedControllerRole_TrackedControllerRole_RightHand) };
+        if left_index == right_index
+            || left_index == 0
+            || right_index == 0
+            || left_index >= openvr_sys::k_unMaxTrackedDeviceCount
+            || right_index >= openvr_sys::k_unMaxTrackedDeviceCount
+        {
+            return None;
+        }
+        let mut poses = [openvr_sys::TrackedDevicePose_t::default();
+            openvr_sys::k_unMaxTrackedDeviceCount as usize];
+        unsafe {
+            api.GetDeviceToAbsoluteTrackingPose?(
+                openvr_sys::ETrackingUniverseOrigin_TrackingUniverseStanding,
+                0.0,
+                poses.as_mut_ptr(),
+                poses.len() as u32,
+            );
+        }
+        let pose = |index: u32| {
+            let pose = &poses[index as usize];
+            (pose.bDeviceIsConnected
+                && pose.bPoseIsValid
+                && crate::photo::interaction::valid_transform(pose.mDeviceToAbsoluteTracking.m))
+            .then_some(pose.mDeviceToAbsoluteTracking.m)
+        };
+        let mut state = openvr_sys::VRControllerState_t::default();
+        if !unsafe {
+            api.GetControllerState?(left_index, &mut state, std::mem::size_of_val(&state) as u32)
+        } {
+            return None;
+        }
+        Some(LegacyVrInput {
+            head: pose(0)?,
+            left: pose(left_index)?,
+            right: pose(right_index)?,
+            left_index,
+            right_index,
+            grip: state.ulButtonPressed & (1u64 << openvr_sys::EVRButtonId_k_EButton_Grip) != 0,
         })
     }
 }
@@ -858,6 +1019,7 @@ struct WindowsOpenVrOverlay {
     overlay_handle: openvr_sys::VROverlayHandle_t,
     placement_policy: OverlayPlacementPolicy,
     applied_placement_policy: Option<OverlayPlacementPolicy>,
+    tracked_presentation: Option<(u32, [[f32; 4]; 3], f32, f32)>,
     visible: bool,
     output_adapter: OpenVrOutputAdapter,
     _session: Rc<WindowsOpenVrSession>,
@@ -886,6 +1048,7 @@ impl WindowsOpenVrOverlay {
             overlay_handle,
             placement_policy: OverlayPlacementPolicy::default(),
             applied_placement_policy: None,
+            tracked_presentation: None,
             visible: false,
             output_adapter,
             _session: session,
@@ -957,6 +1120,7 @@ impl WindowsOpenVrOverlay {
             return Ok(());
         }
         self.applied_placement_policy = None;
+        self.tracked_presentation = None;
         self.placement_policy
             .apply(self.overlay_api(), self.overlay_handle)?;
         self.applied_placement_policy = Some(self.placement_policy.clone());
@@ -1127,6 +1291,7 @@ impl SpatialReanchorApi for WindowsOpenVrOverlay {
         origin: SpatialTrackingOrigin,
         transform: [[f32; 4]; 3],
     ) -> Result<(), OpenVrError> {
+        self.tracked_presentation = None;
         let set_transform = self
             .overlay_api()
             .SetOverlayTransformAbsolute

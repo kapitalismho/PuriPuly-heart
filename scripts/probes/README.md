@@ -1,10 +1,62 @@
-# X1: controller input alongside VRChat
+# Temporary VR photo experiments
 
-Preparation for [#341](https://github.com/kapitalismho/PuriPuly-heart/issues/341), under [#338](https://github.com/kapitalismho/PuriPuly-heart/issues/338). This standalone probe reuses the original `controller-watch` approach from the recovered capture probe (`probe.py`, `cmd_controller_watch`; `HANDOFF.md`, section 10 step 4). It does not import that probe's camera controls or revive its excluded shutter/performance experiments.
+Temporary native-interaction and standalone operator tools for [#341](https://github.com/kapitalismho/PuriPuly-heart/issues/341), under [#338](https://github.com/kapitalismho/PuriPuly-heart/issues/338). The optional X1 diagnostic reuses the recovered `controller-watch` approach (`probe.py`, `cmd_controller_watch`; `HANDOFF.md`, section 10 step 4), without importing its camera controls or reviving excluded experiments.
 
-X1 asks whether left grip and both hand poses are readable while VRChat runs, whether the interaction also grabs the camera/objects or changes avatar gestures, and whether each controller can produce a felt haptic. Budget about ten minutes of physical interaction. No photo capture, photo transmission, model calls, OSC commands, product UI, or VR overlays are added. The probe does not start SteamVR or VRChat. Haptics are off unless explicitly requested.
+## Current owner decisions
 
-## First physical run: legacy API
+The owner approved shared input with VRChat and proceeding directly to temporary interaction implementation. Input capture/suppression and a no-interference gate are not required. The standalone X1 probe below is an optional input-mapping diagnostic, not a prerequisite for implementing or trying the temporary VR flow. Physical input availability and felt haptics still need observation; they are not established by code inspection.
+
+Feedback routing is settled: successful grab start and the valid 12 cm pull trigger give a short pulse on the left controller. The first drawn translated block gives one pulse on the right controller per request attempt, using the existing application-authorized feedback grant. The owner explicitly selected first-block display, not whole-photo completion. Renderer recovery and reopening do not replay this notification. There is no shutter, release, or additional whole-photo-completion haptic. Grab-start feedback supersedes the earlier restriction to trigger/first-block feedback only.
+
+The source precedents use shared legacy input, not exclusive game-input ownership: [VRCT](https://github.com/misyaguziya/VRCT/blob/79419a1f2ce78d38993b0f33e273155667eb0b6a/src-python/models/overlay/overlay.py#L53-L55) explicitly notes simultaneous VRChat delivery; [VRCLT](https://github.com/VRCLT/VRCLT/blob/775fab0d460feb3dd034c5902523cdf1fc510f13/vrclt/vr/wrist_ui.py#L1-L11) keeps game input active. Their ray-targeted drag implementations do not establish physical success of the near-wrist pull on the user's hardware.
+
+These decisions replace the earlier requirement to finish a separate X1 interference experiment before implementation. Physical X3 legibility/interaction observations, X8 language qualification, and assembled-flow evidence remain pending. Final UI remains #342; no Python product OCR UI is authorized.
+
+## X3: no-provider native photo preview
+
+`x3_photo_preview.py` launches the actual native photo role and uses its authenticated loopback bridge. It offers an explicitly selected existing PNG, without provider calls, credentials, OCR or pixel processing in Python. Native decodes and draws the image. A recorded translated composite is shown as a **base-image preview with zero translation blocks**; it cannot produce a genuine first-translated-block notification. Test right-hand notification through the actual block path, not by pretending this prerecorded image is a newly translated block.
+
+Native's optional manifest `interaction` object exposes `grab_m`, `icon_width_m`, `photo_width_m`, `facing_show_deg`, `forward_show_deg`, `facing_hide_deg`, `forward_hide_deg`, `dwell_ms`, `wrist_transform` and `photo_transform`. The transforms are rigid 3×4 controller-relative matrices in metres. Defaults are temporary tuning candidates: 7 cm grab range, 3 cm icon, 50 cm held width, 40°/25° show angles, 55°/35° hide angles and 200 ms dwell. Appearance/release is linear over 150 ms; icon return is 225 ms ease-out. See the [interaction owner](../../native/overlay/src/photo/interaction.rs). Physical wrist/hand alignment and comfort remain to be observed rather than inferred from these defaults.
+
+Build and assemble the executable using the [native instructions](../../native/overlay/README.md#build-and-verification). Start SteamVR and VRChat manually before a physical run. From the repository root:
+
+```powershell
+$overlay = Join-Path $env:TEMP 'puripuly-overlay-tests/release/PuriPulyHeartOverlay.exe'
+$renderRoot = 'C:\path\to\retained\native_photo340_20261031'
+$image = Join-Path $renderRoot 'native_outline_1080/u01_photo/composite.png'
+python scripts/probes/x3_photo_preview.py --executable $overlay --image $image --offer-delay 5 --seconds 180
+```
+
+Use a Python environment with the project's existing dependencies. No new project dependency is required. The launcher prints the exact executable identity and a private evidence directory. It refuses OpenVR launch when SteamVR is not already running.
+
+After native readiness, this command creates one synthetic offer after five seconds. Look at the right wrist and start the left grip inside the highlighted grab range. Pull the left hand 12 cm farther from the wrist anchor:
+
+- Grab-start and the valid pull each request one left-hand pulse. The icon returns to the wrist; the first pull authorizes the preview but does not leave the photo held.
+- Release, then grab and pull again to open the retained preview in the left hand. It appears over 150 ms; releasing reverses alpha and width over 150 ms, then hides it. Reopening does not resend or regenerate anything.
+- Releasing before the pull threshold returns the icon without opening/authorizing the photo. Moving both hands together without increasing their separation must not trigger.
+- The initial opportunity lasts ten seconds; only the latest authorized preview remains available for ten minutes after the offer. Start another invocation for another synthetic opportunity, or use actual photo signals below.
+
+For the scoped real-shot observations, append `--watch-dir '<explicit VRChat photo directory>'`. The existing watcher ignores files present at startup. Every new PNG signal offers **the same selected preview image**, not a translation of the newly captured photo. No camera control or transmission is performed. This mode lets the operator record reaction, false triggers and missed windows using the existing rendered material; it is not the assembled provider flow.
+
+For the 1440p reference, select the corresponding `native_outline_1440/.../composite.png` and add `--reference-1440`; otherwise the native default deliberately fits within 1920×1080. Compare at the same held geometry. For original comparison, run separately with that case's `original.png` or `original_view.png`. Changing the asset creates a separate preview photo; this is not the product's original-layer toggle test. The real compositor retains its original/erase/text layer control.
+
+Physical observations should cover wrist visibility, grip recognition, cancellation/relative pull, held-photo readability at the candidate geometry, release/reopen and felt left feedback. Shared game input is accepted. Record what was actually seen/felt; software composition or submission does not establish HMD consumption. The planned X3 sample remains about 20 real shots, not a new image-quality campaign or a new decision on the selected 1080p default.
+
+### Software-only preview smoke
+
+```powershell
+python scripts/probes/x3_photo_preview.py --executable $overlay --image $image --backend offscreen --offer-delay 0.1 --software-pull-after 0.2 --seconds 15
+```
+
+This explicit offscreen control performs a software pull, exports `preview.png`, hides, reopens, exports `reopened.png`, and shuts down the child. Add `--reference-1440` with the reference asset to preserve its resolution. Software injection is rejected in OpenVR mode. `bridge_control_mode=probe` permits the existing debug commands, while `requested_native_backend=offscreen` selects real GPU rendering; the receipt-only probe backend is not claimed to draw.
+
+The evidence directory contains `events.jsonl`, `summary.json` and the requested exports. The token-bearing launch manifest is removed during owned cleanup. Keep outputs private when the selected asset contains personal photos. Exit success and `shutdown_acknowledged`/`native_exit_code` establish different facts from physical display.
+
+## Optional X1 input diagnostic
+
+X1 records left grip, both hand poses and controller haptic API calls while the user operates VRChat. The diagnostic itself adds no photo capture, photo transmission, model calls, OSC commands, product UI, or VR overlays. It does not start SteamVR or VRChat. Haptics are off unless explicitly requested.
+
+### Legacy API capture
 
 Run commands from the repository root in PowerShell. `uv` supplies the pinned standalone OpenVR package without changing the application's dependencies.
 
@@ -16,7 +68,7 @@ Run commands from the repository root in PowerShell. `uv` supplies the pinned st
    ```
 
 3. Start with grip released. Bring the left hand near the right wrist, grip, move the left hand roughly 30 cm away, then release. Repeat five times. Also move both arms together without changing their relative distance. Exercise right grip and both triggers briefly to identify the separate inputs; triggers are diagnostic controls, not a new translation gesture.
-4. Watch whether gripping changes the avatar hand gesture or picks up a nearby object. Repeat with the VRChat camera manually open/nearby to check accidental camera grabbing. Run another 30-second capture if needed; keep the observations tied to each run.
+4. Camera/object grabbing and avatar gesture changes may be noted, but shared input is accepted and their absence is not a pass condition. No separate interference trial is required.
 5. When ready to feel the pulses, run:
 
    ```powershell
@@ -27,7 +79,7 @@ Run commands from the repository root in PowerShell. `uv` supplies the pinned st
 
 No wrist icon is expected. Distances are between controller origins from the same current pose snapshot, **not a calibrated wrist anchor or an implemented 12 cm pull trigger**. Invalid/disconnected tracking removes the distance rather than reusing stale coordinates.
 
-## SteamVR Input fallback: only if needed
+### SteamVR Input fallback: only if needed
 
 No grip transitions after deliberate trials, or unavailable legacy state, is not proof that grip is impossible. Check the explicit action path next. The controller type is discovered at runtime; no guessed hardware-specific default binding is shipped.
 
@@ -54,7 +106,7 @@ Action haptics request 40 ms at 80 Hz and amplitude 0.25, once per selected hand
 
 References: [SteamVR Input](https://github.com/ValveSoftware/openvr/wiki/SteamVR-Input), [action manifests](https://github.com/ValveSoftware/openvr/wiki/Action-manifest), [OpenVR application types](https://github.com/ValveSoftware/openvr/wiki/API-Documentation).
 
-## Evidence and next decision
+### Evidence and next decision
 
 Each invocation prints a unique local directory under `%TEMP%\puripuly-x1`. It contains `events.jsonl` and `summary.json`; action mode also creates its private manifests. These files contain local paths, controller metadata and pose traces. Do not commit or publish raw output.
 
@@ -65,15 +117,15 @@ Keep a separate human observation with:
 - Run directory, headset/controller model, connection method, and confirmation that VRChat remained in VR.
 - API path and, for action mode, the active binding and any force threshold.
 - Left/right physical role agreement and deliberate grip trial count versus recorded transitions.
-- Camera/object grabbing and avatar gesture changes, with camera-nearby versus camera-away context.
+- Any useful camera/object or gesture observations; absence of shared-input effects is not required.
 - Left and right haptics: felt, not felt, or not attempted.
 - Tracking loss, unavailable bindings, interruptions or other missing observations.
 
 Machine `physical_observations` remain explicitly unperformed; accompany them with the human note rather than interpreting software success as physical proof. Exit 0 means capture completed, 2 means OpenVR initialization unavailable, 130 means interrupted, and 1 means another setup/poll/cleanup error. Read `cleanup_errors` before another action-mode run.
 
-Choose the input path only after reviewing this evidence together. If neither API establishes usable grip after correct binding and deliberate trials, record the original pose-only pull fallback as the next decision path; this probe does not implement or qualify it. X3 follows X1 and will consume #340's existing X11 1080p/1440p renders. X3, X8, assembled-flow validation and final UI are not completed by this preparation.
+Use the legacy input path for the temporary implementation. If the actual hardware does not expose the expected physical grip, use this diagnostic to establish the mapping and evaluate the SteamVR Input path. If neither API establishes usable grip after correct binding and deliberate trials, the original pose-only pull remains a decision path, not an implemented or qualified fallback. X3 consumes #340's existing X11 1080p/1440p renders without reopening the selected 1080p default.
 
-## Local preparation verification
+### Local diagnostic verification
 
 The standalone help and both actual no-runtime entry paths were exercised. With SteamVR stopped, background initialization returned code 121 (`InitError_Init_NoServerForBackgroundApp`), with no controller samples or haptic calls. This establishes safe unavailable-runtime behavior, not live input or binding activation.
 

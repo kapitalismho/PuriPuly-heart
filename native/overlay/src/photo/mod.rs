@@ -4,6 +4,8 @@ pub mod compositor;
 #[cfg(windows)]
 mod gpu;
 pub mod image;
+pub mod interaction;
+mod icon;
 pub mod manifest;
 #[cfg(windows)]
 mod offline;

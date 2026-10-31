@@ -1,0 +1,587 @@
+from __future__ import annotations
+
+import argparse
+import asyncio
+import csv
+import hashlib
+import json
+import math
+import os
+import struct
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+from uuid import uuid4
+
+
+class PreviewState:
+    def __init__(self, image: Path, width: int, height: int, publish, event):
+        self.image = image
+        self.width = width
+        self.height = height
+        self.publish = publish
+        self.event = event
+        self.revision = 0
+        self.photo = None
+        self.shutter = 0.0
+        self.pulls = set()
+
+    def snapshot(self):
+        self.publish(
+            {
+                "type": "photo_snapshot",
+                "revision": self.revision,
+                "photo": None if self.photo is None else dict(self.photo),
+            }
+        )
+
+    def changed(self, kind):
+        self.revision += 1
+        self.snapshot()
+        self.event(
+            kind,
+            photo_id=self.photo["photo_id"],
+            revision=self.revision,
+            attempt_id=self.photo["attempt_id"],
+            phase=self.photo["phase"],
+            visible=self.photo["visible"],
+        )
+
+    def offer(self, now, wall_ms):
+        self.shutter = now
+        self.pulls.clear()
+        self.photo = {
+            "photo_id": str(uuid4()),
+            "path": str(self.image),
+            "file_size": self.image.stat().st_size,
+            "shutter_unix_ms": wall_ms,
+            "attempt_id": 0,
+            "phase": "offer",
+            "offer_open": True,
+            "visible": False,
+            "image": None,
+            "preparations": [],
+            "blocks": [],
+            "failure_code": None,
+            "first_block_drawn": False,
+        }
+        self.changed("preview_offer")
+        self.tick(now)
+
+    def tick(self, now):
+        photo = self.photo
+        if photo is None or photo["phase"] == "expired":
+            return
+        if now - self.shutter >= 600:
+            photo.update(phase="expired", offer_open=False, visible=False)
+            self.changed("retention_expired")
+        elif now - self.shutter >= 10 and photo["offer_open"]:
+            photo["offer_open"] = False
+            self.changed("offer_closed")
+
+    def control(self, value, generation, now):
+        self.tick(now)
+        kind = value["type"]
+        photo = self.photo
+        if (
+            generation != 1
+            or photo is None
+            or value.get("photo_id") != photo["photo_id"]
+            or photo["phase"] == "expired"
+        ):
+            self.event("control_rejected", control=kind, reason="not_current")
+            return
+        if kind == "photo_pull":
+            if value["event_id"] in self.pulls:
+                self.event("control_rejected", control=kind, reason="duplicate_pull")
+                return
+            if photo["attempt_id"] == 0 and not photo["offer_open"]:
+                self.event("control_rejected", control=kind, reason="offer_closed")
+                return
+            self.pulls.add(value["event_id"])
+            reopened = photo["attempt_id"] == 1
+            photo.update(
+                attempt_id=1,
+                phase="completed",
+                offer_open=False,
+                visible=True,
+                image={"path": str(self.image), "width": self.width, "height": self.height},
+            )
+            self.changed("preview_reopened" if reopened else "preview_opened")
+        elif kind == "photo_hidden" and photo["visible"]:
+            photo["visible"] = False
+            self.changed("preview_hidden")
+        else:
+            self.event("control_rejected", control=kind, reason="preview_has_no_translation_blocks")
+
+
+def png_dimensions(path):
+    with path.open("rb") as stream:
+        header = stream.read(33)
+    if len(header) != 33 or header[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
+        raise ValueError("image must have a PNG IHDR header")
+    width, height = struct.unpack(">II", header[16:24])
+    if not width or not height or max(width, height) > 0x7FFFFFFF:
+        raise ValueError("invalid PNG dimensions")
+    return width, height
+
+
+class Evidence:
+    def __init__(self):
+        self.path = Path(tempfile.mkdtemp(prefix="puripuly-x3-preview-"))
+        self.stream = (self.path / "events.jsonl").open("x", encoding="utf-8")
+        self.started = time.monotonic()
+        self.summary = {
+            "status": "starting",
+            "preview_only": True,
+            "provider_requests": 0,
+            "translation_blocks": 0,
+            "physical_observations": "unperformed",
+        }
+
+    def event(self, kind, **fields):
+        record = {"event": kind, "elapsed_s": time.monotonic() - self.started, **fields}
+        self.stream.write(json.dumps(record, allow_nan=False) + "\n")
+        self.stream.flush()
+        print(json.dumps(record, allow_nan=False), flush=True)
+
+    def finish(self):
+        self.summary["elapsed_s"] = time.monotonic() - self.started
+        (self.path / "summary.json").write_text(
+            json.dumps(self.summary, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+        )
+        self.stream.close()
+
+
+def runtime_running():
+    if os.name != "nt":
+        return False
+    result = subprocess.run(
+        ["tasklist", "/FI", "IMAGENAME eq vrserver.exe", "/FO", "CSV", "/NH"],
+        capture_output=True,
+        check=True,
+        timeout=5,
+    )
+    return any(
+        row and row[0].lower() == "vrserver.exe"
+        for row in csv.reader(result.stdout.decode("ascii", errors="replace").splitlines())
+    )
+
+
+async def drain(stream, evidence, signals):
+    while raw := await stream.readline():
+        try:
+            value = json.loads(raw)
+        except ValueError, UnicodeDecodeError:
+            evidence.event("native_non_json_output", bytes=len(raw))
+            continue
+        if not isinstance(value, dict):
+            continue
+        fields = {
+            key: value[key]
+            for key in (
+                "type",
+                "stage",
+                "code",
+                "pid",
+                "backend",
+                "photo_id",
+                "attempt_id",
+                "block_count",
+                "original_uploads",
+                "submitted",
+                "recovered",
+                "elapsed_ms",
+            )
+            if key in value
+        }
+        evidence.event("native", **fields)
+        if value.get("type") in ("photo_runtime_error", "photo_image_failed"):
+            signals["error"] = value.get("code", "native_error")
+        if value.get("stage") == "display_source_ready":
+            signals["decoded"] = True
+        if value.get("stage") == "composed" and value.get("original_uploads", 0) > 0:
+            signals["composed"] = True
+
+
+async def stop_child(process, bridge, readers, evidence):
+    errors = []
+    if process is not None:
+        try:
+            if process.returncode is None:
+                try:
+                    bridge.send({"type": "shutdown"})
+                except Exception as exc:
+                    errors.append("shutdown_send_" + type(exc).__name__)
+                try:
+                    await asyncio.wait_for(process.wait(), 3)
+                except TimeoutError:
+                    evidence.event("shutdown_escalated", action="terminate")
+                    process.terminate()
+                    try:
+                        await asyncio.wait_for(process.wait(), 2)
+                    except TimeoutError:
+                        evidence.event("shutdown_escalated", action="kill")
+                        process.kill()
+                        await asyncio.wait_for(process.wait(), 2)
+            evidence.summary["native_exit_code"] = process.returncode
+            evidence.summary["shutdown_acknowledged"] = bridge.shutdown_complete.is_set()
+            if process.returncode != 0:
+                errors.append("native_exit_nonzero")
+        except Exception as exc:
+            errors.append("child_cleanup_" + type(exc).__name__)
+            if process.returncode is None:
+                try:
+                    process.kill()
+                    await asyncio.wait_for(process.wait(), 2)
+                except Exception as cleanup_exc:
+                    errors.append("child_kill_" + type(cleanup_exc).__name__)
+    if readers:
+        try:
+            results = await asyncio.wait_for(asyncio.gather(*readers, return_exceptions=True), 2)
+            errors.extend(
+                "reader_" + type(item).__name__
+                for item in results
+                if isinstance(item, BaseException)
+            )
+        except TimeoutError:
+            errors.append("reader_drain_timeout")
+    try:
+        await asyncio.wait_for(bridge.close(), 3)
+    except Exception as exc:
+        errors.append("bridge_cleanup_" + type(exc).__name__)
+    return errors
+
+
+async def run(args, evidence):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+    from puripuly_heart.core.photo.bridge import PhotoBridge
+    from puripuly_heart.core.photo.capture import PhotoCaptureWatcher
+
+    image = args.image.expanduser().resolve(strict=True)
+    executable = args.executable.expanduser().resolve(strict=True)
+    width, height = png_dimensions(image)
+    control_mode = "probe" if args.backend == "offscreen" else "openvr"
+    with executable.open("rb") as stream:
+        executable_hash = hashlib.file_digest(stream, "sha256").hexdigest()
+    evidence.summary.update(
+        requested_native_backend=args.backend,
+        bridge_control_mode=control_mode,
+        executable=str(executable),
+        executable_sha256=executable_hash,
+        image_dimensions=[width, height],
+        max_size=[2560, 1440] if args.reference_1440 else [1920, 1080],
+        source_script=str(Path(__file__).resolve()),
+        python_executable=sys.executable,
+        offer_source=(
+            "new_file_signal_same_selected_asset" if args.watch_dir else "delayed_synthetic"
+        ),
+        bridge_source=str(Path(sys.modules[PhotoBridge.__module__].__file__).resolve()),
+    )
+    evidence.event(
+        "configuration",
+        requested_native_backend=args.backend,
+        bridge_control_mode=control_mode,
+        image_dimensions=[width, height],
+        max_size=evidence.summary["max_size"],
+    )
+    if args.backend == "openvr" and not await asyncio.to_thread(runtime_running):
+        evidence.summary["status"] = "runtime_not_running"
+        evidence.event("runtime_not_running", native_started=False, steamvr_launch_attempted=False)
+        return 2
+    bridge = PhotoBridge(
+        control=lambda value, generation: state.control(value, generation, time.monotonic())
+    )
+    state = PreviewState(image, width, height, bridge.publish, evidence.event)
+    state.snapshot()
+    process = None
+    readers = []
+    ready_task = None
+    exit_task = None
+    manifest_path = evidence.path / "launch.json"
+    signals = {"decoded": False, "composed": False, "error": None}
+    result = 1
+    try:
+        await bridge.start()
+        manifest = await bridge.activate(1, backend=control_mode)
+        manifest["backend"] = args.backend
+        manifest["image"] = {
+            "max_size": evidence.summary["max_size"],
+            "debug_controls": True,
+            "export_dir": str(evidence.path),
+        }
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        if os.name != "nt":
+            manifest_path.chmod(0o600)
+        watcher = None
+        if args.watch_dir:
+            watcher = PhotoCaptureWatcher(
+                args.watch_dir.expanduser().resolve(strict=True),
+                evidence.path / "empty-vrchat-logs",
+            )
+            await watcher.start()
+            evidence.event(
+                "watch_baselined", old_files_ignored=True, capture_is_not_translated=True
+            )
+        kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+        process = await asyncio.create_subprocess_exec(
+            str(executable),
+            "--role",
+            "photo",
+            "--config",
+            str(manifest_path),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            **kwargs,
+        )
+        evidence.event("native_started", pid=process.pid)
+        readers = [
+            asyncio.create_task(drain(stream, evidence, signals))
+            for stream in (process.stdout, process.stderr)
+        ]
+        exit_task = asyncio.create_task(process.wait())
+        ready_task = asyncio.create_task(bridge.ready.wait())
+        done, _ = await asyncio.wait(
+            (exit_task, ready_task),
+            timeout=args.startup_timeout,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if exit_task in done or ready_task not in done:
+            evidence.summary["status"] = "native_start_failed"
+            return 2
+        evidence.event("native_ready", handshake=True, preview_decoded=False)
+        started = time.monotonic()
+        offered_at = None
+        smoke_stage = 0
+        exported_at = None
+        last_receipt = -1
+        while time.monotonic() - started < args.seconds:
+            now = time.monotonic()
+            if exit_task.done() or bridge.disconnected.is_set() or signals["error"]:
+                evidence.summary["status"] = "native_terminal_error"
+                return 2
+            if watcher:
+                capture = await watcher.poll()
+                if capture is not None:
+                    state.offer(capture.observed_monotonic, capture.shutter_unix_ms)
+                    offered_at = now
+                    evidence.event(
+                        "new_file_signal", selected_asset_unchanged=True, captured_pixels_read=False
+                    )
+            elif offered_at is None and now - started >= args.offer_delay:
+                state.offer(now, int(time.time() * 1000))
+                offered_at = now
+            state.tick(now)
+            for receipt in tuple(bridge.receipts):
+                if receipt["revision"] > last_receipt:
+                    evidence.event(
+                        "state_received",
+                        **{
+                            key: receipt[key]
+                            for key in ("photo_id", "attempt_id", "revision", "block_count")
+                        },
+                    )
+                    last_receipt = receipt["revision"]
+            if args.software_pull_after is not None and offered_at is not None:
+                photo = state.photo
+                if smoke_stage == 0 and now - offered_at >= args.software_pull_after:
+                    if not bridge.send(
+                        {
+                            "type": "photo_probe_pull",
+                            "photo_id": photo["photo_id"],
+                            "event_id": str(uuid4()),
+                        }
+                    ):
+                        raise RuntimeError("software pull rejected")
+                    evidence.event("offscreen_software_pull", physical_gesture=False)
+                    smoke_stage = 1
+                elif (
+                    smoke_stage in (1, 4)
+                    and photo["visible"]
+                    and signals["decoded"]
+                    and signals["composed"]
+                ):
+                    label = "preview" if smoke_stage == 1 else "reopened"
+                    if not bridge.send(
+                        {
+                            "type": "photo_debug_export",
+                            "photo_id": photo["photo_id"],
+                            "label": label,
+                        }
+                    ):
+                        raise RuntimeError("export rejected")
+                    smoke_stage += 1
+                    exported_at = now
+                elif smoke_stage in (2, 5):
+                    label = "preview" if smoke_stage == 2 else "reopened"
+                    png = evidence.path / f"{label}.png"
+                    metadata = evidence.path / f"{label}.json"
+                    if png.exists() and metadata.exists():
+                        dimensions = png_dimensions(png)
+                        data = json.loads(metadata.read_text(encoding="utf-8"))
+                        scale = min(
+                            evidence.summary["max_size"][0] / width,
+                            evidence.summary["max_size"][1] / height,
+                        )
+                        expected = [max(1, round(width * scale)), max(1, round(height * scale))]
+                        if (
+                            list(dimensions) != expected
+                            or data["blocks"]
+                            or data["original_uploads"] != 1
+                        ):
+                            raise RuntimeError("preview export contract mismatch")
+                        evidence.event(
+                            "offscreen_exported",
+                            label=label,
+                            dimensions=dimensions,
+                            translation_blocks=0,
+                            original_uploads=data["original_uploads"],
+                            physical_display=False,
+                        )
+                        if smoke_stage == 5:
+                            evidence.summary["status"] = "offscreen_preview_exported"
+                            result = 0
+                            break
+                        if not bridge.send(
+                            {"type": "photo_probe_hide", "photo_id": photo["photo_id"]}
+                        ):
+                            raise RuntimeError("hide rejected")
+                        smoke_stage = 3
+                    elif now - exported_at > 5:
+                        raise RuntimeError("preview export timeout")
+                elif smoke_stage == 3 and not photo["visible"]:
+                    if not bridge.send(
+                        {
+                            "type": "photo_probe_pull",
+                            "photo_id": photo["photo_id"],
+                            "event_id": str(uuid4()),
+                        }
+                    ):
+                        raise RuntimeError("reopen rejected")
+                    smoke_stage = 4
+            await asyncio.sleep(0.05)
+        else:
+            evidence.summary["status"] = (
+                "smoke_incomplete" if args.software_pull_after is not None else "duration_completed"
+            )
+            result = 2 if args.software_pull_after is not None else 0
+    except asyncio.CancelledError:
+        evidence.summary["status"] = "interrupted"
+        raise
+    except Exception as exc:
+        evidence.summary["status"] = "launcher_error"
+        evidence.event("launcher_error", error_type=type(exc).__name__)
+    finally:
+        errors = await stop_child(process, bridge, readers, evidence)
+        for task in (ready_task, exit_task):
+            if task is not None:
+                task.cancel()
+        await asyncio.gather(
+            *(task for task in (ready_task, exit_task) if task is not None), return_exceptions=True
+        )
+        manifest_path.unlink(missing_ok=True)
+        evidence.summary["cleanup_errors"] = errors
+        if errors:
+            evidence.event("cleanup_failed", errors=errors)
+            evidence.summary["primary_status"] = evidence.summary["status"]
+            evidence.summary["status"] = "cleanup_failed"
+            result = 2
+        evidence.summary.update(
+            source_decoded=signals["decoded"],
+            composed=signals["composed"],
+            native_error=signals["error"],
+        )
+    return result
+
+
+def parser():
+    command = argparse.ArgumentParser(
+        description="Temporary NO-provider X3 native base-image preview. No translation or fake blocks. "
+        "OpenVR shares VRChat input; start SteamVR yourself before running. "
+        "A separate --image invocation is needed to view an original asset."
+    )
+    command.add_argument(
+        "--image",
+        type=Path,
+        required=True,
+        help="Explicit recorded PNG asset; never decoded in Python",
+    )
+    command.add_argument(
+        "--executable",
+        type=Path,
+        required=True,
+        help="Trusted built overlay executable beside its DLL/fonts",
+    )
+    command.add_argument("--backend", choices=("openvr", "offscreen"), default="openvr")
+    command.add_argument(
+        "--reference-1440",
+        action="store_true",
+        help="Use 2560x1440 bounds instead of native 1920x1080 default",
+    )
+    command.add_argument(
+        "--watch-dir",
+        type=Path,
+        help="Baseline old files; new PNG signals offer the SAME --image, never translate the capture",
+    )
+    command.add_argument(
+        "--offer-delay",
+        type=float,
+        default=2,
+        help="Seconds after native ready for one synthetic offer without --watch-dir",
+    )
+    command.add_argument(
+        "--seconds", type=float, default=60, help="Finite duration after native ready"
+    )
+    command.add_argument("--startup-timeout", type=float, default=10)
+    command.add_argument(
+        "--software-pull-after",
+        type=float,
+        help="OFFSCREEN ONLY: seconds after synthetic offer; export, hide, reopen, export, then exit",
+    )
+    return command
+
+
+def main(argv=None):
+    command = parser()
+    args = command.parse_args(argv)
+    for name in ("offer_delay", "seconds", "startup_timeout", "software_pull_after"):
+        value = getattr(args, name)
+        if value is not None and (
+            not math.isfinite(value)
+            or value < 0
+            or name in ("seconds", "startup_timeout")
+            and value == 0
+        ):
+            command.error(
+                f"--{name.replace('_', '-')} must be finite and positive (delays may be zero)"
+            )
+    if args.software_pull_after is not None and (
+        args.backend != "offscreen" or args.watch_dir or args.software_pull_after >= 10
+    ):
+        command.error(
+            "--software-pull-after requires --backend offscreen, no --watch-dir, and delay < 10s"
+        )
+    evidence = Evidence()
+    print(f"Local evidence: {evidence.path}", flush=True)
+    print(
+        "NO provider/model/API: selected PNG is only a native base image; no translated-block haptic. "
+        "New watched captures only signal this SAME asset. Physical gestures/haptics/display are unobserved.",
+        flush=True,
+    )
+    try:
+        result = asyncio.run(run(args, evidence))
+    except KeyboardInterrupt:
+        result = 130
+    except Exception as exc:
+        evidence.summary["status"] = "launcher_error"
+        evidence.event("launcher_error", error_type=type(exc).__name__)
+        result = 2
+    finally:
+        evidence.finish()
+    return result
+
+
+if __name__ == "__main__":
+    sys.exit(main())

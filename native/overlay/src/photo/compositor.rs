@@ -79,6 +79,7 @@ pub struct PhotoCompositor {
     pub frame_gpu_ms: Option<f64>,
     font: Option<super::image::PhotoFont>,
     timings: HashMap<u64, [f64; 3]>,
+    frame_timing_started: bool,
 }
 
 impl PhotoCompositor {
@@ -154,7 +155,31 @@ impl PhotoCompositor {
             frame_gpu_ms: None,
             font: None,
             timings: HashMap::new(),
+            frame_timing_started: false,
         })
+    }
+
+    pub fn icon_texture(&self, rgba: &[u8], size: u32) -> Result<PhotoTexture, PhotoError> {
+        let texture = self.create_texture(size, size, false)?;
+        let bgra: Vec<u8> = rgba
+            .chunks_exact(4)
+            .flat_map(|p| [p[2], p[1], p[0], p[3]])
+            .collect();
+        unsafe {
+            self.d3d
+                .UpdateSubresource(&texture, 0, None, bgra.as_ptr().cast(), size * 4, 0);
+        }
+        Ok(PhotoTexture::new(texture))
+    }
+
+    pub fn save_texture(
+        &self,
+        texture: &PhotoTexture,
+        width: u32,
+        height: u32,
+        path: &Path,
+    ) -> Result<(), PhotoError> {
+        self.save_d3d_texture(texture.texture(), width, height, path)
     }
 
     pub fn set_original(&mut self, working: Arc<WorkingPhoto>) -> Result<(), PhotoError> {
@@ -417,6 +442,7 @@ impl PhotoCompositor {
             bottom: working.pixels.height() as f32,
         };
         self.frame_timer.begin(&self.d3d);
+        self.frame_timing_started = true;
         unsafe {
             self.d2d
                 .SetTarget(self.target.as_ref().ok_or(PhotoError::Graphics)?);
@@ -533,7 +559,11 @@ impl PhotoCompositor {
             }
             .map_err(|_| PhotoError::Graphics)?;
             if ready.as_bool() {
-                self.frame_gpu_ms = self.frame_timer.elapsed_ms(&self.d3d)?;
+                self.frame_gpu_ms = if self.frame_timing_started {
+                    self.frame_timer.elapsed_ms(&self.d3d)?
+                } else {
+                    None
+                };
                 for block in &mut self.blocks {
                     if let Some(timer) = block.roi_timer.take() {
                         let elapsed = timer.elapsed_ms(&self.d3d)?;
@@ -565,8 +595,22 @@ impl PhotoCompositor {
         let working = self.working.as_ref().ok_or(PhotoError::Graphics)?;
         let width = working.pixels.width();
         let height = working.pixels.height();
+        self.save_d3d_texture(
+            self.texture.as_ref().ok_or(PhotoError::Graphics)?,
+            width,
+            height,
+            path,
+        )
+    }
+
+    fn save_d3d_texture(
+        &self,
+        texture: &ID3D11Texture2D,
+        width: u32,
+        height: u32,
+        path: &Path,
+    ) -> Result<(), PhotoError> {
         let staging = self.create_texture(width, height, true)?;
-        let texture = self.texture.as_ref().ok_or(PhotoError::Graphics)?;
         let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
         unsafe {
             self.d3d.CopyResource(&staging, texture);

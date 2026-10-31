@@ -4,9 +4,7 @@ use super::worker::RunningImageWorker;
 use serde_json::json;
 use std::collections::HashSet;
 use std::path::Path;
-use std::time::Duration;
-#[cfg(windows)]
-use std::time::Instant;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::bridge::{PhotoBridge, PhotoIncoming};
 use super::image::{
@@ -15,6 +13,9 @@ use super::image::{
 use super::manifest::{PhotoBackend, PhotoError, PhotoManifest, PHOTO_PROTOCOL_VERSION};
 use super::prepare::{PreparationWorker, PrepareCompletion};
 use super::state::{PhotoState, SnapshotAdmission};
+use super::interaction::{HapticCue, PhotoInteraction};
+#[cfg(windows)]
+use super::icon::{self, IconState};
 use crate::openvr::{
     OpenVrEventClass, OpenVrOverlay, OpenVrSession, OverlayFrameSubmitter, OverlayTextureSubmitter,
 };
@@ -100,6 +101,11 @@ pub struct PhotoRuntime {
     export_dir: Option<std::path::PathBuf>,
     debug_controls: bool,
     pending_gpu_block: Option<u64>,
+    interaction: PhotoInteraction,
+    pull_sequence: u64,
+    #[cfg(windows)]
+    icons: Option<[PhotoTexture; 3]>,
+    icon_state: Option<usize>,
 }
 
 impl PhotoRuntime {
@@ -122,6 +128,15 @@ impl PhotoRuntime {
         if !matches!(backend, Backend::Probe) {
             return Err(PhotoError::Graphics);
         }
+        #[cfg(windows)]
+        let icons = if let Some(compositor) = &compositor {
+            let textures = [IconState::Idle, IconState::Grab, IconState::Failed]
+                .map(|state| compositor.icon_texture(&icon::pixels(state), icon::ICON_SIZE));
+            let [idle, grab, failed] = textures;
+            Some([idle?, grab?, failed?])
+        } else {
+            None
+        };
         let (images, worker) = PhotoImageBoundary::channel();
         Ok((
             Self {
@@ -142,6 +157,11 @@ impl PhotoRuntime {
                 #[cfg(windows)]
                 export_dir: manifest.image.export_dir.clone(),
                 pending_gpu_block: None,
+                interaction: PhotoInteraction::new(manifest.interaction.clone()),
+                pull_sequence: 0,
+                #[cfg(windows)]
+                icons,
+                icon_state: None,
             },
             worker,
         ))
@@ -160,6 +180,10 @@ impl PhotoRuntime {
         manifest: &PhotoManifest,
         worker: PhotoImageWorker,
     ) -> Result<(), PhotoError> {
+        #[cfg(windows)]
+        if let Some(compositor) = &mut self.compositor {
+            compositor.ready().await?;
+        }
         let (mut bridge, first) =
             tokio::time::timeout(Duration::from_secs(10), PhotoBridge::connect(manifest))
                 .await
@@ -193,6 +217,7 @@ impl PhotoRuntime {
                     }
                     _ = tick.tick() => {
                         if let Backend::OpenVr(surfaces) = &mut self.backend { surfaces.poll()?; }
+                        self.interaction_tick(&mut bridge).await?;
                         self.render_frame(&mut bridge).await?;
                     }
                 }
@@ -266,24 +291,23 @@ impl PhotoRuntime {
                             compositor.clear_photo();
                         }
                     }
-                    self.haptic_granted = false;
-                    self.haptic_accepted = false;
-                    self.live_drawn_block = None;
-                    self.pending_gpu_block = None;
-                    self.drawn_reported = self.state.photo().is_some_and(|photo| {
-                        photo.first_block_drawn || (prior.is_none() && !photo.blocks.is_empty())
-                    });
+                    self.reset_feedback(prior.is_none());
                 }
+                self.interaction
+                    .snapshot(self.state.photo(), Instant::now(), unix_ms());
                 let snapshot = self.state.snapshot().ok_or(PhotoError::Protocol)?;
                 self.images.publish(snapshot);
                 let photo = snapshot.photo.as_deref();
                 if let Backend::OpenVr(surfaces) = &mut self.backend {
-                    if let Some(surface) = surfaces.photo() {
-                        surface
-                            .set_overlay_visible(
-                                photo.is_some_and(|photo| photo.visible) && self.texture.is_some(),
-                            )
-                            .map_err(|_| PhotoError::OpenVr)?;
+                    if current.is_none() {
+                        for surface in [&mut surfaces.icon, &mut surfaces.photo]
+                            .into_iter()
+                            .flatten()
+                        {
+                            surface
+                                .set_overlay_visible(false)
+                                .map_err(|_| PhotoError::OpenVr)?;
+                        }
                     }
                 }
                 bridge.send(json!({
@@ -369,6 +393,9 @@ impl PhotoRuntime {
                 block_id,
             } => {
                 self.grant_haptic(&photo_id, attempt_id, block_id);
+                if self.take_haptic_grant() {
+                    self.haptic(HapticCue::FirstBlock);
+                }
             }
             PhotoIncoming::DebugOriginal { photo_id, enabled } => {
                 if !self.debug_controls {
@@ -422,6 +449,16 @@ impl PhotoRuntime {
         }
         Ok(true)
     }
+    fn reset_feedback(&mut self, recovering: bool) {
+        self.haptic_granted = false;
+        self.haptic_accepted = false;
+        self.live_drawn_block = None;
+        self.pending_gpu_block = None;
+        self.drawn_reported = self.state.photo().is_some_and(|photo| {
+            photo.first_block_drawn || (recovering && !photo.blocks.is_empty())
+        });
+    }
+
     fn grant_haptic(&mut self, photo_id: &str, attempt_id: u64, block_id: u64) {
         if !self.haptic_accepted
             && self.live_drawn_block == Some(block_id)
@@ -625,76 +662,204 @@ impl PhotoRuntime {
         Ok(())
     }
 
-    async fn render_frame(&mut self, bridge: &mut PhotoBridge) -> Result<(), PhotoError> {
-        #[cfg(windows)]
-        {
-            let Some(compositor) = &mut self.compositor else {
-                return Ok(());
-            };
-            let now = Instant::now();
-            if !compositor.needs_frame(now) {
-                return Ok(());
-            }
-            let start = Instant::now();
-            let Some(texture) = compositor.render(now, false)? else {
-                return Ok(());
-            };
-            compositor.ready().await?;
-            let block_count = compositor.block_count();
-            let Some(photo) = self.state.photo() else {
-                return Ok(());
-            };
-            let drawn = if let Backend::OpenVr(surfaces) = &mut self.backend {
-                let surface = surfaces.photo().ok_or(PhotoError::OpenVr)?;
-                surface
-                    .set_overlay_texture(texture.pointer())
-                    .map_err(|_| PhotoError::OpenVr)?;
-                surface
-                    .set_overlay_visible(photo.visible)
-                    .map_err(|_| PhotoError::OpenVr)?;
-                photo.visible && !compositor.original_view
-            } else {
-                false
-            };
-            self.texture = Some(texture);
+    fn haptic(&mut self, cue: HapticCue) {
+        if let Backend::OpenVr(surfaces) = &self.backend {
+            let delivered = surfaces._session.pulse(cue.hand());
             println!(
                 "{}",
-                json!({
-                    "type": "photo_image_stage", "photo_id": photo.photo_id,
-                    "attempt_id": photo.attempt_id, "stage": "composed", "elapsed_ms": start.elapsed().as_secs_f64() * 1000.0,
-                    "block_count": block_count, "original_uploads": compositor.original_uploads,
-                    "gpu_ms": compositor.frame_gpu_ms, "gpu_timing_valid": compositor.frame_gpu_ms.is_some(),
-                    "submitted": matches!(self.backend, Backend::OpenVr(_)),
-                })
+                json!({"type":"photo_interaction", "event":"haptic", "cue":format!("{cue:?}"), "hand":format!("{:?}", cue.hand()), "software_pulse":delivered})
             );
-            if let Some(block_id) = self.pending_gpu_block.take() {
-                if let Some(gpu_ms) = compositor.frame_gpu_ms {
+        }
+    }
+
+    async fn interaction_tick(&mut self, bridge: &mut PhotoBridge) -> Result<(), PhotoError> {
+        let Backend::OpenVr(surfaces) = &self.backend else {
+            return Ok(());
+        };
+        let input = surfaces._session.legacy_input();
+        let frame = self
+            .interaction
+            .step(self.state.photo(), input, Instant::now());
+        if frame.grab {
+            self.haptic(HapticCue::Grab);
+        }
+        if frame.pull {
+            self.haptic(HapticCue::Pull);
+            self.pull_sequence += 1;
+            if let Some(photo) = self.state.photo() {
+                bridge.send(json!({"type":"photo_pull","photo_id":photo.photo_id,"event_id":format!("native-{}",self.pull_sequence)})).await?;
+                if photo.attempt_id == 0 {
                     bridge
-                        .send_timing(
-                            &photo.photo_id,
-                            photo.attempt_id,
-                            block_id,
-                            "compose_gpu",
-                            gpu_ms,
-                        )
-                        .await?;
-                }
-            }
-            if drawn && !self.drawn_reported && !photo.first_block_drawn {
-                if let Some(block_id) = compositor.first_visible_block(now) {
-                    self.drawn_reported = true;
-                    self.live_drawn_block = Some(block_id);
-                    bridge
-                        .send(json!({
-                            "type": "photo_first_block_drawn", "photo_id": photo.photo_id,
-                            "attempt_id": photo.attempt_id, "block_id": block_id,
-                        }))
+                        .send(json!({"type":"photo_hidden","photo_id":photo.photo_id}))
                         .await?;
                 }
             }
         }
+        if frame.hidden {
+            if let Some(photo) = self.state.photo() {
+                bridge
+                    .send(json!({"type":"photo_hidden","photo_id":photo.photo_id}))
+                    .await?;
+            }
+        }
         Ok(())
     }
+    fn take_draw_report(
+        &mut self,
+        drawn: bool,
+        block_id: Option<u64>,
+    ) -> Option<(String, u64, u64)> {
+        let photo = self.state.photo()?;
+        if !drawn || self.drawn_reported || photo.first_block_drawn {
+            return None;
+        }
+        let block_id = block_id?;
+        self.drawn_reported = true;
+        self.live_drawn_block = Some(block_id);
+        Some((photo.photo_id.clone(), photo.attempt_id, block_id))
+    }
+
+    async fn render_frame(&mut self, bridge: &mut PhotoBridge) -> Result<(), PhotoError> {
+        #[cfg(windows)]
+        {
+            let now = Instant::now();
+            let start = now;
+            let Some(compositor) = &mut self.compositor else {
+                return Ok(());
+            };
+            let updated = compositor.needs_frame(now);
+            if updated {
+                if let Some(texture) = compositor.render(now, false)? {
+                    compositor.ready().await?;
+                    self.texture = Some(texture);
+                }
+            }
+            let block_count = compositor.block_count();
+            let photo = self.state.photo();
+            let mut drawn = false;
+            if let Backend::OpenVr(surfaces) = &mut self.backend {
+                let frame = &self.interaction.frame;
+                let active = photo.is_some_and(|photo| self.interaction.active(photo, now));
+                let icon = surfaces.icon().ok_or(PhotoError::OpenVr)?;
+                if let Some(placement) = frame.icon.filter(|_| active) {
+                    let state =
+                        if photo.is_some_and(|p| p.phase == super::state::PhotoPhase::Failed) {
+                            2
+                        } else if frame.glow {
+                            1
+                        } else {
+                            0
+                        };
+                    if self.icon_state != Some(state) {
+                        icon.set_overlay_texture(
+                            self.icons.as_ref().ok_or(PhotoError::Graphics)?[state].pointer(),
+                        )
+                        .map_err(|_| PhotoError::OpenVr)?;
+                        self.icon_state = Some(state);
+                    }
+                    icon.set_tracked_presentation(
+                        placement.device,
+                        placement.transform,
+                        placement.width,
+                        placement.alpha,
+                    )
+                    .map_err(|_| PhotoError::OpenVr)?;
+                    icon.set_overlay_visible(true)
+                        .map_err(|_| PhotoError::OpenVr)?;
+                } else {
+                    icon.set_overlay_visible(false)
+                        .map_err(|_| PhotoError::OpenVr)?;
+                }
+                let surface = surfaces.photo().ok_or(PhotoError::OpenVr)?;
+                if let (Some(placement), Some(texture)) =
+                    (frame.photo.filter(|_| active), &self.texture)
+                {
+                    if updated {
+                        surface
+                            .set_overlay_texture(texture.pointer())
+                            .map_err(|_| PhotoError::OpenVr)?;
+                    }
+                    surface
+                        .set_tracked_presentation(
+                            placement.device,
+                            placement.transform,
+                            placement.width,
+                            placement.alpha,
+                        )
+                        .map_err(|_| PhotoError::OpenVr)?;
+                    surface
+                        .set_overlay_visible(true)
+                        .map_err(|_| PhotoError::OpenVr)?;
+                    drawn = placement.alpha > 0.0
+                        && photo.is_some_and(|p| p.visible)
+                        && !compositor.original_view;
+                } else {
+                    if updated {
+                        if let Some(texture) = &self.texture {
+                            surface
+                                .set_overlay_texture(texture.pointer())
+                                .map_err(|_| PhotoError::OpenVr)?;
+                        }
+                    }
+                    surface
+                        .set_overlay_visible(false)
+                        .map_err(|_| PhotoError::OpenVr)?;
+                }
+            }
+            let Some(photo) = photo else {
+                return Ok(());
+            };
+            if updated {
+                println!(
+                    "{}",
+                    json!({
+                        "type": "photo_image_stage", "photo_id": photo.photo_id,
+                        "attempt_id": photo.attempt_id, "stage": "composed", "elapsed_ms": start.elapsed().as_secs_f64() * 1000.0,
+                        "block_count": block_count, "original_uploads": compositor.original_uploads,
+                        "gpu_ms": compositor.frame_gpu_ms, "gpu_timing_valid": compositor.frame_gpu_ms.is_some(),
+                        "submitted": matches!(self.backend, Backend::OpenVr(_)),
+                    })
+                );
+                if let Some(block_id) = self.pending_gpu_block.take() {
+                    if let Some(gpu_ms) = compositor.frame_gpu_ms {
+                        bridge
+                            .send_timing(
+                                &photo.photo_id,
+                                photo.attempt_id,
+                                block_id,
+                                "compose_gpu",
+                                gpu_ms,
+                            )
+                            .await?;
+                    }
+                }
+            }
+            let visible_block = if drawn && !self.drawn_reported && !photo.first_block_drawn {
+                compositor.first_visible_block(now)
+            } else {
+                None
+            };
+            if let Some((photo_id, attempt_id, block_id)) =
+                self.take_draw_report(drawn, visible_block)
+            {
+                bridge
+                    .send(json!({
+                        "type": "photo_first_block_drawn", "photo_id": photo_id,
+                        "attempt_id": attempt_id, "block_id": block_id,
+                    }))
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn unix_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .min(u64::MAX as u128) as u64
 }
 
 pub async fn run_cli(args: &[String]) -> i32 {

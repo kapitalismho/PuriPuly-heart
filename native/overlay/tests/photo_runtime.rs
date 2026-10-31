@@ -23,6 +23,7 @@ fn manifest() -> PhotoManifest {
         generation: 1,
         backend: PhotoBackend::Probe,
         image: Default::default(),
+        interaction: Default::default(),
     }
 }
 
@@ -297,6 +298,7 @@ async fn start_child(
         "bridge_url": format!("ws://{}", listener.local_addr().unwrap()), "session_token": config.session_token,
         "instance_id": config.instance_id, "generation": config.generation, "backend": config.backend,
         "image": config.image,
+        "interaction": config.interaction,
     });
     std::fs::write(&path, document.to_string()).unwrap();
     let child = ChildGuard(
