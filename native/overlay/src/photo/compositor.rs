@@ -293,7 +293,7 @@ impl PhotoCompositor {
                         &run.layout,
                         &fill,
                         &outline_brush,
-                        outline.width,
+                        outline.width * 2.0,
                     )
                     .map_err(|_| PhotoError::Graphics)?
                 } else {

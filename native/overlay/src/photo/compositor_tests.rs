@@ -191,3 +191,102 @@ async fn real_gpu_plate_alpha_is_applied_once_at_half_and_full_fade() {
     }
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[tokio::test]
+async fn real_gpu_outline_preserves_logical_exterior_ink_radius() {
+    let directory =
+        std::env::temp_dir().join(format!("puri340-outline-radius-{}", std::process::id()));
+    std::fs::create_dir(&directory).unwrap();
+    let working = Arc::new(
+        WorkingPhoto::new(
+            Arc::new(image::RgbImage::from_pixel(
+                512,
+                256,
+                image::Rgb([200, 200, 200]),
+            )),
+            [512, 256],
+        )
+        .unwrap(),
+    );
+    let prepared = PreparedRegion {
+        bbox: Rect {
+            left: 64.0,
+            top: 64.0,
+            right: 448.0,
+            bottom: 160.0,
+        },
+        roi: PixelRect {
+            x: 64,
+            y: 64,
+            width: 384,
+            height: 96,
+        },
+        core: image::GrayImage::from_pixel(384, 96, image::Luma([255])),
+        glyph_size: 96.0,
+        fill: [0, 255, 0],
+        plate: false,
+        erase: None,
+        mask_ms: 0.0,
+        erase_ms: 0.0,
+    };
+    let font = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../src/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc");
+    let mut typesetter = PhotoTypesetter::with_font_path(&font).unwrap();
+    let text = typesetter.typeset(&working, &prepared, "한글H").unwrap();
+    let logical = text.style.outline.as_ref().unwrap().width;
+    assert!(logical >= 6.0);
+    let mut compositor = PhotoCompositor::new(None).unwrap();
+    compositor.set_original(working).unwrap();
+    let mut reference = text.clone();
+    reference.style.outline.as_mut().unwrap().width = 0.0001;
+    let start = Instant::now();
+    compositor
+        .add_block(0, None, Some(reference), 0.0, start)
+        .unwrap();
+    let fill = capture(
+        &mut compositor,
+        start + BLOCK_FADE,
+        &directory.join("fill.png"),
+    )
+    .await;
+    compositor.clear_attempt();
+    compositor
+        .add_block(0, None, Some(text), 0.0, start)
+        .unwrap();
+    let outlined = capture(
+        &mut compositor,
+        start + BLOCK_FADE,
+        &directory.join("outlined.png"),
+    )
+    .await;
+    let bounds = |image: &image::RgbaImage| {
+        let mut bounds = [i32::MAX, i32::MAX, i32::MIN, i32::MIN];
+        for (x, y, pixel) in image.enumerate_pixels() {
+            if pixel[0] < 100 && pixel[2] < 100 {
+                bounds[0] = bounds[0].min(x as i32);
+                bounds[1] = bounds[1].min(y as i32);
+                bounds[2] = bounds[2].max(x as i32 + 1);
+                bounds[3] = bounds[3].max(y as i32 + 1);
+            }
+        }
+        assert!(bounds[0] < bounds[2] && bounds[1] < bounds[3]);
+        bounds
+    };
+    let fill_bounds = bounds(&fill);
+    let outline_bounds = bounds(&outlined);
+    let outsets = [
+        fill_bounds[0] - outline_bounds[0],
+        fill_bounds[1] - outline_bounds[1],
+        outline_bounds[2] - fill_bounds[2],
+        outline_bounds[3] - fill_bounds[3],
+    ];
+    for (side, outset) in outsets.into_iter().enumerate() {
+        assert!(
+            (outset as f32 - logical).abs() <= 1.0,
+            "side {side}: exterior {outset}px, logical outline {logical}px"
+        );
+    }
+    assert_ne!(fill, outlined);
+    assert_eq!(compositor.original_uploads, 1);
+    std::fs::remove_dir_all(directory).unwrap();
+}
