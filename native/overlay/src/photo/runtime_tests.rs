@@ -199,6 +199,8 @@ impl PhotoRuntime {
         icon: OpenVrOverlay,
         photo_surface: OpenVrOverlay,
         session: OpenVrSession,
+        photo_width_m: Option<f32>,
+        mut assert_held_width: impl FnMut(),
         mut fail_photo_show: impl FnMut(bool),
         mut set_input: impl FnMut(bool, f32),
         mut assert_pulses: impl FnMut(&[(u32, u32, u16)]),
@@ -321,12 +323,16 @@ impl PhotoRuntime {
         }
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let manifest: PhotoManifest = serde_json::from_value(json!({
+        let mut manifest = json!({
             "protocol_version":1, "role":"photo",
             "bridge_url":format!("ws://{}", listener.local_addr().unwrap()),
             "session_token":"controlled-runtime", "instance_id":"11111111-1111-4111-8111-111111111111",
             "generation":1, "backend":"offscreen", "interaction":{"wrist_transform":IDENTITY},
-        })).unwrap();
+        });
+        if let Some(width) = photo_width_m {
+            manifest["interaction"]["photo_width_m"] = json!(width);
+        }
+        let manifest: PhotoManifest = serde_json::from_value(manifest).unwrap();
         let server = async {
             let (stream, _) = listener.accept().await.unwrap();
             let mut socket = accept_async(stream).await.unwrap();
@@ -399,7 +405,7 @@ impl PhotoRuntime {
         assert!(runtime.interaction.frame.pull);
         assert_pulses(&[(1, 0, 900)]);
         assert_eq!(message(&mut socket).await["type"], "photo_pull");
-        tokio::time::sleep(Duration::from_millis(80)).await;
+        tokio::time::sleep(Duration::from_millis(160)).await;
         runtime.interaction_tick(&mut bridge).await.unwrap();
         assert!(!runtime.interaction.frame.pull);
         assert_pulses(&[(1, 0, 900)]);
@@ -413,6 +419,7 @@ impl PhotoRuntime {
         no_report(&mut socket).await;
         fail_photo_show(false);
         runtime.render_frame(&mut bridge).await.unwrap();
+        assert_held_width();
         let first = message(&mut socket).await;
         assert_eq!(
             first,

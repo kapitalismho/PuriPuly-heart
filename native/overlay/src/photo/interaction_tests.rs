@@ -156,14 +156,15 @@ fn early_release_sends_nothing_and_returns_with_wrist_relative_ease_out() {
 #[test]
 fn retained_pull_appears_and_reverses_alpha_and_width_without_snapshot_reopen() {
     let mut f = Fixture::new(1);
+    f.interaction.config.photo_width_m = 0.64;
     f.look();
     f.step(360, Some(input(true, 0.0)));
     assert!(f.step(380, Some(input(true, 0.12))).pull);
     let half = f.step(455, Some(input(true, 0.12))).photo.unwrap();
     assert!((half.alpha - 0.5).abs() < 0.0001);
-    assert!((half.width - 0.265).abs() < 0.0001);
+    assert!((half.width - 0.335).abs() < 0.0001);
     let full = f.step(530, Some(input(true, 0.12))).photo.unwrap();
-    assert_eq!(full.width, 0.5);
+    assert_eq!(full.width, 0.64);
     assert_eq!(full.alpha, 1.0);
     let release = f.step(550, Some(input(false, 0.12)));
     assert!(release.hidden);
@@ -172,7 +173,7 @@ fn retained_pull_appears_and_reverses_alpha_and_width_without_snapshot_reopen() 
         .snapshot(Some(&f.photo), f.start + Duration::from_millis(560), 1560);
     let half = f.step(625, Some(input(false, 0.12))).photo.unwrap();
     assert!((half.alpha - 0.5).abs() < 0.0001);
-    assert!((half.width - 0.265).abs() < 0.0001);
+    assert!((half.width - 0.335).abs() < 0.0001);
     assert!(f.step(700, Some(input(false, 0.12))).photo.is_none());
     assert!(f.step(900, Some(input(false, 0.12))).photo.is_none());
     f.step(920, Some(input(true, 0.0)));

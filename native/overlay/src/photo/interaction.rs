@@ -32,7 +32,7 @@ impl Default for TemporaryInteractionConfig {
         Self {
             grab_m: 0.07,
             icon_width_m: 0.03,
-            photo_width_m: 0.50,
+            photo_width_m: 0.375,
             facing_show_deg: 40.0,
             forward_show_deg: 25.0,
             facing_hide_deg: 55.0,

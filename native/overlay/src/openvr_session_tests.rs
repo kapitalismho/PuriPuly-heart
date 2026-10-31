@@ -9,6 +9,7 @@ struct Calls {
     fail_create: bool,
     transforms: Vec<(u32, [[f32; 4]; 3])>,
     widths: Vec<f32>,
+    surface_widths: Vec<(u64, f32)>,
     alphas: Vec<f32>,
     fail_alpha: bool,
     fail_show: Option<u64>,
@@ -52,8 +53,12 @@ unsafe extern "C" fn flag(
 ) -> openvr_sys::EVROverlayError {
     0
 }
-unsafe extern "C" fn width(_: u64, width: f32) -> openvr_sys::EVROverlayError {
-    CALLS.with(|calls| calls.borrow_mut().widths.push(width));
+unsafe extern "C" fn width(handle: u64, width: f32) -> openvr_sys::EVROverlayError {
+    CALLS.with(|calls| {
+        let mut calls = calls.borrow_mut();
+        calls.widths.push(width);
+        calls.surface_widths.push((handle, width));
+    });
     0
 }
 unsafe extern "C" fn transform(
@@ -270,8 +275,11 @@ unsafe extern "C" fn poses(
                 [0.0, 0.0, 1.0, 0.0],
             ];
             if let Some(distance) = calls.interaction_distance {
-                pose.mDeviceToAbsoluteTracking.m[0][3] =
-                    if i == calls.left as usize { distance } else { 0.0 };
+                pose.mDeviceToAbsoluteTracking.m[0][3] = if i == calls.left as usize {
+                    distance
+                } else {
+                    0.0
+                };
                 pose.mDeviceToAbsoluteTracking.m[2][3] = if i == 0 { 0.5 } else { 0.0 };
             }
         }
@@ -313,12 +321,7 @@ fn legacy_grip_poses_and_haptic_hands_resolve_roles_fresh_and_fail_closed() {
     assert_eq!((fresh.left_index, fresh.right_index), (5, 6));
     assert_eq!(fresh.left[0][3], 5.0);
     assert!(session.pulse(HapticCue::FirstBlock.hand()));
-    LEGACY.with(|calls| {
-        assert_eq!(
-            calls.borrow().pulses,
-            [(1, 0, 900), (6, 0, 900)]
-        )
-    });
+    LEGACY.with(|calls| assert_eq!(calls.borrow().pulses, [(1, 0, 900), (6, 0, 900)]));
     LEGACY.with(|calls| calls.borrow_mut().fail_state = true);
     assert!(session.legacy_input().is_none());
     assert!(!session.pulse(TrackedHand::Left));
@@ -381,44 +384,67 @@ fn tracked_surface_applies_real_pose_width_alpha_and_only_caches_complete_succes
 
 #[tokio::test]
 async fn windows_graphics_controlled_held_photo_runtime_reports_first_draw_once_per_attempt() {
-    CALLS.with(|calls| *calls.borrow_mut() = Calls::default());
-    LEGACY.with(|calls| {
-        *calls.borrow_mut() = LegacyCalls {
-            left: 1,
-            right: 2,
-            ..Default::default()
-        }
-    });
-    let mut overlay_api = api();
-    let mut system_api: openvr_sys::VR_IVRSystem_FnTable = unsafe { std::mem::zeroed() };
-    system_api.GetTrackedDeviceIndexForControllerRole = Some(controller_role);
-    system_api.GetControllerState = Some(controller_state);
-    system_api.GetDeviceToAbsoluteTrackingPose = Some(poses);
-    system_api.TriggerHapticPulse = Some(pulse);
-    let mut session = session(&mut overlay_api);
-    Rc::get_mut(&mut session.inner).unwrap().system_api = &mut system_api;
-    let icon = OpenVrOverlay::in_session(&session, "photo.controlled-runtime.icon").unwrap();
-    let photo = OpenVrOverlay::in_session(&session, "photo.controlled-runtime.photo").unwrap();
-    crate::photo::runtime::PhotoRuntime::assert_controlled_held_render_frame(
-        icon,
-        photo,
-        session,
-        |fail| CALLS.with(|calls| calls.borrow_mut().fail_show = fail.then_some(2)),
-        |grip, distance| LEGACY.with(|calls| {
-            let mut calls = calls.borrow_mut();
-            calls.grip = grip;
-            calls.interaction_distance = Some(distance);
-        }),
-        |expected| LEGACY.with(|calls| assert_eq!(calls.borrow().pulses, expected)),
-    )
-    .await;
-    CALLS.with(|calls| {
-        let calls = calls.borrow();
-        assert!(calls.textures.iter().any(|(handle, _)| *handle == 2));
-        assert!(calls.shown.iter().filter(|handle| **handle == 2).count() >= 3);
-        assert_eq!(calls.visible.get(&2), Some(&false));
-        assert_eq!(calls.destroyed.len(), 2);
-        assert_eq!(calls.shutdowns, 1);
-    });
-    LEGACY.with(|calls| assert_eq!(calls.borrow().pulses, [(1, 0, 900), (2, 0, 900), (2, 0, 900)]));
+    for configured_width in [None, Some(0.64)] {
+        CALLS.with(|calls| *calls.borrow_mut() = Calls::default());
+        LEGACY.with(|calls| {
+            *calls.borrow_mut() = LegacyCalls {
+                left: 1,
+                right: 2,
+                ..Default::default()
+            }
+        });
+        let mut overlay_api = api();
+        let mut system_api: openvr_sys::VR_IVRSystem_FnTable = unsafe { std::mem::zeroed() };
+        system_api.GetTrackedDeviceIndexForControllerRole = Some(controller_role);
+        system_api.GetControllerState = Some(controller_state);
+        system_api.GetDeviceToAbsoluteTrackingPose = Some(poses);
+        system_api.TriggerHapticPulse = Some(pulse);
+        let mut session = session(&mut overlay_api);
+        Rc::get_mut(&mut session.inner).unwrap().system_api = &mut system_api;
+        let icon = OpenVrOverlay::in_session(&session, "photo.controlled-runtime.icon").unwrap();
+        let photo = OpenVrOverlay::in_session(&session, "photo.controlled-runtime.photo").unwrap();
+        crate::photo::runtime::PhotoRuntime::assert_controlled_held_render_frame(
+            icon,
+            photo,
+            session,
+            configured_width,
+            || {
+                CALLS.with(|calls| {
+                    assert_eq!(
+                        calls
+                            .borrow()
+                            .surface_widths
+                            .iter()
+                            .rev()
+                            .find(|(handle, _)| *handle == 2),
+                        Some(&(2, configured_width.unwrap_or(0.375))),
+                    );
+                })
+            },
+            |fail| CALLS.with(|calls| calls.borrow_mut().fail_show = fail.then_some(2)),
+            |grip, distance| {
+                LEGACY.with(|calls| {
+                    let mut calls = calls.borrow_mut();
+                    calls.grip = grip;
+                    calls.interaction_distance = Some(distance);
+                })
+            },
+            |expected| LEGACY.with(|calls| assert_eq!(calls.borrow().pulses, expected)),
+        )
+        .await;
+        CALLS.with(|calls| {
+            let calls = calls.borrow();
+            assert!(calls.textures.iter().any(|(handle, _)| *handle == 2));
+            assert!(calls.shown.iter().filter(|handle| **handle == 2).count() >= 3);
+            assert_eq!(calls.visible.get(&2), Some(&false));
+            assert_eq!(calls.destroyed.len(), 2);
+            assert_eq!(calls.shutdowns, 1);
+        });
+        LEGACY.with(|calls| {
+            assert_eq!(
+                calls.borrow().pulses,
+                [(1, 0, 900), (2, 0, 900), (2, 0, 900)]
+            )
+        });
+    }
 }
