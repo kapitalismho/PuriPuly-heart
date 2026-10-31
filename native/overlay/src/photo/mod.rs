@@ -1,19 +1,19 @@
 pub mod bridge;
-pub mod image;
-pub mod manifest;
-pub mod prepare;
-pub mod runtime;
-pub mod state;
-pub mod processing;
-mod telea;
-mod worker;
 #[cfg(windows)]
 pub mod compositor;
 #[cfg(windows)]
-pub mod typeset;
+mod gpu;
+pub mod image;
+pub mod manifest;
 #[cfg(windows)]
 mod offline;
+pub mod prepare;
+pub mod processing;
+pub mod runtime;
+pub mod state;
+mod telea;
 #[cfg(windows)]
-mod gpu;
+pub mod typeset;
+mod worker;
 
 pub use runtime::run_cli;
