@@ -704,6 +704,20 @@ async def test_peer_activation_waits_for_provisioning_before_recording_convergen
     )
 
 
+@pytest.mark.parametrize("demand", [False, True])
+async def test_capture_target_refresh_without_runtime_only_applies_when_listen_is_off(
+    demand: bool,
+) -> None:
+    harness = Harness(runtime_available=False)
+    harness.settings.ui.peer_translation_enabled = demand
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+
+    assert await owner.refresh_capture_target() is not demand
+    assert owner.snapshot().effective_enabled is False
+    assert harness.settings.ui.peer_translation_enabled is demand
+
+
 @pytest.mark.asyncio
 async def test_peer_owner_rejects_non_converged_apply_without_poisoning_signature_cache() -> None:
     harness = Harness()

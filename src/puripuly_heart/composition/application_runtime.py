@@ -841,6 +841,9 @@ def compose_application_runtime(
                 log_diagnostic=log_diagnostic,
                 translation_demand_sink=sync_local_translation_demand,
                 stop_audio_test=lambda: require_audio_test().stop(),
+                transaction_result_sink=lambda result: require_settings_application().results.set(
+                    result
+                ),
             )
         return peer
 
@@ -2367,6 +2370,7 @@ def compose_application_runtime(
             secret_store_factory=create_settings_secret_store,
         ),
         index_selection=index_selection,
+        settings_results=settings_owner.results,
         osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
         runtime_control_authority=runtime_control_authority,
         runtime_control_activity=runtime_control_activity,

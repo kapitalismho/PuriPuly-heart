@@ -360,6 +360,16 @@ class UiSettingsRuntimeAdapter:
             return False
         return await self.application.apply(materialize_immediate_settings_intent(settings, intent))
 
+    async def retry_settings_runtime(self) -> bool:
+        settings = self.settings.require_committed()
+        runtime = self.application.provider_runtime
+        plan = runtime.build_plan(settings, force_rebuild_llm=False) if runtime else None
+        return await self.application.apply_direct(
+            settings,
+            persist=False,
+            provider_plan=plan,
+        )
+
     async def apply_prompt_intent(self, intent: PromptApplyIntent) -> object:
         settings = self.settings.canonical
         if settings is None:

@@ -84,7 +84,7 @@ def _worker_policy(environment: dict[str, str]) -> ProxyPolicy:
 def _worker_environment() -> dict[str, str]:
     environment = os.environ.copy()
     tls = select_tls(environment=environment)
-    policy = _worker_policy(environment)
+    policy = _worker_policy(environment).snapshot()
     environment[_WORKER_PROXY_POLICY_ENV] = json.dumps(
         {
             "environment": policy.environment,

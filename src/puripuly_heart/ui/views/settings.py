@@ -425,6 +425,7 @@ class SettingsView(ft.Column):
         # Callbacks (assigned by App)
         self.on_settings_changed: Callable[[ImmediateSettingsIntent], None] | None = None
         self.on_prompt_apply_settings: Callable[[PromptApplyIntent], None] | None = None
+        self.on_pending_prompt_changed: Callable[[PromptApplyIntent], None] | None = None
         self.on_providers_changed: Callable[[], None] | None = None
         self.on_local_llm_secret_changed: Callable[[], None] | None = None
         self.on_custom_stt_secret_changed: Callable[[], None] | None = None
@@ -598,6 +599,7 @@ class SettingsView(ft.Column):
         self.on_loopback_capture_summary = general.loopback_capture_summary
         self.on_osc_effective_ports = general.osc_effective_ports
         self.on_prompt_apply_settings = prompt.prompt_apply_settings
+        self.on_pending_prompt_changed = prompt.pending_prompt_changed
         self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
         self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
         self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
@@ -6426,9 +6428,11 @@ class SettingsView(ft.Column):
         self._stage_prompt_draft(value)
 
     def _on_prompt_commit(self, value: str) -> None:
+        self._stage_prompt_draft(value)
+        if self.on_pending_prompt_changed is not None:
+            self.on_pending_prompt_changed(PromptApplyIntent(value))
         if not self.has_pending_prompt_changes and value == self._committed_prompt_value():
             return
-        self._stage_prompt_draft(value)
         if self.has_provider_changes:
             return
         if self.has_pending_prompt_changes:

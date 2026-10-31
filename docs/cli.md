@@ -93,6 +93,13 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 - Apply a translation model and its connection together using a combination from `settings choices`. For ASR, `asr set --channel self|peer|both --provider <choice>` is the convenience form.
 - Explicit provider fields can retry pending provider application; unrelated general settings edits do not. Observe committed settings and effective provider state separately, including after restart when checking persistence.
 
+### GUI Autosave
+
+- GUI settings edits are coalesced and attempted once per submitted edit. There are no timed retries or automatic runtime-only replays after failure. Saved-but-unapplied edits remain saved; persistence and effective runtime state are separate results.
+- Expected save/application failures do not show a settings failure toast, a persistent recovery row, or a dedicated Retry button. Diagnostics and unrelated operation notifications remain available.
+- Unsaved, reverted, or unknown-outcome edits remain only in the current page's memory; closing the app does not preserve them for restart. Explicitly submitting the affected setting again permits another attempt. Unrelated edits, repeated queue drains, and navigation without a new draft do not replay a failed submission.
+- This settings queue belongs to the GUI. CLI operations use the application owners and their receipts. Explicit runtime-only application and existing provider, telemetry-reporting, and model-installation recovery are unchanged. Actual persistence and resource application can still delay other ordered operations.
+
 ### Interpret Readiness at Its Owner
 
 | Observation | What it does not establish |
@@ -110,6 +117,8 @@ Matching `translation set off` or `capture set <channel> off` can revoke pending
 ### Peer Capture and Audio Tests
 
 Read `capture terms` first. Only an informed user's explicit choice authorizes `capture set peer on --accept-peer-terms`; never auto-supply consent. The flag is valid only for peer-on. Peer speech is excluded from the VRChat chatbox.
+
+A capture-target change that is saved while requested Peer capture remains pending reports `degraded`, not `applied`, through both the GUI application boundary and `audio.target.set` control receipts. With Peer capture intentionally off, successful target application does not require an active capture source.
 
 `audio test on|off` runs VAD without recognition or translation. It pauses normal capture and restores only still-valid prior intent; inspect `app status` → `audio_test` for readiness, failures, and VAD readings. Stopping waits for owned input release, not just a visual toggle.
 
@@ -215,6 +224,12 @@ puripuly.exe auth logout chatgpt
 - Storage-read failure is unknown state (`signed_in: null`), not logout. Do not delete settings, encrypted secrets, or their `.lock` file as a recovery shortcut. If authentication succeeded but provider activation failed, retry translation enablement after correcting the runtime cause.
 - Logout is local-only except ChatGPT, which also requests refresh-token revocation. Inspect the reported scope; local deletion alone does not prove remote revocation.
 - Browser authorization and app-to-service traffic can use different routes. Correct proxy/TLS configuration rather than disabling certificate verification. Share only sanitized diagnostic fields, never OAuth codes, keys, tokens, proxy URLs, or full settings/secret files.
+
+### Proxy Changes
+
+- Shared external HTTP clients read the currently visible proxy settings when dispatching each request. Generic WebSocket connectors read them when opening a connection, including redirected connection attempts. Changing the proxy does not migrate an existing request or socket, or automatically restart recognition.
+- Gemini Live and ordinary Hugging Face/Xet worker downloads retain a proxy snapshot selected during session or operation setup. Start a new session or operation to pick up changed settings in those paths.
+- Environment settings are read from the running process; editing operating-system environment variables does not necessarily update that process. Proxy refresh does not reload an existing client's explicit CA-file configuration.
 
 ## Events and Privacy
 

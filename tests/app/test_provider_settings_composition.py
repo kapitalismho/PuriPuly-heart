@@ -67,7 +67,9 @@ async def test_peer_provider_options_survive_composed_apply_and_reload(
         assert len(pending) == 1
         intent = pending.pop()
         assert intent is not None
-        await app.apply_provider_intent(intent)
+        outcome = await app.apply_settings_change(intent)
+        assert outcome.saved is True
+        assert outcome.transaction is not None
         view.acknowledge_provider_apply_settings(intent)
         app.refresh_settings_projection()
 

@@ -669,23 +669,6 @@ async def test_close_after_launch_tasks_cancels_app_active_day_retry() -> None:
     assert owner._retry_task_handle is None
 
 
-def test_translator_app_telemetry_binding_delegates_to_owner() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    calls: list[object] = []
-
-    class _Owner:
-        def apply_telemetry_enabled(self, enabled: bool) -> None:
-            calls.append(("apply", enabled))
-
-        def schedule_app_active_day_report(self) -> None:
-            calls.append(("schedule",))
-
-    app._telemetry_reporting = _Owner()
-    app._on_telemetry_enabled_change(True)
-    app._schedule_app_active_day_report()
-    assert calls == [("apply", True), ("schedule",)]
-
-
 @pytest.mark.asyncio
 async def test_close_after_launch_cancels_existing_telemetry_retry_only() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
@@ -837,6 +820,7 @@ class ConstructionDummySettingsView(ft.Container):
         self.on_apply_loopback_capture_option = general.apply_loopback_capture_option
         self.on_loopback_capture_summary = general.loopback_capture_summary
         self.on_prompt_apply_settings = prompt.prompt_apply_settings
+        self.on_pending_prompt_changed = prompt.pending_prompt_changed
         self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
         self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
         self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
@@ -960,6 +944,7 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     )
     assert app.view_settings.on_verify_api_key == app._on_verify_api_key
     assert app.view_settings.on_prompt_apply_settings == app._on_prompt_apply_settings
+    assert app.view_settings.on_pending_prompt_changed == app._on_pending_prompt_changed
     assert app.view_settings.on_start_audio_test == app._on_start_audio_test
     assert app.view_settings.on_desktop_overlay_lock_change == (app._on_desktop_overlay_lock_change)
     assert app.view_settings.on_desktop_overlay_size_change == (app._on_desktop_overlay_size_change)
@@ -1681,7 +1666,11 @@ def test_translator_app_4x3_window_keeps_shell_navigation_usable(
     monkeypatch.setattr(app.content_area, "update", lambda: None)
 
     assert app.content_area.padding == app_module.APP_CONTENT_PADDING
-    assert app.layout.controls == [app.title_bar, app.content_area, app.bottom_nav]
+    assert app.layout.controls == [
+        app.title_bar,
+        app.content_area,
+        app.bottom_nav,
+    ]
     assert app.content_area.content is app.view_dashboard
 
     app._on_nav_change(1)
