@@ -1,0 +1,20 @@
+{
+  "action_sets": [
+    {"name": "/actions/x1", "usage": "leftright"}
+  ],
+  "actions": [
+    {"name": "/actions/x1/in/grip", "type": "boolean", "requirement": "suggested"},
+    {"name": "/actions/x1/in/trigger", "type": "boolean", "requirement": "optional"},
+    {"name": "/actions/x1/out/haptic", "type": "vibration", "requirement": "suggested"}
+  ],
+  "default_bindings": [],
+  "localization": [
+    {
+      "language_tag": "en_us",
+      "/actions/x1": "X1 observation only",
+      "/actions/x1/in/grip": "Grip",
+      "/actions/x1/in/trigger": "Trigger",
+      "/actions/x1/out/haptic": "Haptic"
+    }
+  ]
+}
