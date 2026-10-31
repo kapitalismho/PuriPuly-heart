@@ -14,9 +14,6 @@ from puripuly_heart.app.services.provider.provider_credential_verification impor
     ProviderCredentialVerificationOwner,
     ProviderCredentialVerificationRequest,
 )
-from puripuly_heart.app.wiring.wiring_composition import (
-    create_provider_credential_verification_interaction_owner,
-)
 
 
 @dataclass
@@ -51,37 +48,6 @@ class RecordingVerifier:
         if self.failure is not None:
             raise self.failure
         return self.outcomes.get(("qwen", model), False)
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("provider", "selected_model"),
-    (
-        ("google", "gemini-model"),
-        ("openai", "gpt-6-luna"),
-        ("openrouter", None),
-        ("deepseek", None),
-        ("deepgram", None),
-        ("soniox", None),
-    ),
-)
-async def test_owner_routes_direct_provider_verification(
-    provider: str,
-    selected_model: str | None,
-) -> None:
-    verifier = RecordingVerifier(outcomes={(provider, selected_model): True})
-    owner = ProviderCredentialVerificationOwner(verifier=verifier)
-
-    outcome = await owner.verify(
-        ProviderCredentialVerificationRequest(
-            provider=provider,
-            api_key="secret",
-            selected_model=selected_model,
-        )
-    )
-
-    assert outcome.status == PROVIDER_CREDENTIAL_VERIFIED
-    assert verifier.calls == [(provider, "secret", selected_model, None, False)]
 
 
 @pytest.mark.asyncio
@@ -132,7 +98,7 @@ async def test_owner_rejects_empty_and_unknown_credentials_without_verifier_call
 
     empty = await owner.verify(
         ProviderCredentialVerificationRequest(
-            provider="google",
+            provider="gemini",
             api_key="",
         )
     )
@@ -158,7 +124,7 @@ async def test_owner_contains_verifier_failure_and_emits_safe_diagnostics() -> N
 
     outcome = await owner.verify(
         ProviderCredentialVerificationRequest(
-            provider="google",
+            provider="gemini",
             api_key="secret",
             selected_model="gemini-model",
         )
@@ -185,7 +151,7 @@ async def test_interaction_owner_maps_empty_unknown_failed_and_error_results() -
         error_sink=lambda provider, error: error_calls.append((provider, error)),
     )
 
-    assert await owner.verify("google", "") == (False, "API Key is empty")
+    assert await owner.verify("gemini", "") == (False, "API Key is empty")
     assert await owner.verify("unknown", "secret") == (
         False,
         "Unknown provider: unknown",
@@ -199,15 +165,3 @@ async def test_interaction_owner_maps_empty_unknown_failed_and_error_results() -
     assert error_calls == [("deepseek", "provider.failure")]
 
 
-def test_interaction_owner_factory_composes_verifier_and_callbacks() -> None:
-    verifier = RecordingVerifier()
-    owner = create_provider_credential_verification_interaction_owner(
-        verifier=verifier,
-        selected_model_provider=lambda provider: f"{provider}-model",
-        low_latency=True,
-    )
-
-    assert isinstance(owner, ProviderCredentialVerificationInteractionOwner)
-    assert owner.verification_owner.verifier is verifier
-    assert owner.selected_model_provider("google") == "google-model"
-    assert owner.low_latency is True

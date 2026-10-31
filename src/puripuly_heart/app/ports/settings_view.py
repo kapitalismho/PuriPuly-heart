@@ -70,10 +70,9 @@ class TranslationSelectionSnapshot:
 @dataclass(frozen=True, slots=True)
 class ProviderVerificationSnapshot:
     deepgram: bool
-    gemini_transcribe: bool
+    gemini: bool
     elevenlabs_scribe: bool
     soniox: bool
-    google: bool
     openrouter: bool
     openai: bool
     deepseek: bool

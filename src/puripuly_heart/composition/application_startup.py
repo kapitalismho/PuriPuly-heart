@@ -156,13 +156,14 @@ class ApplicationStartupAdapter:
                     == "verified"
                     for member in (
                         "deepgram",
-                        "gemini_transcribe",
+                        "gemini",
                         "elevenlabs_scribe",
                     )
                 )
             else:
                 stt_key_map = {
                     "qwen_audio": self.alibaba_verified_key(),
+                    "gemini_transcribe": "gemini",
                 }
                 stt_verified_key = stt_key_map.get(stt_provider, stt_provider)
                 stt_entry = getattr(
@@ -189,13 +190,14 @@ class ApplicationStartupAdapter:
                     == "verified"
                     for member in (
                         "deepgram",
-                        "gemini_transcribe",
+                        "gemini",
                         "elevenlabs_scribe",
                     )
                 )
             else:
                 peer_key_map = {
                     "qwen_audio": self.alibaba_verified_key(),
+                    "gemini_transcribe": "gemini",
                 }
                 peer_verified_key = peer_key_map.get(peer_stt_provider, peer_stt_provider)
                 peer_entry = getattr(
@@ -214,7 +216,6 @@ class ApplicationStartupAdapter:
         )
         if self.llm_requires_secret(LLMProviderName(llm_provider)):
             llm_key_map = {
-                "gemini": "google",
                 "openrouter": "openrouter",
                 "deepseek": "deepseek",
                 "qwen": self.alibaba_verified_key(),

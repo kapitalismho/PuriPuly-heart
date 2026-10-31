@@ -246,13 +246,6 @@ def _build_provider_preferences(
             "only": ["inference-net", "deepseek"],
             "allow_fallbacks": False,
         }
-    if provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY:
-        return {
-            "sort": "latency",
-            "only": ["google-vertex", "google-ai-studio"],
-            "allow_fallbacks": True,
-            "data_collection": "deny",
-        }
     if model == "google/gemma-4-26b-a4b-it" and len(models) <= 1:
         return {
             "sort": {"by": "latency"},

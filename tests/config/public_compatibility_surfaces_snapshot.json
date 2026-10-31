@@ -1,107 +1,5 @@
 {
   "secret_store": {
-    "keyring_service_name": "puripuly-heart",
-    "registry_keys": [
-      "google_api_key",
-      "openrouter_api_key",
-      "openrouter_managed_api_key",
-      "openrouter_managed_qq_api_key",
-      "openrouter_managed_user_id",
-      "openrouter_managed_user_installation_id",
-      "deepseek_api_key",
-      "deepgram_api_key",
-      "soniox_api_key",
-      "alibaba_api_key_beijing",
-      "alibaba_api_key_singapore",
-      "alibaba_api_key",
-      "local_llm_api_key",
-      "managed_device_private_key",
-      "managed_device_public_key",
-      "managed_identity_binding"
-    ],
-    "env_lookup_paths": [
-      {
-        "owner": "gemini_llm",
-        "lookup": "require_secret",
-        "key": "google_api_key",
-        "env_vars": [
-          "GOOGLE_API_KEY"
-        ],
-        "legacy_keys": []
-      },
-      {
-        "owner": "openrouter_byok_llm",
-        "lookup": "openrouter_byok",
-        "key": "openrouter_api_key",
-        "env_vars": [
-          "OPENROUTER_API_KEY"
-        ],
-        "legacy_keys": []
-      },
-      {
-        "owner": "deepseek_llm",
-        "lookup": "require_secret",
-        "key": "deepseek_api_key",
-        "env_vars": [
-          "DEEPSEEK_API_KEY"
-        ],
-        "legacy_keys": []
-      },
-      {
-        "owner": "qwen_beijing_llm_stt_peer_stt",
-        "lookup": "require_secret_any",
-        "key": "alibaba_api_key_beijing",
-        "env_vars": [
-          "ALIBABA_API_KEY_BEIJING",
-          "ALIBABA_API_KEY",
-          "DASHSCOPE_API_KEY"
-        ],
-        "legacy_keys": [
-          "alibaba_api_key"
-        ]
-      },
-      {
-        "owner": "qwen_singapore_llm_stt_peer_stt",
-        "lookup": "require_secret_any",
-        "key": "alibaba_api_key_singapore",
-        "env_vars": [
-          "ALIBABA_API_KEY_SINGAPORE",
-          "ALIBABA_API_KEY",
-          "DASHSCOPE_API_KEY"
-        ],
-        "legacy_keys": [
-          "alibaba_api_key"
-        ]
-      },
-      {
-        "owner": "deepgram_stt_peer_stt",
-        "lookup": "require_secret",
-        "key": "deepgram_api_key",
-        "env_vars": [
-          "DEEPGRAM_API_KEY"
-        ],
-        "legacy_keys": []
-      },
-      {
-        "owner": "soniox_stt_peer_stt",
-        "lookup": "require_secret",
-        "key": "soniox_api_key",
-        "env_vars": [
-          "SONIOX_API_KEY"
-        ],
-        "legacy_keys": []
-      },
-      {
-        "owner": "local_llm_optional",
-        "lookup": "optional_secret_store_only",
-        "key": "local_llm_api_key",
-        "env_vars": [],
-        "legacy_keys": [],
-        "ignored_env_vars": [
-          "LOCAL_LLM_API_KEY"
-        ]
-      }
-    ],
     "encrypted_file": {
       "version": 1,
       "salt_b64": "dm5leHQtZ2F0ZTAtc2FsdA==",
@@ -230,7 +128,6 @@
     ],
     "llm_provider_prompt_keys": [
       "deepseek",
-      "gemini",
       "local_llm",
       "managed_gemma",
       "openrouter",
@@ -243,7 +140,6 @@
       "gemma4_26b_31b_byok",
       "qwen35_flash_managed",
       "deepseek_v4_flash_managed",
-      "gemini_flash_byok",
       "deepseek_v4_flash_41_managed",
       "qwen35_flash_byok",
       "deepseek_v4_flash_byok",
@@ -255,7 +151,6 @@
       "gemma4_byok",
       "gemma4_31b_managed",
       "gemma4_31b_byok",
-      "gemini31_flash_lite_byok",
       "openrouter:byok:google/gemma-4-26b-a4b-it",
       "openrouter:byok:qwen/qwen3.5-flash-02-23",
       "openrouter:managed:google/gemma-4-26b-a4b-it",
@@ -315,8 +210,6 @@
   },
   "guard_coverage": {
     "secret_store": [
-      "tests/config/test_public_compatibility_surfaces.py::test_secret_store_key_registry_snapshot_matches_current_public_keys",
-      "tests/config/test_public_compatibility_surfaces.py::test_secret_store_env_lookup_snapshot_matches_current_fallback_behavior",
       "tests/config/test_public_compatibility_surfaces.py::test_settings_serialization_excludes_secret_store_registry_keys",
       "tests/config/test_public_compatibility_surfaces.py::test_secret_store_encrypted_file_fixture_decrypts_and_freezes_wire_format",
       "tests/config/test_public_compatibility_surfaces.py::test_secret_store_encrypted_file_path_resolution_and_env_passphrase",
@@ -353,7 +246,6 @@
       "tests/config/test_prompt_loader.py::test_get_default_prompt_reads_translation_prompt"
     ],
     "provider_aliases": [
-      "tests/config/test_config_and_secrets.py::test_legacy_gemini_byok_alias_is_compatibility_only",
       "tests/config/test_config_and_secrets.py::test_openrouter_alias_for_fields_does_not_expose_deepseek_v4_pro"
     ],
     "provider_runtime_public_config": [

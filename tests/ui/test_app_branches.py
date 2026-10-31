@@ -81,8 +81,8 @@ def _vnext(
 ) -> AppSettingsVNext:
     current = AppSettingsVNext()
     translation = current.intent.translation
-    if llm == "gemini":
-        model = model or "gemini_flash"
+    if llm == "openai":
+        model = model or "gpt_6_luna"
         connection = connection or "official_byok"
     elif llm == "local_llm":
         model = model or "local_llm"
@@ -3511,7 +3511,7 @@ async def test_local_llm_secret_changed_ignores_non_local_llm_provider() -> None
     ) -> None:
         calls.append(force_rebuild_llm)
 
-    settings = _vnext(llm="gemini")
+    settings = _vnext(llm="openai")
     controller = SimpleNamespace(settings=settings, apply_providers=fake_apply_providers)
     app._ui_application = compose_test_ui_application_boundary(controller)
 
@@ -3677,7 +3677,7 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
         api_key_verified=SimpleNamespace(
             deepgram=False,
             soniox=False,
-            google=False,
+            gemini=False,
             openrouter=False,
             deepseek=False,
             alibaba_beijing=False,
@@ -3699,19 +3699,19 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
     app._ui_application = compose_test_ui_application_boundary(controller)
 
     deepgram_result = await app._on_verify_api_key("deepgram", "k")
-    google_result = await app._on_verify_api_key("google", "k")
+    gemini_result = await app._on_verify_api_key("gemini", "k")
     openrouter_result = await app._on_verify_api_key("openrouter", "k")
     deepseek_result = await app._on_verify_api_key("deepseek", "k")
 
     assert deepgram_result == (True, "ok")
-    assert google_result == (False, "ok")
+    assert gemini_result == (False, "ok")
     assert openrouter_result == (False, "ok")
     assert deepseek_result == (True, "ok")
     assert settings.api_key_verified.deepgram is True
-    assert settings.api_key_verified.google is False
+    assert settings.api_key_verified.gemini is False
     assert settings.api_key_verified.openrouter is False
     assert settings.api_key_verified.deepseek is True
-    assert app.view_dashboard.stt_calls[-1] == (False, False)
+    assert app.view_dashboard.stt_calls[-1] == (True, False)
     assert app.view_dashboard.trans_calls[-1] == (False, False)
     assert len(saves) == 4
 
@@ -3721,7 +3721,7 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    app.view_settings = SimpleNamespace(_google_key=SimpleNamespace(value="new-key"))
+    app.view_settings = SimpleNamespace(_gemini_key=SimpleNamespace(value="new-key"))
     app.view_dashboard = SimpleNamespace(
         stt_calls=[],
         trans_calls=[],
@@ -3734,12 +3734,12 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
     )
 
     async def fake_verify(provider: str, key: str):
-        assert (provider, key) == ("google", "old-key")
+        assert (provider, key) == ("gemini", "old-key")
         return True, "ok"
 
     settings = SimpleNamespace(
         api_key_verified=SimpleNamespace(
-            google=False,
+            gemini=False,
         )
     )
     saves: list[tuple[str, str, bool]] = []
@@ -3753,10 +3753,10 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
     )
     app._ui_application = compose_test_ui_application_boundary(controller)
 
-    result = await app._on_verify_api_key("google", "old-key")
+    result = await app._on_verify_api_key("gemini", "old-key")
 
     assert result == (True, "ok")
-    assert settings.api_key_verified.google is False
+    assert settings.api_key_verified.gemini is False
     assert saves == []
     assert app.view_dashboard.stt_calls == []
     assert app.view_dashboard.trans_calls == []

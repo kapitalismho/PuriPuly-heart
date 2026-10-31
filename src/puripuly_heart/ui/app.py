@@ -2167,10 +2167,9 @@ class TranslatorApp:
     def _api_key_verification_matches_current_field(self, provider: str, key: str) -> bool:
         field_by_provider = {
             "deepgram": "_deepgram_key",
-            "gemini_transcribe": "_gemini_transcribe_key",
+            "gemini": "_gemini_key",
             "elevenlabs_scribe": "_elevenlabs_scribe_key",
             "soniox": "_soniox_key",
-            "google": "_google_key",
             "openrouter": "_openrouter_key",
             "deepseek": "_deepseek_key",
             "alibaba_beijing": "_alibaba_key_beijing",
@@ -2210,9 +2209,10 @@ class TranslatorApp:
             return "alibaba_beijing" if region == QwenRegion.BEIJING.value else "alibaba_singapore"
         if peer_provider == "rolling_free":
             return "rolling_free"
+        if peer_provider == "gemini_transcribe":
+            return "gemini"
         if peer_provider in (
             "deepgram",
-            "gemini_transcribe",
             "elevenlabs_scribe",
             "soniox",
         ):
@@ -2238,7 +2238,11 @@ class TranslatorApp:
             selected_members = ("gemini_transcribe",)
         for member in selected_members:
             try:
-                if getattr(getattr(verification, member, None), "status", None) == "verified":
+                verification_provider = "gemini" if member == "gemini_transcribe" else member
+                if (
+                    getattr(getattr(verification, verification_provider, None), "status", None)
+                    == "verified"
+                ):
                     return True
             except Exception:
                 continue
@@ -2267,13 +2271,13 @@ class TranslatorApp:
         # Sync verification result with dashboard needs_key flags (UI update on user click)
         if provider in (
             "deepgram",
-            "gemini_transcribe",
+            "gemini",
             "elevenlabs_scribe",
             "soniox",
             "alibaba_beijing",
             "alibaba_singapore",
         ):
-            if provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe"):
+            if provider in ("deepgram", "gemini", "elevenlabs_scribe"):
                 if self._is_self_rolling():
                     self.view_dashboard.set_stt_needs_key(
                         not self._rolling_member_verified(), update_ui=False
@@ -2283,7 +2287,6 @@ class TranslatorApp:
             else:
                 self.view_dashboard.set_stt_needs_key(not success, update_ui=False)
         if provider in (
-            "google",
             "openrouter",
             "openai",
             "deepseek",
@@ -2294,7 +2297,7 @@ class TranslatorApp:
         peer_tag = self._peer_api_key_provider_tag()
         if provider == peer_tag or (
             peer_tag == "rolling_free"
-            and provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe")
+            and provider in ("deepgram", "gemini", "elevenlabs_scribe")
         ):
             if peer_tag == "rolling_free":
                 self.view_dashboard.set_peer_needs_key(
@@ -2311,10 +2314,9 @@ class TranslatorApp:
             return False
         provider = {
             "deepgram_api_key": "deepgram",
-            "gemini_transcribe_api_key": "gemini_transcribe",
+            "gemini_api_key": "gemini",
             "elevenlabs_scribe_api_key": "elevenlabs_scribe",
             "soniox_api_key": "soniox",
-            "google_api_key": "google",
             "openrouter_api_key": "openrouter",
             "openai_api_key": "openai",
             "deepseek_api_key": "deepseek",
@@ -2323,13 +2325,13 @@ class TranslatorApp:
         }.get(key)
         if provider in {
             "deepgram",
-            "gemini_transcribe",
+            "gemini",
             "elevenlabs_scribe",
             "soniox",
             "alibaba_beijing",
             "alibaba_singapore",
         }:
-            if provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe"):
+            if provider in ("deepgram", "gemini", "elevenlabs_scribe"):
                 if self._is_self_rolling():
                     self.view_dashboard.set_stt_needs_key(
                         not self._rolling_member_verified(), update_ui=False
@@ -2339,7 +2341,6 @@ class TranslatorApp:
             else:
                 self.view_dashboard.set_stt_needs_key(True, update_ui=False)
         if provider in {
-            "google",
             "openrouter",
             "openai",
             "deepseek",
@@ -2352,7 +2353,7 @@ class TranslatorApp:
             provider == peer_tag
             or (
                 peer_tag == "rolling_free"
-                and provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe")
+                and provider in ("deepgram", "gemini", "elevenlabs_scribe")
             )
         ):
             if peer_tag == "rolling_free":
@@ -2368,10 +2369,9 @@ class TranslatorApp:
         # Map secret key name to provider name
         key_to_provider = {
             "deepgram_api_key": "deepgram",
-            "gemini_transcribe_api_key": "gemini_transcribe",
+            "gemini_api_key": "gemini",
             "elevenlabs_scribe_api_key": "elevenlabs_scribe",
             "soniox_api_key": "soniox",
-            "google_api_key": "google",
             "openrouter_api_key": "openrouter",
             "openai_api_key": "openai",
             "deepseek_api_key": "deepseek",
@@ -2386,13 +2386,13 @@ class TranslatorApp:
             # Update dashboard needs_key flag
             if provider in (
                 "deepgram",
-                "gemini_transcribe",
+                "gemini",
                 "elevenlabs_scribe",
                 "soniox",
                 "alibaba_beijing",
                 "alibaba_singapore",
             ):
-                if provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe"):
+                if provider in ("deepgram", "gemini", "elevenlabs_scribe"):
                     if self._is_self_rolling():
                         self.view_dashboard.set_stt_needs_key(
                             not self._rolling_member_verified(), update_ui=False
@@ -2402,7 +2402,6 @@ class TranslatorApp:
                 else:
                     self.view_dashboard.set_stt_needs_key(True, update_ui=False)
             if provider in (
-                "google",
                 "openrouter",
                 "openai",
                 "deepseek",
@@ -2413,7 +2412,7 @@ class TranslatorApp:
             peer_tag = self._peer_api_key_provider_tag()
             if provider == peer_tag or (
                 peer_tag == "rolling_free"
-                and provider in ("deepgram", "gemini_transcribe", "elevenlabs_scribe")
+                and provider in ("deepgram", "gemini", "elevenlabs_scribe")
             ):
                 if peer_tag == "rolling_free":
                     self.view_dashboard.set_peer_needs_key(

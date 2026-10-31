@@ -111,7 +111,6 @@
 | ---: | --- |
 | 0 | Gemma 4 26B + 31B |
 | 3 | DeepSeek V4 Flash |
-| 5 | Gemini 3.8 Flash |
 | 7 | Qwen 3.8 Flash |
 | 8 | OpenAI-compatible API |
 | 9 | Custom HTTP API |
@@ -123,4 +122,5 @@
 | 16 | Index-Translate 35B |
 
 - Used by: `PuriPuly_Translator`
+- Translation IDs `5` and legacy `6` are retired and rejected as unknown values. Existing IDs are not renumbered.
 

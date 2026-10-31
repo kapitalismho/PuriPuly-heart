@@ -292,7 +292,6 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "provider.deepseek_v4_flash_41",
     TranslationModel.GPT_6_LUNA: "provider.gpt_6_luna",
-    TranslationModel.GEMINI_FLASH: "provider.gemini_flash",
     TranslationModel.QWEN_38_FLASH: "provider.qwen38_flash",
     TranslationModel.LOCAL_LLM: "provider.local_llms",
     TranslationModel.CUSTOM_HTTP: "provider.custom_http",
@@ -332,7 +331,6 @@ _TRANSLATION_MODELS = (
     TranslationModel.GPT_6_LUNA,
     TranslationModel.LOCAL_LLM,
     TranslationModel.CUSTOM_HTTP,
-    TranslationModel.GEMINI_FLASH,
     TranslationModel.QWEN_38_FLASH,
 )
 _TRANSLATION_MODEL_SECTION_ORDER = (
@@ -351,7 +349,6 @@ _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.GPT_6_LUNA: "settings.translation_model.section.recommended_cloud",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
     TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
-    TranslationModel.GEMINI_FLASH: "settings.translation_model.section.others",
     TranslationModel.QWEN_38_FLASH: "settings.translation_model.section.others",
 }
 
@@ -1013,7 +1010,7 @@ class SettingsView(ft.Column):
         )
 
         self._llm_text = self._build_clickable_text(
-            t("provider.gemini_flash"),
+            t("provider.gemma4_26b_31b"),
             self._on_llm_click,
         )
         self._trans_title = ft.Text(
@@ -1055,10 +1052,10 @@ class SettingsView(ft.Column):
                 self.show_snackbar(msg, bg) if self.show_snackbar else None
             ),
         )
-        self._gemini_transcribe_key = ApiKeyField(
-            "settings.gemini_transcribe_api_key",
-            "gemini_transcribe_api_key",
-            "gemini_transcribe",
+        self._gemini_key = ApiKeyField(
+            "settings.gemini_api_key",
+            "gemini_api_key",
+            "gemini",
             on_verify=self._verify_key,
             on_save=self._on_secret_change,
             show_snackbar=lambda msg, bg: (
@@ -1105,16 +1102,6 @@ class SettingsView(ft.Column):
             ),
             height=None,
             expand=False,
-        )
-        self._google_key = ApiKeyField(
-            "settings.google_api_key",
-            "google_api_key",
-            "google",
-            on_verify=self._verify_key,
-            on_save=self._on_secret_change,
-            show_snackbar=lambda msg, bg: (
-                self.show_snackbar(msg, bg) if self.show_snackbar else None
-            ),
         )
         self._openrouter_key = ApiKeyField(
             "settings.openrouter_api_key",
@@ -1286,9 +1273,8 @@ class SettingsView(ft.Column):
                 # self._qwen_region_row removed
                 self._deepgram_key,
                 self._elevenlabs_scribe_key,
-                self._gemini_transcribe_key,
+                self._gemini_key,
                 self._soniox_key,
-                self._google_key,
                 self._deepseek_key,
                 self._openai_key,
                 self._qwen_api_host_row,
@@ -2947,11 +2933,9 @@ class SettingsView(ft.Column):
         settings: ProviderSettingsSnapshot | None,
     ) -> str:
         if settings is None:
-            return "gemini"
+            return "openrouter"
         if settings.llm_provider == LLMProviderName.INDEX_TRANSLATE:
             return "index_translate"
-        if settings.llm_provider == LLMProviderName.GEMINI:
-            return "gemini"
         if settings.llm_provider == LLMProviderName.OPENROUTER:
             return "openrouter"
         if settings.llm_provider in (LLMProviderName.OPENAI, LLMProviderName.CHATGPT):
@@ -3932,8 +3916,6 @@ class SettingsView(ft.Column):
             return
         snapshot = result.snapshot
 
-        if snapshot.google_api_key is not None:
-            self._google_key.value = snapshot.google_api_key
         if snapshot.openrouter_api_key is not None:
             self._openrouter_key.value = snapshot.openrouter_api_key
         if snapshot.openai_api_key is not None:
@@ -3942,10 +3924,10 @@ class SettingsView(ft.Column):
             self._deepseek_key.value = snapshot.deepseek_api_key
         if snapshot.deepgram_api_key is not None:
             self._deepgram_key.value = snapshot.deepgram_api_key
-        if snapshot.gemini_transcribe_api_key is not None:
-            gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
-            if gemini_transcribe_key is not None:
-                gemini_transcribe_key.value = snapshot.gemini_transcribe_api_key
+        if snapshot.gemini_api_key is not None:
+            gemini_key = getattr(self, "_gemini_key", None)
+            if gemini_key is not None:
+                gemini_key.value = snapshot.gemini_api_key
         if snapshot.elevenlabs_scribe_api_key is not None:
             elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
             if elevenlabs_scribe_key is not None:
@@ -3981,14 +3963,14 @@ class SettingsView(ft.Column):
         verified = settings.verified
 
         # Map field -> (has_key, is_verified)
-        gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
+        gemini_key = getattr(self, "_gemini_key", None)
         elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
         field_map = [
             (self._deepgram_key, self._deepgram_key.value, verified.deepgram),
             (
-                gemini_transcribe_key,
-                gemini_transcribe_key.value if gemini_transcribe_key else None,
-                verified.gemini_transcribe,
+                gemini_key,
+                gemini_key.value if gemini_key else None,
+                verified.gemini,
             ),
             (
                 elevenlabs_scribe_key,
@@ -3996,7 +3978,6 @@ class SettingsView(ft.Column):
                 verified.elevenlabs_scribe,
             ),
             (self._soniox_key, self._soniox_key.value, verified.soniox),
-            (self._google_key, self._google_key.value, verified.google),
             (self._openrouter_key, self._openrouter_key.value, verified.openrouter),
             (self._openai_key, self._openai_key.value, verified.openai),
             (self._deepseek_key, self._deepseek_key.value, verified.deepseek),
@@ -4101,18 +4082,15 @@ class SettingsView(ft.Column):
             if provider in _ROLLING_MEMBER_STT_PROVIDERS:
                 visible_cloud_free_tier.add(provider)
         self._deepgram_key.visible = STTProviderName.DEEPGRAM in visible_cloud_free_tier
-        gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
-        if gemini_transcribe_key is not None:
-            gemini_transcribe_key.visible = (
-                STTProviderName.GEMINI_TRANSCRIBE in visible_cloud_free_tier
-            )
+        gemini_key = getattr(self, "_gemini_key", None)
+        if gemini_key is not None:
+            gemini_key.visible = True
         elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
         if elevenlabs_scribe_key is not None:
             elevenlabs_scribe_key.visible = (
                 STTProviderName.ELEVENLABS_SCRIBE in visible_cloud_free_tier
             )
         self._soniox_key.visible = STTProviderName.SONIOX in active_stt_providers
-        self._google_key.visible = not is_custom_http and llm == LLMProviderName.GEMINI
         self._sync_managed_key_card(settings)
         if is_custom_http:
             self._managed_key_card.visible = False
@@ -4173,9 +4151,8 @@ class SettingsView(ft.Column):
                 for control in (
                     self._deepgram_key,
                     getattr(self, "_elevenlabs_scribe_key", None),
-                    getattr(self, "_gemini_transcribe_key", None),
+                    getattr(self, "_gemini_key", None),
                     self._soniox_key,
-                    self._google_key,
                     self._deepseek_key,
                     self._openai_key,
                     self._alibaba_key_beijing,
@@ -4676,16 +4653,6 @@ class SettingsView(ft.Column):
                     if openrouter_source == OpenRouterCredentialSource.MANAGED
                     else OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_BYOK
                 )
-        elif model == TranslationModel.GEMINI_FLASH:
-            llm_provider = (
-                LLMProviderName.GEMINI
-                if connection == TranslationConnection.OFFICIAL_BYOK
-                else LLMProviderName.OPENROUTER
-            )
-            if llm_provider == LLMProviderName.OPENROUTER:
-                openrouter_source = OpenRouterCredentialSource.BYOK
-                openrouter_model = OpenRouterLLMModel.GEMINI_FLASH
-                openrouter_alias = OpenRouterSelectionAlias.GEMINI_FLASH_BYOK
         elif model == TranslationModel.QWEN_38_FLASH:
             llm_provider = LLMProviderName.QWEN
         elif model in MANAGED_GEMMA_MODELS:
@@ -6735,10 +6702,9 @@ class SettingsView(ft.Column):
 
         # Components
         self._deepgram_key.apply_locale()
-        self._gemini_transcribe_key.apply_locale()
+        self._gemini_key.apply_locale()
         self._elevenlabs_scribe_key.apply_locale()
         self._soniox_key.apply_locale()
-        self._google_key.apply_locale()
         self._managed_trial_usage_bar.apply_locale()
         self._openrouter_key.apply_locale()
         self._openai_key.apply_locale()

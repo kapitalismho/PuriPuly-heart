@@ -38,15 +38,14 @@ PROVIDER_CREDENTIAL_EMPTY: Final[ProviderCredentialVerificationStatus] = "empty"
 PROVIDER_CREDENTIAL_UNKNOWN: Final[ProviderCredentialVerificationStatus] = "unknown"
 PROVIDER_CREDENTIAL_ERROR: Final[ProviderCredentialVerificationStatus] = "error"
 
-_MODEL_AWARE_PROVIDERS = frozenset({"google", "openai"})
+_MODEL_AWARE_PROVIDERS = frozenset({"openai"})
 _DIRECT_PROVIDERS = frozenset(
     {
-        "google",
         "openrouter",
         "openai",
         "deepseek",
         "deepgram",
-        "gemini_transcribe",
+        "gemini",
         "elevenlabs_scribe",
         "soniox",
     }
@@ -151,7 +150,7 @@ class ProviderCredentialVerificationOwner:
     ) -> ProviderCredentialVerificationOutcome:
         if provider == "openrouter" and isinstance(exception, Exception):
             report = openrouter_auth_failure_report(exception, stage="key_verification")
-        elif provider in {"deepgram", "gemini_transcribe", "elevenlabs_scribe", "soniox"}:
+        elif provider in {"deepgram", "elevenlabs_scribe", "soniox"}:
             report = stt_failure_report(
                 exception, provider=provider, operation="key_verification", channel=""
             )

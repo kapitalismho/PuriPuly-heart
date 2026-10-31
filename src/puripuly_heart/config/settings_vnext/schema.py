@@ -23,7 +23,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 54
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 55
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -304,11 +304,6 @@ class QwenTranslationIntent:
 
 
 @dataclass(frozen=True, slots=True)
-class GeminiTranslationIntent:
-    llm_model: str = "gemini-3.8-flash"
-
-
-@dataclass(frozen=True, slots=True)
 class DeepSeekTranslationIntent:
     llm_model: str = "deepseek-flash"
 
@@ -329,7 +324,6 @@ class TranslationIntent:
     openrouter_selected_source: str = "managed"
     openrouter_selection_alias: str | None = "gemma4_26b_31b_managed"
     openrouter_provider_routing: str = "gemma4_26b_31b_latency"
-    gemini: GeminiTranslationIntent = field(default_factory=GeminiTranslationIntent)
     deepseek: DeepSeekTranslationIntent = field(default_factory=DeepSeekTranslationIntent)
     qwen: QwenTranslationIntent = field(default_factory=QwenTranslationIntent)
     gpu_device_id: str = "auto"
@@ -872,10 +866,9 @@ class ProviderVerificationEntry:
 @dataclass(frozen=True, slots=True)
 class ProviderVerificationState:
     deepgram: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
-    gemini_transcribe: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
+    gemini: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     elevenlabs_scribe: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     soniox: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
-    google: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     openrouter: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     openai: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     deepseek: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
@@ -1112,7 +1105,6 @@ __all__ = [
     "DesktopFletOverlayPositionIntent",
     "DesktopFletOverlayVisualIntent",
     "GithubStarPromptState",
-    "GeminiTranslationIntent",
     "IntegratedContextIntent",
     "IntegratedContextState",
     "is_safe_compatibility_extension_key",

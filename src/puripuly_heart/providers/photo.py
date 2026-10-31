@@ -513,15 +513,15 @@ def make_photo_connection(
     *,
     route: str,
     chatgpt_session: ChatGptAccessTokenPort | None = None,
-    google_api_key: str | None = None,
+    gemini_api_key: str | None = None,
     model: str | None = None,
 ) -> PhotoProviderConnection:
     if route == "luna" and chatgpt_session is not None and model in (None, "gpt-6-luna"):
         return LunaPhotoConnection(chatgpt_session)
     if (
         route == "google"
-        and google_api_key
+        and gemini_api_key
         and model in (None, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
     ):
-        return GooglePhotoConnection(google_api_key, model=model or "gemini-3.5-flash-lite")
+        return GooglePhotoConnection(gemini_api_key, model=model or "gemini-3.5-flash-lite")
     raise PhotoProviderError("photo_request_rejected", retryable=False)

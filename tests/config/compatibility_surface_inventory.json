@@ -88,7 +88,7 @@
         "tests/config/public_compatibility_surfaces_snapshot.json::provider_aliases"
       ],
       "fixture_or_guard_refs": [
-        "tests/config/test_config_and_secrets.py::test_legacy_gemini_byok_alias_is_compatibility_only",
+        "tests/config/test_config_and_secrets.py::test_retired_translation_aliases_are_not_selectable",
         "tests/config/test_config_and_secrets.py::test_openrouter_alias_for_fields_does_not_expose_deepseek_v4_pro",
         "tests/config/test_runtime_resolution.py::test_legacy_openrouter_selection_aliases_normalize_before_resolved_runtime"
       ],
@@ -779,7 +779,6 @@
       },
       "exports": [
         {"name": "deepseek", "kind": "submodule"},
-        {"name": "gemini", "kind": "submodule"},
         {"name": "local_openai", "kind": "submodule"},
         {"name": "openrouter", "kind": "submodule"},
         {"name": "qwen_async", "kind": "submodule"}
@@ -792,14 +791,6 @@
       "runtime_all_matches_exports": false,
       "facade_contract": null,
       "exports": [{"name": "DeepSeekLLMProvider", "kind": "attribute"}]
-    },
-    {
-      "module": "puripuly_heart.providers.llm.gemini",
-      "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/providers/llm/gemini.py", "tests/providers/test_gemini_provider.py"],
-      "runtime_all_matches_exports": false,
-      "facade_contract": null,
-      "exports": [{"name": "GeminiLLMProvider", "kind": "attribute"}]
     },
     {
       "module": "puripuly_heart.providers.llm.local_openai",
@@ -1163,6 +1154,14 @@
         "puripuly_heart.core.local_translation"
       ],
       "rationale": "Managed local-translation provisioning, runtime ownership, profiles, and package exports are internal composition contracts rather than external public compatibility facades."
+    },
+    {
+      "surface": "photo capture, parsing, prompt, and native bridge runtime modules",
+      "classification": "internal_photo_runtime",
+      "module_prefixes": [
+        "puripuly_heart.core.photo"
+      ],
+      "rationale": "Photo capture, request lifecycle, block parsing, prompt assembly, and native bridge package exports are internal photo application and provider contracts rather than external public compatibility facades."
     },
     {
       "surface": "provider STT local decode coordinator",

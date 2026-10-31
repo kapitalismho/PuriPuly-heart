@@ -26,11 +26,11 @@ from puripuly_heart.core.osc.control_schema import (
 )
 
 
-def test_gemini_osc_id_5_is_canonical_and_id_6_is_inbound_legacy_only() -> None:
-    assert TRANSLATION_MODEL_IDS[5] == "gemini_flash"
-    assert TRANSLATION_MODEL_IDS[6] == "gemini_flash"
-    assert TRANSLATION_MODEL_ID_BY_VALUE["gemini_flash"] == 5
-    assert translation_model_id_for_selection("gemini_flash", "official_byok") == 5
+@pytest.mark.parametrize("identifier", [5, 6])
+def test_retired_translation_ids_are_rejected(identifier: int) -> None:
+    assert identifier not in TRANSLATION_MODEL_IDS
+    with pytest.raises(UnknownOscControlValueError):
+        decode_control_message("/avatar/parameters/PuriPuly_Translator", identifier)
     assert set(LANGUAGE_IDS.values()) == set(SUPPORTED_LANGUAGES)
     assert len(LANGUAGE_IDS) == len(set(LANGUAGE_IDS.values()))
 
@@ -206,8 +206,6 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         1: "gemma4_26b_31b",
         2: "gemma4_26b_31b",
         3: "deepseek_v4_flash",
-        5: "gemini_flash",
-        6: "gemini_flash",
         7: "qwen38_flash",
         8: "local_llm",
         9: "custom_http",

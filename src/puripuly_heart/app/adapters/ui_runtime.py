@@ -625,7 +625,6 @@ class UiProviderRuntimeAdapter:
             active_secret = None
             if translation.connection == "official_byok":
                 active_secret = {
-                    "gemini": "google_api_key",
                     "openai": "openai_api_key",
                     "deepseek": "deepseek_api_key",
                 }.get(provider_llm_for_translation(translation.model, translation.connection))

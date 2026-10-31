@@ -28,12 +28,12 @@ class PhotoProviderAdapter:
                 ),
             )
         try:
-            key = self.secret_store().get("google_api_key")
+            key = self.secret_store().get("gemini_api_key")
         except Exception:
             return None
         if not key:
             return None
         return PhotoRoute(
             "google-" + hashlib.sha256(key.encode()).hexdigest(),
-            lambda model: make_photo_connection(route="google", google_api_key=key, model=model),
+            lambda model: make_photo_connection(route="google", gemini_api_key=key, model=model),
         )

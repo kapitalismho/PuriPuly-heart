@@ -1884,7 +1884,6 @@ def compose_application_runtime(
             verification_provider = None
             if translation.connection == "official_byok":
                 verification_provider = {
-                    "gemini": "google",
                     "openai": "openai",
                     "deepseek": "deepseek",
                 }.get(provider)
@@ -2164,7 +2163,6 @@ def compose_application_runtime(
         ):
             return False
         return provider in {
-            LLMProviderName.GEMINI,
             LLMProviderName.OPENROUTER,
             LLMProviderName.QWEN,
             LLMProviderName.DEEPSEEK,

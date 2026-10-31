@@ -228,7 +228,7 @@ print(json.dumps({key: store.get(key) for key in keys}))
                 stream.close()
 
 
-@pytest.mark.parametrize("operation", ["get", "set", "delete"])
+@pytest.mark.parametrize("operation", ["get", "set", "delete", "migrate"])
 def test_retained_store_rejects_changed_salt_without_touching_replacement(
     tmp_path: Path, operation: str
 ) -> None:
@@ -242,6 +242,8 @@ def test_retained_store_rejects_changed_salt_without_touching_replacement(
     with pytest.raises(ValueError, match="salt changed"):
         if operation == "set":
             retained.set("managed", "old-instance")
+        elif operation == "migrate":
+            retained._migrate_gemini_api_key()
         else:
             getattr(retained, operation)("managed")
     assert path.read_bytes() == before
@@ -297,3 +299,58 @@ def test_failed_atomic_replace_preserves_contents_and_allows_retry(
     store.set("managed", "new")
     assert store.get("managed") == "new"
     assert store.get("unrelated") == "keep"
+
+
+@pytest.mark.parametrize("concurrent_key", ["unrelated", "gemini_api_key"])
+def test_gemini_migration_serializes_persistence_cleanup_and_other_instances(
+    tmp_path: Path, monkeypatch, concurrent_key: str
+) -> None:
+    path = tmp_path / "secrets.json"
+    migrating = EncryptedFileSecretStore(path, passphrase="synthetic")
+    migrating.set("gemini_transcribe_api_key", "synthetic-stt")
+    migrating.set("google_api_key", "synthetic-retired")
+    migrating.set("unrelated", "synthetic-unrelated")
+    retained = EncryptedFileSecretStore(path, passphrase="synthetic")
+    writing = threading.Event()
+    release = threading.Event()
+    attempted = threading.Event()
+    original = secrets._atomic_write_json
+
+    def gated_write(target: Path, data: object) -> None:
+        if threading.current_thread().name.startswith("migration"):
+            if "gemini_transcribe_api_key" in data["items"]:
+                writing.set()
+                assert release.wait(10)
+        original(target, data)
+
+    def concurrent_write() -> None:
+        attempted.set()
+        retained.set(concurrent_key, "synthetic-concurrent")
+
+    monkeypatch.setattr(secrets, "_atomic_write_json", gated_write)
+    with (
+        ThreadPoolExecutor(max_workers=1, thread_name_prefix="migration") as migrating_pool,
+        ThreadPoolExecutor(max_workers=1) as writing_pool,
+    ):
+        migration = migrating_pool.submit(migrating._migrate_gemini_api_key)
+        try:
+            assert writing.wait(10)
+            other_write = writing_pool.submit(concurrent_write)
+            assert attempted.wait(10)
+            with pytest.raises(TimeoutError):
+                other_write.result(timeout=0.1)
+        finally:
+            release.set()
+        migration.result(timeout=10)
+        other_write.result(timeout=10)
+
+    fresh = EncryptedFileSecretStore(path, passphrase="synthetic")
+    expected = {
+        "gemini_api_key": "synthetic-stt",
+        "unrelated": "synthetic-unrelated",
+        concurrent_key: "synthetic-concurrent",
+    }
+    for store in (migrating, retained, fresh):
+        assert {key: store.get(key) for key in expected} == expected
+        assert store.get("gemini_transcribe_api_key") is None
+        assert store.get("google_api_key") is None

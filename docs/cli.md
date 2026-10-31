@@ -199,6 +199,10 @@ puripuly.exe secrets presence
 
 Saving an active BYOK translation key applies it to subsequent work without enabling capture/translation. A saved-but-unapplied key can report `degraded`; keep storage success distinct from runtime adoption. A verification probe is not proof of live recognition/translation health, and unavailable verification reports `action_required` rather than success.
 
+Gemini speech recognition and photo translation share `gemini_api_key`, displayed as **Gemini API Key** in settings regardless of the selected speech provider. At secret-store initialization, the former `gemini_transcribe_api_key` is moved to that identifier unless a canonical value already exists. The retired `google_api_key` is deleted, never imported; both former identifiers are rejected by control commands. Existing keys are not verified automatically. The shared verification action probes API authentication, not model readiness, free-tier eligibility, or remaining quota.
+
+Gemini 3.8 Flash is no longer a speech/text translation choice, through either the official API or OpenRouter. Saved selections migrate to the current managed Gemma default; unrelated selections and credentials are retained.
+
 ### Authentication and Recovery
 
 ```powershell

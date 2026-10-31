@@ -27,7 +27,7 @@ from tests.config.settings_migration_fixtures import (
 PROVIDER_VERIFICATION_FIELDS = (
     "deepgram",
     "soniox",
-    "google",
+    "gemini",
     "openrouter",
     "deepseek",
     "alibaba_beijing",
@@ -230,48 +230,98 @@ def test_final_dev_v30_flat_fixture_archives_then_resets_without_value_continuit
     assert list(tmp_path.glob("*.bak")) == [first.backup_path]
 
 
-def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
+@pytest.mark.parametrize(
+    "model",
+    ["gemini_flash", "gemini3_flash", "gemini31_flash_lite", "gemini37_flash"],
+)
+@pytest.mark.parametrize("connection", ["official_byok", "openrouter"])
+def test_retired_gemini_selection_migrates_recoverably_without_provider_calls(
+    tmp_path: Path, model: str, connection: str
+) -> None:
+    from puripuly_heart.app.wiring.wiring_llm_factory import runtime_resolution_input_from_vnext
+    from puripuly_heart.config.runtime_resolution import resolve_llm_config
+
+    compat = _compat()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 54
+    raw["intent"]["translation"].update(
+        model=model,
+        connection=connection,
+        gemini={"llm_model": "gemini-3.8-flash"},
+        openrouter_model="google/gemini-3.8-flash",
+        openrouter_selection_alias=f"{model}_byok",
+        openrouter_provider_routing="google_gemini_latency",
+        openrouter_selected_source="byok",
+        previous_llm_model=model,
+        connection_history={model: connection, "qwen38_flash": "official_byok"},
+    )
+    path = tmp_path / "settings.json"
+    original = _write_json_bytes(path, raw)
+
+    loaded = compat.load_vnext_settings(path)
+
+    assert loaded.ok
+    assert loaded.migrated
+    assert loaded.settings is not None
+    assert loaded.backup_path is not None
+    assert loaded.backup_path.read_bytes() == original
+    translation = loaded.settings.intent.translation
+    assert (translation.model, translation.connection) == ("gemma4_26b_31b", "managed")
+    assert translation.previous_llm_model == "gemma4_26b_31b"
+    assert translation.connection_history == {
+        "gemma4_26b_31b": "managed",
+        "qwen38_flash": "official_byok",
+    }
+    assert translation.openrouter_model == "google/gemma-4-26b-a4b-it"
+    assert translation.openrouter_selection_alias == "gemma4_26b_31b_managed"
+    assert translation.openrouter_selected_source == "managed"
+    assert translation.openrouter_provider_routing == "gemma4_26b_31b_latency"
+    assert "gemini" not in serialization.to_dict(loaded.settings)["intent"]["translation"]
+    resolved = resolve_llm_config(runtime_resolution_input_from_vnext(loaded.settings))
+    assert resolved.primary.provider == "openrouter"
+    assert resolved.primary.credential.reference == "openrouter:managed"
+    persisted = path.read_bytes()
+
+    restarted = compat.load_vnext_settings(path)
+
+    assert restarted.ok
+    assert not restarted.migrated
+    assert restarted.settings == loaded.settings
+    assert path.read_bytes() == persisted
+
+
+def test_retired_gemini_history_preserves_current_selection_and_supported_history() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 
-    canonical = serialization.to_dict(AppSettingsVNext())
-    translation = canonical["intent"]["translation"]
-    translation["model"] = "gemini3_flash"
-    translation["connection"] = "official_byok"
-    translation["gemini"] = {"llm_model": "gemini-3-flash-preview"}
-    translation["openrouter_model"] = "google/gemini-3-flash-preview"
-    translation["openrouter_selection_alias"] = "gemini3_flash_byok"
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["translation"].update(
+        model="qwen38_flash",
+        connection="official_byok",
+        previous_llm_model="gemini37_flash",
+        connection_history={
+            "gemini_flash": "openrouter",
+            "gemini37_flash": "official_byok",
+            "gemma4_26b_31b": "openrouter",
+            "qwen38_flash": "official_byok",
+        },
+        gemini={"llm_model": "gemini-3.7-flash"},
+        openrouter_model="google/gemini-3.7-flash",
+        openrouter_selection_alias="gemini37_flash_byok",
+        openrouter_provider_routing="google_gemini_latency",
+    )
 
-    migrated = migration.from_dict(canonical)
-    result = serialization.to_dict(migrated)["intent"]["translation"]
+    result = serialization.to_dict(migration.from_dict(raw))["intent"]["translation"]
 
-    assert result["model"] == "gemini_flash"
-    assert result["gemini"]["llm_model"] == "gemini-3.8-flash"
-    assert result["openrouter_model"] == "google/gemini-3.8-flash"
-    assert result["openrouter_selection_alias"] == "gemini_flash_byok"
-
-
-def test_vnext_dict_migrates_gemini_flash_version_bump_nested_fields() -> None:
-    from puripuly_heart.config.settings_vnext import migration, serialization
-
-    canonical = serialization.to_dict(AppSettingsVNext())
-    translation = canonical["intent"]["translation"]
-    translation["model"] = "gemini37_flash"
-    translation["connection"] = "official_byok"
-    translation["gemini"] = {"llm_model": "gemini-3.7-flash"}
-    translation["openrouter_model"] = "google/gemini-3.7-flash"
-    translation["openrouter_selection_alias"] = "gemini37_flash_byok"
-    translation["previous_llm_model"] = "gemini37_flash"
-    translation["connection_history"] = {"gemini37_flash": "official_byok"}
-
-    migrated = migration.from_dict(canonical)
-    result = serialization.to_dict(migrated)["intent"]["translation"]
-
-    assert result["model"] == "gemini_flash"
-    assert result["gemini"]["llm_model"] == "gemini-3.8-flash"
-    assert result["openrouter_model"] == "google/gemini-3.8-flash"
-    assert result["openrouter_selection_alias"] == "gemini_flash_byok"
-    assert result["previous_llm_model"] == "gemini_flash"
-    assert result["connection_history"] == {"gemini_flash": "official_byok"}
+    assert (result["model"], result["connection"]) == ("qwen38_flash", "official_byok")
+    assert result["previous_llm_model"] == "gemma4_26b_31b"
+    assert result["connection_history"] == {
+        "gemma4_26b_31b": "openrouter",
+        "qwen38_flash": "official_byok",
+    }
+    assert result["openrouter_model"] == "google/gemma-4-26b-a4b-it"
+    assert result["openrouter_selection_alias"] == "gemma4_26b_31b_managed"
+    assert "gemini" not in result
 
 
 def test_vnext_dict_migrates_legacy_deepseek_openrouter_model() -> None:
@@ -390,7 +440,7 @@ def test_saved_deepseek_41_snapshot_upgrade_persists_across_restart(
         previous_llm_model="deepseek_v4_flash_41",
         connection_history={
             "deepseek_v4_flash_41": connection,
-            "gemini_flash": "official_byok",
+            "qwen38_flash": "official_byok",
         },
         openrouter_model="deepseek/deepseek-v4.1-flash",
         openrouter_selected_source=source,
@@ -607,19 +657,19 @@ def test_deepseek_v4_managed_history_moves_without_replacing_saved_41_connection
     raw = serialization.to_dict(AppSettingsVNext())
     raw["intent"]["translation"].update(
         {
-            "model": "gemini_flash",
+            "model": "qwen38_flash",
             "connection": "official_byok",
             "previous_llm_model": "deepseek_v4_flash",
             "connection_history": {
                 "deepseek_v4_flash": "managed_china",
                 "deepseek_v4_flash_41": "official_byok",
-                "gemini_flash": "official_byok",
+                "qwen38_flash": "official_byok",
             },
         }
     )
 
     translated = migration.from_dict(raw).intent.translation
-    assert translated.model == "gemini_flash"
+    assert translated.model == "qwen38_flash"
     assert translated.connection == "official_byok"
     assert translated.previous_llm_model == "deepseek_v4_flash_41"
     assert translated.connection_history["deepseek_v4_flash_41"] == "official_byok"
@@ -783,8 +833,11 @@ def test_vnext_dict_migrates_legacy_gemini_byok_alias_only() -> None:
     migrated = migration.from_dict(canonical)
     result = serialization.to_dict(migrated)["intent"]["translation"]
 
-    assert result["model"] == "gemini_flash"
-    assert result["openrouter_selection_alias"] == "gemini_flash_byok"
+    assert result["model"] == "gemma4_26b_31b"
+    assert result["connection"] == "managed"
+    assert result["openrouter_selected_source"] == "managed"
+    assert result["openrouter_selection_alias"] == "gemma4_26b_31b_managed"
+    assert result["openrouter_model"] == "google/gemma-4-26b-a4b-it"
 
 
 def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
@@ -2292,7 +2345,7 @@ def test_load_skips_system_prompt_backup_when_already_default(tmp_path: Path) ->
     path = tmp_path / "settings.json"
     raw = serialization.to_dict(AppSettingsVNext())
     raw["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
-    raw["intent"]["prompts"]["system_prompt"] = load_prompt_for_provider("gemini")
+    raw["intent"]["prompts"]["system_prompt"] = load_prompt_for_provider("openrouter")
     _write_json_bytes(path, raw)
 
     result = compat.load_vnext_settings(path, now=fixed_now)

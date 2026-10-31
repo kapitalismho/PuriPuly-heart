@@ -342,12 +342,11 @@ def _extension_ids(application: UiApplicationBoundary) -> tuple[str, ...]:
 
 
 _VERIFIABLE_SECRET_PROVIDERS = {
-    "google_api_key": "google",
     "openrouter_api_key": "openrouter",
     "openai_api_key": "openai",
     "deepseek_api_key": "deepseek",
     "deepgram_api_key": "deepgram",
-    "gemini_transcribe_api_key": "gemini_transcribe",
+    "gemini_api_key": "gemini",
     "elevenlabs_scribe_api_key": "elevenlabs_scribe",
     "soniox_api_key": "soniox",
     "alibaba_api_key_beijing": "alibaba_beijing",
@@ -822,7 +821,6 @@ class ApplicationControlOwner:
             CLOUD_FREE_TIER_STT_PROVIDERS,
             MAX_CUSTOM_VOCAB_TERMS,
             DeepSeekLLMModel,
-            GeminiLLMModel,
             LLMProviderName,
             LocalLLMBackend,
             OpenRouterCredentialSource,
@@ -1176,7 +1174,6 @@ class ApplicationControlOwner:
                 "openrouter_credential_sources": [
                     item.value for item in OpenRouterCredentialSource
                 ],
-                "gemini_llm_models": [item.value for item in GeminiLLMModel],
                 "deepseek_llm_models": [item.value for item in DeepSeekLLMModel],
                 "local_llm_backends": [item.value for item in LocalLLMBackend],
             },

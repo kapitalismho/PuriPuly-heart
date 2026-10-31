@@ -186,12 +186,12 @@ async def test_osc_model_only_selection_restores_other_model_history_or_default(
         "openrouter:byok",
     )
 
-    await application.set_translation_model("gemini_flash")
+    await application.set_translation_model("qwen38_flash")
     assert current.intent.translation.connection == "official_byok"
-    gemini_runtime = resolve_llm_config(runtime_resolution_input_from_vnext(current)).primary
-    assert (gemini_runtime.provider, gemini_runtime.credential.reference) == (
-        "gemini",
-        "gemini:byok",
+    qwen_runtime = resolve_llm_config(runtime_resolution_input_from_vnext(current)).primary
+    assert (qwen_runtime.provider, qwen_runtime.credential.reference) == (
+        "qwen",
+        "qwen:beijing",
     )
     await application.set_translation_model("gpt_6_luna")
     assert current.intent.translation.connection == "official_byok"

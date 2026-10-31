@@ -74,7 +74,7 @@ async def test_composed_startup_starts_photo_with_captions_off_survives_pipeline
     def connection(**kwargs):
         assert kwargs["route"] == "luna"
         assert isinstance(kwargs["chatgpt_session"], ChatGptSession)
-        assert "google_api_key" not in kwargs
+        assert "gemini_api_key" not in kwargs
         routes.append(kwargs["route"])
         return ControlledConnection(records)
 
@@ -202,7 +202,11 @@ async def test_composed_route_priority_requires_chatgpt_session_not_openai_key(
         application_runtime, "default_http_extensions_dir", lambda: tmp_path / "extensions"
     )
     monkeypatch.setattr(ChatGptSession, "status", lambda self: SimpleNamespace(signed_in=signed_in))
-    store = {"google_api_key": google_key, "openai_api_key": "must-never-authorize-luna"}
+    store = {
+        "gemini_api_key": google_key,
+        "google_api_key": "retired-key-must-not-authorize-photos",
+        "openai_api_key": "must-never-authorize-luna",
+    }
     monkeypatch.setattr(application_runtime, "create_secret_store", lambda *args, **kwargs: store)
     owners = []
     calls = []
@@ -233,9 +237,9 @@ async def test_composed_route_priority_requires_chatgpt_session_not_openai_key(
             assert calls[0]["route"] == expected
             if expected == "luna":
                 assert isinstance(calls[0]["chatgpt_session"], ChatGptSession)
-                assert "google_api_key" not in calls[0]
+                assert "gemini_api_key" not in calls[0]
             else:
-                assert calls[0]["google_api_key"] == google_key
+                assert calls[0]["gemini_api_key"] == google_key
                 assert "chatgpt_session" not in calls[0]
     finally:
         await app.stop()
