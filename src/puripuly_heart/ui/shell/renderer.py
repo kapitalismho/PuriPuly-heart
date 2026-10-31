@@ -17,7 +17,6 @@ def compose_app_shell(slots: AppShellSlots) -> AppShellRegions:
     layout = ft.Column(
         controls=[
             slots.title_bar,
-            *([slots.settings_status] if slots.settings_status is not None else []),
             content_area,
             slots.bottom_nav,
         ],

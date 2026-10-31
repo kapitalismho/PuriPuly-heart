@@ -1686,11 +1686,9 @@ def test_translator_app_4x3_window_keeps_shell_navigation_usable(
     assert app.content_area.padding == app_module.APP_CONTENT_PADDING
     assert app.layout.controls == [
         app.title_bar,
-        app._settings_status,
         app.content_area,
         app.bottom_nav,
     ]
-    assert app._settings_status.visible is False
     assert app.content_area.content is app.view_dashboard
 
     app._on_nav_change(1)

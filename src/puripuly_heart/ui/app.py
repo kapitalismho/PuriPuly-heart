@@ -65,7 +65,6 @@ from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
     DashboardTranslationIntents,
 )
-from puripuly_heart.ui.flet_runtime import is_control_mounted
 from puripuly_heart.ui.fonts import (
     font_for_language,
     register_ui_fonts,
@@ -513,7 +512,6 @@ class TranslatorApp:
                 bottom_nav=self.bottom_nav,
                 content_padding=APP_CONTENT_PADDING,
                 debug_panel=self.debug_preview_panel,
-                settings_status=self._build_settings_status(),
             )
         )
         self.content_area = shell.content_area
@@ -1061,7 +1059,6 @@ class TranslatorApp:
             recovery = SettingsRecovery(
                 self.application.apply_settings_change,
                 self._on_settings_committed,
-                self._update_settings_status,
             )
             self._settings_recovery = recovery
         return recovery
@@ -1071,11 +1068,6 @@ class TranslatorApp:
             return
         recovery = self._ensure_settings_recovery()
         recovery.submit(intent)
-        self._queue_settings_mutation_task(recovery.drain)
-
-    def _retry_failed_settings(self, _event=None) -> None:
-        recovery = self._ensure_settings_recovery()
-        recovery.retry()
         self._queue_settings_mutation_task(recovery.drain)
 
     def _on_settings_committed(self, intent: object) -> None:
@@ -1090,33 +1082,6 @@ class TranslatorApp:
             view.acknowledge_prompt_apply_settings(intent)
         self.application.refresh_settings_projection()
         self._sync_audio_test_dialog_if_stopped()
-
-    def _build_settings_status(self) -> ft.Container:
-        self._settings_status_text = ft.Text(expand=True, size=12)
-        self._settings_retry_button = ft.TextButton(
-            t("settings.recovery.retry"), on_click=self._retry_failed_settings
-        )
-        self._settings_status = ft.Container(
-            content=ft.Row([self._settings_status_text, self._settings_retry_button]),
-            padding=ft.Padding.symmetric(horizontal=16, vertical=6),
-            visible=False,
-        )
-        return self._settings_status
-
-    def _update_settings_status(self, phase: str) -> None:
-        status = getattr(self, "_settings_status", None)
-        if status is None:
-            return
-        status.visible = phase != "idle"
-        if phase != "idle":
-            self._settings_status_text.value = t(f"settings.recovery.{phase}")
-        failed = phase.endswith("_failed")
-        self._settings_status_text.color = COLOR_WARNING if failed else COLOR_PRIMARY
-        self._settings_retry_button.content = t("settings.recovery.retry")
-        self._settings_retry_button.visible = failed
-        self._settings_retry_button.disabled = not failed
-        if is_control_mounted(status):
-            status.update()
 
     def _content_padding_for_index(self, index: int) -> int | ft.Padding:
         if index == 1:

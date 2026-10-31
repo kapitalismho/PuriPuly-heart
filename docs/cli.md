@@ -93,6 +93,13 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 - Apply a translation model and its connection together using a combination from `settings choices`. For ASR, `asr set --channel self|peer|both --provider <choice>` is the convenience form.
 - Explicit provider fields can retry pending provider application; unrelated general settings edits do not. Observe committed settings and effective provider state separately, including after restart when checking persistence.
 
+### GUI Autosave
+
+- GUI settings edits use bounded automatic save/application recovery. Saved-but-unapplied edits retry current canonical settings without replaying the old edit. Unknown save outcomes stop automatic retries.
+- Expected save/application failures do not show a settings failure toast, a persistent recovery row, or a dedicated Retry button. Diagnostics and unrelated operation notifications remain available.
+- After retries end, unsaved edits remain only in the current page's memory; closing the app does not preserve them for restart. Submitting the affected setting again starts a new attempt budget; unrelated edits do not restart every exhausted save.
+- This recovery queue belongs to the GUI. CLI operations use the application owners and their receipts, not the GUI's pending-edit queue.
+
 ### Interpret Readiness at Its Owner
 
 | Observation | What it does not establish |

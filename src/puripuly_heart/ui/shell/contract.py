@@ -17,7 +17,6 @@ class AppShellSlots:
     bottom_nav: ft.Control
     content_padding: int
     debug_panel: ft.Control | None = None
-    settings_status: ft.Control | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -19,7 +19,6 @@ from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import TransactionResult
 from puripuly_heart.ui.app import TranslatorApp
-from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.settings_recovery import SettingsRecovery
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
@@ -27,21 +26,18 @@ from tests.helpers.ui_application import compose_test_ui_application_boundary
 async def test_failed_save_retries_automatically_and_keeps_the_edit_until_saved():
     calls = []
     committed = []
-    states = []
     intent = LocaleSettingsIntent("ja")
 
     async def apply(value):
         calls.append(value)
         return SettingsApplyOutcome(saved=len(calls) > 1, applied=len(calls) > 1)
 
-    recovery = SettingsRecovery(apply, committed.append, states.append, retry_delays=(0,))
+    recovery = SettingsRecovery(apply, committed.append, retry_delays=(0,))
     recovery.submit(intent)
     await recovery.drain()
     assert calls == [intent, intent]
     assert committed == [intent]
-    assert recovery.phase == "idle"
     assert not recovery.has_pending
-    assert "retrying_save" in states
 
 
 async def test_saved_but_unapplied_retries_current_runtime_without_resaving_old_intent():
@@ -53,15 +49,15 @@ async def test_saved_but_unapplied_retries_current_runtime_without_resaving_old_
         calls.append(value)
         return SettingsApplyOutcome(saved=True, applied=value is None)
 
-    recovery = SettingsRecovery(apply, committed.append, lambda _: None, retry_delays=(0,))
+    recovery = SettingsRecovery(apply, committed.append, retry_delays=(0,))
     recovery.submit(intent)
     await recovery.drain()
     assert calls == [intent, None]
     assert committed == [intent]
-    assert recovery.phase == "idle"
+    assert not recovery.has_pending
 
 
-async def test_exhausted_save_failure_can_be_retried_without_a_listen_toggle():
+async def test_exhausted_save_failure_stays_pending_until_a_newer_edit():
     calls = []
     available = False
 
@@ -69,18 +65,19 @@ async def test_exhausted_save_failure_can_be_retried_without_a_listen_toggle():
         calls.append(value)
         return SettingsApplyOutcome(saved=available, applied=available)
 
-    recovery = SettingsRecovery(apply, lambda _: None, lambda _: None, retry_delays=(0,))
+    recovery = SettingsRecovery(apply, lambda _: None, retry_delays=(0,))
     intent = LocaleSettingsIntent("ja")
     recovery.submit(intent)
     await recovery.drain()
+    await recovery.drain()
     assert calls == [intent, intent]
-    assert recovery.phase == "save_failed"
     assert recovery.has_pending
     available = True
-    recovery.retry()
+    latest = LocaleSettingsIntent("ko")
+    recovery.submit(latest)
     await recovery.drain()
-    assert calls == [intent, intent, intent]
-    assert recovery.phase == "idle"
+    assert calls == [intent, intent, latest]
+    assert not recovery.has_pending
 
 
 async def test_newer_edit_supersedes_failed_retry_and_preserves_other_provider_fields():
@@ -94,7 +91,7 @@ async def test_newer_edit_supersedes_failed_retry_and_preserves_other_provider_f
     async def sleep(_delay):
         recovery.submit(PromptApplyIntent("new"))
 
-    recovery = SettingsRecovery(apply, lambda _: None, lambda _: None, sleep=sleep)
+    recovery = SettingsRecovery(apply, lambda _: None, sleep=sleep)
     recovery.submit(first)
     await recovery.drain()
     assert len(calls) == 2
@@ -105,22 +102,29 @@ async def test_newer_edit_supersedes_failed_retry_and_preserves_other_provider_f
 
 
 async def test_failed_runtime_recovery_does_not_hide_an_independent_unsaved_edit():
+    calls = []
+    committed = []
+
     async def apply(value):
+        calls.append(value)
         if value is None:
             return SettingsApplyOutcome(saved=True, applied=True)
         return SettingsApplyOutcome(saved=isinstance(value, LocaleSettingsIntent), applied=False)
 
-    recovery = SettingsRecovery(apply, lambda _: None, lambda _: None, retry_delays=(0,))
-    recovery.submit(LocaleSettingsIntent("ja"))
-    recovery.submit(PeerVadHangoverIntent(900))
+    recovery = SettingsRecovery(apply, committed.append, retry_delays=(0,))
+    saved = LocaleSettingsIntent("ja")
+    unsaved = PeerVadHangoverIntent(900)
+    recovery.submit(saved)
+    recovery.submit(unsaved)
     await recovery.drain()
-    assert recovery.phase == "save_failed"
     assert recovery.has_pending
+    assert committed == [saved]
+    assert calls.count(unsaved) == 2
+    assert calls.count(None) == 1
 
 
-async def test_shutdown_during_retry_never_reapplies_or_updates_presentation():
+async def test_shutdown_during_retry_never_reapplies():
     calls = []
-    states = []
 
     async def apply(value):
         calls.append(value)
@@ -128,13 +132,12 @@ async def test_shutdown_during_retry_never_reapplies_or_updates_presentation():
 
     async def sleep(_delay):
         recovery.stop()
-        states.clear()
 
-    recovery = SettingsRecovery(apply, lambda _: None, states.append, sleep=sleep)
+    recovery = SettingsRecovery(apply, lambda _: None, sleep=sleep)
     recovery.submit(LocaleSettingsIntent("ja"))
     await recovery.drain()
     assert len(calls) == 1
-    assert states == []
+    assert not recovery.has_pending
 
 
 async def test_submission_during_inflight_apply_is_not_acknowledged_or_lost():
@@ -150,7 +153,7 @@ async def test_submission_during_inflight_apply_is_not_acknowledged_or_lost():
             await release.wait()
         return SettingsApplyOutcome(saved=True, applied=True)
 
-    recovery = SettingsRecovery(apply, committed.append, lambda _: None)
+    recovery = SettingsRecovery(apply, committed.append)
     first = LocaleSettingsIntent("ja")
     latest = LocaleSettingsIntent("en")
     recovery.submit(first)
@@ -165,34 +168,26 @@ async def test_submission_during_inflight_apply_is_not_acknowledged_or_lost():
 
 
 @pytest.mark.parametrize("saved", [False, True])
-async def test_visible_failure_offers_retry_and_clears_only_after_success(saved):
+async def test_settings_failures_remain_pending_without_notifications(saved):
     results = SettingsTransactionResultOwner()
-    available = False
     calls = []
+    notifications = []
     workers = []
 
     async def apply_settings(_settings):
         calls.append("save")
         results.set(
             TransactionResult(
-                (
-                    "settings_commit_success_runtime_applied"
-                    if available
-                    else (
-                        "settings_commit_success_runtime_degraded"
-                        if saved
-                        else "settings_commit_failed"
-                    )
-                ),
+                ("settings_commit_success_runtime_degraded" if saved else "settings_commit_failed"),
                 None,
                 None,
             )
         )
-        return available
+        return False
 
     async def retry_settings_runtime():
         calls.append("runtime")
-        return available
+        return False
 
     app = TranslatorApp.__new__(TranslatorApp)
     app._ui_application = compose_test_ui_application_boundary(
@@ -204,55 +199,45 @@ async def test_visible_failure_offers_retry_and_clears_only_after_success(saved)
     )
     app.application._settings_results = results
     app._run_page_task = workers.append
-    app._build_settings_status()
-    app._ensure_settings_recovery()._retry_delays = ()
+    app._show_snackbar = lambda *args: notifications.append(args)
+    app._ensure_settings_recovery()._retry_delays = (0,)
     app._on_settings_changed(LocaleSettingsIntent("ja"))
     await workers[0]()
 
-    assert app._settings_status.visible
-    assert app._settings_status_text.value == t(
-        "settings.recovery.apply_failed" if saved else "settings.recovery.save_failed"
-    )
-    assert app._settings_retry_button.visible
-    assert not app._settings_retry_button.disabled
-    available = True
-    app._settings_retry_button.on_click(None)
-    await workers[-1]()
-    assert not app._settings_status.visible
+    assert app._settings_recovery.has_pending
     assert calls == ["save", "runtime" if saved else "save"]
+    assert notifications == []
 
 
-async def test_unknown_outcome_requires_manual_retry_without_claiming_save_failure():
+async def test_unknown_outcome_stops_automatic_retries_and_retains_the_edit():
     calls = []
 
     async def apply(value):
         calls.append(value)
         return SettingsApplyOutcome(saved=None, applied=False)
 
-    recovery = SettingsRecovery(apply, lambda _: None, lambda _: None, retry_delays=(0, 0))
-    recovery.submit(LocaleSettingsIntent("ja"))
+    recovery = SettingsRecovery(
+        apply, lambda _: pytest.fail("unknown edit acknowledged"), retry_delays=(0, 0)
+    )
+    intent = LocaleSettingsIntent("ja")
+    recovery.submit(intent)
     await recovery.drain()
-    assert len(calls) == 1
-    assert recovery.phase == "unknown_failed"
-    recovery.retry()
     await recovery.drain()
-    assert len(calls) == 2
+    assert calls == [intent]
+    assert recovery.has_pending
 
 
-async def test_shutdown_during_apply_does_not_acknowledge_or_publish_late_result():
+async def test_shutdown_during_apply_does_not_acknowledge_late_result():
     committed = []
-    phases = []
 
     async def apply(_value):
         recovery.stop()
-        phases.clear()
         return SettingsApplyOutcome(saved=True, applied=True)
 
-    recovery = SettingsRecovery(apply, committed.append, phases.append)
+    recovery = SettingsRecovery(apply, committed.append)
     recovery.submit(LocaleSettingsIntent("ja"))
     await recovery.drain()
     assert committed == []
-    assert phases == []
     assert not recovery.has_pending
 
 
@@ -264,16 +249,16 @@ async def test_new_successful_change_rechecks_existing_runtime_failure():
         calls.append(value)
         return SettingsApplyOutcome(saved=True, applied=available)
 
-    recovery = SettingsRecovery(apply, lambda _: None, lambda _: None, retry_delays=())
+    recovery = SettingsRecovery(apply, lambda _: None, retry_delays=())
     recovery.submit(LocaleSettingsIntent("ja"))
     await recovery.drain()
-    assert recovery.phase == "apply_failed"
+    assert recovery.has_pending
     available = True
     latest = LocaleSettingsIntent("ko")
     recovery.submit(latest)
     await recovery.drain()
     assert calls[-2:] == [latest, None]
-    assert recovery.phase == "idle"
+    assert not recovery.has_pending
 
 
 @pytest.mark.parametrize("merged", [False, True])
@@ -339,7 +324,7 @@ async def test_prompt_reversion_supersedes_failed_autosave_through_editor(
         edit_and_blur(replacement)
 
     recovery = SettingsRecovery(
-        apply, ui._on_settings_committed, lambda _: None, retry_delays=(0,), sleep=retry_delay
+        apply, ui._on_settings_committed, retry_delays=(0,), sleep=retry_delay
     )
     ui._settings_recovery = recovery
     edit_and_blur("discarded prompt")
@@ -351,7 +336,7 @@ async def test_prompt_reversion_supersedes_failed_autosave_through_editor(
         == replacement
     )
     assert view._prompt_editor.value == replacement
-    assert recovery.phase == "idle"
+    assert not recovery.has_pending
     if merged:
         assert settings.require_committed().intent.stt.soniox.enable_speaker_diarization is False
 
@@ -382,23 +367,20 @@ def test_unchanged_prompt_blur_does_not_start_autosave(monkeypatch, tmp_path):
     assert getattr(ui, "_settings_recovery", None) is None
 
 
-async def test_repeated_compensation_retains_edit_and_reports_reverted_state():
+async def test_repeated_compensation_retains_edit_without_acknowledging_it():
     intent = LocaleSettingsIntent("ja")
     attempts = []
-    phases = []
 
     async def apply(value):
         attempts.append(value)
         return SettingsApplyOutcome(saved=False, applied=False, reverted=True)
 
     recovery = SettingsRecovery(
-        apply, lambda _: pytest.fail("reverted edit acknowledged"), phases.append, retry_delays=(0,)
+        apply, lambda _: pytest.fail("reverted edit acknowledged"), retry_delays=(0,)
     )
     recovery.submit(intent)
     await recovery.drain()
     assert attempts == [intent, intent]
-    assert "retrying_reverted" in phases
-    assert recovery.phase == "reverted_failed"
     assert recovery.has_pending
 
 
@@ -422,7 +404,7 @@ async def test_prompt_reversion_during_inflight_apply_is_saved_after_stale_compl
         )
         return SettingsApplyOutcome(saved=True, applied=True)
 
-    recovery = SettingsRecovery(apply, lambda _: None, lambda _: None)
+    recovery = SettingsRecovery(apply, lambda _: None)
     recovery.submit(PromptApplyIntent("discarded"))
     if merged:
         recovery.submit(ProviderApplyIntent((SonioxSpeakerDiarizationEdit(False),)))
@@ -433,4 +415,4 @@ async def test_prompt_reversion_during_inflight_apply_is_saved_after_stale_compl
     await task
     assert prompt == "committed"
     assert len(calls) == 2
-    assert recovery.phase == "idle"
+    assert not recovery.has_pending

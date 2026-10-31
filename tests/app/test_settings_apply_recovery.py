@@ -139,10 +139,9 @@ async def test_runtime_recovery_reloads_saved_configuration_without_another_disk
     contents = settings.path.read_bytes()
     modified = settings.path.stat().st_mtime_ns
     effects.failure = None
-    recovery = SettingsRecovery(app.apply_settings_change, lambda _: None, lambda _: None)
+    recovery = SettingsRecovery(app.apply_settings_change, lambda _: None)
     recovery.submit(None)
     await recovery.drain()
-    assert recovery.phase == "idle"
     assert settings.path.read_bytes() == contents
     assert settings.path.stat().st_mtime_ns == modified
     assert settings.require_committed().intent.ui.locale == "ko"
@@ -162,19 +161,21 @@ async def test_unsaved_edit_recovers_after_storage_failure_and_survives_reload(
             raise OSError("controlled storage failure")
         return persist(*args, **kwargs)
 
+    async def restore_storage(_delay):
+        nonlocal available
+        assert recovery.has_pending
+        assert settings.path.read_bytes() == original
+        assert settings.require_committed().intent.ui.locale != "ja"
+        assert settings.peer_translation_enabled() is True
+        available = True
+
     monkeypatch.setattr(settings.persistence, "persist", controlled_persist)
     recovery = SettingsRecovery(
-        app.apply_settings_change, lambda _: None, lambda _: None, retry_delays=()
+        app.apply_settings_change, lambda _: None, retry_delays=(0,), sleep=restore_storage
     )
     recovery.submit(LocaleSettingsIntent("ja"))
     await recovery.drain()
-    assert recovery.phase == "save_failed"
-    assert settings.path.read_bytes() == original
-    assert settings.require_committed().intent.ui.locale != "ja"
-    available = True
-    recovery.retry()
-    await recovery.drain()
-    assert recovery.phase == "idle"
+    assert not recovery.has_pending
     assert load_vnext_settings(settings.path).settings.intent.ui.locale == "ja"
     assert settings.peer_translation_enabled() is True
 
@@ -319,13 +320,12 @@ async def test_transient_local_asr_failure_preserves_requested_change_after_comp
         attempts.append((value, result.saved, result.applied))
         return result
 
-    recovery = SettingsRecovery(apply, committed.append, lambda _: None, retry_delays=(0,))
+    recovery = SettingsRecovery(apply, committed.append, retry_delays=(0,))
     recovery.submit(intent)
     await recovery.drain()
     assert load_vnext_settings(settings.path).settings.intent.languages.source_language == "ja"
     assert attempts == [(intent, not active, False), (intent if active else None, True, True)]
     assert committed == [intent]
-    assert recovery.phase == "idle"
     assert not recovery.has_pending
     assert settings.peer_translation_enabled()
 
