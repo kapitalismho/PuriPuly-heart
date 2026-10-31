@@ -498,6 +498,79 @@ async def test_proxy_change_preserves_inflight_response(monkeypatch):
                     finish.set()
 
 
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_client_close_releases_keepalive_connections_to_previous_proxies(
+    monkeypatch, asynchronous
+):
+    received = []
+    received_eof = {}
+    eof = {path: asyncio.Event() for path in ("/first", "/second")}
+    tasks = []
+
+    async def handle(reader, writer):
+        try:
+            header = await reader.readuntil(b"\r\n\r\n")
+            method, path, _ = header.split(b"\r\n", 1)[0].decode().split(" ", 2)
+            received.append((method, path))
+            writer.write(
+                b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: keep-alive\r\n\r\nok"
+            )
+            await writer.drain()
+            received_eof[path] = await reader.read()
+            eof[path].set()
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+    def accept(reader, writer):
+        tasks.append(asyncio.create_task(handle(reader, writer)))
+
+    server = await asyncio.start_server(accept, "127.0.0.1", 0)
+    url = f"http://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    try:
+        async with (
+            recording_proxy() as (first, first_requests),
+            recording_proxy() as (second, second_requests),
+        ):
+            if asynchronous:
+                client = network_clients.external_async_client(timeout=2)
+            else:
+                client = network_clients.external_client(timeout=2)
+
+            def consume_response(target):
+                with client.stream("GET", target) as response:
+                    assert response.status_code == 200
+                    assert response.read() == b"ok"
+
+            try:
+                for path, proxy in (("/first", first), ("/second", second)):
+                    monkeypatch.setenv("HTTP_PROXY", proxy)
+                    if asynchronous:
+                        async with client.stream("GET", url + path) as response:
+                            assert response.status_code == 200
+                            assert await response.aread() == b"ok"
+                    else:
+                        await asyncio.to_thread(consume_response, url + path)
+                assert received == [("GET", "/first"), ("GET", "/second")]
+                assert first_requests == [("GET", url + "/first")]
+                assert second_requests == [("GET", url + "/second")]
+                assert not any(event.is_set() for event in eof.values())
+            finally:
+                if asynchronous:
+                    await client.aclose()
+                else:
+                    await asyncio.to_thread(client.close)
+            async with asyncio.timeout(3):
+                await asyncio.gather(*(event.wait() for event in eof.values()))
+            assert received_eof == {"/first": b"", "/second": b""}
+    finally:
+        server.close()
+        server.close_clients()
+        async with asyncio.timeout(3):
+            await asyncio.gather(*tasks)
+            await server.wait_closed()
+
+
 @pytest.mark.parametrize("directory", [False, True])
 async def test_explicit_ca_https_and_wss(certificates, monkeypatch, directory):
     root, ca_dir, contexts = certificates

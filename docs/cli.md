@@ -216,6 +216,12 @@ puripuly.exe auth logout chatgpt
 - Logout is local-only except ChatGPT, which also requests refresh-token revocation. Inspect the reported scope; local deletion alone does not prove remote revocation.
 - Browser authorization and app-to-service traffic can use different routes. Correct proxy/TLS configuration rather than disabling certificate verification. Share only sanitized diagnostic fields, never OAuth codes, keys, tokens, proxy URLs, or full settings/secret files.
 
+### Proxy Changes
+
+- Shared external HTTP clients read the currently visible proxy settings when dispatching each request. Generic WebSocket connectors read them when opening a connection, including redirected connection attempts. Changing the proxy does not migrate an existing request or socket, or automatically restart recognition.
+- Gemini Live and ordinary Hugging Face/Xet worker downloads retain a proxy snapshot selected during session or operation setup. Start a new session or operation to pick up changed settings in those paths.
+- Environment settings are read from the running process; editing operating-system environment variables does not necessarily update that process. Proxy refresh does not reload an existing client's explicit CA-file configuration.
+
 ## Events and Privacy
 
 Normal CLI results are UTF-8 JSON with `output_version: 1` on stdout; diagnostics/errors use stderr. Help is human-readable. Follow commands emit one JSON event per line. The local protocol authenticates same-user instance identity and token over loopback; it is not an unauthenticated management API.

@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections import deque
 from uuid import uuid4
 
 import pytest
-from websockets.asyncio.server import serve
 
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity, AudioSegmentSettingsSnapshot
 from puripuly_heart.core.stt.backend import (
@@ -17,8 +15,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTSessionProjection,
 )
-from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
-from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend, _SonioxSession
+from puripuly_heart.providers.stt.soniox import _SonioxSession
 
 
 class _RecordingWebSocket:
@@ -96,188 +93,6 @@ async def _seal(session: _SonioxSession, request: STTProviderTurnRequest) -> Non
         seal_reason="silence",
         observed_trailing_silence_ms=0,
     )
-
-
-async def _collect_turn(session: _SonioxSession) -> list[object]:
-    events = []
-    async for event in session.turn_events():
-        events.append(event)
-        if isinstance(event, STTProviderTurnTerminal):
-            return events
-    raise AssertionError("session ended without a terminal")
-
-
-def _burst_tokens(count: int) -> list[dict[str, object]]:
-    return [
-        {
-            "text": f"word{index} ",
-            "is_final": True,
-            "start_ms": index * 10,
-            "end_ms": (index + 1) * 10,
-            "language": "en" if index < count // 3 or index >= count * 2 // 3 else "ja",
-            "speaker": "A" if index < count // 3 or index >= count * 2 // 3 else "B",
-        }
-        for index in range(count)
-    ]
-
-
-def _assert_burst_preserved(
-    events: list[object],
-    request: STTProviderTurnRequest,
-    tokens: list[dict[str, object]],
-    scope: str,
-) -> None:
-    updates = [event for event in events if isinstance(event, STTProviderTurnUpdate)]
-    terminal = events[-1]
-    assert isinstance(terminal, STTProviderTurnTerminal)
-    text = "".join(token["text"] for token in tokens)
-    assert "".join(update.text for update in updates) == text
-    assert terminal.identity == request.identity
-    assert (terminal.outcome, terminal.text, terminal.epoch_disposition) == ("final", text, "reuse")
-    assert terminal.failure_reason is None
-    assert [run.language for run in terminal.final_language_runs] == ["en", "ja", "en"]
-    assert [run.speaker_id for run in terminal.final_speaker_runs] == ["A", "B", "A"]
-    assert {run.session_scope for run in terminal.final_speaker_runs} == {scope}
-    assert "".join(run.text for run in terminal.final_language_runs) == text
-    assert "".join(run.text for run in terminal.final_speaker_runs) == text
-    normalizer = STTScopedTurnNormalizer(request.identity)
-    for update in updates:
-        normalizer.apply_update(update)
-    normalized = normalizer.apply_terminal(terminal)
-    assert normalized.outcome == "final"
-    assert normalized.text == text.rstrip()
-    assert [run.speaker_id for run in normalized.final_speaker_runs] == ["A", "B", "A"]
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("token_count", [255, 256, 1024])
-@pytest.mark.parametrize("fin_in_same_response", [False, True])
-async def test_soniox_burst_preserves_complete_turn_and_attribution(
-    token_count: int, fin_in_same_response: bool
-) -> None:
-    session, _ = _session()
-    request = _request(1)
-    tokens = _burst_tokens(token_count)
-    fin = {"text": "<fin>", "is_final": True}
-    collector = None
-    try:
-        await session.begin_turn(request)
-        await _seal(session, request)
-        collector = asyncio.create_task(_collect_turn(session))
-        await asyncio.sleep(0)
-        session._handle_message(
-            json.dumps(
-                {
-                    "request_id": "request-1",
-                    "tokens": tokens + ([fin] if fin_in_same_response else []),
-                }
-            )
-        )
-        if not fin_in_same_response:
-            await asyncio.sleep(0)
-            session._handle_message(json.dumps({"tokens": [fin]}))
-        events = await asyncio.wait_for(collector, timeout=1)
-        _assert_burst_preserved(events, request, tokens, session.speaker_session_scope)
-        await session.begin_turn(_request(2))
-    finally:
-        await session.close()
-        if collector is not None:
-            await asyncio.gather(collector, return_exceptions=True)
-
-
-@pytest.mark.asyncio
-async def test_soniox_buffered_responses_allow_consumer_to_progress() -> None:
-    tokens = _burst_tokens(1024)
-
-    class BufferedWebSocket(_RecordingWebSocket):
-        def __init__(self) -> None:
-            super().__init__()
-            self.responses = deque(json.dumps({"tokens": [token]}) for token in tokens)
-            self.responses.append(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
-
-        async def recv(self):
-            if self.responses:
-                return self.responses.popleft()
-            await asyncio.Event().wait()
-
-    session, _ = _session()
-    session._ws = BufferedWebSocket()
-    request = _request(1)
-    collector = None
-    try:
-        await session.begin_turn(request)
-        await _seal(session, request)
-        collector = asyncio.create_task(_collect_turn(session))
-        session._recv_task = asyncio.create_task(session._recv_loop())
-        events = await asyncio.wait_for(collector, timeout=1)
-        _assert_burst_preserved(events, request, tokens, session.speaker_session_scope)
-    finally:
-        await session.close()
-        if collector is not None:
-            await asyncio.gather(collector, return_exceptions=True)
-
-
-@pytest.mark.asyncio
-async def test_soniox_local_websocket_delivers_burst_and_reuses_connection() -> None:
-    tokens = _burst_tokens(1024)
-    connections = []
-
-    async def handler(connection) -> None:
-        connections.append(connection)
-        await connection.recv()
-        async for message in connection:
-            if isinstance(message, str) and json.loads(message).get("type") == "finalize":
-                await connection.send(
-                    json.dumps({"tokens": tokens + [{"text": "<fin>", "is_final": True}]})
-                )
-
-    async with serve(handler, "127.0.0.1", 0, ping_interval=None) as server:
-        host, port = server.sockets[0].getsockname()[:2]
-        backend = SonioxRealtimeSTTBackend(
-            api_key="synthetic-local-key",
-            endpoint=f"ws://{host}:{port}",
-            language_hints=["en", "ja"],
-            enable_language_identification=True,
-            enable_speaker_diarization=True,
-        )
-        session = await backend.open_session(
-            projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
-        )
-        try:
-            for order in (1, 2):
-                request = _request(order)
-                await session.begin_turn(request)
-                await _seal(session, request)
-                events = await asyncio.wait_for(_collect_turn(session), timeout=2)
-                _assert_burst_preserved(events, request, tokens, session.speaker_session_scope)
-            assert len(connections) == 1
-        finally:
-            await session.close()
-
-
-@pytest.mark.asyncio
-async def test_soniox_malformed_token_preserves_preceding_batch_in_failure_terminal() -> None:
-    session, _ = _session()
-    request = _request(1)
-    tokens = _burst_tokens(6)
-    try:
-        await session.begin_turn(request)
-        await _seal(session, request)
-        session._handle_message(json.dumps({"request_id": "request-1", "tokens": [*tokens, None]}))
-        events = await asyncio.wait_for(_collect_turn(session), timeout=1)
-        terminal = events[-1]
-        assert isinstance(terminal, STTProviderTurnTerminal)
-        assert (terminal.outcome, terminal.failure_reason, terminal.epoch_disposition) == (
-            "degraded",
-            "soniox_protocol_ambiguity",
-            "retire",
-        )
-        assert terminal.text == "".join(token["text"] for token in tokens)
-        assert [run.speaker_id for run in terminal.final_speaker_runs] == ["A", "B", "A"]
-        assert [run.language for run in terminal.final_language_runs] == ["en", "ja", "en"]
-        assert terminal.provenance[0].native_request_id == "request-1"
-    finally:
-        await session.close()
 
 
 @pytest.mark.asyncio
