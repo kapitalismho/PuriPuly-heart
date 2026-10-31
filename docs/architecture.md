@@ -74,6 +74,8 @@ Contracts: [audio ownership](../src/puripuly_heart/core/audio/ownership.py), [au
 - Channel generations fence cancelled or replaced results. Started native work remains owned until settlement; requesting cancellation does not authorize early Model/Session destruction.
 - The [asset catalog](../src/puripuly_heart/core/local_asr/local_stt_catalog.py) owns language routing and readiness. CPU Auto requires its four current CPU assets; unsupported languages and missing assets do not select a retired, cloud or GPU fallback. The [CLI contract](cli.md#local-speech-recognition) describes migration and control behavior.
 
+Behavior: [production-composition evidence checks](../tests/release_evidence/test_local_asr_production_composition.py) distinguish a present GPU worker from a resident model using synthetic snapshots; they do not qualify native inference or native Model counts.
+
 
 ### Translation
 
