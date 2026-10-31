@@ -650,8 +650,8 @@ async def test_capture_target_owner_publishes_general_snapshot_after_apply() -> 
         remember_projection=lambda value: projections.append(value),
     )
 
-    async def apply_capture_target(_settings) -> None:
-        return None
+    async def apply_capture_target(_settings) -> bool:
+        return True
 
     owner = PeerCaptureTargetApplicationOwner(
         settings=settings,

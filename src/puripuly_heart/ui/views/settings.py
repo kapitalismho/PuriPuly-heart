@@ -6428,11 +6428,11 @@ class SettingsView(ft.Column):
         self._stage_prompt_draft(value)
 
     def _on_prompt_commit(self, value: str) -> None:
+        self._stage_prompt_draft(value)
         if self.on_pending_prompt_changed is not None:
             self.on_pending_prompt_changed(PromptApplyIntent(value))
         if not self.has_pending_prompt_changes and value == self._committed_prompt_value():
             return
-        self._stage_prompt_draft(value)
         if self.has_provider_changes:
             return
         if self.has_pending_prompt_changes:

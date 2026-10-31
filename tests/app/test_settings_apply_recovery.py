@@ -15,7 +15,7 @@ from puripuly_heart.app.services.settings.settings_transaction_result import (
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import TransactionResult
-from puripuly_heart.ui.settings_recovery import SettingsRecovery
+from puripuly_heart.ui.settings_queue import SettingsQueue
 from tests.app.test_settings_application_owner import FakeRuntimeEffects
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
@@ -139,16 +139,15 @@ async def test_runtime_recovery_reloads_saved_configuration_without_another_disk
     contents = settings.path.read_bytes()
     modified = settings.path.stat().st_mtime_ns
     effects.failure = None
-    recovery = SettingsRecovery(app.apply_settings_change, lambda _: None)
-    recovery.submit(None)
-    await recovery.drain()
+    result = await app.apply_settings_change(None)
+    assert result.saved and result.applied
     assert settings.path.read_bytes() == contents
     assert settings.path.stat().st_mtime_ns == modified
     assert settings.require_committed().intent.ui.locale == "ko"
     assert settings.peer_translation_enabled() is True
 
 
-async def test_unsaved_edit_recovers_after_storage_failure_and_survives_reload(
+async def test_unsaved_edit_requires_explicit_resubmission_and_survives_reload(
     tmp_path, monkeypatch
 ):
     app, settings = persistent_application(tmp_path, FakeRuntimeEffects([]))
@@ -161,21 +160,21 @@ async def test_unsaved_edit_recovers_after_storage_failure_and_survives_reload(
             raise OSError("controlled storage failure")
         return persist(*args, **kwargs)
 
-    async def restore_storage(_delay):
-        nonlocal available
-        assert recovery.has_pending
-        assert settings.path.read_bytes() == original
-        assert settings.require_committed().intent.ui.locale != "ja"
-        assert settings.peer_translation_enabled() is True
-        available = True
-
     monkeypatch.setattr(settings.persistence, "persist", controlled_persist)
-    recovery = SettingsRecovery(
-        app.apply_settings_change, lambda _: None, retry_delays=(0,), sleep=restore_storage
-    )
-    recovery.submit(LocaleSettingsIntent("ja"))
-    await recovery.drain()
-    assert not recovery.has_pending
+    queue = SettingsQueue(app.apply_settings_change, lambda _: None)
+    intent = LocaleSettingsIntent("ja")
+    queue.submit(intent)
+    await queue.drain()
+    assert queue.has_pending
+    assert settings.path.read_bytes() == original
+    assert settings.require_committed().intent.ui.locale != "ja"
+    assert settings.peer_translation_enabled() is True
+    available = True
+    await queue.drain()
+    assert settings.path.read_bytes() == original
+    queue.submit(intent)
+    await queue.drain()
+    assert not queue.has_pending
     assert load_vnext_settings(settings.path).settings.intent.ui.locale == "ja"
     assert settings.peer_translation_enabled() is True
 
@@ -237,6 +236,7 @@ async def test_capture_target_change_reports_saved_and_applied_separately(
     async def apply_runtime(_settings):
         if failure == "runtime":
             raise RuntimeError("controlled capture restart failure")
+        return True
 
     target = PeerCaptureTargetApplicationOwner(
         settings=settings,
@@ -320,13 +320,22 @@ async def test_transient_local_asr_failure_preserves_requested_change_after_comp
         attempts.append((value, result.saved, result.applied))
         return result
 
-    recovery = SettingsRecovery(apply, committed.append, retry_delays=(0,))
-    recovery.submit(intent)
-    await recovery.drain()
+    queue = SettingsQueue(apply, committed.append)
+    queue.submit(intent)
+    await queue.drain()
+    await queue.drain()
+    assert attempts == [(intent, not active, False)]
+    assert committed == ([] if active else [intent])
+    assert queue.has_pending is active
+    assert load_vnext_settings(settings.path).settings.intent.languages.source_language == (
+        original.intent.languages.source_language if active else "ja"
+    )
+    queue.submit(intent)
+    await queue.drain()
     assert load_vnext_settings(settings.path).settings.intent.languages.source_language == "ja"
-    assert attempts == [(intent, not active, False), (intent if active else None, True, True)]
-    assert committed == [intent]
-    assert not recovery.has_pending
+    assert attempts == [(intent, not active, False), (intent, True, True)]
+    assert committed == ([intent] if active else [intent, intent])
+    assert not queue.has_pending
     assert settings.peer_translation_enabled()
 
 

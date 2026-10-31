@@ -565,6 +565,10 @@ class PeerApplicationOwner:
         self.sync_effective_flags()
         self.presentation_changed()
 
+    async def refresh_capture_target(self) -> bool:
+        await self.refresh_runtime()
+        return self.capture_runtime_convergence(self.config_factory()) is not False
+
     async def refresh_runtime(
         self,
         *,

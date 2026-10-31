@@ -129,7 +129,7 @@ def compose_peer_application(
         processes=WindowsProcessCaptureInventoryAdapter(),
         devices=WindowsLoopbackDeviceInventoryAdapter(),
         runtime_effects=PeerCaptureTargetRuntimeEffectsAdapter(
-            refresh_peer=owner.refresh_runtime,
+            refresh_peer=owner.refresh_capture_target,
             sync_effective_flags=lambda _settings: owner.sync_effective_flags(state.state()),
             refresh_presentation=presentation_changed,
         ),

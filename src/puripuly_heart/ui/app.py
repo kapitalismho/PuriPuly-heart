@@ -91,7 +91,7 @@ from puripuly_heart.ui.settings.contract import (
     SettingsProviderIntents,
     SettingsSurfaceIntents,
 )
-from puripuly_heart.ui.settings_recovery import SettingsRecovery
+from puripuly_heart.ui.settings_queue import SettingsQueue
 from puripuly_heart.ui.shell.contract import AppShellSlots
 from puripuly_heart.ui.shell.renderer import compose_app_shell
 from puripuly_heart.ui.theme import (
@@ -419,9 +419,9 @@ class TranslatorApp:
     def _freeze_ui_ingress(self) -> None:
         self._shutting_down = True
         self._settings_mutation_queue = []
-        recovery = getattr(self, "_settings_recovery", None)
-        if recovery is not None:
-            recovery.stop()
+        settings_queue = getattr(self, "_settings_queue", None)
+        if settings_queue is not None:
+            settings_queue.stop()
 
     async def _on_page_lifecycle_end(self, _event=None) -> None:
         await self.shutdown()
@@ -1053,22 +1053,22 @@ class TranslatorApp:
 
         self._run_page_task(_worker)
 
-    def _ensure_settings_recovery(self) -> SettingsRecovery:
-        recovery = getattr(self, "_settings_recovery", None)
-        if recovery is None:
-            recovery = SettingsRecovery(
+    def _ensure_settings_queue(self) -> SettingsQueue:
+        settings_queue = getattr(self, "_settings_queue", None)
+        if settings_queue is None:
+            settings_queue = SettingsQueue(
                 self.application.apply_settings_change,
                 self._on_settings_committed,
             )
-            self._settings_recovery = recovery
-        return recovery
+            self._settings_queue = settings_queue
+        return settings_queue
 
-    def _queue_settings_apply(self, intent: object) -> None:
+    def _queue_settings_apply(self, intent: object, *, resubmit: bool = True) -> None:
         if getattr(self, "_shutting_down", False):
             return
-        recovery = self._ensure_settings_recovery()
-        recovery.submit(intent)
-        self._queue_settings_mutation_task(recovery.drain)
+        settings_queue = self._ensure_settings_queue()
+        if settings_queue.submit(intent, resubmit=resubmit):
+            self._queue_settings_mutation_task(settings_queue.drain)
 
     def _on_settings_committed(self, intent: object) -> None:
         view = getattr(self, "view_settings", None)
@@ -1102,11 +1102,11 @@ class TranslatorApp:
             if self.view_settings.has_provider_changes:
                 pending_settings = self.view_settings.build_provider_apply_settings()
                 if pending_settings is not None:
-                    self._queue_settings_apply(pending_settings)
+                    self._queue_settings_apply(pending_settings, resubmit=False)
             elif getattr(self.view_settings, "has_pending_prompt_changes", False):
                 pending = PromptApplyIntent(self.view_settings._prompt_editor.value)
 
-                self._queue_settings_apply(pending)
+                self._queue_settings_apply(pending, resubmit=False)
 
         if index == 0:
             self.content_area.content = self.view_dashboard
@@ -1448,11 +1448,14 @@ class TranslatorApp:
         self._queue_settings_apply(change)
 
     def _on_settings_changed(self, intent: ImmediateSettingsIntent) -> None:
+        if getattr(self, "_shutting_down", False):
+            return
+
         async def _task():
-            await self._ensure_settings_recovery().drain()
+            await self._ensure_settings_queue().drain()
             self._sync_audio_test_dialog_if_stopped()
 
-        self._ensure_settings_recovery().submit(intent)
+        self._ensure_settings_queue().submit(intent)
         self._queue_settings_mutation_task(_task)
 
     def _on_start_audio_test(self) -> None:
@@ -1526,9 +1529,12 @@ class TranslatorApp:
         self._queue_settings_apply(intent)
 
     def _on_pending_prompt_changed(self, intent: PromptApplyIntent) -> None:
-        recovery = getattr(self, "_settings_recovery", None)
-        if recovery is not None and recovery.replace_pending_prompt(intent):
-            self._queue_settings_mutation_task(recovery.drain)
+        settings_queue = getattr(self, "_settings_queue", None)
+        if settings_queue is not None and settings_queue.replace_pending_prompt(intent):
+            view = getattr(self, "view_settings", None)
+            if view is not None:
+                view.has_pending_prompt_changes = True
+            self._queue_settings_mutation_task(settings_queue.drain)
 
     def _on_providers_changed(self) -> None:
         view_settings = getattr(self, "view_settings", None)

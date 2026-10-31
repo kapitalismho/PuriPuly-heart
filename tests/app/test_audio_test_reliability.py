@@ -231,9 +231,10 @@ async def test_specialized_target_cutover_stops_all_test_sources_before_persist_
     settings.apply_capture_target = persist
     settings.remember_projection = lambda _settings: None
 
-    async def refresh(_settings):
+    async def refresh(_settings) -> bool:
         assert not harness.owner.active
         events.append("refresh")
+        return True
 
     owner = PeerCaptureTargetApplicationOwner(
         settings=settings,

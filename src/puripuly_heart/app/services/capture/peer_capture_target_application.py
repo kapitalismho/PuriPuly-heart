@@ -158,8 +158,8 @@ class PeerCaptureTargetApplicationOwner:
         self.settings.authoritative = True
         self.settings.remember_projection(next_settings)
         self.warning_reset()
-        await self.runtime_effects.apply_capture_target(next_settings)
-        self._publish_result("settings_commit_success_runtime_applied")
+        if await self.runtime_effects.apply_capture_target(next_settings):
+            self._publish_result("settings_commit_success_runtime_applied")
         _provider, general, _prompt, _overlay = settings_view_surface_snapshots(next_settings)
         with contextlib.suppress(Exception):
             self.settings_presentation_sink(general)

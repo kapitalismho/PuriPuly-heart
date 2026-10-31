@@ -95,10 +95,10 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 
 ### GUI Autosave
 
-- GUI settings edits use bounded automatic save/application recovery. Saved-but-unapplied edits retry current canonical settings without replaying the old edit. Unknown save outcomes stop automatic retries.
+- GUI settings edits are coalesced and attempted once per submitted edit. There are no timed retries or automatic runtime-only replays after failure. Saved-but-unapplied edits remain saved; persistence and effective runtime state are separate results.
 - Expected save/application failures do not show a settings failure toast, a persistent recovery row, or a dedicated Retry button. Diagnostics and unrelated operation notifications remain available.
-- After retries end, unsaved edits remain only in the current page's memory; closing the app does not preserve them for restart. Submitting the affected setting again starts a new attempt budget; unrelated edits do not restart every exhausted save.
-- This recovery queue belongs to the GUI. CLI operations use the application owners and their receipts, not the GUI's pending-edit queue.
+- Unsaved, reverted, or unknown-outcome edits remain only in the current page's memory; closing the app does not preserve them for restart. Explicitly submitting the affected setting again permits another attempt. Unrelated edits, repeated queue drains, and navigation without a new draft do not replay a failed submission.
+- This settings queue belongs to the GUI. CLI operations use the application owners and their receipts. Explicit runtime-only application and existing provider, telemetry-reporting, and model-installation recovery are unchanged. Actual persistence and resource application can still delay other ordered operations.
 
 ### Interpret Readiness at Its Owner
 
@@ -117,6 +117,8 @@ Matching `translation set off` or `capture set <channel> off` can revoke pending
 ### Peer Capture and Audio Tests
 
 Read `capture terms` first. Only an informed user's explicit choice authorizes `capture set peer on --accept-peer-terms`; never auto-supply consent. The flag is valid only for peer-on. Peer speech is excluded from the VRChat chatbox.
+
+A capture-target change that is saved while requested Peer capture remains pending reports `degraded`, not `applied`, through both the GUI application boundary and `audio.target.set` control receipts. With Peer capture intentionally off, successful target application does not require an active capture source.
 
 `audio test on|off` runs VAD without recognition or translation. It pauses normal capture and restores only still-valid prior intent; inspect `app status` → `audio_test` for readiness, failures, and VAD readings. Stopping waits for owned input release, not just a visual toggle.
 

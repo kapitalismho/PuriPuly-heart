@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -17,23 +16,17 @@ from puripuly_heart.app.ports.settings_view import (
 @dataclass
 class _PendingChange:
     intent: object
-    attempts: int = 0
-    delay: float | None = None
+    attempted: bool = False
 
 
-class SettingsRecovery:
+class SettingsQueue:
     def __init__(
         self,
         apply: Callable[[object], Awaitable[SettingsApplyOutcome]],
         committed: Callable[[object], None],
-        *,
-        retry_delays: tuple[float, ...] = (1.0, 3.0),
-        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self._apply = apply
         self._committed = committed
-        self._retry_delays = retry_delays
-        self._sleep = sleep
         self._pending: dict[object, _PendingChange] = {}
         self._closed = False
         self._running = False
@@ -42,17 +35,18 @@ class SettingsRecovery:
     def has_pending(self) -> bool:
         return bool(self._pending)
 
-    def submit(self, intent: object) -> None:
+    def submit(self, intent: object, *, resubmit: bool = True) -> bool:
         if self._closed:
-            return
+            return False
         key: object = type(intent) if intent is not None else None
         if isinstance(intent, CustomVocabularySettingsIntent):
             key = (type(intent), intent.source_language)
         if isinstance(intent, PromptApplyIntent):
             provider = self._pending.get(ProviderApplyIntent)
             if provider is not None:
-                self.submit(ProviderApplyIntent((SystemPromptEdit(intent.value),)))
-                return
+                return self.submit(
+                    ProviderApplyIntent((SystemPromptEdit(intent.value),)), resubmit=resubmit
+                )
         if isinstance(intent, ProviderApplyIntent):
             edits = {}
             previous = self._pending.get(key)
@@ -72,7 +66,11 @@ class SettingsRecovery:
             )
             changes.update((type(change), change) for change in intent.changes)
             intent = AudioSettingsIntent(tuple(changes.values()))
+        previous = self._pending.get(key)
+        if not resubmit and previous is not None and previous.intent == intent:
+            return False
         self._pending[key] = _PendingChange(intent)
+        return True
 
     def replace_pending_prompt(self, intent: PromptApplyIntent) -> bool:
         if self._closed:
@@ -107,42 +105,24 @@ class SettingsRecovery:
         self._running = True
         try:
             while not self._closed:
-                candidates = [
-                    (key, pending)
-                    for key, pending in self._pending.items()
-                    if pending.attempts <= len(self._retry_delays)
-                ]
-                if not candidates:
+                candidate = next(
+                    (
+                        (key, pending)
+                        for key, pending in self._pending.items()
+                        if not pending.attempted
+                    ),
+                    None,
+                )
+                if candidate is None:
                     return
-                key, pending = min(candidates, key=lambda item: item[1].delay is not None)
-                if pending.delay is not None:
-                    delay = pending.delay
-                    pending.delay = None
-                    await self._sleep(delay)
-                    continue
+                key, pending = candidate
+                pending.attempted = True
                 result = await self._apply(pending.intent)
                 if self._closed:
                     return
-                pending.attempts += 1
                 if result.saved and pending.intent is not None:
                     self._committed(pending.intent)
-                if self._pending.get(key) is not pending:
-                    if result.saved and not result.applied:
-                        self._pending.setdefault(None, _PendingChange(None))
-                    continue
-                if result.applied or result.saved and pending.intent is not None:
+                if self._pending.get(key) is pending and (result.applied or result.saved):
                     del self._pending[key]
-                if result.applied:
-                    if key is not None and None in self._pending:
-                        self._pending[None] = _PendingChange(None)
-                    continue
-                if result.saved and pending.intent is not None:
-                    key = None
-                    pending = _PendingChange(None, attempts=pending.attempts)
-                    self._pending[key] = pending
-                if result.saved is None:
-                    pending.attempts = len(self._retry_delays) + 1
-                elif pending.attempts <= len(self._retry_delays):
-                    pending.delay = self._retry_delays[pending.attempts - 1]
         finally:
             self._running = False

@@ -669,24 +669,6 @@ async def test_close_after_launch_tasks_cancels_app_active_day_retry() -> None:
     assert owner._retry_task_handle is None
 
 
-def test_translator_app_telemetry_change_uses_settings_recovery() -> None:
-    from puripuly_heart.app.ports.settings_view import TelemetrySettingsIntent
-
-    app = TranslatorApp.__new__(TranslatorApp)
-    calls: list[object] = []
-
-    class _Owner:
-        def schedule_app_active_day_report(self) -> None:
-            calls.append(("schedule",))
-
-    app._telemetry_reporting = _Owner()
-    app._queue_settings_apply = calls.append
-    app._on_telemetry_enabled_change(True)
-    app._on_telemetry_enabled_change(None)
-    app._schedule_app_active_day_report()
-    assert calls == [TelemetrySettingsIntent(True), ("schedule",)]
-
-
 @pytest.mark.asyncio
 async def test_close_after_launch_cancels_existing_telemetry_retry_only() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
