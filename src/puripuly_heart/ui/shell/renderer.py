@@ -15,7 +15,11 @@ def compose_app_shell(slots: AppShellSlots) -> AppShellRegions:
         content=slots.content,
     )
     layout = ft.Column(
-        controls=[slots.title_bar, content_area, slots.bottom_nav],
+        controls=[
+            slots.title_bar,
+            content_area,
+            slots.bottom_nav,
+        ],
         expand=True,
         spacing=APP_SHELL_LAYOUT_SPACING,
     )

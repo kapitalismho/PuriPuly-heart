@@ -64,7 +64,7 @@ G15_GENERAL_INTENT_FIELDS = (
     "loopback_capture_summary",
     "osc_effective_ports",
 )
-G15_PROMPT_INTENT_FIELDS = ("prompt_apply_settings",)
+G15_PROMPT_INTENT_FIELDS = ("prompt_apply_settings", "pending_prompt_changed")
 G15_OVERLAY_INTENT_FIELDS = (
     "desktop_overlay_lock_change",
     "desktop_overlay_size_change",
@@ -78,6 +78,7 @@ G15_OVERLAY_INTENT_FIELDS = (
 )
 G15_OWNED_VIEW_CALLBACKS = (
     "on_prompt_apply_settings",
+    "on_pending_prompt_changed",
     "on_start_audio_test",
     "on_telemetry_enabled_change",
     "on_list_loopback_capture_options",

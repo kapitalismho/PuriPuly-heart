@@ -32,10 +32,13 @@ from puripuly_heart.app.ports.settings_view import (
     AlibabaConnectionDraftSnapshot,
     GeneralSettingsSnapshot,
     ImmediateSettingsIntent,
+    LoopbackCaptureSettingsIntent,
     OpenRouterPkceTarget,
     OverlaySettingsSnapshot,
     PromptApplyIntent,
     ProviderApplyIntent,
+    SettingsApplyOutcome,
+    TelemetrySettingsIntent,
 )
 from puripuly_heart.app.ports.ui_application import (
     TranslationEnablePreparation,
@@ -70,6 +73,9 @@ from puripuly_heart.app.services.application_shutdown import (
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
 from puripuly_heart.app.services.index_selection import IndexSelectionOwner
+from puripuly_heart.app.services.settings.settings_transaction_result import (
+    SettingsTransactionResultOwner,
+)
 from puripuly_heart.config.alibaba_connection import AlibabaEndpointMode, AlibabaRegion
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import provider_llm_for_translation
@@ -93,6 +99,7 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "apply_alibaba_connection_draft",
         "apply_settings",
         "apply_settings_intent",
+        "apply_settings_change",
         "apply_prompt_intent",
         "apply_provider_intent",
         "apply_telemetry_enabled",
@@ -162,6 +169,7 @@ _ORDERED_INTENTS = frozenset(
         "apply_settings",
         "apply_alibaba_connection_draft",
         "apply_settings_intent",
+        "apply_settings_change",
         "apply_prompt_intent",
         "edit_alibaba_connection_draft",
         "apply_provider_intent",
@@ -327,6 +335,7 @@ class UiApplicationBoundary:
         index_selection: IndexSelectionOwner | None = None,
         runtime_control_authority: Callable[[str, asyncio.Task | None], bool | None] | None = None,
         runtime_control_activity: Callable[[], tuple[tuple[str, bool], ...]] | None = None,
+        settings_results: SettingsTransactionResultOwner | None = None,
     ) -> None:
         self._startup = startup
         self._startup_task: asyncio.Task[None] | None = None
@@ -334,6 +343,7 @@ class UiApplicationBoundary:
         self._input_runtime = input_runtime
         self._peer_capture = peer_capture
         self._settings = settings
+        self._settings_results = settings_results or SettingsTransactionResultOwner()
         self._provider = provider
         self._audio_test = audio_test
         self._overlay = overlay
@@ -920,6 +930,61 @@ class UiApplicationBoundary:
         result = await self._settings.apply_settings_intent(intent)
         await self._publish_osc_state()
         return result
+
+    async def apply_settings_change(self, intent: object | None) -> SettingsApplyOutcome:
+        with self._settings_results.capture() as scope:
+            try:
+                if intent is None:
+                    raw = await self._settings.retry_settings_runtime()
+                elif isinstance(intent, ProviderApplyIntent):
+                    settings = self._settings.materialize_provider_intent(intent)
+                    self.log_basic(
+                        "[Settings] provider_apply_requested "
+                        f"self={settings.intent.stt.provider} peer={settings.intent.peer_stt.provider}"
+                    )
+                    raw = await self._provider.apply_providers(settings)
+                elif isinstance(intent, PromptApplyIntent):
+                    raw = await self._settings.apply_prompt_intent(intent)
+                elif isinstance(intent, LoopbackCaptureSettingsIntent):
+                    raw = await self._peer_capture.apply_loopback_capture_option(intent.value)
+                elif isinstance(intent, TelemetrySettingsIntent):
+                    raw = await self._settings.apply_telemetry_enabled(intent.enabled)
+                elif isinstance(intent, LanguageSelectionChange):
+                    raw = await self._settings.on_dashboard_language_change(intent)
+                else:
+                    raw = await self._settings.apply_settings_intent(intent)
+            except Exception as exc:
+                emit_failure(
+                    logging.getLogger(__name__),
+                    ErrorDiagnostics(
+                        component="gui_settings_apply",
+                        operation="apply_settings_change",
+                        code="settings_apply_exception",
+                        category="transaction",
+                        visibility="basic",
+                        content_policy="metadata_only",
+                        status_code=None,
+                        retry_after_ms=None,
+                        fields=safe_exception_fields(exc),
+                    ),
+                )
+                raw = False
+            result = scope.current
+        await self._publish_osc_state()
+        if scope.reverted:
+            return SettingsApplyOutcome(
+                saved=False, applied=False, transaction=result, reverted=True
+            )
+        if result is None:
+            return SettingsApplyOutcome(
+                saved=True if raw is True or intent is None else None,
+                applied=raw is True,
+            )
+        return SettingsApplyOutcome(
+            saved=result.status.startswith("settings_commit_success_"),
+            applied=result.status == "settings_commit_success_runtime_applied",
+            transaction=result,
+        )
 
     async def apply_prompt_intent(self, intent: PromptApplyIntent) -> object:
         result = await self._settings.apply_prompt_intent(intent)

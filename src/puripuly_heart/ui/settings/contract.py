@@ -69,6 +69,7 @@ class SettingsGeneralIntents:
 @dataclass(frozen=True, slots=True)
 class SettingsPromptIntents:
     prompt_apply_settings: Callable[[PromptApplyIntent], None]
+    pending_prompt_changed: Callable[[PromptApplyIntent], None] | None = None
 
 
 @dataclass(frozen=True, slots=True)

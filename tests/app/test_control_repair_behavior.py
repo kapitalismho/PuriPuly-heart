@@ -94,6 +94,99 @@ def offline(tmp_path, monkeypatch):
     return path
 
 
+@pytest.mark.parametrize(
+    ("demand", "ready", "status"),
+    [(True, False, "degraded"), (True, True, "applied"), (False, False, "applied")],
+)
+async def test_audio_target_control_receipt_matches_effective_listen_application(
+    tmp_path, monkeypatch, demand, ready, status
+):
+    from tests.app.test_peer_capture_target_application import capture_application
+
+    harness = capture_application(tmp_path, monkeypatch, demand=demand, ready=ready)
+    try:
+        accepted = await harness.control.submit(
+            "audio.target.set", {"value": "device:Synthetic A"}, request_id="target-state"
+        )
+        receipt = await harness.control.wait(accepted["operation_id"], timeout=5)
+        assert receipt["terminal"] is True
+        assert receipt["status"] == status
+        assert receipt["transaction"]["status"] == (
+            "settings_commit_success_runtime_applied"
+            if status == "applied"
+            else "settings_commit_success_runtime_degraded"
+        )
+        assert (
+            harness.settings.require_committed().intent.desktop_audio.capture_target.device_name
+            == "Synthetic A"
+        )
+        assert harness.settings.peer_translation_enabled() is demand
+        assert harness.runtime.snapshot.desired_active is demand
+        assert harness.runtime.snapshot.effective_active is (demand and ready)
+        assert harness.peer.owner.snapshot().effective_enabled is (demand and ready)
+    finally:
+        await harness.peer.owner.close()
+        await harness.control.drain_operations()
+
+
+@pytest.mark.parametrize("unavailable", [False, True])
+async def test_audio_target_control_preserves_invalid_and_unavailable_rejection(
+    tmp_path, monkeypatch, unavailable
+):
+    from puripuly_heart.app.ports.ui_models import OptionItem
+    from tests.app.test_peer_capture_target_application import capture_application
+
+    harness = capture_application(tmp_path, monkeypatch)
+    if unavailable:
+        monkeypatch.setattr(
+            harness.app,
+            "list_loopback_capture_options",
+            lambda: [OptionItem(value="device:Unknown", label="Unknown", disabled=True)],
+        )
+    try:
+        accepted = await harness.control.submit(
+            "audio.target.set", {"value": "device:Unknown"}, request_id="target-rejected"
+        )
+        receipt = await harness.control.wait(accepted["operation_id"], timeout=5)
+        assert receipt["status"] == ("action_required" if unavailable else "rejected")
+        assert receipt["error"]["code"] == (
+            "capture_target_unavailable" if unavailable else "invalid_arguments"
+        )
+        assert harness.sources == []
+        assert harness.provider.requests == []
+    finally:
+        await harness.peer.owner.close()
+        await harness.control.drain_operations()
+
+
+async def test_audio_target_control_preserves_failed_runtime_exception(tmp_path, monkeypatch):
+    from tests.app.test_peer_capture_target_application import capture_application
+
+    harness = capture_application(tmp_path, monkeypatch)
+    harness.app._runtime_logging = None
+
+    async def fail_refresh():
+        raise RuntimeError("controlled capture runtime failure")
+
+    effects = harness.peer.target.runtime_effects
+    harness.peer.target.runtime_effects = replace(effects, refresh_peer=fail_refresh)
+    try:
+        accepted = await harness.control.submit(
+            "audio.target.set", {"value": "device:Synthetic A"}, request_id="target-failed"
+        )
+        receipt = await harness.control.wait(accepted["operation_id"], timeout=5)
+        assert receipt["status"] == "failed"
+        assert receipt["error"]["code"] == "application_operation_failed"
+        assert (
+            harness.settings.require_committed().intent.desktop_audio.capture_target.device_name
+            == "Synthetic A"
+        )
+        assert harness.settings.peer_translation_enabled() is True
+    finally:
+        await harness.peer.owner.close()
+        await harness.control.drain_operations()
+
+
 @pytest.mark.asyncio
 async def test_committed_gui_event_is_unsolicited_and_staged_failure_is_invisible(
     offline, monkeypatch
@@ -739,8 +832,8 @@ async def test_long_output_wait_orders_cli_overlay_audio_and_gui_settings_captur
         await release.wait()
         return TextSubmissionAdmission("admitted", uuid4(), ())
 
-    async def no_audio_effects(_settings):
-        pass
+    async def no_audio_effects(_settings) -> bool:
+        return True
 
     try:
         await app.start()
