@@ -96,7 +96,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 
 ![음성 인식과 번역을 결합한 전체 파이프라인의 문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 벤치마크 당시 PuriPuly의 구성: Gemini Transcribe → Luna (0.676), Soniox STT → Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). 평가 모델: Gemini 3.7 Flash.](../images/performance/1.png)
 
-![문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 PuriPuly에서 사용할 수 있는 모델: GPT-6 luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Qwen 3.8, Gemini 3.5, Soniox는 문자 오류율(CER) 5% 이하인 결과만 선별. 평가 모델: Gemini 3.7 Flash.](../images/performance/2.png)
+![문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 PuriPuly에서 사용할 수 있는 모델: Luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Qwen 3.8, Gemini 3.5, Soniox는 문자 오류율(CER) 5% 이하인 결과만 선별. 평가 모델: Gemini 3.7 Flash.](../images/performance/2.png)
 
 - 파란색 막대는 벤치마크 당시 PuriPuly의 구성이에요. CPU Qwen3-ASR 0.6B는 이후 제거되었으며, 해당 수치는 아래의 새 모델을 측정한 결과가 아니에요.
 - 마이크로소프트의 Gemba MQM 프레임워크를 사용해서 실험했어요.
@@ -115,7 +115,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | **Index-Translate 35B A3B**   | 무제한       | 무제한                 | 5,000회 | 7,260회     |
 | **Gemma 4 26B A4B + 31B** | 13,940회 | 13,940회 | 3,680회 | 4,770회 |
 | **DeepSeek V4.1 Flash**   | 16,800회   | 16,800회             | 3,860회 | 5,070회     |
-| **GPT-6 luna** | 8,680회 | 8,680회 | 3,170회 | 3,950회 |
+| **Luna** | 8,680회 | 8,680회 | 3,170회 | 3,950회 |
 
 
 #### 기타 모델
@@ -139,7 +139,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | **Index-Translate 35B A3B**   | 0원        | 0원                  | ~0.3원  | ~0.2원      |
 | **Gemma 4 26B A4B + 31B** | ~0.1원 | ~0.1원 | ~0.4원 | ~0.3원 |
 | **DeepSeek V4.1 Flash**   | ~0.08원    | ~0.08원              | ~0.4원  | ~0.3원      |
-| **GPT-6 luna** | ~0.16원 | ~0.16원 | ~0.4원 | ~0.4원 |
+| **Luna** | ~0.16원 | ~0.16원 | ~0.4원 | ~0.4원 |
 
 
 #### 기타 모델
@@ -157,7 +157,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 - *1달러 당 사용 가능 횟수는 발화당 비용 테이블의 반올림 전 계산값 기준*
 - *모든 비용과 사용 가능 횟수는 근사치 계산*
 - *DeepSeek V4.1 Flash는 캐시 히트율 70%, V4 Flash는 60% 가정 / 피크 타임은 고려하지 않음*
-- *GPT-6 luna는 OpenAI API 요금 기준, 캐시 할인 미적용 가정 / ChatGPT로 연결하면 API 요금 대신 Codex 한도를 사용해요*
+- *Luna는 OpenAI API 요금 기준, 캐시 할인 미적용 가정 / ChatGPT로 연결하면 API 요금 대신 Codex 한도를 사용해요*
 - *Qwen API 비용은 베이징 리전 기준*
 - *요금표 기준: 2026년 10월 17일*
 - *1 달러 = 1400원*

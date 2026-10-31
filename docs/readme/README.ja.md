@@ -88,7 +88,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 ## 翻訳比較
 ![音声認識と翻訳を組み合わせた全体パイプラインの文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はベンチマーク時のPuriPuly構成：Gemini Transcribe → Luna (0.676)、Soniox STT → Luna (0.942)、Qwen ASR 1.7B → Gemma 26B (1.024)、Gemini Transcribe → Gemma 26B (1.084)、Soniox STT → Gemma 26B (1.293)、Qwen ASR 0.6B → Gemma 26B (2.374)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (2.108)、Gemini 3.5 Live Translate (3.754)、Soniox Translate (4.989)。評価モデル：Gemini 3.7 Flash。](../images/performance/1.png)
 
-![文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：GPT-6 luna (0.130)、Gemma 4 26B A4B (0.387)、DeepSeek-V4 Flash 0731 (0.571)、Gemma 4 E4B QAT Q4 (1.577)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (1.392)、Papago (2.699)、Gemini 3.5 Translate (2.991)、Soniox Translate (3.473)、DeepL (3.914)、Google Translation (5.731)。Qwen 3.8、Gemini 3.5、Sonioxは文字誤り率（CER）が5%以下の結果のみを選別。評価モデル：Gemini 3.7 Flash。](../images/performance/2.png)
+![文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：Luna (0.130)、Gemma 4 26B A4B (0.387)、DeepSeek-V4 Flash 0731 (0.571)、Gemma 4 E4B QAT Q4 (1.577)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (1.392)、Papago (2.699)、Gemini 3.5 Translate (2.991)、Soniox Translate (3.473)、DeepL (3.914)、Google Translation (5.731)。Qwen 3.8、Gemini 3.5、Sonioxは文字誤り率（CER）が5%以下の結果のみを選別。評価モデル：Gemini 3.7 Flash。](../images/performance/2.png)
 
 - 青い棒はベンチマーク時のPuriPuly構成です。CPU Qwen3-ASR 0.6Bはその後廃止されており、その結果は以下の新モデルを測定したものではありません。
 - マイクロソフトのGemba MQMフレームワークを使って実験しました。
@@ -106,7 +106,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 | **Index-Translate 35B A3B** | 無制限 | 無制限 | 5,000回 | 7,260回 |
 | **Gemma 4 26B A4B + 31B** | 13,940回 | 13,940回 | 3,680回 | 4,770回 |
 | **DeepSeek V4.1 Flash** | 16,800回 | 16,800回 | 3,860回 | 5,070回 |
-| **GPT-6 luna** | 8,680回 | 8,680回 | 3,170回 | 3,950回 |
+| **Luna** | 8,680回 | 8,680回 | 3,170回 | 3,950回 |
 
 #### その他のモデル
 
@@ -126,7 +126,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 | **Index-Translate 35B A3B** | 0円 | 0円 | ~0.03円 | ~0.02円 |
 | **Gemma 4 26B A4B + 31B** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.03円 |
 | **DeepSeek V4.1 Flash** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.03円 |
-| **GPT-6 luna** | ~0.02円 | ~0.02円 | ~0.05円 | ~0.04円 |
+| **Luna** | ~0.02円 | ~0.02円 | ~0.05円 | ~0.04円 |
 
 #### その他のモデル
 
@@ -141,7 +141,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 *   *1ドルあたりの使用可能回数は、発話あたりのコスト表の四捨五入前の値を基準に算出*
 *   *すべてのコストと使用可能回数は概算*
 *   *DeepSeek V4.1 Flashはキャッシュヒット率70%、V4 Flash（OpenRouter）は60%を仮定しています*
-*   *GPT-6 lunaはOpenAI APIの料金を基準とし、キャッシュ割引なしを仮定しています。ChatGPTで接続した場合はAPI料金の代わりにCodexの利用上限を使います*
+*   *LunaはOpenAI APIの料金を基準とし、キャッシュ割引なしを仮定しています。ChatGPTで接続した場合はAPI料金の代わりにCodexの利用上限を使います*
 *   *Qwen APIコストは北京リージョン基準*
 *   *料金表基準: 2026年10月17日*
 *   *1ドル = 150円*
