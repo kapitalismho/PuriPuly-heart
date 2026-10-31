@@ -205,6 +205,26 @@ def test_require_gpu_session_rejects_worker_before_channel_open() -> None:
         )
 
 
+def test_require_gpu_session_rejects_nonresident_model_with_active_worker() -> None:
+    owner = _owner_snapshot(
+        worker_pid=4242,
+        active_channels=frozenset({"self", "peer"}),
+        configured_device_id="vulkan-index-0",
+        model_resident=False,
+        self_model="qwen3-asr-1.7b",
+        peer_model="qwen3-asr-1.7b",
+    )
+
+    with pytest.raises(RuntimeError, match="GPU model was not resident"):
+        evidence._require_gpu_session(
+            owner,
+            channel="peer",
+            expected_device_id="vulkan-index-0",
+            expected_pid=4242,
+            stage="production Peer inference",
+        )
+
+
 def test_require_gpu_session_requires_shared_pid_and_both_channels() -> None:
     after_self = _owner_snapshot(worker_pid=4242, active_channels=frozenset({"self"}))
     pid = evidence._require_gpu_session(
