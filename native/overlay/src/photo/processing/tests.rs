@@ -178,6 +178,206 @@ fn fill_sampling_and_leftover_detect_unmasked_same_color_text() {
 }
 
 #[test]
+fn wider_erase_preserves_core_fill_and_coverage_but_can_reduce_leftover_plate() {
+    let mut pixels = RgbImage::from_pixel(100, 100, Rgb([240, 240, 240]));
+    let mut core = GrayImage::new(100, 100);
+    for y in 35..65 {
+        for x in 40..50 {
+            core.put_pixel(x, y, Luma([255]));
+            pixels.put_pixel(x, y, Rgb([10, 20, 30]));
+        }
+        for x in 51..54 {
+            pixels.put_pixel(x, y, Rgb([10, 20, 30]));
+        }
+    }
+    let work = WorkingPhoto {
+        pixels: Arc::new(pixels),
+        scale_x: 1.0,
+        scale_y: 1.0,
+        reference_scale: 0.75,
+    };
+    let bbox = Rect {
+        left: 20.0,
+        top: 20.0,
+        right: 80.0,
+        bottom: 80.0,
+    };
+    let roi = PixelRect {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+    };
+    let before = colors_and_leftover(&work, bbox, roi, &core, &dilate(&core, 1, true), 20.0);
+    let after = colors_and_leftover(
+        &work,
+        bbox,
+        roi,
+        &core,
+        &dilate(&core, erase_radius(20.0, work.reference_scale), true),
+        20.0,
+    );
+    assert_eq!(before.0, [10, 20, 30]);
+    assert_eq!(after.0, before.0);
+    assert_eq!(before.2, 300);
+    assert_eq!(after.2, before.2);
+    assert_eq!(before.1, 0.3);
+    assert_eq!(after.1, 0.2);
+    let plate = |count: usize, leftover: f32| {
+        count as f32 / (bbox.width() * bbox.height()) < 0.03 || leftover >= 0.3
+    };
+    assert!(plate(before.2, before.1));
+    assert!(!plate(after.2, after.1));
+    for mask in [&dilate(&core, 1, true), &dilate(&core, 10, true)] {
+        let sparse = GrayImage::from_fn(100, 100, |x, y| {
+            Luma([if x == 40 && (35..65).contains(&y) {
+                255
+            } else {
+                0
+            }])
+        });
+        let (_, leftover, count) = colors_and_leftover(&work, bbox, roi, &sparse, mask, 20.0);
+        assert_eq!(count, 30);
+        assert!(plate(count, leftover));
+    }
+}
+
+#[test]
+fn refreshed_erase_uses_actual_height_radius_and_preserves_prepared_measurements() {
+    for (height, extra) in [(719, 1), (1068, 1), (1080, 1), (1440, 1), (2160, 2)] {
+        let work = WorkingPhoto::new(
+            Arc::new(RgbImage::from_fn(100, height, |x, y| {
+                Rgb([
+                    (x * 17 % 251) as u8,
+                    (y * 23 % 251) as u8,
+                    (x * y % 251) as u8,
+                ])
+            })),
+            [1920, height],
+        )
+        .unwrap();
+        let roi = PixelRect {
+            x: 20,
+            y: 20,
+            width: 60,
+            height: 60,
+        };
+        let core = GrayImage::from_fn(60, 60, |x, y| {
+            Luma([if (20..40).contains(&x) && (20..40).contains(&y) {
+                255
+            } else {
+                0
+            }])
+        });
+        for (glyph, baseline) in [(20.0, 1), (50.0, 2), (70.0, 4)] {
+            let mut region = PreparedRegion {
+                bbox: Rect {
+                    left: 40.0,
+                    top: 40.0,
+                    right: 60.0,
+                    bottom: 60.0,
+                },
+                roi,
+                core: core.clone(),
+                glyph_size: glyph,
+                fill: [7, 8, 9],
+                plate: false,
+                erase: None,
+                mask_ms: 17.0,
+                erase_ms: 19.0,
+            };
+            let expected = erase_patch(
+                &work,
+                roi,
+                &dilate(&core, baseline + extra, true),
+                &work.pixels,
+            )
+            .unwrap();
+            let old =
+                erase_patch(&work, roi, &dilate(&core, baseline, true), &work.pixels).unwrap();
+            assert_ne!(expected.pixels, old.pixels);
+            refresh_erase(&work, &mut region, &work.pixels).unwrap();
+            let actual = region.erase.as_ref().unwrap();
+            assert_eq!(actual.rect, roi);
+            assert_eq!(actual.pixels, expected.pixels);
+            assert_eq!(region.core, core);
+            assert_eq!(region.fill, [7, 8, 9]);
+            assert_eq!(region.glyph_size, glyph);
+            assert!(!region.plate);
+            assert_eq!(region.mask_ms, 17.0);
+            assert!(region.erase_ms > 19.0);
+        }
+    }
+}
+
+#[test]
+#[ignore = "requires selected external ONNX, ORT and controlled mask.json source fixture"]
+fn selected_model_prepare_and_refresh_share_actual_scale_erase_support() {
+    let root =
+        PathBuf::from(std::env::var_os("PURI_PHOTO340_REFERENCE").expect("reference fixtures"));
+    let model = PathBuf::from(std::env::var_os("PURI_PHOTO340_MODEL").expect("chosen ONNX model"));
+    let runtime = PathBuf::from(std::env::var_os("PURI_PHOTO340_ORT").expect("ONNX Runtime"));
+    let fixture: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(root.join("mask.json")).unwrap()).unwrap();
+    let original = Arc::new(
+        image::open(fixture["source"].as_str().unwrap())
+            .unwrap()
+            .into_rgb8(),
+    );
+    let bbox: [f64; 4] = std::array::from_fn(|i| fixture["bbox"][i].as_f64().unwrap());
+    let mut processor = MaskProcessor::new(&model, Some(&runtime)).unwrap();
+    for (height, extra) in [(719, 1), (1068, 1), (1080, 1), (1440, 1), (2160, 2)] {
+        let width = (f64::from(original.width()) * f64::from(height) / f64::from(original.height()))
+            .ceil() as u32;
+        let work = WorkingPhoto::new(original.clone(), [width, height]).unwrap();
+        assert_eq!(work.pixels.height(), height);
+        let mut region = processor
+            .prepare(
+                &work,
+                work.map_bbox(bbox),
+                fixture["lines"].as_u64().unwrap() as u32,
+                &work.pixels,
+            )
+            .unwrap();
+        assert!(
+            !region.plate,
+            "fixture must remain a positive erase case at {height}"
+        );
+        let core = region.core.clone();
+        assert!(core.pixels().filter(|p| p[0] != 0).count() > 100);
+        let radius = (0.05 * region.glyph_size).round_ties_even().max(1.0) as u32 + extra;
+        let expected = erase_patch(
+            &work,
+            region.roi,
+            &dilate(&core, radius, true),
+            &work.pixels,
+        )
+        .unwrap();
+        assert_eq!(region.erase.as_ref().unwrap().pixels, expected.pixels);
+        let measurements = (
+            region.fill,
+            region.plate,
+            region.mask_ms,
+            region.bbox,
+            region.roi,
+        );
+        refresh_erase(&work, &mut region, &work.pixels).unwrap();
+        assert_eq!(region.erase.as_ref().unwrap().pixels, expected.pixels);
+        assert_eq!(region.core, core);
+        assert_eq!(
+            (
+                region.fill,
+                region.plate,
+                region.mask_ms,
+                region.bbox,
+                region.roi
+            ),
+            measurements
+        );
+    }
+}
+
+#[test]
 fn erase_patch_changes_only_masked_pixels_and_keeps_source_immutable() {
     let original = Arc::new(RgbImage::from_fn(100, 100, |x, y| {
         if (40..60).contains(&x) && (40..60).contains(&y) {
@@ -454,7 +654,7 @@ fn refresh_rejects_wrong_background_without_changing_region_and_skips_plates() {
 
 #[test]
 #[ignore = "requires controlled overlapping sequential OpenCV references"]
-fn refreshed_hidden_erase_matches_sequential_opencv_without_repeating_mask_work() {
+fn sequential_telea_reference_and_wider_refresh_preserve_committed_context() {
     let root = PathBuf::from(
         std::env::var_os("PURI_PHOTO340_REFERENCE").expect("reference fixture directory"),
     );
@@ -497,6 +697,19 @@ fn refreshed_hidden_erase_matches_sequential_opencv_without_repeating_mask_work(
         second_expected.as_raw(),
         "fixture must distinguish original from committed Telea context"
     );
+    let reference_patch =
+        erase_patch(&work, roi(1), &dilate(&second_core, 1, true), &committed).unwrap();
+    let mut reference_result = committed.clone();
+    apply_erase(&mut reference_result, &reference_patch);
+    assert_eq!(reference_result.as_raw(), second_expected.as_raw());
+    let wider_mask = dilate(&second_core, 2, true);
+    let expected_patch = erase_patch(&work, roi(1), &wider_mask, &committed).unwrap();
+    let stale_patch = erase_patch(&work, roi(1), &wider_mask, &original).unwrap();
+    let mut expected_result = committed.clone();
+    apply_erase(&mut expected_result, &expected_patch);
+    let mut stale_wider_result = committed.clone();
+    apply_erase(&mut stale_wider_result, &stale_patch);
+    assert_ne!(stale_wider_result.as_raw(), expected_result.as_raw());
     let mut second = PreparedRegion {
         bbox: Rect {
             left: 45.0,
@@ -522,7 +735,7 @@ fn refreshed_hidden_erase_matches_sequential_opencv_without_repeating_mask_work(
     let differences = committed
         .as_raw()
         .iter()
-        .zip(second_expected.as_raw())
+        .zip(expected_result.as_raw())
         .filter(|(a, b)| a != b)
         .count();
     eprintln!("Sequential overlapping erase: {differences} differing channels");

@@ -141,7 +141,7 @@ impl PhotoTypesetter {
         self.metrics.layouts.clear();
         let height = photo.pixels.height() as f32;
         let scale = height / 1440.0;
-        let floor = (8.0 * scale).max(0.011 * height);
+        let floor = (8.0 * scale).max(0.015 * height);
         let measured = measure_source(
             &region.core,
             [region.roi.x as f32, region.roi.y as f32],
@@ -189,6 +189,7 @@ impl PhotoTypesetter {
             floor,
             cap,
             &self.placed,
+            rect(0.0, 0.0, photo.pixels.width() as f32, height),
         )?;
         let collision_boxes = best.boxes(&info);
         let overlap_area = overlap_sum(&collision_boxes, &self.placed);

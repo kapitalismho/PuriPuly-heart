@@ -144,7 +144,16 @@ fn windows_graphics_dynamic_scale_uses_actual_height_once() {
         let result = typesetter
             .typeset(&photo(height), &region(scale), "번역 문장\n다음 문장")
             .unwrap();
-        assert!((result.floor - 0.011 * height as f32).abs() < 0.001);
+        assert!((result.floor - 0.015 * height as f32).abs() < 0.001);
+        assert!(!result.runs.is_empty());
+        for run in &result.runs {
+            let mut actual_size = 0.0;
+            unsafe {
+                run.layout.GetFontSize(0, &mut actual_size, None).unwrap();
+            }
+            assert_eq!(actual_size, run.size);
+            assert!(actual_size >= result.floor);
+        }
         let normalized = result.source_cap / scale;
         if let Some(expected) = reference {
             assert!((normalized - expected).abs() < 0.05);
@@ -172,20 +181,199 @@ fn windows_graphics_dynamic_scale_uses_actual_height_once() {
 #[test]
 fn windows_graphics_floor_fallback_never_renders_below_readable_floor() {
     let mut typesetter = typesetter();
-    let mut region = region(1.0);
-    region.core = GrayImage::new(8, 8);
-    region.roi.width = 8;
-    region.roi.height = 8;
-    region.bbox = rect(80.0, 100.0, 88.0, 108.0);
-    region.glyph_size = 4.0;
-    let block = typesetter
-        .typeset(&photo(1440), &region, "작은 칸에 들어가지 않는 긴 문장")
+    for height in [720, 1080, 1440, 2160] {
+        typesetter.reset();
+        let scale = height as f32 / 1440.0;
+        let mut region = region(scale);
+        region.core = GrayImage::new(8, 8);
+        region.roi.width = 8;
+        region.roi.height = 8;
+        region.bbox = rect(80.0, 100.0, 88.0, 108.0);
+        region.glyph_size = 4.0 * scale;
+        let block = typesetter
+            .typeset(&photo(height), &region, "작은 칸에 들어가지 않는 긴 문장")
+            .unwrap();
+        let expected_floor = 0.015 * height as f32;
+        assert!((block.floor - expected_floor).abs() < 0.001);
+        assert_eq!(block.selected_size, block.floor);
+        assert!(block.source_cap < block.floor);
+        assert!(block.region_overflow);
+        assert!(block.collision);
+        assert!(!block.runs.is_empty());
+        for run in &block.runs {
+            let mut actual_size = 0.0;
+            unsafe {
+                run.layout.GetFontSize(0, &mut actual_size, None).unwrap();
+            }
+            assert_eq!(actual_size, run.size);
+            assert!((actual_size - expected_floor).abs() < 0.001);
+        }
+    }
+}
+
+#[test]
+fn windows_graphics_floor_rescue_wraps_complete_paragraph_without_moving_prior_ink() {
+    let mut typesetter = typesetter();
+    let photo = photo(1080);
+    let first = typesetter
+        .typeset(&photo, &region(0.75), "먼저 배치한 문장\n그대로 남는 문장")
         .unwrap();
+    let prior = typesetter.placed_boxes().to_vec();
+    let mut paragraph = region(0.75);
+    paragraph.roi = PixelRect {
+        x: 91,
+        y: 461,
+        width: 278,
+        height: 48,
+    };
+    paragraph.bbox = rect(100.0, 470.0, 360.0, 500.0);
+    paragraph.core = GrayImage::from_fn(278, 48, |x, y| {
+        Luma([if (9..269).contains(&x) && (12..23).contains(&y) {
+            255
+        } else {
+            0
+        }])
+    });
+    let text = "좁은 영역에서도 읽을 수 있어야 하는 아주 길고 자세한 번역 문장이 여러 줄에 걸쳐 계속 이어집니다.";
+    let block = typesetter.typeset(&photo, &paragraph, text).unwrap();
+    assert_eq!(block.kind, LayoutKind::Horizontal);
     assert_eq!(block.selected_size, block.floor);
     assert!(block.source_cap < block.floor);
+    assert!(block.runs.len() >= 3);
     assert!(block.region_overflow);
-    assert!(block.collision);
-    assert!(!block.runs.is_empty());
+    let compact = |text: &str| {
+        text.chars()
+            .filter(|c| !c.is_whitespace())
+            .collect::<String>()
+    };
+    assert_eq!(
+        compact(
+            &block
+                .runs
+                .iter()
+                .map(|run| run.text.as_str())
+                .collect::<String>()
+        ),
+        compact(text)
+    );
+    let bounds = rect(0.0, 0.0, photo.pixels.width() as f32, 1080.0);
+    assert!(block
+        .collision_boxes
+        .iter()
+        .all(|&ink| contains(bounds, ink)));
+    assert_eq!(&typesetter.placed_boxes()[..prior.len()], prior.as_slice());
+    assert_eq!(first.collision_boxes, prior);
+    assert!(!hits(&block.collision_boxes, &prior));
+    for run in &block.runs {
+        let mut size = 0.0;
+        unsafe {
+            run.layout.GetFontSize(0, &mut size, None).unwrap();
+        }
+        assert_eq!(size, block.floor);
+    }
+}
+
+#[test]
+fn windows_graphics_floor_rescue_margin_is_bounded_and_clamped_to_photo() {
+    let mut typesetter = typesetter();
+    let extent = rect(1.0, 10.0, 75.0, 20.0);
+    let model_box = rect(0.0, 5.0, 75.0, 25.0);
+    let info = SourceMeasurement {
+        angle_degrees: 0.0,
+        direction: Direction::Horizontal,
+        extent,
+        slots: vec![extent],
+        glyph_size: 10.0,
+        center: [38.0, 15.0],
+    };
+    let text = "가나다라마바사아자차카타파하";
+    let photo_bounds = rect(0.0, 0.0, 85.0, 200.0);
+    let block = layout::choose(
+        &mut typesetter.metrics,
+        text,
+        &info,
+        model_box,
+        20.0,
+        10.0,
+        &[],
+        photo_bounds,
+    )
+    .unwrap();
+    assert_eq!(block.kind, LayoutKind::Horizontal);
+    assert_eq!(block.size, 20.0);
+    assert!(block.overflow);
+    assert!(block
+        .runs
+        .iter()
+        .all(|run| run.ink.left >= 0.0 && run.ink.right <= 85.0));
+    let ink = block.runs.iter().map(|run| run.ink).reduce(union).unwrap();
+    assert!(((ink.left + ink.right) * 0.5 - 42.5).abs() < 0.001);
+    assert!(((ink.top + ink.bottom) * 0.5 - 17.5).abs() < 0.001);
+    assert_eq!(info.extent, extent);
+    assert_eq!(info.slots, vec![extent]);
+    assert_eq!(info.center, [38.0, 15.0]);
+}
+
+#[test]
+fn windows_graphics_floor_fallback_retains_slots_when_not_every_candidate_overflows() {
+    let mut typesetter = typesetter();
+    let extent = rect(100.0, 100.0, 300.0, 130.0);
+    let mut info = SourceMeasurement {
+        angle_degrees: 0.0,
+        direction: Direction::Horizontal,
+        extent,
+        slots: vec![extent],
+        glyph_size: 20.0,
+        center: [200.0, 115.0],
+    };
+    let photo_bounds = rect(0.0, 0.0, 1920.0, 1080.0);
+    let placed = [photo_bounds];
+    let blocked = layout::choose(
+        &mut typesetter.metrics,
+        "한글",
+        &info,
+        extent,
+        20.0,
+        20.0,
+        &placed,
+        photo_bounds,
+    )
+    .unwrap();
+    assert_eq!(blocked.kind, LayoutKind::Lines);
+    assert!(!blocked.overflow);
+    assert!(hits(&blocked.boxes(&info), &placed));
+    info.angle_degrees = 12.0;
+    let rotated = layout::choose(
+        &mut typesetter.metrics,
+        "회전된 긴 문장은 기존 줄 배치를 유지합니다",
+        &info,
+        extent,
+        20.0,
+        10.0,
+        &[],
+        photo_bounds,
+    )
+    .unwrap();
+    assert_eq!(rotated.kind, LayoutKind::Lines);
+    assert!(rotated.overflow);
+    info.angle_degrees = 0.0;
+    info.direction = Direction::Vertical;
+    info.extent = rect(100.0, 100.0, 112.0, 150.0);
+    info.slots = vec![info.extent];
+    let vertical = layout::choose(
+        &mut typesetter.metrics,
+        "한글 세로 문장",
+        &info,
+        info.extent,
+        20.0,
+        10.0,
+        &[],
+        photo_bounds,
+    )
+    .unwrap();
+    assert_eq!(vertical.kind, LayoutKind::Lines);
+    assert!(vertical.overflow);
+    assert_eq!(vertical.size, 20.0);
 }
 
 #[test]

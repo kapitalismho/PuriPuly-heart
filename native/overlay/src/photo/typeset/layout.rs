@@ -1,6 +1,6 @@
 use super::{
-    contains, hits, image_bounds, overlap_sum, rect, translated, union, DirectWriteMetrics,
-    Direction, LayoutKind, Rect, SourceMeasurement,
+    contains, hits, image_bounds, overlap, rect, translated, union, DirectWriteMetrics, Direction,
+    LayoutKind, Rect, SourceMeasurement,
 };
 
 #[derive(Clone)]
@@ -37,6 +37,7 @@ pub(super) fn choose(
     floor: f32,
     cap: f32,
     placed: &[Rect],
+    photo_bounds: Rect,
 ) -> Result<Candidate, String> {
     let mut regions = vec![info.extent];
     if info.angle_degrees == 0.0 {
@@ -110,15 +111,71 @@ pub(super) fn choose(
     }) {
         return Ok(best);
     }
+    let rescue = info.angle_degrees == 0.0
+        && info.direction == Direction::Horizontal
+        && fallback.iter().all(|candidate| candidate.overflow);
+    if rescue {
+        let base = union(info.extent, model_box);
+        let margin = floor * 0.5;
+        let expanded = rect(
+            (base.left - margin).max(photo_bounds.left),
+            (base.top - margin).max(photo_bounds.top),
+            (base.right + margin).min(photo_bounds.right),
+            (base.bottom + margin).min(photo_bounds.bottom),
+        );
+        if let Some(candidate) = layout(
+            metrics,
+            text,
+            &lines,
+            info,
+            expanded,
+            LayoutKind::Horizontal,
+            floor,
+            false,
+        )? {
+            fallback.push(candidate);
+        }
+    }
+    let span = |candidate: &Candidate| {
+        let (top, bottom) = candidate
+            .runs
+            .iter()
+            .fold((f32::INFINITY, f32::NEG_INFINITY), |(top, bottom), run| {
+                (top.min(run.ink.top), bottom.max(run.ink.bottom))
+            });
+        bottom - top
+    };
     fallback
         .into_iter()
-        .min_by(|a, b| {
-            overlap_sum(&a.boxes(info), placed)
-                .total_cmp(&overlap_sum(&b.boxes(info), placed))
+        .map(|candidate| {
+            let overlap = candidate
+                .collision
+                .iter()
+                .map(|&bounds| image_bounds(bounds, info))
+                .flat_map(|bounds| {
+                    placed
+                        .iter()
+                        .map(move |&previous| overlap(bounds, previous))
+                })
+                .sum::<f32>();
+            (candidate, overlap)
+        })
+        .min_by(|(a, a_overlap), (b, b_overlap)| {
+            a_overlap
+                .total_cmp(b_overlap)
                 .then_with(|| a.overflow.cmp(&b.overflow))
                 .then_with(|| score(b).total_cmp(&score(a)))
-                .then_with(|| (b.kind == LayoutKind::Lines).cmp(&(a.kind == LayoutKind::Lines)))
+                .then_with(|| {
+                    if rescue {
+                        (b.kind == LayoutKind::Horizontal)
+                            .cmp(&(a.kind == LayoutKind::Horizontal))
+                            .then_with(|| span(a).total_cmp(&span(b)))
+                    } else {
+                        (b.kind == LayoutKind::Lines).cmp(&(a.kind == LayoutKind::Lines))
+                    }
+                })
         })
+        .map(|(candidate, _)| candidate)
         .ok_or_else(|| "photo translation has no drawable text".into())
 }
 

@@ -377,11 +377,7 @@ impl MaskProcessor {
                 },
             ])
         });
-        let mask = dilate(
-            &core,
-            (0.05 * glyph_size).round_ties_even().max(1.0) as u32,
-            true,
-        );
+        let mask = dilate(&core, erase_radius(glyph_size, photo.reference_scale), true);
         let (fill, leftover, count) =
             colors_and_leftover(photo, bbox, roi, &core, &mask, glyph_size);
         let plate =
@@ -406,6 +402,11 @@ impl MaskProcessor {
             erase_ms,
         })
     }
+}
+
+#[inline]
+fn erase_radius(glyph_size: f32, reference_scale: f32) -> u32 {
+    (0.05 * glyph_size).round_ties_even().max(1.0) as u32 + reference_scale.ceil().max(1.0) as u32
 }
 
 fn dilate(core: &GrayImage, radius: u32, ellipse: bool) -> GrayImage {
@@ -602,7 +603,7 @@ pub fn refresh_erase(
     let start = Instant::now();
     let mask = dilate(
         &region.core,
-        (0.05 * region.glyph_size).round_ties_even().max(1.0) as u32,
+        erase_radius(region.glyph_size, photo.reference_scale),
         true,
     );
     region.erase = Some(erase_patch(photo, region.roi, &mask, erase_source)?);
