@@ -11,6 +11,7 @@ pytest.importorskip("flet")
 from puripuly_heart.app.ports.settings_view import (
     CustomSttEndpointEdit,
     CustomSttModelEdit,
+    SettingsApplyOutcome,
     SystemPromptEdit,
     TranslationSelectionEdit,
 )
@@ -123,14 +124,14 @@ async def test_index_immediate_apply_commits_only_selection_and_keeps_drafts(
         )
         observed.append(canonical)
         _load(view, canonical)
-        return runtime_applied
+        return SettingsApplyOutcome(saved=True, applied=runtime_applied)
 
     app = TranslatorApp.__new__(TranslatorApp)
     app.view_settings = view
     app._queue_settings_mutation_task = queued.append
     app._log_basic = lambda message: None
     app._ui_application = SimpleNamespace(
-        apply_provider_intent=apply,
+        apply_settings_change=apply,
         refresh_settings_projection=lambda: _load(view, canonical),
         compatibility_settings=lambda: canonical,
     )
@@ -172,14 +173,14 @@ async def test_failed_index_immediate_apply_keeps_committed_selection_and_pendin
 
     async def apply(intent):
         applied.append(intent)
-        return False
+        return SettingsApplyOutcome(saved=False, applied=False)
 
     app = TranslatorApp.__new__(TranslatorApp)
     app.view_settings = view
     app._queue_settings_mutation_task = queued.append
     app._log_basic = lambda message: None
     app._ui_application = SimpleNamespace(
-        apply_provider_intent=apply,
+        apply_settings_change=apply,
         refresh_settings_projection=lambda: pytest.fail("failed write cannot acknowledge"),
         compatibility_settings=lambda: _settings(
             TranslationModel.GEMMA4_26B_31B, TranslationConnection.MANAGED
