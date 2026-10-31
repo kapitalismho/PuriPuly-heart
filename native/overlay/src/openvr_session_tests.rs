@@ -11,6 +11,10 @@ struct Calls {
     widths: Vec<f32>,
     alphas: Vec<f32>,
     fail_alpha: bool,
+    fail_show: Option<u64>,
+    visible: std::collections::HashMap<u64, bool>,
+    textures: Vec<(u64, usize)>,
+    shown: Vec<u64>,
 }
 
 thread_local! { static CALLS: RefCell<Calls> = RefCell::new(Calls::default()); }
@@ -76,6 +80,50 @@ unsafe extern "C" fn alpha(_: u64, alpha: f32) -> openvr_sys::EVROverlayError {
         }
     })
 }
+unsafe extern "C" fn texture(
+    handle: u64,
+    texture: *mut openvr_sys::Texture_t,
+) -> openvr_sys::EVROverlayError {
+    let texture = unsafe { &*texture };
+    assert!(!texture.handle.is_null());
+    assert_eq!(texture.eType, openvr_sys::ETextureType_TextureType_DirectX);
+    CALLS.with(|calls| {
+        calls
+            .borrow_mut()
+            .textures
+            .push((handle, texture.handle as usize))
+    });
+    0
+}
+
+unsafe extern "C" fn show(handle: u64) -> openvr_sys::EVROverlayError {
+    CALLS.with(|calls| {
+        let mut calls = calls.borrow_mut();
+        if calls.fail_show == Some(handle) {
+            return 1;
+        }
+        calls.visible.insert(handle, true);
+        calls.shown.push(handle);
+        0
+    })
+}
+
+unsafe extern "C" fn hide(handle: u64) -> openvr_sys::EVROverlayError {
+    CALLS.with(|calls| calls.borrow_mut().visible.insert(handle, false));
+    0
+}
+
+unsafe extern "C" fn visible(handle: u64) -> bool {
+    CALLS.with(|calls| {
+        calls
+            .borrow()
+            .visible
+            .get(&handle)
+            .copied()
+            .unwrap_or(false)
+    })
+}
+
 fn shutdown() {
     CALLS.with(|calls| calls.borrow_mut().shutdowns += 1);
 }
@@ -105,6 +153,10 @@ fn api() -> openvr_sys::VR_IVROverlay_FnTable {
     api.SetOverlayWidthInMeters = Some(width);
     api.SetOverlayTransformTrackedDeviceRelative = Some(transform);
     api.SetOverlayAlpha = Some(alpha);
+    api.SetOverlayTexture = Some(texture);
+    api.ShowOverlay = Some(show);
+    api.HideOverlay = Some(hide);
+    api.IsOverlayVisible = Some(visible);
     api
 }
 
@@ -320,4 +372,42 @@ fn tracked_surface_applies_real_pose_width_alpha_and_only_caches_complete_succes
         assert_eq!(calls.transforms.len(), 3);
         assert_eq!(calls.alphas, [0.5, 0.75, 0.75]);
     });
+}
+
+#[tokio::test]
+async fn windows_graphics_controlled_held_photo_runtime_reports_first_draw_once_per_attempt() {
+    CALLS.with(|calls| *calls.borrow_mut() = Calls::default());
+    LEGACY.with(|calls| {
+        *calls.borrow_mut() = LegacyCalls {
+            left: 1,
+            right: 2,
+            ..Default::default()
+        }
+    });
+    let mut overlay_api = api();
+    let mut system_api: openvr_sys::VR_IVRSystem_FnTable = unsafe { std::mem::zeroed() };
+    system_api.GetTrackedDeviceIndexForControllerRole = Some(controller_role);
+    system_api.GetControllerState = Some(controller_state);
+    system_api.GetDeviceToAbsoluteTrackingPose = Some(poses);
+    system_api.TriggerHapticPulse = Some(pulse);
+    let mut session = session(&mut overlay_api);
+    Rc::get_mut(&mut session.inner).unwrap().system_api = &mut system_api;
+    let icon = OpenVrOverlay::in_session(&session, "photo.controlled-runtime.icon").unwrap();
+    let photo = OpenVrOverlay::in_session(&session, "photo.controlled-runtime.photo").unwrap();
+    crate::photo::runtime::PhotoRuntime::assert_controlled_held_render_frame(
+        icon,
+        photo,
+        session,
+        |fail| CALLS.with(|calls| calls.borrow_mut().fail_show = fail.then_some(2)),
+    )
+    .await;
+    CALLS.with(|calls| {
+        let calls = calls.borrow();
+        assert!(calls.textures.iter().any(|(handle, _)| *handle == 2));
+        assert!(calls.shown.iter().filter(|handle| **handle == 2).count() >= 3);
+        assert_eq!(calls.visible.get(&2), Some(&false));
+        assert_eq!(calls.destroyed.len(), 2);
+        assert_eq!(calls.shutdowns, 1);
+    });
+    LEGACY.with(|calls| assert_eq!(calls.borrow().pulses, [(2, 0, 900), (2, 0, 900)]));
 }

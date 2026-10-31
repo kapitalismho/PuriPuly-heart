@@ -648,21 +648,74 @@ async fn image_stage(
 #[tokio::test]
 #[ignore = "requires the developer-supplied selected mask and ONNX Runtime"]
 async fn actual_offscreen_native_pipeline_reuses_decode_hides_erase_accumulates_and_clears_retry() {
-    actual_native_pipeline(PhotoBackend::Offscreen).await;
+    actual_native_pipeline().await;
 }
 
 #[cfg(windows)]
 #[tokio::test]
-#[ignore = "requires SteamVR, the developer-supplied selected mask, and ONNX Runtime"]
-async fn actual_openvr_native_pipeline_submits_ready_textures_and_preserves_independent_session() {
-    actual_native_pipeline(PhotoBackend::Openvr).await;
+#[ignore = "requires SteamVR; submits hidden textures without controller input"]
+async fn actual_openvr_hidden_texture_submission_survives_surface_and_child_session_shutdown() {
+    use puripuly_heart_overlay::openvr::OverlayTextureSubmitter;
+    use puripuly_heart_overlay::photo::{
+        compositor::PhotoCompositor, processing::WorkingPhoto, runtime::PhotoOpenVrSurfaces,
+    };
+    use windows::core::Interface;
+    let mut config = manifest();
+    config.backend = PhotoBackend::Openvr;
+    let mut surfaces = PhotoOpenVrSurfaces::new(&config).unwrap();
+    let adapter = surfaces.photo().unwrap().output_adapter();
+    let mut compositor = PhotoCompositor::new(Some(&adapter)).unwrap();
+    compositor
+        .set_original(std::sync::Arc::new(
+            WorkingPhoto::new(std::sync::Arc::new(image::RgbImage::new(8, 8)), [8, 8]).unwrap(),
+        ))
+        .unwrap();
+    let texture = compositor
+        .render(std::time::Instant::now(), false)
+        .unwrap()
+        .unwrap();
+    compositor.ready().await.unwrap();
+    surfaces.close_icon();
+    surfaces
+        .photo()
+        .unwrap()
+        .set_overlay_texture(texture.texture().as_raw())
+        .unwrap();
+    let (mut child, mut socket, directory) = start_child(&config, "actual-openvr-session").await;
+    assert_eq!(receive(&mut socket).await["type"], "photo_auth");
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":1,"photo":null}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 1);
+    assert_eq!(receive(&mut socket).await["type"], "photo_ready");
+    send(&mut socket, json!({"type":"shutdown"})).await;
+    assert_eq!(
+        receive(&mut socket).await["type"],
+        "photo_shutdown_complete"
+    );
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while child.0.try_wait().unwrap().is_none() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(child.0.wait().unwrap().success());
+    surfaces
+        .photo()
+        .unwrap()
+        .set_overlay_texture(texture.texture().as_raw())
+        .unwrap();
+    std::fs::remove_dir_all(directory).unwrap();
 }
 
 #[cfg(windows)]
-async fn actual_native_pipeline(backend: PhotoBackend) {
+async fn actual_native_pipeline() {
     use std::io::BufRead;
     let mut config = manifest();
-    config.backend = backend;
+    config.backend = PhotoBackend::Offscreen;
     config.image.model_path = Some(
         std::env::var_os("PURIPULY_PHOTO_MASK_MODEL")
             .expect("explicit external selected model required")
@@ -671,36 +724,10 @@ async fn actual_native_pipeline(backend: PhotoBackend) {
     config.image.runtime_path = std::env::var_os("PURIPULY_PHOTO_ORT_RUNTIME").map(Into::into);
     config.image.max_size = [320, 180];
     config.image.debug_controls = true;
-    let name = if backend == PhotoBackend::Openvr {
-        "actual-openvr-pipeline"
-    } else {
-        "actual-image-pipeline"
-    };
+    let name = "actual-image-pipeline";
     let root = std::env::temp_dir().join(format!("puri339-native-{}-{name}", std::process::id()));
     let exports = root.join("exports");
     config.image.export_dir = Some(exports.clone());
-    let mut independent = if backend == PhotoBackend::Openvr {
-        use puripuly_heart_overlay::photo::{
-            compositor::PhotoCompositor, processing::WorkingPhoto, runtime::PhotoOpenVrSurfaces,
-        };
-        let mut surfaces = PhotoOpenVrSurfaces::new(&config).unwrap();
-        let adapter = surfaces.photo().unwrap().output_adapter();
-        let mut compositor = PhotoCompositor::new(Some(&adapter)).unwrap();
-        compositor
-            .set_original(std::sync::Arc::new(
-                WorkingPhoto::new(std::sync::Arc::new(image::RgbImage::new(8, 8)), [8, 8]).unwrap(),
-            ))
-            .unwrap();
-        let texture = compositor
-            .render(std::time::Instant::now(), false)
-            .unwrap()
-            .unwrap();
-        compositor.ready().await.unwrap();
-        surfaces.close_icon();
-        Some((surfaces, compositor, texture))
-    } else {
-        None
-    };
     let (mut child, mut socket, directory) = start_child(&config, name).await;
     let (stages, mut stage_receiver) = tokio::sync::mpsc::unbounded_channel();
     let stdout = child.0.stdout.take().unwrap();
@@ -714,6 +741,10 @@ async fn actual_native_pipeline(backend: PhotoBackend) {
     });
     assert_eq!(receive(&mut socket).await["type"], "photo_auth");
     let mut current = photo();
+    current.shutter_unix_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
     let source = directory.join("capture.png");
     let mut pixels = image::RgbImage::from_pixel(320, 180, image::Rgb([230, 230, 220]));
     for y in 45..65 {
@@ -835,7 +866,7 @@ async fn actual_native_pipeline(backend: PhotoBackend) {
         assert_eq!(receive(&mut socket).await["revision"], 5 + id);
     }
     let submitted = image_stage(&mut stage_receiver, "composed", Some(3)).await;
-    assert_eq!(submitted["submitted"], backend == PhotoBackend::Openvr);
+    assert_eq!(submitted["submitted"], false);
     tokio::time::sleep(Duration::from_millis(130)).await;
     send(
         &mut socket,
@@ -868,12 +899,6 @@ async fn actual_native_pipeline(backend: PhotoBackend) {
     )
     .await;
     assert_eq!(receive(&mut socket).await["revision"], 8);
-    if backend == PhotoBackend::Openvr {
-        let first = receive(&mut socket).await;
-        assert_eq!(first["type"], "photo_first_block_drawn");
-        assert_eq!(first["block_id"], 0);
-        current.first_block_drawn = true;
-    }
     current.visible = false;
     send(
         &mut socket,
@@ -974,14 +999,5 @@ async fn actual_native_pipeline(backend: PhotoBackend) {
     .unwrap();
     assert!(child.0.wait().unwrap().success());
     reader.join().unwrap();
-    if let Some((surfaces, _compositor, texture)) = &mut independent {
-        use puripuly_heart_overlay::openvr::OverlayTextureSubmitter;
-        use windows::core::Interface;
-        surfaces
-            .photo()
-            .unwrap()
-            .set_overlay_texture(texture.texture().as_raw())
-            .unwrap();
-    }
     std::fs::remove_dir_all(directory).unwrap();
 }
