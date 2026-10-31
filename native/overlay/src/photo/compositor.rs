@@ -36,7 +36,7 @@ use super::image::PhotoTexture;
 use super::manifest::PhotoError;
 use super::processing::{PixelRect, PreparedRegion, Rect, WorkingPhoto};
 use super::typeset::TypesetBlock;
-use crate::openvr::OpenVrOutputAdapter;
+use crate::openvr::{OpenVrOutputAdapter, OverlayTextureSubmitter};
 use crate::presentation::AdapterIdentity;
 use crate::renderer::glyph_run::render_text_layout_to_command_list;
 
@@ -170,6 +170,20 @@ impl PhotoCompositor {
                 .UpdateSubresource(&texture, 0, None, bgra.as_ptr().cast(), size * 4, 0);
         }
         Ok(PhotoTexture::new(texture))
+    }
+
+    pub fn submit_texture(
+        &self,
+        surface: &impl OverlayTextureSubmitter,
+        texture: &PhotoTexture,
+    ) -> Result<(), PhotoError> {
+        surface
+            .set_overlay_texture(texture.pointer())
+            .map_err(|_| PhotoError::OpenVr)?;
+        unsafe {
+            self.d3d.Flush();
+        }
+        Ok(())
     }
 
     pub fn save_texture(

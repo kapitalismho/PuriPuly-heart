@@ -56,6 +56,20 @@ For the 1440p reference, select the corresponding `native_outline_1440/.../compo
 
 Physical observations should cover wrist visibility, grip recognition, cancellation/relative pull, held-photo readability at the candidate geometry, release/reopen and felt left feedback. Shared game input is accepted. Record what was actually seen/felt; software composition or submission does not establish HMD consumption. The planned X3 sample remains about 20 real shots, not a new image-quality campaign or a new decision on the selected 1080p default.
 
+### Quiet GPU handoff
+
+The photo compositor flushes its existing D3D11 immediate context after each successful OpenVR texture submission, for both the wrist icon and held photo. Producer readiness before submission remains required; it does not dispatch copy work queued by `SetOverlayTexture` afterward. The post-submit flush dispatches work without a completion wait, extra redraw, or resubmission. It does not acknowledge physical headset presentation.
+
+The missing-icon investigation isolated this boundary with a hidden native overlay. The producer icon matched its source before and after the empty-offer reset, but SteamVR image readback stayed zero for more than 1.3 seconds after submission. One subsequent producer-context flush, without resubmission, delivered the expected icon pixels. This was not a photo-detection, provider, or source-decoding prerequisite. Gaze, grab, timeout, haptic, and size policies are unchanged.
+
+With SteamVR already running, the opt-in regression exercises initial content, replacement content, a second producer device, and restoration without further rendering after each handoff. It compares complete destination pixels, keeps its overlay hidden, and destroys its owned surface:
+
+```powershell
+cargo test --locked --manifest-path native/overlay/Cargo.toml --lib photo::runtime::tests::windows_graphics_photo341_quiet_texture_handoff_reaches_steamvr -- --ignored --exact
+```
+
+A separate synthetic one-frame probe reproduced the same missing post-submit dispatch in the current caption renderer. This supports the previously unresolved hypothesis in [#147](https://github.com/kapitalismho/PuriPuly-heart/issues/147), not a conclusion that every historical caption delay had this cause. This photo repair does not modify the caption renderer or its P05 fresh-render protection. Physical icon visibility and caption latency remain separate headset observations.
+
 ### Software-only preview smoke
 
 ```powershell

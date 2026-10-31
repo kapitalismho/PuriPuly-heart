@@ -17,7 +17,7 @@ use super::interaction::{HapticCue, PhotoInteraction};
 #[cfg(windows)]
 use super::icon::{self, IconState};
 use crate::openvr::{
-    OpenVrEventClass, OpenVrOverlay, OpenVrSession, OverlayFrameSubmitter, OverlayTextureSubmitter,
+    OpenVrEventClass, OpenVrOverlay, OpenVrSession, OverlayFrameSubmitter,
 };
 
 pub fn surface_identity(manifest: &PhotoManifest, surface: &str) -> String {
@@ -748,10 +748,10 @@ impl PhotoRuntime {
                             0
                         };
                     if self.icon_state != Some(state) {
-                        icon.set_overlay_texture(
-                            self.icons.as_ref().ok_or(PhotoError::Graphics)?[state].pointer(),
-                        )
-                        .map_err(|_| PhotoError::OpenVr)?;
+                        compositor.submit_texture(
+                            icon,
+                            &self.icons.as_ref().ok_or(PhotoError::Graphics)?[state],
+                        )?;
                         self.icon_state = Some(state);
                     }
                     icon.set_tracked_presentation(
@@ -772,9 +772,7 @@ impl PhotoRuntime {
                     (frame.photo.filter(|_| active), &self.texture)
                 {
                     if updated {
-                        surface
-                            .set_overlay_texture(texture.pointer())
-                            .map_err(|_| PhotoError::OpenVr)?;
+                        compositor.submit_texture(surface, texture)?;
                     }
                     surface
                         .set_tracked_presentation(
@@ -793,9 +791,7 @@ impl PhotoRuntime {
                 } else {
                     if updated {
                         if let Some(texture) = &self.texture {
-                            surface
-                                .set_overlay_texture(texture.pointer())
-                                .map_err(|_| PhotoError::OpenVr)?;
+                            compositor.submit_texture(surface, texture)?;
                         }
                     }
                     surface

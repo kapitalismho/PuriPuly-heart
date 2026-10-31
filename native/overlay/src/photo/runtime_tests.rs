@@ -144,6 +144,88 @@ async fn windows_graphics_photo341_icons_and_held_preview_readback() {
 }
 
 #[cfg(windows)]
+#[tokio::test]
+#[ignore = "requires an already-running SteamVR runtime; creates hidden surfaces only"]
+async fn windows_graphics_photo341_quiet_texture_handoff_reaches_steamvr() {
+    use std::ffi::{CStr, CString};
+
+    let session = OpenVrSession::new().unwrap();
+    let identity = format!("photo341.quiet-handoff.p{}", std::process::id());
+    let surface = OpenVrOverlay::in_session(&session, &identity).unwrap();
+    let adapter = surface.output_adapter();
+    let mut first = PhotoCompositor::new(Some(&adapter)).unwrap();
+    let mut second = PhotoCompositor::new(Some(&adapter)).unwrap();
+    let idle = icon::pixels(IconState::Idle);
+    let grab = icon::pixels(IconState::Grab);
+    let failed = icon::pixels(IconState::Failed);
+    let textures = [
+        first.icon_texture(&idle, icon::ICON_SIZE).unwrap(),
+        first.icon_texture(&grab, icon::ICON_SIZE).unwrap(),
+        second.icon_texture(&failed, icon::ICON_SIZE).unwrap(),
+    ];
+    first.ready().await.unwrap();
+    second.ready().await.unwrap();
+    first.clear_photo();
+    first.invalidate();
+    assert!(!first.needs_frame(Instant::now()));
+    assert!(first.render(Instant::now(), false).unwrap().is_none());
+
+    let version = CStr::from_bytes_with_nul(openvr_sys::IVROverlay_Version).unwrap();
+    let version = CString::new(format!("FnTable:{}", version.to_str().unwrap())).unwrap();
+    let mut error = 0;
+    let pointer = unsafe { openvr_sys::VR_GetGenericInterface(version.as_ptr(), &mut error) };
+    assert_eq!(error, 0);
+    assert_ne!(pointer, 0);
+    let api = unsafe { &*(pointer as *const openvr_sys::VR_IVROverlay_FnTable) };
+    let key = CString::new(format!("com.puripuly.heart.overlay.{identity}")).unwrap();
+    let mut handle = 0;
+    assert_eq!(
+        unsafe { api.FindOverlay.unwrap()(key.as_ptr().cast_mut(), &mut handle) },
+        0
+    );
+
+    for (stage, compositor, texture, expected) in [
+        ("initial-idle", &first, &textures[0], &idle),
+        ("changed-grab", &first, &textures[1], &grab),
+        ("different-device", &second, &textures[2], &failed),
+        ("restored-idle", &first, &textures[0], &idle),
+    ] {
+        let expected_bgra: Vec<u8> = expected
+            .chunks_exact(4)
+            .flat_map(|pixel| [pixel[2], pixel[1], pixel[0], pixel[3]])
+            .collect();
+        compositor.submit_texture(&surface, texture).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut pixels = vec![0; expected.len()];
+        let mut width = 0;
+        let mut height = 0;
+        loop {
+            let error = unsafe {
+                api.GetOverlayImageData.unwrap()(
+                    handle,
+                    pixels.as_mut_ptr().cast(),
+                    pixels.len() as u32,
+                    &mut width,
+                    &mut height,
+                )
+            };
+            if error == 0 && pixels == expected_bgra {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "{stage}: SteamVR texture differs: error={error}, dimensions={width}x{height}, nonzero_alpha={}, first_mismatch={:?}",
+                pixels.chunks_exact(4).filter(|pixel| pixel[3] != 0).count(),
+                pixels.chunks_exact(4).zip(expected_bgra.chunks_exact(4)).find(|(actual, expected)| actual != expected)
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!((width, height), (icon::ICON_SIZE, icon::ICON_SIZE));
+        assert_eq!(surface.observed_overlay_visible(), Some(false));
+    }
+}
+
+#[cfg(windows)]
 fn synthetic_drawable() -> (
     std::sync::Arc<super::super::processing::WorkingPhoto>,
     super::super::processing::PreparedRegion,
