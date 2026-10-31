@@ -209,6 +209,7 @@ struct LegacyCalls {
     grip: bool,
     fail_state: bool,
     invalid_pose: Option<usize>,
+    interaction_distance: Option<f32>,
     pulses: Vec<(u32, u32, u16)>,
 }
 
@@ -268,6 +269,11 @@ unsafe extern "C" fn poses(
                 [0.0, 1.0, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
             ];
+            if let Some(distance) = calls.interaction_distance {
+                pose.mDeviceToAbsoluteTracking.m[0][3] =
+                    if i == calls.left as usize { distance } else { 0.0 };
+                pose.mDeviceToAbsoluteTracking.m[2][3] = if i == 0 { 0.5 } else { 0.0 };
+            }
         }
     });
 }
@@ -297,7 +303,6 @@ fn legacy_grip_poses_and_haptic_hands_resolve_roles_fresh_and_fail_closed() {
     LEGACY.with(|calls| calls.borrow_mut().grip = true);
     assert!(session.legacy_input().unwrap().grip);
     use crate::photo::interaction::HapticCue;
-    assert!(session.pulse(HapticCue::Grab.hand()));
     assert!(session.pulse(HapticCue::Pull.hand()));
     LEGACY.with(|calls| {
         let mut calls = calls.borrow_mut();
@@ -311,7 +316,7 @@ fn legacy_grip_poses_and_haptic_hands_resolve_roles_fresh_and_fail_closed() {
     LEGACY.with(|calls| {
         assert_eq!(
             calls.borrow().pulses,
-            [(1, 0, 900), (1, 0, 900), (6, 0, 900)]
+            [(1, 0, 900), (6, 0, 900)]
         )
     });
     LEGACY.with(|calls| calls.borrow_mut().fail_state = true);
@@ -330,7 +335,7 @@ fn legacy_grip_poses_and_haptic_hands_resolve_roles_fresh_and_fail_closed() {
         calls.right = 5;
     });
     assert!(session.legacy_input().is_none());
-    LEGACY.with(|calls| assert_eq!(calls.borrow().pulses.len(), 3));
+    LEGACY.with(|calls| assert_eq!(calls.borrow().pulses.len(), 2));
 }
 
 #[test]
@@ -399,6 +404,12 @@ async fn windows_graphics_controlled_held_photo_runtime_reports_first_draw_once_
         photo,
         session,
         |fail| CALLS.with(|calls| calls.borrow_mut().fail_show = fail.then_some(2)),
+        |grip, distance| LEGACY.with(|calls| {
+            let mut calls = calls.borrow_mut();
+            calls.grip = grip;
+            calls.interaction_distance = Some(distance);
+        }),
+        |expected| LEGACY.with(|calls| assert_eq!(calls.borrow().pulses, expected)),
     )
     .await;
     CALLS.with(|calls| {
@@ -409,5 +420,5 @@ async fn windows_graphics_controlled_held_photo_runtime_reports_first_draw_once_
         assert_eq!(calls.destroyed.len(), 2);
         assert_eq!(calls.shutdowns, 1);
     });
-    LEGACY.with(|calls| assert_eq!(calls.borrow().pulses, [(2, 0, 900), (2, 0, 900)]));
+    LEGACY.with(|calls| assert_eq!(calls.borrow().pulses, [(1, 0, 900), (2, 0, 900), (2, 0, 900)]));
 }

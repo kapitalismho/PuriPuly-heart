@@ -136,14 +136,13 @@ fn within(a: [f32; 3], b: [f32; 3], degrees: f32) -> bool {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HapticCue {
-    Grab,
     Pull,
     FirstBlock,
 }
 impl HapticCue {
     pub fn hand(self) -> TrackedHand {
         match self {
-            Self::Grab | Self::Pull => TrackedHand::Left,
+            Self::Pull => TrackedHand::Left,
             Self::FirstBlock => TrackedHand::Right,
         }
     }

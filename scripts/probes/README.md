@@ -6,7 +6,7 @@ Temporary native-interaction and standalone operator tools for [#341](https://gi
 
 The owner approved shared input with VRChat and proceeding directly to temporary interaction implementation. Input capture/suppression and a no-interference gate are not required. The standalone X1 probe below is an optional input-mapping diagnostic, not a prerequisite for implementing or trying the temporary VR flow. Physical input availability and felt haptics still need observation; they are not established by code inspection.
 
-Feedback routing is settled: successful grab start and the valid 12 cm pull trigger give a short pulse on the left controller. The first drawn translated block gives one pulse on the right controller per request attempt, using the existing application-authorized feedback grant. The owner explicitly selected first-block display, not whole-photo completion. Renderer recovery and reopening do not replay this notification. There is no shutter, release, or additional whole-photo-completion haptic. Grab-start feedback supersedes the earlier restriction to trigger/first-block feedback only.
+Feedback routing is settled: only the valid 12 cm pull trigger gives a short pulse on the left controller. The first drawn translated block gives one pulse on the right controller per request attempt, using the existing application-authorized feedback grant. The owner explicitly selected first-block display, not whole-photo completion. Renderer recovery and reopening do not replay this notification. There is no grab-start, shutter, release, or additional whole-photo-completion haptic. The owner's latest decision removes the previously approved grab-start pulse; grab highlighting and interaction remain unchanged.
 
 The source precedents use shared legacy input, not exclusive game-input ownership: [VRCT](https://github.com/misyaguziya/VRCT/blob/79419a1f2ce78d38993b0f33e273155667eb0b6a/src-python/models/overlay/overlay.py#L53-L55) explicitly notes simultaneous VRChat delivery; [VRCLT](https://github.com/VRCLT/VRCLT/blob/775fab0d460feb3dd034c5902523cdf1fc510f13/vrclt/vr/wrist_ui.py#L1-L11) keeps game input active. Their ray-targeted drag implementations do not establish physical success of the near-wrist pull on the user's hardware.
 
@@ -31,7 +31,7 @@ Use a Python environment with the project's existing dependencies. No new projec
 
 After native readiness, this command creates one synthetic offer after five seconds. Look at the right wrist and start the left grip inside the highlighted grab range. Pull the left hand 12 cm farther from the wrist anchor:
 
-- Grab-start and the valid pull each request one left-hand pulse. The icon returns to the wrist; the first pull authorizes the preview but does not leave the photo held.
+- Grab-start is silent. The valid pull requests one left-hand pulse. The icon returns to the wrist; the first pull authorizes the preview but does not leave the photo held.
 - Release, then grab and pull again to open the retained preview in the left hand. It appears over 150 ms; releasing reverses alpha and width over 150 ms, then hides it. Reopening does not resend or regenerate anything.
 - Releasing before the pull threshold returns the icon without opening/authorizing the photo. Moving both hands together without increasing their separation must not trigger.
 - The initial opportunity lasts ten seconds; only the latest authorized preview remains available for ten minutes after the offer. Start another invocation for another synthetic opportunity, or use actual photo signals below.

@@ -200,6 +200,8 @@ impl PhotoRuntime {
         photo_surface: OpenVrOverlay,
         session: OpenVrSession,
         mut fail_photo_show: impl FnMut(bool),
+        mut set_input: impl FnMut(bool, f32),
+        mut assert_pulses: impl FnMut(&[(u32, u32, u16)]),
     ) {
         use super::super::interaction::IDENTITY;
         use super::super::state::{Photo, PhotoPhase};
@@ -379,8 +381,29 @@ impl PhotoRuntime {
         photo.visible = true;
         publish(&mut runtime, &mut bridge, &mut socket, 3, &photo).await;
         no_report(&mut socket).await;
+        set_input(false, 0.0);
+        runtime.interaction_tick(&mut bridge).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(350)).await;
+        runtime.interaction_tick(&mut bridge).await.unwrap();
+        set_input(true, 0.0);
+        runtime.interaction_tick(&mut bridge).await.unwrap();
+        assert!(runtime.interaction.frame.grab);
+        assert!(runtime.interaction.frame.glow);
+        assert_pulses(&[]);
+        set_input(true, 0.119);
+        runtime.interaction_tick(&mut bridge).await.unwrap();
+        assert!(!runtime.interaction.frame.pull);
+        assert_pulses(&[]);
+        set_input(true, 0.12);
+        runtime.interaction_tick(&mut bridge).await.unwrap();
+        assert!(runtime.interaction.frame.pull);
+        assert_pulses(&[(1, 0, 900)]);
+        assert_eq!(message(&mut socket).await["type"], "photo_pull");
+        tokio::time::sleep(Duration::from_millis(80)).await;
+        runtime.interaction_tick(&mut bridge).await.unwrap();
+        assert!(!runtime.interaction.frame.pull);
+        assert_pulses(&[(1, 0, 900)]);
         let clock = Instant::now();
-        hold(&mut runtime, clock);
         fail_photo_show(true);
         assert_eq!(
             runtime.render_frame(&mut bridge).await,

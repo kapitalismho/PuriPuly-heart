@@ -680,9 +680,6 @@ impl PhotoRuntime {
         let frame = self
             .interaction
             .step(self.state.photo(), input, Instant::now());
-        if frame.grab {
-            self.haptic(HapticCue::Grab);
-        }
         if frame.pull {
             self.haptic(HapticCue::Pull);
             self.pull_sequence += 1;
