@@ -1936,6 +1936,10 @@ def test_photo_stage_timings_and_failures_survive_without_content_or_live_ui(tmp
         f"[Photo] cleanup_failed {identity} failure_code=photo_connection_close_failed",
         "[Photo] process_failed generation=2 failure_code=photo_child_exited",
     ]
+    accepted.extend(
+        f"[Photo] image_{stage} {identity} block_id=0 duration_ms=1.250"
+        for stage in ("mask", "erase", "typeset", "roi_upload", "compose_gpu")
+    )
     rejected = [
         f"[Photo] failed {identity} failure_code=photo_private_secret",
         f"[Photo] total {identity} duration_ms=nan",
@@ -1944,6 +1948,7 @@ def test_photo_stage_timings_and_failures_survive_without_content_or_live_ui(tmp
         f"[Photo] source_ready {identity} source=private-source-text",
         f"[Photo] preparation {identity} path=C:/private/photo.png",
         f"[Photo] private-stage {identity}",
+        f"[Photo] image_unrecognized {identity} duration_ms=1",
         f"[Photo] total {identity} duration_ms=1 duration_ms=2",
     ]
     try:

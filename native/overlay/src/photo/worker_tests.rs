@@ -1,0 +1,370 @@
+use super::*;
+use serde_json::json;
+
+fn input(
+    revision: u64,
+    attempt: u64,
+    blocks: serde_json::Value,
+    preparations: serde_json::Value,
+) -> PhotoSnapshot {
+    PhotoSnapshot {revision,photo:Some(Arc::new(serde_json::from_value(json!({
+        "photo_id":"synthetic","path":"no-decoder-must-open-this.png","file_size":1,"shutter_unix_ms":1,
+        "attempt_id":attempt,"phase":"requesting","offer_open":false,"visible":false,
+        "image":{"path":"retained-only.png","width":128,"height":72},"blocks":blocks,"preparations":preparations,
+        "failure_code":null,"first_block_drawn":false
+    })).unwrap()))}
+}
+
+fn kept(id: u64) -> serde_json::Value {
+    json!({"block_id":id,"bbox":[1.25,2.5,100.5,50.25],"source":"Brand 123","translation":"Brand 123"})
+}
+
+#[test]
+fn coalesced_cumulative_blocks_preserve_arrival_order_without_redecoding_or_model_initialization() {
+    let pixels = Arc::new(image::RgbImage::new(128, 72));
+    let mut pipeline = ImagePipeline::new(PhotoImageConfig {
+        max_size: [128, 72],
+        model_path: Some("missing-selected-model.onnx".into()),
+        ..Default::default()
+    });
+    let snapshot = input(2, 1, json!([kept(8), kept(3)]), json!([]));
+    let mut completed = Vec::new();
+    let mut original = None;
+    pipeline
+        .process(
+            &snapshot,
+            Some(pixels.clone()),
+            || true,
+            |output| {
+                match output {
+                    PhotoImageOutput::Original { working, recovered } => {
+                        assert!(!recovered);
+                        assert!(Arc::ptr_eq(&working.pixels, &pixels));
+                        original = Some(working);
+                    }
+                    PhotoImageOutput::Block {
+                        block_id, region, ..
+                    } => {
+                        assert!(region.is_none());
+                        completed.push(block_id);
+                    }
+                    _ => panic!("kept blocks must not initialize masking"),
+                }
+                true
+            },
+        )
+        .unwrap();
+    assert_eq!(completed, vec![8, 3]);
+    assert!(pipeline.processor.is_none());
+    pipeline
+        .process(
+            &snapshot,
+            Some(pixels.clone()),
+            || true,
+            |_| panic!("completed blocks must not repeat"),
+        )
+        .unwrap();
+    let retry = input(3, 2, json!([kept(5)]), json!([]));
+    pipeline
+        .process(
+            &retry,
+            Some(pixels),
+            || true,
+            |output| {
+                match output {
+                    PhotoImageOutput::Original { working, .. } => {
+                        assert!(Arc::ptr_eq(&working, original.as_ref().unwrap()))
+                    }
+                    PhotoImageOutput::Block { block_id, .. } => assert_eq!(block_id, 5),
+                    _ => panic!("retry must reuse the source and clear only upper-layer work"),
+                }
+                true
+            },
+        )
+        .unwrap();
+}
+
+#[test]
+fn bbox_candidate_does_not_invent_source_geometry_and_missing_model_is_explicit_at_source_ready() {
+    let pixels = Arc::new(image::RgbImage::new(128, 72));
+    let mut pipeline = ImagePipeline::new(PhotoImageConfig {
+        max_size: [128, 72],
+        model_path: Some("missing-selected-model.onnx".into()),
+        ..Default::default()
+    });
+    let bbox = json!([{"block_id":0,"bbox":[10,10,100,50],"source":null,"source_line_count":null}]);
+    let snapshot = input(1, 1, json!([]), bbox);
+    let mut candidate = false;
+    pipeline
+        .process(
+            &snapshot,
+            Some(pixels.clone()),
+            || true,
+            |output| {
+                match output {
+                    PhotoImageOutput::Original { .. } => {}
+                    PhotoImageOutput::Candidate { rect, .. } => {
+                        assert!(rect.width >= 90);
+                        assert!(rect.height >= 40);
+                        candidate = true;
+                    }
+                    _ => panic!("bbox alone must never mask or reveal"),
+                }
+                true
+            },
+        )
+        .unwrap();
+    assert!(candidate);
+    assert!(pipeline.processor.is_none());
+    assert!(pipeline.prepared.is_empty());
+    let source = input(
+        2,
+        1,
+        json!([]),
+        json!([{"block_id":0,"bbox":[10,10,100,50],"source":"A\nB","source_line_count":2}]),
+    );
+    let result = pipeline.process(
+        &source,
+        Some(pixels),
+        || true,
+        |_| panic!("missing model must not pretend erase is ready"),
+    );
+    assert_eq!(result, Err("mask_model_missing"));
+}
+
+fn prepared_patch() -> PreparedRegion {
+    PreparedRegion {
+        bbox: Rect {
+            left: 10.0,
+            top: 10.0,
+            right: 70.0,
+            bottom: 40.0,
+        },
+        roi: PixelRect {
+            x: 10,
+            y: 10,
+            width: 60,
+            height: 30,
+        },
+        core: image::GrayImage::from_pixel(60, 30, image::Luma([255])),
+        glyph_size: 16.0,
+        fill: [10, 20, 30],
+        plate: false,
+        erase: Some(super::super::processing::ErasePatch {
+            rect: PixelRect {
+                x: 9,
+                y: 12,
+                width: 10,
+                height: 1,
+            },
+            pixels: image::RgbaImage::from_fn(10, 1, |x, _| {
+                image::Rgba([200, 20, 30, if x == 0 || x == 9 { 255 } else { 0 }])
+            }),
+        }),
+        mask_ms: 17.0,
+        erase_ms: 2.0,
+    }
+}
+
+#[test]
+fn committed_context_tracks_actual_changed_runs_and_retry_discards_only_attempt_pixels() {
+    let original = image::RgbImage::new(128, 72);
+    let mut pipeline = ImagePipeline::new(PhotoImageConfig::default());
+    pipeline.erase_source = Some(original.clone());
+    let region = prepared_patch();
+    pipeline.prepared.insert(
+        99,
+        PendingRegion {
+            region: prepared_patch(),
+            context_revision: 0,
+        },
+    );
+    pipeline.commit_erase(&region);
+    assert_eq!(pipeline.commit_revision, 1);
+    assert_eq!(
+        pipeline.erase_source.as_ref().unwrap().get_pixel(9, 12).0,
+        [200, 20, 30]
+    );
+    assert_eq!(
+        pipeline.erase_source.as_ref().unwrap().get_pixel(10, 12).0,
+        [0, 0, 0]
+    );
+    assert_eq!(pipeline.changes[0].1.len(), 2);
+    let unchanged_hole = PixelRect {
+        x: 11,
+        y: 12,
+        width: 3,
+        height: 1,
+    };
+    assert!(!pipeline.changes[0]
+        .1
+        .iter()
+        .any(|run| intersects(*run, unchanged_hole)));
+    pipeline.commit_erase(&region);
+    assert_eq!(pipeline.commit_revision, 1);
+    let mut plate = prepared_patch();
+    plate.plate = true;
+    pipeline.commit_erase(&plate);
+    assert_eq!(pipeline.commit_revision, 1);
+    pipeline.clear_attempt(2);
+    assert!(pipeline.erase_source.is_none());
+    assert!(pipeline.changes.is_empty());
+    assert_eq!(pipeline.commit_revision, 0);
+    assert_eq!(original.get_pixel(9, 12).0, [0, 0, 0]);
+}
+
+#[test]
+fn keep_completion_discards_hidden_erase_without_contaminating_next_region() {
+    let pixels = Arc::new(image::RgbImage::new(128, 72));
+    let mut pipeline = ImagePipeline::new(PhotoImageConfig {
+        max_size: [128, 72],
+        ..Default::default()
+    });
+    pipeline
+        .process(
+            &input(1, 1, json!([]), json!([])),
+            Some(pixels.clone()),
+            || true,
+            |_| true,
+        )
+        .unwrap();
+    pipeline.erase_source = Some((*pixels).clone());
+    pipeline.prepared.insert(
+        8,
+        PendingRegion {
+            region: prepared_patch(),
+            context_revision: 0,
+        },
+    );
+    let snapshot = input(2, 1, json!([kept(8)]), json!([]));
+    pipeline
+        .process(
+            &snapshot,
+            Some(pixels.clone()),
+            || true,
+            |output| {
+                assert!(matches!(
+                    output,
+                    PhotoImageOutput::Block { region: None, .. }
+                ));
+                true
+            },
+        )
+        .unwrap();
+    assert!(pipeline.prepared.is_empty());
+    assert_eq!(pipeline.erase_source.as_ref().unwrap(), &*pixels);
+    assert_eq!(pipeline.commit_revision, 0);
+}
+
+#[cfg(windows)]
+#[test]
+fn hidden_erase_refresh_reuses_mask_and_only_current_successful_text_commits() {
+    use std::cell::Cell;
+    let mut source = image::RgbImage::new(128, 72);
+    for y in 18..25 {
+        for x in 18..55 {
+            source.put_pixel(x, y, image::Rgb([255, 255, 255]));
+        }
+    }
+    let pixels = Arc::new(source);
+    let mut pipeline = ImagePipeline::new(PhotoImageConfig {
+        max_size: [128, 72],
+        ..Default::default()
+    });
+    pipeline
+        .process(
+            &input(1, 1, json!([]), json!([])),
+            Some(pixels.clone()),
+            || true,
+            |_| true,
+        )
+        .unwrap();
+    pipeline.erase_source = Some((*pixels).clone());
+    let mut pending = prepared_patch();
+    pending.core = image::GrayImage::new(60, 30);
+    for y in 8..15 {
+        for x in 8..45 {
+            pending.core.put_pixel(x, y, image::Luma([255]));
+        }
+    }
+    let core = pending.core.clone();
+    pipeline.prepared.insert(
+        1,
+        PendingRegion {
+            region: pending,
+            context_revision: 0,
+        },
+    );
+    pipeline.commit_erase(&prepared_patch());
+    let snapshot = input(
+        2,
+        1,
+        json!([{"block_id":1,"bbox":[10,10,70,40],"source":"SOURCE","translation":"Translated"}]),
+        json!([]),
+    );
+    let calls = Cell::new(0);
+    let before = pipeline.erase_source.as_ref().unwrap().clone();
+    pipeline
+        .process(
+            &snapshot,
+            Some(pixels.clone()),
+            || {
+                let call = calls.get() + 1;
+                calls.set(call);
+                call < 3
+            },
+            |output| {
+                assert!(matches!(
+                    output,
+                    PhotoImageOutput::Timing { stage: "erase", .. }
+                ));
+                true
+            },
+        )
+        .unwrap();
+    assert_eq!(pipeline.erase_source.as_ref().unwrap(), &before);
+    assert_eq!(pipeline.commit_revision, 1);
+    let mut pending = prepared_patch();
+    pending.core = core.clone();
+    pipeline.prepared.insert(
+        1,
+        PendingRegion {
+            region: pending,
+            context_revision: 0,
+        },
+    );
+    let mut completed = false;
+    pipeline
+        .process(
+            &snapshot,
+            Some(pixels),
+            || true,
+            |output| {
+                if let PhotoImageOutput::Timing { elapsed_ms, .. } = output {
+                    assert!(elapsed_ms >= 0.0);
+                    return true;
+                }
+                if let PhotoImageOutput::FontReady { font } = output {
+                    assert!(!font.family.is_empty());
+                    assert!(font.hangul_ink_ratio > 0.0);
+                    return true;
+                }
+                let PhotoImageOutput::Block {
+                    region: Some(region),
+                    ..
+                } = output
+                else {
+                    panic!("current translation must complete")
+                };
+                assert_eq!(region.core, core);
+                assert_eq!(region.fill, [10, 20, 30]);
+                assert_eq!(region.mask_ms, 17.0);
+                assert!(region.erase_ms > 2.0);
+                completed = true;
+                true
+            },
+        )
+        .unwrap();
+    assert!(completed);
+    assert!(pipeline.commit_revision >= 2);
+}

@@ -155,3 +155,29 @@ async fn image_worker_runs_off_async_progress_and_shutdown_drains_started_work()
     assert_eq!(result.result.err(), Some("preparation_cancelled"));
     assert!(!directory.0.join("output/source.png").exists());
 }
+
+#[test]
+fn shared_source_decoder_advances_jpeg_recovery_and_preparation_without_extension_dependency() {
+    use puripuly_heart_overlay::photo::prepare::{decode_source, recover_original};
+    let directory = Directory::new("shared-jpeg");
+    let mut request = directory.request(320, 180);
+    let pixels = RgbImage::from_pixel(320, 180, Rgb([200, 90, 35]));
+    let mut bytes = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes, 95)
+        .encode_image(&pixels)
+        .unwrap();
+    let decoded = decode_source(&bytes).unwrap();
+    assert_eq!(decoded.dimensions(), (320, 180));
+    for (actual, expected) in decoded.get_pixel(0, 0).0.iter().zip([200i16, 90, 35]) {
+        assert!((i16::from(*actual) - expected).abs() <= 3);
+    }
+    let snapshot = directory.0.join("recovery.snapshot");
+    std::fs::write(&snapshot, &bytes).unwrap();
+    let recovered = recover_original(&snapshot).unwrap();
+    assert_eq!(&*recovered, &decoded);
+    request.source_path = snapshot.to_string_lossy().into_owned();
+    request.expected_file_id = file_identity(&File::open(&snapshot).unwrap()).unwrap();
+    let prepared = prepare(&request, &AtomicBool::new(false)).ok().unwrap();
+    assert_eq!(&*prepared.original, &decoded);
+    assert_eq!(std::fs::read(&prepared.source_path).unwrap(), bytes);
+}

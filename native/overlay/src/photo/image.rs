@@ -33,16 +33,45 @@ impl PhotoTexture {
     }
 }
 
+#[derive(serde::Serialize)]
+pub struct PhotoFont {
+    pub family: String,
+    pub source: String,
+    pub hangul_ink_ratio: f32,
+}
+
 pub enum PhotoImageOutput {
+    Timing {
+        block_id: u64,
+        stage: &'static str,
+        elapsed_ms: f64,
+    },
+    FontReady {
+        font: PhotoFont,
+    },
+    Candidate {
+        block_id: u64,
+        rect: super::processing::PixelRect,
+        elapsed_ms: f64,
+    },
     Prepared {
         block_id: u64,
         stage: PreparationStage,
         elapsed_ms: f64,
     },
-    Composed {
-        texture: PhotoTexture,
-        block_ids: Vec<u64>,
-        elapsed_ms: f64,
+    Original {
+        working: Arc<super::processing::WorkingPhoto>,
+        recovered: bool,
+    },
+    Block {
+        block_id: u64,
+        region: Option<super::processing::PreparedRegion>,
+        #[cfg(windows)]
+        typeset: Option<super::typeset::TypesetBlock>,
+        typeset_ms: f64,
+    },
+    Failed {
+        code: &'static str,
     },
 }
 
@@ -83,12 +112,8 @@ impl PhotoImageWorker {
     }
 
     pub async fn next_input(&mut self) -> Option<Arc<PhotoSnapshot>> {
-        loop {
-            self.input.changed().await.ok()?;
-            if let Some(input) = self.input.borrow_and_update().clone() {
-                return Some(input);
-            }
-        }
+        self.input.changed().await.ok()?;
+        self.input.borrow_and_update().clone()
     }
 
     pub async fn complete(&self, result: PhotoImageResult) -> Result<(), PhotoImageResult> {
@@ -100,6 +125,10 @@ impl PhotoImageWorker {
         !latest
             .as_deref()
             .is_some_and(|latest| same_attempt(input, latest))
+    }
+
+    pub(crate) fn complete_blocking(&self, result: PhotoImageResult) -> bool {
+        self.output.blocking_send(result).is_ok()
     }
 }
 
@@ -150,6 +179,7 @@ impl PhotoImageBoundary {
         if let Some(original) = retained {
             match snapshot.photo.as_ref().filter(|photo| {
                 photo.photo_id == original.photo_id
+                    && photo.phase != super::state::PhotoPhase::Expired
                     && photo
                         .image
                         .as_ref()
@@ -197,6 +227,28 @@ impl PhotoImageBoundary {
             return false;
         };
         match &result.output {
+            PhotoImageOutput::Timing {
+                block_id,
+                stage,
+                elapsed_ms,
+            } => {
+                elapsed_ms.is_finite()
+                    && *elapsed_ms >= 0.0
+                    && matches!(*stage, "mask" | "erase" | "typeset")
+                    && has_stage(photo, *block_id, PreparationStage::Source)
+                    && has_stage(input_photo, *block_id, PreparationStage::Source)
+            }
+            PhotoImageOutput::Candidate {
+                block_id,
+                elapsed_ms,
+                ..
+            } => {
+                elapsed_ms.is_finite()
+                    && *elapsed_ms >= 0.0
+                    && has_stage(photo, *block_id, PreparationStage::Bbox)
+                    && has_stage(input_photo, *block_id, PreparationStage::Bbox)
+                    && self.prepared.insert((*block_id, PreparationStage::Bbox))
+            }
             PhotoImageOutput::Prepared {
                 block_id,
                 stage,
@@ -211,19 +263,15 @@ impl PhotoImageBoundary {
                 }
                 self.prepared.insert((*block_id, *stage))
             }
-            PhotoImageOutput::Composed {
-                block_ids,
-                elapsed_ms,
-                ..
-            } => {
-                elapsed_ms.is_finite()
-                    && *elapsed_ms >= 0.0
-                    && block_ids.len() <= input_photo.blocks.len()
-                    && block_ids.len() <= photo.blocks.len()
-                    && block_ids
-                        .iter()
-                        .enumerate()
-                        .all(|(index, id)| photo.blocks[index].block_id == *id)
+            PhotoImageOutput::Original { .. }
+            | PhotoImageOutput::Failed { .. }
+            | PhotoImageOutput::FontReady { .. } => true,
+            PhotoImageOutput::Block { block_id, .. } => {
+                input_photo
+                    .blocks
+                    .iter()
+                    .any(|block| block.block_id == *block_id)
+                    && photo.blocks.iter().any(|block| block.block_id == *block_id)
             }
         }
     }
@@ -242,7 +290,7 @@ fn has_stage(photo: &Photo, id: u64, stage: PreparationStage) -> bool {
     }) || photo.blocks.iter().any(|block| block.block_id == id)
 }
 
-fn same_attempt(left: &PhotoSnapshot, right: &PhotoSnapshot) -> bool {
+pub(crate) fn same_attempt(left: &PhotoSnapshot, right: &PhotoSnapshot) -> bool {
     match (&left.photo, &right.photo) {
         (Some(left), Some(right)) => {
             left.attempt_id > 0

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
+import math
 import secrets
 from collections import deque
 from collections.abc import Awaitable, Callable
@@ -15,6 +16,8 @@ from websockets.exceptions import ConnectionClosed
 from puripuly_heart.core.lifecycle import LifecycleScope
 
 from .protocol import PhotoProviderError
+
+_IMAGE_TIMING_STAGES = frozenset({"mask", "erase", "typeset", "roi_upload", "compose_gpu"})
 
 
 class PhotoBridge:
@@ -198,6 +201,13 @@ class PhotoBridge:
             "photo_pull": {"photo_id": str, "event_id": str},
             "photo_hidden": {"photo_id": str},
             "photo_first_block_drawn": {"photo_id": str, "attempt_id": int, "block_id": int},
+            "photo_image_timing": {
+                "photo_id": str,
+                "attempt_id": int,
+                "block_id": int,
+                "stage": str,
+                "duration_ms": (int, float),
+            },
             "photo_state_received": {
                 "photo_id": (str, type(None)),
                 "attempt_id": int,
@@ -236,7 +246,32 @@ class PhotoBridge:
                 return False
             if type(item) is int and item < 0:
                 return False
+        if kind == "photo_image_timing":
+            if value["stage"] not in _IMAGE_TIMING_STAGES:
+                return False
+            try:
+                finite = math.isfinite(value["duration_ms"])
+            except OverflowError:
+                return False
+            if not finite or value["duration_ms"] < 0:
+                return False
         return True
+
+    def _current_image_timing(self, value: dict) -> bool:
+        photo = self._snapshot.get("photo")
+        if (
+            photo is None
+            or photo.get("photo_id") != value["photo_id"]
+            or photo.get("attempt_id") != value["attempt_id"]
+            or photo.get("phase") == "expired"
+        ):
+            return False
+        if any(block["block_id"] == value["block_id"] for block in photo.get("blocks", ())):
+            return True
+        return value["stage"] in {"mask", "erase"} and any(
+            preparation["block_id"] == value["block_id"] and preparation.get("source") is not None
+            for preparation in photo.get("preparations", ())
+        )
 
     async def _handle(self, connection: ServerConnection) -> None:
         sender: asyncio.Task | None = None
@@ -282,6 +317,9 @@ class PhotoBridge:
                     self.receipts.append({**value, "generation": generation})
                 elif kind in ("photo_prepared", "photo_prepare_failed"):
                     self._prepared(value, generation)
+                elif kind == "photo_image_timing":
+                    if self._current_image_timing(value):
+                        self._control(value, generation)
                 else:
                     command = self._control(value, generation)
                     if command is not None:

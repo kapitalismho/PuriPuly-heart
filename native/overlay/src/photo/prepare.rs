@@ -1,4 +1,4 @@
-use image::{codecs::jpeg::JpegEncoder, imageops, ImageFormat, Rgb, RgbImage};
+use image::{codecs::jpeg::JpegEncoder, imageops, Rgb, RgbImage};
 use serde::Deserialize;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
@@ -209,6 +209,17 @@ fn read_source(request: &PrepareRequest) -> Result<Vec<u8>, &'static str> {
     Ok(bytes)
 }
 
+pub fn decode_source(bytes: &[u8]) -> Result<RgbImage, &'static str> {
+    image::load_from_memory(bytes)
+        .map(|image| image.into_rgb8())
+        .map_err(|_| "source_incomplete")
+}
+
+pub fn recover_original(path: &Path) -> Result<Arc<RgbImage>, &'static str> {
+    let bytes = std::fs::read(path).map_err(|_| "source_unavailable")?;
+    decode_source(&bytes).map(Arc::new)
+}
+
 pub fn prepare(
     request: &PrepareRequest,
     cancel: &AtomicBool,
@@ -218,9 +229,7 @@ pub fn prepare(
         cancelled(cancel)?;
         let outcome = read_source(request).and_then(|bytes| {
             let decode_start = Instant::now();
-            let image = image::load_from_memory_with_format(&bytes, ImageFormat::Png)
-                .map_err(|_| "source_incomplete")?
-                .into_rgb8();
+            let image = decode_source(&bytes)?;
             Ok((bytes, image, decode_start.elapsed().as_secs_f64() * 1000.0))
         });
         match outcome {

@@ -23,6 +23,10 @@ pub enum PhotoIncoming {
     ProbePull { photo_id: String, event_id: String },
     #[serde(rename = "photo_probe_hide")]
     ProbeHide { photo_id: String },
+    #[serde(rename = "photo_debug_original")]
+    DebugOriginal { photo_id: String, enabled: bool },
+    #[serde(rename = "photo_debug_export")]
+    DebugExport { photo_id: String, label: String },
     #[serde(rename = "photo_haptic")]
     Haptic {
         photo_id: String,
@@ -68,6 +72,21 @@ impl PhotoBridge {
             .send(Message::Text(payload.to_string().into()))
             .await
             .map_err(|_| PhotoError::Bridge)
+    }
+
+    pub async fn send_timing(
+        &mut self,
+        photo_id: &str,
+        attempt_id: u64,
+        block_id: u64,
+        stage: &str,
+        duration_ms: f64,
+    ) -> Result<(), PhotoError> {
+        self.send(json!({
+            "type":"photo_image_timing","photo_id":photo_id,"attempt_id":attempt_id,
+            "block_id":block_id,"stage":stage,"duration_ms":duration_ms,
+        }))
+        .await
     }
 
     pub async fn next(&mut self) -> Result<PhotoIncoming, PhotoError> {

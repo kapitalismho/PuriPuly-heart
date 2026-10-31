@@ -115,6 +115,11 @@ class PhotoApplicationOwner:
             return self.lifecycle.first_block_drawn(
                 value["photo_id"], value["attempt_id"], value["block_id"], generation
             )
+        elif kind == "photo_image_timing":
+            self._diagnostic(
+                f"image_{value['stage']}",
+                {key: value[key] for key in ("photo_id", "attempt_id", "block_id", "duration_ms")},
+            )
         return None
 
     def stop_ingress(self) -> None:

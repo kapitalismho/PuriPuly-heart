@@ -1,7 +1,12 @@
+#[cfg(windows)]
+use super::compositor::PhotoCompositor;
+use super::worker::RunningImageWorker;
 use serde_json::json;
 use std::collections::HashSet;
 use std::path::Path;
 use std::time::Duration;
+#[cfg(windows)]
+use std::time::Instant;
 
 use super::bridge::{PhotoBridge, PhotoIncoming};
 use super::image::{
@@ -74,6 +79,7 @@ impl PhotoOpenVrSurfaces {
 enum Backend {
     Probe,
     OpenVr(PhotoOpenVrSurfaces),
+    Offscreen,
 }
 
 pub struct PhotoRuntime {
@@ -84,20 +90,38 @@ pub struct PhotoRuntime {
     drawn_reported: bool,
     haptic_granted: bool,
     haptic_accepted: bool,
-    composed_blocks: usize,
     texture: Option<PhotoTexture>,
     preparation: PreparationWorker,
     preparation_started: bool,
     live_drawn_block: Option<u64>,
+    #[cfg(windows)]
+    compositor: Option<PhotoCompositor>,
+    #[cfg(windows)]
+    export_dir: Option<std::path::PathBuf>,
+    debug_controls: bool,
+    pending_gpu_block: Option<u64>,
 }
 
 impl PhotoRuntime {
     pub fn new(manifest: &PhotoManifest) -> Result<(Self, PhotoImageWorker), PhotoError> {
         manifest.validate()?;
-        let backend = match manifest.backend {
+        let mut backend = match manifest.backend {
             PhotoBackend::Probe => Backend::Probe,
             PhotoBackend::Openvr => Backend::OpenVr(PhotoOpenVrSurfaces::new(manifest)?),
+            PhotoBackend::Offscreen => Backend::Offscreen,
         };
+        #[cfg(windows)]
+        let compositor = match &mut backend {
+            Backend::Probe => None,
+            Backend::OpenVr(surfaces) => Some(PhotoCompositor::new(Some(
+                &surfaces.photo().ok_or(PhotoError::OpenVr)?.output_adapter(),
+            ))?),
+            Backend::Offscreen => Some(PhotoCompositor::new(None)?),
+        };
+        #[cfg(not(windows))]
+        if !matches!(backend, Backend::Probe) {
+            return Err(PhotoError::Graphics);
+        }
         let (images, worker) = PhotoImageBoundary::channel();
         Ok((
             Self {
@@ -109,10 +133,15 @@ impl PhotoRuntime {
                 live_drawn_block: None,
                 haptic_granted: false,
                 haptic_accepted: false,
-                composed_blocks: 0,
                 texture: None,
                 preparation: PreparationWorker::new().map_err(|_| PhotoError::Protocol)?,
                 preparation_started: false,
+                #[cfg(windows)]
+                compositor,
+                debug_controls: manifest.image.debug_controls,
+                #[cfg(windows)]
+                export_dir: manifest.image.export_dir.clone(),
+                pending_gpu_block: None,
             },
             worker,
         ))
@@ -126,7 +155,11 @@ impl PhotoRuntime {
         std::mem::take(&mut self.haptic_granted)
     }
 
-    pub async fn run(mut self, manifest: &PhotoManifest) -> Result<(), PhotoError> {
+    pub async fn run(
+        mut self,
+        manifest: &PhotoManifest,
+        worker: PhotoImageWorker,
+    ) -> Result<(), PhotoError> {
         let (mut bridge, first) =
             tokio::time::timeout(Duration::from_secs(10), PhotoBridge::connect(manifest))
                 .await
@@ -140,33 +173,51 @@ impl PhotoRuntime {
                 "generation": manifest.generation, "pid": std::process::id(), "backend": manifest.backend,
             })
         );
-        let mut tick = tokio::time::interval(Duration::from_millis(20));
-        loop {
-            tokio::select! {
-                incoming = bridge.next() => {
-                    if !self.receive(incoming?, &mut bridge).await? { break; }
+        let worker = if matches!(self.backend, Backend::Probe) {
+            None
+        } else {
+            Some(RunningImageWorker::start(worker, manifest.image.clone())?)
+        };
+        let mut outcome: Result<(), PhotoError> = async {
+            let mut tick = tokio::time::interval(Duration::from_millis(20));
+            loop {
+                tokio::select! {
+                    incoming = bridge.next() => {
+                        if !self.receive(incoming?, &mut bridge).await? { break; }
+                    }
+                    Some(result) = self.images.next_result() => {
+                        self.image_result(result, &mut bridge).await?;
+                    }
+                    Some(completion) = self.preparation.next_result() => {
+                        self.prepared(completion, &mut bridge).await?;
+                    }
+                    _ = tick.tick() => {
+                        if let Backend::OpenVr(surfaces) = &mut self.backend { surfaces.poll()?; }
+                        self.render_frame(&mut bridge).await?;
+                    }
                 }
-                Some(result) = self.images.next_result() => {
-                    self.image_result(result, &mut bridge).await?;
-                }
-                Some(completion) = self.preparation.next_result() => {
-                    self.prepared(completion, &mut bridge).await?;
-                }
-                _ = tick.tick() => {
-                    if let Backend::OpenVr(surfaces) = &mut self.backend { surfaces.poll()?; }
+            }
+            Ok(())
+        }
+        .await;
+        self.preparation.shutdown().await;
+        while let Some(completion) = self.preparation.try_result() {
+            if let Err(error) = self.prepared(completion, &mut bridge).await {
+                if outcome.is_ok() {
+                    outcome = Err(error);
                 }
             }
         }
-        self.preparation.shutdown().await;
-        while let Some(completion) = self.preparation.try_result() {
-            self.prepared(completion, &mut bridge).await?;
-        }
         self.images.close();
+        if let Some(worker) = worker {
+            worker.shutdown().await;
+        }
         self.texture = None;
         if let Backend::OpenVr(surfaces) = &mut self.backend {
             surfaces.close_icon();
             surfaces.close_photo();
         }
+        outcome?;
         drop(self);
         bridge
             .send(json!({"type": "photo_shutdown_complete"}))
@@ -192,6 +243,7 @@ impl PhotoRuntime {
                 let prior = self
                     .state
                     .photo()
+                    .filter(|photo| photo.phase != super::state::PhotoPhase::Expired)
                     .map(|photo| (photo.photo_id.clone(), photo.attempt_id));
                 if self.state.apply(revision, photo)? == SnapshotAdmission::Stale {
                     return Ok(true);
@@ -199,16 +251,25 @@ impl PhotoRuntime {
                 let current = self
                     .state
                     .photo()
+                    .filter(|photo| photo.phase != super::state::PhotoPhase::Expired)
                     .map(|photo| (photo.photo_id.clone(), photo.attempt_id));
                 if prior != current {
                     self.pulls.clear();
                     self.preparation.cancel();
                     self.preparation_started = false;
                     self.texture = None;
+                    #[cfg(windows)]
+                    if let Some(compositor) = &mut self.compositor {
+                        if prior.as_ref().map(|key| &key.0) == current.as_ref().map(|key| &key.0) {
+                            compositor.clear_attempt();
+                        } else {
+                            compositor.clear_photo();
+                        }
+                    }
                     self.haptic_granted = false;
                     self.haptic_accepted = false;
-                    self.composed_blocks = 0;
                     self.live_drawn_block = None;
+                    self.pending_gpu_block = None;
                     self.drawn_reported = self.state.photo().is_some_and(|photo| {
                         photo.first_block_drawn || (prior.is_none() && !photo.blocks.is_empty())
                     });
@@ -230,6 +291,11 @@ impl PhotoRuntime {
                     "attempt_id": photo.map_or(0, |photo| photo.attempt_id), "revision": snapshot.revision,
                     "block_count": photo.map_or(0, |photo| photo.blocks.len()),
                 })).await?;
+                #[cfg(windows)]
+                if let Some(compositor) = &mut self.compositor {
+                    compositor.invalidate();
+                }
+                self.render_frame(bridge).await?;
             }
             PhotoIncoming::Prepare(request) => {
                 let current = self.state.photo().is_some_and(|photo| {
@@ -268,7 +334,7 @@ impl PhotoRuntime {
                 }
             }
             PhotoIncoming::ProbePull { photo_id, event_id } => {
-                if !matches!(self.backend, Backend::Probe) {
+                if !matches!(self.backend, Backend::Probe) && !self.debug_controls {
                     return Err(PhotoError::Protocol);
                 }
                 if event_id.is_empty() || event_id.len() > 256 {
@@ -284,7 +350,7 @@ impl PhotoRuntime {
                 }
             }
             PhotoIncoming::ProbeHide { photo_id } => {
-                if !matches!(self.backend, Backend::Probe) {
+                if !matches!(self.backend, Backend::Probe) && !self.debug_controls {
                     return Err(PhotoError::Protocol);
                 }
                 if self
@@ -304,6 +370,54 @@ impl PhotoRuntime {
             } => {
                 self.grant_haptic(&photo_id, attempt_id, block_id);
             }
+            PhotoIncoming::DebugOriginal { photo_id, enabled } => {
+                if !self.debug_controls {
+                    return Err(PhotoError::Protocol);
+                }
+                if self
+                    .state
+                    .photo()
+                    .is_some_and(|photo| photo.photo_id == photo_id)
+                {
+                    #[cfg(windows)]
+                    if let Some(compositor) = &mut self.compositor {
+                        compositor.view_original(enabled);
+                        self.render_frame(bridge).await?;
+                    }
+                }
+            }
+            PhotoIncoming::DebugExport { photo_id, label } => {
+                if !self.debug_controls
+                    || label.is_empty()
+                    || label.len() > 64
+                    || !label
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+                {
+                    return Err(PhotoError::Protocol);
+                }
+                if self
+                    .state
+                    .photo()
+                    .is_some_and(|photo| photo.photo_id == photo_id)
+                {
+                    #[cfg(windows)]
+                    if let (Some(compositor), Some(directory)) =
+                        (&mut self.compositor, &self.export_dir)
+                    {
+                        std::fs::create_dir_all(directory).map_err(|_| PhotoError::Image)?;
+                        compositor.render(Instant::now(), false)?;
+                        compositor.ready().await?;
+                        compositor.save(&directory.join(format!("{label}.png")))?;
+                        std::fs::write(
+                            directory.join(format!("{label}.json")),
+                            serde_json::to_vec_pretty(&compositor.metadata())
+                                .map_err(|_| PhotoError::Image)?,
+                        )
+                        .map_err(|_| PhotoError::Image)?;
+                    }
+                }
+            }
             PhotoIncoming::Shutdown => return Ok(false),
         }
         Ok(true)
@@ -314,10 +428,7 @@ impl PhotoRuntime {
             && self.state.photo().is_some_and(|photo| {
                 photo.photo_id == photo_id
                     && photo.attempt_id == attempt_id
-                    && photo
-                        .blocks
-                        .first()
-                        .is_some_and(|block| block.block_id == block_id)
+                    && photo.blocks.iter().any(|block| block.block_id == block_id)
             })
         {
             self.haptic_granted = true;
@@ -395,7 +506,54 @@ impl PhotoRuntime {
         if !self.images.accept(&result, snapshot) {
             return Ok(());
         }
-        let (texture, block_ids, elapsed_ms) = match result.output {
+        match result.output {
+            PhotoImageOutput::Timing {
+                block_id,
+                stage,
+                elapsed_ms,
+            } => {
+                #[cfg(windows)]
+                if let Some(compositor) = &mut self.compositor {
+                    compositor.record_timing(block_id, stage, elapsed_ms);
+                }
+                let photo = snapshot.photo.as_deref().ok_or(PhotoError::Protocol)?;
+                bridge
+                    .send_timing(
+                        &photo.photo_id,
+                        photo.attempt_id,
+                        block_id,
+                        stage,
+                        elapsed_ms,
+                    )
+                    .await?;
+                return Ok(());
+            }
+            PhotoImageOutput::FontReady { font } => {
+                println!(
+                    "{}",
+                    json!({
+                        "type":"photo_image_stage","stage":"typesetter_ready",
+                        "family":font.family,"source":font.source,"hangul_ink_ratio":font.hangul_ink_ratio,
+                    })
+                );
+                #[cfg(windows)]
+                if let Some(compositor) = &mut self.compositor {
+                    compositor.set_font(font);
+                }
+            }
+            PhotoImageOutput::Candidate {
+                block_id,
+                rect,
+                elapsed_ms,
+            } => {
+                println!(
+                    "{}",
+                    json!({
+                        "type": "photo_image_stage", "stage": "bbox_candidate", "block_id": block_id,
+                        "elapsed_ms": elapsed_ms, "candidate_width": rect.width, "candidate_height": rect.height,
+                    })
+                );
+            }
             PhotoImageOutput::Prepared {
                 block_id,
                 stage,
@@ -409,50 +567,130 @@ impl PhotoRuntime {
                         "block_id": block_id, "stage": format!("{stage:?}"), "elapsed_ms": elapsed_ms,
                     })
                 );
+            }
+            PhotoImageOutput::Original { working, recovered } => {
+                #[cfg(windows)]
+                if let Some(compositor) = &mut self.compositor {
+                    compositor.set_original(working)?;
+                }
+                println!(
+                    "{}",
+                    json!({"type": "photo_image_stage", "stage": "display_source_ready", "recovered": recovered})
+                );
+            }
+            #[cfg(windows)]
+            PhotoImageOutput::Block {
+                block_id,
+                region,
+                typeset,
+                typeset_ms,
+            } =>
+            {
+                #[cfg(windows)]
+                if let Some(compositor) = &mut self.compositor {
+                    let translated = region.is_some();
+                    let has_patch = region.as_ref().is_some_and(|region| region.erase.is_some());
+                    let roi_ms = compositor.add_block(
+                        block_id,
+                        region,
+                        typeset,
+                        typeset_ms,
+                        Instant::now(),
+                    )?;
+                    if translated {
+                        self.pending_gpu_block = Some(block_id);
+                    }
+                    if has_patch {
+                        let photo = snapshot.photo.as_deref().ok_or(PhotoError::Protocol)?;
+                        bridge
+                            .send_timing(
+                                &photo.photo_id,
+                                photo.attempt_id,
+                                block_id,
+                                "roi_upload",
+                                roi_ms,
+                            )
+                            .await?;
+                    }
+                }
+            }
+            #[cfg(not(windows))]
+            PhotoImageOutput::Block { .. } => return Err(PhotoError::Graphics),
+            PhotoImageOutput::Failed { code } => {
+                eprintln!("{}", json!({"type": "photo_image_failed", "code": code}));
+                return Err(PhotoError::Image);
+            }
+        }
+        self.render_frame(bridge).await?;
+        Ok(())
+    }
+
+    async fn render_frame(&mut self, bridge: &mut PhotoBridge) -> Result<(), PhotoError> {
+        #[cfg(windows)]
+        {
+            let Some(compositor) = &mut self.compositor else {
+                return Ok(());
+            };
+            let now = Instant::now();
+            if !compositor.needs_frame(now) {
                 return Ok(());
             }
-            PhotoImageOutput::Composed {
-                texture,
-                block_ids,
-                elapsed_ms,
-            } => (texture, block_ids, elapsed_ms),
-        };
-        if block_ids.len() < self.composed_blocks {
-            return Ok(());
-        }
-        let Backend::OpenVr(surfaces) = &mut self.backend else {
-            return Ok(());
-        };
-        let Some(surface) = surfaces.photo() else {
-            return Ok(());
-        };
-        #[cfg(windows)]
-        surface
-            .set_overlay_texture(texture.pointer())
-            .map_err(|_| PhotoError::OpenVr)?;
-        self.texture = Some(texture);
-        self.composed_blocks = block_ids.len();
-        let photo = snapshot.photo.as_deref().ok_or(PhotoError::Protocol)?;
-        println!(
-            "{}",
-            json!({
-                "type": "photo_image_stage", "photo_id": photo.photo_id,
-                "attempt_id": photo.attempt_id, "stage": "composed", "elapsed_ms": elapsed_ms,
-            })
-        );
-        surface
-            .set_overlay_visible(photo.visible)
-            .map_err(|_| PhotoError::OpenVr)?;
-        if photo.visible && !self.drawn_reported && !photo.first_block_drawn {
-            if let Some(block_id) = block_ids.first() {
-                self.drawn_reported = true;
-                self.live_drawn_block = Some(*block_id);
-                bridge
-                    .send(json!({
-                        "type": "photo_first_block_drawn", "photo_id": photo.photo_id,
-                        "attempt_id": photo.attempt_id, "block_id": block_id,
-                    }))
-                    .await?;
+            let start = Instant::now();
+            let Some(texture) = compositor.render(now, false)? else {
+                return Ok(());
+            };
+            compositor.ready().await?;
+            let block_count = compositor.block_count();
+            let Some(photo) = self.state.photo() else {
+                return Ok(());
+            };
+            let drawn = if let Backend::OpenVr(surfaces) = &mut self.backend {
+                let surface = surfaces.photo().ok_or(PhotoError::OpenVr)?;
+                surface
+                    .set_overlay_texture(texture.pointer())
+                    .map_err(|_| PhotoError::OpenVr)?;
+                surface
+                    .set_overlay_visible(photo.visible)
+                    .map_err(|_| PhotoError::OpenVr)?;
+                photo.visible && !compositor.original_view
+            } else {
+                false
+            };
+            self.texture = Some(texture);
+            println!(
+                "{}",
+                json!({
+                    "type": "photo_image_stage", "photo_id": photo.photo_id,
+                    "attempt_id": photo.attempt_id, "stage": "composed", "elapsed_ms": start.elapsed().as_secs_f64() * 1000.0,
+                    "block_count": block_count, "original_uploads": compositor.original_uploads,
+                    "gpu_ms": compositor.frame_gpu_ms, "gpu_timing_valid": compositor.frame_gpu_ms.is_some(),
+                    "submitted": matches!(self.backend, Backend::OpenVr(_)),
+                })
+            );
+            if let Some(block_id) = self.pending_gpu_block.take() {
+                if let Some(gpu_ms) = compositor.frame_gpu_ms {
+                    bridge
+                        .send_timing(
+                            &photo.photo_id,
+                            photo.attempt_id,
+                            block_id,
+                            "compose_gpu",
+                            gpu_ms,
+                        )
+                        .await?;
+                }
+            }
+            if drawn && !self.drawn_reported && !photo.first_block_drawn {
+                if let Some(block_id) = compositor.first_visible_block(now) {
+                    self.drawn_reported = true;
+                    self.live_drawn_block = Some(block_id);
+                    bridge
+                        .send(json!({
+                            "type": "photo_first_block_drawn", "photo_id": photo.photo_id,
+                            "attempt_id": photo.attempt_id, "block_id": block_id,
+                        }))
+                        .await?;
+                }
             }
         }
         Ok(())
@@ -471,14 +709,27 @@ pub async fn run_cli(args: &[String]) -> i32 {
         );
         return 0;
     }
+    #[cfg(windows)]
+    if args.len() == 5 && args[1] == "--role" && args[2] == "photo" && args[3] == "--offline" {
+        return match super::offline::run(Path::new(&args[4])).await {
+            Ok(()) => 0,
+            Err(error) => {
+                eprintln!(
+                    "{}",
+                    json!({"type": "photo_runtime_error", "code": error.code()})
+                );
+                1
+            }
+        };
+    }
     if args.len() != 5 || args[1] != "--role" || args[2] != "photo" || args[3] != "--config" {
         eprintln!("usage: PuriPulyHeartOverlay --role photo --config <manifest.json>");
         return 2;
     }
     let outcome = async {
         let manifest = PhotoManifest::load(Path::new(&args[4]))?;
-        let (runtime, _image_worker) = PhotoRuntime::new(&manifest)?;
-        runtime.run(&manifest).await
+        let (runtime, image_worker) = PhotoRuntime::new(&manifest)?;
+        runtime.run(&manifest, image_worker).await
     }
     .await;
     match outcome {

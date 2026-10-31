@@ -12,7 +12,7 @@ This guide covers ownership, cross-language contracts, and build/verification en
 | Python runtime and bridge | Target selection, process supervision, authenticated sessions, snapshot delivery, readiness observation, and bounded recovery |
 | Native caption runtime | Accepting ordered caption snapshots, rendering, GPU readiness, OpenVR submission, spatial placement, and presentation retries |
 | Python photo owner | Passive capture, route eligibility, pull authorization, provider requests, retention, and independent photo supervision |
-| Native photo runtime | Photo-session/surface ownership, cumulative block state, and off-loop source decoding/send-JPEG preparation |
+| Native photo runtime | Photo-session/surface ownership; off-loop source decoding, send-JPEG, masking, erase and text layout; layered GPU composition |
 
 Python and native must agree on the manifest, protocol, and advertised execution capabilities. Treat changes as a shared-boundary cutover, not independent renderer upgrades. Caption contracts live in the Python [protocol](../../src/puripuly_heart/core/overlay/protocol.py) and [manifest](../../src/puripuly_heart/core/overlay/manifest.py), with native validation in [bridge](src/bridge.rs) and [manifest](src/manifest.rs). Photo uses a separate [manifest](src/photo/manifest.rs) and [authenticated bridge](../../src/puripuly_heart/core/photo/bridge.py).
 
@@ -47,9 +47,37 @@ Python and native must agree on the manifest, protocol, and advertised execution
 - Python opens an image-only provider connection at the first photo-file signal. No image leaves the PC before a valid pull. Luna uses the existing Sign in with ChatGPT session; Google uses the existing AI Studio credential owner. Neither transport borrows the speech connection pool.
 - A valid pull authorizes native source decoding, Lanczos fit/letterbox and JPEG encoding on the owned image worker. The worker returns completed private source/JPEG paths, original dimensions and the precise send transform. Python reads/base64-serializes the JPEG. A brief incomplete-file wait ends in explicit failure; process loss during preparation does not create a new job-resumption system.
 - A prepared JPEG survives the permitted provider retry independently of renderer recovery. Reopening retained state does not send another request. Retry clears failed-attempt blocks; the request budget, expiry and terminal-error policy belong to the [Python lifecycle](../../src/puripuly_heart/core/photo/lifecycle.py).
-- Full snapshots retain all current-attempt blocks. Geometry is floating-point original-photo `x0,y0,x1,y1`, not Google normalized coordinates or display-composite pixels. Bbox-ready permits candidate-region preparation; source-ready supplies physical source line count; block-complete supplies the full translation and keep-original decision. Erase/type/composition work belongs to [#340](https://github.com/kapitalismho/PuriPuly-heart/issues/340); this boundary does not claim all erase cost is hidden.
-- The explicit `probe` backend exercises real native preparation, cumulative state and reverse pull delivery without OpenVR. It reports receipt, not drawing or physical HMD visibility. It is not a production fallback, final wrist interaction, or Python product OCR entry point. Real temporary VR interaction belongs to [#341](https://github.com/kapitalismho/PuriPuly-heart/issues/341); final UI remains last.
+- Full snapshots retain all current-attempt blocks. Geometry is floating-point original-photo `x0,y0,x1,y1`, not Google normalized coordinates or display-composite pixels. Bbox-ready identifies a candidate region; source-ready supplies the complete source and physical line count for final mask/erase geometry; block-complete applies the keep rule and typesets the complete translation. Early work stays hidden. The amount of erase work overlapped with streaming is measured, not assumed.
+- The image worker resamples the retained decoded original, runs the selected CPU ONNX model and sequential Rust Telea, then measures and fits text using DirectWrite and the existing bundled Noto CJK/fallback chain. ONNX Runtime uses intra-op 2/inter-op 1. The render loop consumes prepared layouts instead of performing inference or fitting.
+- Mask inference, fill sampling and source measurement read the immutable original. Telea reads the current attempt's committed erase background in block-arrival order. A hidden prepared erase is refreshed without repeating inference only when a prior completed patch changes its input region. Kept blocks and plates do not alter that background; retry resets it. Reported erase cost includes any refresh rather than claiming all preparation was hidden.
+- Native image timings use the authenticated photo bridge and the existing metadata-only `[Photo] image_*` diagnostics. Mask/erase preparation is measured even if the completed block is later kept. Additional erase refresh records are additive work segments, not repeated cumulative totals. Typesetting, CPU ROI upload and valid GPU composition duration remain separate; none is physical headset latency or Python product log-view content.
+- The original image is uploaded once for its display lifetime. Completed blocks add ROI erase patches and text without moving previous placements. Erase and complete text fade in together over 100 ms. Original viewing disables both upper layers; retry clears them while retaining the original image.
+- Display content fits within 1920×1080 by default. The fixed spatial constants retain their 1440p reference units and scale by the actual resized photo-content height divided by 1440, excluding padding. Bboxes and derived glyph/font sizes are already in working coordinates and are not scaled again. Reference/custom bounds do not create a Python resolution control.
+- The explicit `probe` backend remains receipt-only and does not initialize image inference or graphics. `offscreen` executes the real native image and D3D11/Direct2D path without OpenVR; `openvr` uses the photo process's own session and matched display adapter. Offscreen pixels and successful submissions are not proof of physical HMD visibility.
 - Native preparation stages, connection time, actual request send, first text, first completed block and stream completion are separate measurements. None is a headset-display timestamp. First-drawn-block feedback requires a real drawing report and is not replayed during renderer recovery.
+
+### Temporary image controls and offline verification
+
+The optional native manifest `image` object accepts `model_path`, `runtime_path`, `max_size`, `export_dir` and `debug_controls`. `max_size` defaults to `[1920,1080]`; debug controls default off. Without an explicit model path, native looks beside the executable under `assets/photo/mbnv4_text_seg.onnx`. A missing model is an explicit image-processing failure, not an alternate model or plate-only fallback. Caption startup remains independent.
+
+For a temporary authenticated bridge probe, enable `image.debug_controls`. `photo_debug_original` accepts the current `photo_id` and `enabled` to toggle the original layer. `photo_debug_export` accepts the current `photo_id` and a safe `label`, and writes a readback under the configured `export_dir`. The existing probe pull/hide messages are also enabled on this temporary surface. These are native verification controls, not product Python OCR controls or final wrist/peek gestures.
+
+The standalone offline path reuses the decoder, image pipeline, typesetter and GPU compositor:
+
+```powershell
+PuriPulyHeartOverlay.exe --role photo --offline <job.json>
+```
+
+The job contains `source_path`, `output_dir`, `model_path`, optional `runtime_path`, optional `max_size`, and `blocks`. Each block has `block_id`, original-photo floating-point `bbox`, `source` and complete `translation`. It writes original, erase-only, composite and original-view PNGs, per-block mask/erase artifacts and `metadata.json`. CPU mask/erase/typeset durations, GPU timestamp durations and total artifact wall time are separate observations; readback and file output are not the ROI-upload estimate. Invalid GPU timing is unavailable, not zero.
+
+Keep offline outputs private when inputs contain personal photos. Use the recovered original 23 cases for [#340's parity and X11 comparison](https://github.com/kapitalismho/PuriPuly-heart/issues/340); do not send them to a provider again. Every earlier display/control remains temporary. Physical interaction and headset legibility remain [#341](https://github.com/kapitalismho/PuriPuly-heart/issues/341); final UI remains last.
+
+### Selected model distribution
+
+The selected export is `mbnv4_text_seg.onnx`, SHA-256 `bfe95d72db1eea72101074293c8d27b77eb87663fa48a23e8258e59249510bcf`, derived from upstream `mbnet_manga_text_seg.pth`, SHA-256 `371ad2c07453e6f52da6c042fb2bcdc6eeb9520ca386f4616b6526ae8483e140`. This export accepts RGB uint8 NCHW and already contains ImageNet normalization and sigmoid; applying those again changes inference.
+
+The [upstream README](https://github.com/daominhwysi/manga-translator/tree/3fd406347926b3edfc90e837fe127df6a69decbe) asserts MIT, but the inspected release has no clear weight-specific redistribution/conversion grant or applicable copyright/third-party notice inventory. **M4 distribution permission remains unresolved.** No weights are bundled or automatically downloaded. Obtain an authoritative permission basis covering the identified checkpoint and converted ONNX before shipping either. The external local artifacts used for parity do not establish distribution rights. Rust Telea/resize attribution is retained in the [third-party notices](../../src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt); the product has no OpenCV dependency.
+
 
 ## Build and Verification
 
@@ -69,10 +97,12 @@ cargo build --locked --manifest-path native/overlay/Cargo.toml --release --bin P
 New-Item -ItemType Directory -Force -Path build/overlay | Out-Null
 Copy-Item (Join-Path $overlayTarget 'release/PuriPulyHeartOverlay.exe') build/overlay/PuriPulyHeartOverlay.exe -Force
 Copy-Item third_party/openvr/win64/openvr_api.dll build/overlay/openvr_api.dll -Force
+Copy-Item third_party/openvr/win64/openvr_api.dll.sha256 build/overlay/openvr_api.dll.sha256 -Force
 .\build\overlay\PuriPulyHeartOverlay.exe --check-startup-contract
 ```
 
 Graphics tests use the production executable-relative bundled-font path; release-mode tests need the font under `release/deps` instead of `debug/deps`.
+For a release executable outside the checkout's staged `build/overlay` directory, also place the trusted OpenVR DLL and its `.sha256` sidecar beside that executable before using the Python process supervisor. Direct offline execution does not exercise the supervisor's packaged-runtime integrity check.
 
 The Windows-only [Overlay CI job](../../.github/workflows/pr-ci.yml) defines the deterministic, graphics, and real-process Python integration tiers. Integration runs with `INTEGRATION=1` and rejects skipped cases; use the workflow for the current selection rather than maintaining another test list here. Shared protocol/startup changes also require the Python boundary checks:
 
@@ -91,6 +121,8 @@ For behavior, protocol, or startup changes, complete Rust checks, a Windows rele
 | Native lifecycle and accepted state | [Runtime](src/runtime.rs), [state](src/state.rs) |
 | Photo capture, requests and child supervision | [Application owner](../../src/puripuly_heart/app/services/photo_application.py), [lifecycle](../../src/puripuly_heart/core/photo/lifecycle.py), [process supervisor](../../src/puripuly_heart/core/photo/process.py) |
 | Photo native state, preparation and image handoff | [Photo runtime](src/photo/runtime.rs), [state](src/photo/state.rs), [preparation](src/photo/prepare.rs), [image boundary](src/photo/image.rs) |
+| Photo mask, erase and source geometry | [CPU processing](src/photo/processing.rs), [Rust Telea](src/photo/telea.rs) |
+| Photo text fitting and layered GPU rendering | [Typesetting](src/photo/typeset.rs), [image worker](src/photo/worker.rs), [compositor](src/photo/compositor.rs), [offline runner](src/photo/offline.rs) |
 | Retry ownership and execution evidence | [Retry episodes](src/retry_episode.rs), [frame cycle](src/frame_cycle.rs), [diagnostics](src/runtime_diagnostics.rs) |
 | Rendering, fitting, and spatial placement | [Renderer](src/renderer/), [spatial policy](src/spatial_policy.rs), [OpenVR](src/openvr.rs) |
 | Desktop renderer | [Desktop overlay](../../src/puripuly_heart/ui/desktop_overlay.py) |

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::path::PathBuf;
 use thiserror::Error;
 
 pub const PHOTO_PROTOCOL_VERSION: u32 = 1;
@@ -9,6 +10,7 @@ pub const PHOTO_PROTOCOL_VERSION: u32 = 1;
 pub enum PhotoBackend {
     Openvr,
     Probe,
+    Offscreen,
 }
 
 #[derive(Clone, Deserialize)]
@@ -21,8 +23,52 @@ pub struct PhotoManifest {
     pub instance_id: String,
     pub generation: u64,
     pub backend: PhotoBackend,
+    #[serde(default)]
+    pub image: PhotoImageConfig,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PhotoImageConfig {
+    pub model_path: Option<PathBuf>,
+    pub runtime_path: Option<PathBuf>,
+    pub max_size: [u32; 2],
+    pub export_dir: Option<PathBuf>,
+    pub debug_controls: bool,
+}
+
+impl Default for PhotoImageConfig {
+    fn default() -> Self {
+        Self {
+            model_path: None,
+            runtime_path: None,
+            max_size: [1920, 1080],
+            export_dir: None,
+            debug_controls: false,
+        }
+    }
+}
+
+impl PhotoImageConfig {
+    pub fn model_path(&self) -> Result<PathBuf, PhotoError> {
+        self.model_path.clone().map(Ok).unwrap_or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .and_then(|path| {
+                    path.parent()
+                        .map(|path| path.join("assets/photo/mbnv4_text_seg.onnx"))
+                })
+                .ok_or(PhotoError::Manifest)
+        })
+    }
+
+    pub fn validate(&self) -> Result<(), PhotoError> {
+        if self.max_size.iter().any(|size| *size == 0 || *size > 16384) {
+            return Err(PhotoError::Manifest);
+        }
+        Ok(())
+    }
+}
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum PhotoError {
     #[error("photo manifest invalid")]
@@ -35,6 +81,10 @@ pub enum PhotoError {
     Protocol,
     #[error("photo OpenVR unavailable")]
     OpenVr,
+    #[error("photo graphics failed")]
+    Graphics,
+    #[error("photo image processing failed")]
+    Image,
 }
 
 impl PhotoError {
@@ -45,6 +95,8 @@ impl PhotoError {
             Self::Authentication => "authentication_rejected",
             Self::Protocol => "protocol_invalid",
             Self::OpenVr => "openvr_unavailable",
+            Self::Graphics => "graphics_failed",
+            Self::Image => "image_processing_failed",
         }
     }
 }
@@ -73,6 +125,7 @@ impl PhotoManifest {
         {
             return Err(PhotoError::Manifest);
         }
+        self.image.validate()?;
         Ok(())
     }
 }

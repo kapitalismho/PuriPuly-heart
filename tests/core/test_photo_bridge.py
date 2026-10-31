@@ -160,3 +160,118 @@ async def test_process_stop_fails_pending_preparation_without_reissuing(tmp_path
             assert bridge._preparations == {}
     finally:
         await bridge.close()
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        {"stage": "unknown"},
+        {"duration_ms": -1},
+        {"duration_ms": float("nan")},
+        {"duration_ms": float("inf")},
+        {"duration_ms": 10**400},
+        {"duration_ms": True},
+        {"block_id": True},
+        {"attempt_id": True},
+        {"source": "private content must not cross this event"},
+        {"source_path": "private-path"},
+    ],
+)
+async def test_image_timing_rejects_nonfinite_unknown_or_content_fields(mutation):
+    bridge = PhotoBridge(control=lambda value, generation: None)
+    await bridge.start()
+    manifest = await bridge.activate(1, backend="probe")
+    try:
+        async with connect(manifest["bridge_url"]) as connection:
+            await connection.send(json.dumps(auth(manifest)))
+            await receive(connection, "photo_snapshot")
+            value = {
+                "type": "photo_image_timing",
+                "photo_id": "current",
+                "attempt_id": 1,
+                "block_id": 0,
+                "stage": "mask",
+                "duration_ms": 2.5,
+            }
+            await connection.send(json.dumps(value | mutation))
+            with pytest.raises(ConnectionClosed):
+                await connection.recv()
+    finally:
+        await bridge.close()
+
+
+async def test_image_timing_preserves_hidden_work_and_current_progress_after_stale_rejection():
+    controls = []
+    bridge = PhotoBridge(control=lambda value, generation: controls.append((value, generation)))
+    await bridge.start()
+    manifest = await bridge.activate(1, backend="probe")
+    photo = {
+        "photo_id": "current",
+        "attempt_id": 1,
+        "phase": "requesting",
+        "blocks": [{"block_id": 1}],
+        "preparations": [{"block_id": 0, "source": "SOURCE", "source_line_count": 1}],
+    }
+    bridge.publish({"type": "photo_snapshot", "revision": 1, "photo": photo})
+    value = {
+        "type": "photo_image_timing",
+        "photo_id": "current",
+        "attempt_id": 1,
+        "block_id": 0,
+        "stage": "mask",
+        "duration_ms": 2.5,
+    }
+    try:
+        async with connect(manifest["bridge_url"]) as connection:
+            await connection.send(json.dumps(auth(manifest)))
+            await receive(connection, "photo_snapshot")
+            for stage in ("mask", "erase"):
+                await connection.send(json.dumps(value | {"stage": stage}))
+            for stage in ("mask", "erase", "typeset", "roi_upload", "compose_gpu"):
+                await connection.send(json.dumps(value | {"block_id": 1, "stage": stage}))
+            await connection.send(json.dumps(value | {"stage": "erase", "duration_ms": 0.5}))
+            for mutation in (
+                {"photo_id": "retired"},
+                {"attempt_id": 2},
+                {"block_id": 99},
+                {"stage": "typeset"},
+            ):
+                await connection.send(json.dumps(value | mutation))
+            await connection.send(
+                json.dumps(value | {"block_id": 1, "stage": "typeset", "duration_ms": 9})
+            )
+            async with asyncio.timeout(1):
+                while not controls or controls[-1][0]["duration_ms"] != 9:
+                    await asyncio.sleep(0)
+            assert len(controls) == 9
+            assert [event["duration_ms"] for event, _ in controls if event["block_id"] == 0] == [
+                2.5,
+                2.5,
+                0.5,
+            ]
+            assert {generation for _, generation in controls} == {1}
+            expired = photo | {"phase": "expired"}
+            bridge.publish({"type": "photo_snapshot", "revision": 2, "photo": expired})
+            assert (await receive(connection, "photo_snapshot"))["revision"] == 2
+            bridge.ready.clear()
+            await connection.send(json.dumps(value))
+            await connection.send(json.dumps({"type": "photo_ready"}))
+            await asyncio.wait_for(bridge.ready.wait(), 1)
+            assert len(controls) == 9
+            retried = photo | {
+                "attempt_id": 2,
+                "blocks": [{"block_id": 8}],
+                "preparations": [],
+            }
+            bridge.publish({"type": "photo_snapshot", "revision": 3, "photo": retried})
+            assert (await receive(connection, "photo_snapshot"))["revision"] == 3
+            await connection.send(
+                json.dumps(value | {"attempt_id": 2, "block_id": 8, "stage": "typeset"})
+            )
+            async with asyncio.timeout(1):
+                while len(controls) < 10:
+                    await asyncio.sleep(0)
+            assert controls[-1][0]["attempt_id"] == 2
+            assert controls[-1][0]["block_id"] == 8
+    finally:
+        await bridge.close()

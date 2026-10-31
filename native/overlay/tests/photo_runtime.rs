@@ -22,6 +22,7 @@ fn manifest() -> PhotoManifest {
         instance_id: "11111111-1111-4111-8111-111111111111".into(),
         generation: 1,
         backend: PhotoBackend::Probe,
+        image: Default::default(),
     }
 }
 
@@ -251,7 +252,18 @@ async fn receive(socket: &mut WebSocketStream<TcpStream>) -> Value {
             .unwrap()
             .unwrap();
         if let Message::Text(text) = message {
-            return serde_json::from_str(&text).unwrap();
+            let value: Value = serde_json::from_str(&text).unwrap();
+            if value["type"] == "photo_image_timing" {
+                assert_eq!(value.as_object().unwrap().len(), 6);
+                assert!(matches!(
+                    value["stage"].as_str(),
+                    Some("mask" | "erase" | "typeset" | "roi_upload" | "compose_gpu")
+                ));
+                let duration = value["duration_ms"].as_f64().unwrap();
+                assert!(duration.is_finite() && duration >= 0.0);
+                continue;
+            }
+            return value;
         }
     }
 }
@@ -284,6 +296,7 @@ async fn start_child(
         "protocol_version": config.protocol_version, "role": config.role,
         "bridge_url": format!("ws://{}", listener.local_addr().unwrap()), "session_token": config.session_token,
         "instance_id": config.instance_id, "generation": config.generation, "backend": config.backend,
+        "image": config.image,
     });
     std::fs::write(&path, document.to_string()).unwrap();
     let child = ChildGuard(
@@ -587,4 +600,386 @@ async fn actual_photo_process_settles_retired_and_shutdown_preparations_before_e
         assert!(child.0.wait().unwrap().success());
         std::fs::remove_dir_all(directory).unwrap();
     }
+}
+
+#[cfg(windows)]
+async fn wait_export(directory: &std::path::Path, label: &str) -> (image::RgbaImage, Value) {
+    let image = directory.join(format!("{label}.png"));
+    let metadata = directory.join(format!("{label}.json"));
+    tokio::time::timeout(Duration::from_secs(15), async {
+        loop {
+            if let Ok(bytes) = std::fs::read(&metadata) {
+                if let Ok(value) = serde_json::from_slice(&bytes) {
+                    return (image::open(&image).unwrap().into_rgba8(), value);
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap()
+}
+
+#[cfg(windows)]
+async fn image_stage(
+    receiver: &mut tokio::sync::mpsc::UnboundedReceiver<Value>,
+    stage: &str,
+    blocks: Option<u64>,
+) -> Value {
+    tokio::time::timeout(Duration::from_secs(30), async {
+        loop {
+            let value = receiver
+                .recv()
+                .await
+                .expect("native stdout ended before stage");
+            if value["stage"] == stage && blocks.is_none_or(|blocks| value["block_count"] == blocks)
+            {
+                return value;
+            }
+        }
+    })
+    .await
+    .unwrap()
+}
+
+#[cfg(windows)]
+#[tokio::test]
+#[ignore = "requires the developer-supplied selected mask and ONNX Runtime"]
+async fn actual_offscreen_native_pipeline_reuses_decode_hides_erase_accumulates_and_clears_retry() {
+    actual_native_pipeline(PhotoBackend::Offscreen).await;
+}
+
+#[cfg(windows)]
+#[tokio::test]
+#[ignore = "requires SteamVR, the developer-supplied selected mask, and ONNX Runtime"]
+async fn actual_openvr_native_pipeline_submits_ready_textures_and_preserves_independent_session() {
+    actual_native_pipeline(PhotoBackend::Openvr).await;
+}
+
+#[cfg(windows)]
+async fn actual_native_pipeline(backend: PhotoBackend) {
+    use std::io::BufRead;
+    let mut config = manifest();
+    config.backend = backend;
+    config.image.model_path = Some(
+        std::env::var_os("PURIPULY_PHOTO_MASK_MODEL")
+            .expect("explicit external selected model required")
+            .into(),
+    );
+    config.image.runtime_path = std::env::var_os("PURIPULY_PHOTO_ORT_RUNTIME").map(Into::into);
+    config.image.max_size = [320, 180];
+    config.image.debug_controls = true;
+    let name = if backend == PhotoBackend::Openvr {
+        "actual-openvr-pipeline"
+    } else {
+        "actual-image-pipeline"
+    };
+    let root = std::env::temp_dir().join(format!("puri339-native-{}-{name}", std::process::id()));
+    let exports = root.join("exports");
+    config.image.export_dir = Some(exports.clone());
+    let mut independent = if backend == PhotoBackend::Openvr {
+        use puripuly_heart_overlay::photo::{
+            compositor::PhotoCompositor, processing::WorkingPhoto, runtime::PhotoOpenVrSurfaces,
+        };
+        let mut surfaces = PhotoOpenVrSurfaces::new(&config).unwrap();
+        let adapter = surfaces.photo().unwrap().output_adapter();
+        let mut compositor = PhotoCompositor::new(Some(&adapter)).unwrap();
+        compositor
+            .set_original(std::sync::Arc::new(
+                WorkingPhoto::new(std::sync::Arc::new(image::RgbImage::new(8, 8)), [8, 8]).unwrap(),
+            ))
+            .unwrap();
+        let texture = compositor
+            .render(std::time::Instant::now(), false)
+            .unwrap()
+            .unwrap();
+        compositor.ready().await.unwrap();
+        surfaces.close_icon();
+        Some((surfaces, compositor, texture))
+    } else {
+        None
+    };
+    let (mut child, mut socket, directory) = start_child(&config, name).await;
+    let (stages, mut stage_receiver) = tokio::sync::mpsc::unbounded_channel();
+    let stdout = child.0.stdout.take().unwrap();
+    let reader = std::thread::spawn(move || {
+        for line in std::io::BufReader::new(stdout).lines() {
+            let value: Value = serde_json::from_str(&line.unwrap()).unwrap();
+            if stages.send(value).is_err() {
+                break;
+            }
+        }
+    });
+    assert_eq!(receive(&mut socket).await["type"], "photo_auth");
+    let mut current = photo();
+    let source = directory.join("capture.png");
+    let mut pixels = image::RgbImage::from_pixel(320, 180, image::Rgb([230, 230, 220]));
+    for y in 45..65 {
+        for x in 30..180 {
+            pixels.put_pixel(x, y, image::Rgb([15, 15, 20]));
+        }
+    }
+    pixels.save(&source).unwrap();
+    current.path = source.to_string_lossy().into_owned();
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":1,"photo":current}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 1);
+    assert_eq!(receive(&mut socket).await["type"], "photo_ready");
+    assert!(!exports.exists());
+    send(
+        &mut socket,
+        json!({"type":"photo_probe_pull","photo_id":current.photo_id,"event_id":"authorized-pull"}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["type"], "photo_pull");
+    current.attempt_id = 1;
+    current.phase = PhotoPhase::Preparing;
+    current.visible = false;
+    current.offer_open = false;
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":2,"photo":current}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 2);
+    let output = directory.join("prepared");
+    std::fs::create_dir(&output).unwrap();
+    let identity = puripuly_heart_overlay::photo::prepare::file_identity(
+        &std::fs::File::open(&source).unwrap(),
+    )
+    .unwrap();
+    send(&mut socket,json!({"type":"photo_prepare","photo_id":current.photo_id,"attempt_id":1,"source_path":source,"output_dir":output,"expected_file_id":identity})).await;
+    let prepared = receive(&mut socket).await;
+    assert_eq!(prepared["type"], "photo_prepared");
+    let retained_source = std::path::PathBuf::from(prepared["source_path"].as_str().unwrap());
+    std::fs::remove_file(&retained_source).unwrap();
+    current.image = Some(PhotoImage {
+        path: retained_source.to_string_lossy().into_owned(),
+        width: 320,
+        height: 180,
+    });
+    current.phase = PhotoPhase::Requesting;
+    current.preparations.push(PhotoPreparation {
+        block_id: 0,
+        bbox: [25.0, 35.0, 200.0, 80.0],
+        source: None,
+        source_line_count: None,
+    });
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":3,"photo":current}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 3);
+    let display = image_stage(&mut stage_receiver, "display_source_ready", None).await;
+    assert_eq!(display["recovered"], false);
+    image_stage(&mut stage_receiver, "bbox_candidate", None).await;
+    send(
+        &mut socket,
+        json!({"type":"photo_debug_export","photo_id":current.photo_id,"label":"bbox"}),
+    )
+    .await;
+    let (original, bbox_metadata) = wait_export(&exports, "bbox").await;
+    assert_eq!(bbox_metadata["blocks"].as_array().unwrap().len(), 0);
+    current.preparations[0].source = Some("SOURCE".into());
+    current.preparations[0].source_line_count = Some(1);
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":4,"photo":current}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 4);
+    image_stage(&mut stage_receiver, "Source", None).await;
+    send(
+        &mut socket,
+        json!({"type":"photo_debug_export","photo_id":current.photo_id,"label":"hidden-erase"}),
+    )
+    .await;
+    let (hidden, hidden_metadata) = wait_export(&exports, "hidden-erase").await;
+    assert_eq!(hidden, original);
+    assert_eq!(hidden_metadata["blocks"].as_array().unwrap().len(), 0);
+    current.blocks.push(PhotoBlock {
+        block_id: 0,
+        bbox: current.preparations[0].bbox,
+        source: "SOURCE".into(),
+        translation: "Translated".into(),
+    });
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":5,"photo":current}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 5);
+    for id in 1..3 {
+        current.blocks.push(PhotoBlock {
+            block_id: id,
+            bbox: [
+                210.0,
+                25.0 + id as f64 * 40.0,
+                310.0,
+                55.0 + id as f64 * 40.0,
+            ],
+            source: format!("SOURCE {id}"),
+            translation: format!("Result {id}"),
+        });
+        send(
+            &mut socket,
+            json!({"type":"photo_snapshot","revision":5+id,"photo":current}),
+        )
+        .await;
+        assert_eq!(receive(&mut socket).await["revision"], 5 + id);
+    }
+    let submitted = image_stage(&mut stage_receiver, "composed", Some(3)).await;
+    assert_eq!(submitted["submitted"], backend == PhotoBackend::Openvr);
+    tokio::time::sleep(Duration::from_millis(130)).await;
+    send(
+        &mut socket,
+        json!({"type":"photo_debug_export","photo_id":current.photo_id,"label":"complete"}),
+    )
+    .await;
+    let (complete, metadata) = wait_export(&exports, "complete").await;
+    assert_ne!(complete, original);
+    assert_eq!(
+        metadata["blocks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|block| block["block_id"].as_u64().unwrap())
+            .collect::<Vec<_>>(),
+        vec![0, 1, 2]
+    );
+    assert_eq!(metadata["original_uploads"], 1);
+    assert!(metadata["composition_gpu_ms"].is_number());
+    assert!(metadata["font"]["family"]
+        .as_str()
+        .unwrap()
+        .contains("Noto Sans CJK"));
+    assert_eq!(metadata["font"]["source"], "BundledNotoCjkMedium");
+    assert!(metadata["font"]["hangul_ink_ratio"].as_f64().unwrap() > 0.0);
+    current.visible = true;
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":8,"photo":current}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 8);
+    if backend == PhotoBackend::Openvr {
+        let first = receive(&mut socket).await;
+        assert_eq!(first["type"], "photo_first_block_drawn");
+        assert_eq!(first["block_id"], 0);
+        current.first_block_drawn = true;
+    }
+    current.visible = false;
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":9,"photo":current}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 9);
+    current.visible = true;
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":10,"photo":current}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 10);
+    send(
+        &mut socket,
+        json!({"type":"photo_debug_original","photo_id":current.photo_id,"enabled":true}),
+    )
+    .await;
+    send(
+        &mut socket,
+        json!({"type":"photo_debug_export","photo_id":current.photo_id,"label":"peek"}),
+    )
+    .await;
+    assert_eq!(wait_export(&exports, "peek").await.0, original);
+    send(
+        &mut socket,
+        json!({"type":"photo_debug_original","photo_id":current.photo_id,"enabled":false}),
+    )
+    .await;
+    current.attempt_id = 2;
+    current.preparations.clear();
+    current.blocks.clear();
+    current.first_block_drawn = false;
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":11,"photo":current}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 11);
+    image_stage(&mut stage_receiver, "display_source_ready", None).await;
+    send(
+        &mut socket,
+        json!({"type":"photo_debug_export","photo_id":current.photo_id,"label":"retry"}),
+    )
+    .await;
+    let (retry, retry_metadata) = wait_export(&exports, "retry").await;
+    assert_eq!(retry, original);
+    assert_eq!(retry_metadata["blocks"].as_array().unwrap().len(), 0);
+    assert_eq!(retry_metadata["original_uploads"], 1);
+    current.visible = true;
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":12,"photo":current}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 12);
+    send(
+        &mut socket,
+        json!({"type":"photo_probe_hide","photo_id":current.photo_id}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["type"], "photo_hidden");
+    current.visible = false;
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":13,"photo":current}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 13);
+    current.visible = true;
+    send(
+        &mut socket,
+        json!({"type":"photo_snapshot","revision":14,"photo":current}),
+    )
+    .await;
+    assert_eq!(receive(&mut socket).await["revision"], 14);
+    send(
+        &mut socket,
+        json!({"type":"photo_debug_export","photo_id":current.photo_id,"label":"reopen"}),
+    )
+    .await;
+    assert_eq!(
+        wait_export(&exports, "reopen").await.1["original_uploads"],
+        1
+    );
+    send(&mut socket, json!({"type":"shutdown"})).await;
+    assert_eq!(
+        receive(&mut socket).await["type"],
+        "photo_shutdown_complete"
+    );
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while child.0.try_wait().unwrap().is_none() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(child.0.wait().unwrap().success());
+    reader.join().unwrap();
+    if let Some((surfaces, _compositor, texture)) = &mut independent {
+        use puripuly_heart_overlay::openvr::OverlayTextureSubmitter;
+        use windows::core::Interface;
+        surfaces
+            .photo()
+            .unwrap()
+            .set_overlay_texture(texture.texture().as_raw())
+            .unwrap();
+    }
+    std::fs::remove_dir_all(directory).unwrap();
 }
