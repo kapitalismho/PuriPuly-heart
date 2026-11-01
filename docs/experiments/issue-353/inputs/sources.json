@@ -1,0 +1,518 @@
+{
+  "historical_commit": "6fa20d64eeb080158fa60c48b1bbb0597ac55eb1",
+  "recovery": {
+    "en": {
+      "path": "docs/experiments/issue-308/followup/manifests/en.jsonl",
+      "sha256": "309e08069d78f850fd4ef0158e6fb3eec51d9d82adc55ecee2053f374eae7c8b"
+    },
+    "ja_selection": {
+      "path": "docs/experiments/issue-308/manifests/selection-ja.jsonl",
+      "sha256": "7cdfd0550bfa524f72a87a653af75edb243ad54151da44148b1bed9a748e839d"
+    },
+    "ja": {
+      "path": "docs/experiments/issue-308/manifests/ja.jsonl",
+      "sha256": "5301768526ef41a40353c0d6d67c0e1f0be0658ed29dffede4b372b8877bd79b"
+    },
+    "replay_en": {
+      "path": "docs/experiments/issue-308/followup/manifests/replay-natural-en-01.json",
+      "sha256": "b44564c21f3e866598cf4c022143ba1175b9eaef5a4baad5ca9c890360ddaa3c"
+    },
+    "replay_ja": {
+      "path": "docs/experiments/issue-308/manifests/replay-natural-ja.json",
+      "sha256": "09d6be6642596cad34d4f51572e22a6c942581a958ce9e2cb1a432627543cbd3"
+    },
+    "original_preparation": {
+      "path": "scripts/bench_asr308_data.py",
+      "sha256": "808643868ca5ea0087509e067760c046edafc5427614813206118a66646edffb"
+    },
+    "followup_preparation": {
+      "path": "scripts/bench_asr308_followup_data.py",
+      "sha256": "673d3b1bd2c42075b56507ba6e598fab4be521a40ae8a8c66348ff716fff2adc"
+    }
+  },
+  "files": [
+    {
+      "path": "sources/ami/ami_public_manual_1.6.2.zip",
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip",
+      "sha256": "b56e5babb2496b8795deeeda7e71178d7fbc9963f94276cf2a3f4b56ebbc9f9d",
+      "language": "en",
+      "kind": "annotation"
+    },
+    {
+      "path": "sources/ami/split_eval.orig",
+      "url": "https://raw.githubusercontent.com/kaldi-asr/kaldi/master/egs/ami/s5/local/split_eval.orig",
+      "sha256": "eb2f322acec2e2c86a1b322d134c868b96f49eb5ef47014e23e1dd493e275c67",
+      "language": "en",
+      "kind": "split"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue01.eaf",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue01/japanese-themed-dialogue01.eaf",
+      "sha256": "c59daa71d0ffa34e50b4c532d33f5c0d2a51ceaa8aea4435a68a87d924f61b32",
+      "language": "ja",
+      "kind": "annotation"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue01_audio.wav",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue01/japanese-themed-dialogue01_audio.wav",
+      "sha256": "ea1138f2b05e6b3cc9580ed1196748ed67c5847f222c1cf4a54de6bf4d9d3282",
+      "language": "ja",
+      "kind": "audio"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue02.eaf",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue02/japanese-themed-dialogue02.eaf",
+      "sha256": "dee4e82d37805493af85cd18493b7b549294f36b99878687a586d6f5d1235d15",
+      "language": "ja",
+      "kind": "annotation"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue02_audio.wav",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue02/japanese-themed-dialogue02_audio.wav",
+      "sha256": "fd371e8dba3462dbb7f09ee0bf1358a6f2e3cc49a1fc0ed270a930f708554f39",
+      "language": "ja",
+      "kind": "audio"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue03.eaf",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue03/japanese-themed-dialogue03.eaf",
+      "sha256": "309a9b1ca0b90d7e615c4e6bd6daa31171627e2846c31cb1eb89ef4b26f97a57",
+      "language": "ja",
+      "kind": "annotation"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue03_audio.wav",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue03/japanese-themed-dialogue03_audio.wav",
+      "sha256": "cbc21140f2c10fd8e55e60b72e2960bf2fb1d3ebabac6e192659aa0c4f1ef6b9",
+      "language": "ja",
+      "kind": "audio"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue04.eaf",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue04/japanese-themed-dialogue04.eaf",
+      "sha256": "1dda6b58d0cb19834c5164632aba46a060768813c5f82bb9e87482f461482a2b",
+      "language": "ja",
+      "kind": "annotation"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue04_audio.wav",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue04/japanese-themed-dialogue04_audio.wav",
+      "sha256": "14a1fa85853c5bf7bbc447298c2ee18830094ac7d7fee9532a7935200e4776e0",
+      "language": "ja",
+      "kind": "audio"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue10.eaf",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue10/japanese-themed-dialogue10.eaf",
+      "sha256": "63756b137c1d707ce3a4ccf04ea2491736b30373b8591a02da11164df9e27f8f",
+      "language": "ja",
+      "kind": "annotation"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue10_audio.wav",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue10/japanese-themed-dialogue10_audio.wav",
+      "sha256": "c4f9ba1e0400970346607523a714256b978edbecbc2e49b8f7b2d7bc4a1d37bf",
+      "language": "ja",
+      "kind": "audio"
+    },
+    {
+      "path": "sources/ami-ihm/test-00000-of-00004.parquet",
+      "url": "https://huggingface.co/datasets/edinburghcstr/ami/resolve/46f28f2503e2ec48f8867a84eef356c70476beab/ihm/test-00000-of-00004.parquet",
+      "sha256": "d95920dccc6924c15215239461bf5d1152fe07c9c61add073bd12da26dd602e0",
+      "language": "en",
+      "kind": "parquet"
+    },
+    {
+      "path": "sources/ami-ihm/test-00001-of-00004.parquet",
+      "url": "https://huggingface.co/datasets/edinburghcstr/ami/resolve/46f28f2503e2ec48f8867a84eef356c70476beab/ihm/test-00001-of-00004.parquet",
+      "sha256": "07a2b1c407cf36bc1e66c1362b0248ed32c897edc2a116549d1dc6b456dc2325",
+      "language": "en",
+      "kind": "parquet"
+    },
+    {
+      "path": "sources/ami-ihm/test-00002-of-00004.parquet",
+      "url": "https://huggingface.co/datasets/edinburghcstr/ami/resolve/46f28f2503e2ec48f8867a84eef356c70476beab/ihm/test-00002-of-00004.parquet",
+      "sha256": "83cde21e55fc884295585327b0ee334cba47ad53bdb787dd5f97437067aca5f8",
+      "language": "en",
+      "kind": "parquet"
+    },
+    {
+      "path": "sources/ami-ihm/test-00003-of-00004.parquet",
+      "url": "https://huggingface.co/datasets/edinburghcstr/ami/resolve/46f28f2503e2ec48f8867a84eef356c70476beab/ihm/test-00003-of-00004.parquet",
+      "sha256": "3312bb79400ddef62d5a0097e124dfabe86a693b4643e7fef7d72a62588280d7",
+      "language": "en",
+      "kind": "parquet"
+    },
+    {
+      "path": "sources/ami/ES2004d.Mix-Headset.wav",
+      "url": "https://huggingface.co/datasets/FluidInference/ami-corpus-mirror/resolve/722d8891643e1e4dc62cfd0d198fa05a1646c3cc/sdm/ES2004d.Mix-Headset.wav",
+      "sha256": "3cfce3297ebb7faeb53c02727eea5e9f2c76e9ed4b62db3b03d73e66836e91f3",
+      "language": "en",
+      "kind": "audio",
+      "purpose": "natural120s continuous original conversation only, not offline IHM sample"
+    }
+  ],
+  "licenses": {
+    "en": {
+      "name": "AMI Meeting Corpus",
+      "attribution": "AMI Consortium; Carletta et al., The AMI Meeting Corpus: A Pre-announcement (2005)",
+      "license": "CC-BY-4.0",
+      "original_license_url": "https://groups.inf.ed.ac.uk/ami/corpus/license.shtml",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "reference_semantics": "Human corpus orthographic references with upstream Kaldi normalization, chunked original individual headset audio. Manual1.6.2 used for independent bounded checks. Natural replay keeps recovered manual timing/humanreferences on original mixed-headset audio.",
+      "speech_context": "Unscripted scenario/role-play product-design meetings, mostly nonnative English; not read speech.",
+      "split_source": "https://raw.githubusercontent.com/kaldi-asr/kaldi/master/egs/ami/s5/local/split_eval.orig",
+      "split_sha256": "eb2f322acec2e2c86a1b322d134c868b96f49eb5ef47014e23e1dd493e275c67",
+      "split": "test",
+      "annotation_sha256": "b56e5babb2496b8795deeeda7e71178d7fbc9963f94276cf2a3f4b56ebbc9f9d",
+      "modifications": "Frozen reconstructed IHM test120 using upstream chunk boundaries, common16kHz mono PCM16, original-profile seeded pink15/pink5. Natural120s originalmixed-headset crop with recovered manual timing/references and pink15. No candidate-derived references.",
+      "context_limit": "Selected ES2004d/IS1009c/TS3003c/TS3003d are spontaneous scenario/role-play design meetings, not read speech or unconstrained casual chats; some source speakers recur across sessions.",
+      "annotation_authority": "https://groups.inf.ed.ac.uk/ami/corpus/overview.shtml",
+      "timing_limit": "Human orthographic references; word-level timings may be forced-aligned upstream. Crops use original transcriber segment boundaries, not model-derived words."
+    },
+    "ja": {
+      "name": "Japanese Themed Casual Conversation Corpus",
+      "attribution": "IngCrowd Inc. / 株式会社イングクラウド",
+      "producer": "https://www.ingcrowd.jp/datasets/",
+      "producer_description": "https://www.ingcrowd.jp/japanese-dialogue-datasets/",
+      "distribution": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue",
+      "revision": "e2eed8769400269f20821deb0e47e68b40012e8b",
+      "license": "CC-BY-NC-4.0",
+      "license_url": "https://creativecommons.org/licenses/by-nc/4.0/",
+      "restriction": "Noncommercial research/verification only; audio remains ignored and is not distributed. Preserve source attribution/license for corpus text rather than applying repository code license.",
+      "reference_semantics": "Original human-created verbatim EAF text, manually segmented/aligned in ELAN; producer explicitly says no ASR was used. Preserve fillers/repetitions. Mixed recording; offline scoring excludes every cross-speaker annotated overlap and angle-tag interval.",
+      "context": "Natural unscripted two-person Zoom conversations about broad themes, not fixed-script reading. Producer's public sample demonstrates corpus/annotation services, NOT model inference.",
+      "authorized_relaxation": "Director adopted this source following explicit user instruction to obtain Japanese data with relaxed criteria:108short+all12eligiblemedium, conversation-local tier labels rather than global speaker count, no official held-out split, and producer service-demonstration corpus allowed.",
+      "split": "issue308-evaluation-sample",
+      "training_overlap": "Unknown; no canonical train/dev/test split or contamination claim. Release chronology is not proof of no overlap.",
+      "speaker_id_semantics": "IDs are conversation-local speaker_1/speaker_2 tiers; public demographics repeat. Cross-conversation identity and unique physical-speaker count unknown.",
+      "strict_candidate_counts": {
+        "01": {
+          "short": 63,
+          "medium": 3
+        },
+        "02": {
+          "short": 79,
+          "medium": 2
+        },
+        "03": {
+          "short": 40,
+          "medium": 3
+        },
+        "04": {
+          "short": 49,
+          "medium": 3
+        },
+        "10": {
+          "short": 25,
+          "medium": 1
+        }
+      },
+      "quota": {
+        "short": 108,
+        "medium": 12
+      },
+      "noise_pair_quota": {
+        "short": 20,
+        "medium": 10
+      },
+      "modifications": "Frozen original clip intervals and natural window; 16 kHz mono PCM16 WAV export; original-profile seeded pink15/pink5 and controls. Human references unchanged."
+    }
+  },
+  "limitations": [
+    "AMI evaluation split is test; IBM lists AMI as a training source. Exact checkpoint training overlap unknown; no contamination audit.",
+    "IngCrowd is an unsplit public corpus-service sample, not an official held-out evaluation split. Unknown training overlap.",
+    "JA speaker tiers are conversation-local, not verified globally distinct physical people.",
+    "Historical prepared WAVs used FLOAT; issue353 requires PCM16. Old prepared hashes are provenance only, not new audio hashes.",
+    "EN reconstructed from Kaldi-preprocessed/normalized IHM test rather than exact recoveredfollowup120; naturalwindow uses originalMix-Headset rather than arithmeticmeanof4headsets. Trainingoverlap stillunknown."
+  ],
+  "license_source_checks": [
+    {
+      "url": "https://groups.inf.ed.ac.uk/ami/corpus/license.shtml",
+      "outcome": "HTTP403 from current read attempt; historical CC-BY-4.0 provenance retained; corroborated by accessible edinburghcstr/ami distribution card."
+    },
+    {
+      "url": "https://huggingface.co/datasets/edinburghcstr/ami/raw/main/README.md",
+      "outcome": "Read distribution card license cc-by-4.0. Final approved English inputs use this distribution's pinned IHM test chunks and Kaldi-normalized human references, not the inaccessible historical individual-headset originals."
+    },
+    {
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/raw/e2eed8769400269f20821deb0e47e68b40012e8b/README.md",
+      "outcome": "Read pinned card: CC-BY-NC-4.0, 16kHz mono16bit WAV, unscripted Zoom themed conversation and manually segmented/transcribed ELAN; no ASR in annotation."
+    }
+  ],
+  "historical_ja_float_hashes": {
+    "ja-ingcrowd-10-speaker_2-a311-noise15": "75851788a09f3a64eeb7ce26270dc3fd625ec2e66fcdb61aa46100a23b864634",
+    "ja-ingcrowd-10-speaker_2-a311-noise5": "40c5bec4458622ad23cc26ac80725a4e54b82da863f4d9b8b9994dfc630e09cf",
+    "ja-ingcrowd-01-speaker_2-a42-noise15": "2a3350bd9b263a73e1b899ba7fef063f2b0dbe1bc8ea152a77aa6403ab30a662",
+    "ja-ingcrowd-01-speaker_2-a42-noise5": "be3e87cdd7786792f90218214c0b9723a1d638976b4cbe0c03d0118f48ddab5b",
+    "ja-ingcrowd-03-speaker_1-a71-noise15": "48e9a95ed3ba4f0acaf0e2c103f268fe9abca9c9a3c4b6e4eb10f857bdfe8bbc",
+    "ja-ingcrowd-03-speaker_1-a71-noise5": "2a8e60fb40a1874fc9b22d79abc31733ea89deb648a58d1702d49917447746bc",
+    "ja-ingcrowd-10-speaker_2-a216-noise15": "a9319592936ff07c778f90bc3543b8c5e850bb02f99226bf85b02f951fe14d41",
+    "ja-ingcrowd-10-speaker_2-a216-noise5": "acbe11d5dcc4aa05c1fb5d28e2d88bc20020cdc845796a6efead02e6b883ca06",
+    "ja-ingcrowd-02-speaker_1-a165-noise15": "8ec34f77034980e4f65393dc1f1d444b8cc8f8bac8bb67501fa4fa25f6ee5481",
+    "ja-ingcrowd-02-speaker_1-a165-noise5": "dea3bd095705cb1548e34f28e470d53af27bb2938dc661adcf880df6894fca62",
+    "ja-ingcrowd-03-speaker_2-a280-noise15": "a25b085741448202405ba7cafeec22ce59e583722dd923cd1c7ffbbc048d29b1",
+    "ja-ingcrowd-03-speaker_2-a280-noise5": "86d87194fcf1a0e646f085b89389c436afb359b047fac0d492a30c55379bb2a4",
+    "ja-ingcrowd-01-speaker_1-a2-noise15": "44e76c8033d652aaa4b85521eafb3da6e223994354def8014337fa77101cb937",
+    "ja-ingcrowd-01-speaker_1-a2-noise5": "7fb4cd5aa78525a680b26e3bb307c22b4fa11a87e5133884be740cbf7ed327d3",
+    "ja-ingcrowd-04-speaker_2-a290-noise15": "6287292cb16e81136a64a96409b4802c927d684b861a4bda4fb408e1d9ac99c1",
+    "ja-ingcrowd-04-speaker_2-a290-noise5": "8cf643c5b634b64fb6e4947711b33614d221659f855ab9391189b95329d35c46",
+    "ja-ingcrowd-10-speaker_2-a274-noise15": "bc6c6e608fa4e7dc1cb7093c4ce0224d108946a88f1dc39d3eb120e1e1c4b51b",
+    "ja-ingcrowd-10-speaker_2-a274-noise5": "8bb3bd57be96ed7d57f562c4c72f944916310a6a8bf3f94130483022383c92c1",
+    "ja-ingcrowd-02-speaker_1-a28-noise15": "d42e2ed6c975a6f987c28499fc3694a9f227db342568a14c9d7cfc7e11c81b1f",
+    "ja-ingcrowd-02-speaker_1-a28-noise5": "e44be92054e0e3416fa589af9bf43d5b063a80af5e503c93121c28c53079fccc",
+    "ja-ingcrowd-04-speaker_1-a122-noise15": "03d2f2667dd3f8fefe6af7030dd5b931f99da0bd74f77f1af44843aa24d50baf",
+    "ja-ingcrowd-04-speaker_1-a122-noise5": "d5adb94398dd5367be79a20368dad14a28d449c3f71daca364044e6bb32b5d95",
+    "ja-ingcrowd-01-speaker_1-a169-noise15": "c30e3d4fefb5a1ec62c9d4f360f4de974bf1c9b91277df53ab7fc4da76f8e077",
+    "ja-ingcrowd-01-speaker_1-a169-noise5": "7a5ed403aac9af147f2799e6fe1ac5bb9cbebe98a15510cc2f9304b460c4d1e0",
+    "ja-ingcrowd-04-speaker_2-a177-noise15": "6703c30a23cca025bc19c4539064e1ce081fbed1d27c3c216b7164de8873356f",
+    "ja-ingcrowd-04-speaker_2-a177-noise5": "ea6dfb31ca8395df51b4a15817f0eaf606b5a03ec73b658296780016b296fd85",
+    "ja-ingcrowd-04-speaker_1-a270-noise15": "d71b363ad56bf6b6caa9ab4a7f482e2d542af748c23802a8b8d6e8112cdab266",
+    "ja-ingcrowd-04-speaker_1-a270-noise5": "d127755c0964e63de20981bda69215a1b12b65aab5ca7baa759a959bfd47c900",
+    "ja-ingcrowd-02-speaker_1-a172-noise15": "b59f3f8705d923c06d1331f3035ebaf5b646c86e809078ad5122c3cf317a50f6",
+    "ja-ingcrowd-02-speaker_1-a172-noise5": "675b94a0257a0ecce22fa7913591d92fa809978ce0387d3f6384743b916df3c2",
+    "ja-ingcrowd-03-speaker_2-a275-noise15": "d56067a7680a012f9d7649c22b83facc5ccfb3a367ecf4b8064a0da437309177",
+    "ja-ingcrowd-03-speaker_2-a275-noise5": "43bb781382818600b36d63f4bf195549e11c99d8fd710c89429d38c379047673",
+    "ja-ingcrowd-04-speaker_2-a213-noise15": "e913109160c4f1e511d4f8b852fe2f147be4ee61218d7de5a021a211caa23078",
+    "ja-ingcrowd-04-speaker_2-a213-noise5": "2bfb73e7c12cc194a919e7f7a0926436a9a96793ec47352e3f73adef53f53243",
+    "ja-ingcrowd-03-speaker_1-a107-noise15": "888abf1a48a0c12ba0cb4b6e2ab875d859c3cfc2102d1814cccb5311b2930db9",
+    "ja-ingcrowd-03-speaker_1-a107-noise5": "f0544d5fe0fe0c16194c3fe0177ae5e521a612c4ba4f04e7398312f021e70b88",
+    "ja-ingcrowd-03-speaker_1-a42-noise15": "fd2b2aa5a603b04e3159c1a5d8a7dd4cb3934c43c8748d537826aaa801042838",
+    "ja-ingcrowd-03-speaker_1-a42-noise5": "056e681068e4c7608cb6f8ef28bd24e6d99f460481753414b2499d49b5cea346",
+    "ja-ingcrowd-03-speaker_2-a296-noise15": "99055dccc4eb4adf74c468aa3fdb2cabeaf004e97b91f38c7f4190521113b0c3",
+    "ja-ingcrowd-03-speaker_2-a296-noise5": "430838b044b5d45f5510c0874e85be358f92670f9a98ad067c14bbd87f2b233e",
+    "ja-ingcrowd-02-speaker_1-a99-noise15": "9be6d12b8f7d87893667855e53d16a71ae35d38f49e89cce1cbaaa47f8f65cd3",
+    "ja-ingcrowd-02-speaker_1-a99-noise5": "b2ceddb9268ea2eb978346a79f218b92a53aab56798dce078a910b5428721c65",
+    "ja-ingcrowd-03-speaker_1-a3-noise15": "51504ef173b2e0298dd9efa505dc242496e870516be17f77eb1aab9483aeda27",
+    "ja-ingcrowd-03-speaker_1-a3-noise5": "735dc997f99085a311eb74753e88105b8f694a2ce1a70025bd016ca9d33c1a1e",
+    "ja-ingcrowd-04-speaker_1-a14-noise15": "1e20d891fe92ca7f05185c88034af9ed1b99b339169ecc0032000f36eca6323e",
+    "ja-ingcrowd-04-speaker_1-a14-noise5": "e723ebb1327d381fa4cdd931ab9525037b4aa7a184e7e474ccefe081b4a73394",
+    "ja-ingcrowd-10-speaker_2-a192-noise15": "77b16a689c3f89cabaa582faf7f5d205f4c6d33bd33581a77ac7712b98340616",
+    "ja-ingcrowd-10-speaker_2-a192-noise5": "6505a55dac772ceebca2fa8299f4d81644eb2b72693639efc041674d667e11e9",
+    "ja-ingcrowd-02-speaker_1-a14-noise15": "3941711f8d5abebded58250d12738c48122209fa94fc8db5da75ba025eeee6ae",
+    "ja-ingcrowd-02-speaker_1-a14-noise5": "5ffc7e46e0e580b12da7cfcd43ad8578d046ca90cf33254817ee86987e9cd923",
+    "ja-ingcrowd-03-speaker_2-a169-noise15": "b9ad5a44aec43d9c68b01a11002ea45ad951be80fbbc7cacb26b7e8f72a730ab",
+    "ja-ingcrowd-03-speaker_2-a169-noise5": "e5f8c389b6fba0c9dd28e49ae0993f577f7b5adfdc3e33e2fab84516cd0df75a",
+    "ja-ingcrowd-04-speaker_1-a116-noise15": "03f35c7b231496ab5718a18fef523e9fc9a80049b2422fd06cccff47d8840ebc",
+    "ja-ingcrowd-04-speaker_1-a116-noise5": "07d78aff7975b630eee70fe5e7f143926f4b0164e13060b0dc2a05b4df810631",
+    "ja-ingcrowd-01-speaker_1-a80-noise15": "f0421fb0aaaaac0cd19db5705529ee9032d4cdc60243cfa8c526d2d954e58073",
+    "ja-ingcrowd-01-speaker_1-a80-noise5": "03f142fcc704d984b698269c8fadaa99eef6d39adbbb1e8a3cb04681c3c40613",
+    "ja-ingcrowd-03-speaker_1-a53-noise15": "99bb065892264fd543cf0e1b52ff66dc38232c5ef21cb12743639d782b43b404",
+    "ja-ingcrowd-03-speaker_1-a53-noise5": "1a9627036cbcac7c094a92ef6dc4124446ec7a61a74fb7caa247669f822795f2",
+    "ja-ingcrowd-04-speaker_1-a25-noise15": "394f5514a5cdfc9f1fca2457d8e0664c539bf9372b785531da6c00e64db592d8",
+    "ja-ingcrowd-04-speaker_1-a25-noise5": "55031ca2bac8a7bfa965e3c48fff8721d7b52167d20c4d1be0a51a50a5842d37",
+    "ja-control-0": "7f9f2921911802d3cc4066183e25f0879d796b0869628f914775379385be7878",
+    "ja-control-1": "142afd6e6b9adff6ce99d43641c2450c00cf1789d52ee4acec7e0ecc55b59626",
+    "ja-control-2": "2338e1ab4421ba3168879b06bcf9f5787026d92cdba65d59cee6b5ee47e6eed9",
+    "ja-control-3": "c4754088d259e83a8416792499f6b5ecc594cd3086d6ccd2e8ab97c91ffaccf2",
+    "ja-control-4": "95b578867509ede623ff51733a54658016008613ea02d8d6b2657b89179ed3a9"
+  },
+  "acquisition_route_note": "Final EN rerun uses pinned public HF IHM testparquet and one pinned public originalMix-Headset only for natural replay. Old original-headset transfer failures preserved separately; final preparation has no oldgit-object dependency.",
+  "historical_unavailable_sources": [
+    {
+      "path": "sources/ami/ES2004d.Headset-0.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-0.wav",
+      "sha256": "210058ed9a9083e71faa63505662d62e9ae4fe10e0a7d8af606ea99b13e4ee90",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-0.wav"
+    },
+    {
+      "path": "sources/ami/ES2004d.Headset-1.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-1.wav",
+      "sha256": "2ee130755b2501bb3e8ae085a491f76aff6d34b8424dd7db1735058f9d22ef5f",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-1.wav"
+    },
+    {
+      "path": "sources/ami/ES2004d.Headset-2.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-2.wav",
+      "sha256": "0061f928a9296cae3e69c32eedd9c752037a279aab329aa16f58632f36dcd41d",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-2.wav"
+    },
+    {
+      "path": "sources/ami/ES2004d.Headset-3.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-3.wav",
+      "sha256": "b1dae76c373f3e7a378f1e4f8355f7d59311af2075f516bd46dddb18e66d0973",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-3.wav"
+    },
+    {
+      "path": "sources/ami/IS1009c.Headset-0.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-0.wav",
+      "sha256": "2d0b713a9a10ad3b3ea1719c845ab3758be092d09cfced4a37188a5084af412d",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-0.wav"
+    },
+    {
+      "path": "sources/ami/IS1009c.Headset-1.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-1.wav",
+      "sha256": "f95638c9089e04f1c523887d18a18a612cc74ffe7805fba0ad9fecaa55ebd62d",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-1.wav"
+    },
+    {
+      "path": "sources/ami/IS1009c.Headset-2.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-2.wav",
+      "sha256": "2a58b4c93f34daf6fdafc3f4a7f86020b9c3c7445b6804ad32540d5055081f88",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-2.wav"
+    },
+    {
+      "path": "sources/ami/IS1009c.Headset-3.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-3.wav",
+      "sha256": "0728c2e4e6123be0151f4315303654b95e0113244654abec2ff1cffb5e339d24",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-3.wav"
+    },
+    {
+      "path": "sources/ami/TS3003c.Headset-0.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-0.wav",
+      "sha256": "2011c8262787016fcd590064d1f1cf57bb36f58c596972fff0d0a4d39eea3b33",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-0.wav"
+    },
+    {
+      "path": "sources/ami/TS3003c.Headset-1.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-1.wav",
+      "sha256": "96989d4270d183ca3df0552fed5a655ee45378cb2059eb534e0c18549cbe5f02",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-1.wav"
+    },
+    {
+      "path": "sources/ami/TS3003c.Headset-2.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-2.wav",
+      "sha256": "0017240bb25d8067c069a199f8e01706fe3288e6eae9ab87324429d2efa2717e",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-2.wav"
+    },
+    {
+      "path": "sources/ami/TS3003c.Headset-3.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-3.wav",
+      "sha256": "1215f020604beece7f3e2d0eac9cae439f70bbc749a5209fea94e659b85177ce",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-3.wav"
+    },
+    {
+      "path": "sources/ami/TS3003d.Headset-0.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-0.wav",
+      "sha256": "b8ba489d252dc6f7e70d1c281083bd086dde190a1468a33ecf092ccf01738502",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-0.wav"
+    },
+    {
+      "path": "sources/ami/TS3003d.Headset-1.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-1.wav",
+      "sha256": "57380f4aa833bf11e3dee2764b3748c1acd8a4d4cc37ff4ff1306981103a9c74",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-1.wav"
+    },
+    {
+      "path": "sources/ami/TS3003d.Headset-2.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-2.wav",
+      "sha256": "8b279e06b0c243b5b77bf7387cb6f5ec2910ef7792eadf624a6f6292bc511097",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-2.wav"
+    },
+    {
+      "path": "sources/ami/TS3003d.Headset-3.wav",
+      "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-3.wav",
+      "sha256": "18eaa25589712fd9c1fcbc66bca28bf11a0297a514f77cd27810be64c51f5287",
+      "language": "en",
+      "kind": "audio",
+      "range_request": true,
+      "historical_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-3.wav"
+    }
+  ],
+  "english_reconstruction": {
+    "status": "approved before any EN candidate inference",
+    "decision": "Use bounded pinned HF Edinburgh IHM test reconstruction, not inaccessible exact16 individual-headset originals, local non-eval mixed audio or24GB archive. Preserve120clean40brief/40short/40medium,4meetings/speaker spread and human references.",
+    "dataset": "edinburghcstr/ami",
+    "revision": "46f28f2503e2ec48f8867a84eef356c70476beab",
+    "config": "ihm",
+    "split": "test",
+    "reference_policy": "Original human references distributed with Kaldi normalization. Human manual1.6.2 annotations used for bounded independent reference/timing sanity checks; no candidate-generated text.",
+    "difference": "Reconstructed IHM utterance selection and upstream Kaldi clip boundaries/normalized text, not the recovered #308 followup120. Exact IDs, durations, source channel/timing and parquet row identities frozen before candidate inference/noise.",
+    "natural_window": "Original ES2004d32.368–152.368s timing/references retained; audio from public original Mix-Headset at pinned FluidInference revision, not recovered mean-of4headsets. Whole natural window preserved, channel/mix difference disclosed.",
+    "natural_revision": "722d8891643e1e4dc62cfd0d198fa05a1646c3cc",
+    "blocker": "Original full individual-headset acquisition failedHTTP403 with Apache htaccess explanation usingHTTPS single/double-slash andHTTPredirect, across16requiredfiles; isolatedPython/requests/header comparison yielded some206ranges but next4MiB403 in bothclients.",
+    "archive_not_taken": "OpenSLR24,359,488,927byte headset archive header accessible, sortedfirstmemberEN2001a.Headset0; Director chose smallerIHMtest reconstruction rather than near-full24GB stream. LegacyOpenSLRlicense CC-BY-NC-SA2.0 modified noted but noarchiveaudio acquired.",
+    "selection_rule": "Ten per target meeting per bucket, deterministic SHA256(seed30820261027:reconstruct:id) order; actual waveform duration; no candidate outputs",
+    "rejected_candidate_counts": {
+      "outside_duration_or_empty_reference": 639
+    },
+    "candidate_count": 2442,
+    "row_count": 120,
+    "clean_length_buckets": {
+      "brief": 40,
+      "short": 40,
+      "medium": 40
+    },
+    "speaker_labels": [
+      "FEE013",
+      "FEE016",
+      "FIE088",
+      "FIO084",
+      "FIO087",
+      "FIO089",
+      "MEE014",
+      "MEO015",
+      "MTD0010ID",
+      "MTD009PM",
+      "MTD011UID",
+      "MTD012ME"
+    ]
+  },
+  "recovered_english_noise_parent_eligibility": {
+    "scope": "Historical-only preliminary exact-recovery plan, superseded by the approved IHM test reconstruction. The final English parents are listed in data-preparation.json languages.en.noise_parent_ids.",
+    "rule": "First30 sorted SHA256(f\"30820261027:noise:{id}\") among recovered originals with nonempty unchanged shared activity mask. Exclude only recovered3empty-mask originals from noise pairing; all120clean speech inputs, original audio/references/bounds, and annotation-end timing fallbacks retained. No candidate-derived references or amplification.",
+    "excluded_from_noise_only": [
+      "followup-en-ES2004d.sync.1178",
+      "followup-en-ES2004d.sync.472",
+      "followup-en-ES2004d.sync.452"
+    ],
+    "replaced_before_issue353_inference": {
+      "removed": [
+        "followup-en-ES2004d.sync.1178",
+        "followup-en-ES2004d.sync.452"
+      ],
+      "added": [
+        "followup-en-IS1009c.sync.298",
+        "followup-en-IS1009c.sync.342"
+      ]
+    }
+  },
+  "en_noise_parent_eligibility": {
+    "rule": "Reconstructed120 selected blind to candidates; eligible means nonempty unchanged original shared energy mask; first30sortedSHA256(seed30820261027:noise:id). Frozen before EN candidate inference."
+  }
+}

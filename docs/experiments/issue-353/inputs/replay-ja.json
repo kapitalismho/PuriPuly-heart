@@ -1,0 +1,1892 @@
+{
+  "language": "ja",
+  "duration_s": 120,
+  "construction": "actual continuous original conversation window; no utterance reordering, gap synthesis, silence deletion, overlap removal or speed change",
+  "selection_rule": "Fixed source per language; earliest120s window after source60s with both edges inside annotation gaps by>=10ms,>=5short and>=2medium turns,>=2native annotation gaps0.1-1s,>=2speakers; KO additionally>=2interviewer turns. Selected before any natural-replay inference.",
+  "source": {
+    "conversation_id": "japanese-themed-dialogue01",
+    "source_paths": [
+      "sources/ingcrowd/japanese-themed-dialogue01_audio.wav"
+    ],
+    "channel_policy": "Original16k mono mixed Zoom recording, complete continuous window including all annotated overlap, laughter and uncertain speech; no separation, muting or inserted gaps.",
+    "annotation_path": "sources/ingcrowd/japanese-themed-dialogue01.eaf",
+    "annotation_sha256": "c59daa71d0ffa34e50b4c532d33f5c0d2a51ceaa8aea4435a68a87d924f61b32",
+    "license": "CC-BY-NC-4.0; noncommercial research/verification only, audio not distributed",
+    "split": "issue308-evaluation-sample",
+    "revision": "e2eed8769400269f20821deb0e47e68b40012e8b",
+    "attribution": "IngCrowd Inc. / 株式会社イングクラウド",
+    "source_context": "Genuine unscripted themed conversation with human verbatim EAF annotations; no ASR in annotation. Producer public corpus-service sample adopted under explicit relaxed criteria, not a model-inference demo or official held-out split. Tier identities are local, not stable cross-conversation speaker IDs. All tagged intervals remain timing/coverage-only with lexical reference unavailable.",
+    "files": [
+      {
+        "path": "sources/ingcrowd/japanese-themed-dialogue01_audio.wav",
+        "sha256": "ea1138f2b05e6b3cc9580ed1196748ed67c5847f222c1cf4a54de6bf4d9d3282",
+        "sample_rate_hz": 16000,
+        "channels": 1,
+        "frames": 10812416,
+        "duration_s": 675.776
+      }
+    ],
+    "original_duration_s": 675.776,
+    "window_start_s": 86.04,
+    "window_end_s": 206.04000000000002,
+    "window_start_sample": 1376640,
+    "window_end_sample": 3296640
+  },
+  "paths": {
+    "clean": "ja/replay-clean.wav",
+    "noise15": "ja/replay-noise15.wav"
+  },
+  "turns": [
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a57",
+      "offset_s": 0.56,
+      "duration_s": 0.76,
+      "speech_end_s": 1.32,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a57",
+      "source_start_s": 86.6,
+      "source_end_s": 87.36,
+      "source_start_sample": 1385600,
+      "source_end_sample": 1397760,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "うーん。",
+      "source_reference": "うーん。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a22",
+      "offset_s": 1.14,
+      "duration_s": 0.44,
+      "speech_end_s": 1.52,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a22",
+      "source_start_s": 87.18,
+      "source_end_s": 87.62,
+      "source_start_sample": 1394880,
+      "source_end_sample": 1401920,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "なんか",
+      "source_reference": "なんか",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a23",
+      "offset_s": 2.09,
+      "duration_s": 6.18,
+      "speech_end_s": 8.27,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a23",
+      "source_start_s": 88.13,
+      "source_end_s": 94.31,
+      "source_start_sample": 1410080,
+      "source_end_sample": 1508960,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "なに、なんか、こんな、いいんだろうか私廃人のようなんだけどと思って<la>過ごしてた。",
+      "reference_status": "unavailable/incomplete lexical reference; timing and input coverage only, not accuracy",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a58",
+      "offset_s": 7.8,
+      "duration_s": 3.72,
+      "speech_end_s": 11.5,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a58",
+      "source_start_s": 93.84,
+      "source_end_s": 97.56,
+      "source_start_sample": 1501440,
+      "source_end_sample": 1560960,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "あでも何だろうね。やっぱ実家が近いとそうなるのかな。なんかその",
+      "source_reference": "あでも何だろうね。やっぱ実家が近いとそうなるのかな。なんかその",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a24",
+      "offset_s": 11.925,
+      "duration_s": 0.8,
+      "speech_end_s": 12.705,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a24",
+      "source_start_s": 97.965,
+      "source_end_s": 98.765,
+      "source_start_sample": 1567440,
+      "source_end_sample": 1580240,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "うーん。",
+      "source_reference": "うーん。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a59",
+      "offset_s": 12.17,
+      "duration_s": 2.97,
+      "speech_end_s": 15.14,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a59",
+      "source_start_s": 98.21,
+      "source_end_s": 101.18,
+      "source_start_sample": 1571360,
+      "source_end_sample": 1618880,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "親の実家がさ、結構、近くて",
+      "source_reference": "親の実家がさ、結構、近くて",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a25",
+      "offset_s": 15.43,
+      "duration_s": 0.69,
+      "speech_end_s": 16.12,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a25",
+      "source_start_s": 101.47,
+      "source_end_s": 102.16,
+      "source_start_sample": 1623520,
+      "source_end_sample": 1634560,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "うんうん。",
+      "source_reference": "うんうん。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a60",
+      "offset_s": 16.35,
+      "duration_s": 2.92,
+      "speech_end_s": 19.270000000000003,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a60",
+      "source_start_s": 102.39,
+      "source_end_s": 105.31,
+      "source_start_sample": 1638240,
+      "source_end_sample": 1684960,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "なんか皆その、自分は遠いけど",
+      "source_reference": "なんか皆その、自分は遠いけど",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a61",
+      "offset_s": 19.75,
+      "duration_s": 3.99,
+      "speech_end_s": 23.73,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a61",
+      "source_start_s": 105.79,
+      "source_end_s": 109.78,
+      "source_start_sample": 1692640,
+      "source_end_sample": 1756480,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "なんか他の家族はだいたい皆同じ街に住んでるっていうか、そんな感じだから",
+      "source_reference": "なんか他の家族はだいたい皆同じ街に住んでるっていうか、そんな感じだから",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a26",
+      "offset_s": 22.87,
+      "duration_s": 0.61,
+      "speech_end_s": 23.48,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a26",
+      "source_start_s": 108.91,
+      "source_end_s": 109.52,
+      "source_start_sample": 1742560,
+      "source_end_sample": 1752320,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "あー。",
+      "source_reference": "あー。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a27",
+      "offset_s": 24.07,
+      "duration_s": 0.79,
+      "speech_end_s": 24.86,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a27",
+      "source_start_s": 110.11,
+      "source_end_s": 110.9,
+      "source_start_sample": 1761760,
+      "source_end_sample": 1774400,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "うんうんうん。",
+      "source_reference": "うんうんうん。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a62",
+      "offset_s": 24.54,
+      "duration_s": 2.01,
+      "speech_end_s": 26.52,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a62",
+      "source_start_s": 110.58,
+      "source_end_s": 112.59,
+      "source_start_sample": 1769280,
+      "source_end_sample": 1801440,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "多分実家もなんか、そんなに",
+      "source_reference": "多分実家もなんか、そんなに",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a63",
+      "offset_s": 27.24,
+      "duration_s": 2.43,
+      "speech_end_s": 29.639999999999997,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a63",
+      "source_start_s": 113.28,
+      "source_end_s": 115.71,
+      "source_start_sample": 1812480,
+      "source_end_sample": 1851360,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "自分が帰る時だけ里帰りみたいになるけど",
+      "source_reference": "自分が帰る時だけ里帰りみたいになるけど",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a28",
+      "offset_s": 29.96,
+      "duration_s": 3.2,
+      "speech_end_s": 33.14,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a28",
+      "source_start_s": 116.0,
+      "source_end_s": 119.2,
+      "source_start_sample": 1856000,
+      "source_end_sample": 1907200,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "うんうんうんうん。あーまあみ、他の人達は別に",
+      "source_reference": "うんうんうんうん。あーまあみ、他の人達は別に",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a64",
+      "offset_s": 31.175,
+      "duration_s": 5.375,
+      "speech_end_s": 36.475,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a64",
+      "source_start_s": 117.215,
+      "source_end_s": 122.59,
+      "source_start_sample": 1875440,
+      "source_end_sample": 1961440,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "なんか、家族内では、そうそうそう。別にずっと、普通の暮らしみたいな感じだから。",
+      "source_reference": "なんか、家族内では、そうそうそう。別にずっと、普通の暮らしみたいな感じだから。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a29",
+      "offset_s": 33.95,
+      "duration_s": 1.15,
+      "speech_end_s": 35.1,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a29",
+      "source_start_s": 119.99,
+      "source_end_s": 121.14,
+      "source_start_sample": 1919840,
+      "source_end_sample": 1938240,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "普通に生活。",
+      "source_reference": "普通に生活。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a30",
+      "offset_s": 35.82,
+      "duration_s": 0.74,
+      "speech_end_s": 36.56,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a30",
+      "source_start_s": 121.86,
+      "source_end_s": 122.6,
+      "source_start_sample": 1949760,
+      "source_end_sample": 1961600,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "ああー。",
+      "source_reference": "ああー。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a31",
+      "offset_s": 37.22,
+      "duration_s": 5.18,
+      "speech_end_s": 42.379999999999995,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a31",
+      "source_start_s": 123.26,
+      "source_end_s": 128.44,
+      "source_start_sample": 1972160,
+      "source_end_sample": 2055040,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "あっえーじゃあさ帰って、な何、出掛けたりとかなんかほら",
+      "source_reference": "あっえーじゃあさ帰って、な何、出掛けたりとかなんかほら",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a65",
+      "offset_s": 39.975,
+      "duration_s": 0.36,
+      "speech_end_s": 40.315000000000005,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a65",
+      "source_start_s": 126.015,
+      "source_end_s": 126.375,
+      "source_start_sample": 2016240,
+      "source_end_sample": 2022000,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "うん。",
+      "source_reference": "うん。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a32",
+      "offset_s": 42.89,
+      "duration_s": 0.78,
+      "speech_end_s": 43.67,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a32",
+      "source_start_s": 128.93,
+      "source_end_s": 129.71,
+      "source_start_sample": 2062880,
+      "source_end_sample": 2075360,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "あーでもあれか。",
+      "source_reference": "あーでもあれか。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a33",
+      "offset_s": 44.17,
+      "duration_s": 0.42,
+      "speech_end_s": 44.59,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a33",
+      "source_start_s": 130.21,
+      "source_end_s": 130.63,
+      "source_start_sample": 2083360,
+      "source_end_sample": 2090080,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "まだ",
+      "source_reference": "まだ",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a34",
+      "offset_s": 45.05,
+      "duration_s": 2.62,
+      "speech_end_s": 47.65,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a34",
+      "source_start_s": 131.09,
+      "source_end_s": 133.71,
+      "source_start_sample": 2097440,
+      "source_end_sample": 2139360,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "あれだよね。子供がいたらとか",
+      "source_reference": "あれだよね。子供がいたらとか",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a66",
+      "offset_s": 48.37,
+      "duration_s": 0.75,
+      "speech_end_s": 49.11,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a66",
+      "source_start_s": 134.41,
+      "source_end_s": 135.16,
+      "source_start_sample": 2150560,
+      "source_end_sample": 2162560,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "はいはいはい。",
+      "source_reference": "はいはいはい。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a35",
+      "offset_s": 48.79,
+      "duration_s": 1.93,
+      "speech_end_s": 50.71,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a35",
+      "source_start_s": 134.83,
+      "source_end_s": 136.76,
+      "source_start_sample": 2157280,
+      "source_end_sample": 2188160,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "ね。子供がいたらなんかこう何だろう。",
+      "source_reference": "ね。子供がいたらなんかこう何だろう。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a36",
+      "offset_s": 51.71,
+      "duration_s": 1.51,
+      "speech_end_s": 53.22,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a36",
+      "source_start_s": 137.75,
+      "source_end_s": 139.26,
+      "source_start_sample": 2204000,
+      "source_end_sample": 2228160,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "テーマパークに行くとか",
+      "source_reference": "テーマパークに行くとか",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a67",
+      "offset_s": 53.2,
+      "duration_s": 0.76,
+      "speech_end_s": 53.96,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a67",
+      "source_start_s": 139.24,
+      "source_end_s": 140.0,
+      "source_start_sample": 2227840,
+      "source_end_sample": 2240000,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "確かにね。",
+      "source_reference": "確かにね。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a37",
+      "offset_s": 54.3,
+      "duration_s": 5.89,
+      "speech_end_s": 60.19,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a37",
+      "source_start_s": 140.34,
+      "source_end_s": 146.23,
+      "source_start_sample": 2245440,
+      "source_end_sample": 2339680,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "ね。あの久しぶりに会ったジジババと一緒にテーマパークに行こうーみたいになる、のかもね。",
+      "source_reference": "ね。あの久しぶりに会ったジジババと一緒にテーマパークに行こうーみたいになる、のかもね。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a68",
+      "offset_s": 56.66,
+      "duration_s": 1.08,
+      "speech_end_s": 57.739999999999995,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a68",
+      "source_start_s": 142.7,
+      "source_end_s": 143.78,
+      "source_start_sample": 2283200,
+      "source_end_sample": 2300480,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "あーうんうん。",
+      "source_reference": "あーうんうん。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a69",
+      "offset_s": 61.49,
+      "duration_s": 1.52,
+      "speech_end_s": 63.010000000000005,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a69",
+      "source_start_s": 147.53,
+      "source_end_s": 149.05,
+      "source_start_sample": 2360480,
+      "source_end_sample": 2384800,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "そうだね。なんかそういう",
+      "source_reference": "そうだね。なんかそういう",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a70",
+      "offset_s": 63.565,
+      "duration_s": 1.38,
+      "speech_end_s": 64.945,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a70",
+      "source_start_s": 149.605,
+      "source_end_s": 150.985,
+      "source_start_sample": 2393680,
+      "source_end_sample": 2415760,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "何だろ。そういうのもないから",
+      "source_reference": "何だろ。そういうのもないから",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a38",
+      "offset_s": 65.46,
+      "duration_s": 0.53,
+      "speech_end_s": 65.99,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a38",
+      "source_start_s": 151.5,
+      "source_end_s": 152.03,
+      "source_start_sample": 2424000,
+      "source_end_sample": 2432480,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "うん。",
+      "source_reference": "うん。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a71",
+      "offset_s": 65.76,
+      "duration_s": 3.69,
+      "speech_end_s": 69.42,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a71",
+      "source_start_s": 151.8,
+      "source_end_s": 155.49,
+      "source_start_sample": 2428800,
+      "source_end_sample": 2487840,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "シンプルに実家に帰って、なんか家族とご飯食べてみたいな。",
+      "source_reference": "シンプルに実家に帰って、なんか家族とご飯食べてみたいな。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a39",
+      "offset_s": 69.42,
+      "duration_s": 5.87,
+      "speech_end_s": 75.24000000000001,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a39",
+      "source_start_s": 155.46,
+      "source_end_s": 161.33,
+      "source_start_sample": 2487360,
+      "source_end_sample": 2581280,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "あーあー。え外になんか外食に行くとかしないの？なんか共通の趣味とかないの？家族で。",
+      "source_reference": "あーあー。え外になんか外食に行くとかしないの？なんか共通の趣味とかないの？家族で。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a174",
+      "offset_s": 76.64,
+      "duration_s": 1.05,
+      "speech_end_s": 77.68,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a174",
+      "source_start_s": 162.68,
+      "source_end_s": 163.73,
+      "source_start_sample": 2602880,
+      "source_end_sample": 2619680,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "ないかも。",
+      "source_reference": "ないかも。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a73",
+      "offset_s": 77.77,
+      "duration_s": 1.43,
+      "speech_end_s": 79.2,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a73",
+      "source_start_s": 163.81,
+      "source_end_s": 165.24,
+      "source_start_sample": 2620960,
+      "source_end_sample": 2643840,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "<la>ない。",
+      "reference_status": "unavailable/incomplete lexical reference; timing and input coverage only, not accuracy",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a175",
+      "offset_s": 78.63,
+      "duration_s": 2.97,
+      "speech_end_s": 81.57,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a175",
+      "source_start_s": 164.67,
+      "source_end_s": 167.64,
+      "source_start_sample": 2634720,
+      "source_end_sample": 2682240,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "なんか各々が各々違うのが好きみたいな感じだから。",
+      "source_reference": "なんか各々が各々違うのが好きみたいな感じだから。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a74",
+      "offset_s": 79.88,
+      "duration_s": 0.5,
+      "speech_end_s": 80.38,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a74",
+      "source_start_s": 165.92,
+      "source_end_s": 166.42,
+      "source_start_sample": 2654720,
+      "source_end_sample": 2662720,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "うんうん。",
+      "source_reference": "うんうん。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a75",
+      "offset_s": 81.58,
+      "duration_s": 1.1,
+      "speech_end_s": 82.67999999999999,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a75",
+      "source_start_s": 167.62,
+      "source_end_s": 168.72,
+      "source_start_sample": 2681920,
+      "source_end_sample": 2699520,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "あー。",
+      "source_reference": "あー。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a176",
+      "offset_s": 83.23,
+      "duration_s": 4.89,
+      "speech_end_s": 88.12,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a176",
+      "source_start_s": 169.27,
+      "source_end_s": 174.16,
+      "source_start_sample": 2708320,
+      "source_end_sample": 2786560,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "そう。だからそ、そうだね。なんか、何か食べに行くとかそんぐらいかな、ほんとに。",
+      "source_reference": "そう。だからそ、そうだね。なんか、何か食べに行くとかそんぐらいかな、ほんとに。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a76",
+      "offset_s": 87.84,
+      "duration_s": 1.22,
+      "speech_end_s": 89.06,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a76",
+      "source_start_s": 173.88,
+      "source_end_s": 175.1,
+      "source_start_sample": 2782080,
+      "source_end_sample": 2801600,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "うーん。",
+      "source_reference": "うーん。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a177",
+      "offset_s": 89.18,
+      "duration_s": 1.86,
+      "speech_end_s": 90.98,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a177",
+      "source_start_s": 175.22,
+      "source_end_s": 177.08,
+      "source_start_sample": 2803520,
+      "source_end_sample": 2833280,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "家族で何かする訳でもないし。",
+      "source_reference": "家族で何かする訳でもないし。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a77",
+      "offset_s": 91.41,
+      "duration_s": 0.67,
+      "speech_end_s": 92.07,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a77",
+      "source_start_s": 177.45,
+      "source_end_s": 178.12,
+      "source_start_sample": 2839200,
+      "source_end_sample": 2849920,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "確かに。",
+      "source_reference": "確かに。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a78",
+      "offset_s": 92.66,
+      "duration_s": 7.9,
+      "speech_end_s": 100.56,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a78",
+      "source_start_s": 178.7,
+      "source_end_s": 186.6,
+      "source_start_sample": 2859200,
+      "source_end_sample": 2985600,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "確かにね。もうなんかいい歳になってきたらさもう親もだし自分もだけどもうなんか食べるのが楽しみ唯一の楽しみみたいなところが",
+      "source_reference": "確かにね。もうなんかいい歳になってきたらさもう親もだし自分もだけどもうなんか食べるのが楽しみ唯一の楽しみみたいなところが",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a178",
+      "offset_s": 95.55,
+      "duration_s": 0.54,
+      "speech_end_s": 96.09,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a178",
+      "source_start_s": 181.59,
+      "source_end_s": 182.13,
+      "source_start_sample": 2905440,
+      "source_end_sample": 2914080,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "うん。",
+      "source_reference": "うん。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a179",
+      "offset_s": 99.995,
+      "duration_s": 1.39,
+      "speech_end_s": 101.375,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a179",
+      "source_start_s": 186.035,
+      "source_end_s": 187.425,
+      "source_start_sample": 2976560,
+      "source_end_sample": 2998800,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "はいはいはいはいはい。",
+      "source_reference": "はいはいはいはいはい。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a79",
+      "offset_s": 101.06,
+      "duration_s": 6.67,
+      "speech_end_s": 107.7,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a79",
+      "source_start_s": 187.1,
+      "source_end_s": 193.77,
+      "source_start_sample": 2993600,
+      "source_end_sample": 3100320,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "あってーだから、うち実家が近いからあんまりその帰省って感じじゃないんだけど、こ、逆に何だろう。",
+      "source_reference": "あってーだから、うち実家が近いからあんまりその帰省って感じじゃないんだけど、こ、逆に何だろう。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a180",
+      "offset_s": 104.99,
+      "duration_s": 0.36,
+      "speech_end_s": 105.35,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_2-a180",
+      "source_start_s": 191.03,
+      "source_end_s": 191.39,
+      "source_start_sample": 3056480,
+      "source_end_sample": 3062240,
+      "speaker_id": "japanese-themed-dialogue01:speaker_2",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "うん。",
+      "source_reference": "うん。",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a80",
+      "offset_s": 108.31,
+      "duration_s": 6.37,
+      "speech_end_s": 114.67,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a80",
+      "source_start_s": 194.35,
+      "source_end_s": 200.72,
+      "source_start_sample": 3109600,
+      "source_end_sample": 3211520,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "普通の、土日とかちょっとした連休とかに親を連れて",
+      "source_reference": "普通の、土日とかちょっとした連休とかに親を連れて",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a81",
+      "offset_s": 115.23,
+      "duration_s": 4.05,
+      "speech_end_s": 119.27000000000001,
+      "speech_end_method": "Shared clean-source energy-VAD within original annotated turn:20ms RMS,max(-50dBFS,peak-30dB),60ms closing/dilation; overlap/background may bias it.",
+      "source_annotation_id": "japanese-themed-dialogue01-speaker_1-a81",
+      "source_start_s": 201.27,
+      "source_end_s": 205.32,
+      "source_start_sample": 3220320,
+      "source_end_sample": 3285120,
+      "speaker_id": "japanese-themed-dialogue01:speaker_1",
+      "role": "participant",
+      "source_role": null,
+      "reference_available": true,
+      "reference": "ちょっとこう車で一時間とか二時間ぐらいのところ、に、こう",
+      "source_reference": "ちょっとこう車で一時間とか二時間ぐらいのところ、に、こう",
+      "reference_status": "original human-verified reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": null,
+      "annotation_event_types": null
+    }
+  ],
+  "annotated_nonspeech_events": [],
+  "overlaps": [
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a57",
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a22"
+      ],
+      "start_s": 1.14,
+      "end_s": 1.32,
+      "duration_s": 0.18000000000000016
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a23",
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a58"
+      ],
+      "start_s": 7.8,
+      "end_s": 8.27,
+      "duration_s": 0.46999999999999975
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a24",
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a59"
+      ],
+      "start_s": 12.17,
+      "end_s": 12.725000000000001,
+      "duration_s": 0.5550000000000015
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a61",
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a26"
+      ],
+      "start_s": 22.87,
+      "end_s": 23.48,
+      "duration_s": 0.6099999999999994
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a27",
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a62"
+      ],
+      "start_s": 24.54,
+      "end_s": 24.86,
+      "duration_s": 0.3200000000000003
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a28",
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a64"
+      ],
+      "start_s": 31.175,
+      "end_s": 33.160000000000004,
+      "duration_s": 1.985000000000003
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a64",
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a29"
+      ],
+      "start_s": 33.95,
+      "end_s": 35.1,
+      "duration_s": 1.1499999999999986
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a64",
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a30"
+      ],
+      "start_s": 35.82,
+      "end_s": 36.55,
+      "duration_s": 0.7299999999999969
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a31",
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a65"
+      ],
+      "start_s": 39.975,
+      "end_s": 40.335,
+      "duration_s": 0.35999999999999943
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a66",
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a35"
+      ],
+      "start_s": 48.79,
+      "end_s": 49.12,
+      "duration_s": 0.3299999999999983
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a36",
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a67"
+      ],
+      "start_s": 53.2,
+      "end_s": 53.22,
+      "duration_s": 0.01999999999999602
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a37",
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a68"
+      ],
+      "start_s": 56.66,
+      "end_s": 57.739999999999995,
+      "duration_s": 1.0799999999999983
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a38",
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a71"
+      ],
+      "start_s": 65.76,
+      "end_s": 65.99,
+      "duration_s": 0.22999999999998977
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a71",
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a39"
+      ],
+      "start_s": 69.42,
+      "end_s": 69.45,
+      "duration_s": 0.030000000000001137
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a73",
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a175"
+      ],
+      "start_s": 78.63,
+      "end_s": 79.2,
+      "duration_s": 0.5700000000000074
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a175",
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a74"
+      ],
+      "start_s": 79.88,
+      "end_s": 80.38,
+      "duration_s": 0.5
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a175",
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a75"
+      ],
+      "start_s": 81.58,
+      "end_s": 81.6,
+      "duration_s": 0.01999999999999602
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a176",
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a76"
+      ],
+      "start_s": 87.84,
+      "end_s": 88.12,
+      "duration_s": 0.28000000000000114
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a78",
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a178"
+      ],
+      "start_s": 95.55,
+      "end_s": 96.09,
+      "duration_s": 0.5400000000000063
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a78",
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a179"
+      ],
+      "start_s": 99.995,
+      "end_s": 100.56,
+      "duration_s": 0.5649999999999977
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a179",
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a79"
+      ],
+      "start_s": 101.06,
+      "end_s": 101.385,
+      "duration_s": 0.32500000000000284
+    },
+    {
+      "ids": [
+        "ja-natural-japanese-themed-dialogue01-speaker_1-a79",
+        "ja-natural-japanese-themed-dialogue01-speaker_2-a180"
+      ],
+      "start_s": 104.99,
+      "end_s": 105.35,
+      "duration_s": 0.35999999999999943
+    }
+  ],
+  "gap_statistics": {
+    "definition": "Gaps in union of original annotated speech intervals, not guaranteed acoustic silence; no generated gaps.",
+    "native_gaps": [
+      {
+        "start_s": 0.0,
+        "end_s": 0.5599999999999881,
+        "duration_s": 0.5599999999999881
+      },
+      {
+        "start_s": 1.5799999999999983,
+        "end_s": 2.089999999999989,
+        "duration_s": 0.5099999999999909
+      },
+      {
+        "start_s": 11.519999999999996,
+        "end_s": 11.924999999999997,
+        "duration_s": 0.40500000000000114
+      },
+      {
+        "start_s": 15.14,
+        "end_s": 15.429999999999993,
+        "duration_s": 0.28999999999999204
+      },
+      {
+        "start_s": 16.11999999999999,
+        "end_s": 16.349999999999994,
+        "duration_s": 0.23000000000000398
+      },
+      {
+        "start_s": 19.269999999999996,
+        "end_s": 19.75,
+        "duration_s": 0.480000000000004
+      },
+      {
+        "start_s": 23.739999999999995,
+        "end_s": 24.069999999999993,
+        "duration_s": 0.3299999999999983
+      },
+      {
+        "start_s": 26.549999999999997,
+        "end_s": 27.239999999999995,
+        "duration_s": 0.6899999999999977
+      },
+      {
+        "start_s": 29.669999999999987,
+        "end_s": 29.959999999999994,
+        "duration_s": 0.29000000000000625
+      },
+      {
+        "start_s": 36.55999999999999,
+        "end_s": 37.22,
+        "duration_s": 0.6600000000000108
+      },
+      {
+        "start_s": 42.39999999999999,
+        "end_s": 42.89,
+        "duration_s": 0.4900000000000091
+      },
+      {
+        "start_s": 43.67,
+        "end_s": 44.17,
+        "duration_s": 0.5
+      },
+      {
+        "start_s": 44.58999999999999,
+        "end_s": 45.05,
+        "duration_s": 0.46000000000000796
+      },
+      {
+        "start_s": 47.67,
+        "end_s": 48.36999999999999,
+        "duration_s": 0.6999999999999886
+      },
+      {
+        "start_s": 50.719999999999985,
+        "end_s": 51.709999999999994,
+        "duration_s": 0.9900000000000091
+      },
+      {
+        "start_s": 53.959999999999994,
+        "end_s": 54.3,
+        "duration_s": 0.3400000000000034
+      },
+      {
+        "start_s": 60.18999999999998,
+        "end_s": 61.489999999999995,
+        "duration_s": 1.3000000000000114
+      },
+      {
+        "start_s": 63.010000000000005,
+        "end_s": 63.56499999999998,
+        "duration_s": 0.5549999999999784
+      },
+      {
+        "start_s": 64.94500000000001,
+        "end_s": 65.46,
+        "duration_s": 0.5149999999999864
+      },
+      {
+        "start_s": 75.29,
+        "end_s": 76.64,
+        "duration_s": 1.3499999999999943
+      },
+      {
+        "start_s": 77.68999999999998,
+        "end_s": 77.77,
+        "duration_s": 0.0800000000000125
+      },
+      {
+        "start_s": 82.67999999999999,
+        "end_s": 83.23,
+        "duration_s": 0.5500000000000114
+      },
+      {
+        "start_s": 89.05999999999999,
+        "end_s": 89.17999999999999,
+        "duration_s": 0.12000000000000455
+      },
+      {
+        "start_s": 91.04,
+        "end_s": 91.40999999999998,
+        "duration_s": 0.3699999999999761
+      },
+      {
+        "start_s": 92.08,
+        "end_s": 92.65999999999998,
+        "duration_s": 0.5799999999999841
+      },
+      {
+        "start_s": 107.73,
+        "end_s": 108.30999999999999,
+        "duration_s": 0.5799999999999841
+      },
+      {
+        "start_s": 114.67999999999999,
+        "end_s": 115.23,
+        "duration_s": 0.5500000000000114
+      },
+      {
+        "start_s": 119.27999999999999,
+        "end_s": 120.00000000000001,
+        "duration_s": 0.7200000000000273
+      }
+    ],
+    "count": 28,
+    "brief_0_1_to_1_s": 25,
+    "min_s": 0.0800000000000125,
+    "median_s": 0.5124999999999886,
+    "max_s": 1.3499999999999943,
+    "energy_inactive_gaps": [
+      {
+        "start_s": 0.0,
+        "end_s": 0.56,
+        "duration_s": 0.56
+      },
+      {
+        "start_s": 1.52,
+        "end_s": 2.12,
+        "duration_s": 0.6000000000000001
+      },
+      {
+        "start_s": 2.4,
+        "end_s": 2.5,
+        "duration_s": 0.10000000000000009
+      },
+      {
+        "start_s": 2.98,
+        "end_s": 3.12,
+        "duration_s": 0.14000000000000012
+      },
+      {
+        "start_s": 3.62,
+        "end_s": 3.72,
+        "duration_s": 0.10000000000000009
+      },
+      {
+        "start_s": 6.18,
+        "end_s": 6.5,
+        "duration_s": 0.3200000000000003
+      },
+      {
+        "start_s": 6.62,
+        "end_s": 7.04,
+        "duration_s": 0.41999999999999993
+      },
+      {
+        "start_s": 7.36,
+        "end_s": 7.54,
+        "duration_s": 0.17999999999999972
+      },
+      {
+        "start_s": 10.82,
+        "end_s": 10.96,
+        "duration_s": 0.14000000000000057
+      },
+      {
+        "start_s": 11.5,
+        "end_s": 11.92,
+        "duration_s": 0.41999999999999993
+      },
+      {
+        "start_s": 12.7,
+        "end_s": 12.84,
+        "duration_s": 0.14000000000000057
+      },
+      {
+        "start_s": 13.62,
+        "end_s": 13.8,
+        "duration_s": 0.1800000000000015
+      },
+      {
+        "start_s": 14.22,
+        "end_s": 14.6,
+        "duration_s": 0.379999999999999
+      },
+      {
+        "start_s": 14.76,
+        "end_s": 14.9,
+        "duration_s": 0.14000000000000057
+      },
+      {
+        "start_s": 15.12,
+        "end_s": 15.48,
+        "duration_s": 0.3600000000000012
+      },
+      {
+        "start_s": 16.12,
+        "end_s": 16.36,
+        "duration_s": 0.23999999999999844
+      },
+      {
+        "start_s": 17.48,
+        "end_s": 17.76,
+        "duration_s": 0.28000000000000114
+      },
+      {
+        "start_s": 19.26,
+        "end_s": 19.76,
+        "duration_s": 0.5
+      },
+      {
+        "start_s": 22.7,
+        "end_s": 22.82,
+        "duration_s": 0.120000000000001
+      },
+      {
+        "start_s": 23.72,
+        "end_s": 24.08,
+        "duration_s": 0.35999999999999943
+      },
+      {
+        "start_s": 25.6,
+        "end_s": 25.9,
+        "duration_s": 0.29999999999999716
+      },
+      {
+        "start_s": 26.52,
+        "end_s": 27.24,
+        "duration_s": 0.7199999999999989
+      },
+      {
+        "start_s": 29.58,
+        "end_s": 29.96,
+        "duration_s": 0.38000000000000256
+      },
+      {
+        "start_s": 30.72,
+        "end_s": 31.18,
+        "duration_s": 0.46000000000000085
+      },
+      {
+        "start_s": 33.14,
+        "end_s": 33.24,
+        "duration_s": 0.10000000000000142
+      },
+      {
+        "start_s": 36.46,
+        "end_s": 37.24,
+        "duration_s": 0.7800000000000011
+      },
+      {
+        "start_s": 37.44,
+        "end_s": 37.74,
+        "duration_s": 0.30000000000000426
+      },
+      {
+        "start_s": 38.86,
+        "end_s": 39.18,
+        "duration_s": 0.3200000000000003
+      },
+      {
+        "start_s": 39.72,
+        "end_s": 40.0,
+        "duration_s": 0.28000000000000114
+      },
+      {
+        "start_s": 40.3,
+        "end_s": 40.4,
+        "duration_s": 0.10000000000000142
+      },
+      {
+        "start_s": 40.74,
+        "end_s": 40.86,
+        "duration_s": 0.11999999999999744
+      },
+      {
+        "start_s": 42.38,
+        "end_s": 42.92,
+        "duration_s": 0.5399999999999991
+      },
+      {
+        "start_s": 43.68,
+        "end_s": 44.18,
+        "duration_s": 0.5
+      },
+      {
+        "start_s": 44.58,
+        "end_s": 45.1,
+        "duration_s": 0.5200000000000031
+      },
+      {
+        "start_s": 45.82,
+        "end_s": 46.04,
+        "duration_s": 0.21999999999999886
+      },
+      {
+        "start_s": 47.62,
+        "end_s": 47.86,
+        "duration_s": 0.240000000000002
+      },
+      {
+        "start_s": 47.92,
+        "end_s": 48.4,
+        "duration_s": 0.4799999999999969
+      },
+      {
+        "start_s": 50.68,
+        "end_s": 51.76,
+        "duration_s": 1.0799999999999983
+      },
+      {
+        "start_s": 53.94,
+        "end_s": 54.32,
+        "duration_s": 0.38000000000000256
+      },
+      {
+        "start_s": 58.98,
+        "end_s": 59.22,
+        "duration_s": 0.240000000000002
+      },
+      {
+        "start_s": 59.34,
+        "end_s": 59.52,
+        "duration_s": 0.17999999999999972
+      },
+      {
+        "start_s": 60.2,
+        "end_s": 61.58,
+        "duration_s": 1.3799999999999955
+      },
+      {
+        "start_s": 62.3,
+        "end_s": 62.4,
+        "duration_s": 0.10000000000000142
+      },
+      {
+        "start_s": 63.0,
+        "end_s": 63.56,
+        "duration_s": 0.5600000000000023
+      },
+      {
+        "start_s": 64.88,
+        "end_s": 65.48,
+        "duration_s": 0.6000000000000085
+      },
+      {
+        "start_s": 66.36,
+        "end_s": 66.5,
+        "duration_s": 0.14000000000000057
+      },
+      {
+        "start_s": 67.12,
+        "end_s": 67.24,
+        "duration_s": 0.11999999999999034
+      },
+      {
+        "start_s": 67.4,
+        "end_s": 67.64,
+        "duration_s": 0.23999999999999488
+      },
+      {
+        "start_s": 69.08,
+        "end_s": 69.44,
+        "duration_s": 0.35999999999999943
+      },
+      {
+        "start_s": 72.68,
+        "end_s": 72.96,
+        "duration_s": 0.2799999999999869
+      },
+      {
+        "start_s": 75.24,
+        "end_s": 76.66,
+        "duration_s": 1.4200000000000017
+      },
+      {
+        "start_s": 77.68,
+        "end_s": 77.98,
+        "duration_s": 0.29999999999999716
+      },
+      {
+        "start_s": 78.18,
+        "end_s": 78.64,
+        "duration_s": 0.45999999999999375
+      },
+      {
+        "start_s": 82.66,
+        "end_s": 83.3,
+        "duration_s": 0.6400000000000006
+      },
+      {
+        "start_s": 83.66,
+        "end_s": 83.76,
+        "duration_s": 0.10000000000000853
+      },
+      {
+        "start_s": 83.86,
+        "end_s": 84.16,
+        "duration_s": 0.29999999999999716
+      },
+      {
+        "start_s": 84.9,
+        "end_s": 85.32,
+        "duration_s": 0.4199999999999875
+      },
+      {
+        "start_s": 89.04,
+        "end_s": 89.24,
+        "duration_s": 0.19999999999998863
+      },
+      {
+        "start_s": 90.96,
+        "end_s": 91.48,
+        "duration_s": 0.5200000000000102
+      },
+      {
+        "start_s": 91.56,
+        "end_s": 91.8,
+        "duration_s": 0.23999999999999488
+      },
+      {
+        "start_s": 91.86,
+        "end_s": 92.68,
+        "duration_s": 0.8200000000000074
+      },
+      {
+        "start_s": 101.38,
+        "end_s": 101.64,
+        "duration_s": 0.2600000000000051
+      },
+      {
+        "start_s": 102.46,
+        "end_s": 102.84,
+        "duration_s": 0.38000000000000966
+      },
+      {
+        "start_s": 106.44,
+        "end_s": 106.66,
+        "duration_s": 0.21999999999999886
+      },
+      {
+        "start_s": 106.82,
+        "end_s": 106.96,
+        "duration_s": 0.14000000000000057
+      },
+      {
+        "start_s": 107.7,
+        "end_s": 108.36,
+        "duration_s": 0.6599999999999966
+      },
+      {
+        "start_s": 108.44,
+        "end_s": 108.62,
+        "duration_s": 0.18000000000000682
+      },
+      {
+        "start_s": 109.32,
+        "end_s": 109.78,
+        "duration_s": 0.46000000000000796
+      },
+      {
+        "start_s": 113.18,
+        "end_s": 113.38,
+        "duration_s": 0.19999999999998863
+      },
+      {
+        "start_s": 113.8,
+        "end_s": 113.92,
+        "duration_s": 0.12000000000000455
+      },
+      {
+        "start_s": 114.12,
+        "end_s": 114.26,
+        "duration_s": 0.14000000000000057
+      },
+      {
+        "start_s": 114.64,
+        "end_s": 115.24,
+        "duration_s": 0.5999999999999943
+      },
+      {
+        "start_s": 118.32,
+        "end_s": 118.48,
+        "duration_s": 0.1600000000000108
+      },
+      {
+        "start_s": 118.86,
+        "end_s": 119.06,
+        "duration_s": 0.20000000000000284
+      },
+      {
+        "start_s": 119.26,
+        "end_s": 120.0,
+        "duration_s": 0.7399999999999949
+      }
+    ]
+  },
+  "limitations": [
+    "Speech ends are common frozen energy estimates constrained by original speech annotations, not acoustic truth; overlapped voices/background can bias attribution.",
+    "Audio retains all overlapping and nonlexical activity even when lexical references are unavailable.",
+    "No listening-based acoustic adjudication or experiment-candidate-derived references."
+  ],
+  "window_candidate_definition": "Chronological scan of midpoint candidates formed by pairs of original no-annotated-speech gaps120s apart; no candidate ASR outputs or recognition scores used.",
+  "boundary_statistics": {
+    "annotated_speech_turns_truncated": 0,
+    "annotated_nonspeech_events_truncated": 0,
+    "policy": "Both window edges lie inside original annotation gaps, not lexical speech. A continuous window can cut a nonspeech event; original event intervals remain recorded and audio is never removed or re-timed."
+  },
+  "historical_float_sha256": {
+    "clean": "e2027855bad82d1e9d8df0ed40c81cbf3cd48f1946501749a25a0e283dac9abe",
+    "noise15": "7d73fa4416a753c6f5bce1bdb725c43f1b77fdbcf5e14aab3351757ad67fb4fe"
+  },
+  "historical_noise": {
+    "snr_target_db": 15,
+    "snr_measured_db": 14.99999987821197,
+    "joint_gain": 0.9406033711824768,
+    "peak": 0.9800000190734863,
+    "seed": 4648467131830293791,
+    "recipe": "Existing frozen pink/fan-like recipe at15dB; active-speech RMS is shared energy mask of full continuous clean source window.",
+    "activity": {
+      "threshold_dbfs": -38.49535367443831,
+      "active_fraction": 0.7266666666666667
+    }
+  },
+  "noise_seed": 4648467131830293791,
+  "historical_reuse": "Original natural clean window, source timing, speech-end estimates and human references recovered unchanged. EN historical rain replaced by original-profile seeded pink15; JA original pink seed preserved. Output converted from historical FLOAT recipe to PCM16.",
+  "noise": {
+    "snr_target_db": 15,
+    "snr_measured_db": 14.99999987821197,
+    "joint_gain": 0.9406033711824768,
+    "peak": 0.9800000190734863,
+    "seed": 4648467131830293791,
+    "recipe": "original #308 seeded FFT pink/fan-like at 15dB; active RMS over complete clean window",
+    "activity": {
+      "threshold_dbfs": -38.49535367443831,
+      "active_fraction": 0.7266666666666667
+    }
+  },
+  "sha256": {
+    "clean": "8cdbe6868df6e141f80a14ce7e49b501cd371e185e2899a2b1a659dc22d06a2b",
+    "noise15": "5c2eb98c424d1a071bf73fbf508d84257dcbeb5ee8b870f0a9f51a02145a5173"
+  }
+}

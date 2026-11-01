@@ -1,0 +1,2013 @@
+{
+  "language": "ja",
+  "variant": "noise15",
+  "duration_s": 120,
+  "admitted_source_end_s": 120.0,
+  "ingress_wall_s": 120.00753270002315,
+  "total_wall_s": 120.88049750000937,
+  "counts": {
+    "delivered": 10,
+    "failed": 0,
+    "expired": 0,
+    "dropped": 0,
+    "replaced": 0,
+    "merged": 0,
+    "empty": 0
+  },
+  "segments": 10,
+  "max_pending_including_active": 1,
+  "pending_at_ingress_end": 1,
+  "pending_after_drain": 0,
+  "recovery_after_ingress_s": 0.872970299969893,
+  "stop_reason": null,
+  "segment_speech_end_to_consumer_ms": {
+    "n": 10,
+    "p50": 1652.3942500352787,
+    "p95": 4236.639705013364,
+    "max": 6143.184900011402
+  },
+  "source_turn_speech_end_to_consumer_ms": {
+    "n": 48,
+    "p50": 6247.595000017899,
+    "p95": 15487.395760026408,
+    "max": 20156.41780001577
+  },
+  "endpoint_ms": {
+    "n": 10,
+    "p50": 704.4656000181533,
+    "p95": 3461.3735800456434,
+    "max": 5662.842700043693
+  },
+  "queue_wait_ms": {
+    "n": 10,
+    "p50": 0.047299981815740466,
+    "p95": 0.06604499940294771,
+    "max": 0.07409998215734959
+  },
+  "decode_ms": {
+    "n": 10,
+    "p50": 811.8150499940384,
+    "p95": 1183.2017299835568,
+    "max": 1286.7470000055619
+  },
+  "final_consumer_queue_ms": {
+    "n": 10,
+    "p50": 0.013999990187585354,
+    "p95": 0.021899992134422057,
+    "max": 0.024600012693554163
+  },
+  "endpoint_multi_source_turn_segments": 10,
+  "source_turns": [
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a57",
+      "speech_end_s": 1.32,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "5cff958b-a377-4835-acdf-5270133fa10d"
+      ],
+      "speech_end_to_consumer_ms": 6343.184900011402
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a22",
+      "speech_end_s": 1.52,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "5cff958b-a377-4835-acdf-5270133fa10d"
+      ],
+      "speech_end_to_consumer_ms": 6143.184900011402
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a23",
+      "speech_end_s": 8.27,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f649f459-5492-45bb-a129-d0d73acc008e"
+      ],
+      "speech_end_to_consumer_ms": 20156.41780001577
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a58",
+      "speech_end_s": 11.5,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f649f459-5492-45bb-a129-d0d73acc008e"
+      ],
+      "speech_end_to_consumer_ms": 16926.41780001577
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a24",
+      "speech_end_s": 12.705,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f649f459-5492-45bb-a129-d0d73acc008e"
+      ],
+      "speech_end_to_consumer_ms": 15721.41780001577
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a59",
+      "speech_end_s": 15.14,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f649f459-5492-45bb-a129-d0d73acc008e"
+      ],
+      "speech_end_to_consumer_ms": 13286.41780001577
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a25",
+      "speech_end_s": 16.12,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f649f459-5492-45bb-a129-d0d73acc008e"
+      ],
+      "speech_end_to_consumer_ms": 12306.417800015768
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a60",
+      "speech_end_s": 19.270000000000003,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f649f459-5492-45bb-a129-d0d73acc008e"
+      ],
+      "speech_end_to_consumer_ms": 9156.417800015766
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a61",
+      "speech_end_s": 23.73,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f649f459-5492-45bb-a129-d0d73acc008e"
+      ],
+      "speech_end_to_consumer_ms": 4696.41780001577
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a26",
+      "speech_end_s": 23.48,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f649f459-5492-45bb-a129-d0d73acc008e"
+      ],
+      "speech_end_to_consumer_ms": 4946.41780001577
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a27",
+      "speech_end_s": 24.86,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f649f459-5492-45bb-a129-d0d73acc008e"
+      ],
+      "speech_end_to_consumer_ms": 3566.4178000157704
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a62",
+      "speech_end_s": 26.52,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f649f459-5492-45bb-a129-d0d73acc008e"
+      ],
+      "speech_end_to_consumer_ms": 1906.4178000157704
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a63",
+      "speech_end_s": 29.639999999999997,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "773d329d-692a-40d2-924a-9d376a7377a0"
+      ],
+      "speech_end_to_consumer_ms": 8270.781500046145
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a28",
+      "speech_end_s": 33.14,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "773d329d-692a-40d2-924a-9d376a7377a0"
+      ],
+      "speech_end_to_consumer_ms": 4770.7815000461405
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a64",
+      "speech_end_s": 36.475,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "773d329d-692a-40d2-924a-9d376a7377a0"
+      ],
+      "speech_end_to_consumer_ms": 1435.78150004614
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a29",
+      "speech_end_s": 35.1,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "773d329d-692a-40d2-924a-9d376a7377a0"
+      ],
+      "speech_end_to_consumer_ms": 2810.78150004614
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a30",
+      "speech_end_s": 36.56,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "773d329d-692a-40d2-924a-9d376a7377a0"
+      ],
+      "speech_end_to_consumer_ms": 1350.7815000461392
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a31",
+      "speech_end_s": 42.379999999999995,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "027d629f-7449-450f-a1d1-dfc2060431c4"
+      ],
+      "speech_end_to_consumer_ms": 6699.009000037336
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a65",
+      "speech_end_s": 40.315000000000005,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "027d629f-7449-450f-a1d1-dfc2060431c4"
+      ],
+      "speech_end_to_consumer_ms": 8764.009000037326
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a32",
+      "speech_end_s": 43.67,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "027d629f-7449-450f-a1d1-dfc2060431c4"
+      ],
+      "speech_end_to_consumer_ms": 5409.009000037329
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a33",
+      "speech_end_s": 44.59,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "027d629f-7449-450f-a1d1-dfc2060431c4"
+      ],
+      "speech_end_to_consumer_ms": 4489.0090000373275
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a34",
+      "speech_end_s": 47.65,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "027d629f-7449-450f-a1d1-dfc2060431c4"
+      ],
+      "speech_end_to_consumer_ms": 1429.0090000373325
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a66",
+      "speech_end_s": 49.11,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "c98bb98d-2a21-49d4-a88a-7564b650a2db"
+      ],
+      "speech_end_to_consumer_ms": 2686.2496000109245
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a35",
+      "speech_end_s": 50.71,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "c98bb98d-2a21-49d4-a88a-7564b650a2db"
+      ],
+      "speech_end_to_consumer_ms": 1086.2496000109231
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a36",
+      "speech_end_s": 53.22,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "620e8f8a-2649-484f-87eb-2b7777af1725"
+      ],
+      "speech_end_to_consumer_ms": 8270.002600010486
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a67",
+      "speech_end_s": 53.96,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "620e8f8a-2649-484f-87eb-2b7777af1725"
+      ],
+      "speech_end_to_consumer_ms": 7530.002600010484
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a37",
+      "speech_end_s": 60.19,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "620e8f8a-2649-484f-87eb-2b7777af1725"
+      ],
+      "speech_end_to_consumer_ms": 1300.0026000104867
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a68",
+      "speech_end_s": 57.739999999999995,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "620e8f8a-2649-484f-87eb-2b7777af1725"
+      ],
+      "speech_end_to_consumer_ms": 3750.0026000104895
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a69",
+      "speech_end_s": 63.010000000000005,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "462036a6-ad91-406d-8632-118026c69f11"
+      ],
+      "speech_end_to_consumer_ms": 14007.975800030394
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a70",
+      "speech_end_s": 64.945,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "462036a6-ad91-406d-8632-118026c69f11"
+      ],
+      "speech_end_to_consumer_ms": 12072.975800030406
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a38",
+      "speech_end_s": 65.99,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "462036a6-ad91-406d-8632-118026c69f11"
+      ],
+      "speech_end_to_consumer_ms": 11027.975800030405
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a71",
+      "speech_end_s": 69.42,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "462036a6-ad91-406d-8632-118026c69f11"
+      ],
+      "speech_end_to_consumer_ms": 7597.975800030397
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a39",
+      "speech_end_s": 75.24000000000001,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "462036a6-ad91-406d-8632-118026c69f11"
+      ],
+      "speech_end_to_consumer_ms": 1777.97580003039
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a174",
+      "speech_end_s": 77.68,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "ddf5f579-441f-497d-b753-91b35dbd4166"
+      ],
+      "speech_end_to_consumer_ms": 15052.783400046166
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a73",
+      "speech_end_s": 79.2,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "ddf5f579-441f-497d-b753-91b35dbd4166"
+      ],
+      "speech_end_to_consumer_ms": 13532.78340004617
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a175",
+      "speech_end_s": 81.57,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "ddf5f579-441f-497d-b753-91b35dbd4166"
+      ],
+      "speech_end_to_consumer_ms": 11162.78340004618
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a74",
+      "speech_end_s": 80.38,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "ddf5f579-441f-497d-b753-91b35dbd4166"
+      ],
+      "speech_end_to_consumer_ms": 12352.783400046177
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a75",
+      "speech_end_s": 82.67999999999999,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "ddf5f579-441f-497d-b753-91b35dbd4166"
+      ],
+      "speech_end_to_consumer_ms": 10052.78340004618
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a176",
+      "speech_end_s": 88.12,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "ddf5f579-441f-497d-b753-91b35dbd4166"
+      ],
+      "speech_end_to_consumer_ms": 4612.783400046169
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a76",
+      "speech_end_s": 89.06,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "ddf5f579-441f-497d-b753-91b35dbd4166"
+      ],
+      "speech_end_to_consumer_ms": 3672.783400046171
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a177",
+      "speech_end_s": 90.98,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "ddf5f579-441f-497d-b753-91b35dbd4166"
+      ],
+      "speech_end_to_consumer_ms": 1752.7834000461694
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a77",
+      "speech_end_s": 92.07,
+      "reference_available": true,
+      "input_end_covered": false,
+      "nonempty_final_covers_end": false,
+      "segment_ids": [],
+      "speech_end_to_consumer_ms": null
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a78",
+      "speech_end_s": 100.56,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f3e2f45d-cc9d-488f-9c7e-b14e9859401f"
+      ],
+      "speech_end_to_consumer_ms": 8894.022400022948
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a178",
+      "speech_end_s": 96.09,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f3e2f45d-cc9d-488f-9c7e-b14e9859401f"
+      ],
+      "speech_end_to_consumer_ms": 13364.022400022946
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a179",
+      "speech_end_s": 101.375,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f3e2f45d-cc9d-488f-9c7e-b14e9859401f"
+      ],
+      "speech_end_to_consumer_ms": 8079.02240002295
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a79",
+      "speech_end_s": 107.7,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f3e2f45d-cc9d-488f-9c7e-b14e9859401f"
+      ],
+      "speech_end_to_consumer_ms": 1754.0224000229473
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a180",
+      "speech_end_s": 105.35,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "f3e2f45d-cc9d-488f-9c7e-b14e9859401f"
+      ],
+      "speech_end_to_consumer_ms": 4104.0224000229555
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a80",
+      "speech_end_s": 114.67,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "a2c587d2-c376-4516-bf9e-d706247dbe86"
+      ],
+      "speech_end_to_consumer_ms": 6152.005100024397
+    },
+    {
+      "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a81",
+      "speech_end_s": 119.27000000000001,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "a2c587d2-c376-4516-bf9e-d706247dbe86"
+      ],
+      "speech_end_to_consumer_ms": 1552.0051000243882
+    }
+  ],
+  "queue_timeline": [
+    {
+      "source_s": 0.032,
+      "wall_s": 0.0468576000421308,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 0.544,
+      "wall_s": 0.544345100002829,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 1.056,
+      "wall_s": 1.0719580000150017,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 1.568,
+      "wall_s": 1.5752255000406876,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 2.08,
+      "wall_s": 2.0881914000492543,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 2.592,
+      "wall_s": 2.6016896000364795,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 3.104,
+      "wall_s": 3.124146300018765,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 3.616,
+      "wall_s": 3.6296543000498787,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 4.128,
+      "wall_s": 4.1313734000432305,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 4.64,
+      "wall_s": 4.646202700037975,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 5.152,
+      "wall_s": 5.160606200050097,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 5.664,
+      "wall_s": 5.682058100006543,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 6.176,
+      "wall_s": 6.189207100018393,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 6.688,
+      "wall_s": 6.701265500043519,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 7.2,
+      "wall_s": 7.213664500042796,
+      "pending": 1,
+      "buffered_audio_ms": 7092.0
+    },
+    {
+      "source_s": 7.712,
+      "wall_s": 7.736151300021447,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 8.224,
+      "wall_s": 8.235273400030565,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 8.736,
+      "wall_s": 8.739307800016832,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 9.248,
+      "wall_s": 9.25124000001233,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 9.76,
+      "wall_s": 9.76423110003816,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 10.272,
+      "wall_s": 10.288586500042584,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 10.784,
+      "wall_s": 10.791019600001164,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 11.296,
+      "wall_s": 11.306818700046279,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 11.808,
+      "wall_s": 11.820696600014344,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 12.32,
+      "wall_s": 12.342192700016312,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 12.832,
+      "wall_s": 12.845804400043562,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 13.344,
+      "wall_s": 13.35977580002509,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 13.856,
+      "wall_s": 13.858513700019103,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 14.368,
+      "wall_s": 14.3738981000497,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 14.88,
+      "wall_s": 14.89668950001942,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 15.392,
+      "wall_s": 15.400959599995986,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 15.904,
+      "wall_s": 15.913778799993452,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 16.416,
+      "wall_s": 16.428773900028318,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 16.928,
+      "wall_s": 16.951343599997927,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 17.44,
+      "wall_s": 17.453823300020304,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 17.952,
+      "wall_s": 17.957353400008287,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 18.464,
+      "wall_s": 18.471378999995068,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 18.976,
+      "wall_s": 18.986359800037462,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 19.488,
+      "wall_s": 19.510896200023126,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 20.0,
+      "wall_s": 20.013701600022614,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 20.512,
+      "wall_s": 20.527088000031654,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 21.024,
+      "wall_s": 21.02473440003814,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 21.536,
+      "wall_s": 21.546410300012212,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 22.048,
+      "wall_s": 22.05247460003011,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 22.56,
+      "wall_s": 22.564488900010474,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 23.072,
+      "wall_s": 23.078906600014307,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 23.584,
+      "wall_s": 23.600595900032204,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 24.096,
+      "wall_s": 24.107661899994127,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 24.608,
+      "wall_s": 24.619861900049727,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 25.12,
+      "wall_s": 25.132916300033685,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 25.632,
+      "wall_s": 25.65239580004709,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 26.144,
+      "wall_s": 26.154928100004327,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 26.656,
+      "wall_s": 26.66962650005007,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 27.168,
+      "wall_s": 27.170034800015856,
+      "pending": 1,
+      "buffered_audio_ms": 20340.0
+    },
+    {
+      "source_s": 27.68,
+      "wall_s": 27.68453440000303,
+      "pending": 1,
+      "buffered_audio_ms": 20340.0
+    },
+    {
+      "source_s": 28.192,
+      "wall_s": 28.197808900033124,
+      "pending": 1,
+      "buffered_audio_ms": 20340.0
+    },
+    {
+      "source_s": 28.704,
+      "wall_s": 28.72238410002319,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 29.216,
+      "wall_s": 29.2366386000067,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 29.728,
+      "wall_s": 29.742702700023074,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 30.24,
+      "wall_s": 30.256493100023363,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 30.752,
+      "wall_s": 30.754051900003105,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 31.264,
+      "wall_s": 31.26671630004421,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 31.776,
+      "wall_s": 31.791857600037474,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 32.288,
+      "wall_s": 32.300940999994054,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 32.8,
+      "wall_s": 32.81411090004258,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 33.312,
+      "wall_s": 33.31382440001471,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 33.824,
+      "wall_s": 33.82866620004643,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 34.336,
+      "wall_s": 34.351602000009734,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 34.848,
+      "wall_s": 34.85532770003192,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 35.36,
+      "wall_s": 35.36830980004743,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 35.872,
+      "wall_s": 35.882463500020094,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 36.384,
+      "wall_s": 36.40674860001309,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 36.896,
+      "wall_s": 36.911084400024265,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 37.408,
+      "wall_s": 37.40945540001849,
+      "pending": 1,
+      "buffered_audio_ms": 10388.0
+    },
+    {
+      "source_s": 37.92,
+      "wall_s": 37.92314280004939,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 38.432,
+      "wall_s": 38.435915200039744,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 38.944,
+      "wall_s": 38.95804100000532,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 39.456,
+      "wall_s": 39.46098289999645,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 39.968,
+      "wall_s": 39.97533070005011,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 40.48,
+      "wall_s": 40.491147900000215,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 40.992,
+      "wall_s": 41.01479510002537,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 41.504,
+      "wall_s": 41.51481150003383,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 42.016,
+      "wall_s": 42.0204368000268,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 42.528,
+      "wall_s": 42.53536570002325,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 43.04,
+      "wall_s": 43.04828839999391,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 43.552,
+      "wall_s": 43.57251580001321,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 44.064,
+      "wall_s": 44.07843520003371,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 44.576,
+      "wall_s": 44.57832860003691,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 45.088,
+      "wall_s": 45.09356240002671,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 45.6,
+      "wall_s": 45.607181400002446,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 46.112,
+      "wall_s": 46.1314881000435,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 46.624,
+      "wall_s": 46.63649629999418,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 47.136,
+      "wall_s": 47.148306200047955,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 47.648,
+      "wall_s": 47.6634281000006,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 48.16,
+      "wall_s": 48.161158600007184,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 48.672,
+      "wall_s": 48.68502650002483,
+      "pending": 1,
+      "buffered_audio_ms": 11476.0
+    },
+    {
+      "source_s": 49.184,
+      "wall_s": 49.19060090003768,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 49.696,
+      "wall_s": 49.70228160003899,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 50.208,
+      "wall_s": 50.213551499997266,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 50.72,
+      "wall_s": 50.73757990001468,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 51.232,
+      "wall_s": 51.238878300006036,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 51.744,
+      "wall_s": 51.75449560000561,
+      "pending": 1,
+      "buffered_audio_ms": 3540.0
+    },
+    {
+      "source_s": 52.256,
+      "wall_s": 52.26985710003646,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 52.768,
+      "wall_s": 52.79331140004797,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 53.28,
+      "wall_s": 53.29374470002949,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 53.792,
+      "wall_s": 53.79823870002292,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 54.304,
+      "wall_s": 54.31232010002714,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 54.816,
+      "wall_s": 54.82869809999829,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 55.328,
+      "wall_s": 55.35251530003734,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 55.84,
+      "wall_s": 55.8512585000135,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 56.352,
+      "wall_s": 56.3545274999924,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 56.864,
+      "wall_s": 56.87019000004511,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 57.376,
+      "wall_s": 57.382182400033344,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 57.888,
+      "wall_s": 57.9014778000419,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 58.4,
+      "wall_s": 58.408565899997484,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 58.912,
+      "wall_s": 58.923408700036816,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 59.424,
+      "wall_s": 59.42514140001731,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 59.936,
+      "wall_s": 59.93896290002158,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 60.448,
+      "wall_s": 60.45266350003658,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 60.96,
+      "wall_s": 60.966455699992366,
+      "pending": 1,
+      "buffered_audio_ms": 9588.0
+    },
+    {
+      "source_s": 61.472,
+      "wall_s": 61.48692240001401,
+      "pending": 1,
+      "buffered_audio_ms": 9588.0
+    },
+    {
+      "source_s": 61.984,
+      "wall_s": 61.99146600003587,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 62.496,
+      "wall_s": 62.50331320002442,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 63.008,
+      "wall_s": 63.020532299997285,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 63.52,
+      "wall_s": 63.52076380001381,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 64.032,
+      "wall_s": 64.04222659999505,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 64.544,
+      "wall_s": 64.54651130002458,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 65.056,
+      "wall_s": 65.0628202999942,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 65.568,
+      "wall_s": 65.57792670000345,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 66.08,
+      "wall_s": 66.09859150002012,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 66.592,
+      "wall_s": 66.60294620000059,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 67.104,
+      "wall_s": 67.11540860001696,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 67.616,
+      "wall_s": 67.6270473000477,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 68.128,
+      "wall_s": 68.14877420000266,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 68.64,
+      "wall_s": 68.65308479999658,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 69.152,
+      "wall_s": 69.15436320001027,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 69.664,
+      "wall_s": 69.66737040004227,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 70.176,
+      "wall_s": 70.18225230003009,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 70.688,
+      "wall_s": 70.7035920000053,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 71.2,
+      "wall_s": 71.20706300000893,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 71.712,
+      "wall_s": 71.72420130000683,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 72.224,
+      "wall_s": 72.2378083000076,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 72.736,
+      "wall_s": 72.73684630001662,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 73.248,
+      "wall_s": 73.2579261000501,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 73.76,
+      "wall_s": 73.76700370002072,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 74.272,
+      "wall_s": 74.28120349999517,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 74.784,
+      "wall_s": 74.79411220003385,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 75.296,
+      "wall_s": 75.31701290002093,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 75.808,
+      "wall_s": 75.82147830002941,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 76.32,
+      "wall_s": 76.33419140003389,
+      "pending": 1,
+      "buffered_audio_ms": 14900.0
+    },
+    {
+      "source_s": 76.832,
+      "wall_s": 76.83577260002494,
+      "pending": 1,
+      "buffered_audio_ms": 14900.0
+    },
+    {
+      "source_s": 77.344,
+      "wall_s": 77.348715500033,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 77.856,
+      "wall_s": 77.87149809999391,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 78.368,
+      "wall_s": 78.37894900003448,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 78.88,
+      "wall_s": 78.89377280004555,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 79.392,
+      "wall_s": 79.39357580000069,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 79.904,
+      "wall_s": 79.90829849999864,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 80.416,
+      "wall_s": 80.43076880002627,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 80.928,
+      "wall_s": 80.93726989999413,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 81.44,
+      "wall_s": 81.45397100003902,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 81.952,
+      "wall_s": 81.96607340004994,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 82.464,
+      "wall_s": 82.48708920000354,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 82.976,
+      "wall_s": 82.99186510004802,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 83.488,
+      "wall_s": 83.48865010001464,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 84.0,
+      "wall_s": 84.0041659999988,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 84.512,
+      "wall_s": 84.51545649999753,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 85.024,
+      "wall_s": 85.0271911000018,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 85.536,
+      "wall_s": 85.55178440001328,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 86.048,
+      "wall_s": 86.05590680002933,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 86.56,
+      "wall_s": 86.56891299999552,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 87.072,
+      "wall_s": 87.08484450000105,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 87.584,
+      "wall_s": 87.60869399999501,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 88.096,
+      "wall_s": 88.10873630002607,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 88.608,
+      "wall_s": 88.61494360002689,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 89.12,
+      "wall_s": 89.12693700002274,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 89.632,
+      "wall_s": 89.6409647000255,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 90.144,
+      "wall_s": 90.16655720002018,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 90.656,
+      "wall_s": 90.6644379000063,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 91.168,
+      "wall_s": 91.18186980002793,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 91.68,
+      "wall_s": 91.69241310004145,
+      "pending": 1,
+      "buffered_audio_ms": 15476.0
+    },
+    {
+      "source_s": 92.192,
+      "wall_s": 92.193109200045,
+      "pending": 1,
+      "buffered_audio_ms": 15476.0
+    },
+    {
+      "source_s": 92.704,
+      "wall_s": 92.71604540001135,
+      "pending": 1,
+      "buffered_audio_ms": 15476.0
+    },
+    {
+      "source_s": 93.216,
+      "wall_s": 93.22102510003606,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 93.728,
+      "wall_s": 93.73593160003657,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 94.24,
+      "wall_s": 94.24697530001868,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 94.752,
+      "wall_s": 94.77119970001513,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 95.264,
+      "wall_s": 95.27699149999535,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 95.776,
+      "wall_s": 95.79236240003956,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 96.288,
+      "wall_s": 96.29028469999321,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 96.8,
+      "wall_s": 96.80301920004422,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 97.312,
+      "wall_s": 97.32569810003042,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 97.824,
+      "wall_s": 97.83300230000168,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 98.336,
+      "wall_s": 98.34612470003776,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 98.848,
+      "wall_s": 98.8581533000106,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 99.36,
+      "wall_s": 99.37397770001553,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 99.872,
+      "wall_s": 99.8972510000458,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 100.384,
+      "wall_s": 100.39926860004198,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 100.896,
+      "wall_s": 100.90904620004585,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 101.408,
+      "wall_s": 101.4201224000426,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 101.92,
+      "wall_s": 101.93003380001755,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 102.432,
+      "wall_s": 102.45430820004549,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 102.944,
+      "wall_s": 102.9539775000303,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 103.456,
+      "wall_s": 103.46000860002823,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 103.968,
+      "wall_s": 103.97307260002708,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 104.48,
+      "wall_s": 104.48751500004437,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 104.992,
+      "wall_s": 105.01101740001468,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 105.504,
+      "wall_s": 105.51848530001007,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 106.016,
+      "wall_s": 106.01783590001287,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 106.528,
+      "wall_s": 106.53016379999463,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 107.04,
+      "wall_s": 107.04451500001596,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 107.552,
+      "wall_s": 107.56380330002867,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 108.064,
+      "wall_s": 108.07009039999684,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 108.576,
+      "wall_s": 108.58356040000217,
+      "pending": 1,
+      "buffered_audio_ms": 15892.0
+    },
+    {
+      "source_s": 109.088,
+      "wall_s": 109.09813660004875,
+      "pending": 1,
+      "buffered_audio_ms": 15892.0
+    },
+    {
+      "source_s": 109.6,
+      "wall_s": 109.62322760000825,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 110.112,
+      "wall_s": 110.1278548000264,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 110.624,
+      "wall_s": 110.62527720001526,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 111.136,
+      "wall_s": 111.13965830003144,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 111.648,
+      "wall_s": 111.65251770004397,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 112.16,
+      "wall_s": 112.17926649999572,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 112.672,
+      "wall_s": 112.67480840004282,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 113.184,
+      "wall_s": 113.19647690001875,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 113.696,
+      "wall_s": 113.71030730003258,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 114.208,
+      "wall_s": 114.21072730002925,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 114.72,
+      "wall_s": 114.73515409999527,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 115.232,
+      "wall_s": 115.23984930000734,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 115.744,
+      "wall_s": 115.75460620003287,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 116.256,
+      "wall_s": 116.26949490001425,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 116.768,
+      "wall_s": 116.79215890000341,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 117.28,
+      "wall_s": 117.29188200004864,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 117.792,
+      "wall_s": 117.7941219000495,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 118.304,
+      "wall_s": 118.30963130004238,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 118.816,
+      "wall_s": 118.82502420002129,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 119.328,
+      "wall_s": 119.34923009999329,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 119.84,
+      "wall_s": 119.85223499999847,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    }
+  ],
+  "boundary": "Independent 1x PCM producer -> current Silero Self endpoint -> actual scoped LocalOfflineSTTSession (FIFO pending TTL12s, 30s seal watchdog and current failure preservation) -> terminal event -> experiment final consumer queue. Bypasses capture-owner pre-provider retention/ingress limits. Not GUI/translation/TTS/overlay/network latency. Source coverage does not prove lexical correctness. First partial N/A; queue replaced/merged are zero by current policy, endpoint grouping separate.",
+  "speech_end": "Recovered shared clean-source energy estimate inside human annotations, biased by background/overlap; not file end/enqueue or acoustic ground truth."
+}

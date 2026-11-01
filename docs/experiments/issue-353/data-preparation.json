@@ -1,0 +1,1818 @@
+{
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/353",
+  "preparation_code": "scripts/asr_benchmark/prepare.py",
+  "command": "python scripts/asr_benchmark/prepare.py --data-root .tmp/asr353/data --language all --offline --check-only",
+  "completed_at_utc": "2026-11-01T14:27:34.836175+00:00",
+  "python": "3.14.10",
+  "dependencies": {
+    "numpy": "2.5.1",
+    "scipy": "1.18.0",
+    "requests": "2.34.2",
+    "pyarrow": "23.0.1"
+  },
+  "output_format": {
+    "sample_rate_hz": 16000,
+    "channels": 1,
+    "encoding": "PCM16 little-endian WAV",
+    "conversion": "Historical prepared WAVs were FLOAT. Recreate original float32 crop/mix/noise, then round-to-nearest ties-to-even(sample*32768), saturate to signed16 and export via stdlib wave. PCM16 hashes replace historical FLOAT hashes; source PCM16 crop samples are unchanged. Pinned original sources already16kHz mono; no resampling required.",
+    "quantization_limit": "Post-PCM16 effective SNR includes quantization; actual per-file SNR retained. Historical active-speech FLOAT recipe still targets exactly15/5dB."
+  },
+  "seed": 30820261027,
+  "noise_recipe": {
+    "parent_seed": "int(SHA256(f'{30820261027}:{parent_id}')[:16],16)",
+    "en_parent_selection": "Reconstructed120 selected blind to candidates; eligible means nonempty unchanged original shared energy mask; first30sortedSHA256(seed30820261027:noise:id). Frozen before EN candidate inference.",
+    "ja_parent_selection": "Recovered original30:20short+10medium",
+    "spectrum": "default_rng(seed).normal; rFFT; non-DC scale1/sqrt(max(freq,20Hz)); DC0; irFFT; mean removed; float32",
+    "active_speech": "320-sample20ms RMS frames; max(-50dBFS,peak-30dB), three-frame closing then dilation; JA human EAF full-interval fallback if mask empty",
+    "mixing": "sqrt(clean_active_power/(noise_active_power*10**(SNR/10))); joint gain min(1,0.98/mixed_peak)",
+    "controls": "durations1,2,3,2.5,4s; first2 exact silence; last3pink(seed=30820261027+index)*0.01"
+  },
+  "provenance": "inputs/sources.json",
+  "limitations": [
+    "AMI evaluation split is test; IBM lists AMI as a training source. Exact checkpoint training overlap unknown; no contamination audit.",
+    "IngCrowd is an unsplit public corpus-service sample, not an official held-out evaluation split. Unknown training overlap.",
+    "JA speaker tiers are conversation-local, not verified globally distinct physical people.",
+    "Historical prepared WAVs used FLOAT; issue353 requires PCM16. Old prepared hashes are provenance only, not new audio hashes.",
+    "EN reconstructed from Kaldi-preprocessed/normalized IHM test rather than exact recoveredfollowup120; naturalwindow uses originalMix-Headset rather than arithmeticmeanof4headsets. Trainingoverlap stillunknown."
+  ],
+  "inference_performed": false,
+  "sources": [
+    {
+      "path": "sources/ami-ihm/test-00000-of-00004.parquet",
+      "url": "https://huggingface.co/datasets/edinburghcstr/ami/resolve/46f28f2503e2ec48f8867a84eef356c70476beab/ihm/test-00000-of-00004.parquet",
+      "sha256": "d95920dccc6924c15215239461bf5d1152fe07c9c61add073bd12da26dd602e0",
+      "language": "en",
+      "kind": "parquet",
+      "bytes": 241989739,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ami-ihm/test-00001-of-00004.parquet",
+      "url": "https://huggingface.co/datasets/edinburghcstr/ami/resolve/46f28f2503e2ec48f8867a84eef356c70476beab/ihm/test-00001-of-00004.parquet",
+      "sha256": "07a2b1c407cf36bc1e66c1362b0248ed32c897edc2a116549d1dc6b456dc2325",
+      "language": "en",
+      "kind": "parquet",
+      "bytes": 292473974,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ami-ihm/test-00002-of-00004.parquet",
+      "url": "https://huggingface.co/datasets/edinburghcstr/ami/resolve/46f28f2503e2ec48f8867a84eef356c70476beab/ihm/test-00002-of-00004.parquet",
+      "sha256": "83cde21e55fc884295585327b0ee334cba47ad53bdb787dd5f97437067aca5f8",
+      "language": "en",
+      "kind": "parquet",
+      "bytes": 426034962,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ami-ihm/test-00003-of-00004.parquet",
+      "url": "https://huggingface.co/datasets/edinburghcstr/ami/resolve/46f28f2503e2ec48f8867a84eef356c70476beab/ihm/test-00003-of-00004.parquet",
+      "sha256": "3312bb79400ddef62d5a0097e124dfabe86a693b4643e7fef7d72a62588280d7",
+      "language": "en",
+      "kind": "parquet",
+      "bytes": 332016187,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ami/ES2004d.Mix-Headset.wav",
+      "url": "https://huggingface.co/datasets/FluidInference/ami-corpus-mirror/resolve/722d8891643e1e4dc62cfd0d198fa05a1646c3cc/sdm/ES2004d.Mix-Headset.wav",
+      "sha256": "3cfce3297ebb7faeb53c02727eea5e9f2c76e9ed4b62db3b03d73e66836e91f3",
+      "language": "en",
+      "kind": "audio",
+      "purpose": "natural120s continuous original conversation only, not offline IHM sample",
+      "bytes": 71113346,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ami/ami_public_manual_1.6.2.zip",
+      "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip",
+      "sha256": "b56e5babb2496b8795deeeda7e71178d7fbc9963f94276cf2a3f4b56ebbc9f9d",
+      "language": "en",
+      "kind": "annotation",
+      "bytes": 22887865,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ami/split_eval.orig",
+      "url": "https://raw.githubusercontent.com/kaldi-asr/kaldi/master/egs/ami/s5/local/split_eval.orig",
+      "sha256": "eb2f322acec2e2c86a1b322d134c868b96f49eb5ef47014e23e1dd493e275c67",
+      "language": "en",
+      "kind": "split",
+      "bytes": 128,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue01.eaf",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue01/japanese-themed-dialogue01.eaf",
+      "sha256": "c59daa71d0ffa34e50b4c532d33f5c0d2a51ceaa8aea4435a68a87d924f61b32",
+      "language": "ja",
+      "kind": "annotation",
+      "bytes": 103214,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue01_audio.wav",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue01/japanese-themed-dialogue01_audio.wav",
+      "sha256": "ea1138f2b05e6b3cc9580ed1196748ed67c5847f222c1cf4a54de6bf4d9d3282",
+      "language": "ja",
+      "kind": "audio",
+      "bytes": 21624910,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue02.eaf",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue02/japanese-themed-dialogue02.eaf",
+      "sha256": "dee4e82d37805493af85cd18493b7b549294f36b99878687a586d6f5d1235d15",
+      "language": "ja",
+      "kind": "annotation",
+      "bytes": 110019,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue02_audio.wav",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue02/japanese-themed-dialogue02_audio.wav",
+      "sha256": "fd371e8dba3462dbb7f09ee0bf1358a6f2e3cc49a1fc0ed270a930f708554f39",
+      "language": "ja",
+      "kind": "audio",
+      "bytes": 22644132,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue03.eaf",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue03/japanese-themed-dialogue03.eaf",
+      "sha256": "309a9b1ca0b90d7e615c4e6bd6daa31171627e2846c31cb1eb89ef4b26f97a57",
+      "language": "ja",
+      "kind": "annotation",
+      "bytes": 113227,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue03_audio.wav",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue03/japanese-themed-dialogue03_audio.wav",
+      "sha256": "cbc21140f2c10fd8e55e60b72e2960bf2fb1d3ebabac6e192659aa0c4f1ef6b9",
+      "language": "ja",
+      "kind": "audio",
+      "bytes": 24385614,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue04.eaf",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue04/japanese-themed-dialogue04.eaf",
+      "sha256": "1dda6b58d0cb19834c5164632aba46a060768813c5f82bb9e87482f461482a2b",
+      "language": "ja",
+      "kind": "annotation",
+      "bytes": 120256,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue04_audio.wav",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue04/japanese-themed-dialogue04_audio.wav",
+      "sha256": "14a1fa85853c5bf7bbc447298c2ee18830094ac7d7fee9532a7935200e4776e0",
+      "language": "ja",
+      "kind": "audio",
+      "bytes": 24303012,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue10.eaf",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue10/japanese-themed-dialogue10.eaf",
+      "sha256": "63756b137c1d707ce3a4ccf04ea2491736b30373b8591a02da11164df9e27f8f",
+      "language": "ja",
+      "kind": "annotation",
+      "bytes": 126312,
+      "acquisition": "verified cached source"
+    },
+    {
+      "path": "sources/ingcrowd/japanese-themed-dialogue10_audio.wav",
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/resolve/e2eed8769400269f20821deb0e47e68b40012e8b/japanese-themed-dialogue10/japanese-themed-dialogue10_audio.wav",
+      "sha256": "c4f9ba1e0400970346607523a714256b978edbecbc2e49b8f7b2d7bc4a1d37bf",
+      "language": "ja",
+      "kind": "audio",
+      "bytes": 23906382,
+      "acquisition": "verified cached source"
+    }
+  ],
+  "acquisition_failures": [],
+  "attempts": [
+    {
+      "command": "python scripts/asr_benchmark/prepare.py --data-root .tmp/asr353/data --language ja --offline",
+      "recorded_at_utc": "2026-11-01T14:09:17.128641+00:00",
+      "acquired_source_count": 10,
+      "acquisition_failures": [],
+      "mode": "render-and-check"
+    },
+    {
+      "command": "python scripts/asr_benchmark/prepare.py --data-root .tmp/asr353/data --language en",
+      "recorded_at_utc": "2026-11-01T14:10:11.875464+00:00",
+      "acquired_source_count": 2,
+      "acquisition_failures": [
+        {
+          "path": "sources/ami/ES2004d.Headset-0.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-0.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-0.wav"
+        },
+        {
+          "path": "sources/ami/ES2004d.Headset-2.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-2.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-2.wav"
+        },
+        {
+          "path": "sources/ami/ES2004d.Headset-1.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-1.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-1.wav"
+        },
+        {
+          "path": "sources/ami/IS1009c.Headset-0.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-0.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-0.wav"
+        },
+        {
+          "path": "sources/ami/IS1009c.Headset-2.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-2.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-2.wav"
+        },
+        {
+          "path": "sources/ami/IS1009c.Headset-3.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-3.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-3.wav"
+        },
+        {
+          "path": "sources/ami/IS1009c.Headset-1.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-1.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-1.wav"
+        },
+        {
+          "path": "sources/ami/ES2004d.Headset-3.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-3.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-3.wav"
+        },
+        {
+          "path": "sources/ami/TS3003c.Headset-2.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-2.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-2.wav"
+        },
+        {
+          "path": "sources/ami/TS3003c.Headset-0.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-0.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-0.wav"
+        },
+        {
+          "path": "sources/ami/TS3003c.Headset-3.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-3.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-3.wav"
+        },
+        {
+          "path": "sources/ami/TS3003d.Headset-0.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-0.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-0.wav"
+        },
+        {
+          "path": "sources/ami/TS3003c.Headset-1.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-1.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-1.wav"
+        },
+        {
+          "path": "sources/ami/TS3003d.Headset-3.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-3.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-3.wav"
+        },
+        {
+          "path": "sources/ami/TS3003d.Headset-1.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-1.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-1.wav"
+        },
+        {
+          "path": "sources/ami/TS3003d.Headset-2.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-2.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-2.wav"
+        }
+      ],
+      "mode": "render-and-check"
+    },
+    {
+      "command": "python scripts/asr_benchmark/prepare.py --data-root .tmp/asr353/data --language en",
+      "recorded_at_utc": "2026-11-01T14:13:12.608415+00:00",
+      "acquired_source_count": 2,
+      "acquisition_failures": [
+        {
+          "path": "sources/ami/ES2004d.Headset-1.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2004d/audio/ES2004d.Headset-1.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2004d/audio/ES2004d.Headset-1.wav"
+        },
+        {
+          "path": "sources/ami/ES2004d.Headset-3.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2004d/audio/ES2004d.Headset-3.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2004d/audio/ES2004d.Headset-3.wav"
+        },
+        {
+          "path": "sources/ami/ES2004d.Headset-2.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2004d/audio/ES2004d.Headset-2.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2004d/audio/ES2004d.Headset-2.wav"
+        },
+        {
+          "path": "sources/ami/ES2004d.Headset-0.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2004d/audio/ES2004d.Headset-0.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2004d/audio/ES2004d.Headset-0.wav"
+        },
+        {
+          "path": "sources/ami/IS1009c.Headset-1.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/IS1009c/audio/IS1009c.Headset-1.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/IS1009c/audio/IS1009c.Headset-1.wav"
+        },
+        {
+          "path": "sources/ami/IS1009c.Headset-3.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/IS1009c/audio/IS1009c.Headset-3.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/IS1009c/audio/IS1009c.Headset-3.wav"
+        },
+        {
+          "path": "sources/ami/TS3003c.Headset-0.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003c/audio/TS3003c.Headset-0.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003c/audio/TS3003c.Headset-0.wav"
+        },
+        {
+          "path": "sources/ami/TS3003c.Headset-1.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003c/audio/TS3003c.Headset-1.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003c/audio/TS3003c.Headset-1.wav"
+        },
+        {
+          "path": "sources/ami/TS3003c.Headset-2.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003c/audio/TS3003c.Headset-2.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003c/audio/TS3003c.Headset-2.wav"
+        },
+        {
+          "path": "sources/ami/IS1009c.Headset-2.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/IS1009c/audio/IS1009c.Headset-2.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/IS1009c/audio/IS1009c.Headset-2.wav"
+        },
+        {
+          "path": "sources/ami/TS3003d.Headset-0.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003d/audio/TS3003d.Headset-0.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003d/audio/TS3003d.Headset-0.wav"
+        },
+        {
+          "path": "sources/ami/TS3003d.Headset-1.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003d/audio/TS3003d.Headset-1.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003d/audio/TS3003d.Headset-1.wav"
+        },
+        {
+          "path": "sources/ami/IS1009c.Headset-0.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/IS1009c/audio/IS1009c.Headset-0.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/IS1009c/audio/IS1009c.Headset-0.wav"
+        },
+        {
+          "path": "sources/ami/TS3003d.Headset-2.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003d/audio/TS3003d.Headset-2.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003d/audio/TS3003d.Headset-2.wav"
+        },
+        {
+          "path": "sources/ami/TS3003d.Headset-3.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003d/audio/TS3003d.Headset-3.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003d/audio/TS3003d.Headset-3.wav"
+        },
+        {
+          "path": "sources/ami/TS3003c.Headset-3.wav",
+          "url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003c/audio/TS3003c.Headset-3.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/TS3003c/audio/TS3003c.Headset-3.wav"
+        }
+      ],
+      "mode": "render-and-check"
+    },
+    {
+      "command": "python scripts/asr_benchmark/prepare.py --data-root .tmp/asr353/data --language en",
+      "recorded_at_utc": "2026-11-01T14:14:59.330806+00:00",
+      "acquired_source_count": 2,
+      "acquisition_failures": [
+        {
+          "path": "sources/ami/ES2004d.Headset-3.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-3.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-3.wav"
+        },
+        {
+          "path": "sources/ami/IS1009c.Headset-0.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-0.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-0.wav"
+        },
+        {
+          "path": "sources/ami/ES2004d.Headset-2.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-2.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-2.wav"
+        },
+        {
+          "path": "sources/ami/ES2004d.Headset-0.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-0.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-0.wav"
+        },
+        {
+          "path": "sources/ami/IS1009c.Headset-2.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-2.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-2.wav"
+        },
+        {
+          "path": "sources/ami/IS1009c.Headset-3.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-3.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-3.wav"
+        },
+        {
+          "path": "sources/ami/TS3003c.Headset-0.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-0.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-0.wav"
+        },
+        {
+          "path": "sources/ami/TS3003c.Headset-1.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-1.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-1.wav"
+        },
+        {
+          "path": "sources/ami/TS3003c.Headset-3.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-3.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-3.wav"
+        },
+        {
+          "path": "sources/ami/ES2004d.Headset-1.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-1.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/ES2004d/audio/ES2004d.Headset-1.wav"
+        },
+        {
+          "path": "sources/ami/TS3003d.Headset-1.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-1.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-1.wav"
+        },
+        {
+          "path": "sources/ami/TS3003c.Headset-2.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-2.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003c/audio/TS3003c.Headset-2.wav"
+        },
+        {
+          "path": "sources/ami/TS3003d.Headset-2.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-2.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-2.wav"
+        },
+        {
+          "path": "sources/ami/TS3003d.Headset-3.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-3.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-3.wav"
+        },
+        {
+          "path": "sources/ami/IS1009c.Headset-1.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-1.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/IS1009c/audio/IS1009c.Headset-1.wav"
+        },
+        {
+          "path": "sources/ami/TS3003d.Headset-0.wav",
+          "url": "http://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-0.wav",
+          "error": "HTTPError: 403 Client Error: Forbidden for url: https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/TS3003d/audio/TS3003d.Headset-0.wav"
+        }
+      ],
+      "mode": "render-and-check"
+    },
+    {
+      "command": "python scripts/asr_benchmark/prepare.py --data-root .tmp/asr353/data --language en --acquire-only",
+      "recorded_at_utc": "2026-11-01T14:21:29.766811+00:00",
+      "acquired_source_count": 7,
+      "acquisition_failures": [],
+      "mode": "acquire-only"
+    },
+    {
+      "command": "python scripts/asr_benchmark/prepare.py --data-root .tmp/asr353/data --language en --offline",
+      "recorded_at_utc": "2026-11-01T14:24:37.085086+00:00",
+      "acquired_source_count": 7,
+      "acquisition_failures": [],
+      "mode": "render-and-check"
+    },
+    {
+      "command": "python scripts/asr_benchmark/prepare.py --data-root .tmp/asr353/data --language all --offline --check-only",
+      "recorded_at_utc": "2026-11-01T14:26:07.203043+00:00",
+      "acquired_source_count": 17,
+      "acquisition_failures": [],
+      "mode": "check-only"
+    }
+  ],
+  "languages": {
+    "ja": {
+      "variant_counts": {
+        "clean": 120,
+        "noise15": 30,
+        "noise5": 30,
+        "control": 5
+      },
+      "all_185_sha256_headers_durations_checked": true,
+      "all_120_clean_crop_samples_and_references_match_frozen_selection": true,
+      "clean_duration_s": 276.215,
+      "clean_length_buckets": {
+        "short": 108,
+        "medium": 12
+      },
+      "conversations": [
+        "japanese-themed-dialogue01",
+        "japanese-themed-dialogue02",
+        "japanese-themed-dialogue03",
+        "japanese-themed-dialogue04",
+        "japanese-themed-dialogue10"
+      ],
+      "speaker_labels": [
+        "japanese-themed-dialogue01:speaker_1",
+        "japanese-themed-dialogue01:speaker_2",
+        "japanese-themed-dialogue02:speaker_1",
+        "japanese-themed-dialogue02:speaker_2",
+        "japanese-themed-dialogue03:speaker_1",
+        "japanese-themed-dialogue03:speaker_2",
+        "japanese-themed-dialogue04:speaker_1",
+        "japanese-themed-dialogue04:speaker_2",
+        "japanese-themed-dialogue10:speaker_1",
+        "japanese-themed-dialogue10:speaker_2"
+      ],
+      "noise_parent_ids": [
+        "ja-ingcrowd-10-speaker_2-a311",
+        "ja-ingcrowd-01-speaker_2-a42",
+        "ja-ingcrowd-03-speaker_1-a71",
+        "ja-ingcrowd-10-speaker_2-a216",
+        "ja-ingcrowd-02-speaker_1-a165",
+        "ja-ingcrowd-03-speaker_2-a280",
+        "ja-ingcrowd-01-speaker_1-a2",
+        "ja-ingcrowd-04-speaker_2-a290",
+        "ja-ingcrowd-10-speaker_2-a274",
+        "ja-ingcrowd-02-speaker_1-a28",
+        "ja-ingcrowd-04-speaker_1-a122",
+        "ja-ingcrowd-01-speaker_1-a169",
+        "ja-ingcrowd-04-speaker_2-a177",
+        "ja-ingcrowd-04-speaker_1-a270",
+        "ja-ingcrowd-02-speaker_1-a172",
+        "ja-ingcrowd-03-speaker_2-a275",
+        "ja-ingcrowd-04-speaker_2-a213",
+        "ja-ingcrowd-03-speaker_1-a107",
+        "ja-ingcrowd-03-speaker_1-a42",
+        "ja-ingcrowd-03-speaker_2-a296",
+        "ja-ingcrowd-02-speaker_1-a99",
+        "ja-ingcrowd-03-speaker_1-a3",
+        "ja-ingcrowd-04-speaker_1-a14",
+        "ja-ingcrowd-10-speaker_2-a192",
+        "ja-ingcrowd-02-speaker_1-a14",
+        "ja-ingcrowd-03-speaker_2-a169",
+        "ja-ingcrowd-04-speaker_1-a116",
+        "ja-ingcrowd-01-speaker_1-a80",
+        "ja-ingcrowd-03-speaker_1-a53",
+        "ja-ingcrowd-04-speaker_1-a25"
+      ],
+      "noise_export_checks": [
+        {
+          "id": "ja-ingcrowd-10-speaker_2-a311-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999980393157042,
+          "error_db": -1.960684295809756e-05,
+          "peak": 0.980010986328125
+        },
+        {
+          "id": "ja-ingcrowd-10-speaker_2-a311-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000006670258039,
+          "error_db": 6.670258039243038e-06,
+          "peak": 0.980010986328125
+        },
+        {
+          "id": "ja-ingcrowd-01-speaker_2-a42-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999990005845676,
+          "error_db": -9.994154323678117e-06,
+          "peak": 0.757476806640625
+        },
+        {
+          "id": "ja-ingcrowd-01-speaker_2-a42-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.99999771552711,
+          "error_db": -2.2844728899684696e-06,
+          "peak": 0.823089599609375
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_1-a71-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999977823450807,
+          "error_db": -2.2176549192565176e-05,
+          "peak": 0.6441650390625
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_1-a71-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000007248130487,
+          "error_db": 7.248130486914306e-06,
+          "peak": 0.671295166015625
+        },
+        {
+          "id": "ja-ingcrowd-10-speaker_2-a216-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000059476188497,
+          "error_db": 5.9476188496887517e-05,
+          "peak": 0.2867431640625
+        },
+        {
+          "id": "ja-ingcrowd-10-speaker_2-a216-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000014258969419,
+          "error_db": 1.425896941942284e-05,
+          "peak": 0.338348388671875
+        },
+        {
+          "id": "ja-ingcrowd-02-speaker_1-a165-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000019746160174,
+          "error_db": 1.9746160173639282e-05,
+          "peak": 0.688323974609375
+        },
+        {
+          "id": "ja-ingcrowd-02-speaker_1-a165-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000007591735848,
+          "error_db": 7.591735847967129e-06,
+          "peak": 0.702789306640625
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_2-a280-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999954400613957,
+          "error_db": -4.559938604309366e-05,
+          "peak": 0.455841064453125
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_2-a280-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999995912781384,
+          "error_db": -4.087218616000143e-06,
+          "peak": 0.4656982421875
+        },
+        {
+          "id": "ja-ingcrowd-01-speaker_1-a2-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.00004745328253,
+          "error_db": 4.7453282530085517e-05,
+          "peak": 0.759735107421875
+        },
+        {
+          "id": "ja-ingcrowd-01-speaker_1-a2-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000001353882003,
+          "error_db": 1.353882002952389e-06,
+          "peak": 0.83673095703125
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_2-a290-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999986456158226,
+          "error_db": -1.3543841774321663e-05,
+          "peak": 0.693145751953125
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_2-a290-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999990718181538,
+          "error_db": -9.281818462270053e-06,
+          "peak": 0.80108642578125
+        },
+        {
+          "id": "ja-ingcrowd-10-speaker_2-a274-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000002400391049,
+          "error_db": 2.400391048595907e-06,
+          "peak": 0.57513427734375
+        },
+        {
+          "id": "ja-ingcrowd-10-speaker_2-a274-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999998040451631,
+          "error_db": -1.9595483689016646e-06,
+          "peak": 0.575286865234375
+        },
+        {
+          "id": "ja-ingcrowd-02-speaker_1-a28-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.00001111316701,
+          "error_db": 1.1113167010634584e-05,
+          "peak": 0.838226318359375
+        },
+        {
+          "id": "ja-ingcrowd-02-speaker_1-a28-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.0000047389769575,
+          "error_db": 4.738976957519014e-06,
+          "peak": 0.886749267578125
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_1-a122-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999934005056977,
+          "error_db": -6.599494302328424e-05,
+          "peak": 0.089691162109375
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_1-a122-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000158629726586,
+          "error_db": 0.00015862972658631236,
+          "peak": 0.086822509765625
+        },
+        {
+          "id": "ja-ingcrowd-01-speaker_1-a169-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.00016763542899,
+          "error_db": 0.0001676354289905646,
+          "peak": 0.14959716796875
+        },
+        {
+          "id": "ja-ingcrowd-01-speaker_1-a169-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999997832651861,
+          "error_db": -2.167348139181513e-06,
+          "peak": 0.152984619140625
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_2-a177-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999992567603131,
+          "error_db": -7.432396868622959e-06,
+          "peak": 0.486846923828125
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_2-a177-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999993484822143,
+          "error_db": -6.515177856769583e-06,
+          "peak": 0.575408935546875
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_1-a270-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000056660150914,
+          "error_db": 5.6660150914211727e-05,
+          "peak": 0.222900390625
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_1-a270-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.00005111036208,
+          "error_db": 5.111036208038655e-05,
+          "peak": 0.26251220703125
+        },
+        {
+          "id": "ja-ingcrowd-02-speaker_1-a172-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999969198953451,
+          "error_db": -3.080104654884508e-05,
+          "peak": 0.980010986328125
+        },
+        {
+          "id": "ja-ingcrowd-02-speaker_1-a172-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999986733876255,
+          "error_db": -1.326612374530356e-05,
+          "peak": 0.980010986328125
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_2-a275-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000016569488977,
+          "error_db": 1.656948897732491e-05,
+          "peak": 0.529541015625
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_2-a275-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999987032381803,
+          "error_db": -1.2967618197023967e-05,
+          "peak": 0.52587890625
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_2-a213-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999969740900083,
+          "error_db": -3.0259099917273602e-05,
+          "peak": 0.817108154296875
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_2-a213-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999994150066615,
+          "error_db": -5.849933384816097e-06,
+          "peak": 0.826812744140625
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_1-a107-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.00000688750867,
+          "error_db": 6.887508670061493e-06,
+          "peak": 0.5704345703125
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_1-a107-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999996421445364,
+          "error_db": -3.5785546357303133e-06,
+          "peak": 0.60858154296875
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_1-a42-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.99986197776691,
+          "error_db": -0.00013802223308978512,
+          "peak": 0.15167236328125
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_1-a42-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000042949616431,
+          "error_db": 4.2949616431364745e-05,
+          "peak": 0.168853759765625
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_2-a296-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.00002765464178,
+          "error_db": 2.7654641780117117e-05,
+          "peak": 0.30853271484375
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_2-a296-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000006894845729,
+          "error_db": 6.894845729021881e-06,
+          "peak": 0.31451416015625
+        },
+        {
+          "id": "ja-ingcrowd-02-speaker_1-a99-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000026804035379,
+          "error_db": 2.6804035378802382e-05,
+          "peak": 0.980010986328125
+        },
+        {
+          "id": "ja-ingcrowd-02-speaker_1-a99-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999996492197012,
+          "error_db": -3.507802987634534e-06,
+          "peak": 0.980010986328125
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_1-a3-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999995728151061,
+          "error_db": -4.271848938586231e-06,
+          "peak": 0.644989013671875
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_1-a3-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999995712847036,
+          "error_db": -4.287152964188579e-06,
+          "peak": 0.646148681640625
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_1-a14-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999975041249591,
+          "error_db": -2.4958750408643482e-05,
+          "peak": 0.8258056640625
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_1-a14-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.00000056922138,
+          "error_db": 5.69221380253282e-07,
+          "peak": 0.874420166015625
+        },
+        {
+          "id": "ja-ingcrowd-10-speaker_2-a192-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999994613236334,
+          "error_db": -5.386763666237471e-06,
+          "peak": 0.450408935546875
+        },
+        {
+          "id": "ja-ingcrowd-10-speaker_2-a192-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000003257171209,
+          "error_db": 3.2571712091922222e-06,
+          "peak": 0.46099853515625
+        },
+        {
+          "id": "ja-ingcrowd-02-speaker_1-a14-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999985884854903,
+          "error_db": -1.4115145097193249e-05,
+          "peak": 0.980010986328125
+        },
+        {
+          "id": "ja-ingcrowd-02-speaker_1-a14-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000008083899726,
+          "error_db": 8.083899725619403e-06,
+          "peak": 0.980010986328125
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_2-a169-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999993941885217,
+          "error_db": -6.05811478315843e-06,
+          "peak": 0.69580078125
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_2-a169-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999995134278689,
+          "error_db": -4.865721311198001e-06,
+          "peak": 0.79632568359375
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_1-a116-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000039956005022,
+          "error_db": 3.995600502193497e-05,
+          "peak": 0.868499755859375
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_1-a116-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999994233073373,
+          "error_db": -5.766926626904478e-06,
+          "peak": 0.863128662109375
+        },
+        {
+          "id": "ja-ingcrowd-01-speaker_1-a80-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000013823552594,
+          "error_db": 1.3823552594161015e-05,
+          "peak": 0.551849365234375
+        },
+        {
+          "id": "ja-ingcrowd-01-speaker_1-a80-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000001991967766,
+          "error_db": 1.991967765846425e-06,
+          "peak": 0.537322998046875
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_1-a53-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000009124149054,
+          "error_db": 9.124149054073882e-06,
+          "peak": 0.578338623046875
+        },
+        {
+          "id": "ja-ingcrowd-03-speaker_1-a53-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000005110991398,
+          "error_db": 5.110991398105114e-06,
+          "peak": 0.634521484375
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_1-a25-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999995280302816,
+          "error_db": -4.719697184185634e-06,
+          "peak": 0.54278564453125
+        },
+        {
+          "id": "ja-ingcrowd-04-speaker_1-a25-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000001624204238,
+          "error_db": 1.6242042377712096e-06,
+          "peak": 0.581298828125
+        }
+      ],
+      "maximum_pcm16_snr_error_db": 0.0001676354289905646,
+      "spot_checks": [
+        {
+          "id": "ja-ingcrowd-01-speaker_1-a102",
+          "reference": "なんか車で何時間か行ったところにお茶どころが、あるんだけど",
+          "source_start_s": 312.05,
+          "source_end_s": 316.19,
+          "human_annotation_reference_and_bounds_match": true,
+          "crop_pcm16_samples_match": true,
+          "speech_end_s": 4.12,
+          "first_20ms_rms_dbfs": -63.98622938501802,
+          "last_20ms_rms_dbfs": -56.82271962291416
+        },
+        {
+          "id": "ja-ingcrowd-02-speaker_2-a267",
+          "reference": "はいはいはい。",
+          "source_start_s": 590.9,
+          "source_end_s": 591.57,
+          "human_annotation_reference_and_bounds_match": true,
+          "crop_pcm16_samples_match": true,
+          "speech_end_s": 0.64,
+          "first_20ms_rms_dbfs": -60.18947683529078,
+          "last_20ms_rms_dbfs": -51.107184762835345
+        },
+        {
+          "id": "ja-ingcrowd-01-speaker_1-a156",
+          "reference": "えっそれって、何。毎年恒例みたいな感じでいつも、固定の友達と行ってんの？",
+          "source_start_s": 573.555,
+          "source_end_s": 579.58,
+          "human_annotation_reference_and_bounds_match": true,
+          "crop_pcm16_samples_match": true,
+          "speech_end_s": 6.0,
+          "first_20ms_rms_dbfs": -63.43677564640831,
+          "last_20ms_rms_dbfs": -59.91171050867882
+        },
+        {
+          "id": "ja-ingcrowd-02-speaker_1-a99",
+          "reference": "本来一台ですむやつを、心配だからって二台にしたらそ、それでまた更に課金になってさ。",
+          "source_start_s": 343.27,
+          "source_end_s": 349.28,
+          "human_annotation_reference_and_bounds_match": true,
+          "crop_pcm16_samples_match": true,
+          "speech_end_s": 6.0,
+          "first_20ms_rms_dbfs": -51.30335782852705,
+          "last_20ms_rms_dbfs": -52.471519020198954
+        }
+      ],
+      "replay": {
+        "duration_s": 120,
+        "continuous_source_pcm16_samples_match": true,
+        "turn_count": 49,
+        "reference_available_count": 47,
+        "original_turn_timing_bounds_checked": true,
+        "annotation_spot_checks": [
+          {
+            "id": "ja-natural-japanese-themed-dialogue01-speaker_2-a57",
+            "reference": "うーん。",
+            "source_start_s": 86.6,
+            "source_end_s": 87.36,
+            "human_annotation_reference_and_bounds_match": true
+          },
+          {
+            "id": "ja-natural-japanese-themed-dialogue01-speaker_1-a22",
+            "reference": "なんか",
+            "source_start_s": 87.18,
+            "source_end_s": 87.62,
+            "human_annotation_reference_and_bounds_match": true
+          }
+        ],
+        "pcm16_snr_db": 14.999995042236305
+      },
+      "auditory_review_performed": false,
+      "review_limit": "Human annotation reference/interval identity and source crop PCM sample integrity checked, not listening review. Shared recovered energy speech ends are estimates, not acoustic ground truth; overlap/room noise may bias them."
+    },
+    "en": {
+      "variant_counts": {
+        "clean": 120,
+        "noise15": 30,
+        "noise5": 30,
+        "control": 5
+      },
+      "all_185_sha256_headers_durations_checked": true,
+      "all_120_clean_crop_samples_and_references_match_frozen_selection": true,
+      "clean_duration_s": 469.6199375,
+      "clean_length_buckets": {
+        "brief": 40,
+        "short": 40,
+        "medium": 40
+      },
+      "conversations": [
+        "ES2004d",
+        "IS1009c",
+        "TS3003c",
+        "TS3003d"
+      ],
+      "speaker_labels": [
+        "FEE013",
+        "FEE016",
+        "FIE088",
+        "FIO084",
+        "FIO087",
+        "FIO089",
+        "MEE014",
+        "MEO015",
+        "MTD0010ID",
+        "MTD009PM",
+        "MTD011UID",
+        "MTD012ME"
+      ],
+      "noise_parent_ids": [
+        "ihm-test-AMI_ES2004d_H03_FEE016_0195450_0195526",
+        "ihm-test-AMI_TS3003d_H02_MTD0010ID_0097748_0097915",
+        "ihm-test-AMI_IS1009c_H01_FIO087_0037914_0038091",
+        "ihm-test-AMI_TS3003c_H01_MTD011UID_0208619_0208669",
+        "ihm-test-AMI_ES2004d_H02_MEE014_0213821_0213994",
+        "ihm-test-AMI_IS1009c_H01_FIO087_0032580_0032667",
+        "ihm-test-AMI_TS3003c_H02_MTD0010ID_0156412_0156537",
+        "ihm-test-AMI_ES2004d_H01_FEE013_0089900_0089963",
+        "ihm-test-AMI_TS3003d_H00_MTD009PM_0058157_0058347",
+        "ihm-test-AMI_ES2004d_H00_MEO015_0141567_0141760",
+        "ihm-test-AMI_TS3003d_H00_MTD009PM_0243727_0243778",
+        "ihm-test-AMI_TS3003d_H00_MTD009PM_0084758_0084993",
+        "ihm-test-AMI_ES2004d_H01_FEE013_0151326_0151659",
+        "ihm-test-AMI_IS1009c_H02_FIO084_0136783_0137172",
+        "ihm-test-AMI_ES2004d_H03_FEE016_0202407_0202851",
+        "ihm-test-AMI_IS1009c_H02_FIO084_0089579_0090048",
+        "ihm-test-AMI_TS3003d_H03_MTD012ME_0170510_0170929",
+        "ihm-test-AMI_IS1009c_H02_FIO084_0087957_0088348",
+        "ihm-test-AMI_TS3003c_H01_MTD011UID_0206838_0207060",
+        "ihm-test-AMI_TS3003d_H03_MTD012ME_0162360_0162741",
+        "ihm-test-AMI_TS3003c_H01_MTD011UID_0199283_0200043",
+        "ihm-test-AMI_TS3003d_H00_MTD009PM_0071360_0072110",
+        "ihm-test-AMI_TS3003c_H03_MTD012ME_0037901_0038470",
+        "ihm-test-AMI_ES2004d_H02_MEE014_0040867_0041709",
+        "ihm-test-AMI_IS1009c_H02_FIO084_0110176_0110781",
+        "ihm-test-AMI_TS3003d_H00_MTD009PM_0113317_0113870",
+        "ihm-test-AMI_ES2004d_H01_FEE013_0192299_0193197",
+        "ihm-test-AMI_TS3003c_H00_MTD009PM_0107399_0108077",
+        "ihm-test-AMI_ES2004d_H02_MEE014_0030462_0031657",
+        "ihm-test-AMI_IS1009c_H01_FIO087_0160229_0160992"
+      ],
+      "noise_export_checks": [
+        {
+          "id": "ihm-test-AMI_ES2004d_H03_FEE016_0195450_0195526-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.003126877925252,
+          "error_db": 0.003126877925252458,
+          "peak": 0.007232666015625
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H03_FEE016_0195450_0195526-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.0009398807020276,
+          "error_db": 0.0009398807020275513,
+          "peak": 0.0111083984375
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H02_MTD0010ID_0097748_0097915-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999915462308195,
+          "error_db": -8.453769180505333e-05,
+          "peak": 0.10107421875
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H02_MTD0010ID_0097748_0097915-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999994339919414,
+          "error_db": -5.6600805855566705e-06,
+          "peak": 0.113525390625
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H01_FIO087_0037914_0038091-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.00000120626902,
+          "error_db": 1.2062690206704474e-06,
+          "peak": 0.980010986328125
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H01_FIO087_0037914_0038091-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.99999791732513,
+          "error_db": -2.0826748698965503e-06,
+          "peak": 0.980010986328125
+        },
+        {
+          "id": "ihm-test-AMI_TS3003c_H01_MTD011UID_0208619_0208669-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999859134758154,
+          "error_db": -0.00014086524184619975,
+          "peak": 0.02874755859375
+        },
+        {
+          "id": "ihm-test-AMI_TS3003c_H01_MTD011UID_0208619_0208669-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.9993057266339695,
+          "error_db": -0.0006942733660304512,
+          "peak": 0.030792236328125
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H02_MEE014_0213821_0213994-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000165756486869,
+          "error_db": 0.0001657564868686734,
+          "peak": 0.085723876953125
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H02_MEE014_0213821_0213994-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000007670213757,
+          "error_db": 7.670213756583166e-06,
+          "peak": 0.09478759765625
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H01_FIO087_0032580_0032667-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999831908922674,
+          "error_db": -0.00016809107732562723,
+          "peak": 0.08734130859375
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H01_FIO087_0032580_0032667-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000039365732034,
+          "error_db": 3.936573203411342e-05,
+          "peak": 0.086273193359375
+        },
+        {
+          "id": "ihm-test-AMI_TS3003c_H02_MTD0010ID_0156412_0156537-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000157933207394,
+          "error_db": 0.00015793320739376782,
+          "peak": 0.155181884765625
+        },
+        {
+          "id": "ihm-test-AMI_TS3003c_H02_MTD0010ID_0156412_0156537-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.0000670515330095,
+          "error_db": 6.705153300945454e-05,
+          "peak": 0.166778564453125
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H01_FEE013_0089900_0089963-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.001780277553538,
+          "error_db": 0.0017802775535376014,
+          "peak": 0.008087158203125
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H01_FEE013_0089900_0089963-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999559160522301,
+          "error_db": -0.0004408394776991287,
+          "peak": 0.01263427734375
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H00_MTD009PM_0058157_0058347-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000186447038725,
+          "error_db": 0.00018644703872539026,
+          "peak": 0.151580810546875
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H00_MTD009PM_0058157_0058347-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999993019636985,
+          "error_db": -6.98036301471916e-06,
+          "peak": 0.15478515625
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H00_MEO015_0141567_0141760-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.00028239598366,
+          "error_db": 0.00028239598366042173,
+          "peak": 0.03955078125
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H00_MEO015_0141567_0141760-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.99964076132955,
+          "error_db": -0.0003592386704500683,
+          "peak": 0.03948974609375
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H00_MTD009PM_0243727_0243778-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999949759636696,
+          "error_db": -5.024036330425474e-05,
+          "peak": 0.155426025390625
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H00_MTD009PM_0243727_0243778-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.99996592367553,
+          "error_db": -3.407632446972286e-05,
+          "peak": 0.185333251953125
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H00_MTD009PM_0084758_0084993-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000265140557174,
+          "error_db": 0.0002651405571736376,
+          "peak": 0.20159912109375
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H00_MTD009PM_0084758_0084993-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000053569261804,
+          "error_db": 5.35692618042205e-05,
+          "peak": 0.19049072265625
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H01_FEE013_0151326_0151659-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.9997249788066,
+          "error_db": -0.000275021193399283,
+          "peak": 0.09588623046875
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H01_FEE013_0151326_0151659-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000037304161196,
+          "error_db": 3.730416119562818e-05,
+          "peak": 0.104736328125
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H02_FIO084_0136783_0137172-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000016177275173,
+          "error_db": 1.617727517277956e-05,
+          "peak": 0.183319091796875
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H02_FIO084_0136783_0137172-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000021502211631,
+          "error_db": 2.1502211630775037e-05,
+          "peak": 0.20037841796875
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H03_FEE016_0202407_0202851-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999990633820367,
+          "error_db": -9.36617963276376e-06,
+          "peak": 0.02874755859375
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H03_FEE016_0202407_0202851-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.9999395418124,
+          "error_db": -6.045818760025412e-05,
+          "peak": 0.032318115234375
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H02_FIO084_0089579_0090048-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999985867177179,
+          "error_db": -1.413282282136663e-05,
+          "peak": 0.285675048828125
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H02_FIO084_0089579_0090048-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000012824880134,
+          "error_db": 1.2824880133877059e-05,
+          "peak": 0.322845458984375
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H03_MTD012ME_0170510_0170929-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.99995377143022,
+          "error_db": -4.622856977931633e-05,
+          "peak": 0.083404541015625
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H03_MTD012ME_0170510_0170929-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.9999578469351835,
+          "error_db": -4.215306481647474e-05,
+          "peak": 0.088836669921875
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H02_FIO084_0087957_0088348-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999995408347488,
+          "error_db": -4.59165251243121e-06,
+          "peak": 0.319488525390625
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H02_FIO084_0087957_0088348-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000010306190767,
+          "error_db": 1.0306190766584677e-05,
+          "peak": 0.345916748046875
+        },
+        {
+          "id": "ihm-test-AMI_TS3003c_H01_MTD011UID_0206838_0207060-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999454819619785,
+          "error_db": -0.0005451803802145605,
+          "peak": 0.05535888671875
+        },
+        {
+          "id": "ihm-test-AMI_TS3003c_H01_MTD011UID_0206838_0207060-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000169251269545,
+          "error_db": 0.00016925126954525638,
+          "peak": 0.0596923828125
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H03_MTD012ME_0162360_0162741-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999907361966367,
+          "error_db": -9.263803363346312e-05,
+          "peak": 0.134979248046875
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H03_MTD012ME_0162360_0162741-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000022626838241,
+          "error_db": 2.2626838241279756e-05,
+          "peak": 0.146881103515625
+        },
+        {
+          "id": "ihm-test-AMI_TS3003c_H01_MTD011UID_0199283_0200043-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999997158878568,
+          "error_db": -2.8411214323398326e-06,
+          "peak": 0.094879150390625
+        },
+        {
+          "id": "ihm-test-AMI_TS3003c_H01_MTD011UID_0199283_0200043-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999972540802203,
+          "error_db": -2.7459197797341517e-05,
+          "peak": 0.100250244140625
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H00_MTD009PM_0071360_0072110-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999990612159817,
+          "error_db": -9.38784018345018e-06,
+          "peak": 0.23431396484375
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H00_MTD009PM_0071360_0072110-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999996407284762,
+          "error_db": -3.592715238198707e-06,
+          "peak": 0.251068115234375
+        },
+        {
+          "id": "ihm-test-AMI_TS3003c_H03_MTD012ME_0037901_0038470-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.99999094264869,
+          "error_db": -9.057351309849082e-06,
+          "peak": 0.191497802734375
+        },
+        {
+          "id": "ihm-test-AMI_TS3003c_H03_MTD012ME_0037901_0038470-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.0000236143343635,
+          "error_db": 2.3614334363486478e-05,
+          "peak": 0.196075439453125
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H02_MEE014_0040867_0041709-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000013549009196,
+          "error_db": 1.3549009196367479e-05,
+          "peak": 0.165557861328125
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H02_MEE014_0040867_0041709-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000008330678265,
+          "error_db": 8.330678264556468e-06,
+          "peak": 0.17547607421875
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H02_FIO084_0110176_0110781-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.999989817229139,
+          "error_db": -1.0182770861177914e-05,
+          "peak": 0.42755126953125
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H02_FIO084_0110176_0110781-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999979133579257,
+          "error_db": -2.086642074328182e-05,
+          "peak": 0.47039794921875
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H00_MTD009PM_0113317_0113870-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000029680658407,
+          "error_db": 2.9680658407471583e-05,
+          "peak": 0.252838134765625
+        },
+        {
+          "id": "ihm-test-AMI_TS3003d_H00_MTD009PM_0113317_0113870-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.999990952120123,
+          "error_db": -9.047879877321918e-06,
+          "peak": 0.2703857421875
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H01_FEE013_0192299_0193197-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.998973963920616,
+          "error_db": -0.0010260360793843404,
+          "peak": 0.027313232421875
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H01_FEE013_0192299_0193197-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000022007349456,
+          "error_db": 2.2007349455677172e-05,
+          "peak": 0.026336669921875
+        },
+        {
+          "id": "ihm-test-AMI_TS3003c_H00_MTD009PM_0107399_0108077-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000011193526833,
+          "error_db": 1.1193526832542489e-05,
+          "peak": 0.3099365234375
+        },
+        {
+          "id": "ihm-test-AMI_TS3003c_H00_MTD009PM_0107399_0108077-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.0000096827328715,
+          "error_db": 9.682732871496569e-06,
+          "peak": 0.318206787109375
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H02_MEE014_0030462_0031657-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 14.99997369997094,
+          "error_db": -2.6300029059456165e-05,
+          "peak": 0.178558349609375
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H02_MEE014_0030462_0031657-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 4.9999770364516065,
+          "error_db": -2.2963548393484245e-05,
+          "peak": 0.19012451171875
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H01_FIO087_0160229_0160992-noise15",
+          "target_db": 15,
+          "pcm16_snr_db": 15.000010191271597,
+          "error_db": 1.0191271597292939e-05,
+          "peak": 0.925506591796875
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H01_FIO087_0160229_0160992-noise5",
+          "target_db": 5,
+          "pcm16_snr_db": 5.000002834926843,
+          "error_db": 2.834926842609775e-06,
+          "peak": 0.980010986328125
+        }
+      ],
+      "maximum_pcm16_snr_error_db": 0.003126877925252458,
+      "spot_checks": [
+        {
+          "id": "ihm-test-AMI_ES2004d_H03_FEE016_0195450_0195526",
+          "reference": "YEAH",
+          "source_start_s": 1954.5,
+          "source_end_s": 1955.260009765625,
+          "upstream_id_bounds_match": true,
+          "upstream_waveform_duration_metadata_error_s": -9.765624999991118e-06,
+          "original_manual_word_text": "Yeah .",
+          "manual_word_ids": [
+            "ES2004d.D.words2248",
+            "ES2004d.D.words2249"
+          ],
+          "human_reference_normalized_match": true,
+          "reference_policy": "Upstream human/Kaldi-normalized text preserved; compare original manual word XML within exposed interval±50ms. Differences remain visible, not rewritten from candidate outputs.",
+          "crop_pcm16_samples_match": true,
+          "speech_end_s": 0.2,
+          "first_20ms_rms_dbfs": -82.90784008781881,
+          "last_20ms_rms_dbfs": -67.28447178322847
+        },
+        {
+          "id": "ihm-test-AMI_IS1009c_H02_FIO084_0095434_0095628",
+          "reference": "IT IT IT'S NOT A HIGH VOLTAGE BATTERY",
+          "source_start_s": 954.3400268554688,
+          "source_end_s": 956.280029296875,
+          "upstream_id_bounds_match": true,
+          "upstream_waveform_duration_metadata_error_s": -2.4414062500532907e-06,
+          "original_manual_word_text": ". It it it's not a high voltage battery .",
+          "manual_word_ids": [
+            "IS1009c.C.words546",
+            "IS1009c.C.words547",
+            "IS1009c.C.words548",
+            "IS1009c.C.words549",
+            "IS1009c.C.words550",
+            "IS1009c.C.words551",
+            "IS1009c.C.words552",
+            "IS1009c.C.words553",
+            "IS1009c.C.words554",
+            "IS1009c.C.words555"
+          ],
+          "human_reference_normalized_match": true,
+          "reference_policy": "Upstream human/Kaldi-normalized text preserved; compare original manual word XML within exposed interval±50ms. Differences remain visible, not rewritten from candidate outputs.",
+          "crop_pcm16_samples_match": true,
+          "speech_end_s": 1.94,
+          "first_20ms_rms_dbfs": -44.36692631807918,
+          "last_20ms_rms_dbfs": -23.745518553637616
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H02_MEE014_0094276_0094535",
+          "reference": "YEAH YEAH THAT YEAH THAT'S FEASIBLE",
+          "source_start_s": 942.760009765625,
+          "source_end_s": 945.3499755859375,
+          "upstream_id_bounds_match": true,
+          "upstream_waveform_duration_metadata_error_s": 3.417968749985789e-05,
+          "original_manual_word_text": "Yeah , yeah , that yeah , that's feasible .",
+          "manual_word_ids": [
+            "ES2004d.C.words1041",
+            "ES2004d.C.words1042",
+            "ES2004d.C.words1043",
+            "ES2004d.C.words1044",
+            "ES2004d.C.words1045",
+            "ES2004d.C.words1047",
+            "ES2004d.C.words1048",
+            "ES2004d.C.words1049",
+            "ES2004d.C.words1050",
+            "ES2004d.C.words1051"
+          ],
+          "human_reference_normalized_match": true,
+          "reference_policy": "Upstream human/Kaldi-normalized text preserved; compare original manual word XML within exposed interval±50ms. Differences remain visible, not rewritten from candidate outputs.",
+          "crop_pcm16_samples_match": true,
+          "speech_end_s": 2.5,
+          "first_20ms_rms_dbfs": -46.61747293732651,
+          "last_20ms_rms_dbfs": -66.26376168942629
+        },
+        {
+          "id": "ihm-test-AMI_ES2004d_H01_FEE013_0215890_0216450",
+          "reference": "SO I'LL BE DELEGATING IN MY UM ROLE AS PROJECT SUPERVISOR SO GOOD LUCK",
+          "source_start_s": 2158.89990234375,
+          "source_end_s": 2164.5,
+          "upstream_id_bounds_match": true,
+          "upstream_waveform_duration_metadata_error_s": -9.765625000035527e-05,
+          "original_manual_word_text": ", so I'll be delegating in my um role as Project Supervisor , so good luck .",
+          "manual_word_ids": [
+            "ES2004d.B.words2008",
+            "ES2004d.B.words2009",
+            "ES2004d.B.words2010",
+            "ES2004d.B.words2011",
+            "ES2004d.B.words2012",
+            "ES2004d.B.words2013",
+            "ES2004d.B.words2014",
+            "ES2004d.B.words2015",
+            "ES2004d.B.words2016",
+            "ES2004d.B.words2017",
+            "ES2004d.B.words2018",
+            "ES2004d.B.words2019",
+            "ES2004d.B.words2020",
+            "ES2004d.B.words2021",
+            "ES2004d.B.words2022",
+            "ES2004d.B.words2023",
+            "ES2004d.B.words2024"
+          ],
+          "human_reference_normalized_match": true,
+          "reference_policy": "Upstream human/Kaldi-normalized text preserved; compare original manual word XML within exposed interval±50ms. Differences remain visible, not rewritten from candidate outputs.",
+          "crop_pcm16_samples_match": true,
+          "speech_end_s": 5.46,
+          "first_20ms_rms_dbfs": -72.20772408767532,
+          "last_20ms_rms_dbfs": -59.88417880639468
+        }
+      ],
+      "replay": {
+        "duration_s": 120,
+        "continuous_source_pcm16_samples_match": true,
+        "turn_count": 33,
+        "reference_available_count": 21,
+        "original_turn_timing_bounds_checked": true,
+        "annotation_spot_checks": [
+          {
+            "id": "followup-en-natural-01-ES2004d.sync.322",
+            "reference": "I presume we're good to go . Okay , um",
+            "source_start_s": 32.704,
+            "source_end_s": 35.568,
+            "human_annotation_reference_and_bounds_match": true
+          },
+          {
+            "id": "followup-en-natural-01-ES2004d.sync.324",
+            "reference": "minutes um we decided to use a kinetic charger ,",
+            "source_start_s": 36.576,
+            "source_end_s": 39.648,
+            "human_annotation_reference_and_bounds_match": true
+          }
+        ],
+        "pcm16_snr_db": 14.999856177791289
+      },
+      "auditory_review_performed": false,
+      "review_limit": "Human annotation reference/interval identity and source crop PCM sample integrity checked, not listening review. Shared recovered energy speech ends are estimates, not acoustic ground truth; overlap/room noise may bias them."
+    }
+  },
+  "frozen_input_hashes": {
+    "en.jsonl": "fececd4854eafcc660417bc962c4f3b0d0bd7cf17eccb2c1a989d9c7e346836c",
+    "ja.jsonl": "6d2b655734e6fbca8ac5fa2f3049abfd9bac35d4d81440e6fadeff5fa4491ea2",
+    "replay-en.json": "3354ea31438bba87fd903c7e63c7a296bfd28fa6ff723199bbc7bff81a32f41d",
+    "replay-ja.json": "a06a563e4e4f28df269766abda057e28ef4c3acc4f4a9d648bf3b0a82eb7bea6",
+    "selection-en.jsonl": "8945493af2fb1e6ea45d667f1c2fe181fc23f1685a11e3cbe8bec6170ea9e607",
+    "selection-ja.jsonl": "19c59626e9e76b4c9678dc048ef9d209b1dd797eea669097b355465aba763eed",
+    "sources.json": "cf9c32cf6e490875d969db9f373ea9b32a075ec2907e2c02e4b7087e7a553e64"
+  },
+  "preparation_code_sha256": "1e37544775821abcc64950ac9de79435905b752cfbd37f7c35496bfcedb6814d",
+  "preparation_complete": true,
+  "recorded_at_utc": "2026-11-01T14:26:06.874642+00:00",
+  "english_reconstruction": {
+    "status": "approved before any EN candidate inference",
+    "decision": "Use bounded pinned HF Edinburgh IHM test reconstruction, not inaccessible exact16 individual-headset originals, local non-eval mixed audio or24GB archive. Preserve120clean40brief/40short/40medium,4meetings/speaker spread and human references.",
+    "dataset": "edinburghcstr/ami",
+    "revision": "46f28f2503e2ec48f8867a84eef356c70476beab",
+    "config": "ihm",
+    "split": "test",
+    "reference_policy": "Original human references distributed with Kaldi normalization. Human manual1.6.2 annotations used for bounded independent reference/timing sanity checks; no candidate-generated text.",
+    "difference": "Reconstructed IHM utterance selection and upstream Kaldi clip boundaries/normalized text, not the recovered #308 followup120. Exact IDs, durations, source channel/timing and parquet row identities frozen before candidate inference/noise.",
+    "natural_window": "Original ES2004d32.368–152.368s timing/references retained; audio from public original Mix-Headset at pinned FluidInference revision, not recovered mean-of4headsets. Whole natural window preserved, channel/mix difference disclosed.",
+    "natural_revision": "722d8891643e1e4dc62cfd0d198fa05a1646c3cc",
+    "blocker": "Original full individual-headset acquisition failedHTTP403 with Apache htaccess explanation usingHTTPS single/double-slash andHTTPredirect, across16requiredfiles; isolatedPython/requests/header comparison yielded some206ranges but next4MiB403 in bothclients.",
+    "archive_not_taken": "OpenSLR24,359,488,927byte headset archive header accessible, sortedfirstmemberEN2001a.Headset0; Director chose smallerIHMtest reconstruction rather than near-full24GB stream. LegacyOpenSLRlicense CC-BY-NC-SA2.0 modified noted but noarchiveaudio acquired.",
+    "selection_rule": "Ten per target meeting per bucket, deterministic SHA256(seed30820261027:reconstruct:id) order; actual waveform duration; no candidate outputs",
+    "rejected_candidate_counts": {
+      "outside_duration_or_empty_reference": 639
+    },
+    "candidate_count": 2442,
+    "row_count": 120,
+    "clean_length_buckets": {
+      "brief": 40,
+      "short": 40,
+      "medium": 40
+    },
+    "speaker_labels": [
+      "FEE013",
+      "FEE016",
+      "FIE088",
+      "FIO084",
+      "FIO087",
+      "FIO089",
+      "MEE014",
+      "MEO015",
+      "MTD0010ID",
+      "MTD009PM",
+      "MTD011UID",
+      "MTD012ME"
+    ]
+  },
+  "recovered_english_noise_parent_eligibility": {
+    "scope": "Historical-only preliminary exact-recovery plan, superseded by the approved IHM test reconstruction. The final English parents are listed in languages.en.noise_parent_ids.",
+    "rule": "First30 sorted SHA256(f\"30820261027:noise:{id}\") among recovered originals with nonempty unchanged shared activity mask. Exclude only recovered3empty-mask originals from noise pairing; all120clean speech inputs, original audio/references/bounds, and annotation-end timing fallbacks retained. No candidate-derived references or amplification.",
+    "excluded_from_noise_only": [
+      "followup-en-ES2004d.sync.1178",
+      "followup-en-ES2004d.sync.472",
+      "followup-en-ES2004d.sync.452"
+    ],
+    "replaced_before_issue353_inference": {
+      "removed": [
+        "followup-en-ES2004d.sync.1178",
+        "followup-en-ES2004d.sync.452"
+      ],
+      "added": [
+        "followup-en-IS1009c.sync.298",
+        "followup-en-IS1009c.sync.342"
+      ]
+    }
+  },
+  "english_noise_parent_eligibility": {
+    "rule": "Reconstructed120 selected blind to candidates; eligible means nonempty unchanged original shared energy mask; first30sortedSHA256(seed30820261027:noise:id). Frozen before EN candidate inference."
+  },
+  "source_license_checks": [
+    {
+      "url": "https://groups.inf.ed.ac.uk/ami/corpus/license.shtml",
+      "outcome": "HTTP403 from current read attempt; historical CC-BY-4.0 provenance retained; corroborated by accessible edinburghcstr/ami distribution card."
+    },
+    {
+      "url": "https://huggingface.co/datasets/edinburghcstr/ami/raw/main/README.md",
+      "outcome": "Read distribution card license cc-by-4.0. Final approved English inputs use this distribution's pinned IHM test chunks and Kaldi-normalized human references, not the inaccessible historical individual-headset originals."
+    },
+    {
+      "url": "https://huggingface.co/datasets/IngCrowd/japanese-themed-dialogue/raw/e2eed8769400269f20821deb0e47e68b40012e8b/README.md",
+      "outcome": "Read pinned card: CC-BY-NC-4.0, 16kHz mono16bit WAV, unscripted Zoom themed conversation and manually segmented/transcribed ELAN; no ASR in annotation."
+    }
+  ],
+  "historical_acquisition_summary": [
+    {
+      "attempt": "Initial exact16 acquisition",
+      "python": "3.14.7",
+      "requests": "2.32.5",
+      "route": "HTTPS canonical;8MiB ranges",
+      "outcome": "16HTTP403 failures; IngCrowd10sources and AMI annotations/split acquired with expectedhashes. Initial run predates attempts recorder; failures observed in bg_3 output."
+    },
+    {
+      "attempt": "Historical1MiB size, HTTPS double-slash, HTTPredirect",
+      "outcome": "Each complete acquisition attempt failed16requiredoriginalWAVs; exact URLs/errors retained in attempts. Some isolated206range probes did not establish full-source access."
+    },
+    {
+      "attempt": "Isolated client/header diagnosis",
+      "outcome": "At3MiB offset evalPython3.14.7/requests2.32.5 and lockedPython3.14.10/requests2.34.2+historicalUserAgent both206; next4MiB failed403 in both. HTTPredirect reachedHTTPS; Apache body said unable to readhtaccess. No general client fix established."
+    },
+    {
+      "attempt": "Bounded archive assessment",
+      "url": "https://openslr.elda.org/resources/16/headset.tar.gz",
+      "outcome": "65536byte header range206; total24359488927bytes; firstmemberEN2001a/audio/EN2001a.Headset-0.wav. Noarchiveaudio extracted/fullarchive acquired; Director chose smallerpinnedIHMtest fallback."
+    },
+    {
+      "attempt": "Approved final publicHF acquisition",
+      "outcome": "4EdinburghIHMtestparquets+ES2004dMix-Headset acquired with pinnedSHA256; primaryrender/check and finalall-languagecheck-only successful."
+    }
+  ],
+  "source_format_observation": {
+    "upstream_ihm_wav": "FLOAT format3; initial stdlibwave inspection raised unknownformat3. scipy.io.wavfile.read successfully decoded16kHzmono float32. No soundfile dependency added.",
+    "pcm16_conversion": "All frozen outputs use stdlibwave PCM16. UpstreamFLOATandhistoricalFLOAThashes are source/provenance, never substituted for newPCM16hashes."
+  },
+  "preliminary_recovered_parent_plan_scope": "The recorded initial2parent replacements concern the ultimately blocked historicalENrecovery plan only. FinalEN120 and30parents were reconstructed afresh under approvedtest-split fallback, then frozen before EN candidate inference.",
+  "checks_run": [
+    {
+      "command": "uv run --no-sync --with pyarrow==23.0.1 python scripts/asr_benchmark/prepare.py --data-root .tmp/asr353/data --language en --offline",
+      "outcome": "PASS; reconstruct/freeze120 plus30pink15+30pink5+5controls; realnatural120sMix-Headsetclean/pink15; sources/hashes/headers/crops/noise/refs/bounds checked."
+    },
+    {
+      "command": ".venv/Scripts/python.exe scripts/asr_benchmark/prepare.py --data-root .tmp/asr353/data --language ja --offline",
+      "outcome": "PASS; exactrecoveredJA120+30pink15+30pink5+5controls and originalnatural120sclean/pink15."
+    },
+    {
+      "command": "uv run --no-sync --with pyarrow==23.0.1 python scripts/asr_benchmark/prepare.py --data-root .tmp/asr353/data --language all --offline --check-only",
+      "outcome": "PASS; both185manifests,370primaryWAVhashes/PCM16headers/durations,240clean source samples,120noise recipe/parentpairchecks,10controls,4naturalreplayWAVs,8offline annotation/reference/boundaryspots and4replayannotation/spots. No listening, ASR, build, linter, formatter or typechecker run by dataowner."
+    }
+  ],
+  "cleanup": {
+    "removed": "Owned failedAMI.part downloads and unusedemptyisolatedenv removed; nofull24GBarchive acquired. Selectedsource/parquet/audio resources retained onlyunderignored.tmp/asr353/data for execution/rerun.",
+    "heavy_preparation_complete": true,
+    "runtime_owner_notified": true,
+    "audio_committed": false,
+    "git_index_history_remote_mutations": false
+  }
+}

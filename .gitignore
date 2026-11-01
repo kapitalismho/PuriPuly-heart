@@ -226,6 +226,7 @@ refactoring/
 .tmp/
 /scripts/*
 !/scripts/bench_*.py
+!/scripts/asr_benchmark/
 !/scripts/ci/
 /scripts/ci/*
 !/scripts/ci/build-native-experimental.ps1

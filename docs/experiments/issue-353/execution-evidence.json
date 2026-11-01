@@ -1,0 +1,595 @@
+{
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/353",
+  "checkout": "96a0d2cfb32a7a05136e510eebe55ec28431bcb4",
+  "recorded_utc": "2026-11-01T14:52:28.072118+00:00",
+  "commands": {
+    "python": ".venv/Scripts/python.exe",
+    "worker": "../../../build/asr_worker/PuriPulyHeartASRWorker.exe (worktree layout; standalone checkout uses build/asr_worker)",
+    "download": "curl --fail --location --retry 2 --create-dirs --output .tmp/asr353/models/granite-speech-5.0-470m-turboctc-multilingual-Q8_0.gguf https://huggingface.co/17slever17/granite-speech-5.0-470m-turboctc-multilingual-GGUF/resolve/62f64d9d5ad35989b06caf199cafe7155944a22b/granite-speech-5.0-470m-turboctc-multilingual-Q8_0.gguf",
+    "initial_smoke_template": "$PY scripts/asr_benchmark/run.py --model $MODEL --language $LANGUAGE --mode smoke --limit 3 --worker $Worker",
+    "initial_smoke_cells": [
+      "ja-granite",
+      "ja-sherpa-ja",
+      "en-granite",
+      "en-orukeet"
+    ],
+    "primary_template": "$PY scripts/asr_benchmark/run.py --model $MODEL --language $LANGUAGE --mode primary --worker $Worker",
+    "primary_serial_order": [
+      "en-orukeet",
+      "en-granite",
+      "ja-sherpa-ja",
+      "ja-granite"
+    ],
+    "replay_template": "$PY scripts/asr_benchmark/run.py --model $MODEL --language $LANGUAGE --mode replay --worker $Worker",
+    "replay_serial_order": [
+      "en-orukeet",
+      "en-granite",
+      "ja-sherpa-ja",
+      "ja-granite"
+    ],
+    "final_bounded_smoke": "$PY scripts/asr_benchmark/run.py --model granite --language en --mode smoke --output docs/experiments/issue-353/results/reuse-smoke --worker $Worker",
+    "offline_summary": "$PY scripts/asr_benchmark/score.py --results docs/experiments/issue-353/results --output docs/experiments/issue-353/results/summary.json"
+  },
+  "observed_outcomes": {
+    "download_exit": 0,
+    "download_size_bytes": 505663136,
+    "model_sha256": "f3efdc05b85b3a764bb5bb7022e69f61cafcecc11605c881c6396a6ed07ec91b",
+    "all_model_artifacts_freshly_hashed": true,
+    "current_app_cpu_granite_smoke_languages": [
+      "en",
+      "ja"
+    ],
+    "primary_cells": 4,
+    "primary_rows": 740,
+    "primary_status": {
+      "ok": 740,
+      "failed": 0,
+      "timeout": 0
+    },
+    "primary_pipeline_wall_s": 226.58,
+    "replay_runs": 8,
+    "replay_pipeline_wall_s": 978.98,
+    "replay_segments": 116,
+    "replay_delivered_nonempty": 115,
+    "replay_empty": 1,
+    "replay_failed_expired_dropped_replaced_queue_merged": 0,
+    "bounded_default_smoke_rows": 3,
+    "bounded_default_smoke_status": "all ok; three distinct clean rows",
+    "offline_summary_exit": 0,
+    "offline_summary_cells": 4,
+    "offline_summary_primary_rows": 740,
+    "offline_summary_replays": 8,
+    "checks_not_run": [
+      "The execution worker did not run a new unit-test suite, CI, linter, formatter or production build. Director integration checks are recorded separately."
+    ]
+  },
+  "runs": [
+    {
+      "file": "docs/experiments/issue-353/results/en-granite-primary-meta.json",
+      "cell": "en-granite",
+      "mode": "primary",
+      "utc_started": "2026-11-01T14:28:14.663182+00:00",
+      "utc_finished": "2026-11-01T14:29:22.734937+00:00",
+      "rows": 185,
+      "initialize_ms": 95.95539997098967,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 1821913088,
+      "resources": {
+        "cpu_seconds": 133.984375,
+        "sampled_peak_tree_rss_bytes": 651378688,
+        "sum_process_peak_working_set_bytes": 653254656,
+        "observed_processes": 2,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    },
+    {
+      "file": "docs/experiments/issue-353/results/en-granite-replay-meta.json",
+      "cell": "en-granite",
+      "mode": "replay",
+      "utc_started": "2026-11-01T14:35:31.673400+00:00",
+      "utc_finished": "2026-11-01T14:39:33.535811+00:00",
+      "rows": 185,
+      "initialize_ms": 92.2176000312902,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 5174235136,
+      "resources": {
+        "cpu_seconds": 75.390625,
+        "sampled_peak_tree_rss_bytes": 722952192,
+        "sum_process_peak_working_set_bytes": 732725248,
+        "observed_processes": 2,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    },
+    {
+      "file": "docs/experiments/issue-353/results/en-granite-smoke-meta.json",
+      "cell": "en-granite",
+      "mode": "smoke",
+      "utc_started": "2026-11-01T14:26:48.429441+00:00",
+      "utc_finished": "2026-11-01T14:26:50.466555+00:00",
+      "rows": 3,
+      "initialize_ms": 141.1472000181675,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 1425330176,
+      "resources": {
+        "cpu_seconds": 2.3125,
+        "sampled_peak_tree_rss_bytes": 592814080,
+        "sum_process_peak_working_set_bytes": 594116608,
+        "observed_processes": 2,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    },
+    {
+      "file": "docs/experiments/issue-353/results/en-orukeet-primary-meta.json",
+      "cell": "en-orukeet",
+      "mode": "primary",
+      "utc_started": "2026-11-01T14:27:03.392574+00:00",
+      "utc_finished": "2026-11-01T14:28:13.353839+00:00",
+      "rows": 185,
+      "initialize_ms": 259.81529999990016,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 1385218048,
+      "resources": {
+        "cpu_seconds": 139.578125,
+        "sampled_peak_tree_rss_bytes": 1294970880,
+        "sum_process_peak_working_set_bytes": 1297842176,
+        "observed_processes": 2,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    },
+    {
+      "file": "docs/experiments/issue-353/results/en-orukeet-replay-meta.json",
+      "cell": "en-orukeet",
+      "mode": "replay",
+      "utc_started": "2026-11-01T14:31:28.738176+00:00",
+      "utc_finished": "2026-11-01T14:35:30.561499+00:00",
+      "rows": 185,
+      "initialize_ms": 269.22060002107173,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 5189308416,
+      "resources": {
+        "cpu_seconds": 73.40625,
+        "sampled_peak_tree_rss_bytes": 1394446336,
+        "sum_process_peak_working_set_bytes": 1398996992,
+        "observed_processes": 2,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    },
+    {
+      "file": "docs/experiments/issue-353/results/en-orukeet-smoke-meta.json",
+      "cell": "en-orukeet",
+      "mode": "smoke",
+      "utc_started": "2026-11-01T14:26:51.700371+00:00",
+      "utc_finished": "2026-11-01T14:26:53.129134+00:00",
+      "rows": 3,
+      "initialize_ms": 280.2353000151925,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 1438765056,
+      "resources": {
+        "cpu_seconds": 1.625,
+        "sampled_peak_tree_rss_bytes": 1201303552,
+        "sum_process_peak_working_set_bytes": 1203122176,
+        "observed_processes": 2,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    },
+    {
+      "file": "docs/experiments/issue-353/results/ja-granite-primary-meta.json",
+      "cell": "ja-granite",
+      "mode": "primary",
+      "utc_started": "2026-11-01T14:29:53.552710+00:00",
+      "utc_finished": "2026-11-01T14:30:48.652199+00:00",
+      "rows": 185,
+      "initialize_ms": 103.62050001276657,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 1839984640,
+      "resources": {
+        "cpu_seconds": 107.078125,
+        "sampled_peak_tree_rss_bytes": 635437056,
+        "sum_process_peak_working_set_bytes": 636739584,
+        "observed_processes": 2,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    },
+    {
+      "file": "docs/experiments/issue-353/results/ja-granite-replay-meta.json",
+      "cell": "ja-granite",
+      "mode": "replay",
+      "utc_started": "2026-11-01T14:43:41.126361+00:00",
+      "utc_finished": "2026-11-01T14:47:46.295859+00:00",
+      "rows": 185,
+      "initialize_ms": 100.2458999864757,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 7637151744,
+      "resources": {
+        "cpu_seconds": 75.671875,
+        "sampled_peak_tree_rss_bytes": 771043328,
+        "sum_process_peak_working_set_bytes": 788447232,
+        "observed_processes": 2,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    },
+    {
+      "file": "docs/experiments/issue-353/results/ja-granite-smoke-meta.json",
+      "cell": "ja-granite",
+      "mode": "smoke",
+      "utc_started": "2026-11-01T14:10:00.303828+00:00",
+      "utc_finished": "2026-11-01T14:10:02.202863+00:00",
+      "rows": 3,
+      "initialize_ms": 120.9303000359796,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 12329209856,
+      "resources": {
+        "cpu_seconds": 2.84375,
+        "sampled_peak_tree_rss_bytes": 603738112,
+        "sum_process_peak_working_set_bytes": 604942336,
+        "observed_processes": 2,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    },
+    {
+      "file": "docs/experiments/issue-353/results/ja-sherpa-ja-primary-meta.json",
+      "cell": "ja-sherpa-ja",
+      "mode": "primary",
+      "utc_started": "2026-11-01T14:29:23.933110+00:00",
+      "utc_finished": "2026-11-01T14:29:52.489613+00:00",
+      "rows": 185,
+      "initialize_ms": 1946.3317000190727,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 1666797568,
+      "resources": {
+        "cpu_seconds": 55.796875,
+        "sampled_peak_tree_rss_bytes": 922943488,
+        "sum_process_peak_working_set_bytes": 924246016,
+        "observed_processes": 1,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    },
+    {
+      "file": "docs/experiments/issue-353/results/ja-sherpa-ja-replay-meta.json",
+      "cell": "ja-sherpa-ja",
+      "mode": "replay",
+      "utc_started": "2026-11-01T14:39:34.656689+00:00",
+      "utc_finished": "2026-11-01T14:43:40.005497+00:00",
+      "rows": 185,
+      "initialize_ms": 2009.1487999889068,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 7080579072,
+      "resources": {
+        "cpu_seconds": 60.234375,
+        "sampled_peak_tree_rss_bytes": 1190584320,
+        "sum_process_peak_working_set_bytes": 1191870464,
+        "observed_processes": 1,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    },
+    {
+      "file": "docs/experiments/issue-353/results/ja-sherpa-ja-smoke-meta.json",
+      "cell": "ja-sherpa-ja",
+      "mode": "smoke",
+      "utc_started": "2026-11-01T14:10:23.218063+00:00",
+      "utc_finished": "2026-11-01T14:10:25.832176+00:00",
+      "rows": 3,
+      "initialize_ms": 1802.4613999878056,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 12372971520,
+      "resources": {
+        "cpu_seconds": 2.921875,
+        "sampled_peak_tree_rss_bytes": 836743168,
+        "sum_process_peak_working_set_bytes": 837890048,
+        "observed_processes": 1,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    },
+    {
+      "file": "docs/experiments/issue-353/results/reuse-smoke/en-granite-smoke-meta.json",
+      "cell": "en-granite",
+      "mode": "smoke",
+      "utc_started": "2026-11-01T14:47:53.529492+00:00",
+      "utc_finished": "2026-11-01T14:47:55.243607+00:00",
+      "rows": 3,
+      "initialize_ms": 91.94839996052906,
+      "first_and_warmup_statuses": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "ram_available_bytes_before_load": 7755501568,
+      "resources": {
+        "cpu_seconds": 2.609375,
+        "sampled_peak_tree_rss_bytes": 595116032,
+        "sum_process_peak_working_set_bytes": 596672512,
+        "observed_processes": 2,
+        "sampling_interval_ms": 50,
+        "resource_errors": []
+      },
+      "initialization_error": null
+    }
+  ],
+  "input_identity": {
+    "en.jsonl": "fececd4854eafcc660417bc962c4f3b0d0bd7cf17eccb2c1a989d9c7e346836c",
+    "ja.jsonl": "6d2b655734e6fbca8ac5fa2f3049abfd9bac35d4d81440e6fadeff5fa4491ea2",
+    "replay-en.json": "3354ea31438bba87fd903c7e63c7a296bfd28fa6ff723199bbc7bff81a32f41d",
+    "replay-ja.json": "a06a563e4e4f28df269766abda057e28ef4c3acc4f4a9d648bf3b0a82eb7bea6",
+    "selection-en.jsonl": "8945493af2fb1e6ea45d667f1c2fe181fc23f1685a11e3cbe8bec6170ea9e607",
+    "selection-ja.jsonl": "19c59626e9e76b4c9678dc048ef9d209b1dd797eea669097b355465aba763eed",
+    "sources.json": "cf9c32cf6e490875d969db9f373ea9b32a075ec2907e2c02e4b7087e7a553e64"
+  },
+  "code_identity": {
+    "scripts/asr_benchmark/adapters.py": "ec5597df9309636b1b3d9fb84975defaa14aca8d2cb3e9face01653ab5921eca",
+    "scripts/asr_benchmark/prepare.py": "1e37544775821abcc64950ac9de79435905b752cfbd37f7c35496bfcedb6814d",
+    "scripts/asr_benchmark/replay.py": "4aefc81bda29b7e7169c4b0f2d06cd07aca3e58ae5d883c831f5457b4773fdf6",
+    "scripts/asr_benchmark/resources.py": "f4892c825903798d148f6f9915d20e15b31bdf0fea96c816a01b43fb45bec67e",
+    "scripts/asr_benchmark/run.py": "59821ead2bbc630b4bf3e6009c601ca6c3bce9d3604eba7224eea058343ee89e",
+    "scripts/asr_benchmark/score.py": "f7b00372ffe9a4b7fad1caa661286718925b39a13470ea315db8c068477476ec"
+  },
+  "model_config_sha256": "565a001bbb0c7bac27aca9bde7059604b21bdc3886a95dfa1e8f9c84c8d99da6",
+  "result_identity": {
+    "docs/experiments/issue-353/results/control-output-review.json": {
+      "bytes": 3398,
+      "sha256": "ab18fe6861af16360a11450b3bfb34a7549d0864706c088dcfc3636e5d874d7f"
+    },
+    "docs/experiments/issue-353/results/en-granite-clean-replay-summary.json": {
+      "bytes": 44679,
+      "sha256": "0294c27fc266498dba4d9cea9ad7f183a9143f4137aa1abf576f57ec011c9501"
+    },
+    "docs/experiments/issue-353/results/en-granite-clean-replay.jsonl": {
+      "bytes": 21077,
+      "sha256": "24107c41461cc031ee99944dd67ea84448e133f67b050c5d687901930c8e7731"
+    },
+    "docs/experiments/issue-353/results/en-granite-noise15-replay-summary.json": {
+      "bytes": 44315,
+      "sha256": "a5141dac1b59f26eccd37df0c476832a17f58892161c55f8c3dcdeb998fd5bdf"
+    },
+    "docs/experiments/issue-353/results/en-granite-noise15-replay.jsonl": {
+      "bytes": 14952,
+      "sha256": "708c5d898df49fcca902974948ec06b1d10ccf1c394ad4fa13d9d68959056eae"
+    },
+    "docs/experiments/issue-353/results/en-granite-primary-meta.json": {
+      "bytes": 18962,
+      "sha256": "a2b62baf544a76c37a50f352541ddda78d70d7c4961b3486b79baba731065cee"
+    },
+    "docs/experiments/issue-353/results/en-granite-primary.jsonl": {
+      "bytes": 141375,
+      "sha256": "bfb1f882d70709783fbf9b9326bbcbfedf23c9cce2d4eb4f8a39b00cd0d07e54"
+    },
+    "docs/experiments/issue-353/results/en-granite-replay-meta.json": {
+      "bytes": 18953,
+      "sha256": "82a4b26eddc70df325964d7d833eefcbab59f5a55e84966226430ed6640832e7"
+    },
+    "docs/experiments/issue-353/results/en-granite-smoke-meta.json": {
+      "bytes": 18805,
+      "sha256": "c40f82ee6e7bc6abc473e72249f7c936f18abb0db014b46d3091dc07748ae39b"
+    },
+    "docs/experiments/issue-353/results/en-granite-smoke.jsonl": {
+      "bytes": 1940,
+      "sha256": "3750585a3091ca2e90a1acdb7fbd81880addee5bfe22870d7db0137587e59d9f"
+    },
+    "docs/experiments/issue-353/results/en-orukeet-clean-replay-summary.json": {
+      "bytes": 44662,
+      "sha256": "61dc225d3db50c735f99c6b2329e68b5c2f5db82143857568d460f5a2960221f"
+    },
+    "docs/experiments/issue-353/results/en-orukeet-clean-replay.jsonl": {
+      "bytes": 21440,
+      "sha256": "aa876ed87eb9fb0c932d488b306b43d65ec16604a4e06dedc47fdef80ad1fda0"
+    },
+    "docs/experiments/issue-353/results/en-orukeet-noise15-replay-summary.json": {
+      "bytes": 44309,
+      "sha256": "54afd9e7d69a9347a715a9dac6113191b9ba46a9c13460e05bfaea8c9a494319"
+    },
+    "docs/experiments/issue-353/results/en-orukeet-noise15-replay.jsonl": {
+      "bytes": 15177,
+      "sha256": "0ef5f8e4d7940ff2276ba2122841a7e17bc79e34fed8cc72ded1c9e7b0b8bb0e"
+    },
+    "docs/experiments/issue-353/results/en-orukeet-primary-meta.json": {
+      "bytes": 18788,
+      "sha256": "a348fc15063aeedeca54f74dba8433a9a83687551285073df95c8102e81cb3ac"
+    },
+    "docs/experiments/issue-353/results/en-orukeet-primary.jsonl": {
+      "bytes": 141089,
+      "sha256": "c46dca277df8f704ad876549673a79680351507c1c2d80f76794a6db8314a16c"
+    },
+    "docs/experiments/issue-353/results/en-orukeet-replay-meta.json": {
+      "bytes": 18788,
+      "sha256": "e27923a96055d9859c717dfdde66763b2794e74ab91e544658a3ff061beb809b"
+    },
+    "docs/experiments/issue-353/results/en-orukeet-smoke-meta.json": {
+      "bytes": 18638,
+      "sha256": "1da67ea31d767940e0170614c66323de2c69f9c3dcd3436c2a7e3240d9cde1a5"
+    },
+    "docs/experiments/issue-353/results/en-orukeet-smoke.jsonl": {
+      "bytes": 1939,
+      "sha256": "1038116c88404c5120d9dcabc01b77a6d766750ec838b4ac0f023020698e6193"
+    },
+    "docs/experiments/issue-353/results/error-examples.json": {
+      "bytes": 7706,
+      "sha256": "d8f70b49419ba395e34bb912bcf33b4dfecc5bd2067a5dc751e94d43c6838c3c"
+    },
+    "docs/experiments/issue-353/results/ja-granite-clean-replay-summary.json": {
+      "bytes": 50886,
+      "sha256": "12c8c43d8591d500202216294503e570fc48838f8b3b1f5d81270ee5ef78d6e4"
+    },
+    "docs/experiments/issue-353/results/ja-granite-clean-replay.jsonl": {
+      "bytes": 10440,
+      "sha256": "1a177c9ee0e9e7f58aa8ad72eb2702ddb673a741ccb2624c413677a492b5f82b"
+    },
+    "docs/experiments/issue-353/results/ja-granite-noise15-replay-summary.json": {
+      "bytes": 50817,
+      "sha256": "74bb8d833a5224824a85bc2bc08997148df2b32a8ab49155bb5019b045d846dd"
+    },
+    "docs/experiments/issue-353/results/ja-granite-noise15-replay.jsonl": {
+      "bytes": 12753,
+      "sha256": "168263a709dc692ad6351c07508d64af03bcc33b45a1e4c050ce84146bbd8eb8"
+    },
+    "docs/experiments/issue-353/results/ja-granite-primary-meta.json": {
+      "bytes": 17832,
+      "sha256": "635c158621d958c31edac9f13642a3a392296a1b6a62eb368cc705deb3c77726"
+    },
+    "docs/experiments/issue-353/results/ja-granite-primary.jsonl": {
+      "bytes": 128868,
+      "sha256": "edb4524f0445d0dca72250396f3d2963cc1d669bb61485d93e3861d344e1b230"
+    },
+    "docs/experiments/issue-353/results/ja-granite-replay-meta.json": {
+      "bytes": 17828,
+      "sha256": "7333f31bf9fde2a51da35ea54944a434d07076c1fcab51a68558cd877bc523f8"
+    },
+    "docs/experiments/issue-353/results/ja-granite-smoke-meta.json": {
+      "bytes": 15023,
+      "sha256": "2635224396a3aadde1fdd4f19f573bb56d57903e9ce56ff2069c1a2e700d2033"
+    },
+    "docs/experiments/issue-353/results/ja-granite-smoke.jsonl": {
+      "bytes": 2121,
+      "sha256": "b26a95975ef63ac7177115ea255ba4a3090c8bababf31fe23b5547cc854c6d52"
+    },
+    "docs/experiments/issue-353/results/ja-sherpa-ja-clean-replay-summary.json": {
+      "bytes": 50857,
+      "sha256": "168bfe90e570a51dbfd81843a95b4a3fa1ef476dbcf783594cc977c31b7885b0"
+    },
+    "docs/experiments/issue-353/results/ja-sherpa-ja-clean-replay.jsonl": {
+      "bytes": 8092,
+      "sha256": "139ebea50aecbfd395e455d1c3cd69ffeb93626b98d164b1e3fafa42fcd711c0"
+    },
+    "docs/experiments/issue-353/results/ja-sherpa-ja-noise15-replay-summary.json": {
+      "bytes": 50793,
+      "sha256": "256ddddeca70d6bda08f61d97584e022ecc604bc14bf0b82530b35e15fb3a292"
+    },
+    "docs/experiments/issue-353/results/ja-sherpa-ja-noise15-replay.jsonl": {
+      "bytes": 10328,
+      "sha256": "f3e49f1aca59cf2d52cbe8a071573fffa4b365680fe0ff25f9eaf70dd8898ab1"
+    },
+    "docs/experiments/issue-353/results/ja-sherpa-ja-primary-meta.json": {
+      "bytes": 17231,
+      "sha256": "41ec3fcc8c4cbf0d36b788139fb9cd05261a51698826e096dcbf5fe4adebd871"
+    },
+    "docs/experiments/issue-353/results/ja-sherpa-ja-primary.jsonl": {
+      "bytes": 101251,
+      "sha256": "f0bfee86e35dccac20fdbacf93a0b5905e4913b52f732dbe37828b794c1ad03e"
+    },
+    "docs/experiments/issue-353/results/ja-sherpa-ja-replay-meta.json": {
+      "bytes": 17235,
+      "sha256": "ab50e620e6702631be0f9ca52c410afb76a9caede66ab7d3a252c4b82909b491"
+    },
+    "docs/experiments/issue-353/results/ja-sherpa-ja-smoke-meta.json": {
+      "bytes": 14323,
+      "sha256": "3854cd39ce24fc7ef8881053221d1bbccc21910cda321d372d6b4017ffc0b42a"
+    },
+    "docs/experiments/issue-353/results/ja-sherpa-ja-smoke.jsonl": {
+      "bytes": 1643,
+      "sha256": "4a3c628aaf8c4e31f25e8bbcc21351d2231af3ac6fc8d50f5d3939b34b9e236c"
+    },
+    "docs/experiments/issue-353/results/memory-observation.json": {
+      "bytes": 702,
+      "sha256": "e08e6a16054d83473fa2f178f23b69cf6dea97bad398b11092a63223847582e2"
+    },
+    "docs/experiments/issue-353/results/report.md": {
+      "bytes": 17831,
+      "sha256": "016838e9d9d69941fef5c8f3e2d8b0114b9521c2ea19a2c2d06935b979757ef8"
+    },
+    "docs/experiments/issue-353/results/reuse-smoke/en-granite-smoke-meta.json": {
+      "bytes": 18948,
+      "sha256": "317516bd646f0a5a478d04f532983db10472dde802b7b6fb870d9d0dc69c0c00"
+    },
+    "docs/experiments/issue-353/results/reuse-smoke/en-granite-smoke.jsonl": {
+      "bytes": 1933,
+      "sha256": "9a83eedb778c0234badccfe415eaf8ed6eae359bc57da011c4582f6a0d5bff38"
+    },
+    "docs/experiments/issue-353/results/summary.json": {
+      "bytes": 533975,
+      "sha256": "0d15b2f1e994e479fbfb9d985336d53624d7c3a9e1adb8b01609a979d0f8bafb"
+    }
+  },
+  "director_integration": {
+    "changes": "Tracked the experiment directory through .gitignore, integrated README, and applied Ruff import ordering plus Black formatting to the six experiment Python files. Production code and measured inference behavior are unchanged.",
+    "style": "uv run --locked ruff check .: passed; uv run --locked black --check .: passed, 1142 files unchanged after formatting.",
+    "test_selection": "uv run --locked python scripts/ci/check_test_selection.py: passed, 521 offline files covered and 10 intentionally excluded files.",
+    "formatted_candidate_smoke": {
+      "command": "uv run --locked python scripts/asr_benchmark/run.py --model granite --language en --mode smoke --output .tmp/asr353/director-smoke --worker ../../../build/asr_worker/PuriPulyHeartASRWorker.exe",
+      "outcome": "Three distinct clean inputs, all status ok, process exit 0.",
+      "raw_texts": ["Yeah.", "It it it's not a high voltage battery.", "Any place."],
+      "boundary": "Existing authenticated CPU worker, current formatted harness, same pinned Granite and frozen audio; no production host or GUI."
+    },
+    "saved_summary": "Offline regeneration produced four cells and eight replays; parsed JSON equaled the tracked saved summary. Regeneration after formatting also exited 0.",
+    "limits": "No local full application suite, GUI check, new benchmark tests or primary/replay rerun. The complete native experiment evidence remains applicable; CI publication checks are separate."
+  },
+  "limits": [
+    "Primary RAM pressure retained; no cause attributed. Replay available RAM and one during-replay snapshot recorded. Hard faults/per-process paging and external CPU load unavailable.",
+    "Current scoped queue policy is reused; its TTL/watchdog/failure branches were not triggered by these successful runs.",
+    "Capture-owner retention and downstream GUI/translation/TTS/output excluded. Consumer boundary is the experiment final queue; coverage of a source end does not establish lexical correctness.",
+    "Windows psutil CPU sampling/counter granularity and50ms RSS sampling apply. RSS sum is not unique memory. No resource failures observed.",
+    "Worker close completed through the app API; no separate per-worker OS exit-code record was saved.",
+    "Initial EN smoke limit3 covers one parent at3SNR. Full primary exercised all185 and final bounded default smoke exercised three distinct clean EN clips.",
+    "Post-primary changes affected smoke default selection and scoring metadata only, not measured primary inference. Replay EOF adaptation was corrected before execution.",
+    "Publication, index/history/GitHub mutation and maintained README integration remain Director-owned. No production surfaces changed by this worker."
+  ]
+}

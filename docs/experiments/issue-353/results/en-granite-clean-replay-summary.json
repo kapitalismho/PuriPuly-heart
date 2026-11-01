@@ -1,0 +1,1837 @@
+{
+  "language": "en",
+  "variant": "clean",
+  "duration_s": 120,
+  "admitted_source_end_s": 120.0,
+  "ingress_wall_s": 120.00926389999222,
+  "total_wall_s": 120.19586869998602,
+  "counts": {
+    "delivered": 25,
+    "failed": 0,
+    "expired": 0,
+    "dropped": 0,
+    "replaced": 0,
+    "merged": 0,
+    "empty": 0
+  },
+  "segments": 25,
+  "max_pending_including_active": 1,
+  "pending_at_ingress_end": 1,
+  "pending_after_drain": 0,
+  "recovery_after_ingress_s": 0.1866114999866113,
+  "stop_reason": null,
+  "segment_speech_end_to_consumer_ms": {
+    "n": 15,
+    "p50": 1170.7776999776245,
+    "p95": 2867.810190012724,
+    "max": 3227.0567000275464
+  },
+  "source_turn_speech_end_to_consumer_ms": {
+    "n": 32,
+    "p50": 2338.2789000200573,
+    "p95": 9490.577699975109,
+    "max": 10403.82769997511
+  },
+  "endpoint_ms": {
+    "n": 15,
+    "p50": 771.9964999798678,
+    "p95": 2344.4381399969543,
+    "max": 2357.7583000194268
+  },
+  "queue_wait_ms": {
+    "n": 25,
+    "p50": 0.05069997860118747,
+    "p95": 0.06308000301942229,
+    "max": 0.0716999638825655
+  },
+  "decode_ms": {
+    "n": 25,
+    "p50": 276.7755000386387,
+    "p95": 868.4426400111988,
+    "max": 905.873200041242
+  },
+  "final_consumer_queue_ms": {
+    "n": 25,
+    "p50": 0.014599994756281376,
+    "p95": 0.018259964417666197,
+    "max": 0.03190001007169485
+  },
+  "endpoint_multi_source_turn_segments": 10,
+  "source_turns": [
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.322",
+      "speech_end_s": 3.0959999999999996,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "7bca5644-30a2-4c04-98eb-71565179b14b"
+      ],
+      "speech_end_to_consumer_ms": 846.2260000137616
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.324",
+      "speech_end_s": 7.1080000000000005,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "777ee19e-271e-4574-a799-5af922ab0c78"
+      ],
+      "speech_end_to_consumer_ms": 1822.7776999776247
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.11",
+      "speech_end_s": 7.760000000000001,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "777ee19e-271e-4574-a799-5af922ab0c78"
+      ],
+      "speech_end_to_consumer_ms": 1170.7776999776245
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.326",
+      "speech_end_s": 13.144,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "3b8d88f5-e095-46ff-b084-8740b68e3558"
+      ],
+      "speech_end_to_consumer_ms": 1189.1746000330893
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.328",
+      "speech_end_s": 47.084,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "54e0b24c-61fb-4ac4-9729-ad6572c24cb9"
+      ],
+      "speech_end_to_consumer_ms": 2698.689100014974
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.330",
+      "speech_end_s": 57.612,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "9de4ac71-f214-4530-a769-4e46bf7a8472"
+      ],
+      "speech_end_to_consumer_ms": 1234.9717000261862
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.682",
+      "speech_end_s": 60.128,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "51e7ff0c-9c60-4969-b651-76acc4e69f17"
+      ],
+      "speech_end_to_consumer_ms": 10403.82769997511
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.332",
+      "speech_end_s": 61.048,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "51e7ff0c-9c60-4969-b651-76acc4e69f17"
+      ],
+      "speech_end_to_consumer_ms": 9483.827699975109
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.13",
+      "speech_end_s": 61.033,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "51e7ff0c-9c60-4969-b651-76acc4e69f17"
+      ],
+      "speech_end_to_consumer_ms": 9498.827699975109
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.684",
+      "speech_end_s": 62.368,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "51e7ff0c-9c60-4969-b651-76acc4e69f17"
+      ],
+      "speech_end_to_consumer_ms": 8163.827699975109
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.15",
+      "speech_end_s": 66.628,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "51e7ff0c-9c60-4969-b651-76acc4e69f17"
+      ],
+      "speech_end_to_consumer_ms": 3903.8276999751106
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.686",
+      "speech_end_s": 77.28800000000001,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "4796a4e5-66e1-4834-81f7-624e09f30826"
+      ],
+      "speech_end_to_consumer_ms": 4103.056700027537
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.17",
+      "speech_end_s": 68.8,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "51e7ff0c-9c60-4969-b651-76acc4e69f17"
+      ],
+      "speech_end_to_consumer_ms": 1731.8276999751133
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.334",
+      "speech_end_s": 73.492,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "4796a4e5-66e1-4834-81f7-624e09f30826"
+      ],
+      "speech_end_to_consumer_ms": 7899.056700027543
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.19",
+      "speech_end_s": 72.292,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "4796a4e5-66e1-4834-81f7-624e09f30826"
+      ],
+      "speech_end_to_consumer_ms": 9099.056700027546
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.21",
+      "speech_end_s": 75.856,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "4796a4e5-66e1-4834-81f7-624e09f30826"
+      ],
+      "speech_end_to_consumer_ms": 5535.056700027553
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.336",
+      "speech_end_s": 78.164,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "4796a4e5-66e1-4834-81f7-624e09f30826"
+      ],
+      "speech_end_to_consumer_ms": 3227.0567000275464
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.688",
+      "speech_end_s": 83.07199999999999,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "d2a0e56d-0590-486c-b1aa-e5816e08fdd5"
+      ],
+      "speech_end_to_consumer_ms": 540.4153999844681
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.25",
+      "speech_end_s": 84.24000000000001,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "efe1649b-e7ed-4228-ad69-1335ab828048"
+      ],
+      "speech_end_to_consumer_ms": 2897.8687000251284
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.338",
+      "speech_end_s": 84.084,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "efe1649b-e7ed-4228-ad69-1335ab828048"
+      ],
+      "speech_end_to_consumer_ms": 3053.8687000251343
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.690",
+      "speech_end_s": 85.16,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "efe1649b-e7ed-4228-ad69-1335ab828048"
+      ],
+      "speech_end_to_consumer_ms": 1977.868700025141
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.27",
+      "speech_end_s": 86.288,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "efe1649b-e7ed-4228-ad69-1335ab828048"
+      ],
+      "speech_end_to_consumer_ms": 849.8687000251408
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.340",
+      "speech_end_s": 87.458,
+      "reference_available": true,
+      "input_end_covered": false,
+      "nonempty_final_covers_end": false,
+      "segment_ids": [],
+      "speech_end_to_consumer_ms": null
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.692",
+      "speech_end_s": 89.036,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "d01b002c-183a-4749-aa32-5869843e08bb"
+      ],
+      "speech_end_to_consumer_ms": 816.6306999847279
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.29",
+      "speech_end_s": 93.771,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "de983592-60ec-4a91-a1bb-bbb4cbc7596f"
+      ],
+      "speech_end_to_consumer_ms": 871.182099982164
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.342",
+      "speech_end_s": 98.16799999999999,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "d77fbd91-03a9-48cd-ba25-5ea97959fe07"
+      ],
+      "speech_end_to_consumer_ms": 1011.4915000209663
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.31",
+      "speech_end_s": 94.931,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "d77fbd91-03a9-48cd-ba25-5ea97959fe07"
+      ],
+      "speech_end_to_consumer_ms": 4248.491500020961
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.33",
+      "speech_end_s": 97.711,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "d77fbd91-03a9-48cd-ba25-5ea97959fe07"
+      ],
+      "speech_end_to_consumer_ms": 1468.4915000209598
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.35",
+      "speech_end_s": 100.97200000000001,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "b2b9cb4a-b09a-420a-b540-a97e3d8f4297"
+      ],
+      "speech_end_to_consumer_ms": 1533.8541999896904
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.694",
+      "speech_end_s": 119.319,
+      "reference_available": false,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "621d7d15-2753-4c13-b7bf-18663f2660c7"
+      ],
+      "speech_end_to_consumer_ms": 839.0198000301581
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.346",
+      "speech_end_s": 107.53200000000001,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "cad8bc2c-1562-4cbc-923e-6c71d6067d86"
+      ],
+      "speech_end_to_consumer_ms": 5059.847400006362
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.348",
+      "speech_end_s": 109.878,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "cad8bc2c-1562-4cbc-923e-6c71d6067d86"
+      ],
+      "speech_end_to_consumer_ms": 2713.8474000063725
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.37",
+      "speech_end_s": 119.33399999999999,
+      "reference_available": true,
+      "input_end_covered": true,
+      "nonempty_final_covers_end": true,
+      "segment_ids": [
+        "621d7d15-2753-4c13-b7bf-18663f2660c7"
+      ],
+      "speech_end_to_consumer_ms": 824.0198000301717
+    }
+  ],
+  "queue_timeline": [
+    {
+      "source_s": 0.032,
+      "wall_s": 0.033627299999352545,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 0.544,
+      "wall_s": 0.5463621999952011,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 1.056,
+      "wall_s": 1.0601199999800883,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 1.568,
+      "wall_s": 1.5713951999787241,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 2.08,
+      "wall_s": 2.0943659000331536,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 2.592,
+      "wall_s": 2.593889700016007,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 3.104,
+      "wall_s": 3.1145592000102624,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 3.616,
+      "wall_s": 3.6293085999786854,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 4.128,
+      "wall_s": 4.128875499998685,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 4.64,
+      "wall_s": 4.655220900021959,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 5.152,
+      "wall_s": 5.157681800017599,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 5.664,
+      "wall_s": 5.669388299982529,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 6.176,
+      "wall_s": 6.185629400017206,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 6.688,
+      "wall_s": 6.7102171999868006,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 7.2,
+      "wall_s": 7.223475900013,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 7.712,
+      "wall_s": 7.727600499987602,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 8.224,
+      "wall_s": 8.226906600000802,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 8.736,
+      "wall_s": 8.740677800029516,
+      "pending": 1,
+      "buffered_audio_ms": 4756.0
+    },
+    {
+      "source_s": 9.248,
+      "wall_s": 9.252162299992051,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 9.76,
+      "wall_s": 9.778963599994313,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 10.272,
+      "wall_s": 10.283753300027456,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 10.784,
+      "wall_s": 10.7960432000109,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 11.296,
+      "wall_s": 11.310298700002022,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 11.808,
+      "wall_s": 11.831739899993408,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 12.32,
+      "wall_s": 12.332099599996582,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 12.832,
+      "wall_s": 12.838298199989367,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 13.344,
+      "wall_s": 13.351513699977659,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 13.856,
+      "wall_s": 13.864679399994202,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 14.368,
+      "wall_s": 14.391304899996612,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 14.88,
+      "wall_s": 14.893001299991738,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 15.392,
+      "wall_s": 15.405523099994753,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 15.904,
+      "wall_s": 15.907447599980514,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 16.416,
+      "wall_s": 16.419756999996025,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 16.928,
+      "wall_s": 16.944026099983603,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 17.44,
+      "wall_s": 17.448423099995125,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 17.952,
+      "wall_s": 17.96298830001615,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 18.464,
+      "wall_s": 18.476782199984882,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 18.976,
+      "wall_s": 19.001950400008354,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 19.488,
+      "wall_s": 19.49916000000667,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 20.0,
+      "wall_s": 20.003691499994602,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 20.512,
+      "wall_s": 20.51926770003047,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 21.024,
+      "wall_s": 21.0325086999801,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 21.536,
+      "wall_s": 21.552894800028298,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 22.048,
+      "wall_s": 22.056554900016636,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 22.56,
+      "wall_s": 22.570978400006425,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 23.072,
+      "wall_s": 23.083838700025808,
+      "pending": 1,
+      "buffered_audio_ms": 5652.0
+    },
+    {
+      "source_s": 23.584,
+      "wall_s": 23.60744470002828,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 24.096,
+      "wall_s": 24.111782199994195,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 24.608,
+      "wall_s": 24.622831400018185,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 25.12,
+      "wall_s": 25.134470799996052,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 25.632,
+      "wall_s": 25.648512299987487,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 26.144,
+      "wall_s": 26.146751300024334,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 26.656,
+      "wall_s": 26.668023800011724,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 27.168,
+      "wall_s": 27.171982100000605,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 27.68,
+      "wall_s": 27.69585369998822,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 28.192,
+      "wall_s": 28.19654219999211,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 28.704,
+      "wall_s": 28.717909700004384,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 29.216,
+      "wall_s": 29.22295630001463,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 29.728,
+      "wall_s": 29.738576899981126,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 30.24,
+      "wall_s": 30.25418530002935,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 30.752,
+      "wall_s": 30.75363659998402,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 31.264,
+      "wall_s": 31.278379200026393,
+      "pending": 1,
+      "buffered_audio_ms": 6516.0
+    },
+    {
+      "source_s": 31.776,
+      "wall_s": 31.782057099975646,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 32.288,
+      "wall_s": 32.29736430000048,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 32.8,
+      "wall_s": 32.81217360001756,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 33.312,
+      "wall_s": 33.33571880002273,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 33.824,
+      "wall_s": 33.8364696999779,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 34.336,
+      "wall_s": 34.349501400021836,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 34.848,
+      "wall_s": 34.85883119999198,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 35.36,
+      "wall_s": 35.3608813000028,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 35.872,
+      "wall_s": 35.884227000002284,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 36.384,
+      "wall_s": 36.394335600023624,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 36.896,
+      "wall_s": 36.89780139998766,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 37.408,
+      "wall_s": 37.409728900005575,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 37.92,
+      "wall_s": 37.92325880000135,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 38.432,
+      "wall_s": 38.446402200032026,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 38.944,
+      "wall_s": 38.94882410002174,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 39.456,
+      "wall_s": 39.461825000005774,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 39.968,
+      "wall_s": 39.975295300013386,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 40.48,
+      "wall_s": 40.49789050000254,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 40.992,
+      "wall_s": 41.009935799986124,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 41.504,
+      "wall_s": 41.5177150000236,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 42.016,
+      "wall_s": 42.018219500023406,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 42.528,
+      "wall_s": 42.53053170000203,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 43.04,
+      "wall_s": 43.044692300027236,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 43.552,
+      "wall_s": 43.57223450002493,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 44.064,
+      "wall_s": 44.07997179997619,
+      "pending": 1,
+      "buffered_audio_ms": 12788.0
+    },
+    {
+      "source_s": 44.576,
+      "wall_s": 44.58160819998011,
+      "pending": 1,
+      "buffered_audio_ms": 12788.0
+    },
+    {
+      "source_s": 45.088,
+      "wall_s": 45.09550270001637,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 45.6,
+      "wall_s": 45.61023400002159,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 46.112,
+      "wall_s": 46.1344548999914,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 46.624,
+      "wall_s": 46.634246599976905,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 47.136,
+      "wall_s": 47.139163699990604,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 47.648,
+      "wall_s": 47.652568400022574,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 48.16,
+      "wall_s": 48.166577800002415,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 48.672,
+      "wall_s": 48.680443299992476,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 49.184,
+      "wall_s": 49.20158290001564,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 49.696,
+      "wall_s": 49.71202939999057,
+      "pending": 1,
+      "buffered_audio_ms": 4532.0
+    },
+    {
+      "source_s": 50.208,
+      "wall_s": 50.21541210002033,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 50.72,
+      "wall_s": 50.727880500024185,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 51.232,
+      "wall_s": 51.241131699993275,
+      "pending": 1,
+      "buffered_audio_ms": 1876.0
+    },
+    {
+      "source_s": 51.744,
+      "wall_s": 51.76608590001706,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 52.256,
+      "wall_s": 52.269612599979155,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 52.768,
+      "wall_s": 52.76894400001038,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 53.28,
+      "wall_s": 53.28293649997795,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 53.792,
+      "wall_s": 53.79993099998683,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 54.304,
+      "wall_s": 54.31550219998462,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 54.816,
+      "wall_s": 54.841009000025224,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 55.328,
+      "wall_s": 55.339886499976274,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 55.84,
+      "wall_s": 55.841834700026084,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 56.352,
+      "wall_s": 56.369058799988125,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 56.864,
+      "wall_s": 56.86674470000435,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 57.376,
+      "wall_s": 57.38232400000561,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 57.888,
+      "wall_s": 57.904896199994255,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 58.4,
+      "wall_s": 58.414220199978445,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 58.912,
+      "wall_s": 58.921585500007495,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 59.424,
+      "wall_s": 59.428965500032064,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 59.936,
+      "wall_s": 59.943613999988884,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 60.448,
+      "wall_s": 60.45970050001051,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 60.96,
+      "wall_s": 60.982930700003635,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 61.472,
+      "wall_s": 61.48657930002082,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 61.984,
+      "wall_s": 61.98587969999062,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 62.496,
+      "wall_s": 62.50055609998526,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 63.008,
+      "wall_s": 63.01714200002607,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 63.52,
+      "wall_s": 63.5424068000284,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 64.032,
+      "wall_s": 64.04613780003274,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 64.544,
+      "wall_s": 64.56850599998143,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 65.056,
+      "wall_s": 65.06733950000489,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 65.568,
+      "wall_s": 65.57279130001552,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 66.08,
+      "wall_s": 66.08518649998587,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 66.592,
+      "wall_s": 66.59993670001859,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 67.104,
+      "wall_s": 67.12515330000315,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 67.616,
+      "wall_s": 67.63325160002569,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 68.128,
+      "wall_s": 68.13810109999031,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 68.64,
+      "wall_s": 68.66161539999302,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 69.152,
+      "wall_s": 69.16731480002636,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 69.664,
+      "wall_s": 69.66564959997777,
+      "pending": 1,
+      "buffered_audio_ms": 11476.0
+    },
+    {
+      "source_s": 70.176,
+      "wall_s": 70.18155829998432,
+      "pending": 1,
+      "buffered_audio_ms": 11476.0
+    },
+    {
+      "source_s": 70.688,
+      "wall_s": 70.69340889999876,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 71.2,
+      "wall_s": 71.20687689998886,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 71.712,
+      "wall_s": 71.72273709997535,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 72.224,
+      "wall_s": 72.23684530000901,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 72.736,
+      "wall_s": 72.73720740003046,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 73.248,
+      "wall_s": 73.25206510000862,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 73.76,
+      "wall_s": 73.76773919997504,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 74.272,
+      "wall_s": 74.27896229998441,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 74.784,
+      "wall_s": 74.79343540000264,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 75.296,
+      "wall_s": 75.31787339999573,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 75.808,
+      "wall_s": 75.82062050001696,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 76.32,
+      "wall_s": 76.32222999999067,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 76.832,
+      "wall_s": 76.83442430000287,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 77.344,
+      "wall_s": 77.34865449997596,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 77.856,
+      "wall_s": 77.87081589997979,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 78.368,
+      "wall_s": 78.38650319998851,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 78.88,
+      "wall_s": 78.89714790001744,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 79.392,
+      "wall_s": 79.39917300001252,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 79.904,
+      "wall_s": 79.91296520002652,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 80.416,
+      "wall_s": 80.42829369998071,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 80.928,
+      "wall_s": 80.9515415999922,
+      "pending": 1,
+      "buffered_audio_ms": 11316.0
+    },
+    {
+      "source_s": 81.44,
+      "wall_s": 81.45084340003086,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 81.952,
+      "wall_s": 81.9553803000017,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 82.464,
+      "wall_s": 82.46907280001324,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 82.976,
+      "wall_s": 82.98162799997954,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 83.488,
+      "wall_s": 83.50727649999317,
+      "pending": 1,
+      "buffered_audio_ms": 1428.0
+    },
+    {
+      "source_s": 84.0,
+      "wall_s": 84.0055885000038,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 84.512,
+      "wall_s": 84.51786939997692,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 85.024,
+      "wall_s": 85.03025429998524,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 85.536,
+      "wall_s": 85.54412410000805,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 86.048,
+      "wall_s": 86.05683419998968,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 86.56,
+      "wall_s": 86.58067330002086,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 87.072,
+      "wall_s": 87.07803520001471,
+      "pending": 1,
+      "buffered_audio_ms": 3540.0
+    },
+    {
+      "source_s": 87.584,
+      "wall_s": 87.60297830001218,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 88.096,
+      "wall_s": 88.10749120003311,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 88.608,
+      "wall_s": 88.63175760000013,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 89.12,
+      "wall_s": 89.13274939998519,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 89.632,
+      "wall_s": 89.63307290000375,
+      "pending": 1,
+      "buffered_audio_ms": 1684.0
+    },
+    {
+      "source_s": 90.144,
+      "wall_s": 90.15921090001939,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 90.656,
+      "wall_s": 90.68171049997909,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 91.168,
+      "wall_s": 91.19458060001489,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 91.68,
+      "wall_s": 91.68162889999803,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 92.192,
+      "wall_s": 92.19743210001616,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 92.704,
+      "wall_s": 92.7178829999757,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 93.216,
+      "wall_s": 93.21941760001937,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 93.728,
+      "wall_s": 93.73508810001658,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 94.24,
+      "wall_s": 94.24789420003071,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 94.752,
+      "wall_s": 94.76274730003206,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 95.264,
+      "wall_s": 95.27689869998721,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 95.776,
+      "wall_s": 95.79948980000336,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 96.288,
+      "wall_s": 96.30230560002383,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 96.8,
+      "wall_s": 96.80126889998792,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 97.312,
+      "wall_s": 97.31495999998879,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 97.824,
+      "wall_s": 97.82894630002556,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 98.336,
+      "wall_s": 98.35324090003269,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 98.848,
+      "wall_s": 98.8568224000046,
+      "pending": 1,
+      "buffered_audio_ms": 4596.0
+    },
+    {
+      "source_s": 99.36,
+      "wall_s": 99.37199870002223,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 99.872,
+      "wall_s": 99.88687490002485,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 100.384,
+      "wall_s": 100.38617559999693,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 100.896,
+      "wall_s": 100.90007309999783,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 101.408,
+      "wall_s": 101.42309789999854,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 101.92,
+      "wall_s": 101.92317289998755,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 102.432,
+      "wall_s": 102.44071930000791,
+      "pending": 1,
+      "buffered_audio_ms": 2900.0
+    },
+    {
+      "source_s": 102.944,
+      "wall_s": 102.95362350001233,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 103.456,
+      "wall_s": 103.47539129998768,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 103.968,
+      "wall_s": 103.98132030002307,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 104.48,
+      "wall_s": 104.48209050000878,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 104.992,
+      "wall_s": 104.99599249998573,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 105.504,
+      "wall_s": 105.51445100002456,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 106.016,
+      "wall_s": 106.04129339999054,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 106.528,
+      "wall_s": 106.53845739999088,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 107.04,
+      "wall_s": 107.0560559000005,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 107.552,
+      "wall_s": 107.55509510001866,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 108.064,
+      "wall_s": 108.08924090000801,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 108.576,
+      "wall_s": 108.59001769998576,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 109.088,
+      "wall_s": 109.10277789999964,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 109.6,
+      "wall_s": 109.60870380001143,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 110.112,
+      "wall_s": 110.12211260001641,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 110.624,
+      "wall_s": 110.63692920003086,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 111.136,
+      "wall_s": 111.14703490003012,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 111.648,
+      "wall_s": 111.67143089999445,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 112.16,
+      "wall_s": 112.1711881000083,
+      "pending": 1,
+      "buffered_audio_ms": 6260.0
+    },
+    {
+      "source_s": 112.672,
+      "wall_s": 112.68642139999429,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 113.184,
+      "wall_s": 113.19078499998432,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 113.696,
+      "wall_s": 113.70685720001347,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 114.208,
+      "wall_s": 114.22039199998835,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 114.72,
+      "wall_s": 114.73203850002028,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 115.232,
+      "wall_s": 115.25454779999563,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 115.744,
+      "wall_s": 115.75049379997654,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 116.256,
+      "wall_s": 116.26872870000079,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 116.768,
+      "wall_s": 116.77973369997926,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 117.28,
+      "wall_s": 117.29175540001597,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 117.792,
+      "wall_s": 117.79304040002171,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 118.304,
+      "wall_s": 118.3091587999952,
+      "pending": 1,
+      "buffered_audio_ms": 5108.0
+    },
+    {
+      "source_s": 118.816,
+      "wall_s": 118.81941940000979,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 119.328,
+      "wall_s": 119.32900540000992,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    },
+    {
+      "source_s": 119.84,
+      "wall_s": 119.85356810002122,
+      "pending": 0,
+      "buffered_audio_ms": 0.0
+    }
+  ],
+  "boundary": "Independent 1x PCM producer -> current Silero Self endpoint -> actual scoped LocalOfflineSTTSession (FIFO pending TTL12s, 30s seal watchdog and current failure preservation) -> terminal event -> experiment final consumer queue. Bypasses capture-owner pre-provider retention/ingress limits. Not GUI/translation/TTS/overlay/network latency. Source coverage does not prove lexical correctness. First partial N/A; queue replaced/merged are zero by current policy, endpoint grouping separate.",
+  "speech_end": "Recovered shared clean-source energy estimate inside human annotations, biased by background/overlap; not file end/enqueue or acoustic ground truth."
+}
