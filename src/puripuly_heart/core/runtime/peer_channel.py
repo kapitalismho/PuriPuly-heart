@@ -1600,17 +1600,17 @@ class PeerCaptureSessionOwner:
                         emit_failure(logger, native, stage=native.operation)
                     async with self._lock:
                         if self._generation == generation and self._desired_active:
-                            self._emit_failure(
-                                PeerCaptureDiagnostic(
-                                    event=PeerCaptureDiagnosticEvent.FAILURE,
-                                    generation=generation,
-                                    state=self._state,
-                                    provider_id=config.provider_id,
-                                    reason=PeerCaptureFailureReason.PROVIDER_FAILED,
-                                    capture_kind=config.capture_target.kind,
-                                    failure_diagnostics=native,
-                                )
+                            diagnostic = PeerCaptureDiagnostic(
+                                event=PeerCaptureDiagnosticEvent.FAILURE,
+                                generation=generation,
+                                state=self._state,
+                                provider_id=config.provider_id,
+                                reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                                capture_kind=config.capture_target.kind,
+                                failure_diagnostics=native,
                             )
+                            self._last_failure = diagnostic
+                            self._emit_failure(diagnostic)
                     raise _PeerCaptureProviderHandoffFailed(native)
                 raise _PeerCaptureProviderHandoffFailed(result.failure_diagnostics)
             pending_failure = self._pending_provider_failures.pop(attachment_token, None)
@@ -1846,6 +1846,7 @@ class PeerCaptureSessionOwner:
                     self._provider_signature = config.provider_signature
                     self._provider_status = PeerCaptureProviderStatus.READY
                     self._state = PeerCaptureSessionState.RUNNING
+                    self._last_failure = None
                     provider_ingress_ready.set()
             if should_release:
                 await self._provider.release(mode="abort")
@@ -2614,7 +2615,6 @@ class PeerCaptureSessionOwner:
         return PeerRuntimeFailureReason.PROCESS_SOURCE_FAILED
 
     def _emit_failure(self, diagnostic: PeerCaptureDiagnostic) -> None:
-        self._last_failure = diagnostic
         try:
             self._notify_state_changed()
         except Exception as exc:
