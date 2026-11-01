@@ -34,7 +34,7 @@ from puripuly_heart.core.peer_capture import (
 )
 from puripuly_heart.ui.app import TranslatorApp
 from puripuly_heart.ui.components.settings.settings_modal import OptionItem, SettingsModal
-from puripuly_heart.ui.i18n import get_locale, set_locale, t
+from puripuly_heart.ui.i18n import set_locale, t
 from puripuly_heart.ui.overlay_peer_contract import (
     build_overlay_peer_consumer_contract,
     is_process_capture_warning_reason,
@@ -871,40 +871,13 @@ def test_dashboard_process_warning_does_not_clear_newer_matching_primary_text() 
     assert displays[-1] == warning.peer.helper_text
 
 
-def test_dashboard_process_warning_does_not_clear_after_status_transition() -> None:
+@pytest.mark.parametrize("status", ["connecting", "connected", "failed"])
+@pytest.mark.parametrize("peer_enabled", [True, False])
+def test_dashboard_process_warning_survives_readiness_until_resolution(
+    status: str,
+    peer_enabled: bool,
+) -> None:
     view = DashboardView()
-    view._stt_showing_warning = False
-    view._translation_showing_warning = False
-    view._process_capture_warning_active = False
-    view._process_capture_warning_reason = None
-    view._process_capture_warning_locale = None
-    view._process_capture_warning_text = ""
-    view._current_display_text = None
-    view._primary_display_revision = 0
-    view._process_capture_warning_display_revision = None
-    view._overlay_peer_contract = None
-    displays: list[str] = []
-    statuses: list[str] = []
-    view._sync_overlay_peer_buttons = lambda: None  # type: ignore[method-assign]
-    view._sync_stt_button_state = lambda: None  # type: ignore[method-assign]
-    view._sync_translation_button_state = lambda: None  # type: ignore[method-assign]
-    view._refresh_language_card = lambda: None  # type: ignore[method-assign]
-    view._ui_font = lambda: None  # type: ignore[method-assign]
-    view._source_lang_code = "en"
-    view._capture_controls = SimpleNamespace(apply_locale=lambda: None)
-    view.trans_button = SimpleNamespace(set_label=lambda _label: None)
-    view.language_card = SimpleNamespace(set_row_labels=lambda *_labels: None)
-    view.display_card = SimpleNamespace(
-        set_status=lambda status, **_kwargs: statuses.append(status),
-        apply_locale=lambda **_kwargs: None,
-    )
-
-    def set_display_text(text: str, **_kwargs: object) -> None:
-        view._primary_display_revision += 1
-        view._current_display_text = text
-        displays.append(text)
-
-    view.set_display_text = set_display_text  # type: ignore[method-assign]
     warning = build_overlay_peer_consumer_contract(
         overlay_intent_enabled=True,
         overlay_state="connected",
@@ -914,60 +887,28 @@ def test_dashboard_process_warning_does_not_clear_after_status_transition() -> N
         peer_warning_reason="process_unavailable_no_process",
     )
     view.set_overlay_peer_contract(warning)
-    view.set_status("connecting")
+    assert view.display_card._display_text.value == warning.peer.helper_text
+    view.set_status(status)
+    assert view.display_card._display_text.value == warning.peer.helper_text
     view.set_overlay_peer_contract(
         build_overlay_peer_consumer_contract(
             overlay_intent_enabled=True,
             overlay_state="connected",
             overlay_failure_reason=None,
-            peer_intent_enabled=False,
-            peer_effective_enabled=False,
+            peer_intent_enabled=peer_enabled,
+            peer_effective_enabled=peer_enabled,
             peer_warning_reason=None,
         )
     )
-    assert statuses == ["connecting"]
-    assert displays == [warning.peer.helper_text]
+    assert view.display_card._display_text.value == t(f"display.{status}")
 
 
 @pytest.mark.parametrize("peer_enabled", [True, False])
-def test_dashboard_unchanged_process_warning_does_not_reacquire_invalidated_primary(
+def test_dashboard_unchanged_process_warning_preserves_newer_content_across_readiness_and_locale(
     peer_enabled: bool,
 ) -> None:
-    previous_locale = get_locale()
     set_locale("en")
     view = DashboardView()
-    view._stt_showing_warning = False
-    view._translation_showing_warning = False
-    view._process_capture_warning_active = False
-    view._process_capture_warning_reason = None
-    view._process_capture_warning_locale = None
-    view._process_capture_warning_text = ""
-    view._current_display_text = None
-    view._primary_display_revision = 0
-    view._process_capture_warning_display_revision = None
-    view._overlay_peer_contract = None
-    displays: list[str] = []
-    statuses: list[str] = []
-    view._sync_overlay_peer_buttons = lambda: None  # type: ignore[method-assign]
-    view._sync_stt_button_state = lambda: None  # type: ignore[method-assign]
-    view._sync_translation_button_state = lambda: None  # type: ignore[method-assign]
-    view._refresh_language_card = lambda: None  # type: ignore[method-assign]
-    view._ui_font = lambda: None  # type: ignore[method-assign]
-    view._source_lang_code = "en"
-    view._capture_controls = SimpleNamespace(apply_locale=lambda: None)
-    view.trans_button = SimpleNamespace(set_label=lambda _label: None)
-    view.language_card = SimpleNamespace(set_row_labels=lambda *_labels: None)
-    view.display_card = SimpleNamespace(
-        set_status=lambda status, **_kwargs: statuses.append(status),
-        apply_locale=lambda **_kwargs: None,
-    )
-
-    def set_display_text(text: str, **_kwargs: object) -> None:
-        view._primary_display_revision += 1
-        view._current_display_text = text
-        displays.append(text)
-
-    view.set_display_text = set_display_text  # type: ignore[method-assign]
     warning = build_overlay_peer_consumer_contract(
         overlay_intent_enabled=True,
         overlay_state="connected",
@@ -977,12 +918,9 @@ def test_dashboard_unchanged_process_warning_does_not_reacquire_invalidated_prim
         peer_warning_reason="process_unavailable_ineligible",
     )
     view.set_overlay_peer_contract(warning)
-    owned_revision = view._process_capture_warning_display_revision
-    view.set_overlay_peer_contract(warning)
-    assert displays == [warning.peer.helper_text]
-    assert view._process_capture_warning_display_revision == owned_revision
 
-    view.set_display_text(warning.peer.helper_text)
+    view.set_display_text("Newer recognition", language_code="en")
+    view.set_display_translation_text("새 번역", language_code="ko")
     view.set_status("connecting")
     set_locale("ko")
     view.apply_locale()
@@ -996,8 +934,7 @@ def test_dashboard_unchanged_process_warning_does_not_reacquire_invalidated_prim
             peer_warning_reason="process_unavailable_ineligible",
         )
     )
-    assert statuses == ["connecting"]
-    assert displays == [warning.peer.helper_text, warning.peer.helper_text]
+    assert view.display_card._display_text.value == "새 번역"
 
     view.set_overlay_peer_contract(
         build_overlay_peer_consumer_contract(
@@ -1009,8 +946,7 @@ def test_dashboard_unchanged_process_warning_does_not_reacquire_invalidated_prim
             peer_warning_reason=None,
         )
     )
-    assert displays == [warning.peer.helper_text, warning.peer.helper_text]
-    set_locale(previous_locale)
+    assert view.display_card._display_text.value == "새 번역"
 
 
 def test_dashboard_changed_process_warning_reclaims_primary_with_new_guidance() -> None:

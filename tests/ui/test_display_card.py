@@ -65,21 +65,6 @@ def test_display_size_never_grows_with_length() -> None:
     assert min(sizes) == display_card_module.DISPLAY_SIZE_CANDIDATES[-1]
 
 
-def test_status_label_maps_known_states() -> None:
-    assert display_card_module._status_label("connecting") == display_card_module.t(
-        "display.connecting"
-    )
-    assert display_card_module._status_label("connected") == display_card_module.t(
-        "display.connected"
-    )
-    assert display_card_module._status_label("stopping") == display_card_module.t(
-        "display.stopping"
-    )
-    assert display_card_module._status_label("other") == display_card_module.t(
-        "display.disconnected"
-    )
-
-
 def test_only_the_source_text_uses_the_dimmed_colour(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -116,10 +101,6 @@ def test_source_flagged_as_translation_uses_the_message_colour(
     assert _visible_color(card) == display_card_module.DISPLAY_SOURCE_COLOR
     assert card._display_text.weight == display_card_module.DISPLAY_SOURCE_WEIGHT
 
-    card.set_display("api key warning", as_translation=True)
-    card.set_status("connected")
-    assert _visible_color(card) == display_card_module.DISPLAY_MESSAGE_COLOR
-
 
 def test_status_and_notice_keep_the_undimmed_message_colour(
     monkeypatch: pytest.MonkeyPatch,
@@ -136,7 +117,7 @@ def test_status_and_notice_keep_the_undimmed_message_colour(
     assert card._display_text.weight == display_card_module.DISPLAY_MESSAGE_WEIGHT
 
 
-def test_a_notice_over_a_live_source_turn_still_uses_the_message_colour(
+def test_notice_preserves_source_across_background_readiness(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     card = DisplayCard(on_submit=lambda _text: None)
@@ -148,6 +129,8 @@ def test_a_notice_over_a_live_source_turn_still_uses_the_message_colour(
     card.set_notice("STT files are missing", tone="warning")
     assert _visible_text(card) == "STT files are missing"
     assert _visible_color(card) == display_card_module.DISPLAY_MESSAGE_COLOR
+    card.set_status("failed")
+    assert _visible_text(card) == "STT files are missing"
 
     card.set_notice(None, None)
     assert _visible_text(card) == "source text"
@@ -191,16 +174,37 @@ def test_clearing_the_translation_restores_the_source(monkeypatch: pytest.Monkey
     assert _visible_color(card) == display_card_module.DISPLAY_SOURCE_COLOR
 
 
-def test_status_replaces_any_turn_content(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("content", ["source", "translation", "error", "api_warning"])
+def test_background_status_preserves_content_until_explicit_restore(
+    content: str,
+) -> None:
     card = DisplayCard(on_submit=lambda _text: None)
-    _mute_display_updates(monkeypatch, card)
+    card.set_status("connected")
+    card.set_display(
+        content,
+        is_error=content == "error",
+        as_translation=content == "api_warning",
+        font_family="content-font",
+        letter_spacing=0.5,
+    )
+    if content == "translation":
+        card.set_display_translation(content, font_family="content-font", letter_spacing=0.5)
+    color = _visible_color(card)
+    weight = card._display_text.weight
 
-    card.set_display("source text")
-    card.set_display_translation("translated text")
-    card.set_status("connected", font_family="font-status")
+    for status in ("connected", "connecting", "stopping", "disconnected", "failed"):
+        assert card.set_status(status, font_family="status-font") is False
+        assert _visible_text(card) == content
+        assert card._display_text.font_family == "content-font"
+        assert card._display_text.style.letter_spacing == 0.5
+        assert _visible_color(card) == color
+        assert card._display_text.weight == weight
 
-    assert _visible_text(card) == display_card_module.t("display.connected")
-    assert card._display_text.font_family == "font-status"
+    assert card.set_status("failed", font_family="status-font", replace_content=True) is True
+    assert _visible_text(card) == display_card_module.t("display.failed")
+    assert card._display_text.font_family == "status-font"
+    card.set_display_translation(None)
+    assert _visible_text(card) == display_card_module.t("display.failed")
 
 
 def test_display_text_is_selectable_and_wraps_within_the_line_budget(
@@ -344,9 +348,11 @@ def test_notice_takes_the_display_slot_and_restores_after_clear(
     card.set_status("other", font_family="status-font")
     card.set_notice("STT files are missing", tone="warning")
     assert _visible_text(card) == "STT files are missing"
+    card.set_status("failed", font_family="status-font")
+    assert _visible_text(card) == "STT files are missing"
 
     card.set_notice(None, None)
-    assert _visible_text(card) == display_card_module.t("display.disconnected")
+    assert _visible_text(card) == display_card_module.t("display.failed")
     assert card._display_text.font_family == "status-font"
 
     card.set_notice("STT 다운로드 중 63%", tone="info")
@@ -410,8 +416,13 @@ def test_yielding_notice_returns_once_the_card_is_idle_again(
     card.set_display_translation("translated text")
     assert _visible_text(card) == "translated text"
 
-    card.set_status("connected")
+    card.set_status("failed")
+    assert _visible_text(card) == "translated text"
+
+    card.set_status("failed", replace_content=True)
     assert _visible_text(card) == notice
+    card.set_notice(None)
+    assert _visible_text(card) == display_card_module.t("display.failed")
 
 
 def test_non_yielding_notice_suppresses_the_translation(
@@ -439,7 +450,7 @@ def test_debug_prefix_applies_to_the_visible_text_only(monkeypatch: pytest.Monke
     card.set_display_translation("translated text", debug_prefix="[P 41c6/3bd7]")
     assert _visible_text(card) == "[P 41c6/3bd7] translated text"
 
-    card.set_status("connected")
+    card.set_status("connected", replace_content=True)
     assert _visible_text(card) == display_card_module.t("display.connected")
     assert "[P 41c6" not in _visible_text(card)
 

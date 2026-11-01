@@ -143,6 +143,12 @@ class FletUiPresentationAdapter:
         if callable(setter):
             setter(enabled)
 
+    def set_dashboard_capture_status(self, status: str) -> None:
+        dashboard = getattr(self._app, "view_dashboard", None)
+        setter = getattr(dashboard, "set_status", None)
+        if callable(setter):
+            setter(status)
+
     def set_dashboard_translation_needs_key(self, needs_key: bool) -> None:
         dashboard = getattr(self._app, "view_dashboard", None)
         setter = getattr(dashboard, "set_translation_needs_key", None)
