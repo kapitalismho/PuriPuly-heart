@@ -41,8 +41,6 @@ _RAW_STRING_ERROR_DEPRECATION_DIAGNOSTIC = (
 
 
 class DashboardEventDestination(Protocol):
-    def publish_status(self, status: str) -> None: ...
-
     def publish_transcript(
         self,
         text: str,
@@ -97,11 +95,6 @@ class RuntimeLoggingPort(Protocol):
 class AppDashboardEventDestination:
     def __init__(self, dashboard: object | None) -> None:
         self._dashboard = dashboard
-
-    def publish_status(self, status: str) -> None:
-        dashboard = self._dashboard
-        if dashboard is not None:
-            dashboard.set_status(status)
 
     def publish_transcript(
         self,
@@ -308,7 +301,6 @@ class UIEventBridge:
         self.runtime_logging = runtime_logging
         self._get_language_codes_callback = get_language_codes
         self._is_translation_enabled_callback = is_translation_enabled
-        self._get_stt_state_callback = get_stt_state
         self._github_star_translation_success_callback = on_github_star_translation_success
         self._overlay_state_changed_callback = on_overlay_state_changed
         self.dashboard_destination = dashboard_destination
@@ -316,7 +308,7 @@ class UIEventBridge:
         self.error_destination = error_destination or AppErrorEventDestination(
             runtime_logging=runtime_logging,
             clear_managed_auth_pending=clear_managed_auth_pending,
-            get_stt_state=self._get_stt_state_callback,
+            get_stt_state=get_stt_state,
         )
         self.projection_service = EventProjectionService()
         self._running = False
@@ -336,14 +328,10 @@ class UIEventBridge:
 
     def _projection_context(self) -> EventProjectionContext:
         source_lang, target_lang = self._get_language_codes()
-        stt_state = (
-            self._get_stt_state_callback() if callable(self._get_stt_state_callback) else None
-        )
         return EventProjectionContext(
             source_language=source_lang,
             target_language=target_lang,
             translation_enabled=self._translation_enabled(),
-            stt_state=stt_state,
         )
 
     def _emit_dashboard_translation_applied_diagnostic(
@@ -444,9 +432,6 @@ class UIEventBridge:
             return
         mapped = map_ui_event(event)
         if mapped is None:
-            return
-        if mapped.kind == "status" and mapped.status is not None:
-            self.dashboard_destination.publish_status(mapped.status)
             return
 
         if mapped.kind == "self_turn":

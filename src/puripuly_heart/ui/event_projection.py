@@ -4,7 +4,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from puripuly_heart.domain.events import SelfTurnPresentation, STTSessionState
+from puripuly_heart.domain.events import SelfTurnPresentation
 from puripuly_heart.domain.models import Transcript, Translation
 from puripuly_heart.ui.event_mapping import MappedEvent
 
@@ -14,7 +14,6 @@ class EventProjectionContext:
     source_language: str | None = None
     target_language: str | None = None
     translation_enabled: bool = False
-    stt_state: STTSessionState | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +50,6 @@ class TranslationAppliedDiagnostic:
 
 @dataclass(frozen=True, slots=True)
 class EventProjectionBatch:
-    status: str | None = None
     transcript: DashboardTranscriptProjection | None = None
     translation: DashboardTranslationProjection | None = None
     history: tuple[HistoryProjection, ...] = ()
@@ -86,8 +84,6 @@ class EventProjectionService:
     ) -> EventProjectionBatch:
         if self._closed:
             return EventProjectionBatch()
-        if mapped.kind == "status":
-            return EventProjectionBatch(status=mapped.status)
         if mapped.kind == "self_turn" and isinstance(mapped.payload, SelfTurnPresentation):
             snapshot = mapped.payload
             if snapshot.turn_generation < self._generation:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
+from uuid import uuid4
 
 import pytest
 
@@ -9,6 +10,8 @@ ft = pytest.importorskip("flet")
 
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.domain.events import SelfTurnPresentation, SelfTurnTargetPresentation
+from puripuly_heart.domain.models import Translation
 from puripuly_heart.ui.dashboard import capture as dashboard_capture_module
 from puripuly_heart.ui.dashboard.contract import (
     DashboardCaptureIntents,
@@ -72,6 +75,7 @@ class FakeDisplayCard:
         self.locale_calls: list[tuple[str | None, str | None]] = []
         self.input_is_focused = False
         self.focus_calls = 0
+        self._showing_status = True
 
     def set_status(
         self,
@@ -79,9 +83,14 @@ class FakeDisplayCard:
         font_family: str | None = None,
         *,
         letter_spacing: float | None = None,
-    ) -> None:
+        replace_content: bool = False,
+    ) -> bool:
         _ = letter_spacing
         self.statuses.append((status, font_family))
+        if not self._showing_status and not replace_content:
+            return False
+        self._showing_status = True
+        return True
 
     def set_display(
         self,
@@ -94,6 +103,7 @@ class FakeDisplayCard:
         as_translation: bool = False,
     ) -> None:
         _ = letter_spacing
+        self._showing_status = False
         self.display_calls.append((text, is_error, font_family))
         self.display_metadata_calls.append(
             {"debug_prefix": debug_prefix, "as_translation": as_translation}
@@ -108,6 +118,7 @@ class FakeDisplayCard:
         debug_prefix: str | None = None,
     ) -> None:
         _ = letter_spacing
+        self._showing_status = False
         self.translation_calls.append((text, font_family))
 
     def set_notice(
@@ -502,6 +513,105 @@ def test_hint_editor_remembers_a_language_without_saving_the_language_selection(
         ("remember", "en"),
         ("add", "en"),
     ]
+
+
+@pytest.mark.parametrize(
+    "content",
+    ["source", "translation", "error", "self_source", "self_translation"],
+)
+def test_dashboard_background_readiness_preserves_content_until_restore(content: str) -> None:
+    view = dashboard_module.DashboardView()
+    view.set_status("connected")
+    if content.startswith("self_"):
+        utterance_id = uuid4()
+        translation = Translation(utterance_id, content) if content == "self_translation" else None
+        view.set_self_turn(
+            SelfTurnPresentation(
+                utterance_id=utterance_id,
+                turn_generation=1,
+                turn_order=1,
+                revision=1,
+                source_revision=1,
+                source_text=content if translation is None else "self source",
+                source_language="ko",
+                source_closed=True,
+                status="active",
+                targets=(
+                    SelfTurnTargetPresentation(
+                        target_language="en",
+                        source_revision=1,
+                        status="ready" if translation is not None else "pending",
+                        translation=translation,
+                    ),
+                ),
+                created_at=0.0,
+            )
+        )
+    else:
+        view.set_display_text(content, language_code="ko", is_error=content == "error")
+        if content == "translation":
+            view.set_display_translation_text(content, language_code="en")
+    face = view.display_card._display_text.font_family
+    tracking = view.display_card._display_text.style.letter_spacing
+
+    for status in ("connected", "connecting", "stopping", "disconnected", "failed"):
+        view.set_status(status)
+        assert view.display_card._display_text.value == content
+        assert view.display_card._display_text.font_family == face
+        assert view.display_card._display_text.style.letter_spacing == tracking
+
+    view._restore_status_display()
+    assert view.display_card._display_text.value == dashboard_module.t("display.failed")
+
+
+@pytest.mark.parametrize("control", ["stt", "translation"])
+def test_api_key_warning_survives_readiness_and_dismisses_to_latest_state(control: str) -> None:
+    view = dashboard_module.DashboardView()
+    view.set_status("connected")
+    if control == "stt":
+        view.set_stt_needs_key(True)
+        toggle = view._toggle_stt
+        warning = dashboard_module.t("dashboard.warn_stt_key")
+    else:
+        view.set_translation_needs_key(True)
+        toggle = view._toggle_translation
+        warning = dashboard_module.t("dashboard.warn_llm_key")
+    toggle()
+    assert view.display_card._display_text.value == warning
+
+    for status in ("connected", "connecting", "stopping", "disconnected", "failed"):
+        view.set_status(status)
+        assert view.display_card._display_text.value == warning
+
+    toggle()
+    assert view.display_card._display_text.value == dashboard_module.t("display.failed")
+
+
+@pytest.mark.parametrize("source", ["local_stt", "gpu", "managed_auth"])
+def test_specific_notice_survives_readiness_and_clears_to_latest_state(source: str) -> None:
+    view = dashboard_module.DashboardView()
+    view.set_status("connecting")
+    if source == "local_stt":
+        view.set_local_stt_notice("missing")
+    elif source == "gpu":
+        view.set_gpu_notice(GpuDashboardNotice(status="install_failed"))
+    else:
+        view.set_managed_auth_pending(True)
+    notice = view.display_card._display_text.value
+    assert notice
+    assert notice != dashboard_module.t("display.connecting")
+
+    view.set_status("connected")
+    assert view.display_card._display_text.value == notice
+    view.set_status("failed")
+    assert view.display_card._display_text.value == notice
+    if source == "local_stt":
+        view.set_local_stt_notice(None)
+    elif source == "gpu":
+        view.set_gpu_notice(None)
+    else:
+        view.set_managed_auth_pending(False)
+    assert view.display_card._display_text.value == dashboard_module.t("display.failed")
 
 
 def test_dashboard_public_setters_update_components(monkeypatch: pytest.MonkeyPatch) -> None:

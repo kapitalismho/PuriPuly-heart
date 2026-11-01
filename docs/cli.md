@@ -110,6 +110,8 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 | Configured overlay/OSC target | Effective resource readiness, remote receipt, or physical display |
 | Applied manual-text admission | Completed translation or destination delivery |
 
+The GUI dashboard's “Ready!” means Self/TALK capture is active and its recognition provider accepts input. It does not require a first recognition result, certify an open remote connection, or guarantee recognition/translation success. Startup is shown as preparing, shutdown as stopping, and unavailable capture as failed. Readiness refreshes preserve existing conversation content and specific error/model notices; they do not clear the display.
+
 Use the terminal operation receipt together with `providers.status`, `models status`, `overlay status`, `osc status`, or the relevant owner's query. Correct the reported cause before explicitly retrying. A failed/cancelled current translation warmup turns effective translation off while retaining the selection and failure details.
 
 Matching `translation set off` or `capture set <channel> off` can revoke pending startup. Shared model demand may keep resources alive for another channel. Runtime stops are distinct from cancelling an explicit model download/import.

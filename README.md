@@ -437,7 +437,7 @@ Upcoming work is tracked publicly on the [PuriPuly project board](https://github
 
 ## Development
 
-Requires Windows x64, standard GIL-enabled CPython **3.14.10**, and [uv](https://docs.astral.sh/uv/) **0.13.5**, matching the CI pins. Install the selected Python explicitly; this uv release's automatic download table predates Python 3.14.10. Run these commands from the repository root.
+Requires Windows x64, standard GIL-enabled CPython **3.14.10**, and [uv](https://docs.astral.sh/uv/) **0.13.6**, matching the CI pins. Install the selected Python explicitly before synchronizing the environment. Run these commands from the repository root.
 
 ### Setup
 

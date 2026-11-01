@@ -61,6 +61,7 @@ flowchart LR
 - Capture owns source order, timing, and audio scope. Audio loss is explicit, not silence; segmentation does not depend on provider readiness.
 - Self and Peer share audio contracts but retain separate endpoint policies and recognition lifecycles. Local resources may be shared without sharing channel authority.
 - Provider adapters translate native events into shared STT contracts. Local audio completion and transcript delivery are distinct; provider recovery stays inside the recognition boundary.
+- Dashboard readiness is a projection of the Self capture owner's lifecycle, not recognition-result/session events. Presentation retains readiness independently of conversation content and specific errors/notices; it does not own runtime state.
 - Source completion drains admitted input. Stop, discontinuity, and replacement revoke affected authority so late results cannot enter current work.
 - VAD-only audio tests exclude normal capture. The application owner handles admission, input release, and restoration of still-authorized capture.
 

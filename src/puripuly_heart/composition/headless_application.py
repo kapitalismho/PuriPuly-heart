@@ -22,13 +22,9 @@ logger = logging.getLogger(__name__)
 
 class _HeadlessDashboard:
     def __init__(self) -> None:
-        self.status: str | None = None
         self.transcript: str | None = None
         self.translation: str | None = None
         self.issue: str | None = None
-
-    def publish_status(self, status: str) -> None:
-        self.status = status
 
     def publish_transcript(
         self, text: str, *, language_code: str | None = None, debug_prefix: str | None = None
@@ -155,6 +151,9 @@ class HeadlessApplicationPresentation:
 
     def set_dashboard_stt_enabled(self, enabled: bool) -> None:
         self._remember("stt_enabled", enabled)
+
+    def set_dashboard_capture_status(self, status: str) -> None:
+        self._remember("capture_status", status)
 
     def set_dashboard_translation_needs_key(self, needs_key: bool) -> None:
         self._remember("translation_needs_key", needs_key)
