@@ -1,0 +1,129 @@
+{
+  "method": "Manual classification of the five frozen silence/noise-only controls per cell; raw nonempty output is counted separately from lexical content. No adapter output or accuracy normalization is suppressed/rewritten. Punctuation-only and explicit no-speech markers are not lexical inventions.",
+  "cells": {
+    "en-granite": {
+      "raw_nonempty": 5,
+      "lexical_false_output": 0,
+      "rows": [
+        {
+          "id": "en-control-0",
+          "text": "<|nospeech|>",
+          "classification": "explicit_no_speech_marker"
+        },
+        {
+          "id": "en-control-1",
+          "text": "<|nospeech|>",
+          "classification": "explicit_no_speech_marker"
+        },
+        {
+          "id": "en-control-2",
+          "text": "<|nospeech|>",
+          "classification": "explicit_no_speech_marker"
+        },
+        {
+          "id": "en-control-3",
+          "text": "<|nospeech|>",
+          "classification": "explicit_no_speech_marker"
+        },
+        {
+          "id": "en-control-4",
+          "text": "<|nospeech|>",
+          "classification": "explicit_no_speech_marker"
+        }
+      ]
+    },
+    "en-orukeet": {
+      "raw_nonempty": 0,
+      "lexical_false_output": 0,
+      "rows": [
+        {
+          "id": "en-control-0",
+          "text": "",
+          "classification": "empty"
+        },
+        {
+          "id": "en-control-1",
+          "text": "",
+          "classification": "empty"
+        },
+        {
+          "id": "en-control-2",
+          "text": "",
+          "classification": "empty"
+        },
+        {
+          "id": "en-control-3",
+          "text": "",
+          "classification": "empty"
+        },
+        {
+          "id": "en-control-4",
+          "text": "",
+          "classification": "empty"
+        }
+      ]
+    },
+    "ja-granite": {
+      "raw_nonempty": 5,
+      "lexical_false_output": 0,
+      "rows": [
+        {
+          "id": "ja-control-0",
+          "text": "<|nospeech|>",
+          "classification": "explicit_no_speech_marker"
+        },
+        {
+          "id": "ja-control-1",
+          "text": "<|nospeech|>",
+          "classification": "explicit_no_speech_marker"
+        },
+        {
+          "id": "ja-control-2",
+          "text": "<|nospeech|>",
+          "classification": "explicit_no_speech_marker"
+        },
+        {
+          "id": "ja-control-3",
+          "text": "<|nospeech|>",
+          "classification": "explicit_no_speech_marker"
+        },
+        {
+          "id": "ja-control-4",
+          "text": "<|nospeech|>",
+          "classification": "explicit_no_speech_marker"
+        }
+      ]
+    },
+    "ja-sherpa-ja": {
+      "raw_nonempty": 5,
+      "lexical_false_output": 4,
+      "rows": [
+        {
+          "id": "ja-control-0",
+          "text": "あっ",
+          "classification": "lexical_false_output"
+        },
+        {
+          "id": "ja-control-1",
+          "text": "。",
+          "classification": "punctuation_only"
+        },
+        {
+          "id": "ja-control-2",
+          "text": "うん",
+          "classification": "lexical_false_output"
+        },
+        {
+          "id": "ja-control-3",
+          "text": "うん",
+          "classification": "lexical_false_output"
+        },
+        {
+          "id": "ja-control-4",
+          "text": "うん。",
+          "classification": "lexical_false_output"
+        }
+      ]
+    }
+  }
+}

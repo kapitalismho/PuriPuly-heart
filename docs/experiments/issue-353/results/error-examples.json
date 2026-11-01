@@ -1,0 +1,199 @@
+{
+  "basis": "Manual reference-versus-raw-output inspection, not listening review or a semantic judge. Examples illustrate failures and counterexamples, not a representative rate. Corpus-text licenses remain separate from repository code.",
+  "languages": {
+    "en": [
+      {
+        "id": "ihm-test-AMI_TS3003d_H03_MTD012ME_0107692_0108376",
+        "variant": "clean",
+        "reference": "BUT THEN AGAIN THAT WOULD BE D J JUST PRETTY MUCH NOT AN OPTION FOR OLDER PEOPLE WHO DON'T EVEN KNOW WHAT A SCROLL WHEEL IS",
+        "reference_units": 27,
+        "outputs": {
+          "en-orukeet": {
+            "text": "But then again, that would be that is just pretty much not an option for older people who don't even know what a scroll wheel is.",
+            "status": "ok",
+            "edits": 2
+          },
+          "en-granite": {
+            "text": "But then again, that would be that is just pretty much another option for older people who don't even know what a scroll wheel is.",
+            "status": "ok",
+            "edits": 4
+          }
+        },
+        "observation": "Negation changed: Granite renders NOT AN OPTION as another option; baseline preserves negation. Both also smooth the disfluency."
+      },
+      {
+        "id": "ihm-test-AMI_ES2004d_H01_FEE013_0151326_0151659-noise5",
+        "variant": "noise5",
+        "reference": "SO SHOULD WE JUST CHANGE THE DESIGN SPECIFICATION THEN",
+        "reference_units": 9,
+        "outputs": {
+          "en-orukeet": {
+            "text": "",
+            "status": "ok",
+            "edits": 9
+          },
+          "en-granite": {
+            "text": "So should we just pain because it' vacation then.",
+            "status": "ok",
+            "edits": 4
+          }
+        },
+        "observation": "At5dB baseline is empty (all9 reference words deleted); Granite returns text but corrupts change the design specification to pain because it vacation."
+      },
+      {
+        "id": "ihm-test-AMI_IS1009c_H01_FIO087_0032580_0032667",
+        "variant": "clean",
+        "reference": "PARTICIPANT THREE",
+        "reference_units": 2,
+        "outputs": {
+          "en-orukeet": {
+            "text": "But it's been three.",
+            "status": "ok",
+            "edits": 4
+          },
+          "en-granite": {
+            "text": "Participant three.",
+            "status": "ok",
+            "edits": 0
+          }
+        },
+        "observation": "Participant label: baseline substitutes But it's been three, while Granite matches PARTICIPANT THREE."
+      },
+      {
+        "id": "ihm-test-AMI_TS3003d_H00_MTD009PM_0058157_0058347-noise5",
+        "variant": "noise5",
+        "reference": "'CAUSE THEN WE HAVE GOT FIFTEEN I THINK",
+        "reference_units": 8,
+        "outputs": {
+          "en-orukeet": {
+            "text": "Fifteen, I think.",
+            "status": "ok",
+            "edits": 5
+          },
+          "en-granite": {
+            "text": "Is then we have got fifteen, I think.",
+            "status": "ok",
+            "edits": 1
+          }
+        },
+        "observation": "Number fifteen is preserved by both; baseline omits most surrounding words, Granite preserves more context."
+      },
+      {
+        "id": "ihm-test-AMI_ES2004d_H02_MEE014_0040867_0041709-noise5",
+        "variant": "noise5",
+        "reference": "AND FINALLY THAT'S HOW WE PUT THE FASHION BACK INTO ELECTRONICS AS THAT IS THAT'S THE COMPANY LOGO",
+        "reference_units": 20,
+        "outputs": {
+          "en-orukeet": {
+            "text": "And finally that's how we put the fashion back into electronics. As that is that's happening over there.",
+            "status": "ok",
+            "edits": 3
+          },
+          "en-granite": {
+            "text": "And finally, that's how we put the fashion back into electronics, 'cause that is going the cut the logo.",
+            "status": "ok",
+            "edits": 5
+          }
+        },
+        "observation": "Both corrupt company logo at5dB. Granite does not dominate every noisy example despite lower pooled WER."
+      }
+    ],
+    "ja": [
+      {
+        "id": "ja-ingcrowd-04-speaker_2-a213",
+        "variant": "clean",
+        "reference": "確かに。",
+        "reference_units": 3,
+        "outputs": {
+          "ja-sherpa-ja": {
+            "text": "確かに",
+            "status": "ok",
+            "edits": 0
+          },
+          "ja-granite": {
+            "text": "That's funny.",
+            "status": "ok",
+            "edits": 10
+          }
+        },
+        "observation": "Wrong-language final: 確かに becomes That's funny. under Granite; baseline is correct. At15/5dB same parent becomes That's fine/That's one."
+      },
+      {
+        "id": "ja-ingcrowd-10-speaker_2-a37",
+        "variant": "clean",
+        "reference": "うんうんうんうんうんうん。",
+        "reference_units": 12,
+        "outputs": {
+          "ja-sherpa-ja": {
+            "text": "うんうんうんうんうん",
+            "status": "ok",
+            "edits": 2
+          },
+          "ja-granite": {
+            "text": "<|nospeech|>.",
+            "status": "ok",
+            "edits": 12
+          }
+        },
+        "observation": "Speech omission/control marker: Granite emits raw <|nospeech|>. for repeated うん; baseline preserves five of six repetitions. Marker is retained, not silently treated as successful empty text."
+      },
+      {
+        "id": "ja-ingcrowd-10-speaker_2-a189",
+        "variant": "clean",
+        "reference": "なんかね色々",
+        "reference_units": 6,
+        "outputs": {
+          "ja-sherpa-ja": {
+            "text": "何かねいろいろ",
+            "status": "ok",
+            "edits": 6
+          },
+          "ja-granite": {
+            "text": "なんかね色いろ",
+            "status": "ok",
+            "edits": 2
+          }
+        },
+        "observation": "Orthography remains visible: なんか/何か and 色々/いろいろ/色いろ are not normalized to equivalence; surface CER is sensitive to these differences."
+      },
+      {
+        "id": "ja-ingcrowd-03-speaker_1-a157",
+        "variant": "clean",
+        "reference": "そっか。私も見習おう。",
+        "reference_units": 9,
+        "outputs": {
+          "ja-sherpa-ja": {
+            "text": "そっか私も見習おう。",
+            "status": "ok",
+            "edits": 0
+          },
+          "ja-granite": {
+            "text": "私もミラーを",
+            "status": "ok",
+            "edits": 7
+          }
+        },
+        "observation": "Consequential lexical omission/substitution: 見習おう is replaced with ミラーを and opening そっか is lost in Granite."
+      },
+      {
+        "id": "ja-ingcrowd-03-speaker_1-a53-noise5",
+        "variant": "noise5",
+        "reference": "月一か月二ぐらいで行くんだけどそこに行くと、あのー一万歩くらい行くんだよね。",
+        "reference_units": 36,
+        "outputs": {
+          "ja-sherpa-ja": {
+            "text": "1100人くらいってんですけど、ここに行くと、1万歩くらいい行んだよね",
+            "status": "ok",
+            "edits": 18
+          },
+          "ja-granite": {
+            "text": "聞いてた口にくらい行くんですけどここに行くとあの一番ぽくらい行くんだよね",
+            "status": "ok",
+            "edits": 14
+          }
+        },
+        "observation": "At5dB both corrupt the frequency 月一か月二. Baseline preserves the step count as 1万歩 (orthographically different from 一万歩); Granite substitutes 一番ぽ. Native digits are not rewritten for scoring."
+      }
+    ]
+  }
+}
