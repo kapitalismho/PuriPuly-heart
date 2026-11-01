@@ -17,6 +17,7 @@ from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import TransactionResult
 from puripuly_heart.ui.settings_queue import SettingsQueue
 from tests.app.test_settings_application_owner import FakeRuntimeEffects
+from tests.helpers.settings_rendezvous import settings_rendezvous
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 
@@ -60,11 +61,15 @@ async def test_ui_result_is_scoped_to_the_attempt_not_the_last_global_failure():
         SimpleNamespace(settings=AppSettingsVNext(), apply_settings=apply_settings)
     )
     app._settings_results = results
-    task = asyncio.create_task(app.apply_settings_change(LocaleSettingsIntent("ja")))
-    await entered.wait()
-    results.set(TransactionResult("settings_commit_success_runtime_degraded", None, None))
-    release.set()
-    result = await task
+    async with settings_rendezvous(
+        app.apply_settings_change(LocaleSettingsIntent("ja")),
+        entered,
+        release,
+        context="attempt-scoped settings result",
+    ) as task:
+        results.set(TransactionResult("settings_commit_success_runtime_degraded", None, None))
+        release.set()
+        result = await task
     assert result.saved is False
 
 

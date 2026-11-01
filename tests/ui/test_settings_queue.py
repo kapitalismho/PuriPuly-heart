@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import nullcontext
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -25,6 +26,7 @@ from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import TransactionResult
 from puripuly_heart.ui.app import TranslatorApp
 from puripuly_heart.ui.settings_queue import SettingsQueue
+from tests.helpers.settings_rendezvous import settings_rendezvous
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 
@@ -149,12 +151,13 @@ async def test_new_generation_survives_old_inflight_result_and_committed_acknowl
 
     queue = SettingsQueue(apply, committed.append)
     queue.submit(first)
-    task = asyncio.create_task(queue.drain())
-    await entered.wait()
-    queue.submit(latest)
-    await queue.drain()
-    release.set()
-    await task
+    async with settings_rendezvous(
+        queue.drain(), entered, release, context="queue supersession apply"
+    ) as task:
+        queue.submit(latest)
+        await queue.drain()
+        release.set()
+        await task
     await queue.drain()
     assert calls == [first, latest]
     assert committed == ([first, latest] if saved else [latest])
@@ -176,13 +179,14 @@ async def test_shutdown_during_apply_drops_queued_work_and_late_acknowledgment()
     queue = SettingsQueue(apply, committed.append)
     first = LocaleSettingsIntent("ja")
     queue.submit(first)
-    task = asyncio.create_task(queue.drain())
-    await entered.wait()
-    queue.submit(LocaleSettingsIntent("en"))
-    queue.stop()
-    queue.submit(LocaleSettingsIntent("ko"))
-    release.set()
-    await task
+    async with settings_rendezvous(
+        queue.drain(), entered, release, context="queue shutdown apply"
+    ) as task:
+        queue.submit(LocaleSettingsIntent("en"))
+        queue.stop()
+        queue.submit(LocaleSettingsIntent("ko"))
+        release.set()
+        await task
     await queue.drain()
     assert calls == [first]
     assert committed == []
@@ -330,19 +334,23 @@ async def test_latest_prompt_through_real_editor_replaces_queued_inflight_or_fai
     edit_and_blur("discarded prompt")
     if merged:
         queue.submit(ProviderApplyIntent((SonioxSpeakerDiarizationEdit(False),)))
-    if phase == "inflight":
-        task = asyncio.create_task(workers.pop(0)())
-        await entered.wait()
-    elif phase == "failed":
-        await workers.pop(0)()
-        await queue.drain()
-        assert len(attempts) == 1
-    edit_and_blur(replacement)
-    if phase == "inflight":
-        release.set()
-        await task
-    while workers:
-        await workers.pop(0)()
+    async with (
+        settings_rendezvous(
+            workers.pop(0)(), entered, release, context="inflight prompt persistence"
+        )
+        if phase == "inflight"
+        else nullcontext()
+    ) as task:
+        if phase == "failed":
+            await workers.pop(0)()
+            await queue.drain()
+            assert len(attempts) == 1
+        edit_and_blur(replacement)
+        if phase == "inflight":
+            release.set()
+            await task
+        while workers:
+            await workers.pop(0)()
     assert (
         load_vnext_settings(settings.path).settings.intent.prompts.system_prompt_override
         == replacement

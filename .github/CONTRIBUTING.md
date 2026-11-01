@@ -36,6 +36,14 @@ The dev extra includes the PE parser required by native-distribution tests. A mi
 
 Keep tests organized around consumer guarantees. Synthetic PE/GPU payloads and evidence-runner reports do not prove real GPU execution, model decoding, audio capture, or installed-product behavior. Preserve the distinct producer-to-fresh-process bundle checks, adversarial loader cases, safe cleanup tests, and runner failure classification when consolidating fixtures or moving tests.
 
+Run the focused settings concurrency checks with:
+
+```powershell
+uv run --locked pytest -p no:cacheprovider tests/ui/test_settings_queue.py tests/app/test_settings_apply_recovery.py
+```
+
+Their scoped rendezvous helper observes both callback arrival and operation completion under one three-second deadline covering the controlled in-flight schedule. An early return reports the missing callback; operation exceptions propagate unchanged. Every exit opens the release gate and cancels and awaits unfinished owned tasks without replacing the active failure. Cleanup relies on cooperative cancellation: this is not protection against blocking the event loop or indefinitely suppressing cancellation, and it adds no production or suite-wide deadlines.
+
 ## Native ASR worker builds
 
 Use CMake 3.19 or newer, the Windows Vulkan SDK, and the supported worker build entry point:
