@@ -224,12 +224,12 @@ class TranslationChannelOwnerCallbacks:
                         self._supersede_self_stream(self._self_last_input_stream)
                     self._self_ready_stream = stream
                 await self._publish_self_session_state(STTSessionState.STREAMING)
+            if channel == "peer":
+                await self._require_peer().handle_recognition_unit_terminal(event)
+                return
             if event.outcome != "final" or not event.unit.text:
                 return
-            if channel == "self":
-                await self._require_self().handle_recognition_unit(event.unit)
-            else:
-                await self._require_peer().handle_recognition_unit(event.unit)
+            await self._require_self().handle_recognition_unit(event.unit)
 
     def _recognition_stream_is_current(self, stream: RecognitionStreamIdentity) -> bool:
         if stream.channel == "self":
@@ -268,6 +268,8 @@ class TranslationChannelOwnerCallbacks:
             await self._require_peer().handle_provider_update(event)
             return
         if isinstance(event, STTProviderEpochEnded):
+            async with self._recognition_locks["peer"]:
+                await self._require_peer().handle_provider_epoch_ended(event)
             return
         if isinstance(event, STTProviderTurnTerminal):
             async with self._recognition_locks["peer"]:
@@ -301,6 +303,9 @@ class TranslationChannelOwnerCallbacks:
             return
         if isinstance(event, STTProviderEpochEnded):
             await self._after_self_epoch_ended(event)
+            if self._peer is not None:
+                async with self._recognition_locks["peer"]:
+                    await self._peer.handle_provider_epoch_ended(event)
             return
         self._stt_sessions.record(event)
         if getattr(event, "channel", None) == "self" or isinstance(

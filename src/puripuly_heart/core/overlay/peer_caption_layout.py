@@ -30,12 +30,13 @@ def _caption_char_width_em(char: str) -> float:
 
 
 def estimate_peer_translation_lines(
-    source_text: str, source_language: str, target_language: str
+    source_text: str, source_language: str, target_language: str, *, text_scale: float = 1.0
 ) -> float:
     source = source_language.lower().replace("_", "-").split("-", 1)[0]
     target = target_language.lower().replace("_", "-").split("-", 1)[0]
     ratio = 1.0 if source == target else _SOURCE_TARGET_LENGTH_RATIOS.get((source, target), 1.617)
-    return sum(_caption_char_width_em(char) for char in source_text) / PEER_LINE_WIDTH_EM * ratio
+    width_limit = PEER_LINE_WIDTH_EM / max(1.0, text_scale)
+    return sum(_caption_char_width_em(char) for char in source_text) / width_limit * ratio
 
 
 def peer_translation_pages(text: str, *, text_scale: float = 1.0) -> tuple[str, ...]:

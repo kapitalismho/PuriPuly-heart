@@ -15,6 +15,7 @@ from puripuly_heart.core.runtime_logging import (
 )
 from puripuly_heart.domain.events import SelfTurnPresentation
 from puripuly_heart.ui.event_dispatch import UIEventBridge
+from puripuly_heart.ui.event_projection import HistoryProjection
 from puripuly_heart.ui.i18n import available_locales, get_locale, set_locale, t
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,9 @@ class _HeadlessHistory:
         pass
 
     def publish_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
+        pass
+
+    def publish_peer_caption(self, history: HistoryProjection) -> None:
         pass
 
 

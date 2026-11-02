@@ -20,6 +20,7 @@ from puripuly_heart.core.orchestrator.translation_request import (
     PreparedTranslationRequest,
     TranslationProcessRequest,
     TranslationRequestPort,
+    _UnmappedDetectedLanguage,
 )
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
@@ -187,6 +188,7 @@ class PeerCaptionOwner:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await self._scope.close()
+        await self.output.reset_peer_caption_admission()
         self._scope = LifecycleScope("PeerCaptionOwner")
         self._segments.clear()
         self._last = None
@@ -246,20 +248,21 @@ class PeerCaptionOwner:
         source: str,
         kind: PeerRequestKind,
         config: TranslationRuntimeConfigSnapshot,
-    ) -> PreparedTranslationRequest:
+    ) -> PreparedTranslationRequest | None:
         if caption.context is None:
             caption.context = self._context(config)
-        return replace(
-            self.requests.prepare(
+        try:
+            prepared = self.requests.prepare(
                 source,
                 channel="peer",
                 config_snapshot=config,
                 detected_language=caption.source_language,
                 peer_request_kind=kind,
                 peer_context_texts=caption.context,
-            ),
-            provider_generation=self.requests.provider_generation,
-        )
+            )
+        except _UnmappedDetectedLanguage:
+            return None
+        return replace(prepared, provider_generation=self.requests.provider_generation)
 
     async def partial(
         self,
@@ -273,11 +276,19 @@ class PeerCaptionOwner:
             transcript.publication_generation, transcript.source_order
         ):
             return
-        if transcript.utterance_id in self._completed or not transcript.text.strip():
+        if transcript.utterance_id in self._completed:
             return
         if len(transcript.text) > self.max_source_chars:
             raise ValueError("Peer partial text capacity exceeded")
         segment = self._segments.get(transcript.utterance_id)
+        if not transcript.text.strip():
+            if segment is not None and provider_id != "qwen_audio":
+                segment.partial = ""
+                segment.pending = None
+                if segment.preview_task is not None:
+                    segment.preview_task.cancel()
+                await self.output.supersede_peer_caption_previews((transcript.utterance_id,))
+            return
         if segment is None:
             if len(self._segments) >= 2:
                 raise ValueError("Peer open segment capacity exceeded")
@@ -342,6 +353,48 @@ class PeerCaptionOwner:
             if task is not None:
                 task.cancel()
 
+    def _complete(self, utterance_id: UUID) -> None:
+        self._completed[utterance_id] = None
+        while len(self._completed) > 4096:
+            self._completed.popitem(last=False)
+
+    async def retire(self, utterance_id: UUID) -> None:
+        segment = self._segments.get(utterance_id)
+        self._complete(utterance_id)
+        if segment is None:
+            return
+        caption = segment.caption
+        self.abandon(utterance_id)
+        caption.revision += 1
+        await self.output.supersede_peer_caption_previews((utterance_id,))
+        await self.output.project_peer_caption(
+            TranslationOutputSubmission(
+                caption.utterance_id,
+                caption.utterance_id,
+                0,
+                "peer",
+                "Peer",
+                "",
+                caption.source_language,
+                self.requests.target_language_for("peer", segment.config.value),
+                "source_only",
+                segment.config,
+                publication_generation=caption.generation,
+                source_order=caption.source_order,
+                peer_caption_revision=caption.revision,
+                peer_superseded_unit_ids=caption.superseded,
+                speaker_assignment=caption.speaker_assignment,
+            )
+        )
+
+    async def retire_epoch(self, provider_epoch_id: str) -> None:
+        for utterance_id, segment in tuple(self._segments.items()):
+            if segment.caption.scope[-1:] == (provider_epoch_id,):
+                await self.retire(utterance_id)
+
+    def is_completed(self, utterance_id: UUID) -> bool:
+        return utterance_id in self._completed
+
     async def final(
         self,
         transcript: Transcript,
@@ -359,6 +412,9 @@ class PeerCaptionOwner:
             return
         if len(transcript.text) > self.max_source_chars:
             raise ValueError("Peer final text capacity exceeded")
+        if not transcript.text.strip():
+            await self.retire(transcript.utterance_id)
+            return
         target = self.requests.target_language_for("peer", config.value)
         fragments = tuple(
             _final_transcript_fragment(
@@ -390,9 +446,7 @@ class PeerCaptionOwner:
         )
         for fragment in fragments:
             self.speaker_identities.retire(fragment.utterance_id)
-        self._completed[transcript.utterance_id] = None
-        while len(self._completed) > 4096:
-            self._completed.popitem(last=False)
+        self._complete(transcript.utterance_id)
         for fragment, assignment in zip(fragments, assignments, strict=True):
             await self._final_fragment(
                 fragment,
@@ -450,6 +504,7 @@ class PeerCaptionOwner:
                         merged,
                         self.requests.source_language_for("peer", config.value),
                         self.requests.target_language_for("peer", config.value),
+                        text_scale=self.output.peer_caption_text_scale,
                     ),
                     provider_id=provider_id,
                     sealed=previous.sealed,
@@ -509,8 +564,8 @@ class PeerCaptionOwner:
         self.runtime.translation_history.append(
             ContextEntry(
                 source,
-                prepared.source_language,
-                prepared.target_language,
+                (prepared.source_language if prepared is not None else caption.source_language),
+                self.requests.target_language_for("peer", config.value),
                 self.clock.now(),
                 "peer",
                 "peer",
@@ -521,7 +576,9 @@ class PeerCaptionOwner:
         revision = caption.revision
         superseded = caption.superseded
         request_assignment = caption.speaker_assignment
+        request_language = caption.source_language
         admission_epoch = self._epoch
+        await self.output.supersede_peer_caption_previews((caption.utterance_id, *superseded))
         await self._slots.acquire()
         if admission_epoch != self._epoch:
             self._slots.release()
@@ -536,6 +593,7 @@ class PeerCaptionOwner:
                 prepared,
                 superseded=superseded,
                 assignment=request_assignment,
+                detected_language=request_language,
             ),
             f"peer:{kind}:{caption.utterance_id}:{revision}",
         )
@@ -547,12 +605,15 @@ class PeerCaptionOwner:
         kind: PeerRequestKind,
         revision: int,
         config: TranslationRuntimeConfigSnapshot,
-        prepared: PreparedTranslationRequest,
+        prepared: PreparedTranslationRequest | None,
         segment: _Segment | None = None,
         superseded: tuple[UUID, ...] = (),
         assignment: SpeakerAssignment | None = None,
+        detected_language: str | None = None,
     ) -> None:
         epoch = self._epoch
+        source_language = prepared.source_language if prepared is not None else detected_language
+        target_language = self.requests.target_language_for("peer", config.value)
         try:
             self.request_counts[kind] += 1
             request = TranslationProcessRequest(
@@ -562,16 +623,18 @@ class PeerCaptionOwner:
                 text=source,
                 channel="peer",
                 source="Peer",
-                target_language=prepared.target_language,
+                target_language=target_language,
                 context_policy="integrated_preferred",
                 config_snapshot=config,
-                detected_language=(
-                    prepared.source_language if prepared.source_language != "auto" else None
-                ),
+                detected_language=source_language if source_language != "auto" else None,
                 publication_generation=caption.generation,
                 source_order=caption.source_order,
                 turn_kind="peer",
-                expected_provider_generation=prepared.provider_generation,
+                expected_provider_generation=(
+                    prepared.provider_generation
+                    if prepared is not None
+                    else self.requests.provider_generation
+                ),
                 peer_request_kind=kind,
                 peer_caption_revision=revision,
                 peer_superseded_unit_ids=superseded,
@@ -590,8 +653,8 @@ class PeerCaptionOwner:
                     "peer",
                     "Peer",
                     source,
-                    prepared.source_language,
-                    prepared.target_language,
+                    source_language,
+                    target_language,
                     "failed",
                     config,
                     failure_code="translation_timeout",
@@ -599,6 +662,8 @@ class PeerCaptionOwner:
                     source_order=caption.source_order,
                     peer_request_kind=kind,
                     peer_caption_revision=revision,
+                    peer_superseded_unit_ids=superseded,
+                    context_texts=caption.context,
                 )
             submission = replace(
                 submission,

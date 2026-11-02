@@ -57,3 +57,13 @@ def test_larger_calibration_keeps_two_line_pages_with_complete_coverage() -> Non
     assert pages[0] == "가" * 14 + "\n" + "가" * 14
     assert all(len(line) <= 14 for page in pages for line in page.splitlines())
     assert "".join(pages).replace("\n", "") == text
+
+
+@pytest.mark.parametrize("scale", [0.8, 1.0, 1.2, 2.0])
+def test_join_estimate_uses_same_effective_scale_as_page_width(scale: float) -> None:
+    source = "가" * 50
+    estimate = estimate_peer_translation_lines(source, "ko", "en", text_scale=scale)
+    assert estimate == pytest.approx(50 / PEER_LINE_WIDTH_EM * 1.617 * max(1.0, scale))
+    assert peer_translation_pages(source, text_scale=scale)[0].splitlines()[0] == (
+        "가" * int(PEER_LINE_WIDTH_EM / max(1.0, scale))
+    )

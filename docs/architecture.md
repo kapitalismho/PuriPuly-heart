@@ -93,11 +93,12 @@ Behavior: [turn lifecycle](../tests/core/test_translation_turn_owner.py), [reque
 
 - Destinations have independent bounded delivery. One destination's failure must not block another or replay recognition/translation. Peer speech never reaches the chatbox; system disclosures require an explicit route.
 - Output preserves turn/publication identity. Revisions may update retained turns without refocusing the dashboard or reviving retired captions. Preview presentation is separate from final accepted history.
+- Peer conversation records carry stable caption identity and monotonic revision beyond translation context. Runtime logging preserves explicit replacement records in the append-only audit, while runtime-record and UI-event delivery converge on one current GUI conversation record. Preview versions remain presentation-only.
 - Python owns logical caption state and lifetime; native overlays own rendering. Presentation does not gate translation, and delivery receipts do not prove physical display or remote UDP receipt.
-- Python also owns Peer page progression, upper-slot reading protection and atomic retirement of absorbed preview captions. Self admission bypasses Peer waiting. Desktop and native render the resulting scene with new Peer captions below the preceding caption, retaining caption identity across promotion.
+- Python also owns Peer page progression, upper-slot reading protection and atomic retirement of absorbed preview captions. The output runtime owns cancelable preview delivery and the bounded first-admission clock across superseding versions; the presenter applies W and page geometry using that clock. The optional layout port exposes current caption scale to join estimation. Self admission bypasses Peer waiting. Desktop and native render the resulting scene with new Peer captions below the preceding caption, retaining caption identity across promotion.
 - The VRChat scene owner survives pipeline rebuilds and has no audio, VAD, or OSC dependency. Only trusted, sanitized population context reaches translation; names/raw logs stay local, and custom HTTP extensions receive no scene data.
 
-Behavior: [output runtime](../tests/core/runtime/test_output_runtime.py), [caption policy](../tests/core/test_self_caption_policy.py), [overlay presenter](../tests/core/test_overlay_presenter.py). Protocols: [native overlays](../native/overlay/README.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](http-extensions.md).
+Behavior: [output runtime](../tests/core/runtime/test_output_runtime.py), [Self caption policy](../tests/core/test_self_caption_policy.py), [Peer lifecycle](../tests/core/test_peer_caption_lifecycle.py), [Peer history](../tests/ui/test_peer_caption_history.py), [overlay presenter](../tests/core/test_overlay_presenter.py). Protocols: [native overlays](../native/overlay/README.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](http-extensions.md).
 
 ## Settings and Credentials
 

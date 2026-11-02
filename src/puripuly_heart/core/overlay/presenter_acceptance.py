@@ -138,7 +138,13 @@ class PresenterAcceptanceLedger:
             )
         ):
             return "stale"
-        creates_entry = not isinstance(event, (SelfActiveClear, UtteranceClosed))
+        creates_entry = not isinstance(event, (SelfActiveClear, UtteranceClosed)) and not (
+            event.channel == "peer"
+            and isinstance(event, TranslationFinal)
+            and event.peer_caption_revision > 0
+            and not event.text.strip()
+            and not event.source_text.strip()
+        )
         if (
             key is not None
             and entry is None
@@ -286,12 +292,27 @@ class PresenterAcceptanceLedger:
         entry: OverlayLogicalTurnEntry | None,
         event: OverlayEventUnion,
     ) -> int:
-        page_bytes = (
-            len(event.text.encode("utf-8")) + len(event.text)
-            if event.channel == "peer"
-            and isinstance(event, (TranslationStreamUpdate, TranslationFinal))
-            else 0
-        )
+        if (
+            event.channel == "peer"
+            and isinstance(event, TranslationFinal)
+            and event.peer_caption_revision > 0
+            and not event.text.strip()
+            and not event.source_text.strip()
+        ):
+            return 0
+        if event.channel == "peer" and isinstance(
+            event, (TranslationStreamUpdate, TranslationFinal)
+        ):
+            page_text = (
+                event.source_text
+                if isinstance(event, TranslationFinal)
+                and event.peer_caption_revision > 0
+                and not event.text.strip()
+                else event.text
+            )
+        else:
+            page_text = ""
+        page_bytes = len(page_text.encode("utf-8")) + len(page_text)
         if entry is None:
             return cls.event_payload_bytes(event) + page_bytes
         current = cls.entry_payload_bytes(entry) + page_bytes

@@ -28,6 +28,7 @@ from .sink import (
     OverlayEventUnion,
     OverlaySink,
     PeerActiveUpdate,
+    PeerPacingWaitObserver,
     PeerTranscriptFinal,
     SelfActiveClear,
     SelfActiveUpdate,
@@ -53,7 +54,6 @@ VISIBLE_TTL_SECONDS = 8.0
 SELF_TRANSLATION_MIN_VISIBLE_SECONDS = 4.0
 SleepFn = Callable[[float], Awaitable[None]]
 PEER_REPLACEMENT_INTERVAL_SECONDS = 1.0
-PeerPacingWaitObserver = Callable[[str], None]
 
 
 class OverlayPresentationTransport(Protocol):
@@ -116,6 +116,10 @@ class OverlayPresenter(OverlaySink):
             calibration=_calibration_from_overlay(self.calibration),
             rendered_entries=[],
         )
+
+    @property
+    def peer_caption_text_scale(self) -> float:
+        return self.calibration.text_scale
 
     @property
     def _entries(self) -> dict[tuple[str, UUID], _LogicalTurnEntry]:
@@ -244,13 +248,14 @@ class OverlayPresenter(OverlaySink):
         event: OverlayEventUnion,
         *,
         on_wait: PeerPacingWaitObserver | None = None,
+        admission_started_at: float | None = None,
     ) -> OverlayApplicationReceipt:
         if event.channel != "peer" or not isinstance(
             event, (PeerTranscriptFinal, TranslationStreamUpdate, TranslationFinal)
         ):
             return await self.emit(event)
         wait_reported = False
-        queued_at = self.clock.now()
+        queued_at = self.clock.now() if admission_started_at is None else admission_started_at
         while True:
             wake: asyncio.Event | None = None
             delay: float | None = None
@@ -321,6 +326,13 @@ class OverlayPresenter(OverlaySink):
         self, event: OverlayEventUnion, *, queued_at: float | None = None
     ) -> float | None:
         key = self._entry_key(event.channel, event.utterance_id)
+        if (
+            isinstance(event, TranslationFinal)
+            and event.peer_caption_revision > 0
+            and not event.text.strip()
+            and not event.source_text.strip()
+        ):
+            return 0.0
         blocks = self.snapshot().blocks
         selected_ids = {block.id for block in blocks}
         if f"{key[0]}:{key[1]}" in selected_ids:
@@ -387,7 +399,12 @@ class OverlayPresenter(OverlaySink):
                 for entry in self._entries.values():
                     if entry.channel == "peer":
                         entry.peer_pages = peer_translation_pages(
-                            entry.translation_text, text_scale=calibration.text_scale
+                            (
+                                entry.original_text
+                                if entry.peer_source_only
+                                else entry.translation_text
+                            ),
+                            text_scale=calibration.text_scale,
                         )
                         entry.peer_page_index = 0
                         entry.peer_page_due_at = None
@@ -552,7 +569,10 @@ class OverlayPresenter(OverlaySink):
             translation_enabled=self.translation_enabled,
         )
         changed = self._finish_peer_reduction_result(result, event)
-        if changed and event.text.strip():
+        if changed and (
+            event.text.strip()
+            or (isinstance(event, TranslationFinal) and event.peer_caption_revision > 0)
+        ):
             for unit_id in event.peer_superseded_unit_ids:
                 if unit_id != event.utterance_id:
                     self._acceptance.remember_scene_terminal(
@@ -1029,6 +1049,8 @@ class OverlayPresenter(OverlaySink):
                 or entry is None
                 or entry.speaker_gray_reason != "palette_overflow"
                 or entry.speaker_assignment is None
+                or not entry.speaker_assignment.palette_overflow
+                or entry.speaker_assignment.attribution.state != "identified"
                 or entry.speaker_assignment.attribution.key is None
             ):
                 return False
@@ -1166,7 +1188,7 @@ class OverlayPresenter(OverlaySink):
         seq = record.tombstone_seq if record.tombstone_seq is not None else entry.closed_seq
         if record.reason == "expired" and entry.ever_visible:
             self._acceptance.remember_scene_terminal(key, record.reason)
-        if record.reason in {"evicted_by_newer_turn", "absorbed_by_repair"}:
+        if record.reason in {"evicted_by_newer_turn", "absorbed_by_repair", "peer_caption_retired"}:
             self._acceptance.remember_scene_terminal(key, record.reason)
         if seq is not None:
             self._acceptance.remember_tombstone(key, seq)

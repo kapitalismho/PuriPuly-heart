@@ -1311,6 +1311,16 @@ class TranslationOutputProjectionOwner:
         return self.output_runtime.has_overlay_destination
 
     @property
+    def peer_caption_text_scale(self) -> float:
+        return self.output_runtime.peer_caption_text_scale
+
+    async def supersede_peer_caption_previews(self, unit_ids: tuple[UUID, ...]) -> None:
+        await self.output_runtime.supersede_peer_caption_previews(unit_ids)
+
+    async def reset_peer_caption_admission(self) -> None:
+        await self.output_runtime.reset_peer_caption_admission()
+
+    @property
     def overlay_sink(self) -> OverlaySink | None:
         return self.output_runtime.overlay_sink
 
@@ -2430,9 +2440,9 @@ class TranslationOutputProjectionOwner:
             raise ValueError("Peer caption publication requires revision identity")
         preview = submission.peer_request_kind == "preview"
         translation = submission.translation
-        if not preview:
+        if not preview and submission.source_text.strip():
             self._record_conversation_submission(submission)
-        if translation is not None:
+        if translation is not None or not preview:
             if self.has_overlay_destination:
                 self.diagnostics.retain_latency_until_output("peer", submission.child_utterance_id)
             else:
@@ -2446,19 +2456,27 @@ class TranslationOutputProjectionOwner:
                 adapter(
                     utterance_id=submission.child_utterance_id,
                     channel="peer",
-                    text=translation.text,
+                    text=translation.text if translation is not None else "",
                     source_text=submission.source_text,
-                    source_language=translation.source_language or submission.source_language or "",
+                    source_language=(
+                        translation.source_language
+                        if translation is not None and translation.source_language
+                        else submission.source_language or ""
+                    ),
                     target_language=submission.target_language,
                     applied_context_mode=submission.applied_context_mode,
                     peer_caption_revision=submission.peer_caption_revision,
                     peer_superseded_unit_ids=submission.peer_superseded_unit_ids,
-                    **self._translation_metadata(translation),
+                    **(
+                        self._translation_metadata(translation)
+                        if translation is not None
+                        else {"speaker_assignment": submission.speaker_assignment}
+                    ),
                 ),
                 publication_generation=submission.publication_generation,
                 source_order=submission.source_order,
             )
-        if not preview:
+        if not preview and submission.source_text.strip():
             transcript = Transcript(
                 utterance_id=submission.child_utterance_id,
                 text=submission.source_text,
@@ -2487,15 +2505,6 @@ class TranslationOutputProjectionOwner:
                         source_order=submission.source_order,
                         peer_caption_revision=submission.peer_caption_revision,
                     )
-                )
-            else:
-                await self.project_peer_source_only(
-                    transcript=transcript,
-                    source_language=submission.source_language or "",
-                    target_language=submission.target_language,
-                    close_is_final=True,
-                    finalize_latency=True,
-                    speaker_assignment=submission.speaker_assignment,
                 )
             await self.publish_peer_chatbox_denial(submission.child_utterance_id)
 
@@ -2974,6 +2983,7 @@ class TranslationOutputProjectionOwner:
             publication_generation=submission.publication_generation,
             source_order=submission.source_order,
             origin_wall_clock_ms=origin_wall_clock_ms,
+            peer_caption_revision=submission.peer_caption_revision,
         )
         self._record_request_context(
             utterance_id=submission.parent_utterance_id,
@@ -3001,6 +3011,7 @@ class TranslationOutputProjectionOwner:
             publication_generation=submission.publication_generation,
             source_order=submission.source_order,
             origin_wall_clock_ms=translation.origin_wall_clock_ms,
+            peer_caption_revision=submission.peer_caption_revision,
         )
 
     @staticmethod
@@ -3035,6 +3046,7 @@ class TranslationOutputProjectionOwner:
         publication_generation: int | None,
         source_order: int | None,
         origin_wall_clock_ms: int | None,
+        peer_caption_revision: int = 0,
     ) -> None:
         runtime_logging = self.diagnostics.runtime_logging
         record = getattr(runtime_logging, "record_conversation_observation", None)
@@ -3055,6 +3067,8 @@ class TranslationOutputProjectionOwner:
         }
         if target_index is not None:
             metadata["target_index"] = target_index
+        if peer_caption_revision:
+            metadata["peer_caption_revision"] = peer_caption_revision
         record(
             utterance_id=str(utterance_id),
             speaker_channel=channel,

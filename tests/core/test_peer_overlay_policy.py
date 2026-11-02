@@ -1,21 +1,27 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from uuid import UUID, uuid4
 
 import pytest
 
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.overlay.peer_caption_layout import peer_translation_pages
+from puripuly_heart.core.overlay.peer_caption_layout import (
+    estimate_peer_translation_lines,
+    peer_translation_pages,
+)
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.protocol import OverlayPresentationSnapshot
 from puripuly_heart.core.overlay.sink import (
+    PeerCaptionAdmissionPort,
+    PeerCaptionLayoutPort,
     SelfActiveUpdate,
     TranslationFinal,
     TranslationStreamUpdate,
 )
+from puripuly_heart.domain.models import SpeakerAssignment, SpeakerAttribution, SpeakerKey
 
 
 @dataclass
@@ -59,6 +65,7 @@ def caption(
     final: bool = True,
     superseded: tuple[UUID, ...] = (),
     source: str = "source",
+    assignment: SpeakerAssignment | None = None,
 ) -> TranslationStreamUpdate:
     kind = TranslationFinal if final else TranslationStreamUpdate
     return kind(
@@ -73,6 +80,7 @@ def caption(
         target_language="ko",
         peer_caption_revision=revision,
         peer_superseded_unit_ids=superseded,
+        speaker_assignment=assignment,
     )
 
 
@@ -341,4 +349,317 @@ async def test_calibration_changes_reflow_peer_pages_on_three_second_timer() -> 
             == peer_translation_pages(text, text_scale=2.0)[1]
         )
     finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_effective_layout_port_tracks_supported_large_calibration_in_join_estimate() -> None:
+    timeline = Timeline()
+    presenter = presenter_for(timeline)
+    source = "가" * 50
+    try:
+        assert isinstance(presenter, PeerCaptionLayoutPort)
+        initial_lines = estimate_peer_translation_lines(
+            source, "ko", "ko", text_scale=presenter.peer_caption_text_scale
+        )
+        await presenter.update_calibration(OverlayCalibration(text_scale=1.2))
+        effective_lines = estimate_peer_translation_lines(
+            source, "ko", "ko", text_scale=presenter.peer_caption_text_scale
+        )
+        assert presenter.peer_caption_text_scale == 1.2
+        assert initial_lines <= 2 < effective_lines
+        assert effective_lines == pytest.approx(initial_lines * 1.2)
+        assert len(peer_translation_pages(source)) == 1
+        assert (
+            len(peer_translation_pages(source, text_scale=presenter.peer_caption_text_scale)) == 2
+        )
+    finally:
+        await presenter.close()
+
+
+def overflow_assignment(speaker: str, *, revision: str = "first-final") -> SpeakerAssignment:
+    return SpeakerAssignment(
+        attribution=SpeakerAttribution(
+            state="identified",
+            key=SpeakerKey("soniox", "same-scope", speaker),
+            source="soniox",
+            speaker_scope_id="same-scope",
+        ),
+        scope_order=(1, 1, 1),
+        palette_overflow=True,
+        source_text_range=(0, 6),
+        source_text_revision=revision,
+    )
+
+
+@pytest.mark.asyncio
+async def test_cross_final_mixed_repair_clears_semantic_ranges_and_overflow_divider() -> None:
+    timeline = Timeline()
+    presenter = presenter_for(timeline)
+    repaired, other = uuid4(), uuid4()
+    initial_assignment = overflow_assignment("speaker-5")
+    mixed = SpeakerAssignment(
+        attribution=SpeakerAttribution("mixed"),
+        scope_order=(1, 1, 1),
+    )
+    try:
+        await presenter.emit(
+            caption(1, repaired, "first", source="alpha,", assignment=initial_assignment)
+        )
+        await presenter.emit(
+            caption(2, other, "second", assignment=overflow_assignment("speaker-6"))
+        )
+        first = presenter._entries[("peer", repaired)]
+        initial_style = first.speaker_style
+        assert initial_style == "gray"
+        assert presenter.snapshot().speaker_divider is True
+        receipt = await presenter.emit_peer_when_admissible(
+            caption(3, repaired, "combined", revision=2, source="alpha, beta", assignment=mixed)
+        )
+        assert receipt.outcome == "applied"
+        assert first.original_text == "alpha, beta"
+        assert first.speaker_assignment is mixed
+        assert first.speaker_assignment.attribution.state == "mixed"
+        assert first.speaker_assignment.source_text_range is None
+        assert first.speaker_assignment.source_text_revision is None
+        assert first.speaker_style == initial_style
+        assert presenter.snapshot().speaker_divider is False
+        stale = await presenter.emit(
+            caption(4, repaired, "obsolete", revision=1, assignment=initial_assignment)
+        )
+        assert stale.outcome == "stale"
+        assert first.speaker_assignment is mixed
+        assert presenter.snapshot().speaker_divider is False
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_identity_corrections_refresh_divider_inputs_without_recoloring() -> None:
+    timeline = Timeline()
+    presenter = presenter_for(timeline)
+    corrected, other = uuid4(), uuid4()
+    try:
+        await presenter.emit(caption(1, corrected, "first", assignment=overflow_assignment("five")))
+        await presenter.emit(caption(2, other, "second", assignment=overflow_assignment("six")))
+        assert presenter.snapshot().speaker_divider is True
+        current = overflow_assignment("seven", revision="corrected-final")
+        current = replace(current, source_text_range=(2, 12))
+        await presenter.emit(caption(3, corrected, "corrected", revision=2, assignment=current))
+        entry = presenter._entries[("peer", corrected)]
+        assert entry.speaker_assignment is current
+        assert entry.speaker_assignment.source_text_range == (2, 12)
+        assert entry.speaker_assignment.source_text_revision == "corrected-final"
+        assert entry.speaker_style == "gray"
+        assert presenter.snapshot().speaker_divider is True
+        same_speaker = overflow_assignment("six", revision="same-speaker-correction")
+        await presenter.emit(
+            caption(4, corrected, "same speaker", revision=3, assignment=same_speaker)
+        )
+        assert presenter.snapshot().speaker_divider is False
+        allocated = replace(overflow_assignment("two"), palette_index=1, palette_overflow=False)
+        await presenter.emit(
+            caption(5, corrected, "allocated speaker", revision=4, assignment=allocated)
+        )
+        assert entry.speaker_assignment is allocated
+        assert entry.speaker_style == "gray"
+        assert presenter.snapshot().speaker_divider is False
+        await presenter.emit(caption(6, corrected, "unknown speaker", revision=5, assignment=None))
+        assert entry.speaker_assignment is None
+        assert entry.speaker_style == "gray"
+        assert presenter.snapshot().speaker_divider is False
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("show_original", [False, True])
+@pytest.mark.parametrize("with_preview", [False, True])
+async def test_source_only_settlement_replaces_preview_with_authoritative_paged_source(
+    show_original: bool,
+    with_preview: bool,
+) -> None:
+    timeline = Timeline()
+    presenter = presenter_for(timeline)
+    presenter.show_peer_original = show_original
+    unit = uuid4()
+    source = "Authoritative source with all final words. " * 6
+    try:
+        if with_preview:
+            await presenter.emit(caption(1, unit, "obsolete preview", final=False))
+        settled = replace(
+            caption(2, unit, "", revision=2, source=source),
+            update_id="source-only-settlement",
+        )
+        receipt = await presenter.emit_peer_when_admissible(settled)
+        assert receipt.outcome == "applied"
+        assert timeline.clock.now() == 0
+        entry = presenter._entries[("peer", unit)]
+        assert entry.translation_text == ""
+        assert entry.peer_source_only is True
+        assert entry.peer_caption_final is True
+        assert entry.peer_caption_revision == 2
+        first = presenter.snapshot().blocks[0]
+        assert first.primary_text == peer_translation_pages(source)[0]
+        assert first.primary_language == "en"
+        assert first.secondary_text == ""
+        assert first.secondary_enabled is False
+        assert first.update_id == "source-only-settlement"
+        await timeline.advance(3.0)
+        assert presenter.snapshot().blocks[0].primary_text == peer_translation_pages(source)[1]
+        await presenter.update_calibration(OverlayCalibration(text_scale=1.2))
+        assert (
+            presenter.snapshot().blocks[0].primary_text
+            == peer_translation_pages(source, text_scale=1.2)[0]
+        )
+        late_preview = await presenter.emit(
+            caption(3, unit, "late preview", revision=3, final=False)
+        )
+        obsolete = await presenter.emit(caption(4, unit, "obsolete final", revision=1))
+        assert late_preview.outcome == obsolete.outcome == "stale"
+        await presenter.emit(caption(5, unit, "successful later repair", revision=4, source=source))
+        assert entry.peer_source_only is False
+        assert presenter.snapshot().blocks[0].primary_text == "successful later repair"
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_source_only_repair_absorbs_all_previews_and_rejects_obsolete_retirement() -> None:
+    timeline, surface = Timeline(), Surface()
+    presenter = presenter_for(timeline, surface)
+    presenter.show_peer_original = False
+    unit, preview, absent_preview, unrelated = uuid4(), uuid4(), uuid4(), uuid4()
+    try:
+        await presenter.emit(caption(1, unit, "first final"))
+        await presenter.emit(caption(2, preview, "preview to absorb", final=False))
+        await presenter.emit_peer_when_admissible(
+            caption(
+                3,
+                unit,
+                "",
+                revision=3,
+                source="first source and corrected next source",
+                superseded=(preview, absent_preview),
+            )
+        )
+        assert len(surface.snapshots[-1].blocks) == 1
+        assert surface.snapshots[-1].blocks[0].id == f"peer:{unit}"
+        assert "corrected next source" in surface.snapshots[-1].blocks[0].primary_text
+        assert ("peer", preview) not in presenter._entries
+        for index, absorbed in enumerate((preview, absent_preview), start=4):
+            late = await presenter.emit(
+                caption(index, absorbed, "late absorbed final", revision=10)
+            )
+            assert late.outcome == "stale"
+        await presenter.emit(caption(6, unrelated, "unrelated"))
+        stale = await presenter.emit(
+            caption(7, unit, "", revision=2, source="", superseded=(unrelated,))
+        )
+        assert stale.outcome == "stale"
+        assert [block.id for block in presenter.snapshot().blocks] == [
+            f"peer:{unit}",
+            f"peer:{unrelated}",
+        ]
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_empty_authoritative_retirement_cancels_pages_without_waiting_or_resurrection() -> (
+    None
+):
+    timeline = Timeline()
+    presenter = presenter_for(timeline)
+    preview, unrelated, absent = uuid4(), uuid4(), uuid4()
+    try:
+        await presenter.emit(caption(1, preview, "가" * 120, final=False))
+        await presenter.emit(caption(2, unrelated, "unrelated final"))
+        retired_absent = await presenter.emit_peer_when_admissible(
+            caption(3, absent, "", revision=2, source="")
+        )
+        assert retired_absent.outcome == "applied"
+        assert timeline.clock.now() == 0
+        assert len(presenter.snapshot().blocks) == 2
+        retired = await presenter.emit_peer_when_admissible(
+            caption(4, preview, "", revision=2, source="", superseded=(absent,))
+        )
+        assert retired.outcome == "applied"
+        assert ("peer", preview) not in presenter._entries
+        assert ("peer", preview) not in presenter._expiration_tasks
+        assert [block.id for block in presenter.snapshot().blocks] == [f"peer:{unrelated}"]
+        await timeline.advance(3.1)
+        for index, unit in enumerate((preview, absent), start=5):
+            late = await presenter.emit(caption(index, unit, "must not return", revision=5))
+            assert late.outcome == "stale"
+        assert [block.id for block in presenter.snapshot().blocks] == [f"peer:{unrelated}"]
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_legacy_local_empty_translation_keeps_existing_source_presentation() -> None:
+    timeline = Timeline()
+    presenter = presenter_for(timeline)
+    unit = uuid4()
+    try:
+        await presenter.emit(caption(1, unit, "", revision=0, source="legacy local source"))
+        entry = presenter._entries[("peer", unit)]
+        assert entry.peer_source_only is False
+        block = presenter.snapshot().blocks[0]
+        assert block.primary_text == ""
+        assert block.secondary_text == "legacy local source"
+        await presenter.update_display_preferences(show_translation=True, show_peer_original=False)
+        assert presenter.snapshot().blocks == []
+        await presenter.emit(caption(2, unit, "", revision=0, source=""))
+        assert ("peer", unit) in presenter._entries
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_superseding_final_uses_remaining_original_caption_admission_budget() -> None:
+    timeline = Timeline()
+    presenter = presenter_for(timeline)
+    upper, lower, unit = uuid4(), uuid4(), uuid4()
+    preview_task = final_task = None
+    try:
+        assert isinstance(presenter, PeerCaptionAdmissionPort)
+        await presenter.emit(caption(1, upper, "가" * 40))
+        await presenter.emit(caption(2, lower, "lower"))
+        admission_started_at = timeline.clock.now()
+        preview_task = asyncio.create_task(
+            presenter.emit_peer_when_admissible(caption(3, unit, "waiting preview", final=False))
+        )
+        await timeline.advance(0)
+        assert not preview_task.done()
+        await timeline.advance(0.6)
+        preview_task.cancel()
+        await asyncio.gather(preview_task, return_exceptions=True)
+        final_task = asyncio.create_task(
+            presenter.emit_peer_when_admissible(
+                caption(4, unit, "authoritative final", revision=2),
+                admission_started_at=admission_started_at,
+            )
+        )
+        await timeline.advance(0)
+        assert not final_task.done()
+        await timeline.advance(0.39)
+        assert not final_task.done()
+        await timeline.advance(0.01)
+        assert final_task.done()
+        assert (await final_task).outcome == "applied"
+        assert timeline.clock.now() == pytest.approx(1.0)
+        assert [block.id for block in presenter.snapshot().blocks] == [
+            f"peer:{lower}",
+            f"peer:{unit}",
+        ]
+        assert presenter.snapshot().blocks[-1].primary_text == "authoritative final"
+        stale = await presenter.emit(caption(5, unit, "waiting preview", final=False))
+        assert stale.outcome == "stale"
+    finally:
+        for task in (preview_task, final_task):
+            if task is not None and not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
         await presenter.close()

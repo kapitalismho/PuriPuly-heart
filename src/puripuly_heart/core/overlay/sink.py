@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import itertools
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import ClassVar, Literal, Protocol
+from typing import ClassVar, Literal, Protocol, runtime_checkable
 from uuid import UUID, uuid4
 
 from puripuly_heart.core.clock import Clock, SystemClock
@@ -13,6 +13,7 @@ from puripuly_heart.domain.models import ChannelId, SpeakerAssignment, Transcrip
 
 AppliedContextMode = Literal["integrated"]
 OverlayTurnKind = Literal["manual", "self", "peer"]
+PeerPacingWaitObserver = Callable[[str], None]
 _ADAPTER_SEQUENCE_NAMESPACES = itertools.count(1)
 
 
@@ -198,6 +199,23 @@ class OverlaySink(Protocol):
         self,
         event: OverlayEventUnion,
     ) -> OverlayApplicationReceipt | None: ...
+
+
+@runtime_checkable
+class PeerCaptionAdmissionPort(Protocol):
+    async def emit_peer_when_admissible(
+        self,
+        event: OverlayEventUnion,
+        *,
+        on_wait: PeerPacingWaitObserver | None = None,
+        admission_started_at: float | None = None,
+    ) -> OverlayApplicationReceipt: ...
+
+
+@runtime_checkable
+class PeerCaptionLayoutPort(Protocol):
+    @property
+    def peer_caption_text_scale(self) -> float: ...
 
 
 @dataclass(slots=True)

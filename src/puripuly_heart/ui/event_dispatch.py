@@ -29,6 +29,7 @@ from puripuly_heart.ui.event_mapping import map_ui_event
 from puripuly_heart.ui.event_projection import (
     EventProjectionContext,
     EventProjectionService,
+    HistoryProjection,
     TranslationAppliedDiagnostic,
 )
 from puripuly_heart.ui.i18n import localize_user_message_ref, t
@@ -73,6 +74,8 @@ class HistoryEventDestination(Protocol):
     ) -> None: ...
 
     def publish_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None: ...
+
+    def publish_peer_caption(self, history: HistoryProjection) -> None: ...
 
 
 class ErrorEventDestination(Protocol):
@@ -167,6 +170,20 @@ class AppHistoryEventDestination:
     def publish_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
         if self._conversation_view is not None:
             self._conversation_view.update_self_turn(snapshot, source=source)
+
+    def publish_peer_caption(self, history: HistoryProjection) -> None:
+        if self._conversation_view is not None:
+            self._conversation_view.append_conversation_record(
+                source=history.source,
+                channel="peer",
+                utterance_id=str(history.utterance_id),
+                source_text=None if history.translated else history.text,
+                translated_text=history.text if history.translated else None,
+                source_language=None if history.translated else history.language_code,
+                target_language=history.language_code if history.translated else None,
+                target_index=0 if history.translated else None,
+                peer_caption_revision=history.peer_caption_revision,
+            )
 
 
 class AppErrorEventDestination:
@@ -468,12 +485,15 @@ class UIEventBridge:
                     self._record_output_failure(event, "dashboard", exc)
             for history in projection.history:
                 try:
-                    self.history_destination.append_entry(
-                        history.source,
-                        history.text,
-                        translated=history.translated,
-                        language_code=history.language_code,
-                    )
+                    if history.peer_caption_revision > 0:
+                        self.history_destination.publish_peer_caption(history)
+                    else:
+                        self.history_destination.append_entry(
+                            history.source,
+                            history.text,
+                            translated=history.translated,
+                            language_code=history.language_code,
+                        )
                 except Exception as exc:
                     self._record_output_failure(event, "conversation_feed", exc)
             return
@@ -500,12 +520,15 @@ class UIEventBridge:
                 )
             for history in projection.history:
                 try:
-                    self.history_destination.append_entry(
-                        history.source,
-                        history.text,
-                        translated=history.translated,
-                        language_code=history.language_code,
-                    )
+                    if history.peer_caption_revision > 0:
+                        self.history_destination.publish_peer_caption(history)
+                    else:
+                        self.history_destination.append_entry(
+                            history.source,
+                            history.text,
+                            translated=history.translated,
+                            language_code=history.language_code,
+                        )
                 except Exception as exc:
                     self._record_output_failure(event, "conversation_feed", exc)
             if isinstance(mapped.payload, Translation):

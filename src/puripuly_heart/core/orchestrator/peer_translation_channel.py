@@ -54,9 +54,11 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 )
 from puripuly_heart.core.speaker_identity import PeerSpeakerIdentityAllocator
 from puripuly_heart.core.stt.backend import (
+    STTProviderEpochEnded,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTRecognitionUnit,
+    STTRecognitionUnitTerminal,
 )
 from puripuly_heart.core.stt.recognition_units import recognition_transcript
 from puripuly_heart.core.vad.gating import SpeechEnd
@@ -72,6 +74,7 @@ from puripuly_heart.domain.models import (
     Transcript,
     Translation,
 )
+from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 
 
 @dataclass(slots=True)
@@ -100,7 +103,9 @@ class PeerTranslationChannelOwner:
     _cloud_final_scopes: dict[UUID, tuple[str, tuple[object, ...], AudioSegmentSnapshot | None]] = (
         field(default_factory=dict)
     )
-    _native_caption_orders: dict[UUID, int] = field(default_factory=dict)
+    _native_caption_orders: dict[UUID, tuple[RecognitionStreamIdentity, int]] = field(
+        default_factory=dict
+    )
 
     def __post_init__(self) -> None:
         if self.runtime.channel != "peer":
@@ -467,14 +472,21 @@ class PeerTranslationChannelOwner:
         stream = unit.identity.stream
         if stream.channel != "peer":
             raise ValueError("Peer translation owner received non-Peer recognition unit")
+        if not unit.is_final and self.cloud_captions.is_completed(unit.identity.unit_id):
+            return
         self.diagnostics.record_recognition_latency(unit)
-        order = self._native_caption_orders.pop(unit.identity.unit_id, None)
-        if order is None:
-            order = self._allocate_publication_order(stream.activation_generation)
+        remembered = self._native_caption_orders.pop(unit.identity.unit_id, None)
+        if remembered is None and not unit.is_final and not unit.text.strip():
+            return
+        order = (
+            self._allocate_publication_order(stream.activation_generation)
+            if remembered is None
+            else remembered[1]
+        )
         if not unit.is_final:
             if not self._cloud_translation_enabled():
                 return
-            self._native_caption_orders[unit.identity.unit_id] = order
+            self._native_caption_orders[unit.identity.unit_id] = (stream, order)
             await self.cloud_captions.partial(
                 Transcript(
                     unit.identity.unit_id,
@@ -508,6 +520,21 @@ class PeerTranslationChannelOwner:
             STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
         )
 
+    async def handle_recognition_unit_terminal(self, event: STTRecognitionUnitTerminal) -> None:
+        if event.unit.identity.stream.channel != "peer":
+            raise ValueError("Peer translation owner received non-Peer recognition unit")
+        if event.outcome == "final" and event.unit.text:
+            await self.handle_recognition_unit(event.unit)
+            return
+        self._native_caption_orders.pop(event.unit.identity.unit_id, None)
+        await self.cloud_captions.retire(event.unit.identity.unit_id)
+
+    async def handle_provider_epoch_ended(self, event: STTProviderEpochEnded) -> None:
+        for unit_id, (stream, _order) in tuple(self._native_caption_orders.items()):
+            if stream.provider_epoch_id == event.provider_epoch_id:
+                self._native_caption_orders.pop(unit_id, None)
+        await self.cloud_captions.retire_epoch(event.provider_epoch_id)
+
     async def handle_provider_turn_terminal(
         self,
         receipt: AudioSegmentTerminalReceipt,
@@ -517,7 +544,7 @@ class PeerTranslationChannelOwner:
         if receipt.identity != terminal.identity.segment:
             raise ValueError("provider terminal receipt identity mismatch")
         if terminal.outcome not in {"final", "degraded"} or not terminal.text:
-            self.cloud_captions.abandon(receipt.identity.segment_id)
+            await self.cloud_captions.retire(receipt.identity.segment_id)
             self.diagnostics.emit(
                 RuntimeDiagnostic(
                     message=(

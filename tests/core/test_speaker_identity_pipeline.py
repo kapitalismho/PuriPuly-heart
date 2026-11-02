@@ -476,13 +476,15 @@ async def test_failed_segment_keeps_sibling_translation_and_every_source_fragmen
         await _wait_for_peer_idle(harness)
         assert provider.calls == ["alpha ", "beta"]
         original = [
-            event.text
+            event.source_text
             for event in overlay.events
-            if getattr(event, "type", None) == "peer_transcript_final"
+            if getattr(event, "type", None) == "translation_final" and not event.text
         ]
         assert original == ["alpha "]
         translated = [
-            event for event in overlay.events if getattr(event, "type", None) == "translation_final"
+            event
+            for event in overlay.events
+            if getattr(event, "type", None) == "translation_final" and event.text
         ]
         assert [
             (event.source_text, event.text, event.speaker_assignment.palette_index)
@@ -636,12 +638,12 @@ async def test_stalled_peer_child_times_out_without_losing_siblings_or_successor
         assert provider.cancelled == {"alpha "}
         assert provider.calls == ["alpha ", "beta", "Cora"]
         events = [
-            (event.type, event.text)
+            ("source_only", event.source_text) if not event.text else (event.type, event.text)
             for event in overlay.events
-            if getattr(event, "type", None) in {"peer_transcript_final", "translation_final"}
+            if getattr(event, "type", None) == "translation_final"
         ]
         assert events == [
-            ("peer_transcript_final", "alpha "),
+            ("source_only", "alpha "),
             ("translation_final", "Second"),
             ("translation_final", "Later"),
         ]
@@ -722,7 +724,7 @@ async def test_cross_final_merge_retains_honest_attribution_and_cumulative_sourc
 ) -> None:
     monkeypatch.setattr(
         "puripuly_heart.core.orchestrator.peer_caption.estimate_peer_translation_lines",
-        lambda *_: 2.0,
+        lambda *_, **__: 2.0,
     )
     clock = FakeClock(_now=100.0)
     presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)

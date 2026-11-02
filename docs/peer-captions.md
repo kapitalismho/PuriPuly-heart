@@ -19,7 +19,7 @@ A caption unit and its translation versions are distinct from an audio segment o
 
 Existing final language/speaker spans remain separate source children with their original attribution and source ranges. The first child settles an existing segment preview; subsequent children retain source order and independent failure/timeout recovery. A child boundary without an independently observed first partial has an unknown gap and therefore does not join.
 
-The first nonempty partial after a final starts the next segment's preview clock. Each check uses the latest cumulative nonempty partial, including the last nonempty partial when Qwen temporarily clears its text. Select the last sentence/clause boundary whose prefix covers at least half of that partial, or the whole partial if there is no such boundary. Refresh only when both the partial and selected source grew relative to the last requested preview.
+The first nonempty partial after a final starts the next segment's preview clock. Each check uses the latest cumulative partial. Qwen alone retains its last nonempty partial when it temporarily clears its text; an empty replacement from another provider retracts the pending source. Select the last sentence/clause boundary whose prefix covers at least half of the partial, or the whole partial if there is no such boundary. Refresh only when both the partial and selected source grew relative to the last requested preview.
 
 Each open segment has at most one running preview and one newest pending source. A final supersedes the preview and does not wait for its timer. Completed preview translations replace the same caption, rather than appending independent speech. Previews never enter committed conversation history or translation context. Request diagnostics distinguish preview, final, repair and continuation so request amplification remains observable.
 
@@ -32,9 +32,11 @@ Joining considers only the immediately preceding caption. The gap is measured fr
 
 A merged unit carries the cumulative identities of superseded units across later repairs. A continuation is an ordinary caption for the next boundary: a later small merge uses the normal prompt, while a later continuation uses the continuation prompt again.
 
-Joining does not add speaker inference or a new speaker-change stop. A repair combining distinct or ambiguous speaker assignments uses the existing `mixed` semantic attribution instead of claiming a single speaker or obsolete single-final source range. The overlay retains its existing immutable first-readable style; that retained style is not new evidence that every word in a repaired caption came from one speaker.
+Translation context and GUI conversation history retain one current record per caption unit. Source and translation components of the same accepted revision converge on that record, regardless of which delivery path arrives first. A newer source-only settlement clears the old translation. Persisted conversation logs remain append-only: caption records identify their stable unit, revision and `commit` or `replace` action, so a repair is an explicit revision rather than another accepted speech contribution. Stale and duplicate versions are rejected; genuinely repeated speech has a distinct unit identity.
 
-The source-layout estimate shares the product's caption width basis. Retained experiment ratios are 0.856 for English-to-Korean and 1.617 for Korean-to-English; same-language estimates use 1.0. Other directions use the historical 1.617 fallback. That fallback is a conservative estimate, not measured pair-specific expansion. The estimate is not a guarantee that the completed translation occupies the predicted number of lines.
+Joining does not add speaker inference or a new speaker-change stop. A repair combining distinct or ambiguous speaker assignments uses the existing `mixed` semantic attribution instead of claiming a single speaker or obsolete single-final source range. Each accepted version updates the overlay's retained semantic assignment; identity-dependent decisions such as the overflow-speaker divider use that current assignment. The overlay retains its existing immutable first-readable style; that retained style is not new evidence that every word in a repaired caption came from one speaker.
+
+The source-layout estimate shares the product's caption width basis and effective text-scale calculation, using the current destination calibration when the join is decided. Retained experiment ratios are 0.856 for English-to-Korean and 1.617 for Korean-to-English; same-language estimates use 1.0. Other directions use the historical 1.617 fallback. That fallback is a conservative estimate, not measured pair-specific expansion. The estimate is not a guarantee that the completed translation occupies the predicted number of lines.
 
 ## Context and editable prompts
 
@@ -56,6 +58,8 @@ Prompt files use the existing process cache; restart the application to load edi
 
 Each Peer block displays up to two translation lines. Longer translations advance through two-line pages every 3 seconds. Every new preview, final or repair version restarts at its first page; final and repair updates to visible captions apply immediately.
 
+A failed cloud final or repair settles its version as source-only: the authoritative source replaces any obsolete preview translation, remains readable even when secondary originals are hidden, and uses the same paging rules. Absorbed preview identities are retired on that settlement. An authoritative empty settlement retires the provisional caption rather than leaving withdrawn text visible.
+
 A new caption enters the lower slot and promotes its predecessor to the upper slot. Upper-slot protection lasts until the later of:
 
 - the current page's last actual visible change plus its reading budget;
@@ -63,7 +67,7 @@ A new caption enters the lower slot and promotes its predecessor to the upper sl
 
 The reading budget is 0.3 seconds plus 1/9 second per wide character and 1/17 second per narrow character of changed text, clamped to 1–3 seconds. Corrections and page turns recompute protection. A new visible occurrence starts a new clock; an older scheduled expiry cannot remove it early. Identical visible text does not manufacture another visible change.
 
-A new Peer caption waits at most 1 second for a protected upper slot, then evicts it. Rare unread-page loss at this bound is an accepted policy limit. Same-caption updates do not wait behind new-caption admission. Self admission bypasses Peer protection and waiting; Peer cannot delay or hide Self.
+A new Peer caption waits at most 1 second for a protected upper slot, then evicts it. A superseding version retains that caption's first admission-attempt time instead of restarting W. Rare unread-page loss at this bound is an accepted policy limit. Same-caption updates do not wait behind new-caption admission, including when an absorbed preview is already waiting in the output queue. Self admission bypasses Peer protection and waiting; Peer cannot delay or hide Self.
 
 Python owns these page and lifetime decisions. Desktop and native renderers follow the ordered scene and retain occupant identity through promotion. Renderer fitting/clipping remains separate from Python pagination. Native acknowledgments and state tests do not establish physical headset visibility.
 
