@@ -2,9 +2,18 @@
 
 ## Candidate and scope
 
-Final implementation checkpoint: `98919abbd7d73c8e33612bafc8e557a2a7ea4fdb`, based on `787e66347f7ca3b2430b21c3fce070d8d8b3e610` (`dev`). The initial checkpoint was `16099940b19e4b8f20b4218c916e6770cc40a3d3`; the main repair/application-observation checkpoint was `37b9a03e393e8e00c590ea828012ea2adc30e75e`. The starting worktree was clean; the historical uncommitted #278 prototype was not present in this worktree.
+Latest implementation checkpoint: `2b6e18783e3eb4dad3c876dc53bfbe74aa05a962`, based on `787e66347f7ca3b2430b21c3fce070d8d8b3e610` (`dev`). The complete local Python partition run was on `98919abbd7d73c8e33612bafc8e557a2a7ea4fdb`. The initial checkpoint was `16099940b19e4b8f20b4218c916e6770cc40a3d3`; the main repair/application-observation checkpoint was `37b9a03e393e8e00c590ea828012ea2adc30e75e`. The starting worktree was clean; the historical uncommitted #278 prototype was not present in this worktree.
 
 The selected F′P/RP-B′ policy was implemented without another policy comparison or threshold tuning. Existing speaker/language source children, local per-final translation, Self/manual input and output isolation remain requirements. Known speaker disagreement across a rule-selected merge uses existing mixed semantic attribution; it does not add another join stop.
+
+## Completion status
+
+[PR #357](https://github.com/kapitalismho/PuriPuly-heart/pull/357) delivers the implementation and its evidence record; it references rather than closes #356. Independent completion review identified two outstanding obligations:
+
+- Current readable application output, including local paging, is not qualified by the gray/black window captures or renderer acknowledgments.
+- The small actual-application baseline-versus-selected comparison explicitly transferred by [#278's owner closing decision](https://github.com/kapitalismho/PuriPuly-heart/issues/278#issuecomment-6580384532) has not run. It requires an actual translation route, suitable permitted inputs/service access and usable visible observation. Synthetic translations and the historical replay results are not substitutes.
+
+These are completion blockers, not a request to retune the selected policy or rerun the 424-cell study. Missing service authority and presentation prerequisites require resolution or an explicit owner revision of completion scope; unavailable-route reporting alone does not waive them.
 
 ## Executed checks
 
@@ -102,6 +111,23 @@ The local overlay captures were genuinely uniform gray. A subsequent bounded non
 
 All captures were limited to the owned 1344×336 window over an owned backdrop, with PID/visibility/point-ownership guards. Each instance and native worker shut down; no owned descendants remained, and the supported post-stop query returned `instance_not_found`. Copied model, worker and PCM staging was removed without changing shared assets.
 
+## Independent presentation-prerequisite diagnosis
+
+A minimal native Flet control, without any PuriPuly imports, provider, audio or credentials, tested the observation prerequisite separately. It used Python 3.14.10 and the same existing Flet/Flet Desktop 1.0.5 client on Windows build 26300, fresh isolated state, an owned window/backdrop and a loopback-only Python guard.
+
+The first native screenshot RPC rejected integer `pixel_ratio=1`; one corrected repeat used `1.0`. Native layout reported the expected control and viewport, and the corrected matching RPC returned a readable 640×200 red control with white and yellow text. Flet 1.0.5's implementation wraps a normally mounted visible child, not an intentionally offscreen-only widget. The bitmap still does not prove that the window presented it.
+
+| Observation boundary | Result |
+| --- | --- |
+| Native session, layout and widget screenshot | Connected; matching method completed and returned readable native-rendered pixels |
+| Guarded screen DC, HWND DC and PrintWindow | Known control absent; window body remained white |
+| Distinct GPU-aware Windows.Graphics.Capture | Supported hardware D3D11 device and exact-owned-HWND capture succeeded; one GPU frame showed the correct title/chrome but a white body, with no known control. No subsequent frame arrived before the eight-second bound; the terminal timeout remains a failed observation |
+| Subsequent metadata-only desktop/session check | `WinSta0`, active input `Default`, accessible input desktop and active console session; no API failure. This is not retrospective proof of presentation health |
+
+The exact-window probe used documented `IGraphicsCaptureItemInterop.CreateForWindow`, not monitor or full-desktop acquisition. A GDI-only explanation is insufficient, but native presentation, visual attachment, composition and shared observation behavior are not conclusively separated. No product defect, driver/environment cause, inactive-desktop cause or human-visible result is inferred.
+
+No product-policy retry, rendering-backend guess, repaint workaround or settings change followed. Owned windows, capture/session/device resources and processes closed; staged public WinRT dependencies and fourteen throwaway Python adapters were removed. Reports, images, logs and all earlier failures remain retained. A working readable-window prerequisite is still missing; this investigation does not close either completion obligation.
+
 ## Focused audio and prompt evidence
 
 A controlled run of the actual controller, segment ledger, scoped recognition engine and production retention profile showed all four named cloud routes remaining open at 6 seconds and sealing at 10 seconds with 160,000 owned samples. Local CPU Auto and local GPU retained their 6-second boundary. The original shared retention bounds were sufficient and returned to zero retained bytes. This used synthetic capture time and a controlled provider, not live transport timing.
@@ -124,7 +150,26 @@ Two independent reviews of the initial checkpoint found defects not caught by it
 
 Focused repaired-path checks passed. A separate fresh-process controlled composition exercised eight lifecycle/output boundaries, produced 24 publication records and closed all eight owned harnesses with stable imported-source hashes and no network denials. It used actual owners, request preparation, output and presenter, but controlled recognition/translation and the native callback's current-stream predicate. It did not launch the application host or qualify pixels, live providers or persistence across restart.
 
-Both independent reviewers verified the main repair checkpoint and retained unaffected baseline coverage. Final integration then exposed one legacy attribution boundary, corrected by `98919abbd` and independently re-verified. The final source guard preserves unversioned first-readable semantics without altering positive-revision behavior. No material code finding remains open; the physical and route limits below remain limits.
+Both independent reviewers verified the main repair checkpoint and retained unaffected baseline coverage. Final integration then exposed one legacy attribution boundary, corrected by `98919abbd` and independently re-verified. That guard preserves unversioned first-readable semantics without altering positive-revision behavior. The subsequent Codex findings and their separate repair evidence follow.
+
+## Post-publication code-review repairs
+
+Codex found two additional P2 defects at published checkpoint `9ccf9f3086f093b4f456819deac53e3d6e46056d`. Both were independently traced, accepted and corrected in `2b6e18783`:
+
+- A nonempty final with no canonical source fragments previously completed without retiring its provisional segment. It now uses existing authoritative retirement before normal completion. The canonical segmenter is unchanged; no punctuation-string special case was added.
+- Join classification used the preceding caption's detected language, but expansion estimation used the configured fallback even when detection existed. Both now use the same detected-or-configured preceding language. Request source-language authority, target language, ratios, thresholds and effective calibration remain unchanged.
+
+The affected lifecycle/request/output/layout and neighboring suites passed **489 checks**, including nine new boundary cases. An originating independent reviewer verified the exact two-file repair and executed **15 focused checks** covering the new cases plus existing empty/epoch retirement and calibration boundaries. No existing assertion, tolerance, skip or expected outcome was weakened.
+
+A fresh-process composition exercised the real Peer owner, request preparation, output runtime and presenter with controlled recognition and deterministic translation. Seven scenarios produced 21 versioned publications, and all seven harnesses closed with zero open segments, caption tasks or pending admission clocks. Repeated zero-fragment finals before and after shown previews retired once, rejected obsolete updates, preserved valid successor publication and left no provisional history. Detected-language decisions crossed the real estimator's boundaries:
+
+| Detected Korean, stored English, target English | Detected-language estimate | Stored-English estimate | Actual corrected request |
+| --- | --- | --- | --- |
+| R0 above two lines | 2.298 | 1.421 | Continuation |
+| R1-only above two lines | 2.377 | 1.470 | Continuation |
+| R1-only above four lines | 4.315 | 2.668 | Independent normal final |
+
+Absent detection retained the configured-language outcomes: Korean continued, English repaired with the original context. Imported-source hashes remained stable and the loopback-only Python guard recorded no denials. The throwaway script was removed. This smoke did not launch the application host or qualify GUI pixels, live services or either outstanding completion obligation. Ruff and Black passed after formatting the new test code; the earlier 9,877-check partition result is not relabeled as an execution on this repair.
 
 ## Failures retained and corrected
 

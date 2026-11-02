@@ -36,7 +36,7 @@ Translation context and GUI conversation history retain one current record per c
 
 Joining does not add speaker inference or a new speaker-change stop. A repair combining distinct or ambiguous speaker assignments uses the existing `mixed` semantic attribution instead of claiming a single speaker or obsolete single-final source range. Each accepted positive caption revision updates the overlay's retained semantic assignment; identity-dependent decisions such as the overflow-speaker divider use that current assignment. Unversioned Peer/local events retain their existing first-readable semantic-assignment behavior. The overlay retains its immutable first-readable style in both paths; that retained style is not new evidence that every word in a repaired caption came from one speaker.
 
-The source-layout estimate shares the product's caption width basis and effective text-scale calculation, using the current destination calibration when the join is decided. Retained experiment ratios are 0.856 for English-to-Korean and 1.617 for Korean-to-English; same-language estimates use 1.0. Other directions use the historical 1.617 fallback. That fallback is a conservative estimate, not measured pair-specific expansion. The estimate is not a guarantee that the completed translation occupies the predicted number of lines.
+The source-layout estimate shares the product's caption width basis and effective text-scale calculation, using the current destination calibration when the join is decided. Both the join rule and expansion estimate use the preceding caption's detected source language when available, otherwise the existing configured source-language fallback. Retained experiment ratios are 0.856 for English-to-Korean and 1.617 for Korean-to-English; same-language estimates use 1.0. Other directions use the historical 1.617 fallback. That fallback is a conservative estimate, not measured pair-specific expansion. The estimate is not a guarantee that the completed translation occupies the predicted number of lines.
 
 ## Context and editable prompts
 
@@ -58,7 +58,7 @@ Prompt files use the existing process cache; restart the application to load edi
 
 Each Peer block displays up to two translation lines. Longer translations advance through two-line pages every 3 seconds. Every new preview, final or repair version restarts at its first page; final and repair updates to visible captions apply immediately.
 
-A failed cloud final or repair settles its version as source-only: the authoritative source replaces any obsolete preview translation, remains readable even when secondary originals are hidden, and uses the same paging rules. Absorbed preview identities are retired on that settlement. An authoritative empty settlement retires the provisional caption rather than leaving withdrawn text visible.
+A failed cloud final or repair settles its version as source-only: the authoritative source replaces any obsolete preview translation, remains readable even when secondary originals are hidden, and uses the same paging rules. Absorbed preview identities are retired on that settlement. An authoritative empty settlement, including a nonempty final that produces no canonical source fragments, retires the provisional caption rather than leaving withdrawn text visible.
 
 A new caption enters the lower slot and promotes its predecessor to the upper slot. Upper-slot protection lasts until the later of:
 
