@@ -1033,7 +1033,8 @@ class OverlayPresentationState:
         entry.peer_page_index = 0
         entry.peer_page_due_at = None
         if event.text.strip() or source_only:
-            entry.speaker_assignment = event.speaker_assignment
+            if event.peer_caption_revision > 0 or entry.speaker_style is None:
+                entry.speaker_assignment = event.speaker_assignment
             entry.translation_language = None if source_only else event_target_language
             entry.translation_update_id = event.update_id
             entry.translation_origin_wall_clock_ms = event.origin_wall_clock_ms
