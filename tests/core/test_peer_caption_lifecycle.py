@@ -16,6 +16,7 @@ from puripuly_heart.core.orchestrator.peer_caption import join_action, preview_s
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
+from puripuly_heart.core.overlay.peer_caption_layout import estimate_peer_translation_lines
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.stt.backend import (
     STTProviderEpochEnded,
@@ -1177,4 +1178,194 @@ async def test_final_settlement_keeps_waiting_preview_original_one_second_budget
         assert harness.output_runtime._peer_caption_admission_started_at == {}
     finally:
         await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("punctuation", ["...", " ？！ "])
+@pytest.mark.parametrize("show_preview", [False, True], ids=["before-preview", "shown-preview"])
+async def test_zero_fragment_final_retires_segment_and_preserves_successor(
+    punctuation, show_preview, monkeypatch
+):
+    timeline = Timeline()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=timeline.clock, sleep=timeline.sleep
+    )
+    harness, backend, _, clock = setup(overlay_sink=presenter, clock=timeline.clock)
+    submissions = []
+    projection = harness.peer_owner.output_projection
+    original = type(projection).project_peer_caption
+
+    async def record(owner, submission):
+        submissions.append(submission)
+        await original(owner, submission)
+
+    monkeypatch.setattr(type(projection), "project_peer_caption", record)
+    retired_ids = []
+    try:
+        await harness.start()
+        for order in range(1, 4):
+            item = transcript(f"Withdrawn observed source {order}", order)
+            retired_ids.append(item.utterance_id)
+            await partial(harness, item)
+            if show_preview:
+                await timeline.advance(5)
+                await harness.peer_owner.cloud_captions.check_previews()
+                await asyncio.wait_for(idle(harness), 1)
+                assert presenter.snapshot().blocks[-1].id == f"peer:{item.utterance_id}"
+            authoritative = replace(item, text=punctuation)
+            await final(harness, authoritative)
+            await final(harness, authoritative)
+            await partial(harness, replace(item, text="Obsolete late partial"))
+            await asyncio.wait_for(idle(harness), 1)
+            assert harness.peer_owner.cloud_captions.is_completed(item.utterance_id)
+            assert harness.peer_owner.cloud_captions._segments == {}
+            assert not presenter.snapshot().blocks
+            assert harness.peer_runtime.translation_history == []
+            await timeline.advance(20)
+            await harness.peer_owner.cloud_captions.check_previews()
+            await asyncio.wait_for(idle(harness), 1)
+        retirements = [
+            submission
+            for submission in submissions
+            if submission.peer_request_kind == "final" and not submission.source_text
+        ]
+        assert [submission.child_utterance_id for submission in retirements] == retired_ids
+        assert all(
+            submission.translation is None
+            and submission.outcome == "source_only"
+            and submission.peer_caption_revision == (2 if show_preview else 1)
+            for submission in retirements
+        )
+        successor = transcript("Valid successor.", 4)
+        await final(harness, successor)
+        await asyncio.wait_for(idle(harness), 1)
+        assert [request.text for request in backend.calls] == (
+            [f"Withdrawn observed source {order}" for order in range(1, 4)] if show_preview else []
+        ) + [successor.text]
+        assert [(block.id, block.primary_text) for block in presenter.snapshot().blocks] == [
+            (f"peer:{successor.utterance_id}", "translated:Valid successor.")
+        ]
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+            successor.text
+        ]
+        ui = []
+        while not harness.ui_events.empty():
+            ui.append(harness.ui_events.get_nowait())
+        assert [
+            event.payload.text for event in ui if event.type is UIEventType.TRANSCRIPT_FINAL
+        ] == [successor.text]
+        assert harness.osc.messages == []
+    finally:
+        await asyncio.wait_for(harness.stop(), 1)
+        await presenter.close()
+    assert harness.peer_owner.cloud_captions._tasks == set()
+    assert harness.output_runtime._peer_caption_admission_started_at == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("detected_language", "configured_source", "boundary", "expected_kind"),
+    [
+        ("ko", "en", "r0-two", "continuation"),
+        ("ko", "en", "r1-two", "continuation"),
+        ("ko", "en", "r1-four", "final"),
+        (None, "ko", "r0-two", "continuation"),
+        (None, "en", "r0-two", "repair"),
+    ],
+    ids=[
+        "detected-r0-continuation",
+        "detected-r1-continuation",
+        "detected-r1-four-line-stop",
+        "configured-korean-fallback",
+        "configured-english-fallback",
+    ],
+)
+async def test_join_estimate_uses_preceding_detected_language_or_configured_fallback(
+    detected_language, configured_source, boundary, expected_kind
+):
+    clock = FakeClock()
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    harness, backend, _, clock = setup(overlay_sink=presenter, clock=clock)
+    harness.configuration.replace(
+        replace(
+            harness.configuration.snapshot().value,
+            peer_source_mode="auto",
+            peer_source_language=configured_source,
+            peer_target_language="en",
+        )
+    )
+    first_source = "가" * (39 if boundary == "r1-four" else 19)
+    first_source += "끝." if boundary.startswith("r1") else ""
+    second_source = "나" * (35 if boundary == "r1-four" else 21)
+    merged = first_source + " " + second_source
+    effective_language = detected_language or configured_source
+    expected_lines = estimate_peer_translation_lines(merged, effective_language, "en")
+    if boundary == "r1-four":
+        assert expected_lines > 4
+        assert 2 < estimate_peer_translation_lines(merged, configured_source, "en") <= 4
+    elif expected_kind == "continuation":
+        assert 2 < expected_lines <= 4
+        if detected_language:
+            assert estimate_peer_translation_lines(merged, configured_source, "en") <= 2
+    else:
+        assert expected_lines <= 2
+
+    def with_language(item):
+        return replace(
+            item,
+            final_language_runs=(
+                (FinalLanguageRun(item.text, detected_language),) if detected_language else ()
+            ),
+        )
+
+    first = with_language(transcript(first_source, 1, final=True))
+    second = with_language(transcript(second_source, 2, final=True))
+    sealed = (
+        replace(
+            owned_peer_speech_end(uuid4(), speech_end_at=1).segment,
+            seal_reason="delivery_deadline",
+        )
+        if boundary.startswith("r1")
+        else None
+    )
+    try:
+        await harness.start()
+        harness.peer_runtime.translation_history.append(
+            ContextEntry("Earlier context.", "en", "en", clock.now(), "peer")
+        )
+        await final(harness, first, sealed=sealed)
+        await idle(harness)
+        clock.advance(0.3)
+        await partial(harness, replace(second, is_final=False, final_language_runs=()))
+        await final(harness, second)
+        await asyncio.wait_for(idle(harness), 1)
+        counts = harness.peer_owner.cloud_captions.request_counts
+        assert counts[expected_kind] == (2 if expected_kind == "final" else 1)
+        assert all(
+            counts[kind] == 0 for kind in ("repair", "continuation") if kind != expected_kind
+        )
+        assert [request.text for request in backend.calls] == [
+            first_source,
+            merged if expected_kind == "repair" else second_source,
+        ]
+        assert all(
+            request.source_language == (detected_language or "auto") for request in backend.calls
+        )
+        assert ("## Peer continuation" in backend.calls[-1].system_prompt) == (
+            expected_kind == "continuation"
+        )
+        assert presenter.snapshot().blocks[-1].id == (
+            f"peer:{first.utterance_id if expected_kind == 'repair' else second.utterance_id}"
+        )
+        if expected_kind == "repair":
+            assert backend.calls[-1].context == backend.calls[0].context
+        else:
+            assert backend.calls[-1].context.endswith(f'- [peer] "{first_source}"')
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+            "Earlier context.",
+            *([merged] if expected_kind == "repair" else [first_source, second_source]),
+        ]
+    finally:
+        await asyncio.wait_for(harness.stop(), 1)
         await presenter.close()

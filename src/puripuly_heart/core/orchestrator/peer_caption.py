@@ -440,6 +440,9 @@ class PeerCaptionOwner:
                 if segment.text.strip()
             )
         )
+        if not fragments:
+            await self.retire(transcript.utterance_id)
+            return
         assignments = tuple(
             self.speaker_identities.observe(fragment, child_sequence=sequence)
             for sequence, fragment in enumerate(fragments)
@@ -486,6 +489,9 @@ class PeerCaptionOwner:
         kind: PeerRequestKind = "final"
         previous = self._last
         if previous is not None and previous.scope == scope and previous.provider_id == provider_id:
+            previous_language = previous.source_language or self.requests.source_language_for(
+                "peer", config.value
+            )
             separator = "" if previous.source[-1:].isspace() or source[:1].isspace() else " "
             merged = previous.source + separator + source
             gap = (
@@ -497,12 +503,11 @@ class PeerCaptionOwner:
                 join_action(
                     previous.source,
                     source,
-                    language=previous.source_language
-                    or self.requests.source_language_for("peer", config.value),
+                    language=previous_language,
                     gap_s=gap,
                     expected_lines=estimate_peer_translation_lines(
                         merged,
-                        self.requests.source_language_for("peer", config.value),
+                        previous_language,
                         self.requests.target_language_for("peer", config.value),
                         text_scale=self.output.peer_caption_text_scale,
                     ),
