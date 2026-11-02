@@ -74,3 +74,5 @@ Python owns these page and lifetime decisions. Desktop and native renderers foll
 ## Evidence limits
 
 The historical 424-cell results—similar median first display, about 8% of cells over 0.5 seconds later, and about 27% additional translation requests—came from a replay harness, not this application's runtime. They are sanity references, not thresholds or claims of measured application performance. A synthetic smoke is not a repeat of that corpus, a cloud-provider qualification or an HMD readability study.
+
+See the [implementation verification record](peer-captions-verification.md) for executed checks, source-pinned observations, earlier screenshots, route dispositions and remaining physical-presentation limits.
