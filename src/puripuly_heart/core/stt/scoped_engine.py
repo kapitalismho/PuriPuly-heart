@@ -221,7 +221,8 @@ class ScopedRecognitionEngine:
     exclusive_provider_ids: frozenset[str] = frozenset(
         {
             "local_cpu_auto",
-            "local_orukeet",
+            "local_granite",
+            "local_gigaam",
             "local_fun_asr_nano",
             "local_fun_asr_mlt_nano",
             "local_parakeet_ja",

@@ -500,14 +500,16 @@ def test_listen_retention_profile_covers_six_seconds_and_largest_prefix(
         ("self", 7 * 16000),
     ],
 )
+@pytest.mark.parametrize("provider_id", ["local_qwen_gpu", "local_granite", "local_gigaam"])
 async def test_production_retention_profiles_accept_listen_boundary_and_long_self_like(
     channel: str,
     content_samples: int,
+    provider_id: str,
 ) -> None:
-    settings = _retention_settings("local_qwen_gpu")
+    settings = _retention_settings(provider_id)
     config = SimpleNamespace(
         channel=channel,
-        provider="local_qwen_gpu",
+        provider=provider_id,
         provider_options={},
         sample_rate_hz=16000,
     )
@@ -964,8 +966,9 @@ async def test_production_cancelled_same_channel_candidate_preserves_live_prepar
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("outcome", ["ready", "cancel", "failure"])
+@pytest.mark.parametrize("provider_id", ["local_granite", "local_gigaam"])
 async def test_cpu_backend_preparation_drains_without_constructing_cancelled_provider(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, outcome: str
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, outcome: str, provider_id: str
 ) -> None:
     from puripuly_heart.core.storage.secrets import InMemorySecretStore
 
@@ -1001,7 +1004,7 @@ async def test_cpu_backend_preparation_drains_without_constructing_cancelled_pro
         gpu_model_path=None,
     )
     request = replace(
-        _gpu_build_request("self", warmup=False), config=_resolved_config("self", "local_orukeet")
+        _gpu_build_request("self", warmup=False), config=_resolved_config("self", provider_id)
     )
     task = asyncio.create_task(factory.create(request, gpu_runtime=object()))
     try:
@@ -1025,7 +1028,7 @@ async def test_cpu_backend_preparation_drains_without_constructing_cancelled_pro
                 await asyncio.wait_for(task, 1)
         else:
             provider = await asyncio.wait_for(task, 1)
-            assert provider.accepted_settings_scope[0] == "local_orukeet"
+            assert provider.accepted_settings_scope[0] == provider_id
             assert construction_threads == [loop_thread]
             await provider.close_backend()
         assert finished.is_set()

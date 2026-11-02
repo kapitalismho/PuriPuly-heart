@@ -1,0 +1,12 @@
+Original model: IBM Granite Speech 5.0 470M TurboCTC.
+Original model repository: https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc
+Source revision: 1dd23f46f6d4e6eae2531982ba2e33220086dd97
+This conversion uses the October 21, 2026 multilingual release.
+Original model license: Apache License 2.0.
+
+GGUF format conversion and Q8_0 quantization packaging by 17slever17.
+No additional model training was performed for this conversion.
+This repository is not an official IBM release.
+
+Conversion tooling: handy-computer/transcribe.cpp, MIT license.
+Its license is included at conversion/LICENSE-transcribe.cpp.

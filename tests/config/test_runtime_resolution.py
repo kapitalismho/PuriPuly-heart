@@ -355,26 +355,29 @@ def test_stt_runtime_intent_normalizes_legacy_vad_floor_for_both_channels(
     assert config.vad_speech_threshold == 0.10
 
 
+@pytest.mark.parametrize("channel", ["self", "peer"])
 @pytest.mark.parametrize(
     ("provider", "expected_provider"),
     [
         ("local_cpu_auto", "local_cpu_auto"),
-        ("local_orukeet", "local_orukeet"),
+        ("local_granite", "local_granite"),
+        ("local_gigaam", "local_gigaam"),
+        ("local_orukeet", "local_cpu_auto"),
         ("local_fun_asr_nano", "local_fun_asr_nano"),
         ("local_fun_asr_mlt_nano", "local_fun_asr_mlt_nano"),
         ("local_parakeet_ja", "local_parakeet_ja"),
         ("local_qwen_gpu", "local_qwen_gpu"),
-        ("local_parakeet_v3", "local_orukeet"),
+        ("local_parakeet_v3", "local_cpu_auto"),
         ("local_qwen", "local_cpu_auto"),
     ],
 )
 def test_stt_runtime_resolution_emits_canonical_local_provider_identity(
-    provider: str, expected_provider: str
+    provider: str, expected_provider: str, channel: str
 ) -> None:
     runtime_resolution = _runtime_resolution_module()
 
     config = runtime_resolution.resolve_stt_config(
-        runtime_resolution.STTRuntimeIntent(provider=provider)
+        runtime_resolution.STTRuntimeIntent(provider=provider, channel=channel)
     )
 
     assert config.provider == expected_provider

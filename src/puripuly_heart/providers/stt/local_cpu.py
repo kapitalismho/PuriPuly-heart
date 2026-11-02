@@ -12,7 +12,8 @@ from puripuly_heart.core.asr_worker import ASRWorkerProcessFactoryPort
 from puripuly_heart.core.local_asr.local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
     FUN_ASR_NANO_MODEL_ID,
-    ORUKEET_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     LocalSTTAssetManifest,
     default_local_stt_model_root,
@@ -37,7 +38,12 @@ LocalCPUBackendFactory = Callable[..., STTBackend]
 
 
 def local_cpu_backend_type(model_id: str) -> type[STTBackend]:
-    if model_id in {ORUKEET_MODEL_ID, FUN_ASR_NANO_MODEL_ID, FUN_ASR_MLT_NANO_MODEL_ID}:
+    if model_id in {
+        GRANITE_MODEL_ID,
+        GIGAAM_MODEL_ID,
+        FUN_ASR_NANO_MODEL_ID,
+        FUN_ASR_MLT_NANO_MODEL_ID,
+    }:
         from puripuly_heart.providers.stt.local_cpp import LocalCppSTTBackend
 
         return LocalCppSTTBackend
@@ -80,12 +86,15 @@ def create_local_cpu_backend(
             **common,
             model_id=model_id,
             provider_id={
-                ORUKEET_MODEL_ID: "local_orukeet",
+                GRANITE_MODEL_ID: "local_granite",
+                GIGAAM_MODEL_ID: "local_gigaam",
                 FUN_ASR_NANO_MODEL_ID: "local_fun_asr_nano",
                 FUN_ASR_MLT_NANO_MODEL_ID: "local_fun_asr_mlt_nano",
             }[model_id],
             language_hint=(
-                None if model_id == ORUKEET_MODEL_ID else source_language.split("-")[0].lower()
+                None
+                if model_id in {GRANITE_MODEL_ID, GIGAAM_MODEL_ID}
+                else source_language.split("-")[0].lower()
             ),
             process_factory=process_factory,
         )

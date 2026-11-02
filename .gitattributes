@@ -1,5 +1,5 @@
 /native/**/Cargo.lock text eol=lf
 /src/puripuly_heart/data/licenses/PYTHON-*-LICENSE.txt -text
 /src/puripuly_heart/data/licenses/DART-BRIDGE-*-LICENSE.txt -text
-/docs/experiments/issue-353/**/*.json -text
-/docs/experiments/issue-353/**/*.jsonl -text
+/benchmarks/asr/inputs/*.json -text
+/benchmarks/asr/inputs/*.jsonl -text

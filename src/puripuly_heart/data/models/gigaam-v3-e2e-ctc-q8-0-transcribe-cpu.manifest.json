@@ -1,0 +1,31 @@
+{
+  "manifest_version": 1,
+  "installed_manifest_version": 1,
+  "model_id": "gigaam-v3-e2e-ctc-q8-0-transcribe-cpu",
+  "engine": "transcribe.cpp-cpu",
+  "license": "MIT",
+  "upstream_repo": "handy-computer/gigaam-v3-e2e-ctc-gguf",
+  "install_dirname": "gigaam-v3-e2e-ctc-q8-0-transcribe-cpu",
+  "installed_manifest_filename": "installed-manifest.json",
+  "sources": {
+    "huggingface": {
+      "name": "huggingface",
+      "repo_id": "handy-computer/gigaam-v3-e2e-ctc-gguf",
+      "revision": "59717de63d50dd9dd93b3249da6ad3f2f1c4ad6b",
+      "download_url_template": "https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf/resolve/59717de63d50dd9dd93b3249da6ad3f2f1c4ad6b/{path}"
+    },
+    "hf_mirror": {
+      "name": "hf_mirror",
+      "repo_id": "handy-computer/gigaam-v3-e2e-ctc-gguf",
+      "revision": "59717de63d50dd9dd93b3249da6ad3f2f1c4ad6b",
+      "download_url_template": "https://hf-mirror.net/handy-computer/gigaam-v3-e2e-ctc-gguf/resolve/59717de63d50dd9dd93b3249da6ad3f2f1c4ad6b/{path}"
+    }
+  },
+  "files": [
+    {
+      "relative_path": "gigaam-v3-e2e-ctc-Q8_0.gguf",
+      "sha256": "9ccce4750dc813a493d96ca15ee251712bedec15ac9a02fa3d2bd732f08ae5eb",
+      "size_bytes": 272151136
+    }
+  ]
+}

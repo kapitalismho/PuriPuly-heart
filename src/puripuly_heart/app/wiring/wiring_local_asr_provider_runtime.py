@@ -82,7 +82,8 @@ _ACTUAL_DEGRADATION_REASONS = frozenset(
 _LOCAL_PROVIDER_IDS = frozenset(
     {
         STTProviderName.LOCAL_CPU_AUTO.value,
-        STTProviderName.LOCAL_ORUKEET.value,
+        STTProviderName.LOCAL_GRANITE.value,
+        STTProviderName.LOCAL_GIGAAM.value,
         STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
         STTProviderName.LOCAL_FUN_ASR_NANO.value,
         STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value,
@@ -335,7 +336,8 @@ def _recognition_retention_profile(
         provider_id
         in {
             STTProviderName.LOCAL_CPU_AUTO.value,
-            STTProviderName.LOCAL_ORUKEET.value,
+            STTProviderName.LOCAL_GRANITE.value,
+            STTProviderName.LOCAL_GIGAAM.value,
             STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
             STTProviderName.LOCAL_FUN_ASR_NANO.value,
             STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value,
@@ -352,7 +354,8 @@ def _recognition_retention_profile(
             if provider_id
             in {
                 STTProviderName.LOCAL_CPU_AUTO.value,
-                STTProviderName.LOCAL_ORUKEET.value,
+                STTProviderName.LOCAL_GRANITE.value,
+                STTProviderName.LOCAL_GIGAAM.value,
                 STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
                 STTProviderName.LOCAL_FUN_ASR_NANO.value,
                 STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value,

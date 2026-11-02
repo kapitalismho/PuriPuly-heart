@@ -224,9 +224,12 @@ Installer_output/
 .references/
 refactoring/
 .tmp/
+/benchmarks/asr/data/
+/benchmarks/asr/models/
+/benchmarks/asr/results/
+/benchmarks/asr/data-preparation.json
 /scripts/*
 !/scripts/bench_*.py
-!/scripts/asr_benchmark/
 !/scripts/ci/
 /scripts/ci/*
 !/scripts/ci/build-native-experimental.ps1

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import tempfile
+import unicodedata
 import wave
 from collections.abc import Awaitable
 from dataclasses import dataclass, field
@@ -19,7 +20,8 @@ from puripuly_heart.core.asr_worker import (
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr.local_stt_assets import (
-    ORUKEET_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     load_local_stt_asset_manifest,
 )
 from puripuly_heart.core.owned_thread import run_owned_thread_call
@@ -36,6 +38,8 @@ class LocalCppSTTBackend(LocalOfflineSTTBackend):
 
     def __post_init__(self) -> None:
         super(LocalCppSTTBackend, self).__post_init__()
+        if self.model_id in {GRANITE_MODEL_ID, GIGAAM_MODEL_ID}:
+            self.language_hint = None
         if self.stream_label not in {"self", "peer"}:
             raise ValueError("native CPU channel must be self or peer")
         if self.process_factory is None:
@@ -48,7 +52,9 @@ class LocalCppSTTBackend(LocalOfflineSTTBackend):
         return client.pid if client is not None else None
 
     async def reconfigure_session_options(self, options: LocalASRSessionOptions) -> None:
-        self.language_hint = None if self.model_id == ORUKEET_MODEL_ID else options.language_hint
+        self.language_hint = (
+            None if self.model_id in {GRANITE_MODEL_ID, GIGAAM_MODEL_ID} else options.language_hint
+        )
 
     async def close(self) -> None:
         await super(LocalCppSTTBackend, self).close()
@@ -126,7 +132,15 @@ class LocalCppSTTBackend(LocalOfflineSTTBackend):
                     ),
                     request_id=request_id,
                 )
-                return result.text.strip()
+                text = result.text.strip()
+                if self.model_id == GRANITE_MODEL_ID and "<|nospeech|>" in text:
+                    remainder = text.replace("<|nospeech|>", "")
+                    if all(
+                        char.isspace() or unicodedata.category(char).startswith("P")
+                        for char in remainder
+                    ):
+                        return ""
+                return text
 
 
 def _write_audio(path: Path, samples: np.ndarray) -> None:

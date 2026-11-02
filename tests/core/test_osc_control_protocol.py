@@ -108,10 +108,18 @@ def test_codec_rejects_wrong_types_unknown_ids_and_unknown_parameters() -> None:
 @pytest.mark.parametrize(
     ("asr_id", "provider"),
     [
+        (0, "local_cpu_auto"),
+        (1, "local_cpu_auto"),
+        (2, "local_parakeet_ja"),
+        (3, "local_cpu_auto"),
         (10, "gemini_transcribe"),
         (11, "elevenlabs_scribe"),
         (12, "qwen_audio"),
         (13, "rolling_free"),
+        (14, "local_fun_asr_nano"),
+        (15, "local_fun_asr_mlt_nano"),
+        (16, "local_granite"),
+        (17, "local_gigaam"),
     ],
 )
 def test_codec_round_trips_new_asr_ids(asr_id: int, provider: str) -> None:
@@ -186,7 +194,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
     )
     assert dict(ASR_IDS) == {
         0: "local_cpu_auto",
-        1: "local_orukeet",
+        1: "local_cpu_auto",
         2: "local_parakeet_ja",
         3: "local_cpu_auto",
         4: "local_qwen_gpu",
@@ -200,6 +208,8 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         13: "rolling_free",
         14: "local_fun_asr_nano",
         15: "local_fun_asr_mlt_nano",
+        16: "local_granite",
+        17: "local_gigaam",
     }
     assert dict(TRANSLATION_MODEL_IDS) == {
         0: "gemma4_26b_31b",

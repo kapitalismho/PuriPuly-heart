@@ -15,6 +15,8 @@ from puripuly_heart.core.audio.ownership import (
     AudioSegmentSettingsSnapshot,
 )
 from puripuly_heart.core.local_asr.local_stt_assets import (
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
     InstalledLocalSTTManifest,
@@ -24,6 +26,7 @@ from puripuly_heart.core.local_asr.local_stt_assets import (
 from puripuly_heart.core.local_asr.local_stt_catalog import (
     LocalCPUInstallSnapshot,
     LocalCPUModelInstall,
+    LocalSTTUnsupportedLanguageError,
 )
 from puripuly_heart.core.stt.backend import (
     STTBackendTranscriptEvent,
@@ -622,8 +625,16 @@ async def test_direct_local_cpu_close_prevents_open_resurrection(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("language", "expected_model"),
+    [
+        ("ja-JP", PARAKEET_JAPANESE_MODEL_ID),
+        ("en-US", GRANITE_MODEL_ID),
+        ("ru-RU", GIGAAM_MODEL_ID),
+    ],
+)
 async def test_cpu_auto_strict_gate_resolves_once_and_awaits_delegate_close(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, language: str, expected_model: str
 ) -> None:
     snapshot = _ready_snapshot()
     verification_modes: list[bool] = []
@@ -656,15 +667,15 @@ async def test_cpu_auto_strict_gate_resolves_once_and_awaits_delegate_close(
         return delegate
 
     backend = LocalCPUAutoSTTBackend(
-        source_language="ja-JP",
+        source_language=language,
         stream_label="self",
         backend_factory=factory,
     )
 
     assert await backend.open_session() is not None
     assert await backend.open_session() is not None
-    assert backend.resolved_model_id == PARAKEET_JAPANESE_MODEL_ID
-    assert factory_calls == [PARAKEET_JAPANESE_MODEL_ID]
+    assert backend.resolved_model_id == expected_model
+    assert factory_calls == [expected_model]
     assert verification_modes == [False]
 
     await backend.close()
@@ -1055,4 +1066,30 @@ async def test_cpu_auto_close_drains_backend_type_preparation_without_late_deleg
         await asyncio.gather(
             opening, *(() if closing is None else (closing,)), return_exceptions=True
         )
+        await backend.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ["uk", "uk-UA"])
+async def test_cpu_auto_rejects_ukrainian_even_with_complete_installs(
+    monkeypatch: pytest.MonkeyPatch, language: str
+) -> None:
+    monkeypatch.setattr(
+        local_cpu_module,
+        "inspect_required_cpu_model_installs",
+        lambda *_args, **_kwargs: _ready_snapshot(),
+    )
+
+    def forbidden_factory(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("unsupported language must not create any fallback")
+
+    backend = LocalCPUAutoSTTBackend(
+        source_language=language,
+        backend_factory=forbidden_factory,
+    )
+    try:
+        with pytest.raises(LocalSTTUnsupportedLanguageError):
+            await backend.open_session()
+        assert backend.resolved_model_id is None
+    finally:
         await backend.close()

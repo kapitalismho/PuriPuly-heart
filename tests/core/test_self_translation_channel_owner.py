@@ -1295,7 +1295,7 @@ async def test_local_scoped_final_preserves_capture_timing_through_preview_accep
     sender = FakeSender()
     paginator = ChatboxPaginator(sender=sender, clock=clock)
     settings = AudioSegmentSettingsSnapshot(
-        provider_id="local_orukeet",
+        provider_id="local_granite",
         provider_signature=("synthetic-local",),
         runtime_signature=("synthetic-local",),
         source_mode="manual",

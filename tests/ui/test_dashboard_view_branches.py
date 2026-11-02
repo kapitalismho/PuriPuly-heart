@@ -727,7 +727,7 @@ def test_dashboard_projects_osc_state_without_emitting_intents(
             baseline.intent,
             peer_stt=replace(
                 baseline.intent.peer_stt,
-                provider=STTProviderName.LOCAL_ORUKEET.value,
+                provider=STTProviderName.LOCAL_GRANITE.value,
             ),
         ),
     )
@@ -1661,18 +1661,26 @@ def test_dashboard_peer_and_overlay_button_labels_render_from_i18n(
     assert view.overlay_button.label == "i18n:dashboard.overlay_label"
 
 
+@pytest.mark.parametrize(
+    "model_id",
+    (
+        "fun-asr-mlt-nano-2512-q8-0-transcribe-cpu",
+        "granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu",
+        "gigaam-v3-e2e-ctc-q8-0-transcribe-cpu",
+    ),
+)
 def test_dashboard_local_stt_notice_can_change_and_clear_without_touching_display(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, model_id: str
 ) -> None:
     view = _make_dashboard(monkeypatch)
 
-    view.set_local_stt_notice_model("fun-asr-mlt-nano-2512-q8-0-transcribe-cpu")
+    view.set_local_stt_notice_model(model_id)
     view.set_local_stt_notice("missing")
     view.set_display_text("hello", language_code="ko")
     view.set_local_stt_notice("downloading", percent=63)
     view.set_local_stt_notice(None)
 
-    model_label = dashboard_module.t("local_stt.model.fun-asr-mlt-nano-2512-q8-0-transcribe-cpu")
+    model_label = dashboard_module.t(f"local_stt.model.{model_id}")
     assert view.display_card.display_calls == [("hello", False, "font-ko")]
     assert view.display_card.notice_calls == [
         (None, None),

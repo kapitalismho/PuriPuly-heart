@@ -70,7 +70,7 @@ OSC_INTEGER_PARAMETER_NAMES: Final = tuple(INTEGER_CONTROLS)
 ASR_IDS: Final[Mapping[int, str]] = MappingProxyType(
     {
         0: "local_cpu_auto",
-        1: "local_orukeet",
+        1: "local_cpu_auto",
         2: "local_parakeet_ja",
         3: "local_cpu_auto",
         4: "local_qwen_gpu",
@@ -84,6 +84,8 @@ ASR_IDS: Final[Mapping[int, str]] = MappingProxyType(
         13: "rolling_free",
         14: "local_fun_asr_nano",
         15: "local_fun_asr_mlt_nano",
+        16: "local_granite",
+        17: "local_gigaam",
     }
 )
 

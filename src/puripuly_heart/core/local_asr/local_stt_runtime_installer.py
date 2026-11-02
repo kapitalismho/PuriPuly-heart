@@ -25,8 +25,8 @@ from puripuly_heart.core.model_download_sources import (
 from puripuly_heart.core.runtime_logging import emit_basic_log
 
 from .local_stt_assets import (
+    GRANITE_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
-    ORUKEET_MODEL_ID,
     InstalledLocalSTTManifest,
     LocalSTTAssetError,
     LocalSTTAssetManifest,
@@ -682,7 +682,7 @@ async def _ensure_local_stt_installed_with_lease(
         raise LocalSTTRuntimeInstallError(
             "runtime local STT model_id does not match the supplied manifest"
         )
-    resolved_manifest = manifest or load_local_stt_asset_manifest(model_id or ORUKEET_MODEL_ID)
+    resolved_manifest = manifest or load_local_stt_asset_manifest(model_id or GRANITE_MODEL_ID)
     resolved_root = model_root or default_local_stt_model_root()
     install_dir = resolved_root / resolved_manifest.install_dirname
     total_bytes = sum(asset.size_bytes or 0 for asset in resolved_manifest.files)

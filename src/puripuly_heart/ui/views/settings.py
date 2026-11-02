@@ -239,7 +239,8 @@ _CUSTOM_VOCAB_DELIMITER_RE = re.compile(r"\s+")
 _STT_UI_PROVIDERS = (
     STTProviderName.DEEPGRAM,
     STTProviderName.LOCAL_CPU_AUTO,
-    STTProviderName.LOCAL_ORUKEET,
+    STTProviderName.LOCAL_GRANITE,
+    STTProviderName.LOCAL_GIGAAM,
     STTProviderName.LOCAL_FUN_ASR_NANO,
     STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
     STTProviderName.LOCAL_PARAKEET_JAPANESE,
@@ -279,7 +280,8 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.CUSTOM_OFFLINE: "settings.stt.section.custom",
     STTProviderName.CUSTOM_REALTIME: "settings.stt.section.custom",
     STTProviderName.LOCAL_QWEN_GPU: "settings.stt.section.gpu_inference",
-    STTProviderName.LOCAL_ORUKEET: "settings.stt.section.cpu_inference",
+    STTProviderName.LOCAL_GRANITE: "settings.stt.section.cpu_inference",
+    STTProviderName.LOCAL_GIGAAM: "settings.stt.section.cpu_inference",
     STTProviderName.LOCAL_FUN_ASR_NANO: "settings.stt.section.cpu_inference",
     STTProviderName.LOCAL_FUN_ASR_MLT_NANO: "settings.stt.section.cpu_inference",
     STTProviderName.LOCAL_PARAKEET_JAPANESE: "settings.stt.section.cpu_inference",
@@ -300,7 +302,8 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
 _LOCAL_STT_PROVIDERS = frozenset(
     {
         STTProviderName.LOCAL_CPU_AUTO,
-        STTProviderName.LOCAL_ORUKEET,
+        STTProviderName.LOCAL_GRANITE,
+        STTProviderName.LOCAL_GIGAAM,
         STTProviderName.LOCAL_FUN_ASR_NANO,
         STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
         STTProviderName.LOCAL_PARAKEET_JAPANESE,

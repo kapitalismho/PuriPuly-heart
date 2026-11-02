@@ -6,7 +6,8 @@ from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRProvisi
 from puripuly_heart.core.local_asr.local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
     FUN_ASR_NANO_MODEL_ID,
-    ORUKEET_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )
@@ -18,7 +19,8 @@ from puripuly_heart.core.local_asr.local_stt_catalog import (
 
 LOCAL_CPU_AUTO_PROVIDER = "local_cpu_auto"
 LOCAL_CPU_DIRECT_MODEL_BY_PROVIDER = {
-    "local_orukeet": ORUKEET_MODEL_ID,
+    "local_granite": GRANITE_MODEL_ID,
+    "local_gigaam": GIGAAM_MODEL_ID,
     "local_fun_asr_nano": FUN_ASR_NANO_MODEL_ID,
     "local_fun_asr_mlt_nano": FUN_ASR_MLT_NANO_MODEL_ID,
     "local_parakeet_ja": PARAKEET_JAPANESE_MODEL_ID,

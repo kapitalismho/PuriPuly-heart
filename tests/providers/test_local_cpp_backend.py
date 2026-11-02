@@ -19,9 +19,16 @@ from puripuly_heart.core.asr_worker import (
     ASRWorkerTranscription,
 )
 from puripuly_heart.core.lifecycle import LifecycleDiagnosticsUnavailableError
-from puripuly_heart.core.local_asr.local_stt_assets import ORUKEET_MODEL_ID
+from puripuly_heart.core.local_asr.local_stt_assets import (
+    FUN_ASR_MLT_NANO_MODEL_ID,
+    FUN_ASR_NANO_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
+)
+from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.stt.backend import STTSessionProjection
 from puripuly_heart.providers.stt.local_cpp import LocalCppSTTBackend
+from puripuly_heart.providers.stt.local_cpu import create_local_cpu_backend
 from tests.providers.test_local_cpu_backends import _scoped_request
 
 
@@ -38,6 +45,8 @@ class NativeWorker:
         self.activation = None
         self.events = asyncio.Queue()
         self.audio = []
+        self.text = "completed speech"
+        self.language_hints = []
 
     async def activate(self, **options):
         self.activation = options
@@ -46,6 +55,7 @@ class NativeWorker:
     async def transcribe(self, *, request_id, channel, audio_path, language_hint=None):
         assert audio_path.is_file()
         self.audio_paths.append(audio_path)
+        self.language_hints.append(language_hint)
         assert channel == self.activation["channel"]
         with wave.open(str(audio_path), "rb") as wav:
             self.audio.append(
@@ -59,7 +69,7 @@ class NativeWorker:
         self.started.set()
         try:
             await self.finish.wait()
-            return ASRWorkerTranscription("completed speech", None, 0.1, 0.2, 2.0)
+            return ASRWorkerTranscription(self.text, None, 0.1, 0.2, 2.0)
         finally:
             self.running = False
 
@@ -92,8 +102,8 @@ class WorkerFactory:
 def backend(tmp_path, channel, factory, monkeypatch):
     instance = LocalCppSTTBackend(
         model_dir=tmp_path,
-        model_id=ORUKEET_MODEL_ID,
-        provider_id="local_orukeet",
+        model_id=GRANITE_MODEL_ID,
+        provider_id="local_granite",
         stream_label=channel,
         process_factory=factory,
     )
@@ -530,3 +540,98 @@ async def test_native_cpu_unexpected_event_failure_remains_a_background_close_er
     assert error.value.diagnostics[0].fields["task_name"] == "events"
     assert error.value.diagnostics[0].fields["exception_class"] == "ValueError"
     await provider.close()
+
+
+@pytest.mark.parametrize(
+    ("model_id", "source_language", "initial_hint", "updated_hint"),
+    [
+        (GRANITE_MODEL_ID, "en-US", None, None),
+        (GIGAAM_MODEL_ID, "ru-RU", None, None),
+        (FUN_ASR_NANO_MODEL_ID, "zh-CN", "zh", "en"),
+        (FUN_ASR_MLT_NANO_MODEL_ID, "ko-KR", "ko", "en"),
+    ],
+)
+async def test_cpu_worker_language_conditioning_survives_reconfiguration(
+    tmp_path, monkeypatch, model_id, source_language, initial_hint, updated_hint
+):
+    factory = WorkerFactory()
+    provider = create_local_cpu_backend(
+        model_id,
+        model_root=tmp_path,
+        source_language=source_language,
+        sample_rate_hz=16000,
+        stream_label="self",
+        process_factory=factory,
+    )
+    monkeypatch.setattr(provider, "_validate_runtime_assets", lambda: None)
+    try:
+        session = await provider.open_session()
+        worker = factory.workers[0]
+        worker.finish.set()
+        await provider.decode_f32(np.ones(160, dtype=np.float32))
+        await provider.reconfigure_session_options(
+            LocalASRSessionOptions(source_language="en-US", language_hint="en")
+        )
+        await provider.decode_f32(np.ones(160, dtype=np.float32))
+        assert worker.language_hints == [initial_hint, updated_hint]
+        await session.close()
+    finally:
+        await provider.close()
+
+
+@pytest.mark.parametrize(
+    ("model_id", "native_text", "expected_text"),
+    [
+        (GRANITE_MODEL_ID, "<|nospeech|>", ""),
+        (GRANITE_MODEL_ID, " \t<|nospeech|>.\n", ""),
+        (GRANITE_MODEL_ID, "\u3000<|nospeech|>。！？… ", ""),
+        (GRANITE_MODEL_ID, "<|nospeech|> <|nospeech|>!", ""),
+        (GRANITE_MODEL_ID, " <|nospeech|> Hello there. ", "<|nospeech|> Hello there."),
+        (GRANITE_MODEL_ID, "Keep this <|nospeech|>.", "Keep this <|nospeech|>."),
+        (GRANITE_MODEL_ID, "слово <|nospeech|>", "слово <|nospeech|>"),
+        (GRANITE_MODEL_ID, "...", "..."),
+        (GIGAAM_MODEL_ID, "<|nospeech|>.", "<|nospeech|>."),
+    ],
+)
+async def test_cpu_scoped_results_suppress_only_granite_marker_only_output(
+    tmp_path, monkeypatch, model_id, native_text, expected_text
+):
+    factory = WorkerFactory()
+    provider = create_local_cpu_backend(
+        model_id,
+        model_root=tmp_path,
+        source_language="en" if model_id == GRANITE_MODEL_ID else "ru",
+        sample_rate_hz=16000,
+        stream_label="peer",
+        process_factory=factory,
+    )
+    monkeypatch.setattr(provider, "_validate_runtime_assets", lambda: None)
+    try:
+        session = await provider.open_session(
+            projection=STTSessionProjection("scoped", "local-epoch")
+        )
+        worker = factory.workers[0]
+        worker.text = native_text
+        worker.finish.set()
+        request = _scoped_request()
+        await session.begin_turn(request)
+        await session.send_turn_audio(
+            request.identity,
+            b"\x00\x40" * 160,
+            payload_sequence=1,
+            source_ranges=(),
+            context_only=False,
+        )
+        await session.seal_turn(
+            request.identity,
+            sealed_content_ranges=(),
+            seal_reason="silence",
+            observed_trailing_silence_ms=800,
+        )
+        terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+        assert terminal.identity == request.identity
+        assert terminal.outcome == ("final" if expected_text else "empty")
+        assert terminal.text == expected_text
+        await session.close()
+    finally:
+        await provider.close()

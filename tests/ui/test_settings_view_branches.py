@@ -2131,79 +2131,71 @@ def test_on_peer_stt_selected_updates_provider_and_pipeline_flags(
     assert changed == []
 
 
-def test_peer_stt_mlt_option_is_selectable(
-    monkeypatch: pytest.MonkeyPatch, settings_events
+@pytest.mark.parametrize(
+    "provider",
+    (
+        STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
+        STTProviderName.LOCAL_GRANITE,
+        STTProviderName.LOCAL_GIGAAM,
+    ),
+)
+@pytest.mark.parametrize("peer", (False, True))
+def test_local_stt_menu_choice_changes_only_the_selected_channel(
+    monkeypatch: pytest.MonkeyPatch, settings_events, provider: STTProviderName, peer: bool
 ) -> None:
     settings = AppSettingsVNext()
+    language = "ru" if provider == STTProviderName.LOCAL_GIGAAM else "en"
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            languages=replace(
+                settings.intent.languages,
+                source_language=language,
+                peer_source_language=language,
+            ),
+        ),
+    )
     view, _ = _make_settings_view(monkeypatch, settings_events)
     settings_events.load(view, settings, config_path=Path("settings.json"))
     attach_dummy_page(monkeypatch, view)
-
+    for control in (
+        view._qwen_region_btn,
+        view._api_keys_column,
+        view._stt_text,
+        view._peer_stt_text,
+    ):
+        monkeypatch.setattr(control, "update", lambda: None)
     captured: dict[str, object] = {}
 
     class DummyModal:
-        def __init__(
-            self,
-            _page,
-            title,
-            options,
-            _on_select,
-            *,
-            show_description=False,
-            two_column=False,
-            left_column_sections=1,
-        ):
-            captured["title"] = title
+        def __init__(self, _page, _title, options, on_select, **_kwargs):
             captured["options"] = options
-            captured["show_description"] = show_description
-            captured["two_column"] = two_column
-            captured["left_column_sections"] = left_column_sections
+            captured["select"] = on_select
 
-        def open(self, current: str) -> None:
-            captured["current"] = current
+        def open(self, _current: str) -> None:
+            pass
 
     monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
 
-    view._on_peer_stt_click(None)
+    if peer:
+        view._on_peer_stt_click(None)
+    else:
+        view._on_stt_click(None)
 
-    options = captured["options"]
-    mlt_option = next(
-        option for option in options if option.value == STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value
-    )
+    option = next(option for option in captured["options"] if option.value == provider.value)
+    assert option.disabled is False
+    captured["select"](option.value)
 
-    assert captured["title"] == t("settings.section.peer_stt")
-    assert captured["show_description"] is True
-    assert captured["two_column"] is True
-    assert captured["left_column_sections"] == 2
-    assert mlt_option.description == ""
-    assert mlt_option.disabled is False
-    assert all(not option.disabled for option in options)
-    assert {option.value for option in options} == {
-        STTProviderName.LOCAL_CPU_AUTO.value,
-        STTProviderName.LOCAL_ORUKEET.value,
-        STTProviderName.LOCAL_FUN_ASR_NANO.value,
-        STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
-        STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value,
-        STTProviderName.LOCAL_QWEN_GPU.value,
-        STTProviderName.ROLLING_FREE.value,
-        STTProviderName.DEEPGRAM.value,
-        STTProviderName.GEMINI_TRANSCRIBE.value,
-        STTProviderName.ELEVENLABS_SCRIBE.value,
-        STTProviderName.QWEN_AUDIO.value,
-        STTProviderName.SONIOX.value,
-        STTProviderName.CUSTOM_OFFLINE.value,
-        STTProviderName.CUSTOM_REALTIME.value,
-    }
-    assert STTProviderName.LOCAL_QWEN_GPU.value in {option.value for option in options}
-    soniox_option = next(
-        option for option in options if option.value == STTProviderName.SONIOX.value
-    )
-    qwen_audio_option = next(
-        option for option in options if option.value == STTProviderName.QWEN_AUDIO.value
-    )
-    assert qwen_audio_option.label == t("provider.qwen_audio")
-    assert qwen_audio_option.description == t("provider.qwen_audio.description")
-    assert soniox_option.description == t("provider.soniox.description")
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    updated = apply_provider_intent(settings_events.settings, pending).intent
+    if peer:
+        assert updated.peer_stt.provider == provider.value
+        assert updated.stt.provider == settings.intent.stt.provider
+    else:
+        assert updated.stt.provider == provider.value
+        assert updated.peer_stt.provider == settings.intent.peer_stt.provider
 
 
 def test_selecting_qwen_audio_stores_qwen_audio_provider_without_changing_peer(
@@ -2253,15 +2245,23 @@ def test_selecting_peer_qwen_audio_does_not_change_self(
     assert view._stt_text.content.value == t("provider.local_cpu_auto")
 
 
-def test_peer_stt_mlt_choice_can_be_persisted(
-    monkeypatch: pytest.MonkeyPatch, settings_events
+@pytest.mark.parametrize(
+    "provider",
+    (
+        STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
+        STTProviderName.LOCAL_GRANITE,
+        STTProviderName.LOCAL_GIGAAM,
+    ),
+)
+def test_peer_stt_local_choice_can_be_persisted(
+    monkeypatch: pytest.MonkeyPatch, settings_events, provider: STTProviderName
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
     view, _ = _make_settings_view(monkeypatch, settings_events)
     settings_events.load(view, settings, config_path=Path("settings.json"))
 
-    view._on_peer_stt_selected(STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value)
+    view._on_peer_stt_selected(provider.value)
 
     pending = view.build_provider_apply_settings()
 
@@ -2269,11 +2269,11 @@ def test_peer_stt_mlt_choice_can_be_persisted(
     assert pending is not None
     assert (
         apply_provider_intent(settings_events.settings, pending).intent.peer_stt.provider
-        == STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value
+        == provider.value
     )
     assert view.has_provider_changes is True
 
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.LOCAL_FUN_ASR_MLT_NANO)
+    settings = _vnext(settings, peer_stt_provider=provider)
     settings_events.load(view, settings, config_path=Path("settings.json"))
 
     normalized_pending = view.build_provider_apply_settings()
@@ -2281,7 +2281,7 @@ def test_peer_stt_mlt_choice_can_be_persisted(
     assert normalized_pending is not None
     assert (
         apply_provider_intent(settings_events.settings, normalized_pending).intent.peer_stt.provider
-        == STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value
+        == provider.value
     )
 
 

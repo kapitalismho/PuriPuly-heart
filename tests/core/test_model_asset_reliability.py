@@ -14,8 +14,8 @@ from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.local_asr import local_stt_runtime_installer as installer
 from puripuly_heart.core.local_asr.local_stt_assets import (
+    GRANITE_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
-    ORUKEET_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
     load_local_stt_asset_manifest,
 )
@@ -546,7 +546,7 @@ async def test_cancelled_deletion_retains_real_lease_until_worker_settles(
 
     else:
         owner = _owner(MutableProvisioningBackend(_all_states()), model_root=tmp_path)
-        model_id = ORUKEET_MODEL_ID
+        model_id = GRANITE_MODEL_ID
         install = tmp_path / load_local_stt_asset_manifest(model_id).install_dirname
 
         def operation():

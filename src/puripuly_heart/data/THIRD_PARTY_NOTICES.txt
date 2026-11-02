@@ -13,7 +13,7 @@ This notice file focuses on components that are bundled, shipped, installed, or 
 
 The technical metadata review performed for the AGPL transition found no obvious license blocker to licensing PuriPuly Heart's own code under AGPL-3.0-or-later. This is a repository metadata review, not legal advice.
 
-Notable shipped/runtime license families include MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, LGPL-2.1-or-later, SIL Open Font License 1.1, CC-BY-4.0, CC-BY-SA-4.0, and the FunASR Model Open Source License Agreement v1.1.
+Notable shipped/runtime license families include MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, LGPL-2.1-or-later, SIL Open Font License 1.1, CC-BY-4.0, and the FunASR Model Open Source License Agreement v1.1.
 
 Runtime/bundled notice-sensitive components:
 - huggingface-hub 2.3.0: Apache-2.0.
@@ -54,7 +54,6 @@ For package-managed dependencies, the authoritative license texts are distribute
 - LGPL-2.1-or-later: source-tree copy at src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt; installed release copy in third_party\soxr\ next to the LGPL source bundle.
 - SIL Open Font License 1.1: included below for bundled fonts.
 - CC-BY-4.0: https://creativecommons.org/licenses/by/4.0/legalcode.en
-- CC-BY-SA-4.0: https://creativecommons.org/licenses/by-sa/4.0/legalcode.en
 - FunASR Model Open Source License Agreement v1.1: pinned model-specific sources are listed below; this is not Apache-2.0.
 
 ----
@@ -165,21 +164,52 @@ File-integrity checks do not repair TLS validation.
 
 ----
 
-Orukeet Q8_0 local CPU model asset (25 languages)
-Model source and authors: https://huggingface.co/oruk/orukeet ; Oruk AI
-Base model: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3 ; NVIDIA
-License for selected Orukeet weights and fitted Gabor kernels: CC-BY-SA-4.0
-Pinned model revision: b59c13a733fce5cf193230d0fa317ee7f145a108
-Selected export: transcribe-cpp/orukeet-Q8_0.gguf
-License: https://huggingface.co/oruk/orukeet/blob/b59c13a733fce5cf193230d0fa317ee7f145a108/LICENSE-WEIGHTS
-Attribution notice: https://huggingface.co/oruk/orukeet/blob/b59c13a733fce5cf193230d0fa317ee7f145a108/NOTICE.md
+Granite Speech 5.0 470M TurboCTC Multilingual Q8_0 local CPU model asset
+Original model and author: https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc ; IBM Granite
+Pinned source checkpoint: 1dd23f46f6d4e6eae2531982ba2e33220086dd97 (October 21, 2026 multilingual release)
+GGUF conversion and Q8_0 packaging: 17slever17
+Pinned export repository: https://huggingface.co/17slever17/granite-speech-5.0-470m-turboctc-multilingual-GGUF/tree/62f64d9d5ad35989b06caf199cafe7155944a22b
+Selected export: granite-speech-5.0-470m-turboctc-multilingual-Q8_0.gguf
+Size: 505,663,136 bytes
+SHA-256: f3efdc05b85b3a764bb5bb7022e69f61cafcecc11605c881c6396a6ed07ec91b
+License: Apache-2.0
+License source: https://huggingface.co/17slever17/granite-speech-5.0-470m-turboctc-multilingual-GGUF/blob/62f64d9d5ad35989b06caf199cafe7155944a22b/LICENSE
+Attribution notice: https://huggingface.co/17slever17/granite-speech-5.0-470m-turboctc-multilingual-GGUF/blob/62f64d9d5ad35989b06caf199cafe7155944a22b/NOTICE
+Packaged texts: puripuly_heart/data/licenses/GRANITE-SPEECH-5.0-LICENSE.txt and GRANITE-SPEECH-5.0-NOTICE.txt
 
-Orukeet is an adaptation of NVIDIA Parakeet TDT 0.6B v3. NVIDIA retains copyright
-in its base model and upstream work, distributed under CC BY 4.0. Oruk AI's r3
-adaptation is CC BY-SA 4.0, with attribution and applicable ShareAlike
-requirements. PuriPuly downloads the transcribe.cpp-compatible export without
-retraining or modifying the selected file. This is not the retired sherpa-onnx
-Parakeet v3 export, nor the incompatible root NeMo-Speech.cpp GGUF export.
+Modifications: 17slever17 converted the multilingual checkpoint to diagnostic
+F32 GGUF and then Q8_0 using transcribe.cpp converter revision
+4d7c1ccefd39e5a9ea36cca5f8fefc6dcc14b99b with the published multilingual
+metadata patch. This is format conversion and weight quantization, not
+additional training. The original multilingual vocabulary and CTC blank token
+are preserved. This is not an official IBM release. PuriPuly downloads the
+selected export unchanged and uses its existing transcribe.cpp runtime pin
+8facde6fcd8fb9caa585a5788ab450df6e8ec7db, independently of the converter pin.
+
+----
+
+GigaAM-v3 e2e-CTC Q8_0 local CPU model asset (Russian only)
+Original model and author: https://huggingface.co/ai-sage/GigaAM-v3 ; GigaChat Team
+Pinned source checkpoint: cec030b4c4f35d928e4a9044a3bdb29ebd499fac
+Pinned export repository: https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf/tree/59717de63d50dd9dd93b3249da6ad3f2f1c4ad6b
+Selected export: gigaam-v3-e2e-ctc-Q8_0.gguf
+Size: 272,151,136 bytes
+SHA-256: 9ccce4750dc813a493d96ca15ee251712bedec15ac9a02fa3d2bd732f08ae5eb
+License: MIT
+Copyright (c) 2024 GigaChat Team
+License source: https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf/blob/59717de63d50dd9dd93b3249da6ad3f2f1c4ad6b/LICENSE
+Attribution notice: https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf/blob/59717de63d50dd9dd93b3249da6ad3f2f1c4ad6b/NOTICE
+Packaged texts: puripuly_heart/data/licenses/GIGAAM-V3-LICENSE.txt and GIGAAM-V3-NOTICE.txt
+
+Modifications: handy-computer converted the pinned ai-sage/GigaAM-v3 checkpoint
+to GGUF for transcribe.cpp, renaming and re-laying-out tensors. Q8_0 stores
+weights at reduced numeric precision; the weights were not retrained or
+fine-tuned. PuriPuly downloads the selected e2e-CTC export unchanged and uses
+the existing transcribe.cpp runtime pin recorded above.
+
+Both Q8_0 assets use weight quantization, not all-INT8 execution. Both have
+byte-identical alternate downloads through hf-mirror.net using their pinned
+repository paths and unchanged size/SHA-256 integrity contracts.
 
 ----
 
@@ -200,11 +230,12 @@ Modifications: handy-computer converted Fun-ASR-Nano-2512 at commit a7088d6 and
 Fun-ASR-MLT-Nano-2512 at commit cf67a93 to GGUF for transcribe.cpp. Conversion
 repackages the weights, renaming and re-laying-out tensors; Q8_0 also stores
 them at reduced numeric precision. The weights were not retrained or fine-tuned.
-PuriPuly uses standard Nano for Chinese and MLT for Korean without modifying
+PuriPuly uses standard Nano for Chinese and MLT for the remaining languages
+in its declared scope after higher-priority CPU routes, without modifying
 these selected exports.
 
 The selected GGUF weights are not embedded in the installer. Setup downloads
-the required four-model CPU catalog; the app also supports managed repair or
+the required five-model CPU catalog; the app also supports managed repair or
 reinstall. The existing hf-mirror.net source uses the same pinned paths, file
 sizes and SHA-256 integrity contracts as the primary Hugging Face source.
 
@@ -226,7 +257,7 @@ Manifest mirror source used by the app: https://huggingface.co/csukuangfj/sherpa
 Additional HTTPS distribution mirror: https://hf-mirror.net/ . The application and Setup use the original pinned repository revisions and unchanged file size/SHA-256 contracts through this endpoint. Mirror downloads use direct HTTPS rather than the Hugging Face SDK.
 License: CC-BY-4.0
 
-The Japanese Parakeet CTC CPU path retains its pinned downloadable ONNX assets and CC BY 4.0 attribution to NVIDIA. The retired multilingual sherpa-onnx Parakeet v3 bundle is no longer installed or used as a fallback; Orukeet's distinct provenance and license are recorded above.
+The Japanese Parakeet CTC CPU path retains its pinned downloadable ONNX assets and CC BY 4.0 attribution to NVIDIA. Retired multilingual CPU bundles are no longer installed or used as fallbacks.
 
 ----
 

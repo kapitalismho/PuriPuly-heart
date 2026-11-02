@@ -425,7 +425,7 @@ async def test_successor_start_waits_without_holding_ingress_lock_for_predecesso
 async def test_sealed_overlap_admits_successor_and_orders_out_of_order_terminals_before_delivery() -> (
     None
 ):
-    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("local_qwen"))
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("local_cpu_auto"))
     a_start, _a_chunk, a_end = segment_events(ledger, start_sample=100, now=1.0)
     b_start, _b_chunk, b_end = segment_events(ledger, start_sample=200, now=2.0)
     session = ControlledScopedSession()
@@ -504,7 +504,7 @@ async def test_successor_begin_failure_drains_predecessor_terminal_from_retiring
 
     ledger = PeerAudioSegmentLedger(
         activation_generation=1,
-        settings=settings("local_qwen"),
+        settings=settings("local_cpu_auto"),
     )
     a_start, _a_chunk, a_end = segment_events(ledger, start_sample=100, now=1.0)
     b_start, _b_chunk, _b_end = segment_events(ledger, start_sample=200, now=2.0)
@@ -1175,8 +1175,9 @@ def test_normalizer_bounds_private_raw_whitespace_and_cumulative_appends() -> No
 
 
 @pytest.mark.asyncio
-async def test_local_write_timeout_keeps_one_quarantined_resource() -> None:
-    local_settings = settings("local_qwen")
+@pytest.mark.parametrize("provider_id", ["local_cpu_auto", "local_granite", "local_gigaam"])
+async def test_local_write_timeout_keeps_one_quarantined_resource(provider_id: str) -> None:
+    local_settings = settings(provider_id)
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=local_settings)
     a_start, _a_chunk, a_end = segment_events(ledger, start_sample=500, now=5.0)
     b_start, _b_chunk, b_end = segment_events(ledger, start_sample=600, now=6.0)
@@ -2629,7 +2630,7 @@ async def test_idle_retirement_reopens_only_for_demand() -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "provider_id",
-    ["custom_offline", "local_cpu_auto", "local_orukeet", "local_qwen_gpu"],
+    ["custom_offline", "local_cpu_auto", "local_granite", "local_gigaam", "local_qwen_gpu"],
 )
 async def test_disabled_session_lifetime_keeps_healthy_session_past_180s(
     provider_id: str,

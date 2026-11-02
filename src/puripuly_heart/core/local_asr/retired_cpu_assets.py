@@ -10,6 +10,12 @@ from .local_stt_assets import default_local_stt_model_root
 from .local_stt_runtime_installer import LocalSTTProvisioningLease
 
 _RETIRED_PAYLOADS = {
+    "orukeet-q8-0-transcribe-cpu": {
+        "transcribe-cpp/orukeet-Q8_0.gguf": (
+            739508608,
+            "cad2f52ac91cad829279422301989687c2cf02e19157352ed25ea501b90dbb7e",
+        ),
+    },
     "qwen3-asr-0.6b-int8-sherpa": {
         "conv_frontend.onnx": (
             44148281,
@@ -53,7 +59,13 @@ _RETIRED_PAYLOADS = {
     },
 }
 RETIRED_CPU_ASR_MODEL_IDS = frozenset(_RETIRED_PAYLOADS)
+_RETIRED_ENGINES = {
+    "orukeet-q8-0-transcribe-cpu": "transcribe.cpp-cpu",
+    "qwen3-asr-0.6b-int8-sherpa": "sherpa-onnx",
+    "parakeet-tdt-0.6b-v3-int8-sherpa": "sherpa-onnx",
+}
 _RETIRED_SETUP_STAGING_SOURCES = {
+    "orukeet-q8-0-transcribe-cpu": frozenset({"huggingface", "hf_mirror"}),
     "qwen3-asr-0.6b-int8-sherpa": frozenset({"huggingface", "modelscope"}),
     "parakeet-tdt-0.6b-v3-int8-sherpa": frozenset({"huggingface", "hf_mirror"}),
 }
@@ -134,7 +146,7 @@ def _matches_identity(path: Path, model_id: str) -> bool:
         for key, value in {
             "manifest_version": 1,
             "model_id": model_id,
-            "engine": "sherpa-onnx",
+            "engine": _RETIRED_ENGINES[model_id],
             "install_dirname": model_id,
         }.items()
     )
@@ -164,7 +176,7 @@ def _remove_recognized(directory: Path, model_id: str, files: list[Path], dirs: 
         {
             "manifest_version": 1,
             "model_id": model_id,
-            "engine": "sherpa-onnx",
+            "engine": _RETIRED_ENGINES[model_id],
             "install_dirname": model_id,
         }
     )

@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -13,15 +14,26 @@ from puripuly_heart.core.local_asr import retired_cpu_assets as retirement_modul
 from puripuly_heart.core.local_asr.local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
     FUN_ASR_NANO_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
-    ORUKEET_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
+    load_local_stt_asset_manifest,
 )
-from puripuly_heart.core.local_asr.local_stt_runtime_installer import LocalSTTProvisioningLease
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
+    LocalSTTProvisioningLease,
+    LocalSTTRuntimeInstallError,
+    ensure_local_stt_installed,
+)
 from puripuly_heart.core.local_asr.retired_cpu_assets import cleanup_retired_cpu_asr_assets
 
 OLD_QWEN = "qwen3-asr-0.6b-int8-sherpa"
 OLD_PARAKEET = "parakeet-tdt-0.6b-v3-int8-sherpa"
+OLD_ORUKEET = "orukeet-q8-0-transcribe-cpu"
+
+
+def _payload_relative_path(model_id: str) -> str:
+    return "transcribe-cpp/orukeet-Q8_0.gguf" if model_id == OLD_ORUKEET else "decoder.int8.onnx"
 
 
 def _seed(root: Path, model_id: str, suffix: str = "") -> Path:
@@ -32,7 +44,7 @@ def _seed(root: Path, model_id: str, suffix: str = "") -> Path:
             {
                 "manifest_version": 1,
                 "model_id": model_id,
-                "engine": "sherpa-onnx",
+                "engine": "transcribe.cpp-cpu" if model_id == OLD_ORUKEET else "sherpa-onnx",
                 "install_dirname": model_id,
                 "selected_source": "huggingface",
                 "selected_revision": "prior-install",
@@ -40,21 +52,24 @@ def _seed(root: Path, model_id: str, suffix: str = "") -> Path:
         ),
         encoding="utf-8",
     )
-    (directory / "decoder.int8.onnx").write_bytes(b"synthetic-retired-payload")
+    payload = directory / _payload_relative_path(model_id)
+    payload.parent.mkdir(parents=True, exist_ok=True)
+    payload.write_bytes(b"synthetic-retired-payload")
     return directory
 
 
 def test_removes_recognized_main_backup_staging_deleting_without_restore(tmp_path) -> None:
     directories = [
         _seed(tmp_path, model_id, suffix)
-        for model_id in (OLD_QWEN, OLD_PARAKEET)
+        for model_id in (OLD_QWEN, OLD_PARAKEET, OLD_ORUKEET)
         for suffix in ("", ".backup", f".staging-{uuid4().hex}", f".deleting-{uuid4().hex}")
     ]
     protected = {}
     for name in (
         PARAKEET_JAPANESE_MODEL_ID,
         LOCAL_QWEN_GPU_MODEL_ID,
-        ORUKEET_MODEL_ID,
+        GRANITE_MODEL_ID,
+        GIGAAM_MODEL_ID,
         FUN_ASR_NANO_MODEL_ID,
         FUN_ASR_MLT_NANO_MODEL_ID,
         "unrelated",
@@ -67,7 +82,7 @@ def test_removes_recognized_main_backup_staging_deleting_without_restore(tmp_pat
     backup_only_root = tmp_path / "backup-only"
     _seed(backup_only_root, OLD_QWEN, ".backup")
     result = cleanup_retired_cpu_asr_assets(model_root=tmp_path)
-    assert result.removed_count == 8
+    assert result.removed_count == 12
     assert result.pending_count == 0
     assert result.error_codes == ()
     assert all(not directory.exists() for directory in directories)
@@ -77,26 +92,30 @@ def test_removes_recognized_main_backup_staging_deleting_without_restore(tmp_pat
     assert not (backup_only_root / OLD_QWEN).exists()
 
 
-def test_unknown_files_and_unrecognized_directories_are_protected(tmp_path) -> None:
-    unknown_neighbor = _seed(tmp_path, OLD_QWEN)
+@pytest.mark.parametrize("model_id", [OLD_QWEN, OLD_ORUKEET])
+def test_unknown_files_and_unrecognized_directories_are_protected(tmp_path, model_id) -> None:
+    unknown_neighbor = _seed(tmp_path, model_id)
     (unknown_neighbor / "user-recording.wav").write_bytes(b"private")
     unrecognized = tmp_path / OLD_PARAKEET
     unrecognized.mkdir()
     (unrecognized / "decoder.int8.onnx").write_bytes(b"not-a-known-model")
-    unrelated_residue = _seed(tmp_path, OLD_QWEN, ".staging-user-notes")
+    unrelated_residue = _seed(tmp_path, model_id, ".staging-user-notes")
     result = cleanup_retired_cpu_asr_assets(model_root=tmp_path)
     assert result.removed_count == 0
     assert result.pending_count == 2
     assert result.error_codes == ("unrecognized_contents",)
-    assert (unknown_neighbor / "decoder.int8.onnx").exists()
+    assert (unknown_neighbor / _payload_relative_path(model_id)).exists()
     assert (unknown_neighbor / "user-recording.wav").read_bytes() == b"private"
     assert unrecognized.exists() and unrelated_residue.exists()
 
 
-def test_partial_delete_failure_stays_recognized_and_retryable(tmp_path, monkeypatch) -> None:
-    directory = _seed(tmp_path, OLD_QWEN)
+@pytest.mark.parametrize("model_id", [OLD_QWEN, OLD_ORUKEET])
+def test_partial_delete_failure_stays_recognized_and_retryable(
+    tmp_path, monkeypatch, model_id
+) -> None:
+    directory = _seed(tmp_path, model_id)
     original = Path.unlink
-    failed_payload = directory / "decoder.int8.onnx"
+    failed_payload = directory / _payload_relative_path(model_id)
 
     def fail_payload(path, *args, **kwargs):
         if path == failed_payload:
@@ -150,8 +169,9 @@ def test_cleanup_respects_provisioning_lease(tmp_path) -> None:
     assert cleanup_retired_cpu_asr_assets(model_root=tmp_path).removed_count == 1
 
 
+@pytest.mark.parametrize("model_id", [OLD_QWEN, OLD_ORUKEET])
 @pytest.mark.parametrize("position", ["model", "payload", "root"])
-def test_symbolic_links_never_follow_or_remove_targets(tmp_path, position) -> None:
+def test_symbolic_links_never_follow_or_remove_targets(tmp_path, position, model_id) -> None:
     target = tmp_path / "external"
     target.mkdir()
     sentinel = target / "decoder.int8.onnx"
@@ -160,11 +180,12 @@ def test_symbolic_links_never_follow_or_remove_targets(tmp_path, position) -> No
     root.mkdir()
     try:
         if position == "model":
-            (root / OLD_QWEN).symlink_to(target, target_is_directory=True)
+            (root / model_id).symlink_to(target, target_is_directory=True)
         elif position == "payload":
-            directory = _seed(root, OLD_QWEN)
-            (directory / "decoder.int8.onnx").unlink()
-            (directory / "decoder.int8.onnx").symlink_to(sentinel)
+            directory = _seed(root, model_id)
+            payload = directory / _payload_relative_path(model_id)
+            payload.unlink()
+            payload.symlink_to(sentinel)
         else:
             root.rmdir()
             root.symlink_to(target, target_is_directory=True)
@@ -196,24 +217,29 @@ def test_windows_junction_is_protected_without_following_target(tmp_path) -> Non
         link.rmdir()
 
 
-def test_payload_only_staging_requires_actual_matching_bytes(tmp_path, monkeypatch) -> None:
+@pytest.mark.parametrize("model_id", [OLD_QWEN, OLD_ORUKEET])
+def test_payload_only_staging_requires_actual_matching_bytes(
+    tmp_path, monkeypatch, model_id
+) -> None:
     payload = b"known-export-payload"
     monkeypatch.setitem(
         retirement_module._RETIRED_PAYLOADS,
-        OLD_QWEN,
-        {"decoder.int8.onnx": (len(payload), hashlib.sha256(payload).hexdigest())},
+        model_id,
+        {_payload_relative_path(model_id): (len(payload), hashlib.sha256(payload).hexdigest())},
     )
-    matching = tmp_path / f"{OLD_QWEN}.staging-{uuid4().hex}"
-    matching.mkdir()
-    (matching / "decoder.int8.onnx").write_bytes(payload)
-    unknown = tmp_path / f"{OLD_QWEN}.staging-{uuid4().hex}"
-    unknown.mkdir()
-    (unknown / "decoder.int8.onnx").write_bytes(b"x" * len(payload))
+    matching = tmp_path / f"{model_id}.staging-{uuid4().hex}"
+    matching_payload = matching / _payload_relative_path(model_id)
+    matching_payload.parent.mkdir(parents=True)
+    matching_payload.write_bytes(payload)
+    unknown = tmp_path / f"{model_id}.staging-{uuid4().hex}"
+    unknown_payload = unknown / _payload_relative_path(model_id)
+    unknown_payload.parent.mkdir(parents=True)
+    unknown_payload.write_bytes(b"x" * len(payload))
     result = cleanup_retired_cpu_asr_assets(model_root=tmp_path)
     assert result.removed_count == 1
     assert result.pending_count == 1
     assert not matching.exists()
-    assert (unknown / "decoder.int8.onnx").read_bytes() == b"x" * len(payload)
+    assert unknown_payload.read_bytes() == b"x" * len(payload)
 
 
 @pytest.mark.parametrize(
@@ -223,6 +249,8 @@ def test_payload_only_staging_requires_actual_matching_bytes(tmp_path, monkeypat
         (OLD_QWEN, "modelscope"),
         (OLD_PARAKEET, "huggingface"),
         (OLD_PARAKEET, "hf_mirror"),
+        (OLD_ORUKEET, "huggingface"),
+        (OLD_ORUKEET, "hf_mirror"),
     ],
 )
 def test_exact_old_setup_source_staging_is_cleaned_but_unknown_contents_survive(
@@ -269,3 +297,36 @@ def test_old_setup_source_staging_partial_failure_remains_retryable(tmp_path, mo
     retried = cleanup_retired_cpu_asr_assets(model_root=tmp_path)
     assert retried.removed_count == 1 and retried.pending_count == 0
     assert not directory.exists()
+
+
+def test_orukeet_identity_requires_native_cpu_engine(tmp_path) -> None:
+    directory = _seed(tmp_path, OLD_ORUKEET)
+    identity = directory / "installed-manifest.json"
+    payload = json.loads(identity.read_text(encoding="utf-8"))
+    payload["engine"] = "sherpa-onnx"
+    identity.write_text(json.dumps(payload), encoding="utf-8")
+    result = cleanup_retired_cpu_asr_assets(model_root=tmp_path)
+    assert result.removed_count == 0
+    assert result.pending_count == 1
+    assert result.error_codes == ("unrecognized_contents",)
+    assert (directory / _payload_relative_path(OLD_ORUKEET)).exists()
+
+
+@pytest.mark.parametrize("retired_model_id", [OLD_ORUKEET, OLD_QWEN, OLD_PARAKEET])
+@pytest.mark.parametrize("identity_source", ["model_id", "manifest"])
+async def test_retired_models_cannot_be_reinstalled_from_supplied_sources(
+    tmp_path, retired_model_id, identity_source
+) -> None:
+    arguments = {"model_root": tmp_path / "models"}
+    if identity_source == "model_id":
+        arguments["model_id"] = retired_model_id
+    else:
+        arguments["manifest"] = replace(
+            load_local_stt_asset_manifest(GRANITE_MODEL_ID),
+            model_id=retired_model_id,
+            install_dirname=retired_model_id,
+        )
+    with pytest.raises(LocalSTTRuntimeInstallError) as error:
+        await ensure_local_stt_installed(**arguments)
+    assert error.value.failure_code == "retired_model"
+    assert not arguments["model_root"].exists()

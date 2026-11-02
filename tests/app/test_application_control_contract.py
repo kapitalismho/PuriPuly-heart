@@ -1830,7 +1830,13 @@ async def test_control_model_commands_download_import_delete_cancel_and_report_a
             locale=lambda: "en",
             model_root=tmp_path / "models",
             choices=(
-                ModelAssetChoice("orukeet-q8-0-transcribe-cpu", "Orukeet", "d", "asr", 1),
+                ModelAssetChoice(
+                    "granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu",
+                    "Granite",
+                    "d",
+                    "asr",
+                    1,
+                ),
                 ModelAssetChoice("gemma-x", "Gemma", "d", "translation", 2, True, ("model.gguf",)),
             ),
         )
@@ -1840,14 +1846,17 @@ async def test_control_model_commands_download_import_delete_cancel_and_report_a
 
         download = await control.submit(
             "models.download",
-            {"model_id": "orukeet-q8-0-transcribe-cpu", "source": "hf-mirror"},
+            {
+                "model_id": "granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu",
+                "source": "hf-mirror",
+            },
             request_id="download",
         )
         await provisioning.started.wait()
         assert (await control.query("models.status", {}))["assets"][0]["status"] == "downloading"
         cancel = await control.submit(
             "models.cancel",
-            {"model_id": "orukeet-q8-0-transcribe-cpu"},
+            {"model_id": "granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu"},
             request_id="cancel",
         )
         assert (await control.wait(cancel["operation_id"], timeout=5))["status"] == "cancelled"
@@ -1903,6 +1912,7 @@ async def test_retired_asr_control_inputs_publish_canonical_choices_and_preserve
     isolated_settings(path)
     raw = json.loads(path.read_text(encoding="utf-8"))
     raw["intent"]["languages"]["source_language"] = "fr"
+    raw["intent"]["languages"]["peer_source_language"] = "ru"
     path.write_text(json.dumps(raw), encoding="utf-8")
     app = compose_headless_application(path)
     try:
@@ -1912,7 +1922,8 @@ async def test_retired_asr_control_inputs_publish_canonical_choices_and_preserve
         catalog = await control.query("settings.choices", {})
         local_choices = {
             "local_cpu_auto",
-            "local_orukeet",
+            "local_granite",
+            "local_gigaam",
             "local_fun_asr_nano",
             "local_fun_asr_mlt_nano",
             "local_parakeet_ja",
@@ -1921,23 +1932,28 @@ async def test_retired_asr_control_inputs_publish_canonical_choices_and_preserve
         for field in ("stt.provider", "peer_stt.provider"):
             choices = set(catalog["choices"][field])
             assert local_choices <= choices
-            assert not choices & {"local_qwen", "local_parakeet_v3"}
+            assert not choices & {"local_qwen", "local_parakeet_v3", "local_orukeet"}
         for index, (command, arguments, expected) in enumerate(
             (
                 (
                     "provider.apply",
-                    {"self": "local_parakeet_v3", "peer": "local_qwen"},
-                    ("local_orukeet", "local_cpu_auto"),
+                    {"self": "local_granite", "peer": "local_gigaam"},
+                    ("local_granite", "local_gigaam"),
+                ),
+                (
+                    "provider.apply",
+                    {"self": "local_parakeet_v3", "peer": "local_orukeet"},
+                    ("local_cpu_auto", "local_cpu_auto"),
                 ),
                 (
                     "settings.apply",
                     {
                         "changes": {
                             "stt.provider": "local_qwen",
-                            "peer_stt.provider": "local_parakeet_v3",
+                            "peer_stt.provider": "local_orukeet",
                         }
                     },
-                    ("local_cpu_auto", "local_orukeet"),
+                    ("local_cpu_auto", "local_cpu_auto"),
                 ),
                 (
                     "provider.apply",
@@ -1952,12 +1968,14 @@ async def test_retired_asr_control_inputs_publish_canonical_choices_and_preserve
             current = (await control.query("settings.current", {}))["settings"]["intent"]
             assert (current["stt"]["provider"], current["peer_stt"]["provider"]) == expected
             assert current["languages"]["source_language"] == "fr"
+            assert current["languages"]["peer_source_language"] == "ru"
             effective = (await control.query("providers.status", {}))["channels"]
             for channel, provider in zip(("self", "peer"), expected, strict=True):
                 assert effective[channel]["selected_provider"] == provider
                 assert effective[channel]["runtime_provider"] not in {
                     "local_qwen",
                     "local_parakeet_v3",
+                    "local_orukeet",
                 }
                 assert not effective[channel]["effective_active"]
         persisted = json.loads(path.read_text(encoding="utf-8"))["intent"]

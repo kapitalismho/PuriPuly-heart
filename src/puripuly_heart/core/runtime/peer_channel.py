@@ -72,7 +72,8 @@ from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 _LOCAL_ASR_PROVIDERS = frozenset(
     {
         "local_cpu_auto",
-        "local_orukeet",
+        "local_granite",
+        "local_gigaam",
         "local_fun_asr_nano",
         "local_fun_asr_mlt_nano",
         "local_parakeet_ja",
@@ -1181,7 +1182,8 @@ class PeerCaptureSessionOwner:
                         and config.provider_id
                         in {
                             "local_cpu_auto",
-                            "local_orukeet",
+                            "local_granite",
+                            "local_gigaam",
                             "local_fun_asr_nano",
                             "local_fun_asr_mlt_nano",
                         }

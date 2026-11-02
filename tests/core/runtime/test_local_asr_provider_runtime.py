@@ -39,8 +39,9 @@ from puripuly_heart.core.local_asr.local_asr_provisioning import (
 )
 from puripuly_heart.core.local_asr.local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
-    ORUKEET_MODEL_ID,
 )
 from puripuly_heart.core.runtime.gpu_asr import (
     GpuASRDiagnostic,
@@ -478,7 +479,7 @@ async def test_model_replacement_reports_completed_old_new_identity_without_eage
     owner, _provisioning, _gpu_factory, provider_factory = _owner(diagnostic_sink=observed.append)
     first = ProviderRuntimeBuildRequest(
         config=replace(_resolved_config(channel, "local_cpu_auto"), source_language="en"),
-        model_id=ORUKEET_MODEL_ID,
+        model_id=GRANITE_MODEL_ID,
     )
     second = ProviderRuntimeBuildRequest(
         config=replace(_resolved_config(channel, "local_cpu_auto"), source_language="ko"),
@@ -495,7 +496,7 @@ async def test_model_replacement_reports_completed_old_new_identity_without_eage
         diagnostic = observed[0]
         assert diagnostic.channel == channel
         assert diagnostic.previous_provider_id == diagnostic.provider_id == "local_cpu_auto"
-        assert diagnostic.previous_model_id == ORUKEET_MODEL_ID
+        assert diagnostic.previous_model_id == GRANITE_MODEL_ID
         assert diagnostic.model_id == FUN_ASR_MLT_NANO_MODEL_ID
         assert diagnostic.previous_source_language == "en"
         assert diagnostic.source_language == "ko"
@@ -552,16 +553,25 @@ async def test_generic_handoff_waits_for_channel_boundary_commit() -> None:
 
 
 @pytest.mark.asyncio
-async def test_owner_dispatches_warmup_and_vad_without_exposing_provider() -> None:
+@pytest.mark.parametrize(
+    ("provider_id", "model_id", "language"),
+    [
+        ("local_granite", GRANITE_MODEL_ID, "fr"),
+        ("local_gigaam", GIGAAM_MODEL_ID, "ru"),
+    ],
+)
+async def test_owner_dispatches_warmup_and_vad_without_exposing_provider(
+    provider_id: str, model_id: str, language: str
+) -> None:
     owner, _provisioning, _gpu_factory, provider_factory = _owner()
     initial_options = LocalASRSessionOptions(
-        source_language="ko",
+        source_language=language,
         source_mode="manual",
-        language_hint="ko",
+        language_hint=None,
     )
     request = ProviderRuntimeBuildRequest(
-        config=_resolved_config("self", "local_orukeet"),
-        model_id="orukeet-model",
+        config=replace(_resolved_config("self", provider_id), source_language=language),
+        model_id=model_id,
         session_options=initial_options,
     )
     await owner.replace_provider(request, start=False)
@@ -572,8 +582,8 @@ async def test_owner_dispatches_warmup_and_vad_without_exposing_provider() -> No
     await owner.handle_vad_event("self", event)
 
     channel = owner.snapshot.channel_for("self")
-    assert channel.provider_id == "local_orukeet"
-    assert channel.model_id == "orukeet-model"
+    assert channel.provider_id == provider_id
+    assert channel.model_id == model_id
     assert channel.phase == "ready"
     assert provider.warmup_calls == 1
     assert provider.vad_events == [event]

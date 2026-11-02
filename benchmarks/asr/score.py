@@ -151,7 +151,7 @@ def summarize(results: Path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--results", type=Path, default=Path("docs/experiments/issue-353/results"))
+    parser.add_argument("--results", type=Path, default=Path(__file__).resolve().parent / "results")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     output = args.output or args.results / "summary.json"

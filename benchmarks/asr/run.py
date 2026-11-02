@@ -7,11 +7,11 @@ import json
 import os
 import sys
 import time
-import urllib.request
 import wave
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+BENCHMARK = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 os.environ["PYTHONPATH"] = str(ROOT / "src")
 
@@ -30,6 +30,30 @@ def read_pcm(path, expected_hash=None):
 def save(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def model_config(config):
+    if config["adapter"] != "app":
+        return config
+    from puripuly_heart.core.local_asr.local_stt_assets import load_local_stt_asset_manifest
+    from puripuly_heart.core.local_asr.local_stt_catalog import LOCAL_CPU_MODEL_CONTRACTS
+
+    manifest = load_local_stt_asset_manifest(config["model_id"])
+    return {
+        **config,
+        "languages": sorted(LOCAL_CPU_MODEL_CONTRACTS[manifest.model_id].supported_language_codes),
+        "repository": manifest.upstream_repo,
+        "revision": manifest.sources["huggingface"].revision,
+        "files": [
+            {
+                "root": "app",
+                "path": f"{manifest.install_dirname}/{asset.relative_path}",
+                "bytes": asset.size_bytes,
+                "sha256": asset.sha256,
+            }
+            for asset in manifest.files
+        ],
+    }
 
 
 def verify_models(config, args):
@@ -64,7 +88,7 @@ async def measured_decode(adapter, pcm, row, sampler, timeout):
 async def execute(args, configs):
     from adapters import ModelAdapter
 
-    config = configs["models"][args.model]
+    config = model_config(configs["models"][args.model])
     if args.language not in config["languages"]:
         raise ValueError("Model does not declare requested language")
     artifacts = verify_models(config, args)
@@ -104,11 +128,11 @@ async def execute(args, configs):
         "rows": len(rows),
     }
     source_paths = [
-        "scripts/asr_benchmark/run.py",
-        "scripts/asr_benchmark/adapters.py",
-        "scripts/asr_benchmark/replay.py",
-        "scripts/asr_benchmark/resources.py",
-        "scripts/asr_benchmark/score.py",
+        "benchmarks/asr/run.py",
+        "benchmarks/asr/adapters.py",
+        "benchmarks/asr/replay.py",
+        "benchmarks/asr/resources.py",
+        "benchmarks/asr/score.py",
         "native/asr_worker/Cargo.toml",
         "src/puripuly_heart/providers/stt/local_cpp.py",
         "src/puripuly_heart/providers/stt/local_session.py",
@@ -137,6 +161,7 @@ async def execute(args, configs):
         for path in sorted(native_site.glob(pattern))
     ]
     adapter = ModelAdapter(config, args.language, args.app_model_root, args.model_root, args.worker)
+    metadata["settings"]["language_hint"] = getattr(adapter.backend, "language_hint", None)
     sampler = ResourceSampler()
     try:
         start = time.perf_counter()
@@ -231,41 +256,41 @@ async def execute(args, configs):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config", type=Path, default=ROOT / "docs/experiments/issue-353/models.json"
-    )
+    parser.add_argument("--config", type=Path, default=BENCHMARK / "models.json")
     parser.add_argument("--model", required=True)
-    parser.add_argument("--language", choices=("en", "ja"))
+    parser.add_argument("--language")
     parser.add_argument(
         "--mode", choices=("download", "smoke", "primary", "replay"), default="primary"
     )
-    parser.add_argument("--data-root", type=Path, default=ROOT / ".tmp/asr353/data")
-    parser.add_argument("--model-root", type=Path, default=ROOT / ".tmp/asr353/models")
+    parser.add_argument("--data-root", type=Path, default=BENCHMARK / "data")
+    parser.add_argument("--model-root", type=Path, default=BENCHMARK / "models")
+    parser.add_argument("--app-model-root", type=Path, default=BENCHMARK / "models")
     parser.add_argument(
-        "--app-model-root",
-        type=Path,
-        default=Path(os.environ.get("LOCALAPPDATA", ".")) / "puripuly-heart/models",
+        "--worker", type=Path, default=ROOT / "build/asr_worker/PuriPulyHeartASRWorker.exe"
     )
-    parser.add_argument("--worker", type=Path, required=False)
-    parser.add_argument("--inputs", type=Path, default=ROOT / "docs/experiments/issue-353/inputs")
-    parser.add_argument("--output", type=Path, default=ROOT / "docs/experiments/issue-353/results")
+    parser.add_argument("--inputs", type=Path, default=BENCHMARK / "inputs")
+    parser.add_argument("--output", type=Path, default=BENCHMARK / "results")
+    parser.add_argument("--source", choices=("huggingface", "hf_mirror"))
     parser.add_argument("--limit", type=int)
     parser.add_argument("--timeout", type=float, default=60)
     args = parser.parse_args()
     configs = json.loads(args.config.read_text(encoding="utf-8"))
     if args.mode == "download":
-        config = configs["models"][args.model]
-        if config["adapter"] != "gguf":
-            parser.error(
-                "Current baselines must be installed through normal app model provisioning"
+        from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
+            ensure_local_stt_installed,
+        )
+
+        config = model_config(configs["models"][args.model])
+        if config["adapter"] != "app":
+            parser.error("Place experimental GGUF files under --model-root before running")
+        installed = asyncio.run(
+            ensure_local_stt_installed(
+                model_id=config["model_id"],
+                model_root=args.app_model_root,
+                preferred_source=args.source,
             )
-        args.model_root.mkdir(parents=True, exist_ok=True)
-        for artifact in config["files"]:
-            path = args.model_root / artifact["path"]
-            url = f"https://huggingface.co/{config['repository']}/resolve/{config['revision']}/{artifact['path']}"
-            if not path.exists():
-                urllib.request.urlretrieve(url, path)
-        print(json.dumps(verify_models(config, args)))
+        )
+        print(json.dumps(installed.to_dict()))
         return
     if not args.language or not args.worker:
         parser.error("Inference requires --language and explicit --worker path")

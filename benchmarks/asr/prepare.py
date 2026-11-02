@@ -24,8 +24,9 @@ from scipy.io import wavfile
 from scipy.ndimage import binary_closing, binary_dilation
 
 ROOT = Path(__file__).resolve().parents[2]
-INPUTS = ROOT / "docs/experiments/issue-353/inputs"
-EVIDENCE = ROOT / "docs/experiments/issue-353/data-preparation.json"
+BENCHMARK = Path(__file__).resolve().parent
+INPUTS = BENCHMARK / "inputs"
+EVIDENCE = BENCHMARK / "data-preparation.json"
 RATE = 16000
 SEED = 30820261027
 NS = "{http://nite.sourceforge.net/}"
@@ -734,7 +735,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Prepare reconstructed AMI IHM test EN and exact recovered IngCrowd JA inputs for #353; no ASR or application startup."
     )
-    parser.add_argument("--data-root", type=Path, required=True)
+    parser.add_argument("--data-root", type=Path, default=BENCHMARK / "data")
     parser.add_argument("--language", choices=("en", "ja", "all"), default="all")
     parser.add_argument(
         "--offline",
@@ -755,8 +756,8 @@ def main() -> None:
     record = json.loads(EVIDENCE.read_text(encoding="utf-8")) if EVIDENCE.exists() else {}
     record.update(
         issue="https://github.com/kapitalismho/PuriPuly-heart/issues/353",
-        preparation_code="scripts/asr_benchmark/prepare.py",
-        command=" ".join(["python", "scripts/asr_benchmark/prepare.py", *sys.argv[1:]]),
+        preparation_code="benchmarks/asr/prepare.py",
+        command=" ".join(["python", "benchmarks/asr/prepare.py", *sys.argv[1:]]),
         recorded_at_utc=datetime.now(timezone.utc).isoformat(),
         python=platform.python_version(),
         dependencies={

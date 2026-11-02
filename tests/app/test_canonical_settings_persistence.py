@@ -910,9 +910,9 @@ def test_failed_cpu_migration_preserves_settings_and_cannot_authorize_asset_reti
     retired = _seed_retired_cpu_install(root)
     path = tmp_path / "settings.json"
     raw = serialization.to_dict(AppSettingsVNext())
-    raw["settings_version"] = 53
-    raw["intent"]["stt"]["provider"] = "local_parakeet_v3"
-    raw["intent"]["peer_stt"]["provider"] = "local_qwen"
+    raw["settings_version"] = AppSettingsVNext().settings_version
+    raw["intent"]["stt"]["provider"] = "local_orukeet"
+    raw["intent"]["peer_stt"]["provider"] = "local_parakeet_v3"
     original = json.dumps(raw).encode("utf-8")
     path.write_bytes(original)
 
@@ -939,7 +939,7 @@ def test_failed_cpu_migration_preserves_settings_and_cannot_authorize_asset_reti
 
     retried = owner.start()
 
-    assert retried.settings.intent.stt.provider == "local_orukeet"
+    assert retried.settings.intent.stt.provider == "local_cpu_auto"
     assert retried.settings.intent.peer_stt.provider == "local_cpu_auto"
     assert not retired.exists()
 
@@ -966,10 +966,12 @@ def test_successful_cpu_upgrade_retires_assets_and_retries_on_canonical_restart(
         protected.append(sentinel)
     path = tmp_path / "settings.json"
     raw = serialization.to_dict(AppSettingsVNext())
-    raw["settings_version"] = 53
+    raw["settings_version"] = AppSettingsVNext().settings_version
     raw["intent"]["stt"]["provider"] = "local_parakeet_v3"
-    raw["intent"]["peer_stt"]["provider"] = "local_qwen"
+    raw["intent"]["peer_stt"]["provider"] = "local_orukeet"
     raw["intent"]["stt"]["gpu_device_id"] = "gpu-sentinel"
+    raw["intent"]["languages"]["source_language"] = "uk"
+    raw["intent"]["languages"]["peer_source_language"] = "ru"
     original = json.dumps(raw).encode("utf-8")
     path.write_bytes(original)
 
@@ -978,9 +980,11 @@ def test_successful_cpu_upgrade_retires_assets_and_retries_on_canonical_restart(
 
     assert first.migrated
     assert first.backup_path.read_bytes() == original
-    assert first.settings.intent.stt.provider == "local_orukeet"
+    assert first.settings.intent.stt.provider == "local_cpu_auto"
     assert first.settings.intent.peer_stt.provider == "local_cpu_auto"
     assert first.settings.intent.stt.gpu_device_id == "gpu-sentinel"
+    assert first.settings.intent.languages.source_language == "uk"
+    assert first.settings.intent.languages.peer_source_language == "ru"
     assert not retired.exists()
     recreated = _seed_retired_cpu_install(root)
 
