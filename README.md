@@ -59,8 +59,8 @@ It works in many environments, including VRChat and Discord.
 - **LLM-Powered Localization** — Slang, colloquialisms, and casual/formal speech, all rendered naturally.
 - **Context Memory** — Keeps the conversation flowing naturally with awareness of prior context.
 - **Two-way Voice Translation** — Translates the other person's voice too, with VR subtitle overlay support.
-- **Start via Discord** — Get going right away without a complex setup process.
-- **The most powerful local full stack** — From Parakeet to Gemma 4 E4B, built with the most efficient models available today.
+- **No setup required** — No need to configure the complicated settings yourself; the built-in agent provides the best experience.
+- **The most powerful local full stack** — From Granite Speech 5.0 to Gemma 4 E4B, built with the most efficient models available today.
 
 ## Q&A
 
@@ -71,10 +71,7 @@ It works in many environments, including VRChat and Discord.
 → Under optimal conditions, latency is around 1 second, measured from when the speaker finishes talking.
 
 - **Does it cost money to use?**
-→ Yes, but only later. New users get a free usage allowance, and even after that the pricing is very cheap; you can translate thousands of times for $1. You can also use it for free by running local models.
-
-- **Do I need to get an API key?**
-→ Yes, but again, only later. At first, just install and authenticate via Discord to start using it.
+→ You can start right away for free. Free options alone already perform well enough. Paid models are also very inexpensive — thousands of uses for $1.
 
 - **Voice recognition is slow.**
 → When using local ASR, processing times can be slow if compute resources are limited. In this case, we recommend switching to a cloud STT service.
@@ -167,17 +164,13 @@ GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Ar
 
 | Model | Runtime | Quantization |
 |---|---|---|
-| Orukeet | CPU | Q8_0 |
+| Granite Speech 5.0 Multilingual | CPU | Q8_0 |
+| GigaAM-v3 e2e-CTC | CPU | Q8_0 |
 | Fun-ASR-Nano-2512 | CPU | Q8_0 |
 | Fun-ASR-MLT-Nano-2512 | CPU | Q8_0 |
 | Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
 | Qwen3-ASR 1.7B | GPU | Q6_K |
 | OpenAI-compatible API | — | — |
-
-CPU Auto considers all 25 Orukeet languages and all 31 Fun-ASR-MLT-Nano languages. Chinese keeps standard Fun-ASR-Nano, Japanese keeps Parakeet CTC, and English and other languages supported by both multilingual models prefer Orukeet. See the [language routing contract](docs/cli.md#local-speech-recognition) for the full mapping. Orukeet and Fun-ASR use transcribe.cpp; Japanese keeps sherpa-onnx. Each active transcribe.cpp CPU channel owns a Model/Session with two inference threads (2+2 for Talk and Listen), without preloading inactive channels. GPU ASR shares one resident Model between independent channel Sessions and serializes inference. Replacement releases the previous GPU Model before loading another.
-
-Windows Setup prepares all four CPU ASR models, downloading them separately when needed; CPU Auto requires all four ready. Old Parakeet v3 selections migrate to Orukeet, and CPU Qwen0.6 selections migrate to CPU Auto. Startup removes recognized retired assets only after recoverable settings persistence; blocked cleanup retries later. Unrecognized files and Japanese/GPU assets are preserved.
-
 
 **LLM**
 
@@ -186,10 +179,6 @@ Windows Setup prepares all four CPU ASR models, downloading them separately when
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
 | Gemma 4 26B A4B IT QAT | GPU only (Vulkan) | UD Q4_K_XL |
 | OpenAI-compatible API | — | — |
-
-Managed Gemma weights download only when the selected model is needed; they are not bundled with the installer. The 26B download is approximately 14.25 GB. Model selection persists across restarts. E4B supports CPU with MTP or GPU; 26B requires a working Vulkan GPU and does not silently switch to CPU or E4B after a failure. Select another model/backend explicitly if the reported device or resource problem cannot be resolved.
-
-Self and Peer can translate concurrently on one managed GPU runtime, with at most two active requests. CPU translation remains serialized. The three retained language-pair prefix slots are separate from this active-request limit. See the [managed local translation contract](docs/cli.md#managed-local-translation) for model identities and fixed profiles.
 
 ---
 
@@ -355,17 +344,13 @@ Network, proxy, TLS certificate, and service errors do not mean your key is inva
 6. Click the circled area to copy the key.
    ![step6](docs/images/gemini/6.png)
 
-7. (Recommended) Click the yellow **Set Up Billing** button to upgrade to the paid tier.
-The tier transition may take a moment.
-   ![step7](docs/images/gemini/7.png)
-
 <details>
 <summary><h3>For Gemini paid subscribers</h3></summary>
 
-8. Go to [Google Developer Program](https://developers.google.com/program/my-benefits) and join the program.
+7. Go to [Google Developer Program](https://developers.google.com/program/my-benefits) and join the program.
    ![step8](docs/images/gemini/8.png)
 
-9. Select the paid tier project you set up in step 7.
+8. Select your paid-tier project.
    ![step9](docs/images/gemini/9.png)
 
 </details>
@@ -479,8 +464,6 @@ Every job still performs locked installation and its complete declared checks. u
 When profiling tests, use `--durations=20` with the affected partition. Remove avoidable preparation or incomplete fake lifecycles before adding workers; preserve real-process, persistence, ordering, cancellation, recovery, and shutdown observations. Compare workflow elapsed time separately from summed job duration, and include cache restore/save costs. Pytest JUnit testcase times include setup and teardown, not only the test body.
 
 Keep a permanent test only when it adds meaningful fault detection or materially better diagnosis beyond the retained suite; compare the same failure family across files and layers before adding another case. Preserve consequential boundaries, state transitions, privacy, persistence, ordering, cancellation, recovery, and continued progress. Change-specific probes need not become permanent tests: remove redundant cases and their unused fixtures instead of moving them into helpers or larger matrices.
-
-[Broker development (Linux)](broker/README.md) · [VR overlay development (Windows)](native/overlay/README.md)
 
 ---
 

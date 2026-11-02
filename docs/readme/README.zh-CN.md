@@ -59,8 +59,8 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 - **基于大语言模型的本地化** — 俚语、口语，乃至敬语与平语，都能自然转换
 - **记忆上下文** — 结合语境，保持自然流畅的对话节奏
 - **双向语音翻译** — 同时翻译对方的语音，支持 VR 字幕浮层
-- **从 Discord 开始** — 无需复杂配置，立即可用
-- **最强本地全栈** — 从 Parakeet 到 Gemma 4 E4B，只搭载当前最高效的模型。
+- **无需设置即可使用** — 无需自己进行复杂设置，内置智能体就会提供最佳体验。
+- **最强本地全栈** — 从 Granite Speech 5.0 到 Gemma 4 E4B，只搭载当前最高效的模型。
 
 ## 常见问题
 
@@ -71,10 +71,7 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 → 在最佳环境下，延迟约为 1 秒左右。以对方说话结束的时刻为基准。
 
 - **使用需要付费吗？**
-→ 是的，但要稍后才付。新用户会获得免费额度。即使额度用完，价格依然非常便宜——1 美元可翻译数千次。此外，使用本地模型还可以完全免费使用。
-
-- **必须申请 API 密钥吗？**
-→ 是的，但同样是稍后再说。一开始只需安装并通过 Discord 验证即可使用。
+→ 可以立刻免费使用。只靠免费选项，效果也已经足够好。付费模型同样非常便宜，1 美元可以用数千次。
 
 - **语音识别速度慢**
 → 使用本地 ASR 时，若计算资源不足，处理时间可能会变长。此时建议切换为云端 STT 服务。
@@ -168,16 +165,13 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 
 | 模型 | 运行环境 | 量化 |
 |---|---|---|
-| Orukeet | CPU | Q8_0 |
+| Granite Speech 5.0 Multilingual | CPU | Q8_0 |
+| GigaAM-v3 e2e-CTC | CPU | Q8_0 |
 | Fun-ASR-Nano-2512 | CPU | Q8_0 |
 | Fun-ASR-MLT-Nano-2512 | CPU | Q8_0 |
 | Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
 | Qwen3-ASR 1.7B | GPU | Q6_K |
 | OpenAI 兼容 API | — | — |
-
-CPU 自动选择会考虑 Orukeet 支持的全部 25 种语言和 Fun-ASR-MLT-Nano 支持的全部 31 种语言。中文仍使用标准 Fun-ASR-Nano，日语仍使用 Parakeet CTC；英语和两种多语言模型共同支持的语言优先使用 Orukeet。完整映射请参阅[语言路由契约](../cli.md#local-speech-recognition)。Orukeet 与 Fun-ASR 使用 transcribe.cpp；日语继续使用 sherpa-onnx。每个活动的 transcribe.cpp CPU 通道独立持有 Model/Session，使用两个推理线程，Talk/Listen 同时运行时为 2+2；不预加载非活动通道。GPU ASR 的独立通道 Session 共享唯一常驻 Model，推理按顺序执行。切换模型时也先释放旧 Model，再加载新模型。
-
-Windows 安装程序会准备全部四个 CPU ASR 模型，并在需要时单独下载；CPU 自动选择需要四个模型均已就绪。旧 Parakeet v3 选择迁移为 Orukeet，CPU Qwen0.6 迁移为 CPU 自动选择。设置以可恢复方式保存后，启动流程仅清理已识别的旧模型文件，失败的清理会在下次启动时重试。无法识别的文件及日语/GPU 模型保持不变。
 
 **LLM**
 
@@ -186,8 +180,6 @@ Windows 安装程序会准备全部四个 CPU ASR 模型，并在需要时单独
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
 | Gemma 4 26B A4B IT QAT | 仅 GPU (Vulkan) | UD Q4_K_XL |
 | OpenAI 兼容 API | — | — |
-
-模型权重不随安装程序打包，仅在需要所选模型时下载。26B 下载大小约为 14.25 GB，模型选择在重启后保留。26B 仅支持 Vulkan GPU；初始化失败时不会自动切换到 CPU 或 E4B。GPU 在同一个运行时中最多同时处理两个 Self/Peer 请求，CPU 仍按顺序处理。参见[固定配置与托管本地翻译契约](../cli.md#managed-local-translation)。
 
 ---
 
@@ -344,17 +336,13 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 6. 点击圆圈标记的地方并复制密钥。
    ![step6](../images/gemini/6.png)
 
-7. （推荐）点击黄色高亮的 **Set Up Billing** 按钮，升级并切换到付费方案。
-切换方案可能需要一些时间。
-   ![step7](../images/gemini/7.png)
-
 <details>
 <summary><h3>Gemini 付费订阅用户</h3></summary>
 
-8. 前往 [Google Developer Program](https://developers.google.com/program/my-benefits) 并加入该计划。
+7. 前往 [Google Developer Program](https://developers.google.com/program/my-benefits) 并加入该计划。
    ![step8](../images/gemini/8.png)
 
-9. 选择您在第 7 步中设置的付费方案项目。
+8. 选择付费方案项目。
    ![step9](../images/gemini/9.png)
 
 </details>
@@ -455,8 +443,6 @@ uv run black --check src tests
 uv run ruff check src tests
 uv run python -m pytest
 ```
-
-[Broker 开发（Linux）](../../broker/README.md) · [VR 浮层开发（Windows）](../../native/overlay/README.md)
 
 ---
 
