@@ -236,16 +236,26 @@ async def test_finals_before_seal_repeats_and_drain_tail_are_conserved_exactly(c
         socket = factory.sockets[0]
         task = socket.task_ids[0]
         await socket.push(native(task, 0, "heartbeat"))
-        await socket.push(native(task, 1, "ignored", sentence_end=False, fixed=True))
+        await socket.push(native(task, 1, "unfinished", sentence_end=False, fixed=True))
         await socket.push(native("stale-task", 1, "stale"))
         for sid in (1, 1, 2):
             await socket.push(native(task, sid, "  No.  "))
-        await wait_until(lambda: session._slots[0].task.last_sentence_id == 2)
+        await wait_until(lambda: len(events) == (3 if channel == "peer" else 2))
         assert not any(isinstance(event, STTProviderTurnTerminal) for event in events)
+        assert all(isinstance(event, STTProviderTurnUpdate) for event in events)
         if channel == "peer":
-            assert events == []
-        else:
-            await wait_until(lambda: len(events) == 2)
+            preview = events[0]
+            assert (preview.stability, preview.assembly, preview.text) == (
+                "provisional",
+                "replace",
+                "unfinished",
+            )
+            assert preview.identity == req.identity
+        stable = [event for event in events if event.stability == "stable"]
+        assert [(event.assembly, event.text) for event in stable] == [
+            ("replace", "  No.  "),
+            ("replace", "  No.    No.  "),
+        ]
         await seal(session, req)
         await socket.push(native(task, 3, " tail. "))
         await socket.push(native(task, 3, " tail. "))
@@ -505,7 +515,15 @@ async def test_channels_hold_four_isolated_slots_and_abort_does_not_cross_channe
         await wait_until(
             lambda: sum(isinstance(event, STTProviderTurnTerminal) for event in events) == 2
         )
-        assert [event.text for event in events] == ["peer survives"] * 2
+        terminals = [event for event in events if isinstance(event, STTProviderTurnTerminal)]
+        updates = [event for event in events if isinstance(event, STTProviderTurnUpdate)]
+        assert [event.text for event in terminals] == ["peer survives"] * 2
+        assert [(event.stability, event.text) for event in updates] == [
+            ("stable", "peer survives"),
+            ("stable", "peer survives"),
+        ]
+        assert [event.identity for event in updates] == [event.identity for event in terminals]
+        assert all(event.outcome == "final" for event in terminals)
     finally:
         await self_session.close()
         await peer_session.close()

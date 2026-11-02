@@ -507,6 +507,12 @@ async def test_installed_sdk_malformed_callback_fails_scoped_turn_and_epoch(
             update = await _next(session)
             assert isinstance(update, STTProviderTurnUpdate)
             assert update.identity == request.identity
+            snapshot = await _next(session)
+            assert isinstance(snapshot, STTProviderTurnUpdate)
+            assert snapshot.identity == request.identity
+            assert snapshot.stability == "provisional"
+            assert snapshot.text == update.text
+            assert snapshot.first_nonempty_at == update.first_nonempty_at
         await _seal(session, request)
         observations["processed"].clear()
         payload = {

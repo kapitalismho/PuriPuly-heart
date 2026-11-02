@@ -25,6 +25,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderInputTerminal,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTRecognitionUnit,
     STTRecognitionUnitTerminal,
     scoped_event_for_delivery,
 )
@@ -259,7 +260,12 @@ class TranslationChannelOwnerCallbacks:
         if isinstance(event, STTRecognitionUnitTerminal):
             await self._admit_recognition_unit(event, channel="peer")
             return
+        if isinstance(event, STTRecognitionUnit):
+            if self._recognition_stream_is_current(event.identity.stream):
+                await self._require_peer().handle_recognition_unit(event)
+            return
         if isinstance(event, STTProviderTurnUpdate):
+            await self._require_peer().handle_provider_update(event)
             return
         if isinstance(event, STTProviderEpochEnded):
             return

@@ -138,6 +138,7 @@ class UIEvent:
     delivery_authority: UIEventDeliveryAuthority | None = None
     operation_id: str | None = None
     request_id: str | None = None
+    peer_caption_revision: int = 0
 
     def __post_init__(self) -> None:
         resolved_channel = self.channel

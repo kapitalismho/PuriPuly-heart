@@ -123,6 +123,21 @@ class PresenterAcceptanceLedger:
             return "stale"
         if entry is not None and event.seq <= entry.last_updated_seq:
             return "stale"
+        if (
+            entry is not None
+            and event.channel == "peer"
+            and isinstance(event, (TranslationStreamUpdate, TranslationFinal))
+            and (
+                event.peer_caption_revision < entry.peer_caption_revision
+                or (
+                    event.peer_caption_revision > 0
+                    and event.peer_caption_revision == entry.peer_caption_revision
+                )
+                or entry.retained_hidden
+                or (entry.peer_caption_final and not event.is_final)
+            )
+        ):
+            return "stale"
         creates_entry = not isinstance(event, (SelfActiveClear, UtteranceClosed))
         if (
             key is not None
@@ -209,6 +224,8 @@ class PresenterAcceptanceLedger:
             getattr(event, "text", None),
             getattr(event, "secondary_text", None),
             getattr(event, "update_id", None),
+            getattr(event, "peer_caption_revision", None),
+            getattr(event, "peer_superseded_unit_ids", None),
         )
 
     @staticmethod
@@ -238,6 +255,7 @@ class PresenterAcceptanceLedger:
             value = getattr(entry, field_name)
             if isinstance(value, str):
                 total += len(value.encode("utf-8"))
+        total += sum(len(page.encode("utf-8")) for page in entry.peer_pages)
         return total
 
     @staticmethod
@@ -259,6 +277,7 @@ class PresenterAcceptanceLedger:
             value = getattr(event, field_name, None)
             if isinstance(value, str):
                 total += len(value.encode("utf-8"))
+        total += len(getattr(event, "peer_superseded_unit_ids", ())) * 16
         return total
 
     @classmethod
@@ -267,9 +286,19 @@ class PresenterAcceptanceLedger:
         entry: OverlayLogicalTurnEntry | None,
         event: OverlayEventUnion,
     ) -> int:
+        page_bytes = (
+            len(event.text.encode("utf-8")) + len(event.text)
+            if event.channel == "peer"
+            and isinstance(event, (TranslationStreamUpdate, TranslationFinal))
+            else 0
+        )
         if entry is None:
-            return cls.event_payload_bytes(event)
-        current = cls.entry_payload_bytes(entry)
+            return cls.event_payload_bytes(event) + page_bytes
+        current = cls.entry_payload_bytes(entry) + page_bytes
+        if event.channel == "peer" and isinstance(
+            event, (TranslationStreamUpdate, TranslationFinal)
+        ):
+            current -= sum(len(page.encode("utf-8")) for page in entry.peer_pages)
         replacements: tuple[tuple[str, str | None], ...] = ()
         if isinstance(event, (SelfTranscriptFinal, PeerTranscriptFinal)):
             replacements = (
@@ -285,6 +314,8 @@ class PresenterAcceptanceLedger:
                 ("translation_source_text_hash", event.source_text_hash),
                 ("translation_logical_turn_key", event.logical_turn_key),
             )
+            if event.channel == "peer" and event.source_text.strip():
+                replacements += (("original_text", event.source_text),)
         elif isinstance(event, (SelfActiveUpdate, PeerActiveUpdate)):
             replacements = (
                 ("live_text", event.text),

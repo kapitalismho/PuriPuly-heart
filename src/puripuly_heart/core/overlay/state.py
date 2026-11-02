@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, replace
 from typing import Protocol
 from uuid import UUID
 
+from puripuly_heart.core.overlay.peer_caption_layout import peer_translation_pages
 from puripuly_heart.core.overlay.protocol import (
     NativeFreshRenderGenerations,
     NativeFreshRenderTargets,
@@ -84,6 +85,13 @@ class OverlayLogicalTurnEntry:
     caption_revision: int = 0
     source_closed: bool = False
     caption_staged: bool = False
+    peer_caption_revision: int = -1
+    peer_caption_final: bool = False
+    peer_pages: tuple[str, ...] = ()
+    peer_page_index: int = 0
+    peer_page_due_at: float | None = None
+    peer_promoted_at: float | None = None
+    peer_protected_until: float | None = None
 
     @property
     def block_id(self) -> str:
@@ -156,6 +164,13 @@ class OverlayPresentationEntry(Protocol):
     caption_staged: bool
     ever_visible: bool
     last_updated_seq: int
+    peer_caption_revision: int
+    peer_caption_final: bool
+    peer_pages: tuple[str, ...]
+    peer_page_index: int
+    peer_page_due_at: float | None
+    peer_promoted_at: float | None
+    peer_protected_until: float | None
 
     @property
     def block_id(self) -> str: ...
@@ -186,6 +201,7 @@ class OverlayPresentationState:
     )
     live_self_turn_key: OverlayEntryKey | None = None
     live_peer_turn_key: OverlayEntryKey | None = None
+    peer_text_scale: float = 1.0
     _pending_removals: list[OverlayEntryRemovalRecord] = field(default_factory=list)
     _snapshot: OverlayPresentationSnapshot = field(default_factory=OverlayPresentationSnapshot)
 
@@ -960,6 +976,13 @@ class OverlayPresentationState:
             return OverlayReductionResult(False)
         event_source_language = _content_language_or_none(event.source_language)
         event_target_language = _content_language_or_none(event.target_language)
+        if event.peer_caption_revision < entry.peer_caption_revision or (
+            event.peer_caption_revision == entry.peer_caption_revision
+            and event.peer_caption_revision > 0
+        ):
+            return OverlayReductionResult(False)
+        if entry.retained_hidden or (entry.peer_caption_final and not event.is_final):
+            return OverlayReductionResult(False)
         if (
             entry.translation_text == event.text
             and (event_source_language is None or entry.original_language == event_source_language)
@@ -984,6 +1007,11 @@ class OverlayPresentationState:
             )
         first_readable_translation = bool(event.text.strip()) and entry.speaker_style is None
         entry.translation_text = event.text
+        entry.peer_caption_revision = event.peer_caption_revision
+        entry.peer_caption_final = isinstance(event, TranslationFinal)
+        entry.peer_pages = peer_translation_pages(event.text, text_scale=self.peer_text_scale)
+        entry.peer_page_index = 0
+        entry.peer_page_due_at = None
         if event.text.strip():
             entry.translation_language = event_target_language
             entry.translation_update_id = event.update_id
@@ -1020,6 +1048,22 @@ class OverlayPresentationState:
             show_peer_original=show_peer_original,
             translation_enabled=translation_enabled,
         )
+        superseded = {("peer", unit_id) for unit_id in event.peer_superseded_unit_ids}
+        if superseded and event.text.strip():
+            lower = self._snapshot.blocks[-1] if self._snapshot.blocks else None
+            if lower is not None and any(
+                lower.id == self._format_entry_key(old_key) for old_key in superseded
+            ):
+                entry.appearance_seq = event.seq
+                entry.peer_promoted_at = None
+                entry.peer_protected_until = None
+            for old_key in superseded - {key}:
+                self.remove_entry(
+                    old_key,
+                    reason="absorbed_by_repair",
+                    now=now,
+                    tombstone_seq=event.seq,
+                )
         return OverlayReductionResult(True)
 
     def apply_peer_utterance_closed(
@@ -1348,6 +1392,12 @@ class OverlayPresentationState:
                 effective_deadline = hidden_deadline
             else:
                 effective_deadline = min(effective_deadline, hidden_deadline)
+        if (
+            entry.channel == "peer"
+            and not entry.retained_hidden
+            and entry.peer_protected_until is not None
+        ):
+            effective_deadline = entry.peer_protected_until
         return effective_deadline, visible_deadline, translation_deadline
 
     def _active_update_entry_or_none(
@@ -1736,7 +1786,11 @@ class OverlayPresentationState:
                     ),
                     channel="peer",
                     block_variant="finalized",
-                    primary_text=translated_text,
+                    primary_text=(
+                        entry.peer_pages[entry.peer_page_index]
+                        if entry.peer_pages
+                        else translated_text
+                    ),
                     secondary_text=original_text,
                     secondary_enabled=show_peer_original and bool(original_text),
                     primary_language=_line_language(

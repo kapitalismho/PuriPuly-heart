@@ -122,6 +122,8 @@ Read `capture terms` first. Only an informed user's explicit choice authorizes `
 
 A capture-target change that is saved while requested Peer capture remains pending reports `degraded`, not `applied`, through both the GUI application boundary and `audio.target.set` control receipts. With Peer capture intentionally off, successful target application does not require an active capture source.
 
+Cloud Peer previews, final settlement, adjacent-caption joining and the two-block display follow the [Peer caption policy](peer-captions.md). Local Peer keeps per-final translation and adopts the same paged display. These are runtime policy changes, not new CLI settings; Peer protection never delays Self captions.
+
 After a capture failure, explicitly applying a valid target reports `applied` once the requested provider and capture configuration are ready and active. Resubmitting that unchanged healthy target also reports `applied`. Prior safe failure evidence remains available through bounded current-instance `diagnostics.history`; it does not make recovered capture degraded. Pending recovery and new current failures still prevent successful convergence.
 
 `audio test on|off` runs VAD without recognition or translation. It pauses normal capture and restores only still-valid prior intent; inspect `app status` → `audio_test` for readiness, failures, and VAD readings. Stopping waits for owned input release, not just a visual toggle.

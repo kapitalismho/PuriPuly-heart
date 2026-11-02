@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Protocol
+from uuid import UUID
 
 from puripuly_heart.core.messages import DiagnosticFieldValue
 
@@ -23,6 +24,8 @@ class PeerSubtitlePublication:
     target_language: str | None
     is_final: bool
     metadata: Mapping[str, DiagnosticFieldValue]
+    peer_caption_revision: int = 0
+    peer_superseded_unit_ids: tuple[UUID, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metadata", _freeze_metadata(self.metadata))

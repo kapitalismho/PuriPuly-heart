@@ -47,6 +47,7 @@ from puripuly_heart.core.overlay.sink import (
     OverlayEventUnion,
     OverlaySink,
     SelfActiveUpdate,
+    TranslationStreamUpdate,
     UtteranceClosed,
 )
 from puripuly_heart.core.runtime.output_batch import (
@@ -1443,7 +1444,11 @@ class OutputRuntime:
             generation, order = identity
             if generation != self._peer_generation:
                 return self._overlay_failure_result(event, "publication_generation_retired")
-            if order < self._latest_peer_source_order:
+            if order < self._latest_peer_source_order and not (
+                isinstance(event, TranslationStreamUpdate)
+                and event.peer_caption_revision > 0
+                and parent_id in self._peer_identity_by_utterance
+            ):
                 return self._overlay_failure_result(event, "stale_source_order")
             if (
                 event.turn_generation is None

@@ -13,8 +13,8 @@ Interpret <input> naturally in the configured target language, preserving the sp
 ### Context Use Cases
 Use context when it directly helps with:
 * Reference: Resolve deictic expressions and omitted referents when the current turn and relevant history support the connection. Include only what the target language needs to express the reference naturally.
-* Ellipsis: Recover omitted subjects, objects, verbs, phrases, or endings when `<input>` and a directly relevant prior turn support the missing meaning. If that meaning is not recoverable, preserve the incompleteness rather than inventing a continuation. Recovering an omission does not require repeating the earlier turn. Express the supported meaning naturally, without turning a short reply into a retelling of the context or completing an unfinished thought.
-* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to. Follow the conversational link rather than assuming the newest turn is always the one being answered.
+${completeSourceOnly}* Ellipsis: Recover omitted subjects, objects, verbs, phrases, or endings when `<input>` and a directly relevant prior turn support the missing meaning. If that meaning is not recoverable, preserve the incompleteness rather than inventing a continuation. Recovering an omission does not require repeating the earlier turn. Express the supported meaning naturally, without turning a short reply into a retelling of the context or completing an unfinished thought.
+${endCompleteSourceOnly}* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to. Follow the conversational link rather than assuming the newest turn is always the one being answered.
 * Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions when context resolves the ambiguity. Do not choose a more specific meaning merely because it fits the earlier topic.
 * Perspective: Preserve speaker, addressee, and viewpoint. Distinguish whose action or experience is described; another speaker supplying context does not transfer that experience to the current speaker.
 * Tone/Register: Recreate equivalent formality, honorifics, and emotional stance. The register the conversation partner uses in `<context>` can help choose a fitting register; the tone of `<input>` itself still comes first.
@@ -51,4 +51,4 @@ Channel: ${inputChannel}
 
 ${targetLanguageRulesSection}
 
-${translationExamplesSection}
+${translationExamplesSection}${peerProvisionalSection}${peerContinuationSection}

@@ -2566,7 +2566,7 @@ fn style_only_snapshot_repaints_same_text_without_reassigning_slot() {
     let initial = runtime.caption_blocks()[0].clone();
     assert_eq!(initial.channel, Some(CaptionChannel::PeerChannel));
     assert_eq!(initial.speaker_style, SpeakerStyle::Gold);
-    let original_slot = runtime.state().scene().slots()[0].as_ref().unwrap().clone();
+    let original_slot = runtime.state().scene().slots()[1].as_ref().unwrap().clone();
     let renderer = CaptionRenderer::new_for_test().unwrap();
     let initial_layout = renderer.render_blocks(vec![initial]).unwrap();
     runtime.clear_redraw_flag();
@@ -2585,7 +2585,7 @@ fn style_only_snapshot_repaints_same_text_without_reassigning_slot() {
             ..
         }
     ));
-    let updated_slot = runtime.state().scene().slots()[0].as_ref().unwrap();
+    let updated_slot = runtime.state().scene().slots()[1].as_ref().unwrap();
     assert_eq!(updated_slot.slot_index, original_slot.slot_index);
     assert_eq!(
         updated_slot.slot_entry_order,
@@ -2770,14 +2770,6 @@ fn divider_requires_two_occupied_slots_and_ignores_slot_order() {
     sticky.revision = 5;
     sticky.blocks.push(newest);
     runtime.apply_snapshot(sticky);
-    let reordered_slots = runtime
-        .state()
-        .scene()
-        .slots()
-        .iter()
-        .map(|slot| slot.as_ref().unwrap().occupant_key.clone())
-        .collect::<Vec<_>>();
-    assert_eq!(reordered_slots, vec!["peer:h", "peer:g"]);
     assert_eq!(rendered_speaker_divider(&runtime), expected);
 }
 
