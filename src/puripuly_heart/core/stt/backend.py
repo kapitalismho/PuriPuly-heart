@@ -121,6 +121,13 @@ class STTProviderTurnTerminal:
     is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
 
 
+class STTScopedWriteFailure(RuntimeError):
+    def __init__(self, terminal: STTProviderTurnTerminal, cause: BaseException | None) -> None:
+        super().__init__(terminal.failure_reason or "provider_write_failed")
+        self.terminal = terminal
+        self.__cause__ = cause
+
+
 _ProviderEvent = TypeVar("_ProviderEvent")
 
 

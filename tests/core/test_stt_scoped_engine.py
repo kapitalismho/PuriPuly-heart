@@ -736,7 +736,7 @@ def test_event_buffer_coalesces_provisional_and_fails_stable_overflow() -> None:
     assert buffer.depth == 1
 
     stable_buffer = STTProviderEventBuffer()
-    for sequence in range(256):
+    for sequence in range(stable_buffer.max_events):
         assert stable_buffer.put(
             STTProviderTurnUpdate(
                 identity=identity,

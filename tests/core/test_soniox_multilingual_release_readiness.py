@@ -130,7 +130,7 @@ def _controlled_session() -> _SonioxSession:
     )
 
 
-def _controlled_final_runs(
+async def _controlled_final_runs(
     languages: tuple[str, ...],
     *,
     final_token_end_ms: tuple[int, ...] | None = None,
@@ -160,7 +160,7 @@ def _controlled_final_runs(
         batch = tokens[batch_start:batch_end]
         if batch_index == len(token_batch_sizes) - 1:
             batch = [*batch, {"text": "<fin>", "is_final": True}]
-        session._handle_message(json.dumps({"tokens": batch}))
+        await session._handle_message(json.dumps({"tokens": batch}))
         batch_start = batch_end
 
     event = session._event_projection._legacy_events.get_nowait()
@@ -266,7 +266,7 @@ async def _run_lifecycle(
 async def test_soniox_tokens_preserve_ordered_language_runs_through_turn_owner(
     scenario: _ControlledScenario,
 ) -> None:
-    runs, trace = _controlled_final_runs(
+    runs, trace = await _controlled_final_runs(
         scenario.languages,
         final_token_end_ms=scenario.final_token_end_ms,
         token_batch_sizes=scenario.token_batch_sizes,
@@ -427,7 +427,7 @@ async def test_production_peer_parent_preserves_per_segment_language_eligibility
 
 @pytest.mark.asyncio
 async def test_controlled_peer_output_preserves_original_and_denies_chatbox() -> None:
-    runs, _ = _controlled_final_runs(("ja", "zh", "ko"))
+    runs, _ = await _controlled_final_runs(("ja", "zh", "ko"))
 
     for show_peer_original in (True, False):
         parent_id = uuid4()

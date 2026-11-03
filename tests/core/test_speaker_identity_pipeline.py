@@ -159,7 +159,7 @@ async def _terminal_from_soniox_tokens(
             }
         ]
     )
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": message_tokens + [{"text": "<fin>", "is_final": True}],

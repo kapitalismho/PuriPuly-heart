@@ -110,7 +110,7 @@ async def test_soniox_reuses_one_transport_for_ordered_final_identical_and_empty
         source_ranges=(),
         context_only=False,
     )
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -132,10 +132,10 @@ async def test_soniox_reuses_one_transport_for_ordered_final_identical_and_empty
         await session.begin_turn(_request(2))
 
     await _seal(session, first)
-    session._handle_message(json.dumps({"tokens": [{"text": "<end>", "is_final": True}]}))
+    await session._handle_message(json.dumps({"tokens": [{"text": "<end>", "is_final": True}]}))
     assert session._event_projection.active_identity == first.identity
     assert session._pending_finalize_requests == 1
-    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    await session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
     first_terminal = await _next(session)
     assert isinstance(first_terminal, STTProviderTurnTerminal)
     assert (first_terminal.text, first_terminal.epoch_disposition) == ("same", "reuse")
@@ -155,7 +155,7 @@ async def test_soniox_reuses_one_transport_for_ordered_final_identical_and_empty
         context_only=False,
     )
     await _seal(session, second)
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -183,7 +183,7 @@ async def test_soniox_reuses_one_transport_for_ordered_final_identical_and_empty
     third = _request(3)
     await session.begin_turn(third)
     await _seal(session, third)
-    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    await session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
     empty = await _next(session)
     assert isinstance(empty, STTProviderTurnTerminal)
     assert (empty.outcome, empty.text, empty.epoch_disposition) == ("empty", "", "reuse")
@@ -220,12 +220,12 @@ async def test_soniox_detectable_idle_output_retires_reused_epoch_without_seedin
     request = _request(1)
     await session.begin_turn(request)
     await _seal(session, request)
-    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    await session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
     terminal = await _next(session)
     assert isinstance(terminal, STTProviderTurnTerminal)
     assert terminal.epoch_disposition == "reuse"
 
-    session._handle_message(json.dumps({"tokens": late_tokens}))
+    await session._handle_message(json.dumps({"tokens": late_tokens}))
     ended = await _next(session)
     assert isinstance(ended, STTProviderEpochEnded)
     assert ended.reason == reason
@@ -242,12 +242,12 @@ async def test_soniox_finished_response_retires_idle_reused_epoch_before_next_be
     request = _request(1)
     await session.begin_turn(request)
     await _seal(session, request)
-    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    await session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
     terminal = await _next(session)
     assert isinstance(terminal, STTProviderTurnTerminal)
     assert terminal.epoch_disposition == "reuse"
 
-    session._handle_message(json.dumps({"tokens": [], "finished": True}))
+    await session._handle_message(json.dumps({"tokens": [], "finished": True}))
     ended = await _next(session)
     assert isinstance(ended, STTProviderEpochEnded)
     assert (ended.reason, ended.orderly) == ("soniox_stream_finished", True)
@@ -256,7 +256,7 @@ async def test_soniox_finished_response_retires_idle_reused_epoch_before_next_be
     with pytest.raises(RuntimeError, match="session is closed"):
         await session.begin_turn(_request(2))
 
-    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    await session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
     await asyncio.sleep(0)
     assert session._event_projection.scoped_event_depth == 0
     await session.close()
@@ -271,7 +271,7 @@ async def test_soniox_finished_response_retires_active_turn_with_preserved_text(
     await session.begin_turn(request)
     await _seal(session, request)
 
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -307,7 +307,7 @@ async def test_soniox_finished_response_retires_active_turn_with_preserved_text(
     assert terminal.failure_retryable is True
     assert ended.failure_retryable is True
 
-    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    await session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
     await asyncio.sleep(0)
     assert session._event_projection.scoped_event_depth == 0
     await session.close()
@@ -329,7 +329,7 @@ async def test_soniox_abort_then_late_fin_cannot_publish_or_reactivate_epoch() -
     assert terminal.epoch_disposition == "retire"
     assert isinstance(ended, STTProviderEpochEnded)
 
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {"tokens": [{"text": "late", "is_final": True}, {"text": "<fin>", "is_final": True}]}
         )
@@ -389,7 +389,7 @@ async def test_soniox_server_error_retryability_is_carried_on_turn_and_idle_epoc
     session, _ = _session()
     if active:
         await session.begin_turn(_request(1))
-    session._handle_message(json.dumps({"tokens": [], **error}))
+    await session._handle_message(json.dumps({"tokens": [], **error}))
     if active:
         terminal = await _next(session)
         assert isinstance(terminal, STTProviderTurnTerminal)
@@ -425,7 +425,7 @@ async def test_soniox_only_known_transport_reasons_are_retryable(
     session, _ = _session()
     if active:
         await session.begin_turn(_request(1))
-    session._scoped_transport_failure(reason, orderly=False)
+    await session._scoped_transport_failure(reason, orderly=False)
     if active:
         terminal = await _next(session)
         assert isinstance(terminal, STTProviderTurnTerminal)
@@ -441,7 +441,7 @@ async def test_soniox_protocol_close_cannot_turn_transport_failure_into_retry() 
     session, websocket = _session()
     websocket.close_code = 1008
     await session.begin_turn(_request(1))
-    session._scoped_transport_failure("soniox_receive_failed", orderly=False)
+    await session._scoped_transport_failure("soniox_receive_failed", orderly=False)
     terminal = await _next(session)
     ended = await _next(session)
     assert isinstance(terminal, STTProviderTurnTerminal)
