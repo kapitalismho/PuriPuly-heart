@@ -387,6 +387,8 @@ Network, proxy, TLS certificate, and service errors do not mean your key is inva
 <details>
 <summary><h3>Soniox</h3></summary>
 
+Soniox uses `stt-rt-v6` for real-time recognition and API-key verification. Saved `stt-rt-v5` model settings are upgraded automatically when loaded.
+
 1. Login to [Soniox Console](https://console.soniox.com/).
    ![step1](docs/images/soniox/1.png)
 

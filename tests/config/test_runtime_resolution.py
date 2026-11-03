@@ -385,17 +385,6 @@ def test_stt_runtime_resolution_emits_canonical_local_provider_identity(
     assert config.credential.required is False
 
 
-def test_soniox_runtime_default_uses_realtime_v5_model() -> None:
-    runtime_resolution = _runtime_resolution_module()
-
-    config = runtime_resolution.resolve_stt_config(
-        runtime_resolution.STTRuntimeIntent(provider=runtime_resolution.STT_PROVIDER_SONIOX)
-    )
-
-    assert config.model == "stt-rt-v5"
-    assert runtime_resolution.SONIOX_STT_MODEL_RT_V5 == "stt-rt-v5"
-
-
 def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -> None:
     runtime_resolution = _runtime_resolution_module()
     resolved = _resolved_module()

@@ -102,7 +102,7 @@ class _RecordingOverlaySink:
 def _soniox_session() -> _SonioxSession:
     return _SonioxSession(
         api_key="test",
-        model="stt-rt-v5",
+        model="stt-rt-v6",
         endpoint="wss://example.invalid",
         sample_rate_hz=16000,
         language_hints=["en"],

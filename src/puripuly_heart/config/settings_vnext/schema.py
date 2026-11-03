@@ -373,11 +373,15 @@ class ElevenLabsScribeSTTIntent:
 
 @dataclass(frozen=True, slots=True)
 class SonioxSTTIntent:
-    model: str = "stt-rt-v5"
+    model: str = "stt-rt-v6"
     endpoint: str = "wss://stt-rt.soniox.com/transcribe-websocket"
     keepalive_interval_s: float = 10.0
     trailing_silence_ms: int = 100
     enable_speaker_diarization: bool = True
+
+    def __post_init__(self) -> None:
+        if self.model == "stt-rt-v5":
+            object.__setattr__(self, "model", "stt-rt-v6")
 
 
 @dataclass(frozen=True, slots=True)

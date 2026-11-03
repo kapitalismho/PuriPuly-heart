@@ -11,7 +11,7 @@ from puripuly_heart.config.runtime_resolution import (
     ELEVENLABS_SCRIBE_STT_MODEL,
     GEMINI_TRANSCRIBE_STT_MODEL,
     QWEN_AUDIO_STT_MODEL,
-    SONIOX_STT_MODEL_RT_V5,
+    SONIOX_STT_MODEL_RT_V6,
 )
 from puripuly_heart.core.diagnostic_validation import (
     stt_startup_failure_code,
@@ -41,7 +41,7 @@ _MODEL_IDENTITIES = frozenset(
         ELEVENLABS_SCRIBE_STT_MODEL,
         GEMINI_TRANSCRIBE_STT_MODEL,
         QWEN_AUDIO_STT_MODEL,
-        SONIOX_STT_MODEL_RT_V5,
+        SONIOX_STT_MODEL_RT_V6,
     )
 )
 _FAILURE_CAUSE_LABELS = {

@@ -272,12 +272,6 @@ async def test_soniox_startup_send_cancellation_closes_post_upgrade_rejected_tra
             await asyncio.gather(opening, return_exceptions=True)
 
 
-def test_soniox_backend_defaults_to_realtime_v5_model() -> None:
-    backend = SonioxRealtimeSTTBackend(api_key="k", language_hints=["en"])
-
-    assert backend.model == "stt-rt-v5"
-
-
 @pytest.mark.asyncio
 async def test_soniox_session_handles_message_errors() -> None:
     session = _make_session()
@@ -1099,7 +1093,7 @@ async def test_soniox_verify_api_key_handles_timeout(monkeypatch):
 
     assert await SonioxRealtimeSTTBackend.verify_api_key("secret") is True
     config = json.loads(str(seen["config"]))
-    assert config["model"] == "stt-rt-v5"
+    assert config["model"] == "stt-rt-v6"
 
 
 @pytest.mark.parametrize("speaker_diarization", [True, False])
@@ -1251,7 +1245,7 @@ async def test_soniox_session_local_server_preserves_finalize_and_remote_close()
     assert len(configs) == 2
     for config in configs:
         assert "api_key" not in config
-        assert config["model"] == "stt-rt-v5"
+        assert config["model"] == "stt-rt-v6"
         assert config["audio_format"] == "pcm_s16le"
         assert config["sample_rate"] == 16000
         assert config["num_channels"] == 1
@@ -1330,7 +1324,7 @@ async def test_soniox_probe_local_server_authenticates_and_closes(response, capl
     assert authenticated == [True]
     assert len(configurations) == 1
     assert "api_key" not in configurations[0]
-    assert configurations[0]["model"] == "stt-rt-v5"
+    assert configurations[0]["model"] == "stt-rt-v6"
     assert marker not in caplog.text
 
 

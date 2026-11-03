@@ -697,6 +697,41 @@ def test_vnext_dict_preserves_qwen_audio_and_uses_self_language_for_blank_peer()
     assert "qwen_asr" not in result["stt"]
 
 
+@pytest.mark.parametrize(
+    ("saved_model", "expected_model"),
+    [("stt-rt-v5", "stt-rt-v6"), ("stt-rt-custom", "stt-rt-custom")],
+)
+def test_soniox_model_upgrade_persists_without_changing_options(
+    tmp_path: Path, saved_model: str, expected_model: str
+) -> None:
+    from puripuly_heart.config.settings_vnext import compat, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    soniox = canonical["intent"]["stt"]["soniox"]
+    soniox.update(
+        model=saved_model,
+        endpoint="wss://soniox.example.test/transcribe",
+        keepalive_interval_s=12.5,
+        trailing_silence_ms=250,
+        enable_speaker_diarization=False,
+    )
+    path = tmp_path / "settings.json"
+    _write_json_bytes(path, canonical)
+
+    first = compat.load_vnext_settings(path)
+    second = compat.load_vnext_settings(path)
+
+    expected = {**soniox, "model": expected_model}
+    assert first.status is compat.SettingsPersistenceStatus.SUCCESS
+    assert first.settings is not None
+    assert serialization.to_dict(first.settings)["intent"]["stt"]["soniox"] == expected
+    assert json.loads(path.read_text(encoding="utf-8"))["intent"]["stt"]["soniox"] == expected
+    assert second.status is compat.SettingsPersistenceStatus.SUCCESS
+    assert second.settings is not None
+    assert serialization.to_dict(second.settings)["intent"]["stt"]["soniox"] == expected
+    assert second.migrated is False
+
+
 def test_qwen_asr_retirement_is_backed_up_and_idempotent(tmp_path: Path) -> None:
     from puripuly_heart.config.settings_vnext import compat, serialization
 

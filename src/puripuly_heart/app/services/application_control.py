@@ -836,7 +836,7 @@ class ApplicationControlOwner:
             ELEVENLABS_SCRIBE_STT_MODEL,
             GEMINI_TRANSCRIBE_STT_MODEL,
             QWEN_AUDIO_STT_MODEL,
-            SONIOX_STT_MODEL_RT_V5,
+            SONIOX_STT_MODEL_RT_V6,
         )
         from puripuly_heart.core.language import get_all_language_options
 
@@ -1205,7 +1205,7 @@ class ApplicationControlOwner:
                     "gemini_transcribe": [GEMINI_TRANSCRIBE_STT_MODEL],
                     "elevenlabs_scribe": [ELEVENLABS_SCRIBE_STT_MODEL],
                     "qwen_audio": [QWEN_AUDIO_STT_MODEL],
-                    "soniox": [SONIOX_STT_MODEL_RT_V5],
+                    "soniox": [SONIOX_STT_MODEL_RT_V6],
                 },
             },
             "extensions": {
