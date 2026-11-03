@@ -6,10 +6,11 @@ Loads system prompts from files in the prompts/ directory.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Mapping
+from typing import Literal, Mapping
 
 from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_GPT_6_LUNA
 from puripuly_heart.config.runtime_resolution import OPENAI_MODEL_GPT_6_LUNA
@@ -38,6 +39,8 @@ class PromptAssemblyCache:
     target_language_rules: Mapping[str, str]
     language_pair_examples: Mapping[str, str]
     fallback_examples: str
+    peer_provisional_instruction: str | None
+    peer_continuation_instruction: str | None
 
 
 _PROMPT_CACHE: PromptAssemblyCache | None = None
@@ -152,6 +155,8 @@ def _load_prompt_cache() -> PromptAssemblyCache:
 
     target_language_rules = _load_markdown_files(prompts_dir / "prompt-rules" / "target-language")
     language_pair_examples = _load_markdown_files(prompts_dir / "prompt-examples" / "language-pair")
+    provisional_path = prompts_dir / "peer_provisional_instruction.md"
+    continuation_path = prompts_dir / "peer_continuation_instruction.md"
 
     return PromptAssemblyCache(
         template=_read_prompt_text(template_path),
@@ -161,6 +166,12 @@ def _load_prompt_cache() -> PromptAssemblyCache:
         target_language_rules=MappingProxyType(target_language_rules),
         language_pair_examples=MappingProxyType(language_pair_examples),
         fallback_examples=language_pair_examples.get(_FALLBACK_EXAMPLES_KEY, ""),
+        peer_provisional_instruction=(
+            _read_prompt_text(provisional_path) if provisional_path.exists() else None
+        ),
+        peer_continuation_instruction=(
+            _read_prompt_text(continuation_path) if continuation_path.exists() else None
+        ),
     )
 
 
@@ -240,6 +251,21 @@ def _collapse_extra_blank_lines(text: str) -> str:
     return text
 
 
+def _render_template_conditionals(template: str, variables: Mapping[str, str]) -> str:
+    def render_match(match: re.Match[str]) -> str:
+        key, body = match.groups()
+        if key not in variables:
+            return match.group(0)
+        return body if variables[key] else ""
+
+    return re.sub(
+        r"\$\{(\w+)\}(.*?)\$\{end\1\}",
+        render_match,
+        template,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+
+
 def _select_translation_examples(
     cache: PromptAssemblyCache, source_name: str, target_name: str
 ) -> str:
@@ -261,10 +287,15 @@ def build_translation_prompt_variables(
     *,
     input_channel: str = "self",
     source_specified: bool = True,
+    peer_request_kind: Literal["normal", "preview", "continuation"] = "normal",
 ) -> dict[str, str]:
     """Build dynamic variables for rendering the shared translation prompt."""
     if input_channel not in {"self", "peer"}:
         raise ValueError(f"unsupported input channel: {input_channel!r}")
+    if peer_request_kind not in {"normal", "preview", "continuation"}:
+        raise ValueError(f"unsupported Peer request kind: {peer_request_kind!r}")
+    is_preview = input_channel == "peer" and peer_request_kind == "preview"
+    is_continuation = input_channel == "peer" and peer_request_kind == "continuation"
     cache = _get_prompt_cache()
     target_rules_key = _resolve_target_language_rules_key(target_name)
     target_language_rules = (
@@ -293,6 +324,18 @@ def build_translation_prompt_variables(
             "## Examples",
             translation_examples,
         ),
+        "completeSourceOnly": "" if is_preview else "true",
+        "endCompleteSourceOnly": "",
+        "peerProvisionalSection": (
+            f"\n\n{cache.peer_provisional_instruction}"
+            if is_preview and cache.peer_provisional_instruction
+            else ""
+        ),
+        "peerContinuationSection": (
+            f"\n\n{cache.peer_continuation_instruction}"
+            if is_continuation and cache.peer_continuation_instruction
+            else ""
+        ),
     }
 
 
@@ -303,6 +346,7 @@ def render_translation_prompt_template(
     target_name: str,
     input_channel: str = "self",
     source_specified: bool = True,
+    peer_request_kind: Literal["normal", "preview", "continuation"] = "normal",
 ) -> str:
     """Render the shared translation prompt template with dynamic variables."""
     rendered = template
@@ -311,7 +355,28 @@ def render_translation_prompt_template(
         target_name,
         input_channel=input_channel,
         source_specified=source_specified,
+        peer_request_kind=peer_request_kind,
     )
+    peer_section = {
+        "preview": "peerProvisionalSection",
+        "continuation": "peerContinuationSection",
+    }.get(peer_request_kind)
+    if (
+        input_channel == "peer"
+        and peer_section is not None
+        and f"${{{peer_section}}}" in template
+        and not variables[peer_section]
+    ):
+        cache = _get_prompt_cache()
+        instruction, filename = (
+            (cache.peer_provisional_instruction, "peer_provisional_instruction.md")
+            if peer_request_kind == "preview"
+            else (cache.peer_continuation_instruction, "peer_continuation_instruction.md")
+        )
+        if instruction is None:
+            raise FileNotFoundError(f"Required Peer instruction not found: {filename}")
+        raise ValueError(f"Required Peer instruction is empty: {filename}")
+    rendered = _render_template_conditionals(rendered, variables)
     for key, value in sorted(variables.items(), key=lambda item: len(item[0]), reverse=True):
         rendered = rendered.replace(f"${{{key}}}", value)
     return _collapse_extra_blank_lines(rendered)

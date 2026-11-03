@@ -25,7 +25,8 @@ from puripuly_heart.core.local_asr.local_asr_provisioning import (
 from puripuly_heart.core.local_asr.local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
     FUN_ASR_NANO_MODEL_ID,
-    ORUKEET_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )
@@ -37,16 +38,22 @@ LOCAL_AUTO_PROVIDER = "local_cpu_auto"
 def _snapshot(
     *,
     mlt: str = "ready",
-    orukeet: str = "ready",
+    granite: str = "ready",
+    gigaam: str = "ready",
     parakeet_ja: str = "ready",
     active: bool = False,
 ) -> LocalASRProvisioningSnapshot:
     return LocalASRProvisioningSnapshot(
         models=(
             LocalASRModelProvisioningState(
-                model_id=ORUKEET_MODEL_ID,
+                model_id=GRANITE_MODEL_ID,
                 backend="cpu",
-                integrity=orukeet,
+                integrity=granite,
+            ),
+            LocalASRModelProvisioningState(
+                model_id=GIGAAM_MODEL_ID,
+                backend="cpu",
+                integrity=gigaam,
             ),
             LocalASRModelProvisioningState(
                 model_id=PARAKEET_JAPANESE_MODEL_ID,
@@ -415,6 +422,35 @@ def test_repair_uses_required_models_when_snapshot_has_no_unavailable_identity()
     assert provisioning.requests[0].model_ids == REQUIRED_CPU_LOCAL_STT_MODEL_IDS
 
 
+@pytest.mark.parametrize(
+    ("integrities", "model_id"),
+    (
+        ({"granite": "missing"}, GRANITE_MODEL_ID),
+        ({"gigaam": "invalid"}, GIGAAM_MODEL_ID),
+    ),
+)
+def test_auto_repair_targets_only_the_unavailable_new_model(
+    integrities: dict[str, str], model_id: str
+) -> None:
+    provisioning = RecordingProvisioning(_snapshot(**integrities))
+    state_box = [
+        _state(
+            self_provider=LOCAL_AUTO_PROVIDER,
+            self_provider_local=True,
+        )
+    ]
+    owner = _owner(provisioning, state_box)
+
+    owner.request_repair(
+        LocalASRCpuRepairRequest(
+            status="missing",
+            channel="self",
+        )
+    )
+
+    assert provisioning.requests[0].model_ids == (model_id,)
+
+
 def test_repair_with_explicit_models_skips_provider_model_resolution() -> None:
     provisioning = RecordingProvisioning(_snapshot(mlt="missing"))
     state_box = [
@@ -437,11 +473,11 @@ def test_repair_with_explicit_models_skips_provider_model_resolution() -> None:
         LocalASRCpuRepairRequest(
             status="invalid",
             channel="self",
-            model_ids=(ORUKEET_MODEL_ID,),
+            model_ids=(GRANITE_MODEL_ID,),
         )
     )
 
-    assert provisioning.requests[0].model_ids == (ORUKEET_MODEL_ID,)
+    assert provisioning.requests[0].model_ids == (GRANITE_MODEL_ID,)
 
 
 def test_repair_with_empty_models_uses_unavailable_subset_before_required_fallback() -> None:

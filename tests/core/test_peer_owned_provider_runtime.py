@@ -252,7 +252,13 @@ def make_config(provider: str) -> PeerCaptureSessionConfig:
         release_backend_after=(
             600.0
             if provider
-            in {"local_cpu_auto", "local_orukeet", "local_fun_asr_nano", "local_fun_asr_mlt_nano"}
+            in {
+                "local_cpu_auto",
+                "local_granite",
+                "local_gigaam",
+                "local_fun_asr_nano",
+                "local_fun_asr_mlt_nano",
+            }
             else None
         ),
     )
@@ -311,7 +317,8 @@ async def test_peer_capture_owner_requests_provider_and_never_constructs_it() ->
     ("provider", "retained"),
     [
         ("local_cpu_auto", True),
-        ("local_orukeet", True),
+        ("local_granite", True),
+        ("local_gigaam", True),
         ("local_fun_asr_nano", True),
         ("local_fun_asr_mlt_nano", True),
         ("local_parakeet_ja", False),

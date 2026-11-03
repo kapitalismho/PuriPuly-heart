@@ -24,6 +24,7 @@ class ContextEntry:
     timestamp: float
     channel: ChannelId = "self"
     origin: str = ""
+    utterance_id: UUID | None = None
 
     def __post_init__(self) -> None:
         _validate_channel(self.channel)

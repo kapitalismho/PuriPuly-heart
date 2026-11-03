@@ -224,6 +224,10 @@ Installer_output/
 .references/
 refactoring/
 .tmp/
+/benchmarks/asr/data/
+/benchmarks/asr/models/
+/benchmarks/asr/results/
+/benchmarks/asr/data-preparation.json
 /scripts/*
 !/scripts/bench_*.py
 !/scripts/ci/

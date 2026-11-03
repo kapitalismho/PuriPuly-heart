@@ -9,14 +9,16 @@ from typing import Literal
 from puripuly_heart.config import paths
 from puripuly_heart.runtime_layout import current_runtime_layout
 
-ORUKEET_MODEL_ID = "orukeet-q8-0-transcribe-cpu"
+GRANITE_MODEL_ID = "granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu"
+GIGAAM_MODEL_ID = "gigaam-v3-e2e-ctc-q8-0-transcribe-cpu"
 FUN_ASR_NANO_MODEL_ID = "fun-asr-nano-2512-q8-0-transcribe-cpu"
 FUN_ASR_MLT_NANO_MODEL_ID = "fun-asr-mlt-nano-2512-q8-0-transcribe-cpu"
 LOCAL_STT_INSTALLED_MANIFEST_FILENAME = "installed-manifest.json"
 PARAKEET_JAPANESE_MODEL_ID = "parakeet-tdt-ctc-0.6b-ja-int8-sherpa"
 LOCAL_QWEN_GPU_MODEL_ID = "qwen3-asr-1.7b-q6-k-transcribe-vulkan"
 REQUIRED_CPU_LOCAL_STT_MODEL_IDS = (
-    ORUKEET_MODEL_ID,
+    GRANITE_MODEL_ID,
+    GIGAAM_MODEL_ID,
     FUN_ASR_NANO_MODEL_ID,
     FUN_ASR_MLT_NANO_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
@@ -224,7 +226,7 @@ def default_local_stt_model_root() -> Path:
     return paths.default_models_dir()
 
 
-def default_local_stt_model_dir(model_id: str = ORUKEET_MODEL_ID) -> Path:
+def default_local_stt_model_dir(model_id: str = GRANITE_MODEL_ID) -> Path:
     manifest_relative_path = LOCAL_STT_MANIFEST_RELATIVE_PATHS.get(model_id)
     if manifest_relative_path is None:
         raise LocalSTTManifestInvalidError(f"unknown local STT model_id: {model_id}")
@@ -247,7 +249,7 @@ def default_local_stt_source_for_locale(
     return model_download_source_candidates(tuple(resolved_manifest.sources), locale=locale)[0]
 
 
-def load_local_stt_asset_manifest(model_id: str = ORUKEET_MODEL_ID) -> LocalSTTAssetManifest:
+def load_local_stt_asset_manifest(model_id: str = GRANITE_MODEL_ID) -> LocalSTTAssetManifest:
     manifest_relative_path = LOCAL_STT_MANIFEST_RELATIVE_PATHS.get(model_id)
     if manifest_relative_path is None:
         raise LocalSTTManifestInvalidError(f"unknown local STT model_id: {model_id}")

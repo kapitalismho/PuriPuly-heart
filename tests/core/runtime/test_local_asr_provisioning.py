@@ -24,8 +24,8 @@ from puripuly_heart.core.local_asr.local_asr_provisioning import (
 from puripuly_heart.core.local_asr.local_gpu_assets import LocalGPUInstallSnapshot
 from puripuly_heart.core.local_asr.local_stt_assets import (
     FUN_ASR_NANO_MODEL_ID,
+    GRANITE_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
-    ORUKEET_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
     InstalledLocalSTTManifest,
@@ -157,7 +157,7 @@ async def test_owner_snapshot_keeps_independent_cpu_availability_and_cpu_auto_co
     snapshot = await owner.inspect_cpu()
 
     assert snapshot.cpu_auto_available is False
-    assert snapshot.state_for(ORUKEET_MODEL_ID).status == "ready"
+    assert snapshot.state_for(GRANITE_MODEL_ID).status == "ready"
     assert snapshot.state_for(FUN_ASR_NANO_MODEL_ID).status == "ready"
     assert snapshot.state_for(PARAKEET_JAPANESE_MODEL_ID).status == "invalid"
     assert snapshot.status_for((FUN_ASR_NANO_MODEL_ID,)) == "ready"
@@ -174,7 +174,7 @@ async def test_owner_marks_only_the_model_with_invalid_manifest_authority_invali
 
     def manifest_loader(model_id: str):
         if model_id == PARAKEET_JAPANESE_MODEL_ID:
-            return load_local_stt_asset_manifest(ORUKEET_MODEL_ID)
+            return load_local_stt_asset_manifest(GRANITE_MODEL_ID)
         return load_local_stt_asset_manifest(model_id)
 
     owner = _owner(backend, manifest_loader=manifest_loader)
@@ -182,7 +182,7 @@ async def test_owner_marks_only_the_model_with_invalid_manifest_authority_invali
     snapshot = await owner.inspect_cpu()
 
     assert snapshot.state_for(PARAKEET_JAPANESE_MODEL_ID).status == "invalid"
-    assert snapshot.state_for(ORUKEET_MODEL_ID).status == "ready"
+    assert snapshot.state_for(GRANITE_MODEL_ID).status == "ready"
     assert snapshot.state_for(FUN_ASR_NANO_MODEL_ID).status == "ready"
 
     await owner.close()
@@ -281,7 +281,7 @@ async def test_targeted_cpu_repair_preserves_valid_models_and_reports_progress()
     assert result.installed_model_ids == (PARAKEET_JAPANESE_MODEL_ID,)
     assert result.failed_model_ids == ()
     assert result.snapshot.cpu_auto_available is True
-    assert result.snapshot.state_for(ORUKEET_MODEL_ID).status == "ready"
+    assert result.snapshot.state_for(GRANITE_MODEL_ID).status == "ready"
     assert result.snapshot.state_for(FUN_ASR_NANO_MODEL_ID).status == "ready"
     progress = [
         snapshot.activity_for("cpu").progress_percent
@@ -529,7 +529,7 @@ async def test_runtime_validation_failure_is_owned_and_safely_diagnosed() -> Non
     )
 
     assert snapshot.state_for(FUN_ASR_NANO_MODEL_ID).status == "invalid"
-    assert snapshot.state_for(ORUKEET_MODEL_ID).status == "ready"
+    assert snapshot.state_for(GRANITE_MODEL_ID).status == "ready"
     assert owner.diagnostics[-1].event == "validation"
     assert owner.diagnostics[-1].failure_type == "LocalSTTManifestInvalidError"
 

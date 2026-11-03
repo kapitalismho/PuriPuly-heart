@@ -151,6 +151,8 @@ class STTScopedTurnNormalizer:
             provenance=update.provenance,
             contribution=contribution,
             recognition_origins=self._recognition_origins,
+            observed_at=update.observed_at,
+            first_nonempty_at=update.first_nonempty_at,
         )
 
     def apply_terminal(self, terminal: STTProviderTurnTerminal) -> STTProviderTurnTerminal:

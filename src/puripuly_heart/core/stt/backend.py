@@ -98,6 +98,8 @@ class STTProviderTurnUpdate:
     contribution: STTTextContribution | None = None
     recognition_origins: tuple[RecognitionTextOrigin, ...] = ()
     is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
+    observed_at: float | None = None
+    first_nonempty_at: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -258,6 +260,8 @@ class STTRecognitionUnit:
     final_language_runs: tuple[FinalLanguageRun, ...] = ()
     final_speaker_runs: tuple[FinalSpeakerRun, ...] = ()
     estimated_last_speech_at: float | None = None
+    is_final: bool = True
+    observed_at: float | None = None
 
     @property
     def retained_bytes(self) -> int:

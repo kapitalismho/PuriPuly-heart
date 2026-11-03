@@ -101,33 +101,55 @@ class ProxyPolicy:
         system: Mapping[str, str] | None = None,
         system_bypass: str | None = None,
     ) -> None:
-        if environment is None:
-            self.environment = urllib.request.getproxies_environment()
+        self._environment = None if environment is None else dict(environment)
+        self._system = None if system is None else dict(system)
+        self._system_bypass = system_bypass
+
+    @property
+    def environment(self) -> dict[str, str]:
+        if self._environment is None:
+            proxies = urllib.request.getproxies_environment()
         else:
             proxies: dict[str, str] = {}
-            for name, value in environment.items():
+            for name, value in self._environment.items():
                 if name.lower().endswith("_proxy") and value:
                     proxies[name[:-6].lower()] = value
-            for name, value in environment.items():
+            for name, value in self._environment.items():
                 if name.endswith("_proxy"):
                     if value:
                         proxies[name[:-6]] = value
                     else:
                         proxies.pop(name[:-6], None)
-            self.environment = proxies
-        if system is None:
-            self.system, bypass = _windows_proxy_settings()
-        else:
-            self.system, bypass = dict(system), ""
-        self.system_bypass = bypass if system_bypass is None else system_bypass
-        self.environment = {
+        return {
             name: value if name == "no" or "://" in value else f"http://{value}"
-            for name, value in self.environment.items()
+            for name, value in proxies.items()
         }
-        self.system = {
-            name: value if "://" in value else f"http://{value}"
-            for name, value in self.system.items()
+
+    def _system_settings(self) -> tuple[dict[str, str], str]:
+        if self._system is None:
+            proxies, bypass = _windows_proxy_settings()
+        else:
+            proxies, bypass = self._system, ""
+        normalized = {
+            name: value if "://" in value else f"http://{value}" for name, value in proxies.items()
         }
+        return normalized, bypass if self._system_bypass is None else self._system_bypass
+
+    @property
+    def system(self) -> dict[str, str]:
+        return self._system_settings()[0]
+
+    @property
+    def system_bypass(self) -> str:
+        return self._system_settings()[1]
+
+    def snapshot(self) -> ProxyPolicy:
+        system, system_bypass = self._system_settings()
+        return ProxyPolicy(
+            environment={f"{name}_proxy": value for name, value in self.environment.items()},
+            system=system,
+            system_bypass=system_bypass,
+        )
 
     def route(self, url: str) -> ProxyRoute:
         parsed = urlsplit(url)
@@ -135,16 +157,18 @@ class ProxyPolicy:
         host = parsed.hostname or ""
         port = parsed.port or {"http": 80, "https": 443, "ws": 80, "wss": 443}.get(scheme)
         authority = f"{host}:{port}" if port else host
-        if urllib.request.proxy_bypass_environment(authority, self.environment):
+        environment = self.environment
+        if urllib.request.proxy_bypass_environment(authority, environment):
             return ProxyRoute(None, "bypass")
         protocol = "https" if scheme == "wss" else "http" if scheme == "ws" else scheme
         keys = (scheme, "socks", protocol, "all") if scheme in ("ws", "wss") else (protocol, "all")
         for key in keys:
-            if self.environment.get(key):
-                return ProxyRoute(self.environment[key], "env")
-        proxy = self.system.get(protocol) or self.system.get("all")
+            if environment.get(key):
+                return ProxyRoute(environment[key], "env")
+        system, system_bypass = self._system_settings()
+        proxy = system.get(protocol) or system.get("all")
         if proxy:
-            for pattern in self.system_bypass.split(";"):
+            for pattern in system_bypass.split(";"):
                 pattern = pattern.strip().lower()
                 if pattern == "<local>" and "." not in host:
                     return ProxyRoute(None, "bypass")

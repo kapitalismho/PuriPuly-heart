@@ -188,7 +188,10 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
         apply_loopback_capture_option=make("apply_loopback_capture_option"),
         loopback_capture_summary=make("loopback_capture_summary"),
     )
-    prompt = SettingsPromptIntents(prompt_apply_settings=make("prompt_apply_settings"))
+    prompt = SettingsPromptIntents(
+        prompt_apply_settings=make("prompt_apply_settings"),
+        pending_prompt_changed=make("pending_prompt_changed"),
+    )
     overlay = SettingsOverlayIntents(
         desktop_overlay_lock_change=make("desktop_overlay_lock_change"),
         desktop_overlay_size_change=make("desktop_overlay_size_change"),
@@ -230,6 +233,7 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     assert view.on_apply_loopback_capture_option is general.apply_loopback_capture_option
     assert view.on_loopback_capture_summary is general.loopback_capture_summary
     assert view.on_prompt_apply_settings is prompt.prompt_apply_settings
+    assert view.on_pending_prompt_changed is prompt.pending_prompt_changed
     assert view.on_desktop_overlay_lock_change is overlay.desktop_overlay_lock_change
     assert view.on_desktop_overlay_size_change is overlay.desktop_overlay_size_change
     assert view.on_desktop_overlay_recovery_action is overlay.desktop_overlay_recovery_action

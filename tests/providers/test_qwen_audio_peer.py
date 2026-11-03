@@ -145,8 +145,11 @@ async def test_peer_completed_segments_only_reach_real_owner_in_source_order_wit
     admitted = []
 
     async def sink(event):
+        if isinstance(event, STTProviderTurnUpdate):
+            await harness.peer_owner.handle_provider_update(event)
+            return
         if not isinstance(event, STTProviderTurnTerminal):
-            pytest.fail("Peer native sentences must not reach translation admission")
+            pytest.fail("Only source snapshots and terminal bundles may reach the Peer owner")
         receipt = ledger.terminalize(
             event.identity.segment.segment_id,
             outcome=event.outcome,

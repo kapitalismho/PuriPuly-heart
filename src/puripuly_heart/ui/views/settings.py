@@ -239,7 +239,8 @@ _CUSTOM_VOCAB_DELIMITER_RE = re.compile(r"\s+")
 _STT_UI_PROVIDERS = (
     STTProviderName.DEEPGRAM,
     STTProviderName.LOCAL_CPU_AUTO,
-    STTProviderName.LOCAL_ORUKEET,
+    STTProviderName.LOCAL_GRANITE,
+    STTProviderName.LOCAL_GIGAAM,
     STTProviderName.LOCAL_FUN_ASR_NANO,
     STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
     STTProviderName.LOCAL_PARAKEET_JAPANESE,
@@ -279,7 +280,8 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.CUSTOM_OFFLINE: "settings.stt.section.custom",
     STTProviderName.CUSTOM_REALTIME: "settings.stt.section.custom",
     STTProviderName.LOCAL_QWEN_GPU: "settings.stt.section.gpu_inference",
-    STTProviderName.LOCAL_ORUKEET: "settings.stt.section.cpu_inference",
+    STTProviderName.LOCAL_GRANITE: "settings.stt.section.cpu_inference",
+    STTProviderName.LOCAL_GIGAAM: "settings.stt.section.cpu_inference",
     STTProviderName.LOCAL_FUN_ASR_NANO: "settings.stt.section.cpu_inference",
     STTProviderName.LOCAL_FUN_ASR_MLT_NANO: "settings.stt.section.cpu_inference",
     STTProviderName.LOCAL_PARAKEET_JAPANESE: "settings.stt.section.cpu_inference",
@@ -299,7 +301,8 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
 _LOCAL_STT_PROVIDERS = frozenset(
     {
         STTProviderName.LOCAL_CPU_AUTO,
-        STTProviderName.LOCAL_ORUKEET,
+        STTProviderName.LOCAL_GRANITE,
+        STTProviderName.LOCAL_GIGAAM,
         STTProviderName.LOCAL_FUN_ASR_NANO,
         STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
         STTProviderName.LOCAL_PARAKEET_JAPANESE,
@@ -422,6 +425,7 @@ class SettingsView(ft.Column):
         # Callbacks (assigned by App)
         self.on_settings_changed: Callable[[ImmediateSettingsIntent], None] | None = None
         self.on_prompt_apply_settings: Callable[[PromptApplyIntent], None] | None = None
+        self.on_pending_prompt_changed: Callable[[PromptApplyIntent], None] | None = None
         self.on_providers_changed: Callable[[], None] | None = None
         self.on_local_llm_secret_changed: Callable[[], None] | None = None
         self.on_custom_stt_secret_changed: Callable[[], None] | None = None
@@ -595,6 +599,7 @@ class SettingsView(ft.Column):
         self.on_loopback_capture_summary = general.loopback_capture_summary
         self.on_osc_effective_ports = general.osc_effective_ports
         self.on_prompt_apply_settings = prompt.prompt_apply_settings
+        self.on_pending_prompt_changed = prompt.pending_prompt_changed
         self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
         self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
         self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
@@ -6393,9 +6398,11 @@ class SettingsView(ft.Column):
         self._stage_prompt_draft(value)
 
     def _on_prompt_commit(self, value: str) -> None:
+        self._stage_prompt_draft(value)
+        if self.on_pending_prompt_changed is not None:
+            self.on_pending_prompt_changed(PromptApplyIntent(value))
         if not self.has_pending_prompt_changes and value == self._committed_prompt_value():
             return
-        self._stage_prompt_draft(value)
         if self.has_provider_changes:
             return
         if self.has_pending_prompt_changes:

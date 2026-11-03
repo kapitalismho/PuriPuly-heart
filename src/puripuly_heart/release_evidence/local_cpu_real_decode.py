@@ -22,7 +22,8 @@ from puripuly_heart.app.adapters.asr_worker_process import DefaultASRWorkerProce
 from puripuly_heart.core.local_asr.local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
     FUN_ASR_NANO_MODEL_ID,
-    ORUKEET_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     load_local_stt_asset_manifest,
 )
@@ -43,12 +44,21 @@ class DecodeCase:
 
 DECODE_CASES = (
     DecodeCase(
-        model_id=ORUKEET_MODEL_ID,
+        model_id=GRANITE_MODEL_ID,
         source_language="en",
-        audio_filename="orukeet-en.wav",
+        audio_filename="granite-en.wav",
         source_url=(
             "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/"
             "8facde6fcd8fb9caa585a5788ab450df6e8ec7db/samples/fleurs-en.wav"
+        ),
+    ),
+    DecodeCase(
+        model_id=GIGAAM_MODEL_ID,
+        source_language="ru",
+        audio_filename="gigaam-ru.wav",
+        source_url=(
+            "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/"
+            "8facde6fcd8fb9caa585a5788ab450df6e8ec7db/samples/ru-short.wav"
         ),
     ),
     DecodeCase(

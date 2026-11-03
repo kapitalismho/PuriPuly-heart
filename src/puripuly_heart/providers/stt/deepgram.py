@@ -221,6 +221,21 @@ class _DeepgramSDKSession(STTBackendSession):
                         assembly="append",
                         text=text,
                         provenance=provenance,
+                        observed_at=asyncio.get_running_loop().time(),
+                    )
+                )
+        if self._event_projection.channel == "peer" and not from_finalize:
+            sequence = self._event_projection.next_update_sequence(identity)
+            if sequence is not None:
+                self._event_projection.put_update(
+                    STTProviderTurnUpdate(
+                        identity=identity,
+                        sequence=sequence,
+                        stability="provisional",
+                        assembly="replace",
+                        text=" ".join(self._scoped_fragments + ([] if is_final else [text])),
+                        provenance=provenance,
+                        observed_at=asyncio.get_running_loop().time(),
                     )
                 )
         if from_finalize:
@@ -377,7 +392,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 "encoding": "linear16",
                 "sample_rate": self.sample_rate_hz,
                 "channels": 1,
-                "interim_results": False,
+                "interim_results": self.stream_label == "peer",
                 "punctuate": True,
                 "vad_events": False,
                 "endpointing": False,

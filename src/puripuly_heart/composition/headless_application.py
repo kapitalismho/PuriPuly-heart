@@ -15,6 +15,7 @@ from puripuly_heart.core.runtime_logging import (
 )
 from puripuly_heart.domain.events import SelfTurnPresentation
 from puripuly_heart.ui.event_dispatch import UIEventBridge
+from puripuly_heart.ui.event_projection import HistoryProjection
 from puripuly_heart.ui.i18n import available_locales, get_locale, set_locale, t
 
 logger = logging.getLogger(__name__)
@@ -22,13 +23,9 @@ logger = logging.getLogger(__name__)
 
 class _HeadlessDashboard:
     def __init__(self) -> None:
-        self.status: str | None = None
         self.transcript: str | None = None
         self.translation: str | None = None
         self.issue: str | None = None
-
-    def publish_status(self, status: str) -> None:
-        self.status = status
 
     def publish_transcript(
         self, text: str, *, language_code: str | None = None, debug_prefix: str | None = None
@@ -68,6 +65,9 @@ class _HeadlessHistory:
         pass
 
     def publish_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
+        pass
+
+    def publish_peer_caption(self, history: HistoryProjection) -> None:
         pass
 
 
@@ -155,6 +155,9 @@ class HeadlessApplicationPresentation:
 
     def set_dashboard_stt_enabled(self, enabled: bool) -> None:
         self._remember("stt_enabled", enabled)
+
+    def set_dashboard_capture_status(self, status: str) -> None:
+        self._remember("capture_status", status)
 
     def set_dashboard_translation_needs_key(self, needs_key: bool) -> None:
         self._remember("translation_needs_key", needs_key)

@@ -13,8 +13,8 @@ Interpret <input> naturally in the configured target language, preserving the sp
 ### Context Use Cases
 Use context when it directly helps with:
 * Reference: Resolve deictic expressions and omitted referents.
-* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.
-* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.
+${completeSourceOnly}* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.
+${endCompleteSourceOnly}* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.
 * Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.
 * Perspective: Preserve speaker, addressee, and viewpoint.
 * Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.
@@ -50,4 +50,4 @@ Channel: ${inputChannel}
 
 ${targetLanguageRulesSection}
 
-${translationExamplesSection}
+${translationExamplesSection}${peerProvisionalSection}${peerContinuationSection}

@@ -16,7 +16,7 @@ class LoopbackDeviceInventoryPort(Protocol):
 
 
 class PeerCaptureTargetRuntimeEffectsPort(Protocol):
-    async def apply_capture_target(self, settings: AppSettingsVNext) -> None: ...
+    async def apply_capture_target(self, settings: AppSettingsVNext) -> bool: ...
 
 
 __all__ = [

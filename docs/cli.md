@@ -93,6 +93,13 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 - Apply a translation model and its connection together using a combination from `settings choices`. For ASR, `asr set --channel self|peer|both --provider <choice>` is the convenience form.
 - Explicit provider fields can retry pending provider application; unrelated general settings edits do not. Observe committed settings and effective provider state separately, including after restart when checking persistence.
 
+### GUI Autosave
+
+- GUI settings edits are coalesced and attempted once per submitted edit. There are no timed retries or automatic runtime-only replays after failure. Saved-but-unapplied edits remain saved; persistence and effective runtime state are separate results.
+- Expected save/application failures do not show a settings failure toast, a persistent recovery row, or a dedicated Retry button. Diagnostics and unrelated operation notifications remain available.
+- Unsaved, reverted, or unknown-outcome edits remain only in the current page's memory; closing the app does not preserve them for restart. Explicitly submitting the affected setting again permits another attempt. Unrelated edits, repeated queue drains, and navigation without a new draft do not replay a failed submission.
+- This settings queue belongs to the GUI. CLI operations use the application owners and their receipts. Explicit runtime-only application and existing provider, telemetry-reporting, and model-installation recovery are unchanged. Actual persistence and resource application can still delay other ordered operations.
+
 ### Interpret Readiness at Its Owner
 
 | Observation | What it does not establish |
@@ -103,6 +110,8 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 | Configured overlay/OSC target | Effective resource readiness, remote receipt, or physical display |
 | Applied manual-text admission | Completed translation or destination delivery |
 
+The GUI dashboard's “Ready!” means Self/TALK capture is active and its recognition provider accepts input. It does not require a first recognition result, certify an open remote connection, or guarantee recognition/translation success. Startup is shown as preparing, shutdown as stopping, and unavailable capture as failed. Readiness refreshes preserve existing conversation content and specific error/model notices; they do not clear the display.
+
 Use the terminal operation receipt together with `providers.status`, `models status`, `overlay status`, `osc status`, or the relevant owner's query. Correct the reported cause before explicitly retrying. A failed/cancelled current translation warmup turns effective translation off while retaining the selection and failure details.
 
 Matching `translation set off` or `capture set <channel> off` can revoke pending startup. Shared model demand may keep resources alive for another channel. Runtime stops are distinct from cancelling an explicit model download/import.
@@ -110,6 +119,10 @@ Matching `translation set off` or `capture set <channel> off` can revoke pending
 ### Peer Capture and Audio Tests
 
 Read `capture terms` first. Only an informed user's explicit choice authorizes `capture set peer on --accept-peer-terms`; never auto-supply consent. The flag is valid only for peer-on. Peer speech is excluded from the VRChat chatbox.
+
+A capture-target change that is saved while requested Peer capture remains pending reports `degraded`, not `applied`, through both the GUI application boundary and `audio.target.set` control receipts. With Peer capture intentionally off, successful target application does not require an active capture source.
+
+After a capture failure, explicitly applying a valid target reports `applied` once the requested provider and capture configuration are ready and active. Resubmitting that unchanged healthy target also reports `applied`. Prior safe failure evidence remains available through bounded current-instance `diagnostics.history`; it does not make recovered capture degraded. Pending recovery and new current failures still prevent successful convergence.
 
 `audio test on|off` runs VAD without recognition or translation. It pauses normal capture and restores only still-valid prior intent; inspect `app status` → `audio_test` for readiness, failures, and VAD readings. Stopping waits for owned input release, not just a visual toggle.
 
@@ -126,26 +139,34 @@ The receipt provides admission and turn identities with `output_delivery: unobse
 
 ### Local Speech Recognition
 
-Use current `settings choices` and `models status`; retired CPU models are not installable choices. CPU Auto considers all supported languages of [Orukeet](https://huggingface.co/oruk/orukeet) (25) and [Fun-ASR-MLT-Nano](https://github.com/handy-computer/transcribe.cpp/blob/8facde6fcd8fb9caa585a5788ab450df6e8ec7db/docs/models/fun-asr-nano.md#choosing-a-variant) (31). It routes by the configured source language, not automatic spoken-language detection, with this priority:
+Use current `settings choices` and `models status`; retired CPU models are not installable choices. CPU Auto is the default for both Self and Peer. It routes by the configured source language, not automatic spoken-language detection, with this priority:
 
 | Selected CPU model | Source language codes |
 | --- | --- |
 | Standard Fun-ASR-Nano | `zh`, including `zh-CN` and `zh-TW` |
 | Parakeet Japanese CTC | `ja` |
-| Orukeet | `bg`, `hr`, `cs`, `da`, `nl`, `en`, `et`, `fi`, `fr`, `de`, `el`, `hu`, `it`, `lv`, `lt`, `mt`, `pl`, `pt`, `ro`, `ru`, `sk`, `sl`, `es`, `sv`, `uk` |
-| Fun-ASR-MLT-Nano | `ko`, `vi`, `id`, `th`, `ms`, `tl`, `ar`, `hi`, `ga`, `yue` |
+| Granite Speech 5.0 Multilingual | `en`, `fr`, `de`, `es`, `pt`, `it` |
+| GigaAM-v3 e2e-CTC | `ru` |
+| Fun-ASR-MLT-Nano | `yue`, `ko`, `vi`, `id`, `th`, `ms`, `tl`, `ar`, `hi`, `bg`, `hr`, `cs`, `da`, `nl`, `et`, `fi`, `el`, `hu`, `ga`, `lv`, `lt`, `mt`, `pl`, `ro`, `sk`, `sl`, `sv` |
 
-English, Chinese and Japanese retain their existing routes; Orukeet wins the other overlaps. Direct MLT selection supports its full 31-language scope, including English, Chinese, Japanese and languages routed to Orukeet by Auto. Regional codes are normalized to their base language. The combined routing contract covers 37 base language codes; this does not add languages to the application's language picker. Languages outside that scope remain explicitly unsupported, without silently switching to cloud, GPU or retired providers. Auto still requires all four current CPU models installed.
+Direct Granite selection supports seven languages: `en`, `fr`, `de`, `es`, `pt`, `it`, `ja`; Auto retains Japanese CTC for `ja`. GigaAM supports Russian only. Direct [MLT selection](https://github.com/handy-computer/transcribe.cpp/blob/8facde6fcd8fb9caa585a5788ab450df6e8ec7db/docs/models/fun-asr-nano.md#choosing-a-variant) supports its full declared 31-language scope, including `zh`, `en`, `ja` and `pt`, which Auto routes elsewhere. Regional codes are normalized to their base language. The union covers 36 base language codes; this does not add languages to the application's language picker. Ukrainian (`uk`) and languages outside that scope are explicitly unsupported, without silently switching to cloud, GPU or retired providers. Auto requires all five current CPU models installed.
 
 - Each active transcribe.cpp CPU channel owns its native Model/Session and requests two inference threads. Talk and Listen can compute concurrently with 2+2 threads, including on the same checkpoint, without preloading an inactive channel. This is not a total process-thread cap.
+- Granite, GigaAM, standard Nano and MLT use Q8_0 weight quantization, not all-INT8 execution. They use the existing CPU worker and unchanged transcribe.cpp revision `8facde6fcd8fb9caa585a5788ab450df6e8ec7db`; Japanese CTC retains sherpa-onnx.
+- Granite and GigaAM receive no language hint. Granite marker-only no-speech output becomes an empty transcript, including surrounding whitespace or terminal punctuation; real mixed lexical output is retained.
 - Fun-ASR Nano and MLT keep ISO language codes at the application/worker boundary and convert them to the checkpoint's documented Chinese language names inside the native prompt (`zh` → `中文`, `ko` → `韩文`). This is language conditioning, not a strict decoder constraint: short, ambiguous or noisy speech can still be misrecognized or produce another language.
 - GPU ASR keeps one resident Model shared by independent channel Sessions and serializes inference. Switching drains and frees the old Model before loading its replacement; it never preloads a second GPU Model.
 - Channel stops or changes revoke that channel's results and retain started native work until settlement. Another channel's unrelated resource remains owned. An admitted stop is not proof of native cleanup.
-- Legacy settings and control input `local_parakeet_v3` normalize to `local_orukeet`; `local_qwen` normalizes to `local_cpu_auto`. Queries, saved settings and choices use canonical values. See [OSC numeric compatibility](vrchat-osc.md#asr-ids) for legacy numeric inputs.
+- Legacy settings and control inputs `local_orukeet`, `local_parakeet_v3` and `local_qwen` normalize to `local_cpu_auto` on both channels and are persisted canonically through the existing recoverable migration. Queries, saved settings and choices use canonical values, including `local_granite` and `local_gigaam` for direct selection. See [OSC numeric compatibility](vrchat-osc.md#asr-ids) for legacy numeric inputs.
 - Only initial application startup, after successful recoverable canonical settings loading, removes recognized retired CPU assets and their known residue before constructing native providers. Ordinary settings reloads or telemetry verification do not authorize deletion. Locked/deferred cleanup retries on a later application startup. Unknown contents, reparse targets, Japanese/GPU assets and settings backups are preserved.
-- Replacement downloads use pinned sizes and SHA-256 with the normal staged installer. The derived `hf_mirror` source serves the same files through `hf-mirror.net`; source reachability is distinct from recognition readiness.
+- All five CPU models have alternate download paths. Downloads use pinned sizes and SHA-256 with the normal staged installer. The derived `hf_mirror` source serves the same files through `hf-mirror.net`, including Granite and GigaAM; source fallback changes neither the selected model nor its integrity contract. Source reachability is distinct from recognition readiness.
+- Windows Setup automatically provisions these five CPU ASR models. The optional **Re-download AI models** task forces their replacement even when installed files pass validation; leaving it unchecked still installs missing or invalid required models. Smart Turn and Silero VAD are bundled application resources, installed with the package rather than downloaded by this task. They are not loaded from the writable ASR model cache. Managed Gemma weights remain a separate on-demand download.
 
-Exact model/source pins live in the [ASR asset registry](../src/puripuly_heart/core/local_asr/local_stt_assets.py) and its packaged manifests. Model license terms, including Orukeet CC BY-SA 4.0 and the FunASR model agreement, are in the [third-party notices](../src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt).
+Exact model/source pins live in the [ASR asset registry](../src/puripuly_heart/core/local_asr/local_stt_assets.py) and its packaged manifests. Granite is Apache-2.0, GigaAM is MIT, and Fun-ASR retains its model agreement; see the [third-party notices](../src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt).
+
+The original [#353 comparison report](https://github.com/kapitalismho/PuriPuly-heart/blob/0246def7b/docs/experiments/issue-353/results/report.md), [saved summary](https://github.com/kapitalismho/PuriPuly-heart/blob/0246def7b/docs/experiments/issue-353/results/summary.json) and [execution evidence](https://github.com/kapitalismho/PuriPuly-heart/blob/0246def7b/docs/experiments/issue-353/execution-evidence.json) remain pinned to the merged experiment commit. That bounded English/Japanese comparison supports the English Granite and retained Japanese CTC decision; it does not benchmark-verify every declared language or Russian GigaAM.
+
+The reusable [CPU ASR benchmark harness](../benchmarks/asr/README.md) keeps scripts, frozen inputs, local model files, audio/cache data and generated results together under `benchmarks/asr/`. Large/local/generated directories are ignored; model downloads reuse the application installer and its alternate-source integrity checks.
 
 ### Managed Local Translation
 
@@ -219,6 +240,12 @@ puripuly.exe auth logout chatgpt
 - Storage-read failure is unknown state (`signed_in: null`), not logout. Do not delete settings, encrypted secrets, or their `.lock` file as a recovery shortcut. If authentication succeeded but provider activation failed, retry translation enablement after correcting the runtime cause.
 - Logout is local-only except ChatGPT, which also requests refresh-token revocation. Inspect the reported scope; local deletion alone does not prove remote revocation.
 - Browser authorization and app-to-service traffic can use different routes. Correct proxy/TLS configuration rather than disabling certificate verification. Share only sanitized diagnostic fields, never OAuth codes, keys, tokens, proxy URLs, or full settings/secret files.
+
+### Proxy Changes
+
+- Shared external HTTP clients read the currently visible proxy settings when dispatching each request. Generic WebSocket connectors read them when opening a connection, including redirected connection attempts. Changing the proxy does not migrate an existing request or socket, or automatically restart recognition.
+- Gemini Live and ordinary Hugging Face/Xet worker downloads retain a proxy snapshot selected during session or operation setup. Start a new session or operation to pick up changed settings in those paths.
+- Environment settings are read from the running process; editing operating-system environment variables does not necessarily update that process. Proxy refresh does not reload an existing client's explicit CA-file configuration.
 
 ## Events and Privacy
 

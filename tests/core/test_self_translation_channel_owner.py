@@ -792,6 +792,8 @@ async def test_native_latency_uses_frozen_anchor_without_waiting_for_local_end(
         clock.advance(1.0)
         llm.release.set()
         await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+        if channel == "peer":
+            await asyncio.wait_for(harness.peer_owner.cloud_captions.wait_for_idle(), timeout=1.0)
         await asyncio.wait_for(harness.output_runtime.wait_for_peer_output_idle(), timeout=1.0)
         if channel == "self":
             assert sender.sent == ["source (translated)"]
@@ -1295,7 +1297,7 @@ async def test_local_scoped_final_preserves_capture_timing_through_preview_accep
     sender = FakeSender()
     paginator = ChatboxPaginator(sender=sender, clock=clock)
     settings = AudioSegmentSettingsSnapshot(
-        provider_id="local_orukeet",
+        provider_id="local_granite",
         provider_signature=("synthetic-local",),
         runtime_signature=("synthetic-local",),
         source_mode="manual",

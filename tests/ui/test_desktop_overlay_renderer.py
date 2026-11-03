@@ -6279,3 +6279,75 @@ async def test_desktop_runtime_window_failure_preserves_safe_cause(boundary: str
         assert "SYNTHETIC_PRIVATE" not in json.dumps(sink.events)
     finally:
         await renderer.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_peer_enters_physical_lower_slot_and_new_caption_promotes_previous() -> None:
+    peer = _block(
+        "peer:first",
+        channel="peer",
+        block_variant="finalized",
+        appearance_seq=1,
+        primary_text="first page",
+        secondary_text="first source",
+        secondary_enabled=True,
+    )
+    next_peer = replace(
+        peer, id="peer:next", occupant_key="peer:next", appearance_seq=2, primary_text="second"
+    )
+    third_peer = replace(
+        peer, id="peer:third", occupant_key="peer:third", appearance_seq=3, primary_text="third"
+    )
+    first = OverlayPresentationSnapshot(revision=1, blocks=[peer])
+    plan = desktop_overlay.build_desktop_caption_plan(first)
+    static = desktop_overlay.build_desktop_caption_surface(plan)
+    assert static.content.controls[0].height == plan.window_height
+    assert static.content.controls[0].alignment == ft.MainAxisAlignment.END
+    app = FakeFletApp()
+    window = desktop_overlay.FletDesktopRendererWindow(app_runner=app.run)
+    try:
+        await window.start(first)
+        model = window._retained_caption_surface
+        assert model is not None
+        assert model.slot_column.height == plan.window_height
+        assert model.slot_column.alignment == ft.MainAxisAlignment.END
+        await window.dispatch_snapshot(
+            OverlayPresentationSnapshot(revision=2, blocks=[peer, next_peer])
+        )
+        assert model.slot_column.alignment == ft.MainAxisAlignment.CENTER
+        assert [text.value for text in model.primary_texts] == ["first page", "second"]
+        await window.dispatch_snapshot(
+            OverlayPresentationSnapshot(revision=3, blocks=[next_peer, third_peer])
+        )
+        assert [text.value for text in model.primary_texts] == ["second", "third"]
+        await window.dispatch_snapshot(OverlayPresentationSnapshot(revision=4, blocks=[third_peer]))
+        assert model.slot_column.alignment == ft.MainAxisAlignment.END
+    finally:
+        await window.close()
+
+
+@pytest.mark.asyncio
+async def test_self_only_surface_retains_existing_centered_placement_after_peer() -> None:
+    app = FakeFletApp()
+    window = desktop_overlay.FletDesktopRendererWindow(app_runner=app.run)
+    peer = _block(
+        "peer:one",
+        channel="peer",
+        block_variant="finalized",
+        appearance_seq=1,
+        primary_text="peer",
+        secondary_text="",
+        secondary_enabled=False,
+    )
+    own = replace(peer, id="self:one", occupant_key="self:one", channel="self", appearance_seq=2)
+    try:
+        await window.start(OverlayPresentationSnapshot(revision=1, blocks=[peer]))
+        await window.dispatch_snapshot(OverlayPresentationSnapshot(revision=2, blocks=[own]))
+        model = window._retained_caption_surface
+        assert model is not None
+        assert model.slot_column.alignment == ft.MainAxisAlignment.CENTER
+        assert model.slot_column.height == pytest.approx(
+            (model.root.height - model.slot_column.spacing) / 2
+        )
+    finally:
+        await window.close()

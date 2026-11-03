@@ -10,8 +10,9 @@ from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRInstall
 from puripuly_heart.core.local_asr.local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
     FUN_ASR_NANO_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
-    ORUKEET_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
     load_local_stt_asset_manifest,
     validate_local_stt_install,
@@ -38,7 +39,12 @@ from tests.core.test_local_stt_runtime_installer import (
     temp_dir as temp_dir,
 )
 
-REPLACEMENT_MODELS = (ORUKEET_MODEL_ID, FUN_ASR_NANO_MODEL_ID, FUN_ASR_MLT_NANO_MODEL_ID)
+REPLACEMENT_MODELS = (
+    GRANITE_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    FUN_ASR_NANO_MODEL_ID,
+    FUN_ASR_MLT_NANO_MODEL_ID,
+)
 
 
 def _local_manifest(model_id, source_directory, base_url):
@@ -81,13 +87,14 @@ class _LocalHuggingFaceTransport:
         return path
 
 
+@pytest.mark.parametrize("model_id", REPLACEMENT_MODELS)
 @pytest.mark.parametrize("selected", ["huggingface", "hf_mirror"])
 @pytest.mark.parametrize("corrupt_selected", [False, True])
 async def test_explicit_choice_is_the_only_source_and_requires_pinned_bytes(
-    tmp_path, file_server, selected, corrupt_selected
+    tmp_path, file_server, model_id, selected, corrupt_selected
 ):
     directory, url = file_server
-    manifest, payload = _local_manifest(FUN_ASR_NANO_MODEL_ID, directory, url)
+    manifest, payload = _local_manifest(model_id, directory, url)
     selected_prefix = "hf" if selected == "huggingface" else "mirror"
     rejected_prefix = "mirror" if selected == "huggingface" else "hf"
     corrupted = selected_prefix if corrupt_selected else rejected_prefix
@@ -144,7 +151,7 @@ async def test_explicit_source_error_retains_safe_code_and_status_without_fallba
     tmp_path, file_server
 ):
     directory, url = file_server
-    manifest, _payload = _local_manifest(ORUKEET_MODEL_ID, directory, url)
+    manifest, _payload = _local_manifest(GRANITE_MODEL_ID, directory, url)
     requests = []
 
     class Downloader:
@@ -246,16 +253,22 @@ async def test_automatic_choice_installs_current_manifest_from_locale_preferred_
     )
 
 
+@pytest.mark.parametrize("model_id", REPLACEMENT_MODELS)
+@pytest.mark.parametrize("first_failure", ["corrupt", "missing"])
 @pytest.mark.parametrize(
     "locale,corrupt_prefix,expected",
     [("zh-CN", "mirror", "huggingface"), ("en", "hf", "hf_mirror")],
 )
 async def test_automatic_choice_can_recover_from_bad_first_source_using_same_pinned_bytes(
-    tmp_path, file_server, locale, corrupt_prefix, expected
+    tmp_path, file_server, model_id, first_failure, locale, corrupt_prefix, expected
 ):
     directory, url = file_server
-    manifest, payload = _local_manifest(FUN_ASR_NANO_MODEL_ID, directory, url)
-    (directory / corrupt_prefix / manifest.files[0].relative_path).write_bytes(b"x" * len(payload))
+    manifest, payload = _local_manifest(model_id, directory, url)
+    first_asset = directory / corrupt_prefix / manifest.files[0].relative_path
+    if first_failure == "corrupt":
+        first_asset.write_bytes(b"x" * len(payload))
+    else:
+        first_asset.unlink()
     installed = await ensure_local_stt_installed(
         model_root=tmp_path / "models",
         manifest=manifest,
@@ -289,7 +302,7 @@ async def test_cancelled_lease_acquisition_waits_and_releases_acquired_lease(tmp
     monkeypatch.setattr(installer.LocalSTTProvisioningLease, "acquire", acquire)
     task = asyncio.create_task(
         ensure_local_stt_installed(
-            model_id=ORUKEET_MODEL_ID, model_root=tmp_path, cancel_event=cancellation
+            model_id=GRANITE_MODEL_ID, model_root=tmp_path, cancel_event=cancellation
         )
     )
     try:

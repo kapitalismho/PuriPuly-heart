@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 from uuid import UUID
 
 from puripuly_heart.core.audio.ownership import (
+    AudioSegmentSnapshot,
     AudioSegmentTerminalReceipt,
     OwnedStreamInput,
     OwnedVadEvent,
@@ -24,6 +25,7 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigSnapshot,
     TranslationRuntimeConfigSnapshotPort,
 )
+from puripuly_heart.core.orchestrator.peer_caption import CLOUD_PEER_PROVIDERS, PeerCaptionOwner
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
     LatencyInheritanceDiagnostic,
     LatencyStageDiagnostic,
@@ -51,7 +53,13 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnRequest,
 )
 from puripuly_heart.core.speaker_identity import PeerSpeakerIdentityAllocator
-from puripuly_heart.core.stt.backend import STTProviderTurnTerminal, STTRecognitionUnit
+from puripuly_heart.core.stt.backend import (
+    STTProviderEpochEnded,
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
+    STTRecognitionUnit,
+    STTRecognitionUnitTerminal,
+)
 from puripuly_heart.core.stt.recognition_units import recognition_transcript
 from puripuly_heart.core.vad.gating import SpeechEnd
 from puripuly_heart.domain.events import (
@@ -66,6 +74,7 @@ from puripuly_heart.domain.models import (
     Transcript,
     Translation,
 )
+from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 
 
 @dataclass(slots=True)
@@ -90,10 +99,24 @@ class PeerTranslationChannelOwner:
     _publication_order_by_generation: dict[int, int] = field(default_factory=dict)
     _retired_local_vad_ids: OrderedDict[UUID, None] = field(default_factory=OrderedDict)
     _accepting_events: bool = field(init=False, default=True)
+    cloud_captions: PeerCaptionOwner = field(init=False)
+    _cloud_final_scopes: dict[UUID, tuple[str, tuple[object, ...], AudioSegmentSnapshot | None]] = (
+        field(default_factory=dict)
+    )
+    _native_caption_orders: dict[UUID, tuple[RecognitionStreamIdentity, int]] = field(
+        default_factory=dict
+    )
 
     def __post_init__(self) -> None:
         if self.runtime.channel != "peer":
             raise ValueError("Peer translation owner requires the Peer channel runtime")
+        self.cloud_captions = PeerCaptionOwner(
+            self.runtime,
+            self.translation_requests,
+            self.output_projection,
+            self.clock,
+            speaker_identities=self._speaker_identities,
+        )
 
     @property
     def accepting_events(self) -> bool:
@@ -101,15 +124,20 @@ class PeerTranslationChannelOwner:
 
     def set_clock(self, clock: Clock) -> None:
         self.clock = clock
+        self.cloud_captions.clock = clock
 
     async def open_ingress(self) -> None:
         self._accepting_events = True
 
     async def close_ingress(self) -> None:
         self._accepting_events = False
+        await self.cloud_captions.drain()
 
     async def close(self) -> None:
         self._accepting_events = False
+        await self.cloud_captions.reset()
+        self._cloud_final_scopes.clear()
+        self._native_caption_orders.clear()
         await self.translation_turns.cancel_pending(channel="peer")
         await self.runtime.reset_runtime_state()
         self._prepared_requests.clear()
@@ -326,6 +354,9 @@ class PeerTranslationChannelOwner:
         if channel != "peer":
             raise ValueError("Peer translation owner cannot reset a non-Peer channel")
         await self.translation_turns.cancel_pending(channel="peer")
+        await self.cloud_captions.reset()
+        self._cloud_final_scopes.clear()
+        self._native_caption_orders.clear()
         await self.runtime.reset_runtime_state()
         self._clear_peer_logical_turn_state()
         self._retired_local_vad_ids.clear()
@@ -441,16 +472,68 @@ class PeerTranslationChannelOwner:
         stream = unit.identity.stream
         if stream.channel != "peer":
             raise ValueError("Peer translation owner received non-Peer recognition unit")
+        if not unit.is_final and self.cloud_captions.is_completed(unit.identity.unit_id):
+            return
         self.diagnostics.record_recognition_latency(unit)
-        order = self._allocate_publication_order(stream.activation_generation)
+        remembered = self._native_caption_orders.pop(unit.identity.unit_id, None)
+        if remembered is None and not unit.is_final and not unit.text.strip():
+            return
+        order = (
+            self._allocate_publication_order(stream.activation_generation)
+            if remembered is None
+            else remembered[1]
+        )
+        if not unit.is_final:
+            if not self._cloud_translation_enabled():
+                return
+            self._native_caption_orders[unit.identity.unit_id] = (stream, order)
+            await self.cloud_captions.partial(
+                Transcript(
+                    unit.identity.unit_id,
+                    unit.text,
+                    False,
+                    created_at=unit.observed_at,
+                    channel="peer",
+                    publication_generation=stream.activation_generation,
+                    source_order=order,
+                ),
+                provider_id=str(stream.settings_scope[0]) if stream.settings_scope else "",
+                scope=(
+                    stream.activation_generation,
+                    stream.capture_epoch,
+                    stream.provider_epoch_id,
+                ),
+                config=self.translation_runtime_config_snapshot(),
+            )
+            return
         transcript = recognition_transcript(
             unit,
             created_at=self.clock.now(),
             publication_order=order,
         )
+        self._cloud_final_scopes[transcript.utterance_id] = (
+            str(stream.settings_scope[0]) if stream.settings_scope else "",
+            (stream.activation_generation, stream.capture_epoch, stream.provider_epoch_id),
+            None,
+        )
         await self.handle_stt_event(
             STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
         )
+
+    async def handle_recognition_unit_terminal(self, event: STTRecognitionUnitTerminal) -> None:
+        if event.unit.identity.stream.channel != "peer":
+            raise ValueError("Peer translation owner received non-Peer recognition unit")
+        if event.outcome == "final" and event.unit.text:
+            await self.handle_recognition_unit(event.unit)
+            return
+        self._native_caption_orders.pop(event.unit.identity.unit_id, None)
+        await self.cloud_captions.retire(event.unit.identity.unit_id)
+
+    async def handle_provider_epoch_ended(self, event: STTProviderEpochEnded) -> None:
+        for unit_id, (stream, _order) in tuple(self._native_caption_orders.items()):
+            if stream.provider_epoch_id == event.provider_epoch_id:
+                self._native_caption_orders.pop(unit_id, None)
+        await self.cloud_captions.retire_epoch(event.provider_epoch_id)
 
     async def handle_provider_turn_terminal(
         self,
@@ -461,6 +544,7 @@ class PeerTranslationChannelOwner:
         if receipt.identity != terminal.identity.segment:
             raise ValueError("provider terminal receipt identity mismatch")
         if terminal.outcome not in {"final", "degraded"} or not terminal.text:
+            await self.cloud_captions.retire(receipt.identity.segment_id)
             self.diagnostics.emit(
                 RuntimeDiagnostic(
                     message=(
@@ -499,6 +583,15 @@ class PeerTranslationChannelOwner:
             utterance_id=receipt.identity.segment_id,
             transcript=transcript,
         )
+        self._cloud_final_scopes[transcript.utterance_id] = (
+            receipt.segment.settings.provider_id,
+            (
+                receipt.identity.activation_generation,
+                receipt.identity.capture_epoch,
+                terminal.identity.provider_epoch_id,
+            ),
+            receipt.segment,
+        )
         await self.handle_stt_event(event)
         return event
 
@@ -506,6 +599,9 @@ class PeerTranslationChannelOwner:
         if channel != "peer":
             raise ValueError("Peer translation owner cannot clear a non-Peer channel")
         await self.translation_turns.cancel_pending(channel="peer")
+        await self.cloud_captions.reset()
+        self._cloud_final_scopes.clear()
+        self._native_caption_orders.clear()
         await self.runtime.clear_live_translation_state()
         self._clear_peer_logical_turn_state()
         self._retired_local_vad_ids.clear()
@@ -560,11 +656,37 @@ class PeerTranslationChannelOwner:
         if isinstance(event, STTPartialEvent):
             if event.channel != "peer":
                 raise ValueError("Peer translation owner received a non-Peer partial event")
+            provider_id = self._current_provider_id()
+            if provider_id in CLOUD_PEER_PROVIDERS and self._cloud_translation_enabled():
+                await self.cloud_captions.partial(
+                    event.transcript,
+                    provider_id=provider_id,
+                    scope=(event.transcript.publication_generation, provider_id),
+                    config=self.translation_runtime_config_snapshot(),
+                )
             return
 
         if isinstance(event, STTFinalEvent):
             if event.channel != "peer":
                 raise ValueError("Peer translation owner received a non-Peer final event")
+            metadata = self._cloud_final_scopes.pop(event.transcript.utterance_id, None)
+            if metadata is None:
+                provider_id = self._current_provider_id()
+                metadata = (
+                    provider_id,
+                    (event.transcript.publication_generation, provider_id),
+                    None,
+                )
+            provider_id, scope, sealed = metadata
+            if provider_id in CLOUD_PEER_PROVIDERS and self._cloud_translation_enabled():
+                await self.cloud_captions.final(
+                    event.transcript,
+                    provider_id=provider_id,
+                    scope=scope,
+                    config=self.translation_runtime_config_snapshot(),
+                    sealed=sealed,
+                )
+                return
             configuration = self.translation_runtime_config_snapshot().value
             self.diagnostics.emit(
                 RuntimeDiagnostic(
@@ -591,6 +713,49 @@ class PeerTranslationChannelOwner:
     async def handle_retired_stt_event(self, event: object) -> None:
         if isinstance(event, STTFinalEvent) and event.channel == "peer":
             await self.handle_stt_event(event)
+
+    def _current_provider_id(self) -> str:
+        return self.local_asr_runtime.snapshot.channel_for("peer").provider_id or ""
+
+    def _cloud_translation_enabled(self) -> bool:
+        return (
+            self.translation_requests.provider_available
+            and self._translation_enabled_for_runtime(self.runtime)
+        )
+
+    async def handle_provider_update(self, event: STTProviderTurnUpdate) -> None:
+        if event.is_current is not None and not event.is_current():
+            return
+        identity = event.identity
+        provider_id = str(identity.settings_scope[0]) if identity.settings_scope else ""
+        if provider_id not in CLOUD_PEER_PROVIDERS or not self._cloud_translation_enabled():
+            return
+        if not self.output_projection.output_runtime.peer_publication_is_authorized(
+            identity.segment.activation_generation, identity.segment.segment_order
+        ):
+            return
+        await self.cloud_captions.partial(
+            Transcript(
+                identity.segment.segment_id,
+                event.text,
+                False,
+                created_at=(
+                    event.first_nonempty_at
+                    if event.first_nonempty_at is not None
+                    else event.observed_at if event.observed_at is not None else self.clock.now()
+                ),
+                channel="peer",
+                publication_generation=identity.segment.activation_generation,
+                source_order=identity.segment.segment_order,
+            ),
+            provider_id=provider_id,
+            scope=(
+                identity.segment.activation_generation,
+                identity.segment.capture_epoch,
+                identity.provider_epoch_id,
+            ),
+            config=self.translation_runtime_config_snapshot(),
+        )
 
     def _require_ingress(self) -> None:
         if not self._accepting_events:

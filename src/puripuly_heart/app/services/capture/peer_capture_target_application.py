@@ -23,6 +23,7 @@ from puripuly_heart.config.settings_vnext.schema import (
     CaptureTargetIntent,
     ProcessCaptureTargetIntent,
 )
+from puripuly_heart.core.messages import TransactionResult
 
 from .peer_capture_target import PeerCaptureTargetResolutionService
 
@@ -45,6 +46,7 @@ class PeerCaptureTargetApplicationOwner:
     settings_presentation_sink: SettingsPresentationSink
     warning_reset: WarningReset
     stop_audio_test: Callable[[], Awaitable[None]]
+    transaction_result_sink: Callable[[TransactionResult], None] | None = None
     _target_resolution: PeerCaptureTargetResolutionService = field(
         init=False,
         default_factory=PeerCaptureTargetResolutionService,
@@ -140,21 +142,31 @@ class PeerCaptureTargetApplicationOwner:
         if value != self.current_value():
             await self.stop_audio_test()
         apply_capture_target = getattr(self.settings, "apply_capture_target", None)
-        if apply_capture_target is not None:
-            next_settings = apply_capture_target(self.decode_option(value))
-        else:
-            next_settings = self.settings.update_capture_target(
-                current,
-                self.decode_option(value),
-            )
+        try:
+            if apply_capture_target is not None:
+                next_settings = apply_capture_target(self.decode_option(value))
+            else:
+                next_settings = self.settings.update_capture_target(
+                    current,
+                    self.decode_option(value),
+                )
+        except Exception:
+            self._publish_result("settings_commit_failed")
+            raise
+        self._publish_result("settings_commit_success_runtime_degraded")
         self.settings.canonical = next_settings
         self.settings.authoritative = True
         self.settings.remember_projection(next_settings)
         self.warning_reset()
-        await self.runtime_effects.apply_capture_target(next_settings)
+        if await self.runtime_effects.apply_capture_target(next_settings):
+            self._publish_result("settings_commit_success_runtime_applied")
         _provider, general, _prompt, _overlay = settings_view_surface_snapshots(next_settings)
         with contextlib.suppress(Exception):
             self.settings_presentation_sink(general)
+
+    def _publish_result(self, status: str) -> None:
+        if self.transaction_result_sink is not None:
+            self.transaction_result_sink(TransactionResult(status, None, None))
 
     @staticmethod
     def encode_process_option(target: ProcessCaptureTargetIntent) -> str:

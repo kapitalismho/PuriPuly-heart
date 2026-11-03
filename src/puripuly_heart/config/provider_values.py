@@ -43,7 +43,8 @@ LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS = frozenset(
 
 class STTProviderName(str, Enum):
     LOCAL_CPU_AUTO = "local_cpu_auto"
-    LOCAL_ORUKEET = "local_orukeet"
+    LOCAL_GRANITE = "local_granite"
+    LOCAL_GIGAAM = "local_gigaam"
     LOCAL_FUN_ASR_NANO = "local_fun_asr_nano"
     LOCAL_FUN_ASR_MLT_NANO = "local_fun_asr_mlt_nano"
     LOCAL_PARAKEET_JAPANESE = "local_parakeet_ja"
@@ -60,9 +61,7 @@ class STTProviderName(str, Enum):
 
 
 def normalize_stt_provider(value: str) -> str:
-    if value == "local_parakeet_v3":
-        return "local_orukeet"
-    if value == "local_qwen":
+    if value in {"local_orukeet", "local_parakeet_v3", "local_qwen"}:
         return "local_cpu_auto"
     return value
 

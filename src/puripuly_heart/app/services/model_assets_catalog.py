@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from puripuly_heart.core.local_asr.local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
     FUN_ASR_NANO_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
-    ORUKEET_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     load_local_stt_asset_manifest,
 )
@@ -25,11 +26,12 @@ class ModelAssetChoice:
 def model_asset_choices() -> tuple[ModelAssetChoice, ...]:
     choices = []
     for model_id, name, key in (
-        (ORUKEET_MODEL_ID, "Orukeet Q8_0", "orukeet"),
+        (GRANITE_MODEL_ID, "Granite Speech 5.0 Multilingual Q8_0", "granite"),
+        (GIGAAM_MODEL_ID, "GigaAM-v3 e2e-CTC Q8_0", "gigaam"),
         (FUN_ASR_NANO_MODEL_ID, "Fun-ASR-Nano-2512 Q8_0", "fun_asr_nano"),
         (FUN_ASR_MLT_NANO_MODEL_ID, "Fun-ASR-MLT-Nano-2512 Q8_0", "fun_asr_mlt_nano"),
-        (LOCAL_QWEN_GPU_MODEL_ID, "Qwen3 ASR 1.7B Q6_K", "qwen_gpu"),
         (PARAKEET_JAPANESE_MODEL_ID, "Parakeet TDT/CTC 0.6B Japanese INT8", "parakeet_ja"),
+        (LOCAL_QWEN_GPU_MODEL_ID, "Qwen3 ASR 1.7B Q6_K", "qwen_gpu"),
     ):
         manifest = load_local_stt_asset_manifest(model_id)
         choices.append(

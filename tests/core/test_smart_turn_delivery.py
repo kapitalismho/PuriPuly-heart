@@ -88,15 +88,16 @@ class Harness:
         hangover_ms: int = 500,
         inference: InferenceOwner | None = None,
         source_language: str = "en",
+        provider_id: str = "test",
     ) -> None:
         self.clock = Clock()
         self.vad = Vad()
         self.inference = inference or InferenceOwner()
         self.events = []
         settings = AudioSegmentSettingsSnapshot(
-            provider_id="test",
-            provider_signature=("test",),
-            runtime_signature=("test",),
+            provider_id=provider_id,
+            provider_signature=(provider_id,),
+            runtime_signature=(provider_id,),
             source_mode="manual",
             source_language=source_language,
             expected_languages=(),
@@ -698,3 +699,195 @@ async def test_repeated_activation_reprobes_and_listen_off_stays_silent() -> Non
     assert len(off.vad.ends) == 1
     assert off.inference.requests == []
     assert off.inference.prepare_count == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider_id", ["soniox", "deepgram", "gemini_transcribe", "qwen_audio"])
+async def test_cloud_final_keeps_four_second_192ms_opportunity(provider_id: str) -> None:
+    harness = Harness(provider_id=provider_id, profile="off", threshold=None, hangover_ms=800)
+    await harness.open()
+    await harness.feed_chunks([3776], speech=True)
+    await harness.feed_chunks([191], speech=False)
+    assert harness.vad.ends == []
+    await harness.feed_chunks([1], speech=False)
+    snapshot = harness.events[-1].segment
+    assert snapshot.seal_reason == "delivery_pause"
+    assert snapshot.delivery_pause_s == pytest.approx(0.192)
+    assert snapshot.content_sample_count == 4000 * 16
+    await harness.controller.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider_id", ["soniox", "deepgram", "gemini_transcribe", "qwen_audio"])
+async def test_cloud_final_five_second_opportunity_requires_192ms(provider_id: str) -> None:
+    harness = Harness(provider_id=provider_id, profile="off", threshold=None, hangover_ms=800)
+    await harness.open()
+    await harness.feed_chunks([4840], speech=True)
+    await harness.feed_chunks([128], speech=False)
+    assert harness.clock.value == pytest.approx(5.0)
+    assert harness.vad.ends == []
+    await harness.feed_chunks([63], speech=False)
+    assert harness.vad.ends == []
+    await harness.feed_chunks([1], speech=False)
+    snapshot = harness.events[-1].segment
+    assert snapshot.delivery_pause_s == pytest.approx(0.192)
+    assert snapshot.seal_reason == "delivery_pause"
+    assert snapshot.smart_turn_incomplete is False
+    await harness.controller.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider_id", ["soniox", "deepgram", "gemini_transcribe", "qwen_audio"])
+async def test_cloud_final_continuous_speech_survives_six_seconds_and_cuts_at_ten(
+    provider_id: str,
+) -> None:
+    harness = Harness(provider_id=provider_id, profile="off", threshold=None)
+    segment_id = await harness.open()
+    await harness.feed_chunks([5968], speech=True)
+    assert harness.clock.value == pytest.approx(6.0)
+    assert harness.vad.ends == []
+    await harness.feed_chunks([3999], speech=True)
+    assert harness.vad.ends == []
+    await harness.feed_chunks([1], speech=True)
+    snapshot = harness.events[-1].segment
+    assert snapshot.identity.segment_id == segment_id
+    assert snapshot.seal_reason == "delivery_deadline"
+    assert snapshot.content_sample_count == 10000 * 16
+    assert snapshot.delivery_pause_s == 0.0
+    assert snapshot.smart_turn_incomplete is False
+    await harness.controller.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "provider_id",
+    [
+        "local_cpu_auto",
+        "local_granite",
+        "local_gigaam",
+        "local_fun_asr_nano",
+        "local_fun_asr_mlt_nano",
+        "local_parakeet_ja",
+        "local_qwen_gpu",
+        "elevenlabs_scribe",
+        "rolling_free",
+        "custom",
+        "custom_offline",
+        "custom_realtime",
+    ],
+)
+async def test_other_routes_keep_128ms_opportunity_and_six_second_hard_cut(
+    provider_id: str,
+) -> None:
+    harness = Harness(provider_id=provider_id, profile="off", threshold=None, hangover_ms=800)
+    await harness.open()
+    await harness.feed_chunks([4840], speech=True)
+    await harness.feed_chunks([127], speech=False)
+    assert harness.vad.ends == []
+    await harness.feed_chunks([1], speech=False)
+    snapshot = harness.events[-1].segment
+    assert snapshot.seal_reason == "delivery_pause"
+    assert snapshot.delivery_pause_s == pytest.approx(0.128)
+    await harness.open()
+    await harness.feed_chunks([5967], speech=True)
+    assert len(harness.vad.ends) == 1
+    await harness.feed_chunks([1], speech=True)
+    assert len(harness.vad.ends) == 2
+    assert harness.events[-1].segment.seal_reason == "delivery_deadline"
+    await harness.controller.close()
+
+
+@pytest.mark.asyncio
+async def test_cloud_pause_timer_does_not_treat_160ms_as_five_second_opportunity() -> None:
+    harness = Harness(provider_id="soniox", profile="off", threshold=None)
+    harness.controller.FOUR_SECOND_AGE_S = 0.05
+    harness.controller.FIVE_SECOND_AGE_S = 0.25
+    harness.controller.CLOUD_HARD_LIMIT_S = 0.5
+    await harness.open()
+    await harness.feed(160, speech=False)
+    await asyncio.sleep(0.3)
+    assert harness.vad.ends == []
+    await harness.feed(32, speech=False)
+    await harness.controller._run_pause_step_timer(
+        harness.controller.current_segment_id, 0.0, pause_ms=192
+    )
+    assert harness.events[-1].segment.delivery_pause_s == pytest.approx(0.192)
+    await harness.controller.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("score", [0.2, 0.99])
+async def test_sealed_smart_turn_evidence_survives_clear_new_segment_and_terminal_receipt(
+    score: float,
+) -> None:
+    harness = Harness(provider_id="soniox")
+    first_id = await harness.open()
+    await harness.feed(224, speech=False)
+    request = harness.inference.requests[0]
+    await harness.complete(0, score=score, at=request.complete_deadline_monotonic_s - 0.1)
+    pause_ms = 800 if score < SMART_TURN_COMPLETE_THRESHOLD else 512
+    await harness.feed(pause_ms - 224, speech=False)
+    sealed = harness.events[-1].segment
+    assert sealed.identity.segment_id == first_id
+    assert sealed.delivery_pause_s == pytest.approx(pause_ms / 1000)
+    assert sealed.smart_turn_incomplete is (score < SMART_TURN_COMPLETE_THRESHOLD)
+    assert sealed.seal_reason == "delivery_pause"
+    assert harness.controller.current_segment_id is None
+    second_id = await harness.open()
+    await harness.feed(224, speech=False)
+    receipt = harness.ledger.terminalize(
+        first_id,
+        outcome="final",
+        now_monotonic_s=harness.clock(),
+        text_authority="authoritative",
+    )
+    assert receipt.identity.segment_id == first_id
+    assert receipt.segment.delivery_pause_s == sealed.delivery_pause_s
+    assert receipt.segment.smart_turn_incomplete is sealed.smart_turn_incomplete
+    assert receipt.segment.seal_reason == sealed.seal_reason
+    assert harness.ledger.snapshots[0].identity.segment_id == second_id
+    assert harness.ledger.snapshots[0].delivery_pause_s is None
+    assert harness.ledger.snapshots[0].smart_turn_incomplete is False
+    await harness.controller.close()
+
+
+@pytest.mark.asyncio
+async def test_hard_cut_keeps_actual_pause_and_incomplete_evidence_without_reason_override() -> (
+    None
+):
+    harness = Harness(provider_id="deepgram")
+    harness.controller.CLOUD_HARD_LIMIT_S = 0.32
+    segment_id = await harness.open()
+    await harness.feed(224, speech=False)
+    await harness.complete(0, score=0.2, at=0.26)
+    await harness.feed(64, speech=False)
+    sealed = harness.events[-1].segment
+    assert sealed.identity.segment_id == segment_id
+    assert sealed.seal_reason == "delivery_deadline"
+    assert sealed.delivery_pause_s == pytest.approx(0.288)
+    assert sealed.smart_turn_incomplete is True
+    await harness.open(genuine=False)
+    assert sealed.delivery_pause_s == pytest.approx(0.288)
+    assert sealed.smart_turn_incomplete is True
+    await harness.controller.close()
+
+
+@pytest.mark.asyncio
+async def test_cloud_policy_is_selected_from_immutable_segment_settings() -> None:
+    from dataclasses import replace
+
+    harness = Harness(provider_id="soniox", profile="off", threshold=None)
+    await harness.open()
+    harness.ledger.rebind(
+        activation_generation=8,
+        settings=replace(harness.ledger.settings, provider_id="local_cpu_auto"),
+    )
+    await harness.feed_chunks([5968], speech=True)
+    assert harness.vad.ends == []
+    await harness.feed_chunks([4000], speech=True)
+    assert harness.events[-1].segment.settings.provider_id == "soniox"
+    await harness.open()
+    await harness.feed_chunks([5968], speech=True)
+    assert harness.events[-1].segment.settings.provider_id == "local_cpu_auto"
+    assert harness.events[-1].segment.seal_reason == "delivery_deadline"
+    await harness.controller.close()

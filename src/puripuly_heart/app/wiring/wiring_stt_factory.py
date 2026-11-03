@@ -46,7 +46,8 @@ from puripuly_heart.config.runtime_resolution import (
     STT_PROVIDER_LOCAL_CPU_AUTO,
     STT_PROVIDER_LOCAL_FUN_ASR_MLT_NANO,
     STT_PROVIDER_LOCAL_FUN_ASR_NANO,
-    STT_PROVIDER_LOCAL_ORUKEET,
+    STT_PROVIDER_LOCAL_GIGAAM,
+    STT_PROVIDER_LOCAL_GRANITE,
     STT_PROVIDER_LOCAL_PARAKEET_JAPANESE,
     STT_PROVIDER_LOCAL_QWEN_GPU,
     STT_PROVIDER_QWEN_AUDIO,
@@ -64,8 +65,9 @@ from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRun
 from puripuly_heart.core.local_asr.local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
     FUN_ASR_NANO_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
-    ORUKEET_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
 )
 from puripuly_heart.core.peer_capture import (
@@ -99,7 +101,8 @@ from .wiring_secrets_factory import require_secret
 
 logger = logging.getLogger(__name__)
 _LOCAL_CPU_MODEL_BY_PROVIDER = {
-    STT_PROVIDER_LOCAL_ORUKEET: ORUKEET_MODEL_ID,
+    STT_PROVIDER_LOCAL_GRANITE: GRANITE_MODEL_ID,
+    STT_PROVIDER_LOCAL_GIGAAM: GIGAAM_MODEL_ID,
     STT_PROVIDER_LOCAL_FUN_ASR_NANO: FUN_ASR_NANO_MODEL_ID,
     STT_PROVIDER_LOCAL_FUN_ASR_MLT_NANO: FUN_ASR_MLT_NANO_MODEL_ID,
     STT_PROVIDER_LOCAL_PARAKEET_JAPANESE: PARAKEET_JAPANESE_MODEL_ID,
@@ -476,12 +479,15 @@ def build_local_asr_session_options(
     *,
     source_language: str,
     source_mode: str = "manual",
+    model_id: str | None = None,
 ) -> LocalASRSessionOptions:
     return LocalASRSessionOptions(
         source_language=source_language,
         source_mode=source_mode,
         language_hint=(
-            None if source_mode == "auto" else get_local_qwen_language_hint(source_language)
+            None
+            if source_mode == "auto" or model_id in {GRANITE_MODEL_ID, GIGAAM_MODEL_ID}
+            else get_local_qwen_language_hint(source_language)
         ),
     )
 
@@ -533,7 +539,10 @@ def build_self_local_asr_transition_request_from_vnext(
         requested_provider=provider,
         actual_provider=actual_provider,
         model_id=model_id,
-        session_options=build_local_asr_session_options(source_language=source_language),
+        session_options=build_local_asr_session_options(
+            source_language=source_language,
+            model_id=model_id,
+        ),
         trigger=trigger,
     )
 
@@ -567,6 +576,7 @@ def build_self_stt_provider_request_from_config(
             else build_local_asr_session_options(
                 source_language=backend.source_language,
                 source_mode=backend.source_mode,
+                model_id=config.model_id or backend.model,
             )
         ),
         provider_signature=config.provider_signature,
@@ -1372,7 +1382,8 @@ def resolve_peer_stt_config(settings: AppSettingsVNext) -> ResolvedPeerSTTConfig
 
     if provider in {
         STTProviderName.LOCAL_CPU_AUTO,
-        STTProviderName.LOCAL_ORUKEET,
+        STTProviderName.LOCAL_GRANITE,
+        STTProviderName.LOCAL_GIGAAM,
         STTProviderName.LOCAL_FUN_ASR_NANO,
         STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
         STTProviderName.LOCAL_PARAKEET_JAPANESE,
@@ -1499,6 +1510,7 @@ def build_peer_capture_session_config_from_vnext(
         build_local_asr_session_options(
             source_language=backend.source_language,
             source_mode=backend.source_mode,
+            model_id=model_id,
         )
         if local_provider
         else None

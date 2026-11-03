@@ -66,7 +66,7 @@ def _safe_token(value: object, fallback: str = "") -> str:
         return fallback
     if (
         not token
-        or len(token) > 64
+        or len(token) > 128
         or any(character not in _SAFE_TOKEN_CHARS for character in token)
     ):
         return fallback
@@ -97,8 +97,10 @@ def _channel_label(channel: object) -> str:
 def _model_label(model_id: object) -> str:
     token = _safe_token(model_id, "")
     normalized = token.casefold()
-    if "orukeet" in normalized:
-        return "Orukeet"
+    if "granite" in normalized:
+        return "Granite Speech 5.0"
+    if "gigaam" in normalized:
+        return "GigaAM-v3"
     if "fun-asr-mlt" in normalized:
         return "Fun-ASR-MLT-Nano"
     if "fun-asr-nano" in normalized:

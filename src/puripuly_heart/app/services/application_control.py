@@ -1852,6 +1852,7 @@ class ApplicationControlOwner:
                         "provider.apply",
                         "secrets.set",
                         "secrets.delete",
+                        "audio.target.set",
                         "overlay.lock",
                         "overlay.size",
                         "overlay.position.reset",

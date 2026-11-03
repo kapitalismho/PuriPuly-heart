@@ -843,6 +843,9 @@ def compose_application_runtime(
                 log_diagnostic=log_diagnostic,
                 translation_demand_sink=sync_local_translation_demand,
                 stop_audio_test=lambda: require_audio_test().stop(),
+                transaction_result_sink=lambda result: require_settings_application().results.set(
+                    result
+                ),
             )
         return peer
 
@@ -1068,20 +1071,18 @@ def compose_application_runtime(
         nonlocal last_self_capture_lifecycle
         provider_status = getattr(snapshot.provider_status, "value", snapshot.provider_status)
         capture_state = getattr(snapshot.state, "value", snapshot.state)
-        if (
-            snapshot.failure_reason is not None
-            or provider_status == "failed"
-            or capture_state == "faulted"
-        ):
+        if snapshot.failure_reason is not None or capture_state == "faulted":
+            lifecycle = "failed"
+        elif provider_status == "releasing" or capture_state == "stopping":
+            lifecycle = "stopping"
+        elif capture_state in {"admission_pending", "starting"}:
+            lifecycle = "preparing"
+        elif provider_status == "failed":
             lifecycle = "failed"
         elif provider_status == "pending":
             lifecycle = "pending"
-        elif capture_state in {"admission_pending", "starting"}:
-            lifecycle = "preparing"
         elif provider_status == "ready" and snapshot.desired_active and snapshot.effective_active:
             lifecycle = "committed"
-        elif provider_status == "releasing" or capture_state == "stopping":
-            lifecycle = "stopping"
         else:
             lifecycle = "idle"
         if lifecycle != last_self_capture_lifecycle:
@@ -1101,6 +1102,17 @@ def compose_application_runtime(
             elif lifecycle == "idle" and last_self_capture_lifecycle == "committed":
                 log_basic("[STT] Recognition stopped")
             last_self_capture_lifecycle = lifecycle
+        if lifecycle == "failed":
+            status = "failed"
+        elif lifecycle == "stopping":
+            status = "stopping"
+        elif not snapshot.desired_active:
+            status = "disconnected"
+        elif lifecycle == "committed":
+            status = "connected"
+        else:
+            status = "connecting"
+        presentation.set_dashboard_capture_status(status)
         require_local_asr().adapters.notice.sync()
         publish_osc_state_from_runtime()
         control_events.publish(
@@ -2119,6 +2131,7 @@ def compose_application_runtime(
     def install_pipeline(components: RuntimePipelineComponents) -> None:
         replace_translation_runtime_enabled(components.translation_runtime_configuration, False)
         pipeline.install(components)
+        on_self_capture_state(components.self_capture.snapshot)
         index_selection.start()
         llm_connection_readiness.sync()
 
@@ -2408,6 +2421,7 @@ def compose_application_runtime(
             secret_store_factory=create_settings_secret_store,
         ),
         index_selection=index_selection,
+        settings_results=settings_owner.results,
         osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
         runtime_control_authority=runtime_control_authority,
         runtime_control_activity=runtime_control_activity,

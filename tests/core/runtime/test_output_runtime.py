@@ -257,6 +257,9 @@ class PacedOverlaySink(RecordingOverlaySink):
     async def emit_peer_when_admissible(
         self,
         event: OverlayEventUnion,
+        *,
+        on_wait=None,
+        admission_started_at: float | None = None,
     ) -> OverlayApplicationReceipt:
         self.started.set()
         await self.release.wait()
@@ -2598,3 +2601,87 @@ async def test_optional_observer_loss_does_not_change_local_publication_outcome(
     assert health["owner_history_evictions"] == 1
     assert "forbidden-observer-body" not in repr(health)
     await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_revisioned_preview_preemption_preserves_unrelated_final_order_and_owned_drain():
+    class GateSink:
+        def __init__(self):
+            self.events = []
+            self.preview_started = asyncio.Event()
+            self.preview_cancelled = asyncio.Event()
+            self.unrelated_started = asyncio.Event()
+            self.release_unrelated = asyncio.Event()
+
+        async def emit(self, event):
+            raise AssertionError("Peer delivery must use the paced boundary")
+
+        async def emit_peer_when_admissible(
+            self, event, *, on_wait=None, admission_started_at=None
+        ):
+            if event.type == "translation_stream_update":
+                self.preview_started.set()
+                try:
+                    await asyncio.Event().wait()
+                except asyncio.CancelledError:
+                    self.preview_cancelled.set()
+                    raise
+            if event.source_text == "Unrelated final.":
+                self.unrelated_started.set()
+                await self.release_unrelated.wait()
+            self.events.append(event)
+
+    sink = GateSink()
+    owner = _output_runtime_class()(chatbox=RecordingChatbox(), overlay_sink=sink)
+    adapter = OverlayEventAdapter()
+    original, absorbed, unrelated, queued = [uuid4() for _ in range(4)]
+
+    def version(unit, source, revision=1, *, preview=False, superseded=()):
+        build = adapter.translation_stream_update if preview else adapter.translation_final
+        return build(
+            utterance_id=unit,
+            channel="peer",
+            text=f"translated:{source}",
+            source_text=source,
+            source_language="en",
+            target_language="ko",
+            applied_context_mode=None,
+            peer_caption_revision=revision,
+            peer_superseded_unit_ids=superseded,
+        )
+
+    first = version(original, "Original,")
+    pending = version(absorbed, "absorbed preview", preview=True)
+    independent = version(unrelated, "Unrelated final.")
+    repair = version(original, "Original, repair", 2, superseded=(absorbed,))
+    queued_preview = version(queued, "queued preview", preview=True)
+    queued_final = version(queued, "Queued final.", 2)
+    try:
+        assert owner.peer_caption_text_scale == 1.0
+        await _publish_peer_overlay(owner, first, source_order=1)
+        await owner.wait_for_peer_output_idle()
+        await _publish_peer_overlay(owner, pending, source_order=2)
+        await asyncio.wait_for(sink.preview_started.wait(), 1)
+        writer = owner._peer_overlay_worker
+        await _publish_peer_overlay(owner, independent, source_order=3)
+        await _publish_peer_overlay(owner, repair, source_order=1)
+        await asyncio.wait_for(sink.unrelated_started.wait(), 1)
+        assert sink.preview_cancelled.is_set()
+        assert owner._peer_overlay_worker is writer
+        assert sink.events == [first]
+        await _publish_peer_overlay(owner, queued_preview, source_order=4)
+        await _publish_peer_overlay(owner, queued_final, source_order=4)
+        sink.release_unrelated.set()
+        await asyncio.wait_for(owner.wait_for_peer_output_idle(), 1)
+        assert sink.events == [first, independent, repair, queued_final]
+        superseded = {
+            decision.publication_id
+            for decision in owner.routing_decisions
+            if decision.reason == "peer_caption_superseded"
+        }
+        assert superseded == {pending.event_id, queued_preview.event_id}
+        assert owner._peer_delivery_task is None
+        assert not owner.has_active_overlay_deliveries
+    finally:
+        sink.release_unrelated.set()
+        await asyncio.wait_for(owner.close(), 1)

@@ -141,7 +141,8 @@ def test_native_child_consumes_production_bundle_resources_without_installed_wri
         "data/fonts/NotoSansCJK-Medium.ttc",
         "data/THIRD_PARTY_NOTICES.txt",
         "data/licenses/PYTHON-3.14.10-LICENSE.txt",
-        "data/models/orukeet-q8-0-transcribe-cpu.manifest.json",
+        "data/models/granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu.manifest.json",
+        "data/models/gigaam-v3-e2e-ctc-q8-0-transcribe-cpu.manifest.json",
     )
     for relative in resource_paths:
         destination = package / relative

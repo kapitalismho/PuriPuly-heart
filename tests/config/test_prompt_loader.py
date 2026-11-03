@@ -197,6 +197,10 @@ def test_build_translation_prompt_variables_returns_expected_keys_and_content() 
         "targetLanguageRulesSection",
         "translationExamples",
         "translationExamplesSection",
+        "completeSourceOnly",
+        "endCompleteSourceOnly",
+        "peerProvisionalSection",
+        "peerContinuationSection",
     }
     assert variables["sourceName"] == "English"
     assert variables["sourceTextRef"] == "the English text"

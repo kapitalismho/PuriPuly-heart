@@ -4,7 +4,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from puripuly_heart.domain.events import SelfTurnPresentation, STTSessionState
+from puripuly_heart.domain.events import SelfTurnPresentation
 from puripuly_heart.domain.models import Transcript, Translation
 from puripuly_heart.ui.event_mapping import MappedEvent
 
@@ -14,7 +14,6 @@ class EventProjectionContext:
     source_language: str | None = None
     target_language: str | None = None
     translation_enabled: bool = False
-    stt_state: STTSessionState | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +36,8 @@ class HistoryProjection:
     text: str
     translated: bool = False
     language_code: str | None = None
+    utterance_id: UUID | None = None
+    peer_caption_revision: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +52,6 @@ class TranslationAppliedDiagnostic:
 
 @dataclass(frozen=True, slots=True)
 class EventProjectionBatch:
-    status: str | None = None
     transcript: DashboardTranscriptProjection | None = None
     translation: DashboardTranslationProjection | None = None
     history: tuple[HistoryProjection, ...] = ()
@@ -68,6 +68,7 @@ class EventProjectionService:
     _retired_order: tuple[int, int] = (-1, -1)
     _generation: int = -1
     max_turns: int = 1000
+    _peer_revisions: OrderedDict[UUID, tuple[int, set[str]]] = field(default_factory=OrderedDict)
 
     def claim_current_turn(self, snapshot: SelfTurnPresentation) -> bool:
         order = (snapshot.turn_generation, snapshot.turn_order)
@@ -86,8 +87,6 @@ class EventProjectionService:
     ) -> EventProjectionBatch:
         if self._closed:
             return EventProjectionBatch()
-        if mapped.kind == "status":
-            return EventProjectionBatch(status=mapped.status)
         if mapped.kind == "self_turn" and isinstance(mapped.payload, SelfTurnPresentation):
             snapshot = mapped.payload
             if snapshot.turn_generation < self._generation:
@@ -118,6 +117,25 @@ class EventProjectionService:
             and getattr(mapped.payload, "utterance_id", None) in self._turns
         ):
             return EventProjectionBatch()
+        if (
+            mapped.peer_caption_revision > 0
+            and getattr(mapped.payload, "channel", None) == "peer"
+            and (mapped.kind == "translation" or mapped.transcript_kind == "final")
+        ):
+            unit_id = mapped.payload.utterance_id
+            previous = self._peer_revisions.get(unit_id)
+            revision = mapped.peer_caption_revision
+            if previous is not None and (
+                revision < previous[0] or (revision == previous[0] and mapped.kind in previous[1])
+            ):
+                return EventProjectionBatch()
+            if previous is None or revision > previous[0]:
+                previous = (revision, set())
+                self._peer_revisions[unit_id] = previous
+            previous[1].add(mapped.kind)
+            self._peer_revisions.move_to_end(unit_id)
+            while len(self._peer_revisions) > self.max_turns:
+                self._peer_revisions.popitem(last=False)
         if mapped.kind == "transcript" and isinstance(mapped.payload, Transcript):
             return self._project_transcript(mapped, mapped.payload, context)
         if mapped.kind == "translation" and isinstance(mapped.payload, Translation):
@@ -143,6 +161,8 @@ class EventProjectionService:
                     mapped.source or "Mic",
                     transcript.text,
                     language_code=context.source_language,
+                    utterance_id=transcript.utterance_id,
+                    peer_caption_revision=mapped.peer_caption_revision,
                 ),
             )
         return EventProjectionBatch(
@@ -173,6 +193,8 @@ class EventProjectionService:
                     translation.text,
                     translated=True,
                     language_code=context.target_language,
+                    utterance_id=translation.utterance_id,
+                    peer_caption_revision=mapped.peer_caption_revision,
                 ),
             ),
             translation_diagnostic=TranslationAppliedDiagnostic(

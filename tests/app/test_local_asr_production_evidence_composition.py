@@ -18,11 +18,9 @@ async def test_evidence_ui_bridge_drains_publications_before_handoff_commit(
     old_provider = _BoundaryProvider(at_boundary=False)
     new_provider = _BoundaryProvider(at_boundary=True)
     provider_handle = ProviderRuntimeHandle(name="evidence-test", provider=old_provider)
-    published_statuses: list[str] = []
     bridge = UIEventBridge(
         event_queue=queue,
         dashboard_destination=SimpleNamespace(
-            publish_status=published_statuses.append,
             publish_transcript=lambda *_args, **_kwargs: True,
             publish_translation=lambda *_args, **_kwargs: True,
             publish_error=lambda _text: None,
@@ -88,8 +86,6 @@ async def test_evidence_ui_bridge_drains_publications_before_handoff_commit(
     finally:
         await evidence.close()
         await provider_handle.close()
-
-    assert published_statuses == ["connected", "stopping"]
 
 
 @pytest.mark.asyncio

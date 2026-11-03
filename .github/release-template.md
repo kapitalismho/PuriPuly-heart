@@ -10,11 +10,11 @@ Download `{{INSTALLER_EXE}}` from the Assets section below, then run it.
 
 
 ## Change logs
-- CPU speech recognition now uses Orukeet for English, Fun-ASR-Nano for Chinese, and Fun-ASR-MLT-Nano for Korean. Japanese Parakeet CTC remains available.
-- Fixed CPU Auto's multilingual routing regression: all 25 Orukeet languages and all 31 Fun-ASR-MLT-Nano languages are considered. English, Chinese and Japanese keep their existing models; Orukeet wins other overlaps, covering 37 language codes in total.
+- CPU speech recognition replaces Orukeet with multilingual Granite Speech 5.0 TurboCTC Q8_0 and adds GigaAM-v3 e2e-CTC Q8_0 for Russian. Chinese Fun-ASR-Nano, Japanese Parakeet CTC, and Fun-ASR-MLT-Nano remain available.
+- CPU Auto routes six Western languages to Granite, Russian to GigaAM, Chinese to standard Nano, Japanese to CTC, and the remaining supported languages to MLT. The combined contract covers 36 language codes; Ukrainian is explicitly unsupported without a hidden fallback.
 - Talk and Listen use independent transcribe.cpp CPU Model/Session instances with two inference threads each. GPU ASR keeps one shared resident Model, separate channel Sessions and serialized inference, including safe model replacement.
-- Old CPU provider selections migrate automatically. Recognized retired Qwen0.6/Parakeet v3 assets are cleaned after recoverable settings migration; blocked deletion retries on later starts without removing unknown or Japanese/GPU assets.
-- The replacement CPU models support pinned, integrity-checked downloads from Hugging Face and the same-byte China mirror.
+- Old Orukeet, Parakeet v3 and Qwen CPU selections migrate to CPU Auto. Recognized retired assets are cleaned only after recoverable settings migration; blocked deletion retries without removing unknown contents or current Japanese/GPU assets.
+- All five CPU models support pinned, integrity-checked Hugging Face downloads and alternate HF-mirror paths. Granite no-speech-marker-only output is treated as an empty transcript.
 - The window stays responsive during startup, including the first Windows process scan. Closing the window during startup also drains pending preparation safely.
 - Gemini speech recognition preserves eligible pre-roll when resuming a stream after an idle period.
 - From the second launch, the message input shows a randomly selected prompt or usage tip. Changing the interface language keeps the selected tip.

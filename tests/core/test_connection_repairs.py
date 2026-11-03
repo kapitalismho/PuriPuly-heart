@@ -105,12 +105,13 @@ async def test_unsupported_explicit_proxy_scheme_is_not_rewritten(monkeypatch):
 @pytest.mark.parametrize(
     "transition", ["direct_to_tls", "tls_to_direct", "tls_to_http", "http_to_tls"]
 )
-async def test_websocket_redirect_reselects_snapshot_and_proxy_tls(
+async def test_websocket_redirect_reselects_route_and_proxy_tls(
     certificates, monkeypatch, transition
 ):
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     received = []
+    source_received = []
 
     async def target(ws):
         received.append(ws.request.headers)
@@ -125,6 +126,7 @@ async def test_websocket_redirect_reselects_snapshot_and_proxy_tls(
             target_url = f"wss://localhost:{target_port}/destination"
 
             def redirect(connection, request):
+                source_received.append(request.headers)
                 response = connection.respond(302, "redirect")
                 response.headers["Location"] = target_url
                 return response
@@ -155,16 +157,58 @@ async def test_websocket_redirect_reselects_snapshot_and_proxy_tls(
                     f"{'ws' if upgraded else 'wss'}://localhost:{source_port}/source",
                     additional_headers={"Authorization": "private-key", "Cookie": "private-cookie"},
                 )
-                monkeypatch.setenv("HTTPS_PROXY", "http://localhost:1")
-                monkeypatch.setenv("WS_PROXY", "http://localhost:1")
-                monkeypatch.setenv("WSS_PROXY", "http://localhost:1")
-                monkeypatch.setenv("NO_PROXY", "*")
                 async with connector as ws:
                     assert await ws.recv() == "redirect-verified"
         assert len(tls_recorded) == 1
         assert len(http_recorded) == (1 if upgraded else 0)
+        assert len(source_received) == len(received) == 1
+        assert source_received[0]["Authorization"] == "private-key"
+        assert source_received[0]["Cookie"] == "private-cookie"
         assert "Authorization" not in received[0]
         assert "Cookie" not in received[0]
+
+
+async def test_websocket_refreshes_proxy_at_open_and_preserves_established_connection(
+    certificates, monkeypatch
+):
+    root, _, contexts = certificates
+    monkeypatch.setenv("SSL_CERT_FILE", str(root))
+    handshakes = []
+    messages = []
+
+    async def echo(ws):
+        handshakes.append(ws.request.headers)
+        async for message in ws:
+            messages.append(message)
+            await ws.send(message)
+
+    async with (
+        recording_proxy() as (first, first_requests),
+        recording_proxy() as (second, second_requests),
+        loopback_websocket_server(echo, ssl=contexts["valid"]) as server,
+    ):
+        port = server.sockets[0].getsockname()[1]
+        monkeypatch.setenv("HTTPS_PROXY", first)
+        connector = network_clients.external_websocket_connect(
+            f"wss://localhost:{port}",
+            additional_headers={"Authorization": "private-key", "Cookie": "private-cookie"},
+        )
+        monkeypatch.setenv("HTTPS_PROXY", second)
+        async with connector as ws:
+            await ws.send("opened-on-current-proxy")
+            assert await ws.recv() == "opened-on-current-proxy"
+            assert first_requests == []
+            assert second_requests == [("CONNECT", f"localhost:{port}")]
+            assert len(handshakes) == 1
+            monkeypatch.setenv("HTTPS_PROXY", first)
+            await ws.send("established-connection-continues")
+            assert await ws.recv() == "established-connection-continues"
+        assert first_requests == []
+        assert second_requests == [("CONNECT", f"localhost:{port}")]
+        assert len(handshakes) == 1
+        assert handshakes[0]["Authorization"] == "private-key"
+        assert handshakes[0]["Cookie"] == "private-cookie"
+        assert messages == ["opened-on-current-proxy", "established-connection-continues"]
 
 
 async def test_websocket_redirect_retains_tls_downgrade_rejection(certificates, monkeypatch):

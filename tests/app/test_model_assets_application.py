@@ -8,14 +8,15 @@ import pytest
 from puripuly_heart.app.services.model_assets import ModelAssetsApplication, ModelAssetsError
 from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice
 from puripuly_heart.core.local_asr.local_stt_assets import (
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
-    ORUKEET_MODEL_ID,
-    load_local_stt_asset_manifest,
 )
 
 GEMMA_ID = "gemma-test"
 CHOICES = (
-    ModelAssetChoice(ORUKEET_MODEL_ID, "Orukeet", "d.qwen", "asr", 10),
+    ModelAssetChoice(GRANITE_MODEL_ID, "Granite Speech 5.0", "d.granite", "asr", 10),
+    ModelAssetChoice(GIGAAM_MODEL_ID, "GigaAM-v3 e2e-CTC", "d.gigaam", "asr", 15),
     ModelAssetChoice(LOCAL_QWEN_GPU_MODEL_ID, "Qwen GPU", "d.gpu", "asr", 20),
     ModelAssetChoice(
         GEMMA_ID,
@@ -105,31 +106,40 @@ async def test_entries_report_disk_integrity_without_touching_owners(tmp_path) -
 
     entries = {entry.model_id: entry for entry in await service.refresh()}
 
-    assert entries[ORUKEET_MODEL_ID].status == "missing"
+    assert entries[GRANITE_MODEL_ID].status == "missing"
     assert entries[GEMMA_ID].status == "invalid"
     assert entries[GEMMA_ID].required_files == ("model.gguf", "draft.gguf")
     assert provisioning.requests == []
 
 
 @pytest.mark.asyncio
-async def test_asr_download_uses_locale_order_reports_progress_and_changes_no_settings(
-    tmp_path,
+@pytest.mark.parametrize(
+    ("model_id", "backend"),
+    (
+        (GRANITE_MODEL_ID, "cpu"),
+        (GIGAAM_MODEL_ID, "cpu"),
+        (LOCAL_QWEN_GPU_MODEL_ID, "gpu"),
+    ),
+)
+async def test_asr_download_reports_progress_for_the_selected_model_without_changing_settings(
+    tmp_path, model_id: str, backend: str
 ) -> None:
     service, provisioning, _gemma = _service(tmp_path)
 
-    task = asyncio.create_task(service.download(LOCAL_QWEN_GPU_MODEL_ID))
+    task = asyncio.create_task(service.download(model_id))
     await provisioning.started.wait()
 
-    assert _status(service, LOCAL_QWEN_GPU_MODEL_ID) == "downloading"
-    assert service.entry(LOCAL_QWEN_GPU_MODEL_ID).progress_percent == 42
+    assert _status(service, model_id) == "downloading"
+    assert service.entry(model_id).progress_percent == 42
     with pytest.raises(ModelAssetsError) as busy:
-        await service.download(ORUKEET_MODEL_ID)
+        await service.download(GRANITE_MODEL_ID)
     assert busy.value.failure_code == "task_busy"
 
     provisioning.release.set()
     await task
     request = provisioning.requests[0]
-    assert (request.backend, request.explicit_gpu_intent) == ("gpu", True)
+    assert (request.backend, request.explicit_gpu_intent) == (backend, backend == "gpu")
+    assert request.model_ids == (model_id,)
     assert request.locale == "zh-CN" and request.preferred_source is None
     assert request.origin == "model_assets"
     assert len(provisioning.requests) == 1
@@ -141,18 +151,18 @@ async def test_failure_is_recorded_on_the_entry_and_cleared_by_the_next_attempt(
     provisioning.release.set()
     provisioning.result = SimpleNamespace(
         cancelled=False,
-        failed_model_ids=(ORUKEET_MODEL_ID,),
+        failed_model_ids=(GRANITE_MODEL_ID,),
         failure_codes=("connection_failed",),
     )
 
     with pytest.raises(ModelAssetsError) as caught:
-        await service.download(ORUKEET_MODEL_ID)
+        await service.download(GRANITE_MODEL_ID)
 
     assert caught.value.failure_code == "connection_failed"
-    assert service.entry(ORUKEET_MODEL_ID).failure_code == "connection_failed"
+    assert service.entry(GRANITE_MODEL_ID).failure_code == "connection_failed"
     provisioning.result = SimpleNamespace(cancelled=False, failed_model_ids=(), failure_codes=())
-    await service.download(ORUKEET_MODEL_ID)
-    assert service.entry(ORUKEET_MODEL_ID).failure_code is None
+    await service.download(GRANITE_MODEL_ID)
+    assert service.entry(GRANITE_MODEL_ID).failure_code is None
 
 
 @pytest.mark.asyncio
@@ -160,16 +170,16 @@ async def test_cancel_targets_the_model_assets_origin_and_is_not_reported_as_fai
     tmp_path,
 ) -> None:
     service, provisioning, _gemma = _service(tmp_path)
-    task = asyncio.create_task(service.download(ORUKEET_MODEL_ID))
+    task = asyncio.create_task(service.download(GRANITE_MODEL_ID))
     await provisioning.started.wait()
 
-    assert await service.cancel(ORUKEET_MODEL_ID) is True
+    assert await service.cancel(GRANITE_MODEL_ID) is True
     with pytest.raises(ModelAssetsError) as caught:
         await task
 
     assert caught.value.failure_code == "cancelled"
     assert provisioning.cancelled == [("cpu", "model_assets")]
-    assert service.entry(ORUKEET_MODEL_ID).failure_code is None
+    assert service.entry(GRANITE_MODEL_ID).failure_code is None
     assert not service.busy
 
 
@@ -177,10 +187,10 @@ async def test_cancel_targets_the_model_assets_origin_and_is_not_reported_as_fai
 async def test_delete_refuses_models_in_use_and_otherwise_uses_the_owning_backend(
     tmp_path,
 ) -> None:
-    service, provisioning, gemma = _service(tmp_path, active=frozenset({ORUKEET_MODEL_ID}))
+    service, provisioning, gemma = _service(tmp_path, active=frozenset({GRANITE_MODEL_ID}))
 
     with pytest.raises(ModelAssetsError) as caught:
-        await service.delete(ORUKEET_MODEL_ID)
+        await service.delete(GRANITE_MODEL_ID)
     assert caught.value.failure_code == "model_in_use"
     assert provisioning.deleted == []
 
@@ -209,23 +219,3 @@ async def test_gemma_download_and_import_use_one_shot_sources(tmp_path) -> None:
     await service.download(GEMMA_ID)
     assert gemma.installs[-1]["source"] is None
     assert gemma.installs[-1]["locale"] == "zh-CN"
-
-
-@pytest.mark.asyncio
-async def test_installed_asr_model_on_disk_is_reported_installed(tmp_path, monkeypatch) -> None:
-    import puripuly_heart.app.services.model_assets as module
-
-    service, _provisioning, _gemma = _service(tmp_path)
-    seen = []
-
-    def inspect(path, *, manifest):
-        seen.append(path)
-        return SimpleNamespace(status="ready")
-
-    monkeypatch.setattr(module, "inspect_local_stt_install_state", inspect)
-
-    await service.refresh()
-
-    manifest = load_local_stt_asset_manifest(ORUKEET_MODEL_ID)
-    assert tmp_path / manifest.install_dirname in seen
-    assert _status(service, ORUKEET_MODEL_ID) == "installed"

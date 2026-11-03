@@ -156,11 +156,34 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("languages", ("ja", "en", "en", "ko")),
         ("languages", ("ja", "en", "en", "ko")),
         ("self_asr", "soniox"),
-        ("peer_asr", "local_orukeet"),
+        ("peer_asr", "local_cpu_auto"),
         ("model", ("qwen38_flash", None)),
     ]
     assert projected == [name for name, _value in packets]
     await router.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("parameter", ["PuriPuly_SelfASR", "PuriPuly_PeerASR"])
+@pytest.mark.parametrize(
+    ("identifier", "provider"),
+    [(1, "local_cpu_auto"), (16, "local_granite"), (17, "local_gigaam")],
+)
+async def test_router_applies_canonical_cpu_asr_slot_meanings(
+    parameter: str, identifier: int, provider: str
+) -> None:
+    application = FakeApplication()
+    application.gate.set()
+    router = OscControlRouter(application)
+    try:
+        result = await router.dispatch_packet(f"/avatar/parameters/{parameter}", identifier)
+
+        assert result.applied
+        assert application.calls == [
+            ("self_asr" if parameter == "PuriPuly_SelfASR" else "peer_asr", provider)
+        ]
+    finally:
+        await router.close()
 
 
 @pytest.mark.asyncio
@@ -222,7 +245,7 @@ async def test_router_coalesces_superseded_expensive_controls() -> None:
     assert third_result.applied is True
     assert application.calls[-1] == ("self_asr", "soniox")
     assert projected == [
-        ("PuriPuly_SelfASR", "local_orukeet"),
+        ("PuriPuly_SelfASR", "local_cpu_auto"),
         ("PuriPuly_SelfASR", "soniox"),
     ]
     await router.close()
@@ -366,7 +389,7 @@ async def test_router_does_not_project_when_application_suppresses_close_cancell
     result = await asyncio.wait_for(dispatch_task, timeout=1)
     assert result.applied is False
     assert result.error == "router_closed"
-    assert application.calls == [("cancelled_self_asr", "local_orukeet")]
+    assert application.calls == [("cancelled_self_asr", "local_cpu_auto")]
     assert projected == []
 
 
@@ -389,7 +412,7 @@ async def test_router_drains_started_command_after_ingress_is_disabled() -> None
     result = await asyncio.wait_for(dispatch_task, timeout=1)
     assert result.applied is False
     assert result.error == "router_disabled"
-    assert ("self_asr", "local_orukeet") in application.calls
+    assert ("self_asr", "local_cpu_auto") in application.calls
     assert projected == []
     await router.close()
 
@@ -416,7 +439,7 @@ async def test_router_rechecks_generation_after_waiting_for_serial_lock() -> Non
     assert first_result.error == "router_disabled"
     assert second_result.applied is False
     assert second_result.error == "router_disabled"
-    assert ("self_asr", "local_orukeet") in application.calls
+    assert ("self_asr", "local_cpu_auto") in application.calls
     assert ("self_capture", True) not in application.calls
     assert projected == []
     await router.close()
@@ -549,7 +572,7 @@ async def test_router_does_not_project_a_cancelled_inflight_coalesced_command() 
     followup = await router.dispatch_packet("/avatar/parameters/PuriPuly_Talk", True)
 
     assert followup.applied is True
-    assert ("self_asr", "local_orukeet") in application.calls
+    assert ("self_asr", "local_cpu_auto") in application.calls
     assert projected == ["PuriPuly_Talk"]
     await router.close()
 

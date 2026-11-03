@@ -292,7 +292,7 @@ class DashboardView(ft.Column):
             self.is_connected = status == "connected"
             self.set_display_text("")
             return
-        self.set_status(status)
+        self.set_status(status, replace_content=True)
 
     def _dismiss_api_key_warning_display(self) -> None:
         if self._stt_showing_warning:
@@ -567,17 +567,18 @@ class DashboardView(ft.Column):
             ),
         )
 
-    def set_status(self, status: str) -> None:
+    def set_status(self, status: str, *, replace_content: bool = False) -> None:
         self._connection_status = status
         self.is_connected = status == "connected"
-        self._primary_display_revision += 1
-        self._current_display_text = None
         status_face = self._typeface(None)
-        self.display_card.set_status(
+        if self.display_card.set_status(
             status,
             font_family=status_face.font_family,
             letter_spacing=status_face.letter_spacing,
-        )
+            replace_content=replace_content,
+        ):
+            self._primary_display_revision += 1
+            self._current_display_text = None
 
     def set_languages_from_codes(
         self,

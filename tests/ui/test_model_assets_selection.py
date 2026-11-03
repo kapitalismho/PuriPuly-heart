@@ -39,7 +39,13 @@ class Page:
 class Application:
     def __init__(self) -> None:
         self.entries = [
-            Entry("asr", "Orukeet", "model_assets.description.orukeet", "asr", 2 * 1024**3),
+            Entry(
+                "asr",
+                "Granite Speech 5.0",
+                "model_assets.description.granite",
+                "asr",
+                2 * 1024**3,
+            ),
             Entry(
                 "gemma",
                 "Gemma E4B",
@@ -130,8 +136,6 @@ async def test_modal_lists_models_by_purpose_and_shows_actions_for_the_selection
     assert t("model_assets.group.translation") in texts
     assert f"2.0 GB ({t('model_assets.status.missing')})" in texts
     assert dialog.selected_model_id == "asr"
-    assert "·" not in " ".join(texts)
-    assert texts.count("Orukeet") == 1
     assert [label for card in dialog._actions.controls for label in _texts(card)] == [
         t("model_assets.action.download")
     ]

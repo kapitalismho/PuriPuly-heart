@@ -23,6 +23,7 @@ from puripuly_heart.app.ports.settings_view import (
     OverlaySettingsSnapshot,
     PromptApplyIntent,
     ProviderApplyIntent,
+    SettingsApplyOutcome,
 )
 from puripuly_heart.app.ports.ui_models import (
     GpuNoticeAction,
@@ -250,6 +251,8 @@ class UiApplicationPort(Protocol):
     async def apply_telemetry_enabled(self, enabled: bool) -> Any | None: ...
 
     async def apply_settings_intent(self, intent: ImmediateSettingsIntent) -> object: ...
+
+    async def apply_settings_change(self, intent: object | None) -> SettingsApplyOutcome: ...
 
     async def apply_prompt_intent(self, intent: PromptApplyIntent) -> object: ...
 

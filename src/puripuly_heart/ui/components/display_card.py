@@ -79,6 +79,8 @@ def _status_label(status: str) -> str:
         return t("display.connected")
     if status == "stopping":
         return t("display.stopping")
+    if status == "failed":
+        return t("display.failed")
     return t("display.disconnected")
 
 
@@ -331,9 +333,12 @@ class DisplayCard(ft.Container):
         font_family: str | None = None,
         *,
         letter_spacing: float | None = None,
-    ):
-        """Update connection status display."""
+        replace_content: bool = False,
+    ) -> bool:
+        """Update capture readiness without replacing existing content."""
         self._status = status
+        if not self._showing_status and not replace_content:
+            return False
         self._showing_status = True
         self._source_as_message = False
         self._source_value = _status_label(status)
@@ -343,6 +348,7 @@ class DisplayCard(ft.Container):
         self._debug_prefix = None
         self._turn_size_cap = None
         self._sync_display()
+        return True
 
     def set_notice(
         self,

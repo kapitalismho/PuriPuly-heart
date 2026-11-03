@@ -72,7 +72,8 @@ from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 _LOCAL_ASR_PROVIDERS = frozenset(
     {
         "local_cpu_auto",
-        "local_orukeet",
+        "local_granite",
+        "local_gigaam",
         "local_fun_asr_nano",
         "local_fun_asr_mlt_nano",
         "local_parakeet_ja",
@@ -743,6 +744,7 @@ class PeerCaptureSessionOwner:
         self._current_stream_capture_epoch: int | None = None
         self._signature: tuple[object, ...] | None = None
         self._provider_signature: tuple[object, ...] | None = None
+        self._provider_runtime_signature: tuple[object, ...] | None = None
         self._provider_attachment_token: object | None = None
         self._provider_ingress_ready: asyncio.Event | None = None
         self._provider_setup_task: asyncio.Task[object] | None = None
@@ -1180,7 +1182,8 @@ class PeerCaptureSessionOwner:
                         and config.provider_id
                         in {
                             "local_cpu_auto",
-                            "local_orukeet",
+                            "local_granite",
+                            "local_gigaam",
                             "local_fun_asr_nano",
                             "local_fun_asr_mlt_nano",
                         }
@@ -1262,7 +1265,10 @@ class PeerCaptureSessionOwner:
                 self._retire_provider_attachment()
                 self._provider_signature = None
             reusable = (
-                self._provider.is_ready(config) and self._provider_attachment_token is not None
+                self._provider.is_ready(config)
+                and self._provider_attachment_token is not None
+                and self._provider_signature == config.provider_signature
+                and self._provider_runtime_signature == config.runtime_signature
             )
             attachment_token = self._provider_attachment_token
             failure_diagnostics: Exception | ErrorDiagnostics | None = None
@@ -1317,7 +1323,9 @@ class PeerCaptureSessionOwner:
                 self._provider_signature = config.provider_signature
                 self._signature = config.runtime_signature
                 if not reusable:
-                    self._commit_provider_attachment(attachment_token)
+                    self._commit_provider_attachment(
+                        attachment_token, runtime_signature=config.runtime_signature
+                    )
                 self._provider_status = PeerCaptureProviderStatus.READY
                 self._state = PeerCaptureSessionState.STOPPED
                 self._emit_event(PeerCaptureDiagnosticEvent.PROVIDER_CHANGED)
@@ -1472,6 +1480,7 @@ class PeerCaptureSessionOwner:
                 self._provider_signature = config.provider_signature
                 self._commit_provider_attachment(
                     attachment_token,
+                    runtime_signature=config.runtime_signature,
                     recovery_handler=on_terminal_failure,
                 )
                 self._provider_status = PeerCaptureProviderStatus.READY
@@ -1593,17 +1602,17 @@ class PeerCaptureSessionOwner:
                         emit_failure(logger, native, stage=native.operation)
                     async with self._lock:
                         if self._generation == generation and self._desired_active:
-                            self._emit_failure(
-                                PeerCaptureDiagnostic(
-                                    event=PeerCaptureDiagnosticEvent.FAILURE,
-                                    generation=generation,
-                                    state=self._state,
-                                    provider_id=config.provider_id,
-                                    reason=PeerCaptureFailureReason.PROVIDER_FAILED,
-                                    capture_kind=config.capture_target.kind,
-                                    failure_diagnostics=native,
-                                )
+                            diagnostic = PeerCaptureDiagnostic(
+                                event=PeerCaptureDiagnosticEvent.FAILURE,
+                                generation=generation,
+                                state=self._state,
+                                provider_id=config.provider_id,
+                                reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                                capture_kind=config.capture_target.kind,
+                                failure_diagnostics=native,
                             )
+                            self._last_failure = diagnostic
+                            self._emit_failure(diagnostic)
                     raise _PeerCaptureProviderHandoffFailed(native)
                 raise _PeerCaptureProviderHandoffFailed(result.failure_diagnostics)
             pending_failure = self._pending_provider_failures.pop(attachment_token, None)
@@ -1612,7 +1621,9 @@ class PeerCaptureSessionOwner:
                     self._config = config
                     self._provider_signature = config.provider_signature
                     self._signature = config.runtime_signature
-                    self._commit_provider_attachment(attachment_token)
+                    self._commit_provider_attachment(
+                        attachment_token, runtime_signature=config.runtime_signature
+                    )
                     self._last_failure = None
                     self._rebind_segment_ledger(generation, config)
             if pending_failure is not None:
@@ -1746,7 +1757,10 @@ class PeerCaptureSessionOwner:
                 return
             self._notify_state_changed()
             reusable = (
-                self._provider.is_ready(config) and self._provider_attachment_token is not None
+                self._provider.is_ready(config)
+                and self._provider_attachment_token is not None
+                and self._provider_signature == config.provider_signature
+                and self._provider_runtime_signature == config.runtime_signature
             )
             attachment_token = self._provider_attachment_token
             if not reusable:
@@ -1803,7 +1817,9 @@ class PeerCaptureSessionOwner:
                 else None
             )
             if not reusable:
-                self._commit_provider_attachment(attachment_token)
+                self._commit_provider_attachment(
+                    attachment_token, runtime_signature=config.runtime_signature
+                )
             if pending_failure is not None:
                 await self._fault_current_generation_locked(
                     generation,
@@ -1832,6 +1848,7 @@ class PeerCaptureSessionOwner:
                     self._provider_signature = config.provider_signature
                     self._provider_status = PeerCaptureProviderStatus.READY
                     self._state = PeerCaptureSessionState.RUNNING
+                    self._last_failure = None
                     provider_ingress_ready.set()
             if should_release:
                 await self._provider.release(mode="abort")
@@ -2270,9 +2287,11 @@ class PeerCaptureSessionOwner:
         self,
         attachment_token: object | None,
         *,
+        runtime_signature: tuple[object, ...] | None = None,
         recovery_handler: PeerCaptureTerminalFailureHandler | None = None,
     ) -> None:
         self._provider_attachment_token = attachment_token
+        self._provider_runtime_signature = runtime_signature
         if recovery_handler is None:
             for pending in self._pending_provider_recoveries.values():
                 self._pending_provider_failures.pop(pending[1], None)
@@ -2598,7 +2617,6 @@ class PeerCaptureSessionOwner:
         return PeerRuntimeFailureReason.PROCESS_SOURCE_FAILED
 
     def _emit_failure(self, diagnostic: PeerCaptureDiagnostic) -> None:
-        self._last_failure = diagnostic
         try:
             self._notify_state_changed()
         except Exception as exc:

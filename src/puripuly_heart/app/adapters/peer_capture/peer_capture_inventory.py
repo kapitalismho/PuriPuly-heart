@@ -45,14 +45,15 @@ class WindowsLoopbackDeviceInventoryAdapter:
 
 @dataclass(frozen=True, slots=True)
 class PeerCaptureTargetRuntimeEffectsAdapter:
-    refresh_peer: Callable[[], Awaitable[None]]
+    refresh_peer: Callable[[], Awaitable[bool]]
     sync_effective_flags: Callable[[object], None]
     refresh_presentation: Callable[[], None]
 
-    async def apply_capture_target(self, settings: AppSettingsVNext) -> None:
-        await self.refresh_peer()
+    async def apply_capture_target(self, settings: AppSettingsVNext) -> bool:
+        applied = await self.refresh_peer()
         self.sync_effective_flags(settings)
         self.refresh_presentation()
+        return applied
 
 
 __all__ = [

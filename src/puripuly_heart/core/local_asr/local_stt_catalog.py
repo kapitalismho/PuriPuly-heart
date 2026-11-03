@@ -7,7 +7,8 @@ from pathlib import Path
 from .local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
     FUN_ASR_NANO_MODEL_ID,
-    ORUKEET_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
     LocalSTTAssetManifest,
@@ -17,35 +18,8 @@ from .local_stt_assets import (
     load_local_stt_asset_manifest,
 )
 
-ORUKEET_SUPPORTED_LANGUAGE_CODES = frozenset(
-    {
-        "bg",
-        "hr",
-        "cs",
-        "da",
-        "nl",
-        "en",
-        "et",
-        "fi",
-        "fr",
-        "de",
-        "el",
-        "hu",
-        "it",
-        "lv",
-        "lt",
-        "mt",
-        "pl",
-        "pt",
-        "ro",
-        "ru",
-        "sk",
-        "sl",
-        "es",
-        "sv",
-        "uk",
-    }
-)
+GRANITE_SUPPORTED_LANGUAGE_CODES = frozenset({"en", "fr", "de", "es", "pt", "it", "ja"})
+GIGAAM_SUPPORTED_LANGUAGE_CODES = frozenset({"ru"})
 FUN_ASR_NANO_SUPPORTED_LANGUAGE_CODES = frozenset({"zh"})
 FUN_ASR_MLT_NANO_SUPPORTED_LANGUAGE_CODES = frozenset(
     {
@@ -87,7 +61,8 @@ PARAKEET_JAPANESE_SUPPORTED_LANGUAGE_CODES = frozenset({"ja"})
 _CPU_AUTO_MODEL_PRIORITY = (
     FUN_ASR_NANO_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
-    ORUKEET_MODEL_ID,
+    GRANITE_MODEL_ID,
+    GIGAAM_MODEL_ID,
     FUN_ASR_MLT_NANO_MODEL_ID,
 )
 
@@ -145,9 +120,13 @@ class LocalCPUAutoUnavailableError(RuntimeError):
 
 
 LOCAL_CPU_MODEL_CONTRACTS = {
-    ORUKEET_MODEL_ID: LocalCPUModelContract(
-        model_id=ORUKEET_MODEL_ID,
-        supported_language_codes=ORUKEET_SUPPORTED_LANGUAGE_CODES,
+    GRANITE_MODEL_ID: LocalCPUModelContract(
+        model_id=GRANITE_MODEL_ID,
+        supported_language_codes=GRANITE_SUPPORTED_LANGUAGE_CODES,
+    ),
+    GIGAAM_MODEL_ID: LocalCPUModelContract(
+        model_id=GIGAAM_MODEL_ID,
+        supported_language_codes=GIGAAM_SUPPORTED_LANGUAGE_CODES,
     ),
     FUN_ASR_NANO_MODEL_ID: LocalCPUModelContract(
         model_id=FUN_ASR_NANO_MODEL_ID,

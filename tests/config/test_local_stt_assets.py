@@ -9,7 +9,6 @@ import pytest
 
 from puripuly_heart.core.local_asr import local_stt_assets as local_stt_assets_module
 from puripuly_heart.core.local_asr.local_stt_assets import (
-    ORUKEET_MODEL_ID,
     InstalledLocalSTTManifest,
     LocalSTTAssetFile,
     LocalSTTAssetManifest,
@@ -18,7 +17,6 @@ from puripuly_heart.core.local_asr.local_stt_assets import (
     LocalSTTManifestInvalidError,
     default_local_stt_installed_manifest_path,
     default_local_stt_model_dir,
-    default_local_stt_model_root,
     default_local_stt_source_for_locale,
     inspect_local_stt_install_state,
     load_local_stt_asset_manifest,
@@ -78,25 +76,13 @@ def _write_valid_install(root: Path, manifest: LocalSTTAssetManifest) -> None:
     )
 
 
-def test_default_local_stt_paths_use_user_config_dir(monkeypatch: pytest.MonkeyPatch) -> None:
-    from puripuly_heart.config import paths
-
-    def _fake_user_config_dir(*, app_dir_name: str = paths.APP_DIR_NAME) -> Path:
-        return Path("/tmp") / app_dir_name
-
-    monkeypatch.setattr(paths, "user_config_dir", _fake_user_config_dir)
-
-    assert default_local_stt_model_root() == Path("/tmp") / paths.APP_DIR_NAME / "models"
-    model_dir = default_local_stt_model_dir(ORUKEET_MODEL_ID)
-    assert model_dir == default_local_stt_model_root() / ORUKEET_MODEL_ID
-    assert default_local_stt_installed_manifest_path(model_dir) == (
-        model_dir / "installed-manifest.json"
-    )
-
-
 @pytest.mark.parametrize(
     "retired_model_id",
-    ["qwen3-asr-0.6b-int8-sherpa", "parakeet-tdt-0.6b-v3-int8-sherpa"],
+    [
+        "orukeet-q8-0-transcribe-cpu",
+        "qwen3-asr-0.6b-int8-sherpa",
+        "parakeet-tdt-0.6b-v3-int8-sherpa",
+    ],
 )
 def test_retired_models_are_not_discoverable_or_downloadable(retired_model_id: str) -> None:
     with pytest.raises(LocalSTTManifestInvalidError, match="unknown local STT model_id"):

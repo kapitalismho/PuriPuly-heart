@@ -58,8 +58,8 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 - **LLMベースのローカライズ** — スラング、口語、タメ口/敬語まで自然に
 - **文脈の記憶** — 前後の流れを踏まえた自然な会話を維持
 - **双方向の音声翻訳** — 相手の音声も一緒に翻訳、VR字幕オーバーレイ対応
-- **Discordで始められる** — 複雑な設定なしですぐに使える
-- **最強のローカルフルスタック** — ParakeetからGemma 4 E4Bまで、今一番効率的なモデルだけを搭載。
+- **設定なしですぐ使える** — 自分で複雑に設定しなくても、内蔵エージェントが最適な体験を提供します。
+- **最強のローカルフルスタック** — Granite Speech 5.0からGemma 4 E4Bまで、今一番効率的なモデルだけを搭載。
 
 ## よくある質問
 
@@ -70,10 +70,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 → 最適な環境であれば、遅延は約1秒ほどです。相手の話が終わった時点が基準です。
 
 - **使うのにお金はかかりますか？**
-→ はい、でも後からです。新規ユーザーには無料の使用枠が用意されています。それ以降もとても安く、1ドルで数千回翻訳できます。また、ローカルモデルを活用すれば無料でも使えます。
-
-- **APIキーを発行する必要がありますか？**
-→ はい、でもこれも後からです。最初はインストールしてDiscordで認証するだけで使えます。
+→ 無料ですぐに使えます。無料オプションだけでも十分な性能が出ます。有料モデルもとても安く、1ドルで数千回使えます。
 
 - **音声認識が遅いです**
 → ローカルASRを使用している際、マシンスペックが不足していると処理が遅くなることがあります。その場合はクラウドSTTサービスへの切り替えをおすすめします。
@@ -86,9 +83,9 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 ---
 
 ## 翻訳比較
-![音声認識と翻訳を組み合わせた全体パイプラインの文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はベンチマーク時のPuriPuly構成：Gemini Transcribe → Luna (0.676)、Soniox STT → Luna (0.942)、Qwen ASR 1.7B → Gemma 26B (1.024)、Gemini Transcribe → Gemma 26B (1.084)、Soniox STT → Gemma 26B (1.293)、Qwen ASR 0.6B → Gemma 26B (2.374)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (2.108)、Gemini 3.5 Live Translate (3.754)、Soniox Translate (4.989)。評価モデル：Gemini 3.7 Flash。](../images/performance/1.png)
+![音声認識と翻訳を組み合わせた全体パイプラインの文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はベンチマーク時のPuriPuly構成：Gemini Transcribe → GPT-6 Luna (0.676)、Soniox STT → GPT-6 Luna (0.942)、Qwen ASR 1.7B → Gemma 26B (1.024)、Gemini Transcribe → Gemma 26B (1.084)、Soniox STT → Gemma 26B (1.293)、Qwen ASR 0.6B → Gemma 26B (2.374)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (2.108)、Gemini 3.5 Live Translate (3.754)、Soniox Translate (4.989)。評価モデル：Gemini 3.7 Flash。](../images/performance/1.png)
 
-![文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：GPT-6 luna (0.130)、Gemma 4 26B A4B (0.387)、DeepSeek-V4 Flash 0731 (0.571)、Gemma 4 E4B QAT Q4 (1.577)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (1.392)、Papago (2.699)、Gemini 3.5 Translate (2.991)、Soniox Translate (3.473)、DeepL (3.914)、Google Translation (5.731)。Qwen 3.8、Gemini 3.5、Sonioxは文字誤り率（CER）が5%以下の結果のみを選別。評価モデル：Gemini 3.7 Flash。](../images/performance/2.png)
+![文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：GPT-6 Luna (0.130)、Gemma 4 26B A4B (0.387)、DeepSeek-V4 Flash 0731 (0.571)、Gemma 4 E4B QAT Q4 (1.577)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (1.392)、Papago (2.699)、Gemini 3.5 Translate (2.991)、Soniox Translate (3.473)、DeepL (3.914)、Google Translation (5.731)。Qwen 3.8、Gemini 3.5、Sonioxは文字誤り率（CER）が5%以下の結果のみを選別。評価モデル：Gemini 3.7 Flash。](../images/performance/2.png)
 
 - 青い棒はベンチマーク時のPuriPuly構成です。CPU Qwen3-ASR 0.6Bはその後廃止されており、その結果は以下の新モデルを測定したものではありません。
 - マイクロソフトのGemba MQMフレームワークを使って実験しました。
@@ -106,7 +103,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 | **Index-Translate 35B A3B** | 無制限 | 無制限 | 5,000回 | 7,260回 |
 | **Gemma 4 26B A4B + 31B** | 13,940回 | 13,940回 | 3,680回 | 4,770回 |
 | **DeepSeek V4.1 Flash** | 16,800回 | 16,800回 | 3,860回 | 5,070回 |
-| **GPT-6 luna** | 8,680回 | 8,680回 | 3,170回 | 3,950回 |
+| **GPT-6 Luna** | 8,680回 | 8,680回 | 3,170回 | 3,950回 |
 
 #### その他のモデル
 
@@ -126,7 +123,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 | **Index-Translate 35B A3B** | 0円 | 0円 | ~0.03円 | ~0.02円 |
 | **Gemma 4 26B A4B + 31B** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.03円 |
 | **DeepSeek V4.1 Flash** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.03円 |
-| **GPT-6 luna** | ~0.02円 | ~0.02円 | ~0.05円 | ~0.04円 |
+| **GPT-6 Luna** | ~0.02円 | ~0.02円 | ~0.05円 | ~0.04円 |
 
 #### その他のモデル
 
@@ -141,7 +138,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 *   *1ドルあたりの使用可能回数は、発話あたりのコスト表の四捨五入前の値を基準に算出*
 *   *すべてのコストと使用可能回数は概算*
 *   *DeepSeek V4.1 Flashはキャッシュヒット率70%、V4 Flash（OpenRouter）は60%を仮定しています*
-*   *GPT-6 lunaはOpenAI APIの料金を基準とし、キャッシュ割引なしを仮定しています。ChatGPTで接続した場合はAPI料金の代わりにCodexの利用上限を使います*
+*   *GPT-6 LunaはOpenAI APIの料金を基準とし、キャッシュ割引なしを仮定しています。ChatGPTで接続した場合はAPI料金の代わりにCodexの利用上限を使います*
 *   *Qwen APIコストは北京リージョン基準*
 *   *料金表基準: 2026年10月17日*
 *   *1ドル = 150円*
@@ -167,16 +164,13 @@ GPU推論はVulkanを使用しています。RadeonでもArcでも、ベンダ�
 
 | モデル | 実行環境 | 量子化 |
 |---|---|---|
-| Orukeet | CPU | Q8_0 |
+| Granite Speech 5.0 Multilingual | CPU | Q8_0 |
+| GigaAM-v3 e2e-CTC | CPU | Q8_0 |
 | Fun-ASR-Nano-2512 | CPU | Q8_0 |
 | Fun-ASR-MLT-Nano-2512 | CPU | Q8_0 |
 | Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
 | Qwen3-ASR 1.7B | GPU | Q6_K |
 | OpenAI互換API | — | — |
-
-CPU自動選択はOrukeetの25言語とFun-ASR-MLT-Nanoの31言語をすべて考慮します。中国語は標準Fun-ASR-Nano、日本語はParakeet CTCを維持し、英語と両多言語モデルが対応する言語ではOrukeetを優先します。全マッピングは[言語ルーティング契約](../cli.md#local-speech-recognition)を参照してください。OrukeetとFun-ASRはtranscribe.cpp、日本語は引き続きsherpa-onnxを使用します。稼働中のtranscribe.cpp CPUチャネルごとに独立したModel/Sessionと推論スレッド2本を使用し、Talk/Listen同時稼働時は2+2です。非稼働チャネルは事前ロードしません。GPU ASRはチャネル別Sessionで常駐Modelを1つだけ共有し、推論を直列化します。モデル変更時も旧Modelの解放後に新モデルをロードします。
-
-WindowsセットアップはCPU ASRモデル4つを準備し、必要な場合は別途ダウンロードします。CPU自動選択には4つすべてが必要です。旧Parakeet v3の選択はOrukeetへ、CPU Qwen0.6はCPU自動選択へ移行します。復旧可能な設定保存後、起動時に識別済みの旧資産のみを削除し、失敗した削除は次回起動時に再試行します。識別できないファイルと日本語/GPUモデルは保持します。
 
 **LLM**
 
@@ -185,8 +179,6 @@ WindowsセットアップはCPU ASRモデル4つを準備し、必要な場合�
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
 | Gemma 4 26B A4B IT QAT | GPU専用 (Vulkan) | UD Q4_K_XL |
 | OpenAI互換API | — | — |
-
-モデルはインストーラーに含まれず、選択したモデルが必要になったときにダウンロードされます。26Bのダウンロードは約14.25 GBです。モデル選択は再起動後も保持されます。26BはVulkan GPU専用で、初期化に失敗してもCPUやE4Bへ自動切り替えしません。GPUでは1つのランタイムでSelf/Peerの最大2リクエストを同時処理し、CPUでは順番に処理します。[固定プロファイルと管理対象ローカル翻訳の契約](../cli.md#managed-local-translation)を参照してください。
 
 ---
 
@@ -346,17 +338,13 @@ PuriPulyはクラウドSTTと組み合わせると最良の体験になります
 6. 丸で囲まれた部分を押してキーをコピーします。
    ![step6](../images/gemini/6.png)
 
-7. （推奨）黄色で強調表示されている **Set Up Billing** ボタンを押し、有料プランに切り替えます。
-プラン切り替えには少し時間がかかることがあります。
-   ![step7](../images/gemini/7.png)
-
 <details>
 <summary><h3>Geminiの有料サブスクリプションをお持ちの方</h3></summary>
 
-8. [Google Developer Program](https://developers.google.com/program/my-benefits) にアクセスし、プログラムに参加してください。
+7. [Google Developer Program](https://developers.google.com/program/my-benefits) にアクセスし、プログラムに参加してください。
    ![step8](../images/gemini/8.png)
 
-9. ステップ7で設定した有料プランのプロジェクトを選択してください。
+8. 有料プランのプロジェクトを選択してください。
    ![step9](../images/gemini/9.png)
 
 </details>
@@ -457,8 +445,6 @@ uv run black --check src tests
 uv run ruff check src tests
 uv run python -m pytest
 ```
-
-[Broker開発（Linux）](../../broker/README.md) · [VRオーバーレイ開発（Windows）](../../native/overlay/README.md)
 
 ---
 

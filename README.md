@@ -59,8 +59,8 @@ It works in many environments, including VRChat and Discord.
 - **LLM-Powered Localization** — Slang, colloquialisms, and casual/formal speech, all rendered naturally.
 - **Context Memory** — Keeps the conversation flowing naturally with awareness of prior context.
 - **Two-way Voice Translation** — Translates the other person's voice too, with VR subtitle overlay support.
-- **Start via Discord** — Get going right away without a complex setup process.
-- **The most powerful local full stack** — From Parakeet to Gemma 4 E4B, built with the most efficient models available today.
+- **No setup required** — No need to configure the complicated settings yourself; the built-in agent provides the best experience.
+- **The most powerful local full stack** — From Granite Speech 5.0 to Gemma 4 E4B, built with the most efficient models available today.
 
 ## Q&A
 
@@ -71,10 +71,7 @@ It works in many environments, including VRChat and Discord.
 → Under optimal conditions, latency is around 1 second, measured from when the speaker finishes talking.
 
 - **Does it cost money to use?**
-→ Yes, but only later. New users get a free usage allowance, and even after that the pricing is very cheap; you can translate thousands of times for $1. You can also use it for free by running local models.
-
-- **Do I need to get an API key?**
-→ Yes, but again, only later. At first, just install and authenticate via Discord to start using it.
+→ You can start right away for free. Free options alone already perform well enough. Paid models are also very inexpensive — thousands of uses for $1.
 
 - **Voice recognition is slow.**
 → When using local ASR, processing times can be slow if compute resources are limited. In this case, we recommend switching to a cloud STT service.
@@ -87,9 +84,9 @@ It works in many environments, including VRChat and Discord.
 ---
 
 ## Translation Comparison
-![Mean error penalty per sentence for the full speech recognition and translation pipeline. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are the benchmarked PuriPuly configurations: Gemini Transcribe → Luna (0.676), Soniox STT → Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). Orange bars are external baselines: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). Judge model: Gemini 3.7 Flash.](docs/images/performance/1.png)
+![Mean error penalty per sentence for the full speech recognition and translation pipeline. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are the benchmarked PuriPuly configurations: Gemini Transcribe → GPT-6 Luna (0.676), Soniox STT → GPT-6 Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). Orange bars are external baselines: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). Judge model: Gemini 3.7 Flash.](docs/images/performance/1.png)
 
-![Mean error penalty per sentence. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are models available in PuriPuly: GPT-6 luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). Orange bars are external baselines: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Only results with a character error rate (CER) of 5% or less were selected for Qwen 3.8, Gemini 3.5, and Soniox. Judge model: Gemini 3.7 Flash.](docs/images/performance/2.png)
+![Mean error penalty per sentence. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are models available in PuriPuly: GPT-6 Luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). Orange bars are external baselines: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Only results with a character error rate (CER) of 5% or less were selected for Qwen 3.8, Gemini 3.5, and Soniox. Judge model: Gemini 3.7 Flash.](docs/images/performance/2.png)
 
 - Blue bars show PuriPuly configurations at the time of the benchmark. CPU Qwen3-ASR 0.6B has since been retired; its result does not measure the replacement models below.
 - We ran the experiment using Microsoft's Gemba MQM framework.
@@ -107,7 +104,7 @@ It works in many environments, including VRChat and Discord.
 | **Index-Translate 35B A3B** | Unlimited | Unlimited | 5,000 | 7,260 |
 | **Gemma 4 26B A4B + 31B** | 13,940 | 13,940 | 3,680 | 4,770 |
 | **DeepSeek V4.1 Flash** | 16,800 | 16,800 | 3,860 | 5,070 |
-| **GPT-6 luna** | 8,680 | 8,680 | 3,170 | 3,950 |
+| **GPT-6 Luna** | 8,680 | 8,680 | 3,170 | 3,950 |
 
 #### Other Models
 
@@ -127,7 +124,7 @@ It works in many environments, including VRChat and Discord.
 | **Index-Translate 35B A3B** | $0 | $0 | ~$0.0002 | ~$0.00014 |
 | **Gemma 4 26B A4B + 31B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.00021 |
 | **DeepSeek V4.1 Flash** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.00020 |
-| **GPT-6 luna** | ~$0.00012 | ~$0.00012 | ~$0.0003 | ~$0.00025 |
+| **GPT-6 Luna** | ~$0.00012 | ~$0.00012 | ~$0.0003 | ~$0.00025 |
 
 #### Other Models
 
@@ -142,7 +139,7 @@ It works in many environments, including VRChat and Discord.
 *   *Uses per Dollar is derived from the un-rounded values in the Cost per Utterance table.*
 *   *All costs and usage counts are approximate.*
 *   *DeepSeek V4.1 Flash assumes a 70% cache hit rate; V4 Flash (OpenRouter) assumes 60%.*
-*   *GPT-6 luna uses OpenAI API pricing with no cache discount assumed; when connected through ChatGPT, it uses your Codex limits instead of API charges.*
+*   *GPT-6 Luna uses OpenAI API pricing with no cache discount assumed; when connected through ChatGPT, it uses your Codex limits instead of API charges.*
 *   *Qwen API costs are based on the Beijing region.*
 *   *Pricing as of October 17, 2026.*
 
@@ -167,17 +164,13 @@ GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Ar
 
 | Model | Runtime | Quantization |
 |---|---|---|
-| Orukeet | CPU | Q8_0 |
+| Granite Speech 5.0 Multilingual | CPU | Q8_0 |
+| GigaAM-v3 e2e-CTC | CPU | Q8_0 |
 | Fun-ASR-Nano-2512 | CPU | Q8_0 |
 | Fun-ASR-MLT-Nano-2512 | CPU | Q8_0 |
 | Parakeet TDT-CTC 0.6B (ja) | CPU | INT8 |
 | Qwen3-ASR 1.7B | GPU | Q6_K |
 | OpenAI-compatible API | — | — |
-
-CPU Auto considers all 25 Orukeet languages and all 31 Fun-ASR-MLT-Nano languages. Chinese keeps standard Fun-ASR-Nano, Japanese keeps Parakeet CTC, and English and other languages supported by both multilingual models prefer Orukeet. See the [language routing contract](docs/cli.md#local-speech-recognition) for the full mapping. Orukeet and Fun-ASR use transcribe.cpp; Japanese keeps sherpa-onnx. Each active transcribe.cpp CPU channel owns a Model/Session with two inference threads (2+2 for Talk and Listen), without preloading inactive channels. GPU ASR shares one resident Model between independent channel Sessions and serializes inference. Replacement releases the previous GPU Model before loading another.
-
-Windows Setup prepares all four CPU ASR models, downloading them separately when needed; CPU Auto requires all four ready. Old Parakeet v3 selections migrate to Orukeet, and CPU Qwen0.6 selections migrate to CPU Auto. Startup removes recognized retired assets only after recoverable settings persistence; blocked cleanup retries later. Unrecognized files and Japanese/GPU assets are preserved.
-
 
 **LLM**
 
@@ -186,10 +179,6 @@ Windows Setup prepares all four CPU ASR models, downloading them separately when
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
 | Gemma 4 26B A4B IT QAT | GPU only (Vulkan) | UD Q4_K_XL |
 | OpenAI-compatible API | — | — |
-
-Managed Gemma weights download only when the selected model is needed; they are not bundled with the installer. The 26B download is approximately 14.25 GB. Model selection persists across restarts. E4B supports CPU with MTP or GPU; 26B requires a working Vulkan GPU and does not silently switch to CPU or E4B after a failure. Select another model/backend explicitly if the reported device or resource problem cannot be resolved.
-
-Self and Peer can translate concurrently on one managed GPU runtime, with at most two active requests. CPU translation remains serialized. The three retained language-pair prefix slots are separate from this active-request limit. See the [managed local translation contract](docs/cli.md#managed-local-translation) for model identities and fixed profiles.
 
 ---
 
@@ -355,17 +344,13 @@ Network, proxy, TLS certificate, and service errors do not mean your key is inva
 6. Click the circled area to copy the key.
    ![step6](docs/images/gemini/6.png)
 
-7. (Recommended) Click the yellow **Set Up Billing** button to upgrade to the paid tier.
-The tier transition may take a moment.
-   ![step7](docs/images/gemini/7.png)
-
 <details>
 <summary><h3>For Gemini paid subscribers</h3></summary>
 
-8. Go to [Google Developer Program](https://developers.google.com/program/my-benefits) and join the program.
+7. Go to [Google Developer Program](https://developers.google.com/program/my-benefits) and join the program.
    ![step8](docs/images/gemini/8.png)
 
-9. Select the paid tier project you set up in step 7.
+8. Select your paid-tier project.
    ![step9](docs/images/gemini/9.png)
 
 </details>
@@ -437,7 +422,7 @@ Upcoming work is tracked publicly on the [PuriPuly project board](https://github
 
 ## Development
 
-Requires Windows x64, standard GIL-enabled CPython **3.14.10**, and [uv](https://docs.astral.sh/uv/) **0.13.5**, matching the CI pins. Install the selected Python explicitly; this uv release's automatic download table predates Python 3.14.10. Run these commands from the repository root.
+Requires Windows x64, standard GIL-enabled CPython **3.14.10**, and [uv](https://docs.astral.sh/uv/) **0.13.6**, matching the CI pins. Install the selected Python explicitly before synchronizing the environment. Run these commands from the repository root.
 
 ### Setup
 
@@ -479,8 +464,6 @@ Every job still performs locked installation and its complete declared checks. u
 When profiling tests, use `--durations=20` with the affected partition. Remove avoidable preparation or incomplete fake lifecycles before adding workers; preserve real-process, persistence, ordering, cancellation, recovery, and shutdown observations. Compare workflow elapsed time separately from summed job duration, and include cache restore/save costs. Pytest JUnit testcase times include setup and teardown, not only the test body.
 
 Keep a permanent test only when it adds meaningful fault detection or materially better diagnosis beyond the retained suite; compare the same failure family across files and layers before adding another case. Preserve consequential boundaries, state transitions, privacy, persistence, ordering, cancellation, recovery, and continued progress. Change-specific probes need not become permanent tests: remove redundant cases and their unused fixtures instead of moving them into helpers or larger matrices.
-
-[Broker development (Linux)](broker/README.md) · [VR overlay development (Windows)](native/overlay/README.md)
 
 ---
 

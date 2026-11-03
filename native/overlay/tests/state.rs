@@ -226,8 +226,8 @@ fn overlay_state_promotes_active_peer_matching_occupant_key_without_reassigning_
         }],
         speaker_divider: false,
     }));
-    let original_slot = state.scene().slots()[0].as_ref().unwrap().slot_index;
-    let original_entry_order = state.scene().slots()[0].as_ref().unwrap().slot_entry_order;
+    let original_slot = state.scene().slots()[1].as_ref().unwrap().slot_index;
+    let original_entry_order = state.scene().slots()[1].as_ref().unwrap().slot_entry_order;
 
     assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
@@ -253,7 +253,7 @@ fn overlay_state_promotes_active_peer_matching_occupant_key_without_reassigning_
         speaker_divider: false,
     }));
 
-    let slot = state.scene().slots()[0].as_ref().unwrap();
+    let slot = state.scene().slots()[1].as_ref().unwrap();
     assert_eq!(slot.slot_index, original_slot);
     assert_eq!(slot.slot_entry_order, original_entry_order);
     assert_eq!(slot.occupant_key, "peer:turn-1");
@@ -265,7 +265,7 @@ fn overlay_state_promotes_active_peer_matching_occupant_key_without_reassigning_
 }
 
 #[test]
-fn overlay_state_fills_first_empty_slot_before_replacing_again() {
+fn overlay_state_places_new_self_below_peer_without_hiding_it() {
     let mut state = OverlayState::default();
 
     assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
@@ -308,6 +308,47 @@ fn overlay_state_fills_first_empty_slot_before_replacing_again() {
             .iter()
             .map(|slot| slot.as_ref().map(|slot| slot.id.clone()))
             .collect::<Vec<_>>(),
-        vec![Some("self:3".to_string()), Some("peer:2".to_string())]
+        vec![Some("peer:2".to_string()), Some("self:3".to_string())]
     );
+}
+
+#[test]
+fn peer_captions_enter_lower_and_promote_previous_without_resetting_identity() {
+    let mut state = OverlayState::default();
+    let first = slot_block("peer:1", "peer:1", 1, "peer", "first page", "", true);
+    let second = slot_block("peer:2", "peer:2", 2, "peer", "second", "", true);
+    let third = slot_block("peer:3", "peer:3", 3, "peer", "third", "", true);
+    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 1,
+        blocks: vec![first.clone()],
+        ..Default::default()
+    }));
+    assert!(state.scene().slots()[0].is_none());
+    let occurrence = state.scene().slots()[1].as_ref().unwrap().slot_entry_order;
+    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 2,
+        blocks: vec![first, second.clone()],
+        ..Default::default()
+    }));
+    let upper = state.scene().slots()[0].as_ref().unwrap();
+    assert_eq!(upper.id, "peer:1");
+    assert_eq!(upper.slot_entry_order, occurrence);
+    assert_eq!(state.scene().slots()[1].as_ref().unwrap().id, "peer:2");
+    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 3,
+        blocks: vec![second.clone(), third.clone()],
+        ..Default::default()
+    }));
+    assert_eq!(state.scene().slots()[0].as_ref().unwrap().id, "peer:2");
+    assert_eq!(state.scene().slots()[1].as_ref().unwrap().id, "peer:3");
+    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 4,
+        blocks: vec![OverlayPresentationBlock {
+            primary_text: "second page".into(),
+            ..second
+        }, third],
+        ..Default::default()
+    }));
+    assert_eq!(state.scene().slots()[0].as_ref().unwrap().primary_text, "second page");
+    assert_eq!(state.scene().slots()[1].as_ref().unwrap().id, "peer:3");
 }
