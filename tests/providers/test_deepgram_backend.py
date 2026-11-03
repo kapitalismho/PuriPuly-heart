@@ -663,6 +663,8 @@ async def test_deepgram_unanswered_close_terminates_real_transport_within_owner_
             DeepgramRealtimeSTTBackend(api_key="synthetic-key", language="en").open_session(), 2
         )
         protocol = connectors[0].connection
+        websocket_keepalive_task = protocol.keepalive_task
+        assert websocket_keepalive_task is not None
         writes = []
         closing = None
         try:
@@ -703,8 +705,7 @@ async def test_deepgram_unanswered_close_terminates_real_transport_within_owner_
             assert protocol.state is State.CLOSED
             assert protocol.transport.is_closing()
             assert protocol.connection_lost_waiter.done()
-            assert protocol.keepalive_task is not None
-            assert protocol.keepalive_task.done()
+            assert websocket_keepalive_task.done()
             assert all(client.is_closed for client in created_http_clients)
             assert session._run_task is None
             assert all(
@@ -723,7 +724,7 @@ async def test_deepgram_unanswered_close_terminates_real_transport_within_owner_
                         "elapsed_s": elapsed,
                         "peer_disconnected": disconnected.is_set(),
                         "protocol": protocol.state.name,
-                        "websocket_keepalive_done": protocol.keepalive_task.done(),
+                        "websocket_keepalive_done": websocket_keepalive_task.done(),
                         "http_clients_closed": all(
                             client.is_closed for client in created_http_clients
                         ),

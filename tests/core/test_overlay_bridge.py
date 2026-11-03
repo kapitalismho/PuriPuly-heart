@@ -5,6 +5,7 @@ import json
 import logging
 import socket
 import time
+from collections.abc import AsyncIterator
 from typing import Any
 from uuid import uuid4
 
@@ -258,6 +259,117 @@ async def test_overlay_bridge_requires_session_token() -> None:
         await bridge.stop()
 
     assert message["type"] == "auth_error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("authenticated", [False, True])
+async def test_overlay_bridge_rejects_unfinished_excessive_fragments_and_recovers(
+    tmp_path, authenticated: bool
+) -> None:
+    diagnostics = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-test", diagnostics_dir=tmp_path, capture_measurements=True
+    )
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        overlay_instance_id="overlay-test",
+        diagnostics=diagnostics,
+    )
+    await bridge.start()
+    release_final_fragment = asyncio.Event()
+
+    async def unfinished_message() -> AsyncIterator[str]:
+        for _ in range(4097):
+            yield ""
+        await release_final_fragment.wait()
+        yield _native_auth()
+
+    try:
+        async with connect(
+            bridge.url, proxy=None, compression=None, ping_interval=None, close_timeout=1
+        ) as ws:
+            if authenticated:
+                await ws.send(_native_auth())
+                snapshot = json.loads(await asyncio.wait_for(ws.recv(), timeout=2.0))
+                assert snapshot["type"] == "snapshot"
+            sender = asyncio.create_task(ws.send(unfinished_message()))
+            try:
+                with pytest.raises(ConnectionClosedError) as caught:
+                    await asyncio.wait_for(ws.recv(), timeout=2.0)
+                assert caught.value.rcvd is not None
+                assert caught.value.rcvd.code == 1009
+                assert caught.value.rcvd.reason == "too many fragments"
+                assert not release_final_fragment.is_set()
+            finally:
+                release_final_fragment.set()
+                await asyncio.wait_for(asyncio.gather(sender, return_exceptions=True), timeout=2.0)
+
+        await _wait_until(
+            lambda: any(
+                event["event"] == "connection_closed" for event in diagnostics.bridge_events
+            )
+        )
+        closed = next(
+            event for event in diagnostics.bridge_events if event["event"] == "connection_closed"
+        )
+        assert closed["authenticated"] is authenticated
+        assert (
+            any(event["event"] == "connection_authenticated" for event in diagnostics.bridge_events)
+            is authenticated
+        )
+        assert not bridge._session_health.token_consumed
+        assert not bridge._authenticated_connections
+        assert bridge.messages.empty()
+
+        async with connect(bridge.url, proxy=None, compression=None, ping_interval=None) as ws:
+            auth = _native_auth()
+            await ws.send(["", auth[:20], auth[20:], ""])
+            snapshot = json.loads(await asyncio.wait_for(ws.recv(), timeout=2.0))
+            assert snapshot["type"] == "snapshot"
+            message = {"type": "overlay_event", "event": "fragmented-recovery"}
+            encoded = json.dumps(message)
+            await ws.send(["", encoded[:10], encoded[10:], ""])
+            assert await asyncio.wait_for(bridge.messages.get(), timeout=2.0) == message
+    finally:
+        await bridge.stop()
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_accepts_auth_at_fragment_limit() -> None:
+    bridge = OverlayBridge(session_token="expected-token", overlay_instance_id="overlay-test")
+    await bridge.start()
+    try:
+        async with connect(bridge.url, proxy=None, compression=None, ping_interval=None) as ws:
+            await ws.send([""] * 4094 + [_native_auth()])
+            snapshot = json.loads(await asyncio.wait_for(ws.recv(), timeout=2.0))
+            assert snapshot["type"] == "snapshot"
+            assert bridge._session_health.token_consumed
+    finally:
+        await bridge.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("authenticated", [False, True])
+async def test_overlay_bridge_preserves_fragmented_message_byte_limit(authenticated: bool) -> None:
+    bridge = OverlayBridge(session_token="expected-token", overlay_instance_id="overlay-test")
+    await bridge.start()
+    try:
+        async with connect(bridge.url, proxy=None, compression=None, ping_interval=None) as ws:
+            if authenticated:
+                await ws.send(_native_auth())
+                snapshot = json.loads(await asyncio.wait_for(ws.recv(), timeout=2.0))
+                assert snapshot["type"] == "snapshot"
+            payload = (
+                json.dumps({"type": "overlay_event"}) if authenticated else _native_auth()
+            ).ljust(1024 * 1024 + 1)
+            await ws.send([payload[: 512 * 1024], payload[512 * 1024 :]])
+            with pytest.raises(ConnectionClosedError) as caught:
+                await asyncio.wait_for(ws.recv(), timeout=2.0)
+            assert caught.value.rcvd is not None
+            assert caught.value.rcvd.code == 1009
+            assert caught.value.rcvd.reason != "too many fragments"
+            assert bridge.messages.empty()
+    finally:
+        await bridge.stop()
 
 
 @pytest.mark.asyncio

@@ -26,6 +26,7 @@ Python and native must agree on the manifest, protocol, and advertised execution
 ## Startup and Shutdown
 
 - Native completes SteamVR preflight and OpenVR, renderer, and font initialization before bridge authentication. Initialization failures retain their startup cause rather than waiting for a connection.
+- The Python bridge bounds both payload bytes and fragment assembly before authentication completes. Excessive fragmentation closes the offending connection without consuming the session token or preventing a fresh valid connection.
 - Python owns one bounded startup budget, including preparation, spawn, initialization, and readiness. Delayed authentication receives the latest pruned scene, not a snapshot retained from before initialization.
 - Scene acceptance requires a valid health-challenge response covering the current scene. A live process or successful resource creation is not sufficient; presentation progress and physical visibility remain separate observations.
 - OFF, failure recovery, and shutdown retain process ownership through bounded cleanup. Timeout does not prove cleanup is complete. Empty output follows the successful-empty-frame/hide contract rather than reviving a prior scene.
