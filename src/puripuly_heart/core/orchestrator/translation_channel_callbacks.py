@@ -273,6 +273,7 @@ class TranslationChannelOwnerCallbacks:
             return
         if isinstance(event, STTProviderTurnTerminal):
             async with self._recognition_locks["peer"]:
+                event = scoped_event_for_delivery(event)
                 admissions = self._require_peer_capture().admit_provider_terminal(event)
                 peer = self._require_peer()
                 for receipt, terminal in admissions:

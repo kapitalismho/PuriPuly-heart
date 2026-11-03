@@ -139,7 +139,8 @@ class STTScopedTurnNormalizer:
             text = self._provisional_text
             runs = self._provisional_runs
             speaker_runs = self._provisional_speaker_runs
-        self._ensure_bounded()
+        if update.stability != "stable":
+            self._ensure_bounded()
         return STTProviderTurnUpdate(
             identity=update.identity,
             sequence=update.sequence,

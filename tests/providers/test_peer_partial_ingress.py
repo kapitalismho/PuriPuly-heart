@@ -39,7 +39,7 @@ async def test_soniox_latest_confirmed_plus_provisional_and_retraction_then_auth
     await session.begin_turn(request)
     normalizer = STTScopedTurnNormalizer(request.identity)
     try:
-        session._handle_message(
+        await session._handle_message(
             json.dumps(
                 {
                     "tokens": [
@@ -56,16 +56,16 @@ async def test_soniox_latest_confirmed_plus_provisional_and_retraction_then_auth
         normalizer.apply_update(stable)
         assert normalizer.apply_update(partial).text == partial.text
         first_at = partial.first_nonempty_at
-        session._handle_message(json.dumps({"tokens": [{"text": ",", "is_final": False}]}))
+        await session._handle_message(json.dumps({"tokens": [{"text": ",", "is_final": False}]}))
         changed = await soniox_next(session)
         assert changed.text == "I agree,"
         assert changed.first_nonempty_at == first_at
-        session._handle_message(json.dumps({"tokens": []}))
+        await session._handle_message(json.dumps({"tokens": []}))
         retracted = await soniox_next(session)
         assert retracted.text == "I agree"
         assert retracted.first_nonempty_at == first_at
         await soniox_seal(session, request)
-        session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+        await session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
         terminal = await soniox_next(session)
         assert isinstance(terminal, STTProviderTurnTerminal)
         assert normalizer.apply_terminal(terminal).text == "I agree"
@@ -74,16 +74,21 @@ async def test_soniox_latest_confirmed_plus_provisional_and_retraction_then_auth
 
 
 @pytest.mark.asyncio
-async def test_soniox_pending_snapshot_keeps_first_nonempty_arrival_when_coalesced():
+async def test_soniox_pending_snapshots_preserve_response_order_and_first_arrival():
     session, _ = soniox_session()
     request = soniox_request(1)
     await session.begin_turn(request)
     try:
-        session._handle_message(json.dumps({"tokens": [{"text": "first", "is_final": False}]}))
+        await session._handle_message(
+            json.dumps({"tokens": [{"text": "first", "is_final": False}]})
+        )
         first_at = session._last_rx_at
-        session._handle_message(
+        await session._handle_message(
             json.dumps({"tokens": [{"text": "first longer,", "is_final": False}]})
         )
+        first = await soniox_next(session)
+        assert first.text == "first"
+        assert first.observed_at == first_at
         latest = await soniox_next(session)
         assert latest.text == "first longer,"
         assert latest.first_nonempty_at == first_at
@@ -98,7 +103,7 @@ async def test_soniox_self_remains_confirmed_only():
     request = replace(soniox_request(1), channel="self")
     await session.begin_turn(request)
     try:
-        session._handle_message(
+        await session._handle_message(
             json.dumps(
                 {
                     "tokens": [
