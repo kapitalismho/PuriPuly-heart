@@ -30,6 +30,17 @@ async def controlled_genai(monkeypatch):
 
     def respond(request):
         requests.append(request)
+        if len(requests) > 1:
+            return httpx.Response(
+                400,
+                json={
+                    "error": {
+                        "code": 400,
+                        "message": "unexpected follow-up request",
+                        "status": "INVALID_ARGUMENT",
+                    }
+                },
+            )
         return httpx.Response(response["status"], json=response["body"])
 
     transport = httpx.MockTransport(respond)
@@ -66,8 +77,14 @@ async def _invoke(provider, operation):
 
 
 @pytest.mark.parametrize("operation", ["translation", "warmup"])
-async def test_generate_content_serializes_explicit_storage_opt_out(controlled_genai, operation):
-    provider, requests, _, sync_client, async_client = controlled_genai
+@pytest.mark.parametrize("finish_reason", ["STOP", "CONTINUATION"])
+async def test_generate_content_serializes_explicit_storage_opt_out(
+    controlled_genai, operation, finish_reason
+):
+    provider, requests, response, sync_client, async_client = controlled_genai
+    response["body"]["candidates"][0]["finishReason"] = finish_reason
+    if finish_reason == "CONTINUATION":
+        response["body"]["continuationToken"] = "c3ludGhldGljLWNvbnRpbnVhdGlvbg=="
     result = await _invoke(provider, operation)
     if operation == "translation":
         assert result.text == "translated"

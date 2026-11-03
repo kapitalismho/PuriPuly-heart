@@ -239,6 +239,7 @@ class GoogleGenaiGeminiClient:
         thinking_level = types.ThinkingLevel.LOW
         config = types.GenerateContentConfig(
             store=False,
+            automatic_continuation=False,
             system_instruction=formatted_system_prompt,
             temperature=0.6,
             thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
