@@ -2551,10 +2551,10 @@ async def test_canonical_delivery_boundaries_survive_production_write_timeout_an
         ledger = owner.segment_ledgers[-1]
         await wait_until(lambda: bool(ledger.snapshots))
         segment = ledger.snapshots[0]
-        due_at = segment.opened_at_monotonic_s + ListenDeliveryController.HARD_LIMIT_S
+        due_at = segment.opened_at_monotonic_s + ListenDeliveryController.CLOUD_HARD_LIMIT_S
         await wait_until(
             lambda: ledger.snapshots[0].seal_reason == "delivery_deadline",
-            timeout_s=ListenDeliveryController.HARD_LIMIT_S + 1.0,
+            timeout_s=ListenDeliveryController.CLOUD_HARD_LIMIT_S + 1.0,
         )
         segment = ledger.snapshots[0]
         fired_at = segment.sealed_at_monotonic_s

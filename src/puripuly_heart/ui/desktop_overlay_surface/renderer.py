@@ -255,14 +255,19 @@ def build_desktop_caption_surface(plan: DesktopCaptionPlan) -> Any:
         )
     slot_controls = [_build_flet_caption_slot(ft, plan, slot) for slot in plan.slots]
     if slot_controls:
+        peer_only_slot = len(plan.slots) == 1 and plan.slots[0].channel == "peer"
         slot_stack_height = (plan.slot_height * len(slot_controls)) + (
             plan.slot_gap * max(0, len(slot_controls) - 1)
         )
+        if peer_only_slot:
+            slot_stack_height = plan.window_height
         stack_controls.append(
             ft.Column(
                 controls=slot_controls,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                alignment=ft.MainAxisAlignment.CENTER,
+                alignment=(
+                    ft.MainAxisAlignment.END if peer_only_slot else ft.MainAxisAlignment.CENTER
+                ),
                 spacing=plan.slot_gap,
                 tight=True,
                 width=plan.window_width,
@@ -1533,10 +1538,16 @@ def _apply_retained_desktop_caption_plan(
     )
     model.full_background.border_radius = plan.border_radius
     visible_slot_count = len(plan.slots)
+    peer_only_slot = visible_slot_count == 1 and plan.slots[0].channel == "peer"
     model.slot_column.visible = bool(visible_slot_count)
     model.slot_column.width = plan.window_width
     model.slot_column.height = (plan.slot_height * visible_slot_count) + (
         plan.slot_gap * max(0, visible_slot_count - 1)
+    )
+    if peer_only_slot:
+        model.slot_column.height = plan.window_height
+    model.slot_column.alignment = (
+        ft.MainAxisAlignment.END if peer_only_slot else ft.MainAxisAlignment.CENTER
     )
     model.slot_column.spacing = plan.slot_gap
     for index, slot_container in enumerate(model.slot_containers):

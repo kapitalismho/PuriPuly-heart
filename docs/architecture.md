@@ -27,7 +27,7 @@ Paths below are navigation entry points, not an exhaustive class inventory.
 | Settings | Canonical intent, persistence, and runtime application coordination | [Persistence](../src/puripuly_heart/app/services/canonical_settings_persistence.py), [settings application](../src/puripuly_heart/app/services/settings/settings_application.py) |
 | Capture | Source authority, audio ordering, segmentation, and capture lifecycle | [Self](../src/puripuly_heart/core/runtime/self_capture.py), [Peer](../src/puripuly_heart/core/runtime/peer_channel.py) |
 | Recognition | Channel-scoped STT; shared local ASR resources and backend transitions | [Scoped engine](../src/puripuly_heart/core/stt/scoped_engine.py), [local ASR runtime](../src/puripuly_heart/core/runtime/local_asr_provider_runtime.py) |
-| Translation | Self source progression; turn admission, cancellation, and publication authority | [Self channel](../src/puripuly_heart/core/orchestrator/self_translation_channel.py), [turn lifecycle](../src/puripuly_heart/core/orchestrator/translation_turn.py) |
+| Translation | Channel-scoped source progression, caption/turn admission, cancellation and publication authority | [Self channel](../src/puripuly_heart/core/orchestrator/self_translation_channel.py), [cloud Peer captions](../src/puripuly_heart/core/orchestrator/peer_caption.py), [turn lifecycle](../src/puripuly_heart/core/orchestrator/translation_turn.py) |
 | Provider requests | Request preparation and provider authority; provider replacement | [Request owner](../src/puripuly_heart/core/orchestrator/translation_request.py), [provider rebuild](../src/puripuly_heart/core/runtime/provider_rebuild.py) |
 | Local models | Asset operations; managed translation server and model lifecycle | [Model assets](../src/puripuly_heart/app/services/model_assets.py), [Gemma runtime](../src/puripuly_heart/core/local_translation/runtime.py) |
 | Output | Routing, independent destination delivery, and delivery history | [Output runtime](../src/puripuly_heart/core/runtime/output.py), [translation projection](../src/puripuly_heart/core/orchestrator/translation_output_projection.py) |
@@ -61,6 +61,7 @@ flowchart LR
 - Capture owns source order, timing, and audio scope. Audio loss is explicit, not silence; segmentation does not depend on provider readiness.
 - Self and Peer share audio contracts but retain separate endpoint policies and recognition lifecycles. Local resources may be shared without sharing channel authority.
 - Provider adapters translate native events into shared STT contracts. Local audio completion and transcript delivery are distinct; provider recovery stays inside the recognition boundary.
+- Peer segment snapshots carry capture-boundary evidence through recognition settlement into caption joining.
 - Dashboard readiness is a projection of the Self capture owner's lifecycle, not recognition-result/session events. Presentation retains readiness independently of conversation content and specific errors/notices; it does not own runtime state.
 - Source completion drains admitted input. Stop, discontinuity, and replacement revoke affected authority so late results cannot enter current work.
 - VAD-only audio tests exclude normal capture. The application owner handles admission, input release, and restoration of still-authorized capture.
@@ -82,7 +83,7 @@ Behavior: [production-composition evidence checks](../tests/release_evidence/tes
 
 - Provider adapters own provider-specific authentication, requests, streaming, and errors behind the common provider boundary. Turn owners own admission, cancellation, stale-result rejection, and publication.
 - Self source closure and translation completion are independent. Speculative results are not accepted history; source/target revisions and turn identity govern presentation.
-- Self and Peer have separate admission while sharing provider capacity. Peer execution may be concurrent, but context preparation and publication preserve admitted order.
+- Self and Peer have separate admission while sharing provider capacity. Cloud Peer owns caption revisions and adjacent-caption repair; local Peer retains per-final translation. Ordinary caption revisions retain their initial context; publication preserves admitted source order.
 - Manual text bypasses capture/STT and uses Self publication. Admission, translation completion, and destination delivery are separate outcomes.
 - Managed local translation owns its server, model, and capacity behind the same provider boundary. Requests retain native resources until settlement; model/backend replacement drains work before admitting a replacement.
 
@@ -92,10 +93,12 @@ Behavior: [turn lifecycle](../tests/core/test_translation_turn_owner.py), [reque
 
 - Destinations have independent bounded delivery. One destination's failure must not block another or replay recognition/translation. Peer speech never reaches the chatbox; system disclosures require an explicit route.
 - Output preserves turn/publication identity. Revisions may update retained turns without refocusing the dashboard or reviving retired captions. Preview presentation is separate from final accepted history.
+- Peer logging retains append-only caption revisions; GUI history converges on one current record per caption.
 - Python owns logical caption state and lifetime; native overlays own rendering. Presentation does not gate translation, and delivery receipts do not prove physical display or remote UDP receipt.
+- The output runtime owns cancelable Peer admission; the presenter owns paging, reading protection, absorbed-caption retirement and layout-scale projection. Desktop and native render the resulting scene; Self admission bypasses Peer waiting.
 - The VRChat scene owner survives pipeline rebuilds and has no audio, VAD, or OSC dependency. Only trusted, sanitized population context reaches translation; names/raw logs stay local, and custom HTTP extensions receive no scene data.
 
-Behavior: [output runtime](../tests/core/runtime/test_output_runtime.py), [caption policy](../tests/core/test_self_caption_policy.py), [overlay presenter](../tests/core/test_overlay_presenter.py). Protocols: [native overlays](../native/overlay/README.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](http-extensions.md).
+Behavior: [output runtime](../tests/core/runtime/test_output_runtime.py), [Self caption policy](../tests/core/test_self_caption_policy.py), [Peer lifecycle](../tests/core/test_peer_caption_lifecycle.py), [Peer history](../tests/ui/test_peer_caption_history.py), [overlay presenter](../tests/core/test_overlay_presenter.py). Protocols: [native overlays](../native/overlay/README.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](http-extensions.md).
 
 ## Settings and Credentials
 

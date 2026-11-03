@@ -321,8 +321,11 @@ async def test_peer_overlay_wait_is_file_only_and_success_stays_in_delivery_hist
     started, release = asyncio.Event(), asyncio.Event()
 
     class PacedSink:
-        async def emit_peer_when_admissible(self, event, *, on_wait):
-            on_wait("protected_rows")
+        async def emit_peer_when_admissible(
+            self, event, *, on_wait=None, admission_started_at=None
+        ):
+            if on_wait is not None:
+                on_wait("protected_rows")
             started.set()
             await release.wait()
             return OverlayApplicationReceipt(

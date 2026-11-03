@@ -17,7 +17,11 @@ from websockets.http11 import Response
 from puripuly_heart.core.audio.format import float32_to_pcm16le_bytes
 from puripuly_heart.core.audio.ownership import PeerAudioSegmentLedger
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.stt.backend import STTProviderTurnTerminal, STTSessionProjection
+from puripuly_heart.core.stt.backend import (
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
+    STTSessionProjection,
+)
 from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
@@ -152,7 +156,8 @@ class ReplacementHarness:
         self.consumer = compose_translation_test_harness(
             stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock()
         )
-        self.events = []
+        self.events: list[STTProviderTurnTerminal] = []
+        self.updates: list[STTProviderTurnUpdate] = []
         self.transcripts = []
         self.terminal_failures = []
         self.retry_delays = []
@@ -199,8 +204,12 @@ class ReplacementHarness:
             await asyncio.sleep(0)
 
     async def consume(self, event):
-        self.events.append(event)
+        if isinstance(event, STTProviderTurnUpdate):
+            self.updates.append(event)
+            await self.consumer.peer_owner.handle_provider_update(event)
+            return
         assert isinstance(event, STTProviderTurnTerminal)
+        self.events.append(event)
         receipt = self.ledger.terminalize(
             event.identity.segment.segment_id,
             outcome=event.outcome,
@@ -256,6 +265,12 @@ class ReplacementHarness:
             range(1, len(texts) + 1)
         )
         assert all(transcript.recognition_origins for transcript in self.transcripts)
+        assert [event.text for event in self.events] == list(texts)
+        for terminal in self.events:
+            updates = [update for update in self.updates if update.identity == terminal.identity]
+            assert [(update.stability, update.assembly, update.text) for update in updates] == [
+                ("stable", "replace", terminal.text)
+            ]
 
     async def seed_pair(self):
         segments = [self.segment(order) for order in (1, 2)]
@@ -651,6 +666,7 @@ async def test_actual_policy_and_upgrade_auth_errors_stop_pre_pcm_and_keep_safe_
         assert unused.task_ids == [] and unused.pcm == b""
         assert env.retry_delays == []
         assert env.transcripts == []
+        assert env.updates == []
         diagnostics = event.failure_diagnostics
         assert diagnostics is not None and diagnostics.channel == "peer"
         assert diagnostics.fields["attempts"] == 1
@@ -700,6 +716,7 @@ async def test_native_rejection_followed_by_temporary_close_keeps_first_cause_an
         await wait_until(lambda: len(env.events) == 1 and bool(env.terminal_failures))
         event = env.events[0]
         assert event.outcome == "failed" and event.text == "" and env.transcripts == []
+        assert env.updates == []
         assert factory.attempts == 1 and failed.closed and failed.pcm == b""
         assert unused.task_ids == [] and unused.pcm == b""
         diagnostics = event.failure_diagnostics
@@ -760,6 +777,7 @@ async def test_actual_temporary_readiness_closures_exhaust_three_pre_pcm_attempt
         assert env.events[0].outcome == "failed"
         assert env.events[0].failure_reason == "provider_not_ready"
         assert env.events[0].text == "" and env.transcripts == []
+        assert env.updates == []
         assert factory.attempts == 3 and factory.sockets == failed
         assert len({socket.task_ids[0] for socket in failed}) == 3
         assert all(socket.closed and socket.pcm == b"" for socket in failed)

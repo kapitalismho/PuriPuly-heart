@@ -1907,3 +1907,89 @@ def test_file_delivery_flushes_priority_records_before_ordinary_batch_expiry(
         release_writer.set()
         release_batch_expiry.set()
         session.close_terminal_owner()
+
+
+@pytest.mark.asyncio
+async def test_peer_conversation_revisions_share_monotonic_parent_identity() -> None:
+    session, stream = _make_runtime_logging_capture()
+    runtime = RuntimeLoggingService(session_service=session)
+    runner = _ObservabilityRunner()
+    sink = _StructuredObservabilitySink()
+    session.configure_structured_observability(
+        conversation_record_sink=sink, observability_runner=runner
+    )
+    try:
+        for revision, translated in ((1, False), (1, True), (3, False), (2, True), (3, True)):
+            runtime.record_conversation_observation(
+                utterance_id="child" if translated else "parent",
+                speaker_channel="peer",
+                transcript_text=None if translated else f"source revision {revision}",
+                translation_text=f"translation revision {revision}" if translated else None,
+                source_language="en",
+                target_language="ko" if translated else None,
+                metadata={
+                    "parent_utterance_id": "parent",
+                    "segment_index": 0,
+                    "target_index": 0 if translated else None,
+                    "peer_caption_revision": revision,
+                },
+            )
+        await runner.drain()
+        assert [
+            record.metadata["peer_caption_revision"] for record in sink.conversation_records
+        ] == [1, 1, 3, 3]
+        assert {
+            record.metadata["peer_caption_unit_id"] for record in sink.conversation_records
+        } == {"parent"}
+        assert [
+            record.metadata["peer_caption_history_action"] for record in sink.conversation_records
+        ] == ["commit", "commit", "replace", "replace"]
+        assert "translation revision 2" not in stream.getvalue()
+        assert 'Caption replace unit="parent" revision=3' in stream.getvalue()
+    finally:
+        runtime.close()
+
+
+def test_peer_revision_retention_is_bounded_and_legacy_logging_is_unchanged() -> None:
+    session, stream = _make_runtime_logging_capture()
+    try:
+        for revision in range(1, 100):
+            session.record_conversation_observation(
+                utterance_id="same-unit",
+                speaker_channel="peer",
+                transcript_text=f"source {revision}",
+                translation_text=None,
+                source_language="en",
+                target_language=None,
+                metadata={"peer_caption_revision": revision},
+            )
+        assert len(session._peer_conversation_revisions) == 1
+        for index in range(4100):
+            session.record_conversation_observation(
+                utterance_id=f"unit-{index}",
+                speaker_channel="peer",
+                transcript_text="genuine repetition",
+                translation_text=None,
+                source_language="en",
+                target_language=None,
+                metadata={"peer_caption_revision": 1},
+            )
+        assert len(session._peer_conversation_revisions) == 4096
+        for channel in ("self", "peer"):
+            for revision in (0, 0):
+                session.record_conversation_observation(
+                    utterance_id="legacy-unit",
+                    speaker_channel=channel,
+                    transcript_text=f"legacy {channel}",
+                    translation_text=None,
+                    source_language="en",
+                    target_language=None,
+                    metadata={"peer_caption_revision": revision},
+                )
+        for channel in ("self", "peer"):
+            lines = [line for line in stream.getvalue().splitlines() if f"legacy {channel}" in line]
+            assert len(lines) == 1
+            assert "Caption" not in lines[0]
+        assert len(session._conversation_record_keys) == 2
+    finally:
+        session.close()

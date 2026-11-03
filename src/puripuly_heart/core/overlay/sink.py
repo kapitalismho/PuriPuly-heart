@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import itertools
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import ClassVar, Literal, Protocol
+from typing import ClassVar, Literal, Protocol, runtime_checkable
 from uuid import UUID, uuid4
 
 from puripuly_heart.core.clock import Clock, SystemClock
@@ -13,6 +13,7 @@ from puripuly_heart.domain.models import ChannelId, SpeakerAssignment, Transcrip
 
 AppliedContextMode = Literal["integrated"]
 OverlayTurnKind = Literal["manual", "self", "peer"]
+PeerPacingWaitObserver = Callable[[str], None]
 _ADAPTER_SEQUENCE_NAMESPACES = itertools.count(1)
 
 
@@ -157,6 +158,8 @@ class TranslationStreamUpdate(OverlayEvent):
     is_final: bool = False
     applied_context_mode: AppliedContextMode | None = None
     source_text: str = ""
+    peer_caption_revision: int = 0
+    peer_superseded_unit_ids: tuple[UUID, ...] = ()
 
     EVENT_TYPE: ClassVar[str] = "translation_stream_update"
 
@@ -196,6 +199,23 @@ class OverlaySink(Protocol):
         self,
         event: OverlayEventUnion,
     ) -> OverlayApplicationReceipt | None: ...
+
+
+@runtime_checkable
+class PeerCaptionAdmissionPort(Protocol):
+    async def emit_peer_when_admissible(
+        self,
+        event: OverlayEventUnion,
+        *,
+        on_wait: PeerPacingWaitObserver | None = None,
+        admission_started_at: float | None = None,
+    ) -> OverlayApplicationReceipt: ...
+
+
+@runtime_checkable
+class PeerCaptionLayoutPort(Protocol):
+    @property
+    def peer_caption_text_scale(self) -> float: ...
 
 
 @dataclass(slots=True)
@@ -263,6 +283,9 @@ class OverlayEventAdapter:
         source_text_len: int | None = None,
         logical_turn_key: str | None = None,
         output_scope: OverlayPublicationScope | None = None,
+        speaker_assignment: SpeakerAssignment | None = None,
+        peer_caption_revision: int = 0,
+        peer_superseded_unit_ids: tuple[UUID, ...] = (),
     ) -> TranslationStreamUpdate:
         return TranslationStreamUpdate(
             **self._common_event_fields(
@@ -276,6 +299,7 @@ class OverlayEventAdapter:
                 source_text_len=source_text_len,
                 logical_turn_key=logical_turn_key,
                 output_scope=output_scope,
+                speaker_assignment=speaker_assignment,
             ),
             text=text,
             source_text=source_text,
@@ -283,6 +307,8 @@ class OverlayEventAdapter:
             target_language=target_language,
             is_final=False,
             applied_context_mode=applied_context_mode,
+            peer_caption_revision=peer_caption_revision,
+            peer_superseded_unit_ids=peer_superseded_unit_ids,
         )
 
     def self_active_update(
@@ -397,6 +423,8 @@ class OverlayEventAdapter:
         logical_turn_key: str | None = None,
         speaker_assignment: SpeakerAssignment | None = None,
         output_scope: OverlayPublicationScope | None = None,
+        peer_caption_revision: int = 0,
+        peer_superseded_unit_ids: tuple[UUID, ...] = (),
     ) -> TranslationFinal:
         return TranslationFinal(
             **self._common_event_fields(
@@ -418,6 +446,8 @@ class OverlayEventAdapter:
             target_language=target_language,
             is_final=True,
             applied_context_mode=applied_context_mode,
+            peer_caption_revision=peer_caption_revision,
+            peer_superseded_unit_ids=peer_superseded_unit_ids,
         )
 
     def utterance_closed(
@@ -512,7 +542,11 @@ class SubtitleOverlayOutputAdapter:
 
         if translation_text.strip():
             await self.sink.emit(
-                self.event_adapter.translation_final(
+                (
+                    self.event_adapter.translation_final
+                    if publication.is_final
+                    else self.event_adapter.translation_stream_update
+                )(
                     utterance_id=utterance_id,
                     channel="peer",
                     text=translation_text,
@@ -520,6 +554,8 @@ class SubtitleOverlayOutputAdapter:
                     source_language=source_language,
                     target_language=target_language,
                     applied_context_mode=self.applied_context_mode,
+                    peer_caption_revision=publication.peer_caption_revision,
+                    peer_superseded_unit_ids=publication.peer_superseded_unit_ids,
                     **protocol_metadata,
                 )
             )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from dataclasses import replace
 
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.stt.backend import (
@@ -43,6 +44,7 @@ class STTSessionEventProjection:
         self.channel: str | None = None
         self._payload_sequences: dict[STTProviderTurnIdentity, int] = {}
         self._update_sequences: dict[STTProviderTurnIdentity, int] = {}
+        self._first_nonempty_at: dict[STTProviderTurnIdentity, float] = {}
         self._sealed_identities: set[STTProviderTurnIdentity] = set()
         self._draining_identities: set[STTProviderTurnIdentity] = set()
         self._retired = False
@@ -173,6 +175,10 @@ class STTSessionEventProjection:
     def put_update(self, event: STTProviderTurnUpdate) -> bool:
         if not self.is_current(event.identity):
             return False
+        if self.channel == "peer":
+            if event.text.strip() and event.observed_at is not None:
+                self._first_nonempty_at.setdefault(event.identity, event.observed_at)
+            event = replace(event, first_nonempty_at=self._first_nonempty_at.get(event.identity))
         buffer = self._scoped_buffer()
         try:
             accepted = buffer.put(event)
@@ -196,6 +202,7 @@ class STTSessionEventProjection:
             self._draining_identities.discard(event.identity)
         self._payload_sequences.pop(event.identity, None)
         self._update_sequences.pop(event.identity, None)
+        self._first_nonempty_at.pop(event.identity, None)
         self._sealed_identities.discard(event.identity)
         self._draining_identities.discard(event.identity)
         if self._active_identity == event.identity:

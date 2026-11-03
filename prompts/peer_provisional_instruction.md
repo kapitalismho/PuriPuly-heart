@@ -1,0 +1,2 @@
+## Peer provisional source override
+This request contains an observed, incomplete Peer source span. Override any instruction to infer omitted verbs, endings, predicates, conditions, polarity or conclusions: do not add them unless they are present in <input>. Translate only the observed <input>; retain incompleteness and uncertainty naturally. Do not turn a topic or subordinate clause into a completed assertion.

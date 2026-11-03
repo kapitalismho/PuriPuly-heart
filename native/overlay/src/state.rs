@@ -331,6 +331,18 @@ impl OverlayScene {
         let mut assigned = self.update_existing_slots(&sorted);
         self.clear_missing_slots(&sorted);
         self.fill_empty_slots(&sorted, &mut assigned);
+        if sorted.iter().any(|block| block.channel == "peer") {
+            let mut ordered: [Option<OverlaySlot>; SLOT_COUNT] = Default::default();
+            for (index, block) in sorted.iter().enumerate() {
+                if let Some(slot) = self.slots.iter_mut().find(|slot| {
+                    slot.as_ref()
+                        .is_some_and(|slot| slot.occupant_key == block.occupant_key)
+                }) {
+                    ordered[SLOT_COUNT - sorted.len() + index] = slot.take();
+                }
+            }
+            self.slots = ordered;
+        }
         self.recompute_slot_anchors(text_scale);
 
         previous != self.slots

@@ -8,7 +8,7 @@ import logging
 import queue
 import re
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from collections.abc import Awaitable, Mapping, Sequence
 from dataclasses import dataclass
 from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
@@ -995,6 +995,9 @@ class SessionRuntimeLoggingService:
         self._conversation_record_order: deque[tuple[str, str, int | None, int | None, str]] = (
             deque()
         )
+        self._peer_conversation_revisions: OrderedDict[
+            tuple[str, str, int | None], tuple[int, set[tuple[int | None, str]], str]
+        ] = OrderedDict()
         self._request_context_keys: set[tuple[str, int | None]] = set()
         self._request_context_order: deque[tuple[str, int | None]] = deque()
         self._diagnostic_history = DiagnosticHistory()
@@ -1548,9 +1551,31 @@ class SessionRuntimeLoggingService:
         disposition = str(values.get("disposition") or "accepted")
         record_kind = "translation" if translation_text is not None else "source"
         key = (speaker_channel, utterance_id, segment_index, target_index, record_kind)
-        if key in self._conversation_record_keys:
-            return
-        self._remember_conversation_key(key)
+        revision_value = values.get("peer_caption_revision")
+        revision = revision_value if isinstance(revision_value, int) else 0
+        if speaker_channel == "peer" and revision > 0:
+            unit_id = str(values.get("parent_utterance_id") or utterance_id)
+            unit_key = (speaker_channel, unit_id, segment_index)
+            previous = self._peer_conversation_revisions.get(unit_key)
+            record_key = (target_index, record_kind)
+            if previous is not None and (
+                revision < previous[0] or (revision == previous[0] and record_key in previous[1])
+            ):
+                return
+            if previous is None or revision > previous[0]:
+                action = "commit" if previous is None else "replace"
+                previous = (revision, set(), action)
+                self._peer_conversation_revisions[unit_key] = previous
+            previous[1].add(record_key)
+            self._peer_conversation_revisions.move_to_end(unit_key)
+            while len(self._peer_conversation_revisions) > 4096:
+                self._peer_conversation_revisions.popitem(last=False)
+            values["peer_caption_unit_id"] = unit_id
+            values["peer_caption_history_action"] = previous[2]
+        else:
+            if key in self._conversation_record_keys:
+                return
+            self._remember_conversation_key(key)
         safe_source, source_redacted = _safe_conversation_text(transcript_text)
         safe_translation, translation_redacted = _safe_conversation_text(translation_text)
         omission = "secret_redacted" if source_redacted or translation_redacted else "none"
@@ -1678,6 +1703,13 @@ class SessionRuntimeLoggingService:
                 disposition=disposition,
                 origin_wall_clock_ms=metadata.get("origin_wall_clock_ms"),
                 turn_kind=metadata.get("turn_kind"),
+                **(
+                    {"peer_caption_revision": metadata["peer_caption_revision"]}
+                    if record.speaker_channel == "peer"
+                    and isinstance(metadata.get("peer_caption_revision"), int)
+                    and metadata["peer_caption_revision"] > 0
+                    else {}
+                ),
             )
         except Exception as exc:
             self.emit_basic(
@@ -1829,6 +1861,15 @@ def _format_conversation_record(
         parts = [header]
         if record.transcript_text is not None:
             parts.append(f"Original {json.dumps(record.transcript_text, ensure_ascii=False)}")
+    revision = metadata.get("peer_caption_revision")
+    if record.speaker_channel == "peer" and isinstance(revision, int) and revision > 0:
+        action = str(metadata.get("peer_caption_history_action") or "commit")
+        parts.insert(
+            1,
+            f"Caption {action} unit={json.dumps(metadata.get('peer_caption_unit_id') or record.utterance_id)} "
+            f"revision={revision} segment={metadata.get('segment_index')} "
+            f"target={metadata.get('target_index')}",
+        )
     if disposition not in {"accepted", "translated"}:
         parts.append(f"Outcome {disposition.replace('_', ' ')}")
     failure_code = metadata.get("failure_code")

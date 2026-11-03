@@ -16,6 +16,7 @@ class MappedEvent:
     source: str | None
     transcript_kind: Literal["partial", "final"] | None = None
     runtime_log_handled: bool = False
+    peer_caption_revision: int = 0
 
 
 def map_ui_event(event: UIEvent) -> MappedEvent | None:
@@ -34,6 +35,7 @@ def map_ui_event(event: UIEvent) -> MappedEvent | None:
             payload=event.payload,
             source=event.source,
             transcript_kind=transcript_kind,
+            peer_caption_revision=event.peer_caption_revision,
         )
     if event.type == UIEventType.TRANSLATION_DONE:
         if not isinstance(event.payload, Translation):
@@ -43,6 +45,7 @@ def map_ui_event(event: UIEvent) -> MappedEvent | None:
             payload=event.payload,
             source=event.source,
             runtime_log_handled=event.runtime_log_handled,
+            peer_caption_revision=event.peer_caption_revision,
         )
     if event.type == UIEventType.OSC_SENT:
         if not isinstance(event.payload, OSCMessage):

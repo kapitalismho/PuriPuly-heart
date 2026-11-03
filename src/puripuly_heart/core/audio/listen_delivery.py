@@ -41,6 +41,9 @@ class ListenDeliveryController:
     FIVE_SECOND_AGE_S = 5.0
     FIVE_SECOND_PAUSE_MS = 128
     HARD_LIMIT_S = 6.0
+    CLOUD_FIVE_SECOND_PAUSE_MS = 192
+    CLOUD_HARD_LIMIT_S = 10.0
+    CLOUD_FINAL_PROVIDER_IDS = frozenset({"soniox", "deepgram", "gemini_transcribe", "qwen_audio"})
     HARD_CUT_OVERLAP_MS = PEER_HARD_ROLLOVER_PRE_ROLL_MS
     SMART_PROBE_MS = 224
     SMART_COMPLETE_MS = 512
@@ -70,6 +73,8 @@ class ListenDeliveryController:
         self._pause_id = 0
         self._pause_started_at_s: float | None = None
         self._sample_rate_hz = 0
+        self._five_second_pause_ms = self.FIVE_SECOND_PAUSE_MS
+        self._hard_limit_s = self.HARD_LIMIT_S
         self._source_frontier = 0
         self._context_revision = 0
         self._context_parts: list[np.ndarray] = []
@@ -100,7 +105,22 @@ class ListenDeliveryController:
                 self._clear_active_segment()
                 self._reset_context()
             return
-        owned = self._ledger.observe_vad_event(event, now_monotonic_s=self._monotonic_clock())
+        delivery_pause_s = None
+        smart_turn_incomplete = False
+        if isinstance(event, SpeechEnd) and event.utterance_id == self._segment_id:
+            if self._sample_rate_hz > 0:
+                delivery_pause_s = self._pause_samples / self._sample_rate_hz
+            snapshot = self._current_snapshot(event.utterance_id)
+            if snapshot is not None:
+                smart_turn_incomplete = self._timely_incomplete(
+                    snapshot.settings.delivery_threshold
+                )
+        owned = self._ledger.observe_vad_event(
+            event,
+            now_monotonic_s=self._monotonic_clock(),
+            delivery_pause_s=delivery_pause_s,
+            smart_turn_incomplete=smart_turn_incomplete,
+        )
         if isinstance(event, SpeechStart):
             self._segment_id = event.utterance_id
             self._opened_at_s = owned.segment.opened_at_monotonic_s
@@ -108,6 +128,11 @@ class ListenDeliveryController:
             self._pause_started_at_s = None
             self._pause_id += 1
             self._sample_rate_hz = owned.segment.settings.target_sample_rate_hz
+            cloud_final = owned.segment.settings.provider_id in self.CLOUD_FINAL_PROVIDER_IDS
+            self._five_second_pause_ms = (
+                self.CLOUD_FIVE_SECOND_PAUSE_MS if cloud_final else self.FIVE_SECOND_PAUSE_MS
+            )
+            self._hard_limit_s = self.CLOUD_HARD_LIMIT_S if cloud_final else self.HARD_LIMIT_S
             self._reset_probe()
             if event.genuine_onset:
                 self._reset_context()
@@ -160,7 +185,7 @@ class ListenDeliveryController:
         if frontier_s is None:
             return
         age_s = max(0.0, frontier_s - opened_at_s)
-        if age_s >= self.HARD_LIMIT_S:
+        if age_s >= self._hard_limit_s:
             await self._seal(segment_id, reason="delivery_deadline", rollover=True)
             return
         pause_ms = self._observed_pause_ms()
@@ -178,7 +203,7 @@ class ListenDeliveryController:
                     await self._seal(segment_id, reason="delivery_pause", rollover=False)
             return
         if not speech_observed and age_s >= self.FIVE_SECOND_AGE_S:
-            if pause_ms >= self.FIVE_SECOND_PAUSE_MS:
+            if pause_ms >= self._five_second_pause_ms:
                 await self._seal(segment_id, reason="delivery_pause", rollover=False)
             return
         if not speech_observed and age_s >= self.FOUR_SECOND_AGE_S:
@@ -329,12 +354,12 @@ class ListenDeliveryController:
             self._run_pause_step_timer(
                 segment_id,
                 max(0.0, opened_at_s + self.FIVE_SECOND_AGE_S - now),
-                pause_ms=self.FIVE_SECOND_PAUSE_MS,
+                pause_ms=self._five_second_pause_ms,
             ),
             name="listen-five-second-step",
         )
         self._hard_task = asyncio.create_task(
-            self._run_hard_timer(segment_id, max(0.0, opened_at_s + self.HARD_LIMIT_S - now)),
+            self._run_hard_timer(segment_id, max(0.0, opened_at_s + self._hard_limit_s - now)),
             name="listen-deadline",
         )
 
@@ -373,7 +398,7 @@ class ListenDeliveryController:
         if (
             reason != "delivery_deadline"
             and opened_at_s is not None
-            and self._monotonic_clock() >= opened_at_s + self.HARD_LIMIT_S
+            and self._monotonic_clock() >= opened_at_s + self._hard_limit_s
         ):
             reason = "delivery_deadline"
             rollover = True

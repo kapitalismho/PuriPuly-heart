@@ -5,6 +5,7 @@ import inspect
 import subprocess
 import sys
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -96,6 +97,7 @@ class ConversationRecord:
     turn_status: str | None = None
     accepted: bool = True
     parent_utterance_id: str | None = None
+    peer_caption_revision: int = 0
 
 
 class ConversationViewModel:
@@ -111,6 +113,7 @@ class ConversationViewModel:
         self._cleanup_batch = cleanup_batch
         self._records: list[ConversationRecord] = []
         self._cleanup_count = 0
+        self._peer_revisions: OrderedDict[str, tuple[int, bool, bool]] = OrderedDict()
 
     @property
     def records(self) -> list[ConversationRecord]:
@@ -121,6 +124,9 @@ class ConversationViewModel:
         return self._cleanup_count
 
     def append(self, record: ConversationRecord) -> None:
+        if record.channel == "peer" and record.peer_caption_revision > 0:
+            self._append_peer_caption(record)
+            return
         if record.utterance_id != "legacy":
             parent_id = record.parent_utterance_id or record.utterance_id
             matches = [
@@ -151,6 +157,61 @@ class ConversationViewModel:
                         translated_text=record.translated_text or previous.translated_text,
                     )
                 return
+        self._records.append(record)
+        if len(self._records) > self._max_entries + self._cleanup_batch:
+            del self._records[: self._cleanup_batch]
+            self._cleanup_count += 1
+
+    def _append_peer_caption(self, record: ConversationRecord) -> None:
+        unit_id = record.parent_utterance_id or record.utterance_id
+        record = replace(record, utterance_id=unit_id)
+        revision = record.peer_caption_revision
+        previous_revision = self._peer_revisions.get(unit_id)
+        has_source = record.source_text is not None
+        has_translation = record.translated_text is not None
+        if previous_revision is not None:
+            if revision < previous_revision[0]:
+                return
+            if revision == previous_revision[0]:
+                has_source = has_source and not previous_revision[1]
+                has_translation = has_translation and not previous_revision[2]
+                if not has_source and not has_translation:
+                    return
+        same_revision = previous_revision is not None and revision == previous_revision[0]
+        self._peer_revisions[unit_id] = (
+            revision,
+            has_source or (same_revision and previous_revision[1]),
+            has_translation or (same_revision and previous_revision[2]),
+        )
+        self._peer_revisions.move_to_end(unit_id)
+        while len(self._peer_revisions) > 2 * (self._max_entries + self._cleanup_batch):
+            self._peer_revisions.popitem(last=False)
+        for index, previous in enumerate(self._records):
+            if previous.channel != "peer" or previous.utterance_id != unit_id:
+                continue
+            self._records[index] = replace(
+                record,
+                timestamp_label=previous.timestamp_label,
+                source=previous.source,
+                source_text=(
+                    record.source_text
+                    if has_source
+                    else previous.source_text if same_revision else None
+                ),
+                translated_text=(
+                    record.translated_text
+                    if has_translation
+                    else previous.translated_text if same_revision else None
+                ),
+                source_language=record.source_language or previous.source_language,
+                target_language=record.target_language or previous.target_language,
+                target_index=(
+                    record.target_index
+                    if record.target_index is not None
+                    else previous.target_index
+                ),
+            )
+            return
         self._records.append(record)
         if len(self._records) > self._max_entries + self._cleanup_batch:
             del self._records[: self._cleanup_batch]
@@ -440,6 +501,7 @@ class LogsView(ft.Column):
         origin_wall_clock_ms: int | None = None,
         turn_kind: str | None = None,
         parent_utterance_id: str | None = None,
+        peer_caption_revision: int = 0,
     ) -> None:
         cleaned_source = source_text.strip() if isinstance(source_text, str) else None
         cleaned_translation = translated_text.strip() if isinstance(translated_text, str) else None
@@ -462,6 +524,7 @@ class LogsView(ft.Column):
                 disposition=disposition,
                 turn_kind=turn_kind,
                 parent_utterance_id=parent_utterance_id,
+                peer_caption_revision=peer_caption_revision,
             )
         )
         if self._showing_conversation:

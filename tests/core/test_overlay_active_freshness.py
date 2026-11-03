@@ -92,15 +92,13 @@ async def test_active_self_noop_and_hidden_secondary_do_not_renew_freshness_or_a
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("active", [True, False])
-async def test_mixed_self_peer_pacing_and_late_translation_preserve_shared_window(
+async def test_mixed_self_peer_admission_and_late_translation_preserve_shared_window(
     active: bool,
 ) -> None:
     clock = FakeClock(_now=10.0)
-    waits = []
 
-    async def paced_sleep(delay: float) -> None:
+    async def controlled_sleep(delay: float) -> None:
         if delay <= 1.0:
-            waits.append(delay)
             clock.advance(delay)
             await asyncio.sleep(0)
         else:
@@ -109,7 +107,7 @@ async def test_mixed_self_peer_pacing_and_late_translation_preserve_shared_windo
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(anchor="spatial_locked"),
         clock=clock,
-        sleep=paced_sleep,
+        sleep=controlled_sleep,
         native_retry_enabled=True,
     )
     adapter = OverlayEventAdapter(clock=clock)
@@ -163,10 +161,19 @@ async def test_mixed_self_peer_pacing_and_late_translation_preserve_shared_windo
                 )
             )
             assert receipt.outcome == "applied"
-        assert waits == pytest.approx([1.0])
-        assert clock.now() == pytest.approx(11.1)
+            current = presenter.snapshot()
+            assert len(current.blocks) <= 2
+            assert any(
+                block.id == f"peer:{peer}" and block.primary_text == "peer translation"
+                for block in current.blocks
+            )
+            if active:
+                retained_self = next(block for block in current.blocks if block.id == initial.id)
+                assert retained_self.primary_text == initial.primary_text
+                assert retained_self.occupant_key == initial.occupant_key
         before_translation = presenter.snapshot()
         assert len(before_translation.blocks) == 2
+        translation_ready_at = clock.now()
         receipt = await presenter.emit(
             adapter.translation_final(
                 utterance_id=turn,
@@ -177,6 +184,7 @@ async def test_mixed_self_peer_pacing_and_late_translation_preserve_shared_windo
                 applied_context_mode=None,
             )
         )
+        assert clock.now() == translation_ready_at
         if active:
             assert receipt.outcome == "applied"
             blocks = presenter.snapshot().blocks
@@ -189,11 +197,22 @@ async def test_mixed_self_peer_pacing_and_late_translation_preserve_shared_windo
             )
             assert translated.block_variant == "active_self"
             assert translated.secondary_text == "late translation"
+            before_freshness = before_translation.native_fresh_render_generations
+            after_freshness = presenter.snapshot().native_fresh_render_generations
+            assert before_freshness is not None and before_freshness.self is not None
+            assert after_freshness is not None and after_freshness.self is not None
+            assert after_freshness.self > before_freshness.self
+            assert (
+                presenter.snapshot().native_fresh_render_targets
+                == before_translation.native_fresh_render_targets
+            )
+            assert presenter.snapshot().native_quiet_tail_episodes.self.phase == "stream"
         else:
             assert receipt.outcome == "stale"
             assert [block.id for block in presenter.snapshot().blocks] == [
                 f"peer:{peer}" for peer in peers
             ]
+            assert presenter.snapshot() == before_translation
     finally:
         await presenter.close()
 

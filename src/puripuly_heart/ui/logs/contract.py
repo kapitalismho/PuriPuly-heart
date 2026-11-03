@@ -25,6 +25,7 @@ class LogsStateSink(Protocol):
         origin_wall_clock_ms: int | None = None,
         turn_kind: str | None = None,
         parent_utterance_id: str | None = None,
+        peer_caption_revision: int = 0,
     ) -> None: ...
 
     def apply_locale(self) -> None: ...

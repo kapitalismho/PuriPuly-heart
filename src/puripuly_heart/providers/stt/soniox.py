@@ -345,6 +345,7 @@ class _SonioxSession(STTBackendSession):
         init=False, default_factory=list, repr=False
     )
     _scoped_tokens: list[_FinalToken] = field(init=False, default_factory=list, repr=False)
+    _peer_had_provisional: bool = field(init=False, default=False)
     _scoped_channel: Literal["self", "peer"] | None = field(init=False, default=None, repr=False)
     _turn_diagnostics: _TurnDiagnostics | None = field(init=False, default=None, repr=False)
     _session_open_at: float | None = field(init=False, default=None, repr=False)
@@ -587,6 +588,7 @@ class _SonioxSession(STTBackendSession):
                 )
             return
 
+        provisional: list[str] = []
         for token in tokens:
             if not isinstance(token, dict):
                 if self._event_projection.is_scoped:
@@ -600,6 +602,8 @@ class _SonioxSession(STTBackendSession):
             text = str(token.get("text", "") or "")
             is_final = bool(token.get("is_final"))
             if not is_final:
+                if text not in {"<fin>", "<end>"}:
+                    provisional.append(text)
                 continue
             if text == "<fin>":
                 if self._event_projection.is_scoped:
@@ -658,6 +662,26 @@ class _SonioxSession(STTBackendSession):
             )
             self._pending_tokens.append(final_token)
             self._emit_scoped_token(final_token, token, data)
+        identity = self._event_projection.active_identity
+        if (
+            identity is not None
+            and self._event_projection.channel == "peer"
+            and (provisional or self._peer_had_provisional)
+        ):
+            sequence = self._event_projection.next_update_sequence(identity)
+            if sequence is not None:
+                self._event_projection.put_update(
+                    STTProviderTurnUpdate(
+                        identity=identity,
+                        sequence=sequence,
+                        stability="provisional",
+                        assembly="replace",
+                        text="".join(token.text for token in self._scoped_tokens)
+                        + "".join(provisional),
+                        observed_at=self._last_rx_at,
+                    )
+                )
+        self._peer_had_provisional = bool(provisional) if identity is not None else False
 
         if data.get("finished") is True and self._event_projection.is_scoped:
             self._scoped_transport_failure("soniox_stream_finished", orderly=True)
@@ -707,6 +731,7 @@ class _SonioxSession(STTBackendSession):
                 final_language_runs=runs,
                 final_speaker_runs=speaker_runs,
                 provenance=provenance,
+                observed_at=self._last_rx_at,
             )
         )
 
@@ -824,6 +849,7 @@ class _SonioxSession(STTBackendSession):
     def _clear_scoped_turn(self) -> None:
         self._scoped_provenance.clear()
         self._scoped_tokens.clear()
+        self._peer_had_provisional = False
         self._scoped_channel = None
         self._pending_tokens.clear()
         self._final_tokens.clear()

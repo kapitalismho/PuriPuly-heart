@@ -1742,6 +1742,9 @@ class ScopedRecognitionEngine:
                                 else None
                             ),
                         )
+                    if not event.is_final:
+                        await self._emit(event)
+                        continue
                     await self._emit(
                         STTRecognitionUnitTerminal(event, "final" if event.text else "empty")
                     )

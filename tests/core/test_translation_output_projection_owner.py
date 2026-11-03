@@ -122,6 +122,9 @@ class BlockingPeerOverlay(RecordingOverlay):
     async def emit_peer_when_admissible(
         self,
         event: OverlayEventUnion,
+        *,
+        on_wait=None,
+        admission_started_at: float | None = None,
     ) -> OverlayApplicationReceipt:
         self.started.set()
         await self.release.wait()
