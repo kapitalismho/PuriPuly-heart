@@ -61,7 +61,7 @@ flowchart LR
 - Capture owns source order, timing, and audio scope. Audio loss is explicit, not silence; segmentation does not depend on provider readiness.
 - Self and Peer share audio contracts but retain separate endpoint policies and recognition lifecycles. Local resources may be shared without sharing channel authority.
 - Provider adapters translate native events into shared STT contracts. Local audio completion and transcript delivery are distinct; provider recovery stays inside the recognition boundary.
-- Peer segment snapshots retain boundary identity, actual pause and Smart Turn evidence through recognition settlement. Caption joining consumes that owned evidence rather than reconstructing it from the controller's current segment.
+- Peer segment snapshots carry capture-boundary evidence through recognition settlement into caption joining.
 - Dashboard readiness is a projection of the Self capture owner's lifecycle, not recognition-result/session events. Presentation retains readiness independently of conversation content and specific errors/notices; it does not own runtime state.
 - Source completion drains admitted input. Stop, discontinuity, and replacement revoke affected authority so late results cannot enter current work.
 - VAD-only audio tests exclude normal capture. The application owner handles admission, input release, and restoration of still-authorized capture.
@@ -83,7 +83,7 @@ Behavior: [production-composition evidence checks](../tests/release_evidence/tes
 
 - Provider adapters own provider-specific authentication, requests, streaming, and errors behind the common provider boundary. Turn owners own admission, cancellation, stale-result rejection, and publication.
 - Self source closure and translation completion are independent. Speculative results are not accepted history; source/target revisions and turn identity govern presentation.
-- Self and Peer have separate admission while sharing provider capacity. Cloud Peer owns provisional caption revisions, final settlement and adjacent-caption repair; local Peer retains per-final translation. Requests retain their original context, and revision-aware output preserves source order without admitting previews into committed history. The [Peer caption policy](peer-captions.md) defines the selected behavior and route boundaries.
+- Self and Peer have separate admission while sharing provider capacity. Cloud Peer owns caption revisions and adjacent-caption repair; local Peer retains per-final translation. Ordinary caption revisions retain their initial context; publication preserves admitted source order.
 - Manual text bypasses capture/STT and uses Self publication. Admission, translation completion, and destination delivery are separate outcomes.
 - Managed local translation owns its server, model, and capacity behind the same provider boundary. Requests retain native resources until settlement; model/backend replacement drains work before admitting a replacement.
 
@@ -93,9 +93,9 @@ Behavior: [turn lifecycle](../tests/core/test_translation_turn_owner.py), [reque
 
 - Destinations have independent bounded delivery. One destination's failure must not block another or replay recognition/translation. Peer speech never reaches the chatbox; system disclosures require an explicit route.
 - Output preserves turn/publication identity. Revisions may update retained turns without refocusing the dashboard or reviving retired captions. Preview presentation is separate from final accepted history.
-- Peer conversation records carry stable caption identity and monotonic revision beyond translation context. Runtime logging preserves explicit replacement records in the append-only audit, while runtime-record and UI-event delivery converge on one current GUI conversation record. Preview versions remain presentation-only.
+- Peer logging retains append-only caption revisions; GUI history converges on one current record per caption.
 - Python owns logical caption state and lifetime; native overlays own rendering. Presentation does not gate translation, and delivery receipts do not prove physical display or remote UDP receipt.
-- Python also owns Peer page progression, upper-slot reading protection and atomic retirement of absorbed preview captions. The output runtime owns cancelable preview delivery and the bounded first-admission clock across superseding versions; the presenter applies W and page geometry using that clock. The optional layout port exposes current caption scale to join estimation. Self admission bypasses Peer waiting. Desktop and native render the resulting scene with new Peer captions below the preceding caption, retaining caption identity across promotion.
+- The output runtime owns cancelable Peer admission; the presenter owns paging, reading protection, absorbed-caption retirement and layout-scale projection. Desktop and native render the resulting scene; Self admission bypasses Peer waiting.
 - The VRChat scene owner survives pipeline rebuilds and has no audio, VAD, or OSC dependency. Only trusted, sanitized population context reaches translation; names/raw logs stay local, and custom HTTP extensions receive no scene data.
 
 Behavior: [output runtime](../tests/core/runtime/test_output_runtime.py), [Self caption policy](../tests/core/test_self_caption_policy.py), [Peer lifecycle](../tests/core/test_peer_caption_lifecycle.py), [Peer history](../tests/ui/test_peer_caption_history.py), [overlay presenter](../tests/core/test_overlay_presenter.py). Protocols: [native overlays](../native/overlay/README.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](http-extensions.md).

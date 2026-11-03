@@ -518,7 +518,7 @@ async def test_context_is_five_recent_peer_finals_and_preview_context_is_frozen(
         )
         for index in range(7):
             harness.peer_runtime.translation_history.append(
-                ContextEntry(f"Recent {index}.", "en", "ko", 60, "peer")
+                ContextEntry(f"Recent {index}.", "en", "ko", 7, "peer")
             )
         harness.self_runtime.translation_history.append(
             ContextEntry("Private Self.", "en", "ko", 60)
@@ -528,18 +528,38 @@ async def test_context_is_five_recent_peer_finals_and_preview_context_is_frozen(
         clock.advance(5)
         await harness.peer_owner.cloud_captions.check_previews()
         await idle(harness)
+        assert len(backend.calls) == 1
+        assert backend.calls[-1].text == item.text
         expected = "\n".join(f'- [peer] "Recent {index}."' for index in range(2, 7))
         assert backend.calls[-1].context == expected
         harness.peer_runtime.translation_history.append(
             ContextEntry("Later context.", "en", "ko", clock.now(), "peer")
         )
+        growing = replace(item, text="Observed incomplete source with more detail")
+        await partial(harness, growing)
+        clock.advance(4)
+        await harness.peer_owner.cloud_captions.check_previews()
+        await idle(harness)
+        assert clock.now() - 7 > 60
+        assert len(backend.calls) == 2
+        assert backend.calls[-1].text == growing.text
+        assert backend.calls[-1].context == expected
         await final(harness, replace(item, text="Authoritative final."))
         await idle(harness)
+        assert len(backend.calls) == 3
+        assert backend.calls[-1].text == "Authoritative final."
         assert backend.calls[-1].context == expected
         ui = []
         while not harness.ui_events.empty():
             ui.append(harness.ui_events.get_nowait())
         assert len([event for event in ui if event.type is UIEventType.TRANSLATION_DONE]) == 1
+        await final(harness, transcript("A new independent sentence.", 2))
+        await idle(harness)
+        assert len(backend.calls) == 4
+        assert backend.calls[-1].text == "A new independent sentence."
+        assert backend.calls[-1].context == (
+            '- [peer] "Later context."\n- [peer] "Authoritative final."'
+        )
     finally:
         await harness.stop()
 
