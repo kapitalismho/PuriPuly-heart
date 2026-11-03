@@ -326,8 +326,6 @@ PuriPuly는 클라우드 ASR와 결합했을 때 최상의 경험을 제공해�
 <details>
 <summary><h3>Gemini</h3></summary>
 
-Gemini 직접 텍스트 번역과 워밍업 요청은 `store: false`를 명시해 제공자의 선택적 요청 로그 저장을 끕니다. 이는 데이터 무보관을 보장하거나 계정·프로젝트 설정을 변경하거나 기존 로그를 삭제하지 않으며, Gemini Live 음성 인식에는 적용되지 않습니다.
-
 1. [Google AI Studio](https://aistudio.google.com/apikey)에 접속해서 **Get API key** 버튼을 클릭하세요.
    ![step1](../images/gemini/1.png)
 

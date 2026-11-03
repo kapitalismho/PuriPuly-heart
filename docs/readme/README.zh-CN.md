@@ -318,8 +318,6 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 <details>
 <summary><h3>Gemini</h3></summary>
 
-直接发送给 Gemini 的文本翻译和预热请求会明确设置 `store: false`，以关闭提供商可选的请求日志存储。这不保证零数据保留，不会更改账号或项目设置、删除现有日志，也不适用于 Gemini Live 转写。
-
 1. 访问 [Google AI Studio](https://aistudio.google.com/apikey) 并点击 **Get API key** 按钮。
    ![step1](../images/gemini/1.png)
 

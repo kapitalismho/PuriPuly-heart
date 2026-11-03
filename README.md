@@ -326,8 +326,6 @@ Network, proxy, TLS certificate, and service errors do not mean your key is inva
 <details>
 <summary><h3>Gemini</h3></summary>
 
-Direct Gemini text translation and warmup explicitly send `store: false` to disable optional provider request logs. This does not guarantee zero data retention, change your account/project settings, delete existing logs, or apply to Gemini Live transcription.
-
 1. Go to [Google AI Studio](https://aistudio.google.com/apikey) and click the **Get API key** button.
    ![step1](docs/images/gemini/1.png)
 

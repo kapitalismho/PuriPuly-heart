@@ -320,8 +320,6 @@ PuriPulyはクラウドSTTと組み合わせると最良の体験になります
 <details>
 <summary><h3>Gemini</h3></summary>
 
-Geminiへの直接のテキスト翻訳とウォームアップのリクエストでは、`store: false`を明示してプロバイダーの任意のリクエストログ保存を無効にします。これはデータの保持ゼロを保証するものではなく、アカウントやプロジェクトの設定変更、既存ログの削除、Gemini Liveの文字起こしには適用されません。
-
 1. [Google AI Studio](https://aistudio.google.com/apikey)にアクセスし、**Get API key** ボタンをクリックします。
    ![step1](../images/gemini/1.png)
 
