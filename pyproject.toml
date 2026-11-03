@@ -26,7 +26,7 @@ dependencies = [
   "psutil>=5.9; platform_system == 'Windows' and platform_python_implementation == 'CPython' and python_version == '3.14' and platform_machine == 'AMD64'",
   "sounddevice==0.5.5",
   "onnxruntime==1.28.0",
-  "google-genai>=2.21.0,<3.0.0",
+  "google-genai>=2.34.0,<3.0.0",
   "elevenlabs>=2.60.0,<3.0.0",
   "websockets==16.1.1",
   "deepgram-sdk==7.8.1",
