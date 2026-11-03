@@ -84,7 +84,7 @@ async def test_generate_content_serializes_explicit_storage_opt_out(
     provider, requests, response, sync_client, async_client = controlled_genai
     response["body"]["candidates"][0]["finishReason"] = finish_reason
     if finish_reason == "CONTINUATION":
-        response["body"]["continuationToken"] = "c3ludGhldGljLWNvbnRpbnVhdGlvbg=="
+        response["body"]["candidates"][0]["continuationToken"] = "c3ludGhldGljLWNvbnRpbnVhdGlvbg=="
     result = await _invoke(provider, operation)
     if operation == "translation":
         assert result.text == "translated"
