@@ -506,22 +506,17 @@ uv run python -m pytest
 
 ---
 
-## 개발자
-
-[salee](https://github.com/kapitalismho)
-
----
-
 ## 기여자
 
-[RICHARDwuxiaofei](https://github.com/RICHARDwuxiaofei)
-[fzcfweasdferttgg-png](https://github.com/fzcfweasdferttgg-png)
+<a href="https://github.com/kapitalismho/PuriPuly-heart/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=kapitalismho/PuriPuly-heart" alt="Contributors" />
+</a>
 
 ---
 
 ## Special Thanks
 
-SUI32C, Nagikokoro, motoka96, Ykol魚, kascr, Just Monika V, FLUVIA, Han โชเล่ย์, EAPE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
+SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
 
 ---
 

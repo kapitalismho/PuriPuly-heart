@@ -446,16 +446,11 @@ uv run python -m pytest
 
 ---
 
-## 开发者
-
-[salee](https://github.com/kapitalismho)
-
----
-
 ## 贡献者
 
-[RICHARDwuxiaofei](https://github.com/RICHARDwuxiaofei)
-[fzcfweasdferttgg-png](https://github.com/fzcfweasdferttgg-png)
+<a href="https://github.com/kapitalismho/PuriPuly-heart/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=kapitalismho/PuriPuly-heart" alt="Contributors" />
+</a>
 
 ---
 
