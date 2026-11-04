@@ -626,6 +626,84 @@ async def test_actual_translation_owners_keep_default_intermediate_and_final_con
 
 
 @pytest.mark.asyncio
+async def test_queued_retraction_revokes_running_peer_preview_and_replacement_progresses(
+    monkeypatch,
+):
+    from puripuly_heart.core.clock import FakeClock
+    from tests.core.test_peer_caption_lifecycle import idle, setup, turn_loop
+
+    clock = FakeClock(_now=100.0)
+    monkeypatch.setattr(soniox, "time", SimpleNamespace(monotonic=clock.now))
+    harness, backend, events, _ = setup(clock=clock)
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    stalled = False
+    engine = None
+    old_source = "Old hypothesis"
+    replacement = "A longer replacement hypothesis"
+
+    async def sink(event):
+        if isinstance(event, STTProviderTurnUpdate):
+            if stalled:
+                entered.set()
+                await release.wait()
+            await harness.peer_owner.handle_provider_update(event)
+
+    try:
+        await harness.start()
+        engine, sessions, sockets, _, _ = await engine_fixture(sink)
+
+        async def receive(text, at):
+            clock._now = at
+            sockets[0].push(message([{"text": text, "is_final": False}] if text else []))
+            await wait_until(
+                lambda: sessions[0]._last_rx_at == at
+                and sessions[0]._event_projection.scoped_event_depth == 0
+            )
+
+        backend.block = True
+        await receive(old_source, 100.0)
+        await asyncio.wait_for(engine.wait_for_event_ingress_drain(), timeout=1)
+        clock._now = 105.0
+        await harness.peer_owner.cloud_captions.check_previews()
+        await wait_until(lambda: len(backend.completions) == 1)
+        assert [request.text for request in backend.calls] == [old_source]
+
+        stalled = True
+        await receive(old_source, 105.0)
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        await receive("", 106.0)
+        await receive(replacement, 107.0)
+        release.set()
+        await asyncio.wait_for(engine.wait_for_event_ingress_drain(), timeout=1)
+        old_translation = backend.completions[0]
+        if not old_translation.done():
+            old_translation.set_result(None)
+        await turn_loop()
+        await asyncio.wait_for(idle(harness), timeout=1)
+        before_next_preview = [event.source_text for event in events]
+
+        backend.block = False
+        clock._now = 109.0
+        await harness.peer_owner.cloud_captions.check_previews()
+        await asyncio.wait_for(idle(harness), timeout=1)
+        assert [request.text for request in backend.calls] == [old_source, replacement]
+        assert events[-1].source_text == replacement
+        assert events[-1].type == "translation_stream_update"
+        assert events[-1].peer_caption_revision == 2
+        assert before_next_preview == []
+        assert [event.source_text for event in events] == [replacement]
+        assert harness.peer_runtime.translation_history == []
+        assert harness.self_runtime.translation_history == []
+        assert harness.osc.messages == []
+    finally:
+        release.set()
+        if engine is not None:
+            await asyncio.wait_for(engine.close(), timeout=3)
+        await asyncio.wait_for(harness.stop(), timeout=3)
+
+
+@pytest.mark.asyncio
 async def test_buffered_responses_yield_before_capacity_is_exhausted():
     received = []
     native_backlog_at_delivery = []
