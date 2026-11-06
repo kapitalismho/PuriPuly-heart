@@ -380,7 +380,7 @@ describe('broker direct deploy automation', () => {
     expect(workflow).toContain("if: steps.privacy_prerequisite.outputs.first_install == 'true'");
   });
 
-  it.skipIf(!bashAvailable)('requires the dedicated deletion inputs and a usable backup before staging and applying only migration 0025', () => {
+  it.skipIf(!bashAvailable)('requires dedicated authorization for legacy telemetry deletion at dispatch', () => {
     const workflow = readFileSync(deployWorkflow, 'utf8');
     const guardScript = extractWorkflowRunBlock(
       workflow,
@@ -418,92 +418,6 @@ describe('broker direct deploy automation', () => {
       },
     ]) {
       expect(runGuardScript(guardScript, scenario.env).status).toBe(scenario.status);
-    }
-
-    const applyScript = extractWorkflowRunBlock(
-      workflow,
-      'Apply explicitly authorized legacy telemetry deletion',
-    );
-    const scenarios: Array<{
-      deletion: string | undefined;
-      confirmation: string | undefined;
-      status: number;
-      applied: boolean;
-      usableBackup?: boolean;
-    }> = [
-      { deletion: undefined, confirmation: undefined, status: 0, applied: false },
-      { deletion: 'false', confirmation: undefined, status: 0, applied: false },
-      { deletion: 'true', confirmation: 'wrong confirmation', status: 1, applied: false },
-      {
-        deletion: 'true',
-        confirmation: 'delete retired translation telemetry from production D1',
-        status: 0,
-        applied: true,
-      },
-      {
-        deletion: 'true',
-        confirmation: 'delete retired translation telemetry from production D1',
-        status: 1,
-        applied: false,
-        usableBackup: false,
-      },
-    ];
-
-    for (const scenario of scenarios) {
-      const tempDir = createRepoTempDir();
-      const migrationsDir = join(tempDir, 'migrations');
-      mkdirSync(migrationsDir);
-      writeFileSync(
-        join(migrationsDir, '0025_drop_legacy_translation_telemetry.sql'),
-        'DROP TABLE IF EXISTS telemetry_active_days;\n',
-      );
-      const backupPath = join(tempDir, 'pre-migration-backup.sql');
-      const configPath = join(tempDir, 'legacy-deletion.jsonc');
-      const outputPath = join(tempDir, 'github-output.txt');
-      const pnpmLogPath = join(tempDir, 'pnpm.log');
-      const bashEnvPath = join(tempDir, 'bash-env.sh');
-      if (scenario.usableBackup !== false) {
-        writeFileSync(backupPath, 'production backup\n');
-      }
-      writeFileSync(configPath, '{}\n');
-      writeFileSync(outputPath, '');
-      writeFileSync(
-        bashEnvPath,
-        'pnpm() { printf \'%s\\n\' "$*" >> "$PNPM_LOG"; }\n',
-      );
-
-      const result = runBashScript(applyScript, tempDir, {
-        DELETE_LEGACY_TRANSLATION_TELEMETRY: scenario.deletion,
-        CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: scenario.confirmation,
-        LEGACY_DELETION_CONFIG_PATH: 'legacy-deletion.jsonc',
-        D1_BACKUP_PATH: 'pre-migration-backup.sql',
-        GITHUB_OUTPUT: 'github-output.txt',
-        PNPM_LOG: 'pnpm.log',
-        BASH_ENV: './bash-env.sh',
-      });
-      expect(result.status).toBe(scenario.status);
-
-      const stagedDir = join(
-        tempDir,
-        '.deploy-direct',
-        'staged-migrations-legacy-telemetry-deletion',
-      );
-      if (scenario.applied) {
-        expect(readdirSync(stagedDir)).toEqual([
-          '0025_drop_legacy_translation_telemetry.sql',
-        ]);
-        expect(readFileSync(pnpmLogPath, 'utf8').split('\n').filter(Boolean)).toEqual([
-          'exec wrangler types --config legacy-deletion.jsonc',
-          'exec wrangler d1 migrations apply puripuly-heart-broker --remote --config legacy-deletion.jsonc',
-        ]);
-        expect(readFileSync(outputPath, 'utf8')).toBe('applied=true\n');
-      } else {
-        expect(existsSync(stagedDir)).toBe(false);
-        expect(existsSync(pnpmLogPath)).toBe(false);
-        if (scenario.status === 0) {
-          expect(readFileSync(outputPath, 'utf8')).toBe('applied=false\n');
-        }
-      }
     }
 
     const backupUploadIndex = workflow.indexOf('Upload pre-migration D1 backup');

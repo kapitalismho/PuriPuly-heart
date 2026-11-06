@@ -259,6 +259,11 @@ jobs:
               )
           PY
 
+      - name: Install backup encryption tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends age
+
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
         with:
@@ -462,26 +467,68 @@ jobs:
 
       - name: Export pre-migration production D1 backup
         id: d1_backup
+        timeout-minutes: 8
         shell: bash
         working-directory: broker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BROKER_D1_BACKUP_AGE_RECIPIENT_PRODUCTION: ${{ vars.BROKER_D1_BACKUP_AGE_RECIPIENT_PRODUCTION }}
         run: |
-          backup_path="$RUNNER_TEMP/puripuly-heart-broker-pre-migration-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql"
-          pnpm exec wrangler d1 export puripuly-heart-broker \
+          umask 077
+          recipient="${BROKER_D1_BACKUP_AGE_RECIPIENT_PRODUCTION:-}"
+          if [[ ! "$recipient" =~ ^age1[0-9a-z]{58}$ ]]; then
+            echo 'BROKER_D1_BACKUP_AGE_RECIPIENT_PRODUCTION must be a native age recipient.' >&2
+            exit 1
+          fi
+          private_dir="$(mktemp -d "$RUNNER_TEMP/puripuly-heart-broker-plaintext-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.XXXXXX")"
+          backup_path="$RUNNER_TEMP/puripuly-heart-broker-pre-migration-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql.age"
+          complete=false
+          cleanup() {
+            rm -rf -- "$private_dir"
+            if [[ "$complete" != true ]]; then
+              rm -f -- "$backup_path"
+            fi
+          }
+          trap cleanup EXIT
+          trap 'exit 129' HUP
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          timeout --signal=TERM --kill-after=10s 60s age --encrypt \
+            --recipient "$recipient" --output "$private_dir/recipient-check.age" /dev/null
+          plaintext_path="$private_dir/backup.sql"
+          timeout --signal=TERM --kill-after=10s 300s pnpm exec wrangler d1 export puripuly-heart-broker \
             --remote --config "${{ steps.render.outputs.config_path }}" \
-            --output "$backup_path"
+            --output "$plaintext_path"
+          test -s "$plaintext_path"
+          timeout --signal=TERM --kill-after=10s 60s age --encrypt \
+            --recipient "$recipient" --output "$backup_path" "$plaintext_path"
           test -s "$backup_path"
-          echo "backup_path=$backup_path" >> "$GITHUB_OUTPUT"
+          backup_sha256="$(sha256sum "$backup_path" | cut -d ' ' -f 1)"
+          rm -rf -- "$private_dir"
+          test ! -e "$private_dir"
+          printf 'backup_path=%s\nbackup_sha256=%s\n' "$backup_path" "$backup_sha256" >> "$GITHUB_OUTPUT"
+          complete=true
 
       - name: Upload pre-migration D1 backup
+        id: d1_backup_upload
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: puripuly-heart-broker-pre-migration-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.d1_backup.outputs.backup_path }}
           if-no-files-found: error
           retention-days: 7
+
+      - name: Verify persisted pre-migration D1 backup
+        shell: bash
+        working-directory: broker
+        env:
+          D1_BACKUP_PATH: ${{ steps.d1_backup.outputs.backup_path }}
+          D1_BACKUP_SHA256: ${{ steps.d1_backup.outputs.backup_sha256 }}
+          D1_BACKUP_UPLOAD_OUTCOME: ${{ steps.d1_backup_upload.outcome }}
+          D1_BACKUP_ARTIFACT_ID: ${{ steps.d1_backup_upload.outputs.artifact-id }}
+          D1_BACKUP_ARTIFACT_DIGEST: ${{ steps.d1_backup_upload.outputs.artifact-digest }}
+        run: bash scripts/verify-persisted-d1-backup.sh
 
       - name: Apply staged pre-backfill D1 migrations
         working-directory: broker
@@ -983,6 +1030,10 @@ jobs:
           CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: ${{ github.event.inputs.confirm_legacy_translation_telemetry_deletion }}
           LEGACY_DELETION_CONFIG_PATH: ${{ steps.render.outputs.legacy_deletion_config_path }}
           D1_BACKUP_PATH: ${{ steps.d1_backup.outputs.backup_path }}
+          D1_BACKUP_SHA256: ${{ steps.d1_backup.outputs.backup_sha256 }}
+          D1_BACKUP_UPLOAD_OUTCOME: ${{ steps.d1_backup_upload.outcome }}
+          D1_BACKUP_ARTIFACT_ID: ${{ steps.d1_backup_upload.outputs.artifact-id }}
+          D1_BACKUP_ARTIFACT_DIGEST: ${{ steps.d1_backup_upload.outputs.artifact-digest }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
@@ -994,7 +1045,7 @@ jobs:
             echo 'confirm_legacy_translation_telemetry_deletion must exactly match: delete retired translation telemetry from production D1' >&2
             exit 1
           fi
-          test -s "$D1_BACKUP_PATH"
+          bash scripts/verify-persisted-d1-backup.sh
 
           staged_migrations_dir='.deploy-direct/staged-migrations-legacy-telemetry-deletion'
           held_migration='0025_drop_legacy_translation_telemetry.sql'
@@ -1023,3 +1074,10 @@ jobs:
 
           Do not connect app / public traffic to the broker until this run has been reviewed and an explicit cutover is approved.
           EOF
+
+      - name: Clean up local D1 backup files
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          rm -rf -- "$RUNNER_TEMP"/puripuly-heart-broker-plaintext-"${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}".*
+          rm -f -- "$RUNNER_TEMP/puripuly-heart-broker-pre-migration-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql.age"

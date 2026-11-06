@@ -44,6 +44,30 @@ The manual [direct-deploy workflow](../.github/workflows/deploy-broker-direct.ym
 
 The manual [daily-auth-cap maintenance workflow](../.github/workflows/maintenance-broker-abuse-controls.yml) requires explicit confirmation, updates only the daily auth cap, and verifies it by readback. Caps must be canonical positive decimals from 1 through 100000; oversized inputs are rejected before numeric-value arithmetic, config rendering, or D1 access. Config preparation uses `BROKER_D1_DATABASE_ID_PRODUCTION`, the required `NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION` variable, and optional `NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION` overlap, as in deployment. Missing or invalid required configuration stops the workflow before D1 access; no key-version default is substituted.
 
+### Private D1 Backups
+
+Before reusing the direct-deploy workflow, an authorized operator must provision and verify an offline recovery identity. On a secure operator machine with [age](https://age-encryption.org/) installed:
+
+```sh
+umask 077
+age-keygen --output /secure/offline/broker-d1-backup.identity
+age-keygen -y /secure/offline/broker-d1-backup.identity
+```
+
+Set only the resulting public `age1...` recipient as the GitHub `production` environment variable `BROKER_D1_BACKUP_AGE_RECIPIENT_PRODUCTION`. Keep the private identity off GitHub, including Actions secrets, runners, artifacts, source, and logs. Maintain separately protected recovery copies and retain matching identities while corresponding backups may need recovery. Verify a synthetic encryption/decryption round trip before configuring the recipient; a valid public key does not prove that an operator holds its private identity.
+
+The workflow exports into a private temporary directory, encrypts with age, and removes plaintext before publishing the backup output. Export and protection are time-bounded, failure/signal traps remove temporary plaintext and incomplete ciphertext, and an always-run step cleans local backup files. Only `.sql.age` ciphertext is selected for the repository-readable artifact, with seven-day retention. Missing or invalid recipient configuration, preparation failure, or upload failure stops deployment before migrations. The persistence gate and authorized telemetry deletion require the same run's protected backup, its produced SHA-256, and successful artifact-upload evidence; arbitrary nonempty replacement files do not satisfy the prerequisite.
+
+To recover, download and unpack the run's artifact, then decrypt only on a secure operator machine:
+
+```sh
+umask 077
+age --decrypt --identity /secure/offline/broker-d1-backup.identity \
+  --output /secure/recovery/pre-migration.sql /download/backup.sql.age
+```
+
+Validate recovered schema and records in isolated local SQLite before any separately authorized production restore. Protect and remove recovered plaintext according to operator policy. Synthetic local recovery checks do not establish production-key custody, a live GitHub upload/download, or a production restore. This repair does not assess or delete historical artifacts.
+
 ### Separately Authorized Retirement
 
 - **Legacy translation telemetry (`0025`):** inspect production aggregate counts/date ranges and external or operator-created dependencies, then obtain explicit deletion approval. Use the workflow's dedicated deletion controls; dispatch confirmation does not prove that review or approval occurred. Deletion uses the run's backup and applies only the held migration after health and production smoke checks.
@@ -53,7 +77,7 @@ The [migration directory](migrations/) defines the forward schema history. Produ
 
 ## Development and Verification
 
-Run Broker tooling from a Linux-native checkout, including WSL-internal storage, not Windows or shared `/mnt/c/...` dependencies. From the repository root:
+Run Broker tooling from a Linux-native checkout, including WSL-internal storage, not Windows or shared `/mnt/c/...` dependencies. Backup checks require `age` and `age-keygen` (`sudo apt-get install age` on Ubuntu). From the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -64,7 +88,7 @@ pnpm exec vitest run broker/tests --exclude "broker/tests/deploy-smoke/**"
 
 `verify:config` checks the pinned Wrangler binding contract without cloud credentials. Use isolated synthetic state and controlled provider responses for local behavior checks. The [Broker CI job](../.github/workflows/pr-ci.yml) defines automated checks; production smoke is a separate, explicitly authorized live operation.
 
-For focused offline maintenance coverage, run `pnpm exec vitest run broker/tests/deploy-automation.spec.ts`. It executes the maintained guard, renderer, cap update, and readback with synthetic configuration and local SQLite; it does not verify live D1 access or authorize a production dispatch.
+For focused offline deployment coverage, run `pnpm exec vitest run broker/tests/deploy-automation.spec.ts broker/tests/d1-backup.spec.ts`. It executes the maintained guard, renderer, cap update/readback, and protected-backup recovery/failure paths with synthetic configuration, real age encryption, controlled local persistence, and local SQLite. It does not verify live D1 or GitHub artifact access and does not authorize a production dispatch.
 
 ## Source Map
 
