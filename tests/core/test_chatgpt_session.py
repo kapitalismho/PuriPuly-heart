@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from threading import Event
 from urllib.parse import parse_qs
 
 import httpx
@@ -12,6 +13,7 @@ from puripuly_heart.core.chatgpt.oauth import (
     CHATGPT_PLAN_SCOPE,
     CHATGPT_REVOKE_URL,
     CHATGPT_TOKEN_URL,
+    ChatGptAuthError,
     ChatGptIdentity,
     ChatGptReauthRequired,
     ChatGptTokenSet,
@@ -23,6 +25,7 @@ from puripuly_heart.core.chatgpt.session import (
     CHATGPT_REFRESH_TOKEN_SECRET,
     ChatGptSession,
 )
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
 from puripuly_heart.core.storage.secrets import EncryptedFileSecretStore, InMemorySecretStore
 
 WINDOWS_CREDENTIAL_MANAGER_MAX_CHARS = 1280
@@ -229,4 +232,319 @@ async def test_refresh_rotation_preserves_concurrent_managed_delivery(tmp_path: 
     finally:
         release.set()
         await asyncio.gather(refresh, return_exceptions=True)
+        await session.close()
+
+
+def _authorize(session: ChatGptSession) -> None:
+    session.store_sign_in(
+        client_id="oaiapp_client",
+        tokens=ChatGptTokenSet(
+            access_token="authorized-access",
+            refresh_token="authorized-refresh",
+            expires_at=5000,
+            scopes=(CHATGPT_PLAN_SCOPE,),
+        ),
+        identity=ChatGptIdentity(subject="new-user", email="new@example.invalid"),
+    )
+
+
+@pytest.mark.parametrize("rejected", [False, True])
+async def test_retired_refresh_cannot_overwrite_or_delete_new_sign_in(rejected: bool) -> None:
+    store = _signed_in_store()
+    store.set("unrelated", "keep")
+    server = _TokenServer()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == CHATGPT_TOKEN_URL and not entered.is_set():
+            entered.set()
+            await release.wait()
+            if rejected:
+                return httpx.Response(400, json={"error": "invalid_grant"})
+        return server.handler(request)
+
+    session = ChatGptSession(
+        secret_store=lambda: store,
+        http_factory=lambda: httpx.AsyncClient(
+            transport=httpx.MockTransport(handler), trust_env=False
+        ),
+        clock=lambda: 1000,
+    )
+    refresh = asyncio.create_task(session.access_token())
+    try:
+        await asyncio.wait_for(entered.wait(), 5)
+        assert (await session.sign_out()).local_credentials_removed is True
+        _authorize(session)
+        release.set()
+        with pytest.raises(ChatGptReauthRequired):
+            await asyncio.wait_for(refresh, 5)
+        assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) == "authorized-refresh"
+        assert await session.access_token() == "authorized-access"
+        assert session.status().email == "new@example.invalid"
+        session.invalidate_access_token("authorized-access")
+        tokens = await asyncio.wait_for(
+            asyncio.gather(*(session.access_token() for _ in range(5))), 5
+        )
+        assert len(set(tokens)) == 1
+        assert server.refresh_calls == (1 if rejected else 2)
+        assert store.get("unrelated") == "keep"
+        assert session.status().signed_in is True
+    finally:
+        release.set()
+        await asyncio.gather(refresh, return_exceptions=True)
+        await session.close()
+
+
+@pytest.mark.parametrize("revoke_status", [200, 500])
+async def test_sign_in_supersedes_logout_before_removal(revoke_status: int) -> None:
+    store = _signed_in_store()
+    server = _TokenServer()
+    server.revoke_status = revoke_status
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == CHATGPT_REVOKE_URL:
+            entered.set()
+            await release.wait()
+        return server.handler(request)
+
+    session = ChatGptSession(
+        secret_store=lambda: store,
+        http_factory=lambda: httpx.AsyncClient(
+            transport=httpx.MockTransport(handler), trust_env=False
+        ),
+        clock=lambda: 1000,
+    )
+    logout = asyncio.create_task(session.sign_out())
+    try:
+        await asyncio.wait_for(entered.wait(), 5)
+        with pytest.raises(ChatGptReauthRequired) as error:
+            await session.access_token()
+        assert error.value.code == "signed_out"
+        assert server.refresh_calls == 0
+        _authorize(session)
+        release.set()
+        result = await asyncio.wait_for(logout, 5)
+        assert result.local_credentials_removed is False
+        assert result.remote_revoked is (revoke_status == 200)
+        diagnostics = (result.diagnostics, *result.secondary_diagnostics)
+        superseded = next(d for d in diagnostics if d.code == "chatgpt_logout_superseded")
+        assert superseded.category == "lifecycle"
+        assert superseded.fields["local_credentials_removed"] is False
+        if revoke_status == 500:
+            assert result.diagnostics.code == "chatgpt_remote_revocation_unconfirmed"
+            assert superseded.cause_id == result.diagnostics.diagnostic_id
+        assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) == "authorized-refresh"
+        assert await session.access_token() == "authorized-access"
+        session.invalidate_access_token("authorized-access")
+        await asyncio.wait_for(session.access_token(), 5)
+        assert server.refresh_calls == 1
+        assert session.status().signed_in is True
+    finally:
+        release.set()
+        await asyncio.gather(logout, return_exceptions=True)
+        await session.close()
+
+
+@pytest.mark.parametrize("mutation", ["rotation", "rejection", "logout"])
+async def test_cancelled_credential_mutation_drains_and_reports_storage_failure(
+    mutation: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    finished = asyncio.Event()
+    release = Event()
+
+    def fail() -> None:
+        loop.call_soon_threadsafe(entered.set)
+        try:
+            if not release.wait(10):
+                raise TimeoutError("Mutation gate was not released")
+            raise OSError("synthetic-private-secret")
+        finally:
+            loop.call_soon_threadsafe(finished.set)
+
+    class FailingStore(InMemorySecretStore):
+        def set(self, key: str, value: str) -> None:
+            if key == CHATGPT_REFRESH_TOKEN_SECRET and value == "r1":
+                fail()
+            super().set(key, value)
+
+        def delete(self, key: str) -> None:
+            if key == CHATGPT_REFRESH_TOKEN_SECRET:
+                fail()
+            super().delete(key)
+
+    store = FailingStore()
+    store.set(CHATGPT_CLIENT_ID_SECRET, "oaiapp_client")
+    store.set(CHATGPT_REFRESH_TOKEN_SECRET, "r0")
+    server = _TokenServer()
+    if mutation == "rejection":
+        server.refresh_status = 400
+    if mutation == "logout":
+        server.revoke_status = 500
+    session = _session(store, server, [1000])
+    task = asyncio.create_task(
+        session.sign_out() if mutation == "logout" else session.access_token()
+    )
+    try:
+        await asyncio.wait_for(entered.wait(), 5)
+        task.cancel()
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(asyncio.shield(task), 0.1)
+        task.cancel()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, 5)
+        await asyncio.wait_for(finished.wait(), 5)
+        diagnostics = [
+            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+        ]
+        failed = next(d for d in diagnostics if d.fields.get("exception_class") == "OSError")
+        assert failed.operation == (
+            "refresh_store" if mutation == "rotation" else "local_credential_delete"
+        )
+        if mutation != "rotation":
+            primary = next(d for d in diagnostics if d.diagnostic_id == failed.cause_id)
+            assert primary.code == (
+                "chatgpt_invalid_grant"
+                if mutation == "rejection"
+                else "chatgpt_remote_revocation_unconfirmed"
+            )
+            assert failed.fields["local_credentials_removed"] is False
+        assert "synthetic-private-secret" not in repr(diagnostics)
+        assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) == "r0"
+    finally:
+        release.set()
+        await asyncio.wait_for(asyncio.gather(task, return_exceptions=True), 5)
+        await session.close()
+
+
+@pytest.mark.parametrize("mutation", ["rotation", "rejection", "logout"])
+async def test_uncancelled_credential_storage_failures_remain_observable(mutation: str) -> None:
+    class FailingStore(InMemorySecretStore):
+        def set(self, key: str, value: str) -> None:
+            if key == CHATGPT_REFRESH_TOKEN_SECRET and value == "r1":
+                raise OSError("synthetic write failure")
+            super().set(key, value)
+
+        def delete(self, key: str) -> None:
+            raise OSError("synthetic cleanup failure")
+
+    store = FailingStore()
+    store.set(CHATGPT_CLIENT_ID_SECRET, "oaiapp_client")
+    store.set(CHATGPT_REFRESH_TOKEN_SECRET, "r0")
+    server = _TokenServer()
+    session = _session(store, server, [1000])
+    try:
+        if mutation == "logout":
+            server.revoke_status = 500
+            result = await session.sign_out()
+            assert result.local_credentials_removed is False
+            assert result.remote_revoked is False
+            assert result.diagnostics.code == "chatgpt_remote_revocation_unconfirmed"
+            failed = result.secondary_diagnostics[0]
+            assert failed.cause_id == result.diagnostics.diagnostic_id
+        elif mutation == "rejection":
+            server.refresh_status = 400
+            with pytest.raises(ChatGptReauthRequired) as error:
+                await session.access_token()
+            assert error.value.diagnostics.fields["local_credentials_removed"] is False
+            failed = error.value.secondary_diagnostics[0]
+            assert failed.cause_id == error.value.diagnostics.diagnostic_id
+        else:
+            with pytest.raises(ChatGptAuthError) as error:
+                await session.access_token()
+            failed = error.value.diagnostics
+        assert failed.fields["exception_class"] == "OSError"
+        assert failed.operation == (
+            "refresh_store" if mutation == "rotation" else "local_credential_delete"
+        )
+        assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) == "r0"
+    finally:
+        await session.close()
+
+
+@pytest.mark.parametrize("rejected", [False, True])
+async def test_started_refresh_mutation_settles_before_new_sign_in(
+    tmp_path: Path, rejected: bool
+) -> None:
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    finished = asyncio.Event()
+    release = Event()
+    path = tmp_path / "secrets.json"
+
+    def mutate(operation) -> None:
+        loop.call_soon_threadsafe(entered.set)
+        try:
+            if not release.wait(10):
+                raise TimeoutError("Mutation gate was not released")
+            operation()
+        finally:
+            loop.call_soon_threadsafe(finished.set)
+
+    class GatedStore(EncryptedFileSecretStore):
+        def set(self, key: str, value: str) -> None:
+            if key == CHATGPT_REFRESH_TOKEN_SECRET and value == "r1":
+                mutate(lambda: super(GatedStore, self).set(key, value))
+            else:
+                super().set(key, value)
+
+        def delete(self, key: str) -> None:
+            mutate(lambda: super(GatedStore, self).delete(key))
+
+    store = GatedStore(path, passphrase="synthetic")
+    store.set(CHATGPT_CLIENT_ID_SECRET, "oaiapp_client")
+    store.set(CHATGPT_REFRESH_TOKEN_SECRET, "r0")
+    store.set(CHATGPT_HOST_ID_SECRET, "host")
+    store.set("unrelated", "keep")
+    server = _TokenServer()
+    if rejected:
+        server.refresh_status = 400
+    session = ChatGptSession(
+        secret_store=lambda: store,
+        http_factory=lambda: httpx.AsyncClient(
+            transport=httpx.MockTransport(server.handler), trust_env=False
+        ),
+        clock=lambda: 1000,
+    )
+    refresh = asyncio.create_task(session.access_token())
+    sign_in = None
+    try:
+        await asyncio.wait_for(entered.wait(), 5)
+        refresh.cancel()
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(asyncio.shield(refresh), 0.1)
+        sign_in = asyncio.create_task(asyncio.to_thread(_authorize, session))
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(asyncio.shield(sign_in), 0.1)
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(refresh, 5)
+        await asyncio.wait_for(sign_in, 5)
+        await asyncio.wait_for(finished.wait(), 5)
+        fresh = EncryptedFileSecretStore(path, passphrase="synthetic")
+        assert fresh.get(CHATGPT_REFRESH_TOKEN_SECRET) == "authorized-refresh"
+        assert session.status().signed_in is True
+        assert await session.access_token() == "authorized-access"
+        server.refresh_status = 200
+        session.invalidate_access_token("authorized-access")
+        await asyncio.wait_for(session.access_token(), 5)
+        assert fresh.get(CHATGPT_REFRESH_TOKEN_SECRET) == "r2"
+        assert fresh.get(CHATGPT_CLIENT_ID_SECRET) == "oaiapp_client"
+        assert fresh.get(CHATGPT_HOST_ID_SECRET) == "host"
+        assert fresh.get("unrelated") == "keep"
+    finally:
+        release.set()
+        await asyncio.wait_for(
+            asyncio.gather(
+                refresh, *([sign_in] if sign_in is not None else []), return_exceptions=True
+            ),
+            5,
+        )
         await session.close()
