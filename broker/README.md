@@ -58,6 +58,8 @@ Set only the resulting public `age1...` recipient as the GitHub `production` env
 
 The workflow exports into a private temporary directory, encrypts with age, and removes plaintext before publishing the backup output. Export and protection are time-bounded, failure/signal traps remove temporary plaintext and incomplete ciphertext, and an always-run step cleans local backup files. Only `.sql.age` ciphertext is selected for the repository-readable artifact, with seven-day retention. Missing or invalid recipient configuration, preparation failure, or upload failure stops deployment before migrations. The persistence gate and authorized telemetry deletion require the same run's protected backup, its produced SHA-256, and successful artifact-upload evidence; arbitrary nonempty replacement files do not satisfy the prerequisite.
 
+Wrangler can log a temporary plaintext-download URL. Exporter stdout/stderr are withheld from public Actions logs, and export failures report only a sanitized exit status. Its debug log stays inside the private temporary directory and is removed with the export; it is never uploaded.
+
 To recover, download and unpack the run's artifact, then decrypt only on a secure operator machine:
 
 ```sh

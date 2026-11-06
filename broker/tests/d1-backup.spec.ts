@@ -14,6 +14,9 @@ const sql = "CREATE TABLE installations (id TEXT PRIMARY KEY, hardware_hash TEXT
   "INSERT INTO installations VALUES ('synthetic-installation-366', 'synthetic-hardware-366');\n" +
   "CREATE TABLE broker_config (key TEXT PRIMARY KEY, value TEXT);\n" +
   "INSERT INTO broker_config VALUES ('synthetic-config-366', '{\"enabled\":true}');\n";
+const signedDownloadUrl = 'https://synthetic.invalid/d1/export.sql?signature=synthetic-capability-366';
+const exporterDiagnostic = 'synthetic-sensitive-diagnostic-366';
+const exporterDiagnostics = `${signedDownloadUrl}\n${sql}${exporterDiagnostic}`;
 const deletionConfirmation = 'delete retired translation telemetry from production D1';
 const stepNames = [
   'Export pre-migration production D1 backup',
@@ -61,6 +64,37 @@ describe('protected pre-migration D1 backup', () => {
     expect(cleanup.status, cleanup.stderr).toBe(0);
     expect(existsSync(scenario.outputs.d1_backup!.backup_path!)).toBe(false);
     expect(readFileSync(scenario.persistedPath).equals(persisted)).toBe(true);
+  });
+
+  it.each([
+    ['success', 0],
+    ['export-failure', 23],
+  ])('keeps exporter stdout, stderr and debug-file diagnostics private on %s', (mode, status) => {
+    const scenario = createScenario();
+    const result = runBackupFlow(scenario, { mode });
+    expect(result.status, result.stderr).toBe(status);
+    expect(scenario.publicOutput.stdout).toBe('');
+    for (const sensitive of [signedDownloadUrl, 'synthetic-capability-366', sql, exporterDiagnostic]) {
+      expect(scenario.publicOutput.stderr).not.toContain(sensitive);
+    }
+    expect(readFileSync(scenario.debugPermissions, 'utf8').trim()).toBe('700 600');
+    expect(existsSync(scenario.env.DEFAULT_WRANGLER_LOG_PATH!)).toBe(false);
+    expectNoPlaintext(scenario);
+    if (status === 0) {
+      expect(scenario.publicOutput.stderr).toBe('');
+      expect(scenario.events).toEqual(['export', 'persist', 'migration', 'deletion']);
+      expect(readdirSync(join(scenario.root, 'local-artifact'))).toEqual(['backup.sql.age']);
+      const recovered = execFileSync('age', ['--decrypt', '--identity', scenario.identity, scenario.persistedPath], { encoding: 'utf8' });
+      expect(sqliteRecords(recovered)).toEqual(sqliteRecords(sql));
+      expect(recovered).not.toContain(signedDownloadUrl);
+      expect(recovered).not.toContain(exporterDiagnostic);
+    } else {
+      expect(scenario.publicOutput.stderr).toMatch(/D1 export failed \(exit status 23\)/u);
+      expect(scenario.events).toEqual(['export']);
+      expect(scenario.outputs.d1_backup).toBeUndefined();
+      expect(existsSync(scenario.persistedPath)).toBe(false);
+      expect(readdirSync(scenario.runnerTemp)).toEqual([]);
+    }
   });
 
   it.each([
@@ -179,12 +213,21 @@ function createScenario() {
   const pnpmLog = join(root, 'pnpm.log');
   const permissions = join(root, 'permissions');
   const exportPath = join(root, 'export-path');
+  const debugPath = join(root, 'debug-path');
+  const debugPermissions = join(root, 'debug-permissions');
   writeFileSync(join(bin, 'pnpm'), '#!/bin/bash\nset -eu\nprintf "%s\\n" "$*" >> "$PNPM_LOG"\n' +
     'if [[ "$*" == "exec wrangler d1 export "* ]]; then\n' +
     '  while [[ "$1" != --output ]]; do shift; done\n' +
     '  cp "$SYNTHETIC_SQL" "$2"\n' +
     '  printf "%s\\n" "$2" > "$EXPORT_PATH"\n' +
     '  printf "%s %s\\n" "$(stat -c %a "$(dirname "$2")")" "$(stat -c %a "$2")" > "$PERMISSIONS"\n' +
+    '  printf "%s\\n" "$SYNTHETIC_DIAGNOSTICS"\n' +
+    '  printf "%s\\n" "$SYNTHETIC_DIAGNOSTICS" >&2\n' +
+    '  debug_path="${WRANGLER_LOG_PATH:-$DEFAULT_WRANGLER_LOG_PATH}"\n' +
+    '  mkdir -p "$(dirname "$debug_path")"\n' +
+    '  printf "%s\\n" "$SYNTHETIC_DIAGNOSTICS" > "$debug_path"\n' +
+    '  printf "%s\\n" "$debug_path" > "$EXPORT_DEBUG_PATH"\n' +
+    '  printf "%s %s\\n" "$(stat -c %a "$(dirname "$debug_path")")" "$(stat -c %a "$debug_path")" > "$DEBUG_PERMISSIONS"\n' +
     '  case "$MODE" in\n' +
     '    empty) : > "$2" ;;\n' +
     '    export-failure) exit 23 ;;\n' +
@@ -206,11 +249,12 @@ function createScenario() {
   chmodSync(join(bin, 'pnpm'), 0o700);
   chmodSync(join(bin, 'age'), 0o700);
   return {
-    root, cwd, runnerTemp, identity, recipient, pnpmLog, permissions, exportPath,
+    root, cwd, runnerTemp, identity, recipient, pnpmLog, permissions, exportPath, debugPath, debugPermissions,
     persistedPath: join(root, 'local-artifact/backup.sql.age'),
     events: [] as string[],
     outputs: {} as Record<string, Record<string, string>>,
     outcomes: {} as Record<string, string>,
+    publicOutput: { stdout: '', stderr: '' },
     env: {
       ...process.env,
       PATH: `${bin}:${process.env.PATH}`,
@@ -218,6 +262,10 @@ function createScenario() {
       GITHUB_RUN_ID: 'synthetic-366',
       GITHUB_RUN_ATTEMPT: '1',
       SYNTHETIC_SQL: seed,
+      SYNTHETIC_DIAGNOSTICS: exporterDiagnostics,
+      DEFAULT_WRANGLER_LOG_PATH: join(root, 'default-wrangler-logs/export.log'),
+      EXPORT_DEBUG_PATH: debugPath,
+      DEBUG_PERMISSIONS: debugPermissions,
       PNPM_LOG: pnpmLog,
       PERMISSIONS: permissions,
       EXPORT_PATH: exportPath,
@@ -241,11 +289,14 @@ interface Scenario {
   pnpmLog: string;
   permissions: string;
   exportPath: string;
+  debugPath: string;
+  debugPermissions: string;
   persistedPath: string;
   events: string[];
   outputs: Record<string, Record<string, string>>;
   outcomes: Record<string, string>;
   env: NodeJS.ProcessEnv;
+  publicOutput: { stdout: string; stderr: string };
 }
 type Options = {
   recipient?: string;
@@ -369,12 +420,15 @@ function runShell(script: string, scenario: Scenario, overrides: NodeJS.ProcessE
     timeout: 20000,
   });
   if (result.error) throw result.error;
+  scenario.publicOutput.stdout += result.stdout;
+  scenario.publicOutput.stderr += result.stderr;
   return { status: result.status, stderr: result.stderr };
 }
 
 function expectNoPlaintext(scenario: Scenario) {
   expect(readdirSync(scenario.runnerTemp).filter((name) => name.includes('plaintext') || name.endsWith('.sql'))).toEqual([]);
   if (existsSync(scenario.exportPath)) expect(existsSync(readFileSync(scenario.exportPath, 'utf8').trim())).toBe(false);
+  if (existsSync(scenario.debugPath)) expect(existsSync(readFileSync(scenario.debugPath, 'utf8').trim())).toBe(false);
 }
 
 function sqliteRecords(contents: string) {

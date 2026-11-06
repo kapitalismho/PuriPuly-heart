@@ -497,9 +497,15 @@ jobs:
           timeout --signal=TERM --kill-after=10s 60s age --encrypt \
             --recipient "$recipient" --output "$private_dir/recipient-check.age" /dev/null
           plaintext_path="$private_dir/backup.sql"
-          timeout --signal=TERM --kill-after=10s 300s pnpm exec wrangler d1 export puripuly-heart-broker \
-            --remote --config "${{ steps.render.outputs.config_path }}" \
-            --output "$plaintext_path"
+          export_status=0
+          WRANGLER_LOG_PATH="$private_dir/wrangler-export.log" \
+            timeout --signal=TERM --kill-after=10s 300s pnpm exec wrangler d1 export puripuly-heart-broker \
+              --remote --config "${{ steps.render.outputs.config_path }}" \
+              --output "$plaintext_path" >/dev/null 2>&1 || export_status=$?
+          if [[ "$export_status" != 0 ]]; then
+            printf 'Production D1 export failed (exit status %s); sensitive exporter diagnostics suppressed.\n' "$export_status" >&2
+            exit "$export_status"
+          fi
           test -s "$plaintext_path"
           timeout --signal=TERM --kill-after=10s 60s age --encrypt \
             --recipient "$recipient" --output "$backup_path" "$plaintext_path"
