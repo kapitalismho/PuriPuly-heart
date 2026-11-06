@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from threading import Event
 from urllib.parse import parse_qs
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -25,7 +26,7 @@ from puripuly_heart.core.chatgpt.session import (
     CHATGPT_REFRESH_TOKEN_SECRET,
     ChatGptSession,
 )
-from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE, normalize_diagnostic
 from puripuly_heart.core.storage.secrets import EncryptedFileSecretStore, InMemorySecretStore
 
 WINDOWS_CREDENTIAL_MANAGER_MAX_CHARS = 1280
@@ -333,15 +334,63 @@ async def test_sign_in_supersedes_logout_before_removal(revoke_status: int) -> N
         superseded = next(d for d in diagnostics if d.code == "chatgpt_logout_superseded")
         assert superseded.category == "lifecycle"
         assert superseded.fields["local_credentials_removed"] is False
+        records = [
+            normalize_diagnostic(
+                diagnostic,
+                instance_id=str(uuid4()),
+                severity="warning",
+                disposition="degraded",
+            )
+            for diagnostic in diagnostics
+        ]
+        for diagnostic, record in zip(diagnostics, records, strict=True):
+            assert record["diagnostic_id"] == diagnostic.diagnostic_id
+            assert record["cause_id"] == diagnostic.cause_id
+            assert record["code"] == diagnostic.code
+            assert record["component"] == "chatgpt_session"
+            assert record["operation"] == diagnostic.operation
+            assert record["stage"] == diagnostic.fields["phase"]
+            assert record["category"] == diagnostic.category
+            assert record["status_code"] == diagnostic.status_code
+            assert record["fields"] == diagnostic.fields
+            assert record["detail"] == {
+                "state": "available",
+                "rejected_fields": 0,
+                "truncated": False,
+            }
         if revoke_status == 500:
             assert result.diagnostics.code == "chatgpt_remote_revocation_unconfirmed"
             assert superseded.cause_id == result.diagnostics.diagnostic_id
+            assert len(records) == 2
+            assert records[0]["status_code"] == 500
+            assert records[0]["fields"] == {
+                "phase": "remote_revoke",
+                "remote_revoked": False,
+                "local_credentials_removed": False,
+            }
+            assert records[1]["cause_id"] == records[0]["diagnostic_id"]
+            assert records[1]["fields"] == {
+                "phase": "local_credential_delete",
+                "local_credentials_removed": False,
+            }
+        else:
+            assert len(records) == 1
+            assert records[0]["cause_id"] is None
+            assert records[0]["fields"] == {
+                "phase": "local_credential_delete",
+                "local_credentials_removed": False,
+                "remote_revoked": True,
+            }
         assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) == "authorized-refresh"
         assert await session.access_token() == "authorized-access"
         session.invalidate_access_token("authorized-access")
-        await asyncio.wait_for(session.access_token(), 5)
+        assert await asyncio.wait_for(session.access_token(), 5) == (
+            "a1" + "x" * REAL_ACCESS_TOKEN_LENGTH
+        )
         assert server.refresh_calls == 1
         assert session.status().signed_in is True
+        assert session.status().email == "new@example.invalid"
+        assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) == "r1"
     finally:
         release.set()
         await asyncio.gather(logout, return_exceptions=True)
