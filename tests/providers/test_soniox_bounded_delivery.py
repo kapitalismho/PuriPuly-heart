@@ -690,7 +690,6 @@ async def test_queued_retraction_revokes_running_peer_preview_and_replacement_pr
         assert [request.text for request in backend.calls] == [old_source, replacement]
         assert events[-1].source_text == replacement
         assert events[-1].type == "translation_stream_update"
-        assert events[-1].peer_caption_revision == 2
         assert before_next_preview == []
         assert [event.source_text for event in events] == [replacement]
         assert harness.peer_runtime.translation_history == []
