@@ -18,6 +18,7 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigSnapshot,
     TranslationRuntimeConfigSnapshotPort,
 )
+from puripuly_heart.core.speaker_identity import native_soniox_attribution
 from puripuly_heart.core.translation_policy import (
     TranslationContextPolicy,
     TranslationRuntimePolicy,
@@ -181,11 +182,95 @@ def _final_transcript_segments(
     return tuple(segments)
 
 
+def _source_speaker_runs(
+    transcript: Transcript, start: int, end: int
+) -> tuple[FinalSpeakerRun, ...]:
+    runs = transcript.final_speaker_runs
+    if "".join(run.text for run in runs) != transcript.text:
+        attribution = native_soniox_attribution(transcript.text, runs)
+        return (
+            FinalSpeakerRun(
+                transcript.text[start:end],
+                None,
+                attribution.speaker_scope_id,
+                source=attribution.source,
+                attribution_state="malformed",
+            ),
+        )
+    selected = []
+    offset = 0
+    for run in runs:
+        run_end = offset + len(run.text)
+        if offset < end and run_end > start:
+            selected.append(replace(run, text=run.text[max(0, start - offset) : end - offset]))
+        offset = run_end
+    return tuple(selected)
+
+
+def _native_soniox_source_groups(transcript: Transcript) -> tuple[_FinalTranscriptSegment, ...]:
+    groups: list[_FinalTranscriptSegment] = []
+    previous_attribution = None
+    for segment in _final_transcript_segments(transcript, split_speakers=True):
+        attribution = native_soniox_attribution(
+            segment.text,
+            _source_speaker_runs(transcript, segment.source_text_start, segment.source_text_end),
+        )
+        if (
+            groups
+            and previous_attribution is not None
+            and previous_attribution.state in ("identified", "missing")
+            and attribution.state in ("identified", "missing")
+            and groups[-1].language == segment.language
+            and previous_attribution.speaker_scope_id == attribution.speaker_scope_id
+            and (
+                previous_attribution.key is None
+                or attribution.key is None
+                or previous_attribution.key == attribution.key
+            )
+        ):
+            previous = groups[-1]
+            groups[-1] = replace(
+                previous,
+                text=previous.text + segment.text,
+                source_text_end=segment.source_text_end,
+                source_end_ms=segment.source_end_ms,
+                overlaps_previous=previous.overlaps_previous or segment.overlaps_previous,
+            )
+            if previous_attribution.key is None:
+                previous_attribution = attribution
+        else:
+            groups.append(segment)
+            previous_attribution = attribution
+    return tuple(groups)
+
+
 def _final_transcript_fragment(
     transcript: Transcript,
     segment: _FinalTranscriptSegment,
     utterance_id: UUID,
+    *,
+    preserve_speaker_runs: bool = False,
 ) -> Transcript:
+    speaker_runs = (
+        (
+            FinalSpeakerRun(
+                segment.text,
+                segment.speaker_id,
+                segment.speaker_session_scope,
+                source_start_ms=segment.source_start_ms,
+                source_end_ms=segment.source_end_ms,
+                overlaps_previous=segment.overlaps_previous,
+                source=segment.speaker_source,
+                attribution_state=segment.attribution_state,
+            ),
+        )
+        if segment.speaker_session_scope or segment.attribution_state != "unavailable"
+        else ()
+    )
+    if preserve_speaker_runs:
+        speaker_runs = _source_speaker_runs(
+            transcript, segment.source_text_start, segment.source_text_end
+        )
     return Transcript(
         utterance_id=utterance_id,
         text=segment.text,
@@ -193,22 +278,7 @@ def _final_transcript_fragment(
         created_at=transcript.created_at,
         channel=transcript.channel,
         final_language_runs=(FinalLanguageRun(segment.text, segment.language),),
-        final_speaker_runs=(
-            (
-                FinalSpeakerRun(
-                    segment.text,
-                    segment.speaker_id,
-                    segment.speaker_session_scope,
-                    source_start_ms=segment.source_start_ms,
-                    source_end_ms=segment.source_end_ms,
-                    overlaps_previous=segment.overlaps_previous,
-                    source=segment.speaker_source,
-                    attribution_state=segment.attribution_state,
-                ),
-            )
-            if segment.speaker_session_scope or segment.attribution_state != "unavailable"
-            else ()
-        ),
+        final_speaker_runs=speaker_runs,
         publication_generation=transcript.publication_generation,
         source_order=transcript.source_order,
         source_text_range=(segment.source_text_start, segment.source_text_end),
