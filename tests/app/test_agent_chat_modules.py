@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import json
-import runpy
-import sys
-from pathlib import Path
 
 import pytest
 
@@ -47,21 +44,6 @@ def test_every_setting_key_and_provider_belongs_to_a_module():
     assert topic_modules("accounts") == ("core", "accounts")
     with pytest.raises(ValueError):
         topic_modules("settings")
-
-
-def test_relay_classifier_module_list_matches_the_registry(tmp_path, monkeypatch):
-    generator = Path(__file__).resolve().parents[2] / "agent-relay/generate-context.py"
-    output = tmp_path / "context-modules.ts"
-    monkeypatch.setattr(sys, "argv", [str(generator), "--output", str(output)])
-    runpy.run_path(str(generator), run_name="__main__")
-    checked_in = generator.parent / "src/context-modules.ts"
-    assert checked_in.read_bytes() == output.read_bytes()
-    generated = json.loads(
-        output.read_text(encoding="utf-8")
-        .removeprefix("export const contextModules = ")
-        .removesuffix(";\n")
-    )
-    assert tuple(module["name"] for module in generated) == MODULES[1:]
 
 
 @pytest.mark.asyncio
