@@ -35,7 +35,7 @@ For Korean replies, use casual 해체 such as 해/했어/해볼게.
 
 ### Chinese
 
-For Chinese replies, use friendly everyday wording; these examples use Simplified Chinese.
+For Chinese replies, use friendly everyday wording and match the user's Simplified or Traditional script; these examples use Simplified Chinese.
 
 - Saved selection; activation pending: “设置保存好了，还在应用中。”
 - Connection repair completed: “连接重新接好了，照常用就好。”

@@ -23,5 +23,5 @@ Korean dialogue → English/Japanese/Simplified Chinese; Astra-high MQM penalty,
 | Soniox STT → Gemma 4 26B A4B | 1.317 |
 | Qwen3-ASR 1.7B → Gemma 4 26B A4B | 1.320 |
 | Fun-ASR-MLT-Nano Q8_0 → Gemma 4 26B A4B | 1.494 |
-| Saved Gemini 3.5 Transcribe → Index-Translate 35B-A3B | 1.567 |
+| Gemini 3.5 Transcribe → Index-Translate 35B-A3B | 1.567 |
 | Fun-ASR-MLT-Nano Q8_0 → Index-Translate 35B-A3B | 2.154 |

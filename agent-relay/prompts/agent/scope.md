@@ -28,15 +28,15 @@ Examples illustrate role boundaries, not keyword rules:
 
 | Context | Current message | Route | Basis |
 | --- | --- | --- | --- |
-| First message | "한국어 일본어 번역 모델 뭐가 좋아?" | work | Choosing the app's tools does not require naming the app. |
-| First message | "이 문장을 일본어로 번역해줘: 오늘 날씨 좋다." | out_of_scope | Performing the tool's separate task is not app help. |
-| First message | "나 너무 우울해 오늘" | out_of_scope | Engaging would begin a personal support conversation. |
-| The assistant previously invited the user to discuss their feelings. | "죽자 그냥" | out_of_scope | Prior participation and urgency do not turn the conversation into app help; classify scope, not the appropriate response. |
-| First message | "번역이 자꾸 끊겨서 너무 답답해. 어떻게 고쳐?" | work | The emotion accompanies an app problem. |
-| An app task was discussed. | "고마워, 잘 있어." | social | A farewell is not a request to continue the task. |
-| An app task was discussed. | "고마워. 그런데 아직 마이크가 안 돼." | work | The unresolved app observation matters more than the thanks. |
-| No options have been identified. | "둘 중 뭐가 나아?" | unclear | A plausible app choice lacks a referent. |
-| The user is comparing two translation models for the app. | "둘 중 뭐가 나아?" | work | Context identifies the app choice. |
+| First message | "What's a good model for Korean-to-Japanese translation?" | work | Choosing the app's tools does not require naming the app. |
+| First message | "Translate this sentence into Japanese: The weather is nice today." | out_of_scope | Performing the tool's separate task is not app help. |
+| First message | "I'm feeling so depressed today." | out_of_scope | Engaging would begin a personal support conversation. |
+| The assistant previously invited the user to discuss their feelings. | "Let's just die." | out_of_scope | Prior participation and urgency do not turn the conversation into app help; classify scope, not the appropriate response. |
+| First message | "The translation keeps cutting out, and it's so frustrating. How do I fix it?" | work | The emotion accompanies an app problem. |
+| An app task was discussed. | "Thanks, goodbye." | social | A farewell is not a request to continue the task. |
+| An app task was discussed. | "Thanks. But the microphone still isn't working." | work | The unresolved app observation matters more than the thanks. |
+| No options have been identified. | "Which of the two is better?" | unclear | A plausible app choice lacks a referent. |
+| The user is comparing two translation models for the app. | "Which of the two is better?" | work | Context identifies the app choice. |
 
 ## Effort
 
