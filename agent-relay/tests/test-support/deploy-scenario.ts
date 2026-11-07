@@ -7,6 +7,8 @@ import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
+import { parse } from 'yaml';
+
 import relay from '../../src/index';
 
 const repository = fileURLToPath(new URL('../../../', import.meta.url));
@@ -163,7 +165,12 @@ export async function runDeployWorkflow(scenario: DeployScenario) {
   await listening;
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('Missing loopback server address.');
-  const env: NodeJS.ProcessEnv = { ...scenario.env, LOCAL_HTTP_URL: `http://127.0.0.1:${address.port}`, RELAY_SCHEMA_QUERY: queryValue };
+  const env: NodeJS.ProcessEnv = {
+    APPLY_MIGRATIONS: String(parse(workflow).on.workflow_dispatch.inputs.apply_migrations.default ?? false),
+    ...scenario.env,
+    LOCAL_HTTP_URL: `http://127.0.0.1:${address.port}`,
+    RELAY_SCHEMA_QUERY: queryValue,
+  };
   const executed: string[] = [];
   let status = 0;
   let failedStep: string | undefined;

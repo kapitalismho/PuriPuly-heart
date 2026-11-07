@@ -8,6 +8,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
+import { parse } from 'yaml';
+
 import { app } from '../../src/app';
 import { applyBrokerMigrations, BROKER_MIGRATION_FILENAMES } from './migrations';
 
@@ -103,7 +105,6 @@ sleep() { :; }
       MODE: options.mode ?? '',
       GITHUB_REF: 'refs/heads/dev',
       CONFIRM_PRODUCTION_DEPLOY: 'deploy puripuly-heart-broker from dev',
-      APPLY_MIGRATIONS: 'false',
       CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token',
       CLOUDFLARE_ACCOUNT_ID: 'synthetic-cloudflare-account',
       BROKER_D1_DATABASE_ID_PRODUCTION: 'synthetic-database',
@@ -136,7 +137,11 @@ export async function runDeployWorkflow(scenario: DeployScenario, responses: Par
   server.listen(0, '127.0.0.1');
   await listening;
   const address = server.address() as { port: number };
-  const env: NodeJS.ProcessEnv = { ...scenario.env, LOCAL_HTTP_URL: `http://127.0.0.1:${address.port}` };
+  const env: NodeJS.ProcessEnv = {
+    APPLY_MIGRATIONS: String(parse(workflow).on.workflow_dispatch.inputs.apply_migrations.default ?? false),
+    ...scenario.env,
+    LOCAL_HTTP_URL: `http://127.0.0.1:${address.port}`,
+  };
   const executed: string[] = [];
   let stdout = '';
   let stderr = '';
