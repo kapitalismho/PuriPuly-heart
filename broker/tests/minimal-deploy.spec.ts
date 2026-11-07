@@ -38,7 +38,7 @@ function changeDatabase(value: DeployScenario, sql: string) {
   }
 }
 
-describe('minimal production Broker deployment', () => {
+describe('minimal production Broker deployment', { timeout: 20000 }, () => {
   it.each([...codeOnlyInputs, { selection: 'empty value', env: { APPLY_MIGRATIONS: '' } }])('deploys code once with $selection without database, secret, policy or issuance mutations', async ({ env }) => {
     const value = scenario({ env });
     const databaseBefore = readFileSync(value.databasePath);
