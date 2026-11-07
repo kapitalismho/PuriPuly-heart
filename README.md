@@ -88,7 +88,7 @@ It works in many environments, including VRChat and Discord.
 
 ![Mean error penalty per sentence. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are models available in PuriPuly: GPT-6 Luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). Orange bars are external baselines: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Only results with a character error rate (CER) of 5% or less were selected for Qwen 3.8, Gemini 3.5, and Soniox. Judge model: Gemini 3.7 Flash.](docs/images/performance/2.png)
 
-- Blue bars show PuriPuly configurations at the time of the benchmark. CPU Qwen3-ASR 0.6B has since been retired; its result does not measure the replacement models below.
+- Blue bars show PuriPuly configurations at the time of the benchmark.
 - We ran the experiment using Microsoft's Gemba MQM framework.
 - It was set up as a multi-turn environment to better resemble real conversation.
 - For the full results, see [here](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).

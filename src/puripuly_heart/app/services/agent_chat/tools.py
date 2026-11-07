@@ -194,7 +194,7 @@ def project_accounts(value: object) -> dict:
         "puri": {
             "allowance": {
                 "unit": "submitted_prompt_turns",
-                "limit": 50,
+                "limit": 30,
                 "period": "server_utc_day",
                 "remaining": None,
                 "availability": "unavailable",

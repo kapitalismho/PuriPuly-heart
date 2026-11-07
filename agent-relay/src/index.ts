@@ -101,7 +101,7 @@ export default {
       if (admission.error === 'service_busy') {
         return error(429, admission.error, 'An assistant request is already running. Wait for it to finish before trying again.');
       }
-      return error(429, admission.error, 'The daily limit of 50 submitted prompts is reached for this UTC day. Settings, Cancel and the static guide remain available.');
+      return error(429, admission.error, 'The daily limit of 30 submitted prompts is reached for this UTC day. Settings, Cancel and the static guide remain available.');
     }
     const accounting = { ...admission.accounting, protocol: (body as ClassifyRequest | RespondRequest).agent_protocol };
     const input = (body as ClassifyRequest | RespondRequest).input;

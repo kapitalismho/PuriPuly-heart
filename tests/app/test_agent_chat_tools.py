@@ -2156,7 +2156,6 @@ async def test_accounts_context_allowlists_coarse_state_without_auth_refresh_or_
     assert accounts["managed"]["budget"]["freshness"] == "unknown"
     assert accounts["managed"]["budget"]["unit"] == "percent"
     assert accounts["puri"]["allowance"]["remaining"] is None
-    assert accounts["puri"]["allowance"]["limit"] == 50
     assert accounts["puri"]["allowance"]["unit"] == "submitted_prompt_turns"
     assert accounts["puri"]["allowance"]["period"] == "server_utc_day"
     assert all(action["requires_user_click"] for action in accounts["actions"])

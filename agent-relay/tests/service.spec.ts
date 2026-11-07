@@ -183,7 +183,7 @@ describe('bounded relay service', () => {
     });
 
   it.each([['/v1/classify', classify], ['/v1/respond', respond]] as const)(
-    'admits the 50th prompt through %s independently of dollars and keeps D, M, tools and notices on that turn', async (path, body) => {
+    'admits the 30th prompt through %s independently of dollars and keeps D, M, tools and notices on that turn', async (path, body) => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-10-30T12:00:00Z'));
       const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
@@ -193,16 +193,16 @@ describe('bounded relay service', () => {
       const count = sqlite.prepare('SELECT COUNT(*) AS total FROM prompt_turns WHERE installation_hash = ? AND utc_date = ?');
       const storedUsage = sqlite.prepare('SELECT * FROM usage_daily WHERE installation_hash = ? AND utc_date = ?');
       try {
-        seedTurns(sqlite, installationHash, '2026-10-30', 49);
-        seedTurns(sqlite, 'b'.repeat(64), '2026-10-30', 50);
-        seedTurns(sqlite, installationHash, '2026-10-29', 50);
+        seedTurns(sqlite, installationHash, '2026-10-30', 29);
+        seedTurns(sqlite, 'b'.repeat(64), '2026-10-30', 30);
+        seedTurns(sqlite, installationHash, '2026-10-29', 30);
         sqlite.prepare('INSERT INTO usage_daily (installation_hash, utc_date, decisions_calls, responses_calls, cost_usd) VALUES (?, ?, 100, 100, 2)')
           .run(installationHash, '2026-10-30');
         expect((await settled(request(path, body), env)).status).toBe(200);
         const continuationPath = path === '/v1/classify' ? '/v1/respond' : '/v1/classify';
         const continuationBody = path === '/v1/classify' ? respond : classify;
         expect((await settled(request(continuationPath, continuationBody), env)).status).toBe(200);
-        expect(count.get(installationHash, '2026-10-30')).toEqual({ total: 50 });
+        expect(count.get(installationHash, '2026-10-30')).toEqual({ total: 30 });
         const row = storedUsage.get(installationHash, '2026-10-30');
         expect(row).toMatchObject({ decisions_calls: 101, responses_calls: 101, uncached_input_tokens: 140,
           cache_read_tokens: 40, cache_write_tokens: 20, decisions_output_tokens: 20, responses_output_tokens: 20,
@@ -228,7 +228,7 @@ describe('bounded relay service', () => {
           { type: 'function_call_output', call_id: 'tool1', output: '{}' },
           { role: 'user', content: '[app notice] Synthetic state change' }];
         expect((await settled(request('/v1/respond', { ...respond, input }), env)).status).toBe(200);
-        expect(count.get(installationHash, '2026-10-30')).toEqual({ total: 50 });
+        expect(count.get(installationHash, '2026-10-30')).toEqual({ total: 30 });
         expect(storedUsage.get(installationHash, '2026-10-30')).toMatchObject({ decisions_calls: 101, responses_calls: 102 });
         expect((await settled(request('/v1/respond', respond, `Bearer ${signToken({ sub: 'c'.repeat(64) })}`), env)).status).toBe(200);
         expect(count.get('c'.repeat(64), '2026-10-30')).toEqual({ total: 1 });
@@ -247,9 +247,9 @@ describe('bounded relay service', () => {
     const env = { ...testEnv(), AGENT_USAGE_DB: db };
     const count = sqlite.prepare('SELECT COUNT(*) AS total FROM prompt_turns WHERE installation_hash = ? AND utc_date = ?');
     try {
-      seedTurns(sqlite, installationHash, '2026-10-30', 49);
+      seedTurns(sqlite, installationHash, '2026-10-30', 29);
       expect((await settled(request('/v1/classify', classify), env)).status).toBe(200);
-      expect(count.get(installationHash, '2026-10-30')).toEqual({ total: 50 });
+      expect(count.get(installationHash, '2026-10-30')).toEqual({ total: 30 });
       vi.setSystemTime(new Date('2026-10-31T00:00:00Z'));
       expect((await settled(request(), env)).status).toBe(200);
       expect(count.get(installationHash, '2026-10-31')).toEqual({ total: 0 });
@@ -278,7 +278,7 @@ describe('bounded relay service', () => {
     { name: 'duplicate', turns: [turnId, turnId, turnId] },
     { name: 'different', turns: [turnId, 'e'.repeat(32), 'f'.repeat(32)] },
     { name: 'mixed duplicate and different', turns: [turnId, turnId, 'f'.repeat(32)] },
-  ])('atomically admits concurrent $name turn IDs at the 49-to-50 boundary', async ({ turns }) => {
+  ])('atomically admits concurrent $name turn IDs at the 29-to-30 boundary', async ({ turns }) => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-30T12:00:00Z'));
     const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
@@ -286,7 +286,7 @@ describe('bounded relay service', () => {
     const { sqlite, db } = accountingDatabase();
     const env = { ...testEnv(), AGENT_USAGE_DB: db };
     try {
-      seedTurns(sqlite, installationHash, '2026-10-30', 49);
+      seedTurns(sqlite, installationHash, '2026-10-30', 29);
       const responses = await Promise.all(turns.map((turn_id, index) =>
         settled(request(index % 2 === 0 ? '/v1/classify' : '/v1/respond',
           { ...(index % 2 === 0 ? classify : respond), turn_id }), env)));
@@ -306,7 +306,7 @@ describe('bounded relay service', () => {
         }
       }
       expect(sqlite.prepare('SELECT COUNT(*) AS total FROM prompt_turns WHERE installation_hash = ? AND utc_date = ?')
-        .get(installationHash, '2026-10-30')).toEqual({ total: 50 });
+        .get(installationHash, '2026-10-30')).toEqual({ total: 30 });
       const completed = responses.filter((response) => response.status === 200).length;
       expect(upstream).toHaveBeenCalledTimes(completed);
       expect(sqlite.prepare('SELECT decisions_calls + responses_calls AS calls FROM usage_daily WHERE installation_hash = ? AND utc_date = ?')
@@ -325,7 +325,7 @@ describe('bounded relay service', () => {
       const { sqlite, db } = accountingDatabase();
       const env = { ...testEnv(), AGENT_USAGE_DB: db };
       try {
-        seedTurns(sqlite, installationHash, '2026-10-30', 49);
+        seedTurns(sqlite, installationHash, '2026-10-30', 29);
         upstream.mockRejectedValueOnce(new Error('private synthetic content'));
         expect((await relay.fetch(request(path, body), env)).status).toBe(502);
         expect((await settled(request(), env)).status).toBe(200);
@@ -337,7 +337,7 @@ describe('bounded relay service', () => {
           decisions_output_tokens: 0, responses_output_tokens: 0, decisions_calls: path === '/v1/classify' ? 1 : 0,
           responses_calls: path === '/v1/classify' ? 2 : 3, missing_usage_count: 3, cost_usd: 0 });
         const turns = sqlite.prepare('SELECT * FROM prompt_turns WHERE installation_hash = ?').all(installationHash);
-        expect(turns).toHaveLength(50);
+        expect(turns).toHaveLength(30);
         expect(turns.filter((turn) => turn.turn_id === turnId)).toHaveLength(1);
         expect(JSON.stringify({ rows, turns })).not.toContain('private');
         expect((await relay.fetch(request('/v1/respond', { ...respond, turn_id: 'f'.repeat(32) }), env)).status).toBe(429);

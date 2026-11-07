@@ -88,7 +88,7 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 
 ![每句平均错误惩罚图表。韩语→英语/日语/中文（简体），216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是 PuriPuly 中可用的模型：GPT-6 Luna (0.130)、Gemma 4 26B A4B (0.387)、DeepSeek-V4 Flash 0731 (0.571)、Gemma 4 E4B QAT Q4 (1.577)。橙色柱状图是外部基线：Qwen 3.8 Live Translate (1.392)、Papago (2.699)、Gemini 3.5 Translate (2.991)、Soniox Translate (3.473)、DeepL (3.914)、Google Translation (5.731)。Qwen 3.8、Gemini 3.5 和 Soniox 仅选取字符错误率（CER）不超过 5% 的结果。评估模型：Gemini 3.7 Flash。](../images/performance/2.png)
 
-- 蓝色柱状图代表基准测试时的 PuriPuly 配置。CPU Qwen3-ASR 0.6B 此后已移除；其结果不代表下方替代模型的性能。
+- 蓝色柱状图代表基准测试时的 PuriPuly 配置。
 - 我们使用微软的 Gemba MQM 框架进行实验。
 - 为贴近真实对话环境，采用了多轮对话设置。
 - 完整实验结果请参阅[此处](https://github.com/kapitalismho/korean-llm-context-translation-benchmark)。

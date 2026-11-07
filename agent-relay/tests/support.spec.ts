@@ -69,7 +69,7 @@ describe('user-authorized opaque support storage', () => {
     sqlite.prepare('INSERT INTO usage_daily (installation_hash, utc_date, decisions_calls, responses_calls) VALUES (?, ?, 50, 50)')
       .run(installationHash, day);
     const seed = sqlite.prepare('INSERT INTO prompt_turns (installation_hash, turn_id, utc_date) VALUES (?, ?, ?)');
-    for (let index = 0; index < 50; index++) {
+    for (let index = 0; index < 30; index++) {
       seed.run(installationHash, index.toString(16).padStart(32, '0'), day);
     }
     const turnsBefore = sqlite.prepare('SELECT * FROM prompt_turns').all();

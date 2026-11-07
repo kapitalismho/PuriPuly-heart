@@ -203,7 +203,7 @@ describe('durable model request admission', () => {
     const { sqlite, db } = accountingDatabase(relayMigrations.slice(0, 3));
     try {
       const seed = sqlite.prepare('INSERT INTO prompt_turns (installation_hash, turn_id, utc_date) VALUES (?, ?, ?)');
-      for (let index = 0; index < 49; index++) seed.run(installationHash, index.toString(16).padStart(32, '0'), '2026-11-01');
+      for (let index = 0; index < 29; index++) seed.run(installationHash, index.toString(16).padStart(32, '0'), '2026-11-01');
       sqlite.exec(readFileSync(new URL('../migrations/0004_request_admission.sql', import.meta.url), 'utf8'));
       const legacyId = '0'.repeat(32);
       for (const classification of [false, true]) {
@@ -215,7 +215,7 @@ describe('durable model request admission', () => {
         .toEqual({ error: 'service_allowance_exhausted' });
       expect(sqlite.prepare('SELECT utc_date, model_admissions, classifier_admitted, expires_at FROM prompt_turns WHERE turn_id = ?')
         .get(legacyId)).toEqual({ utc_date: '2026-11-01', model_admissions: 15, classifier_admitted: 1, expires_at: 0 });
-      expect(sqlite.prepare('SELECT COUNT(*) AS count FROM prompt_turns').get()).toEqual({ count: 50 });
+      expect(sqlite.prepare('SELECT COUNT(*) AS count FROM prompt_turns').get()).toEqual({ count: 30 });
     } finally {
       sqlite.close();
     }
