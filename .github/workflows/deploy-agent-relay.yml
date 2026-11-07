@@ -42,7 +42,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: ${{ secrets.AGENT_USAGE_D1_DATABASE_ID_PRODUCTION }}
       BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
-      RELAY_SCHEMA_QUERY: SELECT 'migration' AS kind, name, '' AS table_name FROM d1_migrations UNION ALL SELECT 'column', p.name, s.name FROM sqlite_schema AS s JOIN pragma_table_info(s.name) AS p WHERE s.type = 'table' AND s.name IN ('usage_daily', 'support_daily', 'prompt_turns', 'request_slots');
+      RELAY_SCHEMA_QUERY: SELECT 'migration' AS kind, name, '' AS table_name FROM d1_migrations UNION ALL SELECT 'column', p.name, s.name FROM sqlite_schema AS s JOIN pragma_table_info(s.name) AS p WHERE s.type = 'table' AND s.name IN ('usage_daily', 'support_daily', 'prompt_turns', 'request_slots', 'protocol_daily');
       WRANGLER_SEND_METRICS: 'false'
       CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false'
     steps:

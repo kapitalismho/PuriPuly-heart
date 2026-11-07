@@ -404,7 +404,7 @@ class DisplayCard(ft.Container):
         self._input_field.hint_text = t(self._input_hint_key)
         # Explicitly set hint font to UI font (Display font)
         self._input_field.hint_style = text_style(
-            _content_face(display_font_family, display_letter_spacing),
+            _content_face(display_font_family or "", _display_tracking(display_letter_spacing)),
             color=COLOR_SECONDARY,
             italic=True,
         )

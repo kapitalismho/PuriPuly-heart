@@ -3,11 +3,16 @@ import systemSource from '../prompts/agent/system.md?raw';
 import guideSource from '../prompts/agent/guide.md?raw';
 import costsSource from '../prompts/agent/references/keys-and-costs.md?raw';
 import benchmarksSource from '../prompts/agent/references/benchmark.md?raw';
+import type { Contract } from './contracts';
 
-const scope = scopeSource.replaceAll('\r\n', '\n');
+const scope = scopeSource.replaceAll('\r\n', '\n').trim();
+const modulesMarker = '{{context_modules}}';
+if (scope.split(modulesMarker).length !== 2) throw new Error('Missing prompt placeholder: context modules');
 const system = systemSource.replaceAll('\r\n', '\n');
 const guide = guideSource.replaceAll('\r\n', '\n').trim();
 if (!guide) throw new Error('Empty prompt: guide');
+const appContextMarker = '{{app_context}}';
+if (guide.split(appContextMarker).length !== 2) throw new Error('Missing prompt placeholder: app context');
 const costs = costsSource.replaceAll('\r\n', '\n').trim();
 if (!costs) throw new Error('Empty reference: costs');
 const benchmarks = benchmarksSource.replaceAll('\r\n', '\n').trim();
@@ -26,8 +31,17 @@ function section(source: string, heading: string): string {
 
 const identityAndVoice = section(system, '## Identity and voice');
 
-export const routeInstructions = section(scope, '## Route');
-export const effortInstructions = section(scope, '## Effort');
-export const workInstructions = `${identityAndVoice}\n\n${section(system, '## Work and unclear requests')}\n\n${guide}\n\n${costs}\n\n${benchmarks}`;
+export function classifierInstructions(contract: Contract): string {
+  return scope.replace(modulesMarker,
+    () => contract.contextModules.map(({ name, description }) => `- ${name}: ${description}`).join('\n'));
+}
+
+export function workInstructions(contract: Contract): string {
+  const appContext = contract.appContext.replaceAll('\r\n', '\n').trim();
+  if (!appContext) throw new Error('Empty contract prompt: app context');
+  const contractGuide = guide.replace(appContextMarker, () => appContext);
+  return `${identityAndVoice}\n\n${section(system, '## Work and unclear requests')}\n\n${contractGuide}\n\n${costs}\n\n${benchmarks}`;
+}
+
 export const socialInstructions = `${identityAndVoice}\n\n${section(system, '## Social acknowledgements')}`;
 export const outOfScopeInstructions = `${identityAndVoice}\n\n${section(system, '## Out-of-scope responses')}`;

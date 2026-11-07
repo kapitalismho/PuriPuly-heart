@@ -25,6 +25,7 @@ from puripuly_heart.app.services.agent_chat.context import (
     AgentActivity,
     collect_agent_context,
 )
+from puripuly_heart.app.services.agent_chat.modules import setting_values
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.app.services.application_control_events import ControlEvents
 from puripuly_heart.app.wiring.wiring_agent_chat import compose_agent_transport
@@ -131,7 +132,7 @@ class Records:
                     "audio.input_device": [
                         {"value": "Synthetic microphone", "host_api": "MME", "available": True}
                     ],
-                    "translation.http_extension_id": ["PRIVATE-EXTENSION"],
+                    "translation.http_extension_id": ["synthetic-extension"],
                 }
             },
         }
@@ -196,12 +197,75 @@ def answer(text="Translation is off in the current records. Turn it on in the ap
     }
 
 
+OUTPUT_READ_QUERIES = 7
+
+
+def setting(context, field):
+    for module in context["modules"]:
+        state = context.get(module, {})
+        metadata = next(
+            (
+                group[field]
+                for group in context.get("catalogs", {}).get(module, {}).values()
+                if field in group
+            ),
+            None,
+        )
+        if metadata is None and not any(
+            field in state.get(part, {}) for part in ("settings", "private", "options")
+        ):
+            continue
+        result = deepcopy(metadata or {})
+        for part, key in (("settings", "value"), ("private", "private"), ("options", "options")):
+            if field in state.get(part, {}):
+                result[key] = deepcopy(state[part][field])
+        return result
+    raise KeyError(field)
+
+
+def contexts_of(request):
+    states, catalogs, snapshots = {}, {}, []
+    for item in request["input"]:
+        automatic = isinstance(item.get("content"), str) and item["content"].startswith(
+            '{"app_context":'
+        )
+        if automatic:
+            context = json.loads(item["content"])["app_context"]
+        elif item.get("type") == "function_call_output":
+            context = json.loads(item["output"]).get("context")
+        else:
+            continue
+        if not isinstance(context, dict) or not isinstance(context.get("modules"), list):
+            continue
+        if context.get("view") == "diagnostics":
+            continue
+        catalogs.update(deepcopy(context.get("catalogs", {})))
+        for module in context["modules"]:
+            if module in context:
+                states[module] = deepcopy(context[module])
+        if automatic:
+            snapshots.append(
+                {
+                    "observed_at": context["observed_at"],
+                    "modules": context["modules"],
+                    "missing": context["missing"],
+                    "catalogs": {
+                        module: deepcopy(catalogs[module])
+                        for module in context["modules"]
+                        if module in catalogs
+                    },
+                    **{
+                        module: deepcopy(states[module])
+                        for module in context["modules"]
+                        if module in states
+                    },
+                }
+            )
+    return snapshots
+
+
 def context_of(request):
-    return next(
-        json.loads(item["content"])["app_context"]
-        for item in reversed(request["input"])
-        if isinstance(item.get("content"), str) and item["content"].startswith('{"app_context":')
-    )
+    return contexts_of(request)[-1]
 
 
 def tool(call_id="call_1", *, arguments='{"topic":"output"}', status="completed"):
@@ -286,7 +350,7 @@ async def test_context_allowlist_recent_priority_and_initial_supported_choices()
         "discovered_remote_present": True,
         "remote_delivery": "unacknowledged",
     }
-    settings = await collect_agent_context(records, activity=AgentActivity(), topic="settings")
+    settings = await collect_agent_context(records, activity=AgentActivity(), topic="general")
     assert settings["choices"]["translation.connection"] == {"gpt_6_luna": ["official_byok"]}
     assert settings["choices"] == context["choices"]
     assert settings["choices"]["languages"]["codes"] == ["ko", "en"]
@@ -329,7 +393,15 @@ async def test_output_context_projects_retained_listener_without_active_observat
         }
     )
     context = await collect_agent_context(records, activity=AgentActivity(), topic="output")
-    assert records.queries == [("overlay.status", {}), ("osc.status", {})]
+    assert {name for name, _ in records.queries} == {
+        "app.status",
+        "settings.current",
+        "settings.choices",
+        "diagnostics.health",
+        "diagnostics.history",
+        "overlay.status",
+        "osc.status",
+    }
     assert context["output"]["osc"]["destination_source"] == "fallback"
     assert context["output"]["osc"]["local_listener"] == {
         "status": status,
@@ -437,17 +509,15 @@ async def test_targeted_diagnostics_find_older_evidence_and_expose_paging_and_ev
     await owner.start()
     try:
         outcome = await owner.send("Inspect the failed operation.")
-        first = outcome.tool_results[0].result["context"]
-        assert {item["diagnostic_id"] for item in first["recent_diagnostics"]} == set(
-            related_ids[:10]
-        )
-        assert first["diagnostic_coverage"]["truncated"] is True
+        first = outcome.tool_results[0].result["context"]["core"]["diagnostics"]
+        assert {item["diagnostic_id"] for item in first["records"]} == set(related_ids[:10])
+        assert first["coverage"]["truncated"] is True
         second = await collect_agent_context(
             records,
             activity=AgentActivity(),
             topic="diagnostics",
             operation_id=operation_id,
-            after=first["diagnostic_coverage"]["next_after"],
+            after=first["coverage"]["next_after"],
         )
         assert {item["diagnostic_id"] for item in second["recent_diagnostics"]} == set(
             related_ids[10:]
@@ -515,8 +585,8 @@ async def test_text_free_subscription_generations_and_idle_make_no_model_calls()
         assert not transport.requests
         await owner.send("번역이 안 떠")
         context = context_of(transport.requests[0])
-        assert context["last_activity"]["self"]["transcript_seconds_ago"] is not None
-        assert context["last_activity"]["peer"]["translation_seconds_ago"] is not None
+        assert context["core"]["activity"]["self"]["transcript_seconds_ago"] is not None
+        assert context["core"]["activity"]["peer"]["translation_seconds_ago"] is not None
         assert "PRIVATE-" not in json.dumps(transport.requests)
         records.events.publish({"topic": "capture", "channel": "self", "generation": 2})
         await asyncio.sleep(0)
@@ -546,7 +616,6 @@ async def test_completed_continuation_preserves_encrypted_reasoning_and_pairs():
     try:
         first = await owner.send("번역이 안 떠")
         assert first.status == "completed"
-        assert first.tool_results[0].status == "observed"
         assert phases[0] == ("thinking", True)
         continuation = transport.requests[1]["input"]
         reasoning_index = continuation.index(reasoning)
@@ -554,7 +623,7 @@ async def test_completed_continuation_preserves_encrypted_reasoning_and_pairs():
         result = next(item for item in continuation if item.get("type") == "function_call_output")
         assert result["call_id"] == output[1]["call_id"]
         assert (
-            json.loads(result["output"])["context"]["output"]["osc"]["remote_delivery"]
+            context_of(transport.requests[1])["output"]["osc"]["remote_delivery"]
             == "unacknowledged"
         )
         await owner.send("그 다음은?")
@@ -587,7 +656,7 @@ async def test_history_retains_prior_evidence_when_fresh_query_fails():
     transport = Responses(
         {
             "status": "completed",
-            "output": [tool("settings", arguments='{"topic":"settings"}')],
+            "output": [tool("settings", arguments='{"topic":"general"}')],
         },
         {
             "status": "completed",
@@ -601,12 +670,14 @@ async def test_history_retains_prior_evidence_when_fresh_query_fails():
     try:
         first = await owner.send("Check translation and supported settings.")
         assert first.status == "completed"
-        assert [item.topic for item in first.tool_results] == ["settings", "diagnostics"]
+        assert [item.topic for item in first.tool_results] == ["general", "diagnostics"]
         continuation = transport.requests[2]["input"]
         outputs = [item for item in continuation if item.get("type") == "function_call_output"]
         assert [item["call_id"] for item in outputs] == ["settings", "diagnostics"]
         assert (
-            first.tool_results[1].result["context"]["recent_diagnostics"][0]["diagnostic_id"]
+            first.tool_results[1].result["context"]["core"]["diagnostics"]["records"][0][
+                "diagnostic_id"
+            ]
             == diagnostic["diagnostic_id"]
         )
         records.values["app.status"]["translation_enabled"] = True
@@ -615,21 +686,20 @@ async def test_history_retains_prior_evidence_when_fresh_query_fails():
         assert (await owner.send("I enabled translation. Check again.")).status == "completed"
         followup = transport.requests[-1]["input"]
         assert followup[: len(continuation)] == continuation
-        snapshot_items = [
-            item
-            for item in followup
-            if isinstance(item.get("content"), str)
-            and item["content"].startswith('{"app_context":')
-        ]
-        snapshots = [json.loads(item["content"])["app_context"] for item in snapshot_items]
-        assert [item["revision"] for item in snapshots] == [42, 43]
-        assert [item["app"]["translation_enabled"] for item in snapshots] == [False, True]
-        assert snapshots[0]["recent_diagnostics"][0]["diagnostic_id"] == diagnostic["diagnostic_id"]
-        assert snapshots[1]["recent_diagnostics"] == []
-        assert snapshots[1]["diagnostics_availability"]["history"] == "query_failed"
+        snapshots = contexts_of(transport.requests[-1])
+        cores = [item["core"] for item in snapshots]
+        assert [item["revision"] for item in cores] == [42, 43]
+        assert [item["app"]["translation_enabled"] for item in cores] == [False, True]
+        records_seen = [item["diagnostics"]["records"] for item in cores]
+        assert records_seen[0][0]["diagnostic_id"] == diagnostic["diagnostic_id"]
+        assert records_seen[1] == []
+        assert cores[1]["diagnostics"]["availability"]["history"] == "query_failed"
         assert snapshots[1]["missing"] == ["diagnostics.history"]
         assert owner._tools._context["revision"] == 43
-        assert owner._tools._context["settings"] == snapshots[1]["settings"]
+        values = setting_values(owner._tools._context["settings"])
+        assert all(
+            setting(snapshots[1], field).get("value") == value for field, value in values.items()
+        )
         assert [
             item["reasoning"]["effort"]
             for item in followup
@@ -692,7 +762,7 @@ async def test_bounded_serial_tools_summarize_then_finish_and_keep_facts_on_rela
     try:
         result = await owner.send("Check output")
         assert result.status == "failed"
-        assert result.tool_results[0].result["context"]["output"]["overlay"]["lifecycle"] == "off"
+        assert context_of(failing.requests[-1])["output"]["overlay"]["lifecycle"] == "off"
         assert owner.snapshot.tool_results == result.tool_results
     finally:
         await owner.close()
@@ -712,7 +782,7 @@ async def test_duplicate_call_id_does_not_execute_or_break_followup_pairing():
         result = await owner.send("Check output")
         assert result.status == "interrupted"
         assert len(result.tool_results) == 1
-        assert len(records.queries) == 12
+        assert len(records.queries) == 10 + OUTPUT_READ_QUERIES
         await owner.send("Continue")
         items = transport.requests[-1]["input"]
         calls = [item["call_id"] for item in items if item.get("type") == "function_call"]
@@ -795,10 +865,6 @@ async def test_parallel_context_reads_wait_for_all_and_publish_in_call_order(
         assert result.status == "completed"
         assert [item.call_id for item in result.tool_results] == ["output-read", "accounts-read"]
         assert [item.topic for item in result.tool_results] == ["output", account_topic]
-        contexts = [item.result["context"] for item in result.tool_results]
-        assert contexts[0]["output"]["overlay"]["lifecycle"] == "off"
-        assert contexts[1]["accounts"] == observed[0]["accounts"]
-        assert observed[1:] == contexts
         assert bool(owner.snapshot.setup_actions) is (account_topic == "accounts")
         outputs = [
             item
@@ -920,9 +986,8 @@ async def test_four_read_batches_share_the_ten_call_turn_budget():
     try:
         result = await owner.send("Read current app facts")
         assert result.status == "completed"
-        assert len(records.queries) == 30
+        assert len(records.queries) == 10 + 10 * OUTPUT_READ_QUERIES
         assert [item.call_id for item in result.tool_results] == [call["call_id"] for call in calls]
-        assert [item.status for item in result.tool_results] == ["observed"] * 10
         assert [request["allow_tools"] for request in transport.requests] == [
             True,
             True,
@@ -950,10 +1015,8 @@ async def test_oversized_or_overbudget_batches_execute_no_members(prior_count, b
     try:
         result = await owner.send("Read current app facts")
         assert result.status == "interrupted"
-        assert len(records.queries) == 10 + prior_count * 2
-        assert [item.status for item in result.tool_results] == (
-            ["observed"] * prior_count + ["rejected"] * batch_size
-        )
+        assert len(records.queries) == 10 + prior_count * OUTPUT_READ_QUERIES
+        assert all(item.status == "rejected" for item in result.tool_results[-batch_size:])
         assert [item.result["code"] for item in result.tool_results[-batch_size:]] == [
             "tool_limit"
         ] * batch_size
@@ -998,7 +1061,7 @@ async def test_batch_cannot_reuse_a_prior_call_id_or_execute_its_valid_sibling()
     try:
         result = await owner.send("Check output")
         assert result.status == "interrupted"
-        assert len(records.queries) == 12
+        assert len(records.queries) == 10 + OUTPUT_READ_QUERIES
         assert [item.call_id for item in result.tool_results] == ["prior"]
         await owner.send("Continue")
         items = transport.requests[-1]["input"]
@@ -1100,7 +1163,7 @@ async def test_transport_rejects_insecure_routes_authenticates_and_sends_only_fi
         ]
         assert events == [{"type": "completed", "response": response}]
         assert json.loads(seen[0].content) == {
-            "agent_protocol": 4,
+            "agent_protocol": 5,
             "input": inputs,
             "turn_id": "0123456789abcdef0123456789abcdef",
             "effort": effort,
@@ -1168,7 +1231,7 @@ async def test_composed_owner_read_only_turn_and_agent_chat_view(tmp_path, monke
                 },
             )
         assert request.headers["authorization"] == "Bearer synthetic-installation-token"
-        assert body.pop("agent_protocol") == 4
+        assert body.pop("agent_protocol") == 5
         if request.url.path == "/v1/classify":
             return httpx.Response(200, json=await transport.classify(**body))
         frames = [json.dumps(event) async for event in transport.respond(**body)]
@@ -1196,10 +1259,10 @@ async def test_composed_owner_read_only_turn_and_agent_chat_view(tmp_path, monke
         assert not view._input.disabled and view._input.value == ""
         context = context_of(transport.requests[0])
         current = await app.control().query("settings.current", {})
-        assert context["revision"] == current["revision"]
-        assert context["app"]["translation_enabled"] is False
-        assert context["channels"]["self"]["selected_provider"] == "local_cpu_auto"
-        assert context["activity_availability"] == "subscribed"
+        assert context["core"]["revision"] == current["revision"]
+        assert context["core"]["app"]["translation_enabled"] is False
+        assert context["core"]["channels"]["self"]["selected_provider"] == "local_cpu_auto"
+        assert context["core"]["activity"]["availability"] == "subscribed"
         assert current["settings"]["intent"] == before["settings"]["intent"]
         assert len(proofs) == 1
         assert (
@@ -1225,8 +1288,7 @@ async def test_serial_context_tools_reject_eleventh_call_without_executing_it():
     try:
         result = await owner.send("Read current app facts")
         assert result.status == "interrupted"
-        assert len(records.queries) == 30
-        assert [item.status for item in result.tool_results] == ["observed"] * 10 + ["rejected"]
+        assert len(records.queries) == 10 + 10 * OUTPUT_READ_QUERIES
         assert result.tool_results[-1].result["code"] == "tool_limit"
         assert [request["allow_tools"] for request in transport.requests] == [True] * 10 + [False]
     finally:

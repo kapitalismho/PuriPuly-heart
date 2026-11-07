@@ -23,6 +23,7 @@ export function usageDatabase() {
     ({ turn_id, model_admissions: 1, expires_at: Date.now() + 86_400_000 }));
   const denial = vi.fn().mockResolvedValue({ code: 'service_allowance_exhausted' });
   const writes: unknown[][] = [];
+  const protocols: unknown[][] = [];
   const releases: unknown[][] = [];
   const run = vi.fn().mockResolvedValue({ success: true, results: [] });
   const prepare = vi.fn((sql: string) => ({
@@ -33,6 +34,10 @@ export function usageDatabase() {
         if (sql.includes('INSERT INTO usage_daily')) {
           writes.push(values);
           return run();
+        }
+        if (sql.includes('INSERT INTO protocol_daily')) {
+          protocols.push(values);
+          return Promise.resolve({ success: true, results: [] });
         }
         releases.push(values);
         return Promise.resolve({ success: true, results: [] });
@@ -49,10 +54,10 @@ export function usageDatabase() {
     for (const statement of statements) results.push(await statement.run());
     return results;
   });
-  return { db: { prepare, batch } as unknown as D1Database, admission, denial, writes, releases, run, prepare, batch };
+  return { db: { prepare, batch } as unknown as D1Database, admission, denial, writes, protocols, releases, run, prepare, batch };
 }
 
-export const relayMigrations = ['0001_usage_daily.sql', '0002_support_daily.sql', '0003_prompt_turns.sql', '0004_request_admission.sql'];
+export const relayMigrations = ['0001_usage_daily.sql', '0002_support_daily.sql', '0003_prompt_turns.sql', '0004_request_admission.sql', '0005_protocol_daily.sql'];
 
 export function accountingDatabase(migrations = relayMigrations) {
   const sqlite = new DatabaseSync(':memory:');

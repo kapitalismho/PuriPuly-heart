@@ -4,8 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import relay from '../src/index';
 import { accountingDatabase, authHeaders, installationHash, responseEvents, signToken, testEnv, tokenSecret, turnId, usageDatabase } from './fixtures';
 
-const classify = { agent_protocol: 4, turn_id: turnId, input: [{ role: 'user', content: 'Synthetic request' }] };
-const respond = { agent_protocol: 4, turn_id: turnId, input: [
+const classify = { agent_protocol: 5, turn_id: turnId, input: [{ role: 'user', content: 'Synthetic request' }] };
+const respond = { agent_protocol: 5, turn_id: turnId, input: [
   { type: 'configuration_update', reasoning: { effort: 'high' } }, ...classify.input,
 ], route: 'work', effort: 'high', allow_tools: true };
 
@@ -208,6 +208,8 @@ describe('bounded relay service', () => {
           cache_read_tokens: 40, cache_write_tokens: 20, decisions_output_tokens: 20, responses_output_tokens: 20,
           missing_usage_count: 0 });
         expect(row?.cost_usd).toBeCloseTo(2.0000269, 12);
+        expect(sqlite.prepare('SELECT agent_protocol, requests FROM protocol_daily WHERE installation_hash = ? AND utc_date = ?')
+          .all(installationHash, '2026-10-30')).toEqual([{ agent_protocol: 5, requests: 2 }]);
         sqlite.prepare('UPDATE usage_daily SET cost_usd = 0.5 WHERE installation_hash = ? AND utc_date = ?')
           .run(installationHash, '2026-10-30');
         const exhausted = storedUsage.get(installationHash, '2026-10-30');

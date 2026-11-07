@@ -7,7 +7,7 @@ import { authHeaders, installationHash, relayEvents, responseEvents, testEnv, tu
 
 const env = testEnv();
 const body = {
-  agent_protocol: 4,
+  agent_protocol: 5,
   turn_id: turnId,
   input: [{ type: 'configuration_update', reasoning: { effort: 'high' } }, { role: 'user', content: '번역이 안 떠' }],
   effort: 'high',
@@ -136,7 +136,7 @@ describe('authenticated agent relay', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each([0, 1, 2, 3, '4', null])('rejects unsupported protocol %s without calling OpenAI', async (agent_protocol) => {
+  it.each([0, 1, 2, 3, 4, '5', null])('rejects unsupported protocol %s without calling OpenAI', async (agent_protocol) => {
     const fetch = mockUpstream();
     const response = await relay.fetch(request({ ...body, agent_protocol }), env);
     expect(response.status).toBe(400);

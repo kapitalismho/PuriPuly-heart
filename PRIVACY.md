@@ -40,7 +40,7 @@ Puri starts when you send a message, without a separate chat-start consent dialo
 
 Use the app's secure credential fields, never chat, for API keys. Known-pattern blocking cannot detect every secret. Keys and their hashes are not tool inputs. Puri history and encrypted reasoning stay in app memory. Reset removes active model context but can retain the app-run report archive and recent setting-change facts; restarting clears them.
 
-Broker authenticates the installation. Relay and OpenAI receive a derived installation identifier, not the raw ID; this is pseudonymous, not anonymous. Required usage/cost records, random prompt-turn identifiers, request limits, and abuse controls remain active with statistics off. Broker uses derived IP identifiers rather than adding raw-IP storage. Ordinary relay databases and logs retain no conversation content, setting values, or raw diagnostics.
+Broker authenticates the installation. Relay and OpenAI receive a derived installation identifier, not the raw ID; this is pseudonymous, not anonymous. Required usage/cost records, including app protocol versions, random prompt-turn identifiers, request limits, and abuse controls remain active with statistics off. Broker uses derived IP identifiers rather than adding raw-IP storage. Ordinary relay databases and logs retain no conversation content, setting values, or raw diagnostics.
 
 OpenAI `store: false` does **not** mean Zero Data Retention. According to [OpenAI's data controls](https://developers.openai.com/api/docs/guides/your-data), checked 2026-10-30:
 

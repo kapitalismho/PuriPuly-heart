@@ -6,7 +6,7 @@ import { authHeaders, relayEvents, responseEvents, testEnv, turnId, usageDatabas
 function request(signal?: AbortSignal): Request {
   return new Request('https://relay.example/v1/respond', {
     method: 'POST', headers: authHeaders(), signal,
-    body: JSON.stringify({ agent_protocol: 4, turn_id: turnId, input: [
+    body: JSON.stringify({ agent_protocol: 5, turn_id: turnId, input: [
       { type: 'configuration_update', reasoning: { effort: 'high' } }, { role: 'user', content: 'Synthetic request' },
     ], effort: 'high', route: 'work', allow_tools: true }),
   });

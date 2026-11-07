@@ -7,8 +7,8 @@ import { maxClassifyBytes, maxRespondBytes } from '../src/requests';
 import { checkAllowance, recordUsage, turnLifetimeMs } from '../src/usage';
 import { accountingDatabase, authHeaders, installationHash, relayEvents, relayMigrations, responseEvents, testEnv, turnId, usageDatabase } from './fixtures';
 
-const classify = { agent_protocol: 4, turn_id: turnId, input: [{ role: 'user', content: 'Synthetic request' }] };
-const respond = { agent_protocol: 4, turn_id: turnId, input: [
+const classify = { agent_protocol: 5, turn_id: turnId, input: [{ role: 'user', content: 'Synthetic request' }] };
+const respond = { agent_protocol: 5, turn_id: turnId, input: [
   { type: 'configuration_update', reasoning: { effort: 'high' } }, ...classify.input,
 ], route: 'work', effort: 'high', allow_tools: true };
 const returned = { object: 'response', status: 'completed', output: [], answers: [], usage: { input_tokens: 10, output_tokens: 2 } };

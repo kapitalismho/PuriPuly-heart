@@ -47,6 +47,9 @@ BUBBLE_GAP = 72
 SCROLL_END_SLACK = 24.0
 SCROLL_RESTORE_DELAY_S = 0.05
 HISTORY_BUBBLE_WIDTH = 380
+BACK_HEIGHT = 52
+PANEL_GAP = 24
+BACK_OFFSET = BACK_HEIGHT + PANEL_GAP
 FADE = ft.Animation(200, ft.AnimationCurve.EASE_OUT)
 HOVER = ft.Animation(200, ft.AnimationCurve.EASE_OUT)
 DICTATION_LIMIT_S = 60.0
@@ -199,7 +202,11 @@ class AgentChatView(ft.Row):
         chat = ft.Container(
             content=ft.Column(
                 [
-                    ft.Container(content=self._messages, padding=24, expand=True),
+                    ft.Container(
+                        content=ft.SelectionArea(content=self._messages, expand=True),
+                        padding=24,
+                        expand=True,
+                    ),
                     ft.Container(
                         content=ft.Row([self._input]),
                         padding=ft.Padding.only(left=24, right=24, bottom=24, top=12),
@@ -300,7 +307,6 @@ class AgentChatView(ft.Row):
                             item.lines[0],
                             size=19,
                             color=COLOR_ON_PRIMARY_CONTAINER,
-                            selectable=True,
                         ),
                         bgcolor=COLOR_PRIMARY_CONTAINER,
                         padding=ft.Padding.symmetric(horizontal=18, vertical=13),
@@ -322,7 +328,7 @@ class AgentChatView(ft.Row):
             for position, line in enumerate(item.lines):
                 bubbles.append(
                     ft.Container(
-                        content=ft.Text(line, size=19, color=COLOR_ON_BACKGROUND, selectable=True),
+                        content=ft.Text(line, size=19, color=COLOR_ON_BACKGROUND),
                         bgcolor=COLOR_BACKGROUND,
                         padding=ft.Padding.symmetric(horizontal=18, vertical=13),
                         border_radius=ft.BorderRadius.only(
@@ -449,7 +455,7 @@ class AgentChatView(ft.Row):
 
         return ft.Container(
             content=text,
-            height=52,
+            height=BACK_HEIGHT,
             padding=ft.Padding.symmetric(horizontal=8),
             alignment=ft.Alignment.CENTER_LEFT,
             on_click=lambda _event: on_back(),
@@ -478,7 +484,7 @@ class AgentChatView(ft.Row):
 
     def _panel(self, controls: list[ft.Control]) -> ft.Container:
         return ft.Container(
-            content=ft.Column(controls, spacing=24, expand=True),
+            content=ft.Column(controls, spacing=PANEL_GAP, expand=True),
             bgcolor=COLOR_SURFACE,
             border_radius=16,
             padding=24,
@@ -513,6 +519,7 @@ class AgentChatView(ft.Row):
             ),
             expand=True,
             alignment=ft.Alignment.CENTER,
+            padding=ft.Padding.only(bottom=BACK_OFFSET),
         )
         panel = self._panel([self._back_button(on_back), zone])
         if on_tap is None or busy:
@@ -616,6 +623,7 @@ class AgentChatView(ft.Row):
             border_color=COLOR_ERROR if failed else COLOR_DIVIDER,
             focused_border_color=COLOR_ERROR if failed else COLOR_PRIMARY,
             bgcolor=COLOR_BACKGROUND,
+            hover_color=COLOR_BACKGROUND,
             text_size=24,
             height=80,
             content_padding=ft.Padding.symmetric(horizontal=20, vertical=22),
@@ -639,7 +647,12 @@ class AgentChatView(ft.Row):
         panel = self._panel(
             [
                 self._back_button(lambda: self._leave_key_entry(view)),
-                ft.Container(content=body, expand=True, alignment=ft.Alignment.CENTER),
+                ft.Container(
+                    content=body,
+                    expand=True,
+                    alignment=ft.Alignment.CENTER,
+                    padding=ft.Padding.only(bottom=BACK_OFFSET),
+                ),
             ]
         )
         return panel

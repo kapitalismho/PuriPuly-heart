@@ -684,7 +684,7 @@ async def test_live_attempts_use_fresh_synthetic_identity_with_actual_refresh_ow
         model_clients.append(models)
         return models
 
-    async def inspect_attempt(case, models, factory, *, identity, relay_contexts):
+    async def inspect_attempt(case, models, factory, *, identity, context_mode, relay_contexts):
         assert relay_contexts == relay_context_manifest
         app = ScenarioApp(case)
         transport = factory(app)
@@ -1724,7 +1724,7 @@ async def test_actual_cli_smoke_covers_retained_suite_and_scripted_boundaries(tm
         arguments.extend(["--case", identity])
     assert await cli.execute(cli.parser().parse_args(arguments)) == 0
     report = cli.load_json(str(output))
-    assert report["agent_protocol"] == 4
+    assert report["agent_protocol"] == 5
     assert report["controlled_smoke"] is True
     assert report["live_pass"] is False
     assert {case["id"] for case in report["cases"]} == set(selected)
@@ -4197,7 +4197,7 @@ async def test_simulator_catalog_and_agent_context_preserve_production_route_cho
         for model in TranslationModel
     }
     assert catalog["providers"]["translation_models"] == choices["translation.connection"]
-    context = await collect_agent_context(app, activity=AgentActivity(), topic="settings")
+    context = await collect_agent_context(app, activity=AgentActivity(), topic="translation")
     assert context["choices"]["translation.model"] == choices["translation.model"]
     assert context["choices"]["translation.connection"] == choices["translation.connection"]
     assert catalog["gpu"]["discovery"]["attempted"] is False

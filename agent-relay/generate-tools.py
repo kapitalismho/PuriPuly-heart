@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from puripuly_heart.app.services.agent_chat.context import TOPICS
+from puripuly_heart.app.services.agent_chat.execution import request_schemas
 from puripuly_heart.app.services.agent_chat.provider_setup import NAVIGATION_PROVIDERS
 from puripuly_heart.app.services.agent_chat.tools import settings_tool_schema
 
@@ -28,13 +29,14 @@ def main() -> None:
             "type": "function",
             "name": "get_app_context",
             "description": (
-                "Read missing or changed app evidence; the initial overview already includes "
-                "settings choices, audio routes, readiness and coarse cached accounts. "
-                "An explicit accounts read also stages user-click account actions; initial "
-                "facts alone do not show controls. No identities, secrets or live balance refresh. "
-                "Diagnostics accepts observed diagnostic_id/operation_id or next_after, "
-                "returning at most 10 records; missing/evicted records do not prove recovery. "
-                "Other topics require null filters. No raw logs or runtime changes."
+                "Read app_context modules omitted from the initial context or refresh stale facts. "
+                "A read returns core plus the same-name topic module; overview returns all. "
+                "An omitted module is not an absent or disabled feature. "
+                "An explicit accounts read also stages user-click account actions; "
+                "initial facts alone do not show controls. No identities, secrets or live balance "
+                "refresh. Diagnostics accepts observed diagnostic_id/operation_id or next_after, "
+                "returning at most 10 records in core.diagnostics; missing/evicted records do not "
+                "prove recovery. Other topics require null filters. No raw logs or runtime changes."
             ),
             "strict": True,
             "parameters": {
@@ -72,10 +74,32 @@ def main() -> None:
         },
         {
             "type": "function",
+            "name": "control_app",
+            "description": (
+                "Read current-instance status or run a few non-settings app actions. "
+                "query.* returns projected metadata only, never private settings, raw content "
+                "or secret values. overlay.set, audio.retry and models.retry run immediately; "
+                "inspect the terminal receipt. secrets.delete, auth.logout and "
+                "overlay.position.reset only create a user-approval card like change_settings; "
+                "explain the effect and end the turn. Deleting a stored key does not revoke it "
+                "at the provider. Model downloads or imports, key entry, account login, manual "
+                "text, restart and overlay calibration are not available here; point the user "
+                "to the existing app screen."
+            ),
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {"request": {"anyOf": _openai_schema(request_schemas(catalog))}},
+                "required": ["request"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "type": "function",
             "name": "withdraw_confirmation",
             "description": (
                 "Withdraw the exact current pending settings card identified by "
-                "app_context.pending_confirmation.id and its remaining unapproved cards when "
+                "app_context.core.pending_confirmation.id and its remaining unapproved cards when "
                 "the user cancels that proposal. A question about the card or an unrelated "
                 "message does not withdraw it. Stale or unknown IDs are rejected. This never "
                 "approves, applies or undoes settings, and creates no app-notice continuation."

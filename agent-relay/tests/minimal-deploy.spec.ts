@@ -62,6 +62,7 @@ function expectAdmissionMigration(value: DeployScenario) {
       { expires_at: 0, model_admissions: 15, classifier_admitted: 1 },
     ]);
     expect(database.prepare('SELECT * FROM request_slots').all()).toEqual([]);
+    expect(database.prepare('SELECT * FROM protocol_daily').all()).toEqual([]);
   } finally { database.close(); }
 }
 
@@ -94,7 +95,7 @@ describe('minimal production Relay deployment', () => {
     }, 20000,
   );
 
-  it('applies the selected real 0004 migration, journals it and retains all accounting and support data', async () => {
+  it('applies the selected real 0004 and 0005 migrations, journals them and retains all accounting and support data', async () => {
     const value = scenario({ pendingMigration: true, env: { APPLY_MIGRATIONS: 'true' } });
     const before = records(value);
     const workerBefore = readWorker(value);
@@ -102,7 +103,7 @@ describe('minimal production Relay deployment', () => {
     expect(result.status, result.stderr).toBe(0);
     expect(records(value)).toEqual(before);
     expectAdmissionMigration(value);
-    expect(readEvents(value)).toContainEqual({ event: 'migrate', pending: ['0004_request_admission.sql'] });
+    expect(readEvents(value)).toContainEqual({ event: 'migrate', pending: ['0004_request_admission.sql', '0005_protocol_daily.sql'] });
     expect(readWorker(value)).toEqual({ ...workerBefore, deployments: 1 });
   }, 20000);
 
@@ -179,7 +180,7 @@ describe('minimal production Relay deployment', () => {
 
   it.each(['false', 'true'])('rejects a completed migration journal without actual admission schema with opt-in=%s', async (APPLY_MIGRATIONS) => {
     const value = scenario({ pendingMigration: true, env: { APPLY_MIGRATIONS } });
-    changeDatabase(value, "INSERT INTO d1_migrations (name) VALUES ('0004_request_admission.sql')");
+    changeDatabase(value, "INSERT INTO d1_migrations (name) VALUES ('0004_request_admission.sql'), ('0005_protocol_daily.sql')");
     const before = readFileSync(value.databasePath);
     const result = await deploy(value);
     expect(result.status).not.toBe(0);

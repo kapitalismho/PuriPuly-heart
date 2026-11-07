@@ -7,12 +7,13 @@ import secrets
 from collections import deque
 from collections.abc import Callable
 from copy import deepcopy
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from time import monotonic
 
 from puripuly_heart import __version__
 from puripuly_heart.app.ports.agent_chat import (
     AgentChatSnapshot,
+    AgentContextMode,
     AgentDecisionEntry,
     AgentEffort,
     AgentSecureEntryPort,
@@ -26,12 +27,17 @@ from puripuly_heart.app.ports.agent_chat import (
     AgentTurnResult,
 )
 from puripuly_heart.app.ports.application_control import ApplicationControl
-from puripuly_heart.app.services.agent_chat.context import (
-    TOPICS,
-    AgentActivity,
-    collect_agent_context,
-)
+from puripuly_heart.app.services.agent_chat.context import AgentActivity, collect_agent_context
 from puripuly_heart.app.services.agent_chat.conversation import AgentConversation
+from puripuly_heart.app.services.agent_chat.modules import (
+    MODULES,
+    TOPICS,
+    confirmation_modules,
+    model_context,
+    model_receipt,
+    ordered_modules,
+    provider_modules,
+)
 from puripuly_heart.app.services.agent_chat.presentation import AgentPresentationBuffer
 from puripuly_heart.app.services.agent_chat.provider_setup import (
     ACCOUNT_SETUP_ACTIONS,
@@ -55,6 +61,21 @@ from puripuly_heart.core.lifecycle import LifecycleScope
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 
+@dataclass(frozen=True, slots=True)
+class _ContextScope:
+    modules: tuple[str, ...] = ()
+    message_index: int | None = None
+    summary: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _AppNotice:
+    item: dict
+    index: int
+    effort: AgentEffort
+    context: _ContextScope
+
+
 class AgentChatOwner:
     def __init__(
         self,
@@ -64,19 +85,25 @@ class AgentChatOwner:
         localize: Callable[[str], str],
         support_log_snapshot: Callable[[], bytes] | None = None,
         decision_timeout: float = 1.0,
+        context_mode: AgentContextMode = "selected",
         clock: Callable[[], float] = monotonic,
     ) -> None:
         self._control = control
         self._transport = transport
         self._localize = localize
         self._decision_timeout = decision_timeout
+        if context_mode not in ("selected", "full"):
+            raise ValueError("unsupported context mode")
+        self._context_mode = context_mode
         self._clock = clock
         self._support_log_snapshot = support_log_snapshot
         self._reports: dict[str, SupportReport] = {}
         self._report_tasks: dict[str, asyncio.Task] = {}
         self._last_activity: float | None = None
         self._last_effort: AgentEffort = "high"
-        self._active_task_summary: str | None = None
+        self._context_scope = _ContextScope()
+        self._card_context: tuple[str, _ContextScope] | None = None
+        self._watched_context = _ContextScope()
         self._activity = AgentActivity()
         self._scope = LifecycleScope("agent-chat")
         self._started = False
@@ -96,12 +123,12 @@ class AgentChatOwner:
         self._prompt_started = 0.0
         self._actions: deque[dict] = deque(maxlen=5)
         self._operations: dict[str, dict] = {}
-        self._pending_notices: deque[tuple[dict, int, AgentEffort]] = deque()
+        self._pending_notices: deque[_AppNotice] = deque()
         self._quiet_notices: deque[tuple[int, dict]] = deque()
         self._active_tool: tuple[str, str | None] | None = None
         self._verification_providers: frozenset[str] = frozenset()
         self._watched_provider: str | None = None
-        self._confirming: dict[str, int] = {}
+        self._confirming: dict[str, tuple[int, _ContextScope]] = {}
         self._allowance_exhausted = False
         self._observations: deque[AgentTurnObservation] = deque(maxlen=20)
         self._observers: set[Callable[[AgentChatSnapshot], None]] = set()
@@ -117,6 +144,7 @@ class AgentChatOwner:
             record_action=self._record_action,
             emit_event=self._tool_event,
         )
+        self._tools.bind_localize(localize)
 
     @property
     def snapshot(self) -> AgentChatSnapshot:
@@ -325,16 +353,19 @@ class AgentChatOwner:
                 ),
             )
 
-    def _stage_account_actions(self, context: dict, generation: int) -> None:
+    def _stage_account_actions(self, context: dict, generation: int) -> bool:
         accounts = context.get("accounts")
         if not isinstance(accounts, dict):
-            return
+            return False
+        staged = False
         for action in ACCOUNT_SETUP_ACTIONS.values():
             identity = f"{generation}:{action.id}"
-            self._setup_actions.setdefault(
-                identity,
-                AgentSetupAction(identity, action.id, action.provider, action.kind, generation),
-            )
+            if identity not in self._setup_actions:
+                self._setup_actions[identity] = AgentSetupAction(
+                    identity, action.id, action.provider, action.kind, generation
+                )
+                staged = True
+        return staged
 
     def _current_setup_action(self, identity: str) -> AgentSetupAction | None:
         action = self._setup_actions.get(identity) if isinstance(identity, str) else None
@@ -410,6 +441,7 @@ class AgentChatOwner:
         controller = self._secure_entry
         self._secure_requests[request.id] = replace(request, status="verifying", code=None)
         self._watched_provider = request.provider
+        self._watched_context = self._context_scope
         completed = False
 
         def complete(provider: str, success: bool, code: str | None) -> None:
@@ -545,7 +577,15 @@ class AgentChatOwner:
         if safe_code is not None:
             text += f" code={safe_code}"
         if success:
-            self._accept_notice(text)
+            self._accept_notice(
+                text,
+                replace(
+                    self._watched_context,
+                    modules=ordered_modules(
+                        (*self._watched_context.modules, *provider_modules(provider))
+                    ),
+                ),
+            )
         else:
             self._record_quiet_notice(text)
 
@@ -572,25 +612,43 @@ class AgentChatOwner:
                     provider if provider in self._verification_providers else None
                 )
                 observable = self._watched_provider is not None
+                if observable:
+                    self._watched_context = self._context_scope
         elif event.get("kind") == "confirmation":
             card_id = event.get("card_id")
-            if self._confirming.pop(card_id, None) == self._notice_epoch:
+            confirmed = self._confirming.pop(card_id, None)
+            if confirmed is not None and confirmed[0] == self._notice_epoch:
+                context = confirmed[1]
+                next_card = event["result"].get("confirmation")
+                self._card_context = (
+                    (
+                        next_card["id"],
+                        replace(
+                            context,
+                            modules=ordered_modules(
+                                (*context.modules, *confirmation_modules(next_card))
+                            ),
+                        ),
+                    )
+                    if isinstance(next_card, dict)
+                    else None
+                )
                 text = "[app notice] confirmation " + json.dumps(
                     {"card_id": card_id, "result": event["result"]}, ensure_ascii=False
                 )
                 if event["result"].get("status") == "declined" or not event.get("resume", True):
                     self._record_quiet_notice(text)
                 else:
-                    self._accept_notice(text)
+                    self._accept_notice(text, context)
         self._emit_event(event)
         return observable
 
-    def _accept_notice(self, text: str) -> None:
+    def _accept_notice(self, text: str, context: _ContextScope) -> None:
         self._last_activity = self._clock()
         item = {"role": "user", "content": text}
         index = self._conversation.display("notice", text, grouped=False)
         self._conversation.record(item)
-        self._pending_notices.append((item, index, self._last_effort))
+        self._pending_notices.append(_AppNotice(item, index, self._last_effort, context))
         self._emit_event({"kind": "app_notice", "text": text})
         self._publish(self._phase)
         self._schedule_notices()
@@ -605,11 +663,10 @@ class AgentChatOwner:
         while self._quiet_notices and (before is None or self._quiet_notices[0][0] <= before):
             self._conversation.append(self._quiet_notices.popleft()[1], archive=False)
 
-    def _append_notice(self, notice: tuple[dict, int, AgentEffort]) -> None:
-        item, index, _ = notice
-        self._append_quiet_notices(index)
-        self._conversation.append(item, archive=False)
-        self._conversation.attach(index)
+    def _append_notice(self, notice: _AppNotice) -> None:
+        self._append_quiet_notices(notice.index)
+        self._conversation.append(notice.item, archive=False)
+        self._conversation.attach(notice.index)
 
     def _schedule_notices(self) -> None:
         if (
@@ -653,7 +710,18 @@ class AgentChatOwner:
             return {"status": "rejected", "code": "closed"}
         card = self._tools.confirmation
         if type(approved) is bool and card is not None and card["id"] == card_id:
-            self._confirming[card_id] = self._notice_epoch
+            context = (
+                self._card_context[1]
+                if self._card_context is not None and self._card_context[0] == card_id
+                else _ContextScope(MODULES)
+            )
+            self._confirming[card_id] = (
+                self._notice_epoch,
+                replace(
+                    context,
+                    modules=ordered_modules((*context.modules, *confirmation_modules(card))),
+                ),
+            )
         epoch = self._notice_epoch
         return await self._tools.confirm(
             card_id, approved, require_current=lambda: self._require_notice_epoch(epoch)
@@ -661,6 +729,7 @@ class AgentChatOwner:
 
     def cancel_confirmation(self) -> None:
         self._confirming.clear()
+        self._card_context = None
         self._tools.cancel_confirmation()
 
     def _publish(self, phase: str) -> None:
@@ -726,6 +795,9 @@ class AgentChatOwner:
         self._notice_epoch += 1
         self._watched_provider = None
         self._confirming.clear()
+        self._card_context = None
+        self._watched_context = _ContextScope()
+        self._context_scope = _ContextScope()
         while self._pending_notices:
             self._append_notice(self._pending_notices.popleft())
         self._tools.cancel_confirmation()
@@ -746,7 +818,9 @@ class AgentChatOwner:
         self._tools.cancel_confirmation()
         self._tools.reset_context()
         self._conversation.reset(separator)
-        self._active_task_summary = None
+        self._context_scope = _ContextScope()
+        self._card_context = None
+        self._watched_context = _ContextScope()
         self._prompt_turn_id = None
         self._prompt_requests = 0
         self._prompt_started = 0.0
@@ -775,7 +849,7 @@ class AgentChatOwner:
         await self._tools.close()
         if self._transport is not None:
             await self._transport.close()
-        self._items.clear()
+        self._conversation.clear_model_context()
         self._observers.clear()
         self._event_observers.clear()
         self._phase = "closed"
@@ -825,7 +899,7 @@ class AgentChatOwner:
         entry: AgentDecisionEntry,
         turn_id: str,
         diagnostic_id: str | None = None,
-        notice: tuple[dict, int, AgentEffort] | None = None,
+        notice: _AppNotice | None = None,
     ) -> asyncio.Task:
         providers = {
             request.provider
@@ -860,17 +934,30 @@ class AgentChatOwner:
             self._append_notice(notice)
         else:
             while self._pending_notices:
-                self._append_notice(self._pending_notices.popleft())
+                pending = self._pending_notices.popleft()
+                self._append_notice(pending)
+                self._context_scope = replace(
+                    pending.context,
+                    modules=ordered_modules(
+                        (*self._context_scope.modules, *pending.context.modules)
+                    ),
+                    message_index=pending.index,
+                )
         self._append_quiet_notices()
         self._conversation.trim()
+        context_index = self._context_scope.message_index
+        if context_index is not None and self._messages[context_index].archived:
+            self._context_scope = _ContextScope()
         decision_input = classification_input(
             text,
             recent_messages=self._conversation.active_messages,
-            active_task=self._active_task_summary,
+            active_task=self._context_scope.summary,
             last_puri_action=self._last_action_summary(),
+            previous_modules=self._context_scope.modules,
         )
+        message_index = notice.index if notice is not None else None
         if entry != "notice":
-            self._conversation.display("user", text)
+            message_index = self._conversation.display("user", text)
             self._pending_user = text
             self._conversation.record({"role": "user", "content": text})
         task = self._scope.create_task(
@@ -881,7 +968,8 @@ class AgentChatOwner:
                 diagnostic_id=diagnostic_id,
                 generation=generation,
                 decision_input=decision_input,
-                notice_effort=notice[2] if notice is not None else self._last_effort,
+                notice=notice,
+                message_index=message_index,
                 turn_results=results,
             ),
             name=f"turn-{generation}",
@@ -902,6 +990,7 @@ class AgentChatOwner:
         context = await collect_agent_context(
             self._control,
             activity=self._activity,
+            localize=self._localize,
             diagnostic_id=diagnostic_id,
             operation_id=operation_id,
             after=after,
@@ -926,6 +1015,30 @@ class AgentChatOwner:
         ][-5:]
         return context
 
+    def _select_context(
+        self, decision: AgentDecision, entry: AgentDecisionEntry, notice: _AppNotice | None
+    ) -> tuple[tuple[str, ...], str, str | None]:
+        if decision.route in {"social", "out_of_scope"}:
+            return (), "brief", None
+        if self._context_mode == "full":
+            return MODULES, "full", None
+        if entry == "error":
+            return MODULES, "error", None
+        if notice is not None:
+            if notice.context.modules:
+                return notice.context.modules, "notice", None
+            return MODULES, "fallback", "missing_notice_context"
+        if decision.context_modules is None:
+            return (
+                MODULES,
+                "fallback",
+                decision.context_reason or decision.reason or "unclear_route",
+            )
+        modules = decision.context_modules
+        if decision.context_relation == "continue":
+            modules = ordered_modules((*self._context_scope.modules, *modules))
+        return modules, "model", None
+
     async def _run_turn(
         self,
         text: str,
@@ -935,7 +1048,8 @@ class AgentChatOwner:
         diagnostic_id: str | None,
         generation: int,
         decision_input: list[dict],
-        notice_effort: AgentEffort,
+        notice: _AppNotice | None,
+        message_index: int | None,
         turn_results: list[AgentToolResult],
     ) -> AgentTurnResult:
         context_task = None
@@ -984,32 +1098,60 @@ class AgentChatOwner:
                     decision = AgentDecision(source="fallback", reason="classify_timeout")
             else:
                 decision = AgentDecision(
-                    "work", "high" if entry == "error" else notice_effort, source=entry
+                    "work",
+                    "high" if entry == "error" else notice.effort,
+                    source=entry,
                 )
             self._require_current(generation)
-            self._emit_decision(entry, generation, decision)
+            context_modules, context_source, context_reason = self._select_context(
+                decision, entry, notice
+            )
+            self._emit_decision(
+                entry,
+                generation,
+                decision,
+                context_modules=context_modules,
+                context_source=context_source,
+                context_reason=context_reason,
+            )
             out_of_scope = decision.route == "out_of_scope"
-            if out_of_scope:
+            brief = decision.route in {"social", "out_of_scope"}
+            if brief:
                 context_task.cancel()
                 self._append_user(text)
             else:
                 self._last_effort = decision.effort
-                if entry != "notice" and decision.route in {"work", "unclear"}:
-                    self._active_task_summary = text[:240]
                 context = await context_task
                 self._require_current(generation)
                 self._tools.observe_context(context)
+                previous = notice.context if notice is not None else self._context_scope
+                self._context_scope = _ContextScope(
+                    context_modules,
+                    message_index,
+                    (
+                        previous.summary
+                        if previous.summary is not None
+                        and (notice is not None or decision.context_relation == "continue")
+                        else text[:240]
+                    ),
+                )
                 self._conversation.append(
                     {"type": "configuration_update", "reasoning": {"effort": decision.effort}},
                     archive=False,
+                )
+                context_view = self._conversation.project_context(
+                    model_context(context, localize=self._localize, modules=context_modules)
                 )
                 self._conversation.append(
                     {
                         "role": "user",
                         "content": json.dumps(
-                            {"app_context": context}, ensure_ascii=False, separators=(",", ":")
+                            {"app_context": context_view},
+                            ensure_ascii=False,
+                            separators=(",", ":"),
                         ),
-                    }
+                    },
+                    context=context_view,
                 )
                 if entry != "notice":
                     self._append_user(text)
@@ -1031,9 +1173,9 @@ class AgentChatOwner:
                             if out_of_scope
                             else deepcopy(
                                 [
-                                    item
-                                    for item in self._items
-                                    if item.get("type") != "configuration_update"
+                                    {"role": message.role, "content": message.text}
+                                    for message in self._conversation.active_messages
+                                    if message.role in {"user", "assistant"}
                                 ]
                                 if decision.route == "social"
                                 else self._items
@@ -1158,12 +1300,7 @@ class AgentChatOwner:
                             function_calls, batch_arguments, contexts, strict=True
                         ):
                             self._require_current(generation)
-                            self._tools.observe_context(context)
-                            if parsed["topic"] == "accounts":
-                                self._stage_account_actions(context, generation)
-                            self._record_result(
-                                call, parsed["topic"], {"status": "observed", "context": context}
-                            )
+                            self._record_context_result(call, parsed["topic"], context, generation)
                         self._publish("thinking")
                         continue
                     call = function_calls[0]
@@ -1180,15 +1317,19 @@ class AgentChatOwner:
                         self._require_current(generation)
                         context = await self._context(**arguments)
                         self._require_current(generation)
-                        self._tools.observe_context(context)
-                        if topic == "accounts":
-                            self._stage_account_actions(context, generation)
-                        self._record_result(call, topic, {"status": "observed", "context": context})
+                        self._record_context_result(call, topic, context, generation)
                     elif call["name"] == "propose_report":
                         result = self._propose_report(arguments["summary"], generation)
                         self._record_result(call, None, result)
                     else:
-                        self._active_tool = (call["name"], None)
+                        request = arguments.get("request")
+                        action = request.get("action") if isinstance(request, dict) else None
+                        topic = (
+                            action
+                            if call["name"] == "control_app" and isinstance(action, str)
+                            else None
+                        )
+                        self._active_tool = (call["name"], topic)
                         self._publish("working")
                         result = await self._tools.execute(
                             call["name"],
@@ -1196,7 +1337,7 @@ class AgentChatOwner:
                             require_current=lambda: self._require_current(generation),
                         )
                         self._require_current(generation)
-                        self._record_result(call, None, result)
+                        self._record_result(call, topic, model_receipt(result))
                         if (
                             call["name"] == "get_provider_setup"
                             and result.get("status") == "available"
@@ -1282,7 +1423,14 @@ class AgentChatOwner:
             return AgentDecision(source="fallback", reason="classify_transport_error")
 
     def _emit_decision(
-        self, entry: AgentDecisionEntry, generation: int, decision: AgentDecision
+        self,
+        entry: AgentDecisionEntry,
+        generation: int,
+        decision: AgentDecision,
+        *,
+        context_modules: tuple[str, ...] = (),
+        context_source: str = "unavailable",
+        context_reason: str | None = None,
     ) -> None:
         self._emit_event(
             {
@@ -1293,6 +1441,11 @@ class AgentChatOwner:
                 "route": decision.route,
                 "effort": decision.effort,
                 "reason": decision.reason,
+                "context_mode": self._context_mode,
+                "context_modules": list(context_modules),
+                "context_source": context_source,
+                "context_reason": context_reason,
+                "context_relation": decision.context_relation,
             }
         )
 
@@ -1369,6 +1522,7 @@ class AgentChatOwner:
             not in {
                 "get_app_context",
                 "change_settings",
+                "control_app",
                 "withdraw_confirmation",
                 "open_settings",
                 "probe_translation",
@@ -1433,13 +1587,56 @@ class AgentChatOwner:
             return None
         return arguments
 
+    def _record_context_result(
+        self, call: dict, topic: str, context: dict, generation: int
+    ) -> None:
+        self._tools.observe_context(context)
+        staged = topic == "accounts" and self._stage_account_actions(context, generation)
+        view = self._conversation.project_context(
+            model_context(context, topic, self._localize),
+            force_modules=("accounts",) if staged else (),
+        )
+        unchanged = (
+            not view.get("missing")
+            and not view.get("catalogs")
+            and view.get("unchanged") == view["modules"]
+        )
+        self._record_result(
+            call,
+            topic,
+            {"status": "unchanged" if unchanged else "observed", "context": view},
+        )
+
     def _record_result(self, call: dict, topic: str | None, result: dict) -> None:
+        context = None
+        if call.get("name") == "get_app_context" and result.get("status") in {
+            "observed",
+            "unchanged",
+        }:
+            context = result["context"]
+            modules = context["modules"]
+            self._context_scope = replace(
+                self._context_scope,
+                modules=ordered_modules((*self._context_scope.modules, *modules)),
+            )
+        card = result.get("confirmation")
+        if result.get("status") == "needs_confirmation" and isinstance(card, dict):
+            self._card_context = (
+                card["id"],
+                replace(
+                    self._context_scope,
+                    modules=ordered_modules(
+                        (*self._context_scope.modules, *confirmation_modules(card))
+                    ),
+                ),
+            )
         self._conversation.append(
             {
                 "type": "function_call_output",
                 "call_id": call["call_id"],
                 "output": json.dumps(result, ensure_ascii=False, separators=(",", ":")),
-            }
+            },
+            context=context,
         )
         name = call.get("name", "unknown")
         self._results.append(

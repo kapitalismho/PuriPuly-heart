@@ -431,7 +431,7 @@ async def test_active_interruption_approval_groups_exact_translation_choice(cata
 
 
 @pytest.mark.asyncio
-async def test_strict_real_schema_excludes_secrets_destinations_and_size(catalog):
+async def test_strict_real_schema_excludes_private_content_and_uses_catalog_bounds(catalog):
     schema = settings_tool_schema(catalog)
     assert set(schema["properties"]) == SETTINGS_FIELDS
     assert set(schema["required"]) == SETTINGS_FIELDS
@@ -455,14 +455,11 @@ async def test_strict_real_schema_excludes_secrets_destinations_and_size(catalog
             "secrets.openai_api_key",
             "auth.login",
             "consent.peer_translation",
-            "chatbox.source.enabled",
-            "osc.connection",
             "osc.host",
             "osc.send_port",
             "osc.receive_port",
             "osc.connection_mode",
             "local_llm.base_url",
-            "overlay.desktop_size",
         ):
             result = await tools.execute("change_settings", {"changes": {excluded: None}})
             assert result["status"] == "rejected"
@@ -707,11 +704,10 @@ async def test_interrupted_caller_retains_terminal_receipt_and_revert_conflicts(
     assert [action["phase"] for action in actions] == ["submitted", "completed"]
     result = actions[-1]["result"]
     assert result["status"] == "degraded"
-    assert result["receipt"]["error"] == {
-        "code": "runtime_not_ready",
-        "explanation": "The selected provider is not effective.",
-    }
-    assert result["receipt"]["transaction"]["message"] == "settings.runtime_degraded"
+    assert result["receipt"]["error"] == {"code": "runtime_not_ready"}
+    assert result["receipt"]["transaction"]["status"] == "settings_commit_success_runtime_degraded"
+    assert "explanation" not in result["receipt"]["error"]
+    assert "message" not in result["receipt"]["transaction"]
     assert "PRIVATE-KEY" not in json.dumps(actions)
     control.hold = False
     control.status = "applied"
@@ -1682,9 +1678,13 @@ async def test_initial_context_projects_bounded_local_evidence_route_and_safe_re
     audio = await collect_agent_context(
         control, activity=AgentActivity(), topic="audio", diagnostic_id=ids[0]
     )
-    for key in ("audio", "provider_verification", "secret_presence", "recent_diagnostics"):
+    for key in ("audio", "provider_verification", "recent_diagnostics"):
         assert audio[key] == context[key]
-    assert "PRIVATE-" not in json.dumps([context, audio])
+    translation = await collect_agent_context(
+        control, activity=AgentActivity(), topic="translation"
+    )
+    assert translation["secret_presence"] == context["secret_presence"]
+    assert "PRIVATE-" not in json.dumps([context, audio, translation])
 
 
 @pytest.mark.asyncio
@@ -1740,7 +1740,7 @@ async def test_audio_setting_choice_projection_drops_private_fields_and_marks_re
             "exception": "PRIVATE-EXCEPTION",
         }
     ]
-    result = await collect_agent_context(control, activity=AgentActivity(), topic="settings")
+    result = await collect_agent_context(control, activity=AgentActivity(), topic="audio")
     initial = await collect_agent_context(control, activity=AgentActivity())
     assert initial["choices"] == result["choices"]
     choice = result["choices"]["audio.input_device"][0]
@@ -2144,7 +2144,9 @@ async def test_accounts_context_allowlists_coarse_state_without_auth_refresh_or_
     if failed:
         control.fail.add("accounts.status")
     result = await collect_agent_context(control, activity=AgentActivity(), topic="accounts")
-    assert control.queries == [("accounts.status", {})]
+    assert [name for name, _ in control.queries if name.startswith(("accounts.", "auth."))] == [
+        "accounts.status"
+    ]
     initial = await collect_agent_context(control, activity=AgentActivity())
     assert initial["accounts"] == result["accounts"]
     accounts = result["accounts"]

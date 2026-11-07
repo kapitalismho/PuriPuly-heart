@@ -84,6 +84,10 @@ async def test_change_preview_covers_single_stacked_long_and_empty_cards():
     assert "Headset Microphone" in texts(left(view))[-1]
     preview.cycle("change")
     assert texts(left(view))[2] == "—"
+    preview.cycle("change")
+    assert texts(left(view))[1:] == ["Deepgram API 키", "저장됨", "없음"]
+    preview.cycle("change")
+    assert texts(left(view))[1:] == ["ChatGPT 계정", "로그인됨", "로그아웃"]
     zone(left(view)).on_click(None)
     await asyncio.gather(*tasks)
     assert left(view) is view._home

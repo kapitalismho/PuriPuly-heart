@@ -2,7 +2,7 @@ export const actionTools = [
   {
     "type": "function",
     "name": "get_app_context",
-    "description": "Read missing or changed app evidence; the initial overview already includes settings choices, audio routes, readiness and coarse cached accounts. An explicit accounts read also stages user-click account actions; initial facts alone do not show controls. No identities, secrets or live balance refresh. Diagnostics accepts observed diagnostic_id/operation_id or next_after, returning at most 10 records; missing/evicted records do not prove recovery. Other topics require null filters. No raw logs or runtime changes.",
+    "description": "Read app_context modules omitted from the initial context or refresh stale facts. A read returns core plus the same-name topic module; overview returns all. An omitted module is not an absent or disabled feature. An explicit accounts read also stages user-click account actions; initial facts alone do not show controls. No identities, secrets or live balance refresh. Diagnostics accepts observed diagnostic_id/operation_id or next_after, returning at most 10 records in core.diagnostics; missing/evicted records do not prove recovery. Other topics require null filters. No raw logs or runtime changes.",
     "strict": true,
     "parameters": {
       "type": "object",
@@ -13,9 +13,11 @@ export const actionTools = [
             "accounts",
             "audio",
             "diagnostics",
+            "general",
+            "languages",
             "output",
             "overview",
-            "settings",
+            "recognition",
             "translation"
           ]
         },
@@ -77,6 +79,46 @@ export const actionTools = [
               "anyOf": [
                 {
                   "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "audio.output_device": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "chatbox.activation_notice.enabled": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "chatbox.source.enabled": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "clipboard.enabled": {
+              "anyOf": [
+                {
+                  "type": "boolean"
                 },
                 {
                   "type": "null"
@@ -361,12 +403,69 @@ export const actionTools = [
                 {
                   "type": "string",
                   "enum": [
-                    "en",
                     "ko",
-                    "zh-CN",
+                    "en",
                     "ja",
-                    "ru"
+                    "zh-CN",
+                    "zh-TW"
                   ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "osc.connection": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "automatic",
+                            "manual",
+                            "off"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "send_port": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 65535
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "receive_port": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 65535
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "send_port",
+                    "receive_port"
+                  ],
+                  "additionalProperties": false
                 },
                 {
                   "type": "null"
@@ -379,6 +478,24 @@ export const actionTools = [
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "overlay.desktop_size": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "tiny",
+                    "xsmall",
+                    "small",
+                    "medium",
+                    "large",
+                    "xlarge"
+                  ]
                 },
                 {
                   "type": "null"
@@ -572,6 +689,16 @@ export const actionTools = [
                 }
               ]
             },
+            "stt.gpu_device_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "stt.provider": {
               "anyOf": [
                 {
@@ -600,6 +727,26 @@ export const actionTools = [
                 }
               ]
             },
+            "stt.soniox.enable_speaker_diarization": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "telemetry.enabled": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "translation.connection": {
               "anyOf": [
                 {
@@ -616,6 +763,203 @@ export const actionTools = [
                     "ollama",
                     "custom_http"
                   ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "translation.connection_history": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "index_translate_35b": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "public_api"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "gemma4_26b_31b": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "managed",
+                            "openrouter"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "deepseek_v4_flash": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "openrouter"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "deepseek_v4_flash_41": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "managed",
+                            "managed_china",
+                            "openrouter",
+                            "official_byok"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "gemini_flash": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "official_byok",
+                            "openrouter"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "gpt_6_luna": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "chatgpt",
+                            "openrouter",
+                            "official_byok"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "qwen38_flash": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "official_byok"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "managed_gemma": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "cpu",
+                            "gpu"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "managed_gemma_26b": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "gpu"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "local_llm": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "ollama"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "custom_http": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "custom_http"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "index_translate_35b",
+                    "gemma4_26b_31b",
+                    "deepseek_v4_flash",
+                    "deepseek_v4_flash_41",
+                    "gemini_flash",
+                    "gpt_6_luna",
+                    "qwen38_flash",
+                    "managed_gemma",
+                    "managed_gemma_26b",
+                    "local_llm",
+                    "custom_http"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "translation.gpu_device_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "translation.http_extension_id": {
+              "anyOf": [
+                {
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -644,14 +988,67 @@ export const actionTools = [
                   "type": "null"
                 }
               ]
+            },
+            "translation.previous_llm_model": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "index_translate_35b",
+                    "gemma4_26b_31b",
+                    "deepseek_v4_flash",
+                    "deepseek_v4_flash_41",
+                    "gemini_flash",
+                    "gpt_6_luna",
+                    "qwen38_flash",
+                    "managed_gemma",
+                    "managed_gemma_26b",
+                    "local_llm",
+                    "custom_http"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "translation.qwen.region": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "beijing",
+                    "singapore"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "vrc_mic_intercept.enabled": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
             "audio.input_device",
             "audio.input_host_api",
+            "audio.output_device",
+            "chatbox.activation_notice.enabled",
+            "chatbox.source.enabled",
+            "clipboard.enabled",
             "languages",
             "locale",
+            "osc.connection",
             "overlay.background_alpha",
+            "overlay.desktop_size",
             "overlay.peer_original.enabled",
             "overlay.swap_caption_languages",
             "overlay.target",
@@ -663,9 +1060,18 @@ export const actionTools = [
             "peer_vad.speech_threshold",
             "self_vad.speech_threshold",
             "stt.cloud_free_tier_providers",
+            "stt.gpu_device_id",
             "stt.provider",
+            "stt.soniox.enable_speaker_diarization",
+            "telemetry.enabled",
             "translation.connection",
-            "translation.model"
+            "translation.connection_history",
+            "translation.gpu_device_id",
+            "translation.http_extension_id",
+            "translation.model",
+            "translation.previous_llm_model",
+            "translation.qwen.region",
+            "vrc_mic_intercept.enabled"
           ],
           "additionalProperties": false
         }
@@ -678,8 +1084,454 @@ export const actionTools = [
   },
   {
     "type": "function",
+    "name": "control_app",
+    "description": "Read current-instance status or run a few non-settings app actions. query.* returns projected metadata only, never private settings, raw content or secret values. overlay.set, audio.retry and models.retry run immediately; inspect the terminal receipt. secrets.delete, auth.logout and overlay.position.reset only create a user-approval card like change_settings; explain the effect and end the turn. Deleting a stored key does not revoke it at the provider. Model downloads or imports, key entry, account login, manual text, restart and overlay calibration are not available here; point the user to the existing app screen.",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "audio.retry"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "auth.logout"
+                  ]
+                },
+                "provider": {
+                  "type": "string",
+                  "enum": [
+                    "qq",
+                    "discord",
+                    "openrouter",
+                    "chatgpt"
+                  ]
+                }
+              },
+              "required": [
+                "action",
+                "provider"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "models.retry"
+                  ]
+                },
+                "backend": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "gpu"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "action",
+                "backend"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "overlay.position.reset"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "overlay.set"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "action",
+                "enabled"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.accounts.status"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.app.status"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.audio.devices"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.auth.status"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.capture.channels"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.consent.peer_translation"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.diagnostics.health"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.diagnostics.history"
+                  ]
+                },
+                "operation_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "diagnostic_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "after": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "limit": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "action",
+                "operation_id",
+                "diagnostic_id",
+                "after",
+                "limit"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.gpu.status"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.models.status"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.osc.status"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.overlay.status"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.providers.status"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.secrets.presence"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.settings.choices"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "query.settings.current"
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "secrets.delete"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "enum": [
+                    "google_api_key",
+                    "openrouter_api_key",
+                    "openai_api_key",
+                    "deepseek_api_key",
+                    "deepgram_api_key",
+                    "gemini_transcribe_api_key",
+                    "elevenlabs_scribe_api_key",
+                    "soniox_api_key",
+                    "local_llm_api_key",
+                    "custom_stt_api_key",
+                    "alibaba_api_key_beijing",
+                    "alibaba_api_key_singapore"
+                  ]
+                }
+              },
+              "required": [
+                "action",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
     "name": "withdraw_confirmation",
-    "description": "Withdraw the exact current pending settings card identified by app_context.pending_confirmation.id and its remaining unapproved cards when the user cancels that proposal. A question about the card or an unrelated message does not withdraw it. Stale or unknown IDs are rejected. This never approves, applies or undoes settings, and creates no app-notice continuation.",
+    "description": "Withdraw the exact current pending settings card identified by app_context.core.pending_confirmation.id and its remaining unapproved cards when the user cancels that proposal. A question about the card or an unrelated message does not withdraw it. Stale or unknown IDs are rejected. This never approves, applies or undoes settings, and creates no app-notice continuation.",
     "strict": true,
     "parameters": {
       "type": "object",

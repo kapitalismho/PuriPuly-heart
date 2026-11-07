@@ -78,6 +78,7 @@ def parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--case", action="append", dest="cases")
     run.add_argument("--split", choices=["development", "heldout"])
+    run.add_argument("--context-mode", choices=["selected", "full"], default="selected")
     run.add_argument("--relay", default=os.environ.get("PURIPULY_SIMULATOR_RELAY"))
     run.add_argument("--relay-build", default=os.environ.get("PURIPULY_SIMULATOR_RELAY_BUILD"))
     run.add_argument(
@@ -132,6 +133,7 @@ def parser() -> argparse.ArgumentParser:
     )
     smoke.add_argument("--output", default="agent-chat-simulator-smoke.json")
     smoke.add_argument("--case", action="append", dest="cases")
+    smoke.add_argument("--context-mode", choices=["selected", "full"], default="selected")
     smoke.add_argument(
         "--relay",
         help="Optional isolated emitted relay with controlled upstream; wiring-only, never a live scenario pass",
@@ -331,6 +333,7 @@ async def execute(args) -> int:
                 emitted,
                 identity="emitted-wiring",
                 controlled=True,
+                context_mode=args.context_mode,
                 relay_contexts=relay_contexts,
             )
             methods = [
@@ -357,6 +360,7 @@ async def execute(args) -> int:
                 relay=args.relay,
                 build=args.relay_build,
                 controlled=True,
+                context_mode=args.context_mode,
                 relay_contexts=relay_contexts,
             )
             report.update(planned_scenarios=1, planned_runs=1)
@@ -381,6 +385,7 @@ async def execute(args) -> int:
             relay="controlled HTTPX transport; no network or emitted Worker",
             build=None,
             controlled=True,
+            context_mode=args.context_mode,
             relay_contexts=relay_contexts,
         )
         cases = select_scenarios(args.cases)
@@ -393,6 +398,7 @@ async def execute(args) -> int:
                 controlled_transport,
                 identity=f"smoke/{case.id}",
                 controlled=True,
+                context_mode=args.context_mode,
                 relay_contexts=relay_contexts,
             )
             report["cases"].append({"id": case.id, "status": result["status"], "attempt": result})
@@ -537,6 +543,7 @@ async def execute(args) -> int:
             relay=args.relay,
             build=args.relay_build,
             controlled=False,
+            context_mode=args.context_mode,
             relay_contexts=relay_contexts,
         )
         report.update(planned_scenarios=len(cases), planned_runs=len(cases) * 3)
@@ -636,6 +643,7 @@ async def execute(args) -> int:
                                 scoped_models,
                                 factory,
                                 identity=identity,
+                                context_mode=args.context_mode,
                                 relay_contexts=relay_contexts,
                             )
 

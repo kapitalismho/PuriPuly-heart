@@ -13,8 +13,13 @@ from pathlib import Path
 import httpx
 
 from puripuly_heart.app.adapters.agent_relay_transport import AgentRelayTransport
-from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL, AgentServiceError
+from puripuly_heart.app.ports.agent_chat import (
+    AGENT_CHAT_PROTOCOL,
+    AgentContextMode,
+    AgentServiceError,
+)
 from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
+from puripuly_heart.app.services.agent_chat.modules import MODULE_DESCRIPTIONS
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.ui.components.agent_secure_entry import AgentSecureEntryController
@@ -349,6 +354,7 @@ async def run_attempt(
     *,
     identity: str,
     controlled: bool = False,
+    context_mode: AgentContextMode = "selected",
     relay_contexts: dict | None = None,
 ) -> dict:
     if relay_contexts is None and not controlled:
@@ -365,6 +371,7 @@ async def run_attempt(
     owner = AgentChatOwner(
         app,
         transport,
+        context_mode=context_mode,
         localize=lambda key: t_for_locale(scenario.persona.language, key),
         support_log_snapshot=lambda: b"Synthetic simulator log only. No microphone, private logs, or real providers.\n",
     )
@@ -419,6 +426,7 @@ async def run_attempt(
         "id": identity,
         "scenario": scenario.payload(),
         "controlled": controlled,
+        "context_mode": context_mode,
         "started_at": datetime.now(timezone.utc).isoformat(),
         "status": "blocked",
     }
@@ -794,12 +802,14 @@ def report_header(
     relay: str | None,
     build: str | None,
     controlled: bool,
+    context_mode: AgentContextMode = "selected",
     relay_contexts: dict | None = None,
 ) -> dict:
     return {
         "format": "puri-agent-simulator-1",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "controlled_smoke": controlled,
+        "context_mode": context_mode,
         "live_pass": False,
         "relay_origin": relay,
         "relay_build": build or "unknown",
@@ -1066,6 +1076,34 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 if index < len(app.scenario.dialogue)
                 else "work"
             )
+            cause = app.scenario.cause
+            if cause.startswith("microphone") or cause in {"capture_off", "clipped_speech"}:
+                modules = {"audio", "recognition"}
+            elif cause in {
+                "recognition_auth",
+                "recognition_options",
+                "reject_paid",
+                "pending_approval",
+                "signup_deepgram",
+            }:
+                modules = {"recognition", "accounts"}
+            elif cause == "recommend_local_gpu":
+                modules = {"recognition", "translation"}
+            elif cause == "first_run":
+                modules = {"audio", "recognition", "translation", "languages"}
+            elif cause in {"english_mismatch", "healthy"}:
+                modules = {"languages"}
+            elif cause == "osc_discovery":
+                modules = {"output"}
+            elif cause == "recovered_auth_overlay":
+                modules = {"translation", "output"}
+            elif app.scenario.category == "unsolvable":
+                modules = set()
+            else:
+                modules = {"translation", "accounts"}
+            if app.intent["languages"]["source_language"] != app.speech_language:
+                modules.add("languages")
+            classification = json.loads(body["input"][-1]["content"])
             return httpx.Response(
                 200,
                 json={
@@ -1075,6 +1113,19 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                             "type": "choice",
                             "name": "effort",
                             "choice": "low" if route != "work" else "high",
+                        },
+                        *(
+                            {
+                                "type": "choice",
+                                "name": f"context_{module}",
+                                "choice": "include" if module in modules else "omit",
+                            }
+                            for module in MODULE_DESCRIPTIONS
+                        ),
+                        {
+                            "type": "choice",
+                            "name": "context_relation",
+                            "choice": "continue" if classification.get("active_task") else "new",
                         },
                     ]
                 },
@@ -1098,7 +1149,9 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 else answer("유료 변경은 적용하지 않았어. 원래 구성을 유지하려면 카드를 거절해 줘.")
             )
         elif app.scenario.category == "unsolvable":
-            if not any("diagnostics_availability" in item.get("context", {}) for item in outputs):
+            if not any(
+                "diagnostics" in item.get("context", {}).get("core", {}) for item in outputs
+            ):
                 result = tool("get_app_context", {"topic": "diagnostics"})
             elif any(item.get("status") in {"pending", "offered"} for item in outputs):
                 result = answer(
@@ -1107,7 +1160,12 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
             else:
                 result = tool("propose_report", {"summary": "Synthetic internal failure"})
         elif cause == "osc_discovery":
-            if not any("output" in item.get("context", {}) for item in outputs):
+            if not any(
+                item.get("status") in {"observed", "unchanged"}
+                and "output" in item.get("context", {}).get("modules", ())
+                and not item["context"].get("missing")
+                for item in outputs
+            ):
                 result = tool("get_app_context", {"topic": "output"})
             elif not any(
                 operation["command"] == "osc.discovery.retry"
@@ -1164,7 +1222,12 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
         elif cause == "capture_off" and not app.capture_active["self"]:
             result = tool("set_capture", {"channel": "self", "enabled": True})
         elif cause == "clipped_speech" and not app.recognition_usable("self"):
-            if not any("audio" in item.get("context", {}) for item in outputs):
+            if not any(
+                item.get("status") in {"observed", "unchanged"}
+                and "audio" in item.get("context", {}).get("modules", ())
+                and not item["context"].get("missing")
+                for item in outputs
+            ):
                 result = tool("get_app_context", {"topic": "audio"})
             elif body["allow_tools"]:
                 samples = sorted(

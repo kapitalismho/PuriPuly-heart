@@ -173,21 +173,33 @@ def relay_context_manifest() -> dict:
     marker = "TRUSTED_CONTEXT_ONLY_NOT_FOR_TERRA"
     return {
         "format": "puri-agent-relay-context-1",
-        "agent_protocol": 4,
+        "agent_protocol": 5,
         "relay_build": "a" * 64,
         "bundle_hashes": {"index.js": "a" * 64, "guide.md": "b" * 64},
         "contexts": {
             "classify": {
                 "model": "synthetic-model",
-                "input_prefix": [],
+                "input_prefix": [
+                    {
+                        "role": "developer",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": marker,
+                                "prompt_cache_breakpoint": {"mode": "explicit"},
+                            }
+                        ],
+                    }
+                ],
                 "questions": [
                     {
                         "type": "choice",
                         "name": "route",
-                        "instructions": marker,
-                        "choices": [{"value": "work", "description": "Synthetic app work"}],
+                        "instructions": "Classify current_message by the Route section.",
+                        "choices": [{"value": "work"}, {"value": "unclear"}],
                     }
                 ],
+                "prompt_cache_options": {"mode": "explicit", "ttl": "30m"},
             },
             "work": {
                 "model": "synthetic-model",

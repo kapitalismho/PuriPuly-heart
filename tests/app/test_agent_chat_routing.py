@@ -5,6 +5,7 @@ import json
 import pytest
 
 from puripuly_heart.app.ports.agent_chat import AgentMessage
+from puripuly_heart.app.services.agent_chat.modules import MODULES
 from puripuly_heart.app.services.agent_chat.routing import (
     AgentDecision,
     classification_input,
@@ -19,6 +20,51 @@ def decision(route="work", effort="high"):
             {"name": "route", "type": "choice", "choice": route},
         ]
     }
+
+
+def selected_decision(*modules, relation="new", route="work", effort="high"):
+    result = decision(route, effort)
+    result["answers"].extend(
+        {
+            "name": f"context_{module}",
+            "type": "choice",
+            "choice": "include" if module in modules else "omit",
+        }
+        for module in MODULES[1:]
+    )
+    result["answers"].append({"name": "context_relation", "type": "choice", "choice": relation})
+    return result
+
+
+def test_independent_context_choices_allow_cross_area_tasks_without_a_two_module_cap():
+    result = selected_decision("audio", "recognition", "languages", "output", relation="continue")
+    extracted = extract_decision(result)
+    assert extracted.route == "work" and extracted.effort == "high"
+    assert extracted.context_modules == ("core", "audio", "recognition", "languages", "output")
+    assert extracted.context_relation == "continue"
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["missing", "duplicate", "invalid", "unclear", "refusal", "relation", "structured"],
+)
+def test_invalid_context_selection_keeps_valid_work_route_without_a_partial_subset(failure):
+    result = selected_decision("translation", "accounts", effort="xhigh")
+    answer = next(item for item in result["answers"] if item["name"] == "context_audio")
+    if failure == "missing":
+        result["answers"].remove(answer)
+    elif failure == "duplicate":
+        result["answers"].append(dict(answer))
+    elif failure == "refusal":
+        answer["type"] = "refusal"
+    elif failure == "relation":
+        result["answers"][-1]["choice"] = "unclear"
+    else:
+        answer["choice"] = {"invalid": True} if failure == "structured" else failure
+    extracted = extract_decision(result)
+    assert extracted.route == "work" and extracted.effort == "xhigh"
+    assert extracted.context_modules is None
+    assert extracted.context_reason is not None
 
 
 @pytest.mark.parametrize("route", ["work", "unclear", "social", "out_of_scope"])
@@ -63,7 +109,7 @@ def test_missing_effort_keeps_valid_route():
     ) == AgentDecision("work", "high")
 
 
-@pytest.mark.parametrize("name", ["route", "effort", None])
+@pytest.mark.parametrize("name", ["route", "effort", "context_unknown", None])
 @pytest.mark.parametrize("duplicate", [False, True])
 def test_any_refusal_overrides_other_choices_with_isolated_brief_route(name, duplicate):
     result = decision("work", "xhigh")
@@ -91,11 +137,19 @@ def test_compact_input_contains_current_message_four_recent_messages_and_short_s
         recent_messages=messages,
         active_task="Model recommendation " + "t" * 1000,
         last_puri_action="get_app_context translation observed " + "a" * 1000,
+        previous_modules=("core", "translation", "accounts"),
     )
     assert len(sent) == 1
     assert sent[0]["role"] == "user"
     content = json.loads(sent[0]["content"])
-    assert set(content) == {"current_message", "recent_messages", "active_task", "last_puri_action"}
+    assert set(content) == {
+        "current_message",
+        "recent_messages",
+        "active_task",
+        "last_puri_action",
+        "previous_modules",
+    }
+    assert content["previous_modules"] == ["core", "translation", "accounts"]
     assert content["current_message"] == "그걸로 해"
     assert [item["content"].split()[0] for item in content["recent_messages"]] == [
         f"message-{i}" for i in range(2, 6)
@@ -116,4 +170,5 @@ def test_first_message_has_no_invented_conversation_or_task():
         "recent_messages": [],
         "active_task": None,
         "last_puri_action": None,
+        "previous_modules": [],
     }

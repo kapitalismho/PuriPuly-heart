@@ -65,15 +65,15 @@ async def test_route_controls_model_invocation_and_whole_turn_effort(route, effo
         assert all(request["effort"] == effective for request in transport.requests)
         assert all(request["route"] == route for request in transport.requests)
         assert transport.requests[0]["allow_tools"] is (route in {"work", "unclear"})
-        if route == "out_of_scope":
+        if route in {"social", "out_of_scope"}:
             assert transport.requests[0]["input"] == [
                 {"role": "user", "content": "synthetic routing message"}
             ]
             assert "app_context" not in json.dumps(owner._items)
         else:
-            assert context_of(transport.requests[0])["revision"] == 42
+            assert context_of(transport.requests[0])["core"]["revision"] == 42
         updates = [item for item in owner._items if item.get("type") == "configuration_update"]
-        assert len(updates) == (0 if route == "out_of_scope" else 1)
+        assert bool(updates) is (route in {"work", "unclear"})
         for request in transport.requests:
             transmitted = [
                 item for item in request["input"] if item.get("type") == "configuration_update"
@@ -130,14 +130,15 @@ async def test_effective_effort_history_survives_social_and_tool_continuations()
         assert effective_inputs(transport.requests[1]["input"]) == xhigh
         transport.routing = decision("social", "high")
         await owner.send("Thanks!")
-        assert not any(
-            item.get("type") == "configuration_update" for item in transport.requests[-1]["input"]
-        )
+        assert transport.requests[-1]["input"] == [
+            {"role": "user", "content": "Inspect capture."},
+            {"role": "assistant", "content": "Capture checked."},
+            {"role": "user", "content": "Thanks!"},
+        ]
         transport.routing = decision("unclear", "high")
         await owner.send("Inspect output.")
         high = xhigh + [
-            ("app_context", "low"),
-            ("Thanks!", "low"),
+            ("Thanks!", "xhigh"),
             ("app_context", "high"),
             ("Inspect output.", "high"),
             ("output", "high"),
@@ -150,10 +151,6 @@ async def test_effective_effort_history_survives_social_and_tool_continuations()
             ("app_context", "low"),
             ("Inspect settings.", "low"),
         ]
-        assert [
-            sum(item.get("type") == "configuration_update" for item in request["input"])
-            for request in transport.requests
-        ] == [1, 1, 0, 3, 3, 4]
         assert [request["effort"] for request in transport.requests] == [
             "xhigh",
             "xhigh",
@@ -665,7 +662,7 @@ async def test_service_terminal_transport_outcomes_never_fall_back_to_model(code
         assert result.status == "service_unavailable"
         assert result.text == t_for_locale("ko", f"agent_chat.{code}")
         assert [request.url.path for request in seen] == ["/v1/classify"]
-        assert json.loads(seen[0].content)["agent_protocol"] == 4
+        assert json.loads(seen[0].content)["agent_protocol"] == 5
         assert seen[0].headers["authorization"] == "Bearer synthetic-installation-token"
     finally:
         await owner.close()
@@ -751,7 +748,7 @@ async def test_terminal_classification_retains_request_for_contextual_recovery(c
             {"role": "assistant", "content": guidance},
             {"role": "user", "content": retry},
         ]
-        assert context_of(response)["revision"] == 42
+        assert context_of(response)["core"]["revision"] == 42
         assert response["effort"] == "high"
     finally:
         await owner.close()

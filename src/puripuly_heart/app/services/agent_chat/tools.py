@@ -6,8 +6,23 @@ from collections.abc import Callable, Mapping
 from copy import deepcopy
 from uuid import uuid4
 
+from puripuly_heart.app.control_presentation import (
+    COMMAND_CHANGES,
+    SETTINGS_PRESENTATION,
+    command_field,
+)
 from puripuly_heart.app.ports.application_control import ApplicationControl
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
+from puripuly_heart.app.services.agent_chat.execution import (
+    CARD_COMMANDS,
+    DIRECT_COMMANDS,
+    private_fields,
+    project_catalog,
+    project_query,
+    request_schemas,
+    safe_receipt,
+    validate,
+)
 from puripuly_heart.app.services.agent_chat.provider_setup import (
     NAVIGATION_PROVIDERS,
     PROVIDER_SETUPS,
@@ -23,52 +38,47 @@ from puripuly_heart.config.translation_values import (
 from puripuly_heart.core.lifecycle import LifecycleScope
 
 SETTINGS_FIELD_PATHS = {
-    "locale": "ui.locale",
-    "audio.input_host_api": "audio.input_host_api",
-    "audio.input_device": "audio.input_device",
-    "peer_expected_languages": "languages.peer_expected_languages",
-    "self_vad.speech_threshold": "stt.vad_speech_threshold",
-    "peer_vad.speech_threshold": "desktop_audio.vad_speech_threshold",
-    "peer_vad.hangover_ms": "desktop_audio.vad_hangover_ms",
-    "peer_vad.pre_roll_ms": "desktop_audio.vad_pre_roll_ms",
-    "overlay.target": "overlay.target",
-    "overlay.translation.enabled": "overlay.show_translation",
-    "overlay.peer_original.enabled": "overlay.show_peer_original",
-    "overlay.background_alpha": "overlay.desktop_flet.visual.background_alpha",
-    "overlay.swap_caption_languages": "overlay.desktop_flet.swap_caption_languages",
-    "stt.provider": "stt.provider",
-    "stt.cloud_free_tier_providers": "stt.cloud_free_tier_providers",
-    "peer_stt.provider": "peer_stt.provider",
-    "translation.model": "translation.model",
-    "translation.connection": "translation.connection",
+    field: descriptor.canonical_path
+    for field, descriptor in SETTINGS_PRESENTATION.items()
+    if not descriptor.local_only
+    and descriptor.canonical_path is not None
+    and field not in {"audio", "translation", "languages"}
+    and not field.startswith("languages.")
 }
 LANGUAGE_FIELD_PATHS = {
-    "source": "languages.source_language",
-    "target": "languages.target_language",
-    "secondary_target": "languages.secondary_target_language",
-    "peer_source": "languages.peer_source_language",
-    "peer_target": "languages.peer_target_language",
-    "peer_source_mode": "languages.peer_source_mode",
+    field.removeprefix("languages."): descriptor.canonical_path
+    for field, descriptor in SETTINGS_PRESENTATION.items()
+    if field.startswith("languages.")
 }
+SETTINGS_FIELD_PATHS["osc.connection"] = "osc.connection"
 SETTINGS_FIELDS = frozenset((*SETTINGS_FIELD_PATHS, "languages"))
 MAX_APPROVAL_BLOCKS = 2
+_COMMAND_EFFECTS = {
+    "secrets.delete": "Removes only the locally stored credential; the provider-side key is not revoked.",
+    "auth.logout": "Removes this app's stored authorization; only ChatGPT also requests remote revocation.",
+    "overlay.position.reset": "Clears the saved desktop caption position and unlocks the window.",
+}
 
 
 def _approval_groups(changes: dict) -> list[dict]:
     blocks = []
     coupled = set()
     for key, value in changes.items():
-        if key.startswith(("translation.", "audio.")):
-            prefix = key.split(".", 1)[0]
-            if prefix not in coupled:
-                coupled.add(prefix)
-                blocks.append(
-                    {
-                        field: item
-                        for field, item in changes.items()
-                        if field.startswith(prefix + ".")
-                    }
+        pair = next(
+            (
+                pair
+                for pair in (
+                    ("translation.model", "translation.connection"),
+                    ("audio.input_host_api", "audio.input_device"),
                 )
+                if key in pair
+            ),
+            None,
+        )
+        if pair is not None:
+            if pair not in coupled:
+                coupled.add(pair)
+                blocks.append({field: changes[field] for field in pair if field in changes})
         elif key == "languages":
             blocks.extend({"languages": {field: item}} for field, item in value.items())
         else:
@@ -97,6 +107,12 @@ _OSC_ENUMS = {
     "destination_source": frozenset({"discovered", "manual", "fallback", "off"}),
 }
 _AUDIO_ROUTE_FIELDS = frozenset({"audio.input_host_api", "audio.input_device"})
+_DYNAMIC_CHOICE_FIELDS = _AUDIO_ROUTE_FIELDS | {
+    "audio.output_device",
+    "stt.gpu_device_id",
+    "translation.gpu_device_id",
+    "translation.http_extension_id",
+}
 _STT_SECRET_KEYS = {
     STTProviderName.DEEPGRAM.value: SettingsSecretKey.DEEPGRAM_API_KEY.value,
     STTProviderName.GEMINI_TRANSCRIBE.value: SettingsSecretKey.GEMINI_TRANSCRIBE_API_KEY.value,
@@ -287,27 +303,28 @@ def _safe_osc_receipt(receipt: dict) -> dict:
 def project_settings(current: dict) -> dict:
     intent = _mapping(_mapping(current.get("settings")).get("intent"))
     values = {}
-    for path in (
-        *SETTINGS_FIELD_PATHS.values(),
-        *LANGUAGE_FIELD_PATHS.values(),
-        "translation.qwen.region",
-    ):
+    for path in (*SETTINGS_FIELD_PATHS.values(), *LANGUAGE_FIELD_PATHS.values()):
         value = intent
         for part in path.split("."):
             value = _mapping(value).get(part)
-        if type(value) in (str, bool, int, float):
-            values[path] = safe_audio_device_label(value) if path in _AUDIO_ROUTE_FIELDS else value
-        elif (
-            path
-            in {
-                "languages.peer_expected_languages",
-                "stt.cloud_free_tier_providers",
-            }
-            and type(value) is list
-        ):
-            if all(type(item) is str for item in value):
-                values[path] = list(value)
-    return {"revision": current.get("revision"), "settings": values}
+        if type(value) is str:
+            value = safe_audio_device_label(value)
+        if value is None or type(value) in (str, bool, int, float, list, dict):
+            values[path] = deepcopy(value)
+    osc = _mapping(intent.get("osc"))
+    values["osc.connection"] = {
+        key: osc.get("connection_mode" if key == "mode" else key)
+        for key in ("mode", "send_port", "receive_port")
+    }
+    return {
+        "revision": current.get("revision"),
+        "settings": values,
+        "private_presence": {
+            field: value
+            for field, value in _mapping(current.get("private_presence")).items()
+            if field in private_fields() and type(value) is bool
+        },
+    }
 
 
 def _choices(catalog: dict, pointer: str) -> object:
@@ -321,9 +338,17 @@ def _choices(catalog: dict, pointer: str) -> object:
 
 def _schema(catalog: dict, source: dict) -> dict:
     kind = source.get("type")
+    if kind == "optional-string":
+        kind = "string"
     if kind == "object":
+        members = source.get("properties")
+        if members is None and "key_choices" in source:
+            members = {
+                key: {"type": "string", "choices": source["value_choices_by_key"] + "/" + key}
+                for key in _choices(catalog, source["key_choices"])
+            }
         properties = {
-            key: _nullable(_schema(catalog, item)) for key, item in source["properties"].items()
+            key: _nullable(_schema(catalog, item)) for key, item in (members or {}).items()
         }
         return {
             "type": "object",
@@ -353,6 +378,8 @@ def _schema(catalog: dict, source: dict) -> dict:
         choices = _choices(catalog, source["choices"])
         if isinstance(choices, Mapping):
             choices = list(dict.fromkeys(value for values in choices.values() for value in values))
+        elif isinstance(choices, list):
+            choices = [item.get("value") if isinstance(item, Mapping) else item for item in choices]
         result["enum"] = list(choices)
         if source.get("empty_allowed") and "" not in result["enum"]:
             result["enum"].append("")
@@ -369,7 +396,7 @@ def settings_tool_schema(catalog: dict) -> dict:
         raise ValueError("settings schemas unavailable")
     properties = {
         key: _nullable(
-            {"type": "string"} if key in _AUDIO_ROUTE_FIELDS else _schema(catalog, schemas[key])
+            {"type": "string"} if key in _DYNAMIC_CHOICE_FIELDS else _schema(catalog, schemas[key])
         )
         for key in sorted(SETTINGS_FIELDS)
     }
@@ -382,42 +409,7 @@ def settings_tool_schema(catalog: dict) -> dict:
 
 
 def _validate(value: object, schema: dict) -> None:
-    if "anyOf" in schema:
-        schema = schema["anyOf"][0]
-    kind = schema["type"]
-    valid = {
-        "string": type(value) is str,
-        "boolean": type(value) is bool,
-        "integer": type(value) is int,
-        "number": type(value) in (int, float),
-        "array": type(value) is list,
-        "object": type(value) is dict,
-    }.get(kind, False)
-    if not valid:
-        raise ValueError("unsupported settings value type")
-    if kind in {"integer", "number"}:
-        if type(value) is float and not math.isfinite(value):
-            raise ValueError("settings value must be finite")
-        if "minimum" in schema and value < schema["minimum"]:
-            raise ValueError("settings value below minimum")
-        if "maximum" in schema and value > schema["maximum"]:
-            raise ValueError("settings value above maximum")
-    if "enum" in schema and value not in schema["enum"]:
-        raise ValueError("unsupported settings choice")
-    if kind == "object":
-        if not value or value.keys() - schema["properties"].keys():
-            raise ValueError("unknown or empty language changes")
-        for key, item in value.items():
-            _validate(item, schema["properties"][key])
-    if kind == "array":
-        if len(value) < schema.get("minItems", 0):
-            raise ValueError("not enough settings values")
-        if "maxItems" in schema and len(value) > schema["maxItems"]:
-            raise ValueError("too many settings values")
-        for item in value:
-            _validate(item, schema["items"])
-        if schema.get("uniqueItems") and len(value) != len(set(value)):
-            raise ValueError("duplicate settings values")
+    validate(value, schema, partial=True)
 
 
 def project_audio_diagnosis(value: object) -> dict:
@@ -494,8 +486,6 @@ def _safe_receipt(receipt: dict) -> dict:
             "terminal",
             "revision",
             "reason",
-            "message",
-            "explanation",
             "diagnostic_id",
             "action",
             "translation_enabled",
@@ -505,15 +495,13 @@ def _safe_receipt(receipt: dict) -> dict:
         ),
     )
     if isinstance(receipt.get("error"), Mapping):
-        result["error"] = _pick(
-            receipt["error"], ("code", "type", "current_revision", "message", "explanation")
-        )
+        result["error"] = _pick(receipt["error"], ("code", "type", "current_revision"))
     diagnostic_fields = ("diagnostic_id", "code", "category", "disposition", "operation")
     if isinstance(receipt.get("diagnostics"), Mapping):
         result["diagnostics"] = _pick(receipt["diagnostics"], diagnostic_fields)
     if isinstance(receipt.get("transaction"), Mapping):
         transaction = receipt["transaction"]
-        result["transaction"] = _pick(transaction, ("status", "message"))
+        result["transaction"] = _pick(transaction, ("status",))
         if isinstance(transaction.get("diagnostics"), Mapping):
             result["transaction"]["diagnostics"] = _pick(
                 transaction["diagnostics"], diagnostic_fields
@@ -570,6 +558,10 @@ class AgentTools:
         self._tasks: set[asyncio.Task] = set()
         self._scope = LifecycleScope("agent-settings-tools")
         self._closed = False
+        self._localize: Callable[[str], str] = lambda key: key
+
+    def bind_localize(self, localize: Callable[[str], str]) -> None:
+        self._localize = localize
 
     @property
     def confirmation(self) -> dict | None:
@@ -620,6 +612,8 @@ class AgentTools:
             return _rejected("tools_closed", "Settings tools are closed.")
         if type(arguments) is not dict:
             return _rejected("invalid_arguments", "Tool arguments must be an object.")
+        if name == "control_app":
+            return await self._control_app(arguments, require_current)
         command = None
         command_arguments = arguments
         if name in {
@@ -729,6 +723,20 @@ class AgentTools:
                 ):
                     raise ValueError("unsupported translation model and connection combination")
             await self._validate_audio_route(changes, catalog, context, require_current)
+            for field in changes.keys() & (_DYNAMIC_CHOICE_FIELDS - _AUDIO_ROUTE_FIELDS):
+                options = catalog["choices"][field]
+                if not any(
+                    (
+                        (
+                            option.get("value") == changes[field]
+                            and option.get("available") is not False
+                        )
+                        if isinstance(option, Mapping)
+                        else option == changes[field]
+                    )
+                    for option in options
+                ):
+                    raise ValueError("Requested setting choice is not currently available.")
             previous = self._previous(changes, context)
         except (KeyError, TypeError, ValueError) as exc:
             return _rejected("invalid_arguments", str(exc))
@@ -770,6 +778,7 @@ class AgentTools:
         require_current()
         self._proposal_id = uuid4().hex
         self._confirmation_queue = []
+        presentation = project_catalog(catalog, self._localize)
         for group in _approval_groups(changes):
             before = {
                 key: (
@@ -786,6 +795,9 @@ class AgentTools:
                     "previous": before,
                     "effects": self._effects(group, before, policy_context, route_effects),
                     "route_effects": route_effects,
+                    "presentation": {
+                        field: presentation[field] for field in group if field in presentation
+                    },
                 }
             )
             for key, value in group.items():
@@ -813,7 +825,7 @@ class AgentTools:
             if key == "languages":
                 previous[key] = {field: settings[LANGUAGE_FIELD_PATHS[field]] for field in value}
             else:
-                previous[key] = deepcopy(settings[SETTINGS_FIELD_PATHS[key]])
+                previous[key] = deepcopy(settings.get(SETTINGS_FIELD_PATHS[key]))
         return previous
 
     async def _validate_audio_route(
@@ -1094,6 +1106,19 @@ class AgentTools:
         self._confirmation = None
         proposal_id = self._proposal_id
         self._changed()
+        if "command" in card:
+            self._confirmation_queue.clear()
+            self._proposal_id = None
+            result = (
+                await self._apply_command(card, require_current)
+                if approved
+                else {"status": "declined", "command": card["command"], "changes": card["changes"]}
+            )
+            self._changed()
+            self._emit_event(
+                {"kind": "confirmation", "card_id": card_id, "result": deepcopy(result)}
+            )
+            return result
         if not approved:
             self._confirmation_queue.clear()
             self._proposal_id = None
@@ -1311,6 +1336,119 @@ class AgentTools:
         self._record_action(
             {
                 "tool": name,
+                "action_id": request_id,
+                "phase": "observed" if result["status"] == "pending" else "completed",
+                "result": deepcopy(result),
+            }
+        )
+        return result
+
+    async def _control_app(self, arguments: dict, require_current: Callable[[], None]) -> dict:
+        if arguments.keys() != {"request"} or type(arguments["request"]) is not dict:
+            return {"status": "rejected", "code": "invalid_control_request"}
+        request = deepcopy(arguments["request"])
+        try:
+            catalog = await self._control.query("settings.choices", {})
+            require_current()
+            validate(request, {"anyOf": request_schemas(catalog)})
+        except Exception:
+            return {"status": "rejected", "code": "invalid_control_request"}
+        action = request.pop("action")
+        request = {key: value for key, value in request.items() if value is not None}
+        if action.startswith("query."):
+            name = action.removeprefix("query.")
+            try:
+                source = await self._control.query(name, request)
+                require_current()
+                projected = await project_query(name, source, self._control, self._localize)
+                if name == "settings.current":
+                    self.observe_context(projected)
+                return {"status": "observed", "result": projected}
+            except Exception:
+                return {"status": "unavailable", "code": "query_unavailable"}
+        if action in DIRECT_COMMANDS:
+            return await self._run_command("control_app", action, request, require_current)
+        if action in CARD_COMMANDS:
+            return await self._propose_command(action, request, require_current)
+        return {"status": "rejected", "code": "unsupported_action"}
+
+    async def _propose_command(
+        self, command: str, arguments: dict, require_current: Callable[[], None]
+    ) -> dict:
+        try:
+            current = await self._control.query("settings.current", {})
+            require_current()
+            before = await self._command_state(command, arguments)
+            require_current()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return {"status": "unavailable", "code": "settings_unavailable"}
+        if type(current.get("revision")) is not int:
+            return {"status": "unavailable", "code": "settings_unavailable"}
+        after = COMMAND_CHANGES[command]
+        if before == after:
+            return {"status": "rejected", "code": "already_applied"}
+        field = command_field(command, arguments)
+        self.cancel_confirmation()
+        self._confirmation = {
+            "id": uuid4().hex,
+            "revision": current["revision"],
+            "command": command,
+            "arguments": deepcopy(arguments),
+            "changes": {field: after},
+            "previous": {} if before is None else {field: before},
+            "effects": [_COMMAND_EFFECTS[command]],
+            "presentation": {},
+        }
+        self._changed()
+        return {"status": "needs_confirmation", "confirmation": self.confirmation}
+
+    async def _command_state(self, command: str, arguments: dict) -> object | None:
+        if command == "overlay.position.reset":
+            return None
+        if command == "auth.logout" and arguments["provider"] in {"chatgpt", "qq", "discord"}:
+            accounts = project_accounts(await self._control.query("accounts.status", {}))
+            if arguments["provider"] == "chatgpt":
+                return accounts["chatgpt"]["signed_in"]
+            managed = accounts["managed"]
+            return (
+                managed["credential_present"]
+                if managed["provider"] == arguments["provider"]
+                else None
+            )
+        name = arguments["name"] if command == "secrets.delete" else "openrouter_api_key"
+        source = await self._control.query("secrets.presence", {})
+        value = _mapping(source.get("effective_presence", source.get("presence"))).get(name)
+        return value if type(value) is bool else None
+
+    async def _apply_command(self, card: dict, require_current: Callable[[], None]) -> dict:
+        command, arguments = card["command"], deepcopy(card["arguments"])
+        request_id = uuid4().hex
+        try:
+            current = await self._control.query("settings.current", {})
+            require_current()
+            if current.get("revision") != card["revision"]:
+                result = {"status": "rejected", "code": "revision_conflict"}
+            else:
+                receipt = await self._control.submit(
+                    command, arguments, request_id=request_id, expected_revision=card["revision"]
+                )
+                if receipt.get("status") not in _TERMINAL:
+                    receipt = await self._control.wait(receipt["operation_id"])
+                safe = safe_receipt(receipt)
+                result = {
+                    "status": safe["status"] if safe.get("terminal") else "pending",
+                    "receipt": safe,
+                }
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            result = {"status": "failed", "code": "control_operation_unavailable"}
+        result.update(command=command, changes=deepcopy(card["changes"]))
+        self._record_action(
+            {
+                "tool": "control_app",
                 "action_id": request_id,
                 "phase": "observed" if result["status"] == "pending" else "completed",
                 "result": deepcopy(result),

@@ -4,56 +4,27 @@ import time
 from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 
+from puripuly_heart.app.control_presentation import SETTINGS_PRESENTATION
 from puripuly_heart.app.ports.application_control import ApplicationControl
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
+from puripuly_heart.app.services.agent_chat.execution import model_safe_catalog, project_catalog
+from puripuly_heart.app.services.agent_chat.modules import TOPICS, topic_queries
 from puripuly_heart.app.services.agent_chat.provider_setup import (
     ACCOUNT_SETUP_ACTIONS,
     PROVIDER_SETUPS,
 )
 from puripuly_heart.app.services.agent_chat.tools import (
+    LANGUAGE_FIELD_PATHS,
     SETTINGS_FIELD_PATHS,
     project_accounts,
     project_osc_output,
+    project_settings,
 )
 from puripuly_heart.app.services.application_audio_devices import safe_audio_device_label
 from puripuly_heart.core.diagnostics import sanitize_diagnostic_fields
 
-TOPICS = frozenset(
-    {"overview", "settings", "audio", "translation", "accounts", "output", "diagnostics"}
-)
-SETTINGS_PATHS = (
-    "intent.ui.locale",
-    "intent.audio.input_host_api",
-    "intent.audio.input_device",
-    "intent.languages.source_language",
-    "intent.languages.target_language",
-    "intent.languages.secondary_target_language",
-    "intent.languages.peer_source_language",
-    "intent.languages.peer_target_language",
-    "intent.languages.peer_source_mode",
-    "intent.languages.peer_expected_languages",
-    "intent.translation.model",
-    "intent.translation.connection",
-    "intent.translation.qwen.region",
-    "intent.translation.qwen.llm_model",
-    "intent.translation.gemini.llm_model",
-    "intent.translation.deepseek.llm_model",
-    "intent.stt.provider",
-    "intent.stt.cloud_free_tier_providers",
-    "intent.peer_stt.provider",
-    "intent.stt.vad_speech_threshold",
-    "intent.stt.low_latency_mode",
-    "intent.stt.low_latency_vad_hangover_ms",
-    "intent.stt.low_latency_merge_gap_ms",
-    "intent.desktop_audio.vad_speech_threshold",
-    "intent.desktop_audio.vad_hangover_ms",
-    "intent.desktop_audio.vad_pre_roll_ms",
-    "intent.overlay.target",
-    "intent.overlay.show_translation",
-    "intent.overlay.show_peer_original",
-    "intent.overlay.desktop_flet.size_preset",
-    "intent.overlay.desktop_flet.swap_caption_languages",
-    "intent.overlay.desktop_flet.visual.background_alpha",
+SETTINGS_PATHS = tuple(
+    "intent." + path for path in (*SETTINGS_FIELD_PATHS.values(), *LANGUAGE_FIELD_PATHS.values())
 )
 CHANNEL_FIELDS = (
     "selected_provider",
@@ -119,24 +90,7 @@ def _pick(value: object, fields: tuple[str, ...]) -> dict:
 
 
 def _settings(value: object) -> dict:
-    result = {}
-    for path in SETTINGS_PATHS:
-        current = value
-        for part in path.split("."):
-            current = _mapping(current).get(part)
-        if current is None or type(current) in (str, bool, int, float):
-            result[path.removeprefix("intent.")] = (
-                safe_audio_device_label(current)
-                if path in {"intent.audio.input_host_api", "intent.audio.input_device"}
-                and type(current) is str
-                else current
-            )
-        elif path in {
-            "intent.languages.peer_expected_languages",
-            "intent.stt.cloud_free_tier_providers",
-        } and isinstance(current, list):
-            result[path.removeprefix("intent.")] = [x for x in current if type(x) is str]
-    return result
+    return project_settings({"settings": value})["settings"]
 
 
 def _audio_devices(value: dict | None, settings: Mapping) -> dict:
@@ -203,7 +157,7 @@ def _audio_choices(value: object) -> list[dict]:
         choice = {
             "value": label,
             "available": source.get("available") is True,
-            "selectable": label == source["value"],
+            "selectable": label == source["value"] and source.get("selectable") is not False,
         }
         if type(source.get("host_api")) is str:
             host = safe_audio_device_label(source["host_api"])
@@ -255,6 +209,7 @@ async def collect_agent_context(
     control: ApplicationControl,
     *,
     activity: AgentActivity,
+    localize: Callable[[str], str] = lambda key: key,
     topic: str = "overview",
     diagnostic_id: str | None = None,
     operation_id: str | None = None,
@@ -266,13 +221,18 @@ async def collect_agent_context(
         raise ValueError("unsupported context topic")
     if (operation_id is not None or after is not None) and topic != "diagnostics":
         raise ValueError("diagnostic filters require the diagnostics topic")
+    queries = topic_queries(topic)
     missing = []
+    allowance = project_accounts(None)["puri"]["allowance"]
+    if puri_allowance_exhausted is True:
+        allowance["exhaustion"] = "observed"
     result = {
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "last_activity": activity.snapshot(),
         "activity_availability": activity.availability,
         "recent_agent_actions": list(recent_agent_actions),
         "missing": missing,
+        "puri_allowance": allowance,
     }
 
     async def query(name: str, arguments: dict | None = None) -> dict | None:
@@ -286,7 +246,7 @@ async def collect_agent_context(
                 missing.append(name)
             return None
 
-    if topic in {"overview", "accounts"}:
+    if "accounts.status" in queries:
         result["accounts"] = project_accounts(await query("accounts.status"))
         if puri_allowance_exhausted is True:
             result["accounts"]["puri"]["allowance"]["exhaustion"] = "observed"
@@ -294,7 +254,7 @@ async def collect_agent_context(
             action.snapshot() for action in ACCOUNT_SETUP_ACTIONS.values()
         ]
 
-    if topic in {"overview", "audio", "translation"}:
+    if "app.status" in queries:
         app = await query("app.status")
         if app is not None:
             result["app"] = _pick(
@@ -322,7 +282,7 @@ async def collect_agent_context(
                         ),
                     ),
                 }
-    if topic in {"overview", "settings", "audio", "translation"}:
+    if "settings.current" in queries:
         settings = await query("settings.current")
         if settings is not None:
             result["revision"] = settings.get("revision")
@@ -330,26 +290,34 @@ async def collect_agent_context(
                 missing.append("settings.current")
             else:
                 result["settings"] = _settings(settings["settings"])
-                if topic in {"overview", "audio", "translation"}:
-                    verification = _mapping(
-                        _mapping(settings["settings"].get("state")).get("provider_verification")
-                    )
-                    result["provider_verification"] = {
-                        provider: {
-                            "status": (
-                                status
-                                if status in {"unknown", "verified", "failed", "skipped"}
-                                else "unknown"
-                            )
-                        }
-                        for provider, entry in verification.items()
-                        if provider in PROVIDER_SETUPS
-                        for status in (_mapping(entry).get("status"),)
+                result["local_settings"] = {
+                    field: {
+                        "presence": settings.get("private_presence", {}).get(field),
+                        "model_editable": False,
+                        "model_readable": False,
                     }
-    if topic in {"overview", "settings"}:
+                    for field, descriptor in SETTINGS_PRESENTATION.items()
+                    if descriptor.local_only
+                }
+                verification = _mapping(
+                    _mapping(settings["settings"].get("state")).get("provider_verification")
+                )
+                result["provider_verification"] = {
+                    provider: {
+                        "status": (
+                            status
+                            if status in {"unknown", "verified", "failed", "skipped"}
+                            else "unknown"
+                        )
+                    }
+                    for provider, entry in verification.items()
+                    if provider in PROVIDER_SETUPS
+                    for status in (_mapping(entry).get("status"),)
+                }
+    if "settings.choices" in queries:
         choices = await query("settings.choices")
         if choices is not None:
-            source = _mapping(choices.get("choices"))
+            source = _mapping(model_safe_catalog(choices).get("choices"))
             allowed = set(SETTINGS_FIELD_PATHS) | {"languages", "peer_expected_languages"}
             result["choices"] = {
                 key: (
@@ -360,7 +328,8 @@ async def collect_agent_context(
                 for key in allowed
                 if key in source and isinstance(source[key], (list, dict))
             }
-    if topic in {"overview", "audio", "translation"}:
+            result["settings_catalog"] = project_catalog(choices, localize)
+    if "secrets.presence" in queries:
         secrets = await query("secrets.presence")
         if secrets is not None:
             result["secret_presence"] = {
@@ -370,18 +339,18 @@ async def collect_agent_context(
                 ).items()
                 if key in {item.value for item in SettingsSecretKey} and type(value) is bool
             }
-    if topic in {"overview", "audio"}:
+    if "audio.devices" in queries:
         result["audio"] = _audio_devices(
             await query("audio.devices"), _mapping(result.get("settings"))
         )
-    if topic in {"overview", "output"}:
+    if "overlay.status" in queries:
         overlay = await query("overlay.status")
         osc = await query("osc.status")
         result["output"] = {
             "overlay": _pick(overlay.get("output"), OVERLAY_FIELDS) if overlay else None,
             "osc": project_osc_output(osc.get("output")) if osc else None,
         }
-    if topic in {"overview", "audio", "diagnostics"}:
+    if "diagnostics" in queries:
         health = await query("diagnostics.health")
         filters = {
             key: value

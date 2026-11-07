@@ -20,6 +20,7 @@ from tests.app.test_agent_chat import (
     Records,
     Responses,
     answer,
+    context_of,
     tool,
 )
 from tests.app.test_agent_chat_routing import decision
@@ -61,14 +62,6 @@ async def notices_done(owner):
     task = owner._notice_task
     if task is not None:
         await task
-
-
-def context_of(request):
-    return [
-        json.loads(item["content"])["app_context"]
-        for item in request["input"]
-        if isinstance(item.get("content"), str) and item["content"].startswith('{"app_context":')
-    ][-1]
 
 
 def test_configuration_updates_are_internal_even_when_recorded_directly():
@@ -277,8 +270,8 @@ async def test_model_withdrawal_uses_current_card_context_without_notice_continu
         await notices_done(owner)
         assert result.status == "completed"
         assert result.tool_results[0].result == {"status": "withdrawn", "card_id": card["id"]}
-        assert context_of(transport.requests[2])["pending_confirmation"] == card
-        assert "previous" not in context_of(transport.requests[2])["pending_confirmation"]
+        assert context_of(transport.requests[2])["core"]["pending_confirmation"] == card
+        assert "previous" not in context_of(transport.requests[2])["core"]["pending_confirmation"]
         assert owner.snapshot.confirmation is None
         assert control.context() == before
         assert not control.submissions and not owner.snapshot.recent_changes
@@ -286,7 +279,7 @@ async def test_model_withdrawal_uses_current_card_context_without_notice_continu
         assert not any(event["kind"] in {"confirmation", "app_notice"} for event in events)
         assert not any(message.role == "notice" for message in owner.snapshot.messages)
         await owner.send("What is pending now?")
-        assert context_of(transport.requests[-1])["pending_confirmation"] is None
+        assert context_of(transport.requests[-1])["core"]["pending_confirmation"] is None
         assert (await owner.confirm(card["id"], True))["status"] == "rejected"
     finally:
         await owner.close()
@@ -329,7 +322,7 @@ async def test_model_cannot_withdraw_a_replaced_card_or_approve_current_settings
             if attempt == "stale_withdrawal"
             else rejected["code"] == "invalid_tool_call"
         )
-        assert context_of(transport.requests[4])["pending_confirmation"] == current
+        assert context_of(transport.requests[4])["core"]["pending_confirmation"] == current
         assert owner.snapshot.confirmation == current
         assert control.context() == before
         assert not control.submissions and not owner.snapshot.recent_changes
@@ -372,7 +365,7 @@ async def test_question_or_off_topic_message_preserves_pending_confirmation(
         assert control.context() == before
         assert not control.submissions
         if route == "work":
-            assert context_of(transport.requests[-1])["pending_confirmation"] == card
+            assert context_of(transport.requests[-1])["core"]["pending_confirmation"] == card
         else:
             assert transport.requests[-1]["input"] == [{"role": "user", "content": message}]
         assert card["id"] not in json.dumps(transport.classifications)
@@ -512,9 +505,9 @@ async def test_cancel_during_submitted_work_keeps_real_fact_without_continuation
         owner.cancel()
         assert not first.done()
         await owner.send("what is happening?")
-        operations = context_of(transport.requests[-1])["agent_operations"]
+        operations = context_of(transport.requests[-1])["core"]["operations"]
         assert len(operations) == 1 and operations[0]["phase"] == "submitted"
-        assert not context_of(transport.requests[-1])["recent_agent_actions"]
+        assert not context_of(transport.requests[-1])["core"]["recent_actions"]
         control.release.set()
         await asyncio.gather(*tuple(owner._tools._tasks))
         assert (await first)["status"] == status
@@ -585,7 +578,7 @@ async def test_last_five_actual_changes_exclude_queries_proposals_noops_and_dupl
         await owner._tools.execute("change_settings", {"changes": {"stt.provider": "deepgram"}})
         await watch(owner)
         await owner.send("query")
-        changes = context_of(owner._transport.requests[-1])["recent_agent_actions"]
+        changes = context_of(owner._transport.requests[-1])["core"]["recent_actions"]
         assert len(changes) == 5
         assert [row["result"]["changes"]["overlay.background_alpha"] for row in changes] == [
             0.2,
@@ -909,7 +902,7 @@ async def test_composed_runtime_notices_mutations_reset_and_restart(tmp_path, mo
         assert len(transport.classifications) == 1 and len(transport.requests) == 5
         assert navigations == [("api", "openai")]
         assert (
-            context_of(transport.requests[-1])["recent_agent_actions"][0]["result"]["status"]
+            context_of(transport.requests[-1])["core"]["recent_actions"][0]["result"]["status"]
             == "applied"
         )
         owner.new_conversation()
@@ -1364,7 +1357,9 @@ async def test_parallel_context_reads_are_drained_without_stale_publication(
         assert len(observed) == (2 if interrupt == "message" else 1)
         assert len(transport.requests) == (2 if interrupt == "message" else 1)
         assert not owner.snapshot.setup_actions
-        assert not any(item.status == "observed" for item in owner.snapshot.tool_results)
+        assert not any(
+            item.status in {"observed", "unchanged"} for item in owner.snapshot.tool_results
+        )
         outputs = [
             item for item in owner.report_archive if item.get("type") == "function_call_output"
         ]
@@ -1400,7 +1395,14 @@ async def test_snapshot_exposes_running_tool_and_card_before_values_to_the_rende
         previous = control.context()["settings"]["stt.provider"]
         assert owner.snapshot.confirmation_previous == {"stt.provider": previous}
         assert "previous" not in card
-        assert "previous" not in json.dumps(transport.requests[-1]["input"])
+        outputs = [
+            json.loads(item["output"])
+            for item in transport.requests[-1]["input"]
+            if item.get("type") == "function_call_output"
+        ]
+        offered = next(item for item in outputs if item.get("status") == "needs_confirmation")
+        assert offered["confirmation"]["id"] == card["id"]
+        assert "previous" not in offered["confirmation"]
     finally:
         await owner.close()
 

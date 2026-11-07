@@ -7,7 +7,7 @@ This guide covers service boundaries and development/deployment entry points. Re
 ## Scope and Boundaries
 
 - Every supported endpoint requires a Broker-issued Puri token, including local development. Model and support admission are enabled separately.
-- Classification selects scope and effort from conversation summaries, not app records. Work responses receive allowlisted app context; brief routes have no tools, and off-topic requests exclude prior work context.
+- Classification selects scope, effort, and app-context modules from conversation summaries, not app records. Work responses receive allowlisted app context; brief routes have no tools, and off-topic requests exclude prior work context.
 - Relay owns the model, endpoint, trusted instructions, cache configuration, and tool schemas. Clients cannot supply trusted instructions or expand tool permissions.
 - Responses stream provisional text. Only a completed response admits tool calls and reasoning continuation; Python fences interrupted text and late results.
 - App tools reuse existing application owners. Every settings change requires approval of its exact values. Credentials use secure app controls; account actions and support uploads remain user actions.
@@ -15,17 +15,17 @@ This guide covers service boundaries and development/deployment entry points. Re
 
 ## Authored Content
 
-[Scope](prompts/agent/scope.md) defines routing, [system](prompts/agent/system.md) defines behavior, and [guide](prompts/agent/guide.md) supplies product knowledge. Work requests include the bundled [cost](prompts/agent/references/keys-and-costs.md) and [benchmark](prompts/agent/references/benchmark.md) references in a stable server-owned prefix. Classification and brief replies exclude those references.
+[Scope](prompts/agent/scope.md) defines classification, [system](prompts/agent/system.md) defines behavior, [guide](prompts/agent/guide.md) supplies product knowledge, and [app context](prompts/agent/app-context.md) describes the current protocol's context format. Work requests include the bundled [cost](prompts/agent/references/keys-and-costs.md) and [benchmark](prompts/agent/references/benchmark.md) references in a stable server-owned prefix; classification has its own. Classification and brief replies exclude those references.
 
 All user-facing language, register, length and formatting guidance lives in the system's `Identity and voice` section. Its style examples are grouped in English, Korean, Chinese and Japanese order, with Chinese kept as one group of the existing Simplified Chinese examples. Work, social and out-of-scope requests share that complete section; the user's requested response language and writing system, or their current message, choose the reply language and script rather than examples, UI settings or earlier conversation.
 
-The relay bundle contains the authoritative English sources; Python does not fetch or duplicate them. Prompt changes require rebuilding and restarting or deploying the Worker. App and Relay protocol changes must roll out together with fresh conversations.
+The relay bundle contains the authoritative English sources; Python does not fetch or duplicate them. Prompt changes require rebuilding and restarting or deploying the Worker. Relay serves every app protocol in its [contract registry](src/contracts.ts); a contract holds tool definitions, context modules, and the app-context format. Shared prompt and policy changes apply to all supported protocols. A contract change adds a protocol, deployed to Relay before the app release; older protocols remain until retired.
 
 ## Authentication, Usage and Stop Control
 
 - The app obtains an in-memory bearer through [Broker installation proof](../broker/README.md#puri-installation-tokens). Relay validates it on every request and uses the derived installation subject for accounting and OpenAI's safety identifier, not the raw installation ID.
 - D1 atomically owns daily prompt-turn admission, per-turn request budgets, and concurrent-request slots. Classification, tool continuations, and eligible app notices share one turn identity. Failure, cancellation, midnight, and token renewal do not renew its budget.
-- Usage records are separate from optional statistics and contain no conversation bodies. Missing usage stays unknown; estimates are not provider billing. There is no dollar-based or global monthly spending cutoff.
+- Usage records, including per-protocol request counts, are separate from optional statistics and contain no conversation bodies. Missing usage stays unknown; estimates are not provider billing. There is no dollar-based or global monthly spending cutoff.
 - Authentication recovery is bounded. An uncertain model request or interrupted stream is not automatically replayed. Missing required configuration and failed admission return static errors rather than another model call.
 - Deploy `AGENT_SERVICE_ENABLED=false` to stop new model admissions. Already dispatched work is not cancelled. `SUPPORT_REPORTS_ENABLED` controls reports independently, including when model allowance is exhausted.
 
@@ -128,10 +128,10 @@ uv run --no-sync python -m puripuly_heart.release_evidence.agent_chat_simulator 
 | Question | Read |
 | --- | --- |
 | Requests, upstream errors, streaming | [Handler](src/index.ts), [request contract](src/requests.ts), [stream](src/stream.ts) |
-| Trusted instructions and tool definitions | [Loader](src/instructions.ts), [scope](src/scope.ts), [bundle](src/bundle.ts), [generator](generate-tools.py) |
+| Trusted instructions and tool definitions | [Loader](src/instructions.ts), [contracts](src/contracts.ts), [scope](src/scope.ts), [bundle](src/bundle.ts), [tool generator](generate-tools.py), [module generator](generate-context.py) |
 | Authentication, admission, usage | [Token verification](src/auth.ts), [accounting](src/usage.ts), [migrations](migrations/) |
 | Support bundles, storage, retention | [App bundle](../src/puripuly_heart/app/services/agent_chat/report.py), [receiver](src/support.ts), [storage operations](operations/support-storage.mjs) |
 | Deployment and schema readiness | [Preparation](operations/prepare-deployment.mjs), [smoke](operations/smoke-deployment.mjs), [deployment checks](tests/deployment.spec.ts) |
-| App context, permissions, conversation lifetime | [Chat owner](../src/puripuly_heart/app/services/agent_chat/owner.py), [context](../src/puripuly_heart/app/services/agent_chat/context.py), [tools](../src/puripuly_heart/app/services/agent_chat/tools.py) |
+| App context, permissions, conversation lifetime | [Chat owner](../src/puripuly_heart/app/services/agent_chat/owner.py), [context](../src/puripuly_heart/app/services/agent_chat/context.py), [modules](../src/puripuly_heart/app/services/agent_chat/modules.py), [tools](../src/puripuly_heart/app/services/agent_chat/tools.py) |
 | App transport and presentation | [Transport](../src/puripuly_heart/app/adapters/agent_relay_transport.py), [presentation](../src/puripuly_heart/app/services/agent_chat/presentation.py) |
-| Behavior checks | [Relay tests](tests/), [app-owner tests](../tests/app/test_agent_chat.py) |
+| Behavior checks | [Relay tests](tests/), [recorded app requests](tests/app-requests/), [app-owner tests](../tests/app/test_agent_chat.py) |

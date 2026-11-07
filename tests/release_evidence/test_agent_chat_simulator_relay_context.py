@@ -5,6 +5,7 @@ from copy import deepcopy
 
 import pytest
 
+from puripuly_heart.app.services.agent_chat.modules import MODULES
 from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
 from puripuly_heart.release_evidence.agent_chat_simulator import runner
 from puripuly_heart.release_evidence.agent_chat_simulator.app import ScenarioApp
@@ -14,6 +15,7 @@ from puripuly_heart.release_evidence.agent_chat_simulator.relay_context import (
     validate_relay_context,
 )
 from puripuly_heart.release_evidence.agent_chat_simulator.scenarios import select_scenarios
+from tests.app.test_agent_chat import context_of
 
 
 def test_manifest_preserves_emitted_prefix_cache_questions_and_options(
@@ -190,6 +192,46 @@ async def test_recorded_inputs_and_allow_tools_stay_per_call(relay_context_manif
         False,
     ]
     assert all(call["request"]["input"] == inputs for call in evidence["M_invocations"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("context_mode", "expected_modules"),
+    [
+        ("selected", ["core", "recognition", "accounts"]),
+        ("full", list(MODULES)),
+    ],
+)
+async def test_smoke_evidence_matches_selected_context_and_full_comparison(
+    context_mode, expected_modules, tmp_path
+):
+    output = tmp_path / f"{context_mode}.json"
+    arguments = cli.parser().parse_args(
+        [
+            "smoke",
+            "--case",
+            "explain-recognition-options",
+            "--context-mode",
+            context_mode,
+            "--output",
+            str(output),
+        ]
+    )
+    assert await cli.execute(arguments) == 0
+    report = json.loads(output.read_text(encoding="utf-8"))
+    attempt = report["cases"][0]["attempt"]
+    assert report["context_mode"] == attempt["context_mode"] == context_mode
+    decisions = attempt["effective_decisions"]
+    assert [decision["context_relation"] for decision in decisions] == ["new", "continue"]
+    assert all(decision["context_modules"] == expected_modules for decision in decisions)
+    assert all(decision["context_mode"] == context_mode for decision in decisions)
+    assert all({"context_source", "context_reason"} <= decision.keys() for decision in decisions)
+    assert [call["decision"] for call in attempt["D_invocations"]] == decisions
+    assert [event for event in attempt["events"] if event.get("kind") == "decision"] == decisions
+    for call in attempt["M_invocations"]:
+        context = context_of(call["request"])
+        assert context["modules"] == expected_modules
+        assert [module for module in MODULES if module in context] == expected_modules
 
 
 @pytest.mark.asyncio

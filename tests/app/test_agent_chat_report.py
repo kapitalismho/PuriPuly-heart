@@ -188,7 +188,7 @@ async def test_next_user_request_sees_only_current_completed_support_receipt(fai
         await asyncio.wait_for(entered.wait(), 2)
         assert calls == (len(transport.classifications), len(transport.requests))
         assert (await owner.send("Has the upload completed yet?")).status == "completed"
-        assert context_of(transport.requests[-1])["support_reports"] == []
+        assert context_of(transport.requests[-1])["core"]["support_reports"] == []
         if reset:
             owner.new_conversation()
         calls = len(transport.classifications), len(transport.requests)
@@ -207,7 +207,7 @@ async def test_next_user_request_sees_only_current_completed_support_receipt(fai
                 else [{"status": "sent", "ticket": result["ticket"]}]
             )
         )
-        assert context["support_reports"] == expected
+        assert context["core"]["support_reports"] == expected
         assert "PRIVATE-" not in json.dumps(context)
         assert all(item.get("type") != "support_report" for item in owner._items)
         assert len(transport.uploads) == 1

@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import pytest
 
+from puripuly_heart.app.control_presentation import setting_label
 from puripuly_heart.app.ports.agent_chat import (
     AgentChatSnapshot,
     AgentMessage,
@@ -15,13 +16,14 @@ from puripuly_heart.app.ports.agent_chat import (
 )
 from puripuly_heart.ui.agent_chat_model import (
     active_status,
+    applied_label,
     change_blocks,
     chat_items,
     done_status,
     history_rows,
     select_left,
 )
-from puripuly_heart.ui.i18n import get_locale, language_name, set_locale
+from puripuly_heart.ui.i18n import get_locale, language_name, set_locale, t
 from puripuly_heart.ui.views.logs import ConversationRecord
 
 
@@ -80,6 +82,57 @@ def test_left_area_follows_the_agreed_priority_and_waits_for_the_reply():
     assert select_left(snapshot()).kind == "home"
 
 
+def test_command_cards_reuse_the_change_card_and_name_their_fixed_result_line():
+    card = {
+        "id": "card-1",
+        "command": "secrets.delete",
+        "changes": {"secrets.deepgram_api_key": False},
+        "previous": {"secrets.deepgram_api_key": True},
+    }
+    assert select_left(snapshot(confirmation=card)).kind == "change"
+    [block] = change_blocks(card)
+    assert "Deepgram" in block.label
+    assert (block.before, block.after) == (
+        t("settings.presentation.secret.saved"),
+        t("settings.presentation.secret.none"),
+    )
+    assert applied_label(card["changes"]) == t(
+        "agent_chat.status.secret_deleted", label=block.label
+    )
+    [account] = change_blocks({"changes": {"accounts.chatgpt": False}, "previous": {}})
+    assert "ChatGPT" in account.label and account.before == ""
+    assert applied_label({"accounts.chatgpt": False}) == t(
+        "agent_chat.status.signed_out", label=account.label
+    )
+    [position] = change_blocks({"changes": {"overlay.desktop_position": "default"}, "previous": {}})
+    assert position.after == t("settings.presentation.desktop_position.default")
+    assert applied_label({"stt.provider": "soniox"}) == t(
+        "agent_chat.status.changed_one", label=setting_label("stt.provider", t)
+    )
+
+
+def test_control_app_progress_lines_come_from_the_requested_action():
+    working = snapshot(
+        busy=True, phase="working", active_tool=("control_app", "query.overlay.status")
+    )
+    overview = t("agent_chat.subject.overview")
+    assert active_status(working).text == t("agent_chat.status.check.active", subject=overview)
+    retrying = snapshot(busy=True, phase="working", active_tool=("control_app", "audio.retry"))
+    assert active_status(retrying).text == t("agent_chat.status.peer_retry.active")
+    results = (
+        AgentToolResult("a", "overlay.set", "applied", {}, "control_app"),
+        AgentToolResult("b", "query.app.status", "observed", {}, "control_app"),
+        AgentToolResult("c", "secrets.delete", "needs_confirmation", {}, "control_app"),
+        AgentToolResult("d", "models.retry", "failed", {}, "control_app"),
+    )
+    assert done_status(results) == " · ".join(
+        (
+            t("agent_chat.status.check.done", subject=overview),
+            t("agent_chat.status.overlay_toggle.done"),
+        )
+    )
+
+
 def test_progress_line_is_app_defined_and_never_model_text():
     working = snapshot(busy=True, phase="working", active_tool=("get_app_context", "diagnostics"))
     assert active_status(working).text == "최근 오류 확인 중"
@@ -120,15 +173,19 @@ def test_change_blocks_merge_coupled_settings_and_format_values():
         },
     }
     blocks = change_blocks(card)
-    assert [block.label for block in blocks] == [
-        "번역",
-        "자막 번역 표시",
-        "상대 음성 감지 민감도",
-        "상대 예상 언어",
+    fields = [
+        "translation",
+        "overlay.translation.enabled",
+        "peer_vad.speech_threshold",
+        "peer_expected_languages",
     ]
-    assert (blocks[1].before, blocks[1].after) == ("켜짐", "꺼짐")
-    assert (blocks[2].before, blocks[2].after) == ("50%", "35%")
-    assert (blocks[3].before, blocks[3].after) == ("0개", "3개")
+    assert [block.label for block in blocks] == [setting_label(field, t) for field in fields]
+    assert (blocks[1].before, blocks[1].after) == (
+        t("settings.option.on"),
+        t("settings.option.off"),
+    )
+    assert (blocks[2].before, blocks[2].after) == ("0.50", "0.35")
+    assert blocks[3].after == " · ".join(language_name(code) for code in ("en", "ja", "ko"))
     assert "translation.model" not in repr(blocks)
 
 
@@ -220,6 +277,12 @@ def test_history_groups_one_utterance_and_keeps_separate_utterances_apart():
         (False, None, ("어디에서 오셨어요?",), False),
         (True, "들려요?", (), True),
     ]
+
+
+def test_history_time_label_shows_hours_and_minutes_only():
+    seconds = replace(record("self", "u1", "안녕", "Hello"), timestamp_label="21:02:45")
+    minutes = record("peer", "p1", "Hi", None)
+    assert [row.time_label for row in history_rows([seconds, minutes])] == ["21:02", "21:02"]
 
 
 def test_history_joins_split_original_and_translation_records_of_one_utterance():

@@ -49,7 +49,7 @@ export function createDeployScenario(options: {
   try {
     database.exec('CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, applied_at TEXT DEFAULT CURRENT_TIMESTAMP)');
     for (const name of readdirSync(join(relayRoot, 'migrations')).filter((name) => name.endsWith('.sql')).sort()) {
-      if (options.pendingMigration && name === '0004_request_admission.sql') continue;
+      if (options.pendingMigration && name >= '0004_') continue;
       database.exec(readFileSync(join(relayRoot, 'migrations', name), 'utf8'));
       database.prepare('INSERT INTO d1_migrations (name) VALUES (?)').run(name);
     }

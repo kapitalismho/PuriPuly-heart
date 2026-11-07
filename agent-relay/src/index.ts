@@ -1,9 +1,9 @@
 import { authenticate, hasTokenSecret } from './auth';
-import { tools } from './bundle';
-import { outOfScopeInstructions, socialInstructions, workInstructions } from './instructions';
+import { contracts, contractFor, supportedProtocols } from './contracts';
+import { classifierInstructions, outOfScopeInstructions, socialInstructions, workInstructions } from './instructions';
 import { beforeAbort, requestLifetime } from './lifetime';
-import { agentProtocol, ClassifyRequest, isClassifyRequest, isRespondRequest, maxClassifyBytes, maxRespondBytes, readRequestJson, RespondRequest } from './requests';
-import { questions } from './scope';
+import { ClassifyRequest, isClassifyRequest, isRespondRequest, maxClassifyBytes, maxRespondBytes, readRequestJson, RespondRequest } from './requests';
+import { classifierQuestions } from './scope';
 import { receiveSupport, SupportEnv } from './support';
 import { responseStream } from './stream';
 import { isRecord } from './type-guards';
@@ -15,15 +15,21 @@ type Env = UsageEnv & SupportEnv & {
   AGENT_SERVICE_ENABLED?: string;
 };
 
-const workDeveloperMessage = {
+const developerMessage = (text: string) => ({
   role: 'developer',
-  content: [{ type: 'input_text', text: workInstructions, prompt_cache_breakpoint: { mode: 'explicit' } }],
-};
-const workOptions = {
-  tools,
-  reasoning: { effort: 'high' },
-  prompt_cache_options: { mode: 'implicit', ttl: '30m' },
-};
+  content: [{ type: 'input_text', text, prompt_cache_breakpoint: { mode: 'explicit' } }],
+});
+const prepared = new Map([...contracts].map(([protocol, contract]) => [protocol, {
+  classifierDeveloperMessage: developerMessage(classifierInstructions(contract)),
+  questions: classifierQuestions(contract),
+  workDeveloperMessage: developerMessage(workInstructions(contract)),
+  workOptions: {
+    tools: contract.tools,
+    reasoning: { effort: 'high' },
+    prompt_cache_options: { mode: 'implicit', ttl: '30m' },
+  },
+}]));
+const supported = supportedProtocols.join(', ');
 const socialOptions = { instructions: socialInstructions, tools: [], reasoning: { effort: 'low' } };
 const outOfScopeOptions = { instructions: outOfScopeInstructions, tools: [], reasoning: { effort: 'low' } };
 
@@ -73,11 +79,11 @@ export default {
       }
       return error(400, 'invalid_request', 'Send a valid agent response request.');
     }
-    if (!isRecord(body) || body.agent_protocol !== agentProtocol || body.turn_id === undefined) {
-      return error(400, 'unsupported_agent_protocol', `Update the app to use supported agent protocol ${agentProtocol}.`);
+    if (!isRecord(body) || !contractFor(body.agent_protocol) || body.turn_id === undefined) {
+      return error(400, 'unsupported_agent_protocol', `Update the app to use a supported agent protocol (${supported}).`);
     }
     if (!(classification ? isClassifyRequest(body) : isRespondRequest(body))) {
-      return error(400, 'invalid_request', `Use agent_protocol ${agentProtocol} and the supported classification or response fields only.`);
+      return error(400, 'invalid_request', `Use a supported agent_protocol (${supported}) and its classification or response fields only.`);
     }
     if (!env.OPENAI_API_KEY) {
       return error(503, 'service_shutdown', 'The assistant service is not configured. Try again later.');
@@ -97,22 +103,24 @@ export default {
       }
       return error(429, admission.error, 'The daily limit of 50 submitted prompts is reached for this UTC day. Settings, Cancel and the static guide remain available.');
     }
-    const { accounting } = admission;
+    const accounting = { ...admission.accounting, protocol: (body as ClassifyRequest | RespondRequest).agent_protocol };
     const input = (body as ClassifyRequest | RespondRequest).input;
+    const contract = prepared.get((body as ClassifyRequest | RespondRequest).agent_protocol)!;
     const responseBody = body as RespondRequest;
     const social = !classification && responseBody.route === 'social';
     const outOfScope = !classification && responseBody.route === 'out_of_scope';
     const noTools = social || outOfScope;
     const upstreamBody = classification ? {
       model: 'gpt-6-luna',
-      input,
+      input: [contract.classifierDeveloperMessage, ...input],
       safety_identifier: installation,
-      questions,
+      questions: contract.questions,
+      prompt_cache_options: { mode: 'explicit', ttl: '30m' },
     } : {
       model: 'gpt-6-luna',
       safety_identifier: installation,
-      ...(outOfScope ? outOfScopeOptions : social ? socialOptions : workOptions),
-      input: noTools ? input : [workDeveloperMessage, ...input],
+      ...(outOfScope ? outOfScopeOptions : social ? socialOptions : contract.workOptions),
+      input: noTools ? input : [contract.workDeveloperMessage, ...input],
       store: false,
       stream: true,
       parallel_tool_calls: !noTools,

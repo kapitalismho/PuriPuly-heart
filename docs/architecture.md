@@ -23,7 +23,7 @@ Paths below are navigation entry points, not an exhaustive class inventory.
 | Area | Responsibility | Entry points |
 | --- | --- | --- |
 | Application boundary | UI intents; typed control operations, queries, and mutation ordering | [UI boundary](../src/puripuly_heart/app/services/ui_application.py), [control owner](../src/puripuly_heart/app/services/application_control.py) |
-| Agent conversation | Conversation lifetime, app-context projection, and model tool dispatch | [Chat owner](../src/puripuly_heart/app/services/agent_chat/owner.py), [context adapter](../src/puripuly_heart/app/services/agent_chat/context.py) |
+| Agent conversation | Conversation lifetime, app-context projection, and model tool dispatch | [Chat owner](../src/puripuly_heart/app/services/agent_chat/owner.py), [context adapter](../src/puripuly_heart/app/services/agent_chat/context.py), [context modules](../src/puripuly_heart/app/services/agent_chat/modules.py) |
 | Local control host | Authenticated endpoint and instance lifetime | [Host](../src/puripuly_heart/cli/host.py), [instance ownership](../src/puripuly_heart/core/control_instance.py) |
 | Settings | Canonical intent, persistence, and runtime application coordination | [Persistence](../src/puripuly_heart/app/services/canonical_settings_persistence.py), [settings application](../src/puripuly_heart/app/services/settings/settings_application.py) |
 | Capture | Source authority, audio ordering, segmentation, and capture lifecycle | [Self](../src/puripuly_heart/core/runtime/self_capture.py), [Peer](../src/puripuly_heart/core/runtime/peer_channel.py) |
@@ -105,7 +105,7 @@ Behavior: [output runtime](../tests/core/runtime/test_output_runtime.py), [Self 
 
 ### Agent conversation
 
-- Python owns conversation lifetime and tool execution. The relay owns model requests, trusted instructions, and tool definitions; Broker supplies installation authentication. App and relay protocol changes require coordinated rollout.
+- Python owns conversation lifetime and tool execution. The relay owns model requests, trusted instructions, and tool definitions; Broker supplies installation authentication. The relay keeps serving supported app protocols; a contract change adds a protocol and reaches the relay before the app release.
 - App context is an allowlisted projection through the application control boundary. Tools use existing application owners and the current settings catalog; model output cannot expand their permissions.
 - Every settings change requires approval of the proposed values. The settings-tool owner queues coupled changes and advances after successful application. Cancellation discards unapproved work without undoing saved changes or cancelling accepted operations.
 - Only completed model responses admit tool calls. Generation fences reject interrupted text and late results. UI renders owner snapshots; active model context is bounded separately from the chat archive.

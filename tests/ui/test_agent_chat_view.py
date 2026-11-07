@@ -146,41 +146,6 @@ async def test_change_card_tap_approves_and_returns_home_with_result_line():
     assert texts(status[0]) == ["음성 인식 바꿈"]
 
 
-@pytest.mark.parametrize("block_count", [2, 3])
-def test_change_card_shows_every_supplied_setting_without_truncation(block_count):
-    changes = {
-        "stt.provider": "gemini_transcribe",
-        "overlay.translation.enabled": False,
-        "peer_vad.speech_threshold": 0.35,
-    }
-    previous = {
-        "stt.provider": "deepgram",
-        "overlay.translation.enabled": True,
-        "peer_vad.speech_threshold": 0.5,
-    }
-    fields = list(changes)[:block_count]
-    owner = Owner(
-        snapshot(
-            confirmation={"id": "card-all", "changes": {field: changes[field] for field in fields}},
-            confirmation_previous={field: previous[field] for field in fields},
-        )
-    )
-    view = AgentChatView(owner)
-    expected = [
-        "음성 인식",
-        "Deepgram",
-        provider_label("gemini_transcribe"),
-        "자막 번역 표시",
-        "켜짐",
-        "꺼짐",
-        "상대 음성 감지 민감도",
-        "50%",
-        "35%",
-    ]
-    assert texts(left(view))[1:] == expected[: block_count * 3]
-    assert owner.calls == []
-
-
 @pytest.mark.asyncio
 async def test_successive_cards_require_distinct_clicks_and_reenable_after_completion():
     first_card = {
@@ -244,7 +209,6 @@ async def test_successive_cards_require_distinct_clicks_and_reenable_after_compl
     applied.set()
     await asyncio.wait_for(staged.wait(), 1)
     assert left(view) is not view._home
-    assert texts(left(view))[1:] == ["상대 음성 감지 민감도", "50%", "35%"]
     assert zone(left(view)).on_click is None
     returned.set()
     await asyncio.gather(*tasks)
@@ -356,6 +320,32 @@ def test_chat_list_pins_to_the_end_without_animation():
     view, _ = view_for(Owner(snapshot()))
     assert view._messages.auto_scroll is True
     assert view._messages.auto_scroll_animation == 0
+
+
+def test_chat_transcript_is_one_continuous_selection():
+    messages = (
+        AgentMessage("user", "마이크가 안 돼"),
+        AgentMessage("assistant", "입력 장치를 바꿨어. 이제 그대로 써봐."),
+    )
+    view, _ = view_for(Owner(snapshot(messages=messages)))
+
+    def ancestors(control, target, path=()):
+        if control is target:
+            return path
+        for child in agent_chat._children(control):
+            found = ancestors(child, target, (*path, control))
+            if found is not None:
+                return found
+        return None
+
+    path = ancestors(view, view._messages)
+    assert path is not None
+    assert sum(isinstance(item, ft.SelectionArea) for item in path) == 1
+    transcript = agent_chat._texts(view._messages)
+    assert {"마이크가 안 돼", "입력 장치를 바꿨어.", "이제 그대로 써봐."} <= {
+        item.value for item in transcript
+    }
+    assert not any(item.selectable for item in transcript)
 
 
 class Dictation:

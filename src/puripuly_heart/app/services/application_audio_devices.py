@@ -32,6 +32,8 @@ def safe_audio_device_label(value: object) -> str:
     if not isinstance(value, str):
         return ""
     text = "".join(character for character in value if character.isprintable()).strip()[:160]
+    if not text:
+        return ""
     return redact_text_for_sink(text, DIAGNOSTIC_SINK_PERSISTED_LOGS).text or ""
 
 

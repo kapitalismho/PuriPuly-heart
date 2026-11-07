@@ -1,10 +1,8 @@
-import { tools } from './bundle';
+import { Contract, contractFor } from './contracts';
 import { isRecord } from './type-guards';
 
-export const agentProtocol = 4;
-
 export type RespondRequest = {
-  agent_protocol: typeof agentProtocol;
+  agent_protocol: number;
   turn_id: string;
   input: Record<string, unknown>[];
   effort: 'low' | 'high' | 'xhigh';
@@ -13,7 +11,7 @@ export type RespondRequest = {
 };
 
 export type ClassifyRequest = {
-  agent_protocol: typeof agentProtocol;
+  agent_protocol: number;
   turn_id: string;
   input: { role: 'user'; content: string }[];
 };
@@ -45,7 +43,7 @@ function contentPart(value: unknown, role: unknown): boolean {
     && (value.logprobs === undefined || value.logprobs === null || Array.isArray(value.logprobs));
 }
 
-function inputItem(value: Record<string, unknown>): boolean {
+function inputItem(value: Record<string, unknown>, contract: Contract): boolean {
   if (value.type === undefined || value.type === 'message') {
     return only(value, ['type', 'role', 'content', 'id', 'status', 'phase'])
       && ['user', 'assistant'].includes(value.role as string)
@@ -69,7 +67,7 @@ function inputItem(value: Record<string, unknown>): boolean {
       && optionalString(value.id) && status(value.status)
       && (value.namespace === undefined || value.namespace === null)
       && typeof value.call_id === 'string' && value.call_id.length > 0
-      && tools.some((tool) => tool.name === value.name) && typeof value.arguments === 'string';
+      && contract.tools.some((tool) => tool.name === value.name) && typeof value.arguments === 'string';
   }
   return value.type === 'function_call_output'
     && only(value, ['id', 'type', 'call_id', 'output', 'status'])
@@ -79,15 +77,16 @@ function inputItem(value: Record<string, unknown>): boolean {
 
 export function isClassifyRequest(value: unknown): value is ClassifyRequest {
   return isRecord(value) && only(value, ['agent_protocol', 'turn_id', 'input'])
-    && value.agent_protocol === agentProtocol && typeof value.turn_id === 'string' && /^[0-9a-f]{32}$/.test(value.turn_id)
+    && contractFor(value.agent_protocol) !== undefined && typeof value.turn_id === 'string' && /^[0-9a-f]{32}$/.test(value.turn_id)
     && Array.isArray(value.input) && value.input.length === 1
     && value.input.every((item: unknown) => isRecord(item) && only(item, ['role', 'content'])
       && item.role === 'user' && typeof item.content === 'string');
 }
 
 export function isRespondRequest(value: unknown): value is RespondRequest {
-  if (!isRecord(value) || !only(value, ['agent_protocol', 'turn_id', 'input', 'effort', 'route', 'allow_tools'])
-    || value.agent_protocol !== agentProtocol || typeof value.turn_id !== 'string' || !/^[0-9a-f]{32}$/.test(value.turn_id)
+  if (!isRecord(value) || !only(value, ['agent_protocol', 'turn_id', 'input', 'effort', 'route', 'allow_tools'])) return false;
+  const contract = contractFor(value.agent_protocol);
+  if (!contract || typeof value.turn_id !== 'string' || !/^[0-9a-f]{32}$/.test(value.turn_id)
     || !effort(value.effort)
     || !['work', 'social', 'out_of_scope', 'unclear'].includes(value.route as string)
     || typeof value.allow_tools !== 'boolean' || !Array.isArray(value.input)) return false;
@@ -99,7 +98,7 @@ export function isRespondRequest(value: unknown): value is RespondRequest {
       if (!work || !only(item, ['type', 'reasoning']) || !isRecord(item.reasoning)
         || !only(item.reasoning, ['effort']) || !effort(item.reasoning.effort)) return false;
       selectedEffort = item.reasoning.effort;
-    } else if (!inputItem(item)) return false;
+    } else if (!inputItem(item, contract)) return false;
   }
   if (work) return selectedEffort === value.effort;
   return value.route !== 'out_of_scope' || (value.input.length === 1

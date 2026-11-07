@@ -588,8 +588,10 @@ def _local_diagnostics_observed(calls: list[dict]) -> bool:
                 if isinstance(value, dict)
                 else None
             )
-            if isinstance(context, dict) and any(
-                key in context for key in ("recent_diagnostics", "diagnostics_availability")
+            if (
+                isinstance(context, dict)
+                and isinstance(context.get("core"), dict)
+                and "diagnostics" in context["core"]
             ):
                 return True
         if any(

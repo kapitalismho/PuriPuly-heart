@@ -653,7 +653,7 @@ def test_pending_paid_refusal_requires_matching_observed_completion_and_unchange
 
 
 def report_evidence_calls(*, inspection_first=True, source="initial_context"):
-    context = {"diagnostics_availability": {"history": "query_failed"}}
+    context = {"core": {"diagnostics": {"availability": {"history": "query_failed"}}}}
     if source == "tool_result":
         observed_input = [
             {

@@ -4,6 +4,11 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import Literal
 
+from puripuly_heart.app.control_presentation import (
+    command_field_kind,
+    setting_label,
+    setting_value_text,
+)
 from puripuly_heart.app.ports.agent_chat import (
     AgentChatSnapshot,
     AgentReportOffer,
@@ -12,7 +17,7 @@ from puripuly_heart.app.ports.agent_chat import (
     AgentToolResult,
 )
 from puripuly_heart.app.services.agent_chat.presentation import completed_sentences
-from puripuly_heart.ui.i18n import language_name, provider_label, t
+from puripuly_heart.ui.i18n import t
 
 APP_NOTICE_PREFIX = "[app notice]"
 MANUAL_RESET = "새 대화로 시작했어요"
@@ -22,8 +27,10 @@ LONG_TEXT_LIMIT = 24
 
 _CONTEXT_SUBJECT_KEYS = {
     "overview": "agent_chat.subject.overview",
-    "settings": "agent_chat.subject.settings",
+    "recognition": "agent_chat.subject.recognition",
     "translation": "agent_chat.subject.translation",
+    "languages": "agent_chat.subject.languages",
+    "general": "agent_chat.subject.general",
     "output": "agent_chat.subject.output",
     "audio": "agent_chat.subject.audio",
     "accounts": "agent_chat.subject.accounts",
@@ -41,6 +48,19 @@ _TOOL_STATUS_KEYS = {
     "set_capture": "agent_chat.status.capture",
     "set_translation": "agent_chat.status.translation_toggle",
 }
+_CONTROL_STATUS_KEYS = {
+    "overlay.set": "agent_chat.status.overlay_toggle",
+    "audio.retry": "agent_chat.status.peer_retry",
+    "models.retry": "agent_chat.status.gpu_retry",
+    "secrets.delete": "agent_chat.status.change_settings",
+    "auth.logout": "agent_chat.status.change_settings",
+    "overlay.position.reset": "agent_chat.status.change_settings",
+}
+_COMMAND_DONE_KEYS = {
+    "secret": "agent_chat.status.secret_deleted",
+    "account": "agent_chat.status.signed_out",
+    "position": "agent_chat.status.position_reset",
+}
 _QUIET_TOOLS = frozenset({"withdraw_confirmation", "propose_report"})
 _NOT_DONE_STATUSES = frozenset(
     {
@@ -54,45 +74,6 @@ _NOT_DONE_STATUSES = frozenset(
         "withdrawn",
         "pending",
         "action_required",
-    }
-)
-
-_FIELD_LABEL_KEYS = {
-    "locale": "agent_chat.field.locale",
-    "audio": "agent_chat.field.microphone",
-    "peer_expected_languages": "agent_chat.field.peer_expected_languages",
-    "self_vad.speech_threshold": "agent_chat.field.self_vad_threshold",
-    "peer_vad.speech_threshold": "agent_chat.field.peer_vad_threshold",
-    "peer_vad.hangover_ms": "agent_chat.field.peer_vad_hangover",
-    "peer_vad.pre_roll_ms": "agent_chat.field.peer_vad_pre_roll",
-    "overlay.target": "agent_chat.field.overlay_target",
-    "overlay.translation.enabled": "agent_chat.field.overlay_translation",
-    "overlay.peer_original.enabled": "agent_chat.field.overlay_peer_original",
-    "overlay.background_alpha": "agent_chat.field.overlay_background",
-    "overlay.swap_caption_languages": "agent_chat.field.overlay_swap",
-    "stt.provider": "agent_chat.field.self_recognition",
-    "stt.cloud_free_tier_providers": "agent_chat.field.free_recognition",
-    "peer_stt.provider": "agent_chat.field.peer_recognition",
-    "translation": "agent_chat.field.translation",
-    "languages.source": "agent_chat.field.source_language",
-    "languages.target": "agent_chat.field.target_language",
-    "languages.secondary_target": "agent_chat.field.secondary_target_language",
-    "languages.peer_source": "agent_chat.field.peer_source_language",
-    "languages.peer_target": "agent_chat.field.peer_target_language",
-    "languages.peer_source_mode": "agent_chat.field.peer_source_mode",
-}
-_PERCENT_FIELDS = frozenset(
-    {"self_vad.speech_threshold", "peer_vad.speech_threshold", "overlay.background_alpha"}
-)
-_MS_FIELDS = frozenset({"peer_vad.hangover_ms", "peer_vad.pre_roll_ms"})
-_PROVIDER_FIELDS = frozenset({"stt.provider", "peer_stt.provider"})
-_LANGUAGE_FIELDS = frozenset(
-    {
-        "languages.source",
-        "languages.target",
-        "languages.secondary_target",
-        "languages.peer_source",
-        "languages.peer_target",
     }
 )
 
@@ -141,12 +122,19 @@ def tool_label(result: AgentToolResult | tuple[str, str | None], *, done: bool) 
     if tool in _QUIET_TOOLS:
         return None
     suffix = "done" if done else "active"
-    if tool == "get_app_context":
+    if tool == "get_app_context" or tool == "control_app" and (topic or "").startswith("query."):
+        context_topic = topic if tool == "get_app_context" else None
         subject = t(
-            _CONTEXT_SUBJECT_KEYS.get(topic or "overview", _CONTEXT_SUBJECT_KEYS["overview"])
+            _CONTEXT_SUBJECT_KEYS.get(
+                context_topic or "overview", _CONTEXT_SUBJECT_KEYS["overview"]
+            )
         )
         return t(f"agent_chat.status.check.{suffix}", subject=subject)
-    key = _TOOL_STATUS_KEYS.get(tool)
+    key = (
+        _CONTROL_STATUS_KEYS.get(topic or "")
+        if tool == "control_app"
+        else _TOOL_STATUS_KEYS.get(tool)
+    )
     return t(f"{key}.{suffix}") if key is not None else None
 
 
@@ -170,11 +158,12 @@ def done_status(results: Sequence[AgentToolResult]) -> str | None:
     for result in results:
         if result.status in _NOT_DONE_STATUSES or result.tool in _QUIET_TOOLS:
             continue
-        if result.tool == "get_app_context":
+        if result.tool == "get_app_context" or (
+            result.tool == "control_app" and (result.topic or "").startswith("query.")
+        ):
+            topic = result.topic if result.tool == "get_app_context" else None
             subject = t(
-                _CONTEXT_SUBJECT_KEYS.get(
-                    result.topic or "overview", _CONTEXT_SUBJECT_KEYS["overview"]
-                )
+                _CONTEXT_SUBJECT_KEYS.get(topic or "overview", _CONTEXT_SUBJECT_KEYS["overview"])
             )
             if subject not in subjects:
                 subjects.append(subject)
@@ -197,31 +186,18 @@ def applied_label(changes: dict) -> str | None:
     labels = [block.label for block in change_blocks({"changes": changes, "previous": {}})]
     if not labels:
         return None
+    kind = command_field_kind(next(iter(changes))) if len(changes) == 1 else None
+    if kind is not None:
+        return t(_COMMAND_DONE_KEYS[kind], label=labels[0])
     if len(labels) == 1:
         return t("agent_chat.status.changed_one", label=labels[0])
     return t("agent_chat.status.changed_many", label=labels[0], count=len(labels) - 1)
 
 
-def _value_text(field: str, value: object) -> tuple[str, bool]:
-    if value is None or value == "":
-        return t("agent_chat.value.none"), False
-    if isinstance(value, bool):
-        return t("agent_chat.value.on" if value else "agent_chat.value.off"), False
-    if field in _PERCENT_FIELDS and isinstance(value, int | float):
-        return f"{round(float(value) * 100)}%", False
-    if field in _MS_FIELDS and isinstance(value, int | float):
-        return f"{int(value)}ms", False
-    if field in _PROVIDER_FIELDS and isinstance(value, str):
-        return provider_label(value), False
-    if field in _LANGUAGE_FIELDS and isinstance(value, str):
-        return language_name(value), False
-    if field == "locale" and isinstance(value, str):
-        return t(f"locale.{value}", default=value), False
-    if isinstance(value, list | tuple):
-        return t("agent_chat.value.count", count=len(value)), False
-    if isinstance(value, dict):
-        return t("agent_chat.value.count", count=len(value)), False
-    text = str(value)
+def _value_text(
+    field: str, value: object, labels: dict[str, str] | None = None
+) -> tuple[str, bool]:
+    text = setting_value_text(field, value, t, choice_labels=labels)
     return text, len(text) > LONG_TEXT_LIMIT
 
 
@@ -230,9 +206,9 @@ def _translation_value(change: dict) -> str:
     connection = change.get("translation.connection")
     parts = []
     if isinstance(model, str):
-        parts.append(t(f"provider.{model}", default=model))
+        parts.append(setting_value_text("translation.model", model, t))
     if isinstance(connection, str):
-        parts.append(t(f"settings.translation_connection.{connection}", default=connection))
+        parts.append(setting_value_text("translation.connection", connection, t))
     return " · ".join(parts) or t("agent_chat.value.none")
 
 
@@ -242,20 +218,33 @@ def _audio_value(change: dict) -> str:
     if isinstance(device, str) and device:
         return device
     if isinstance(host, str) and host:
-        return host
+        return setting_value_text("audio.input_host_api", host, t)
     return t("agent_chat.value.default_device")
 
 
 def change_blocks(card: dict) -> list[ChangeBlock]:
     changes = card.get("changes") or {}
     previous = card.get("previous") or {}
+    presentation = card.get("presentation") or {}
+
+    def labels_for(field: str) -> dict[str, str]:
+        metadata = presentation.get(field, {})
+        choices = metadata.get("choices") or []
+        if not isinstance(choices, list):
+            return {}
+        return {
+            str(item["value"]): item["label"]
+            for item in choices
+            if isinstance(item, dict) and "value" in item and isinstance(item.get("label"), str)
+        }
+
     blocks: list[ChangeBlock] = []
     if not isinstance(changes, dict):
         return blocks
     if "translation.model" in changes or "translation.connection" in changes:
         blocks.append(
             ChangeBlock(
-                t(_FIELD_LABEL_KEYS["translation"]),
+                setting_label("translation", t),
                 _translation_value(previous) if previous else "",
                 _translation_value(changes),
             )
@@ -263,13 +252,18 @@ def change_blocks(card: dict) -> list[ChangeBlock]:
     if "audio.input_host_api" in changes or "audio.input_device" in changes:
         blocks.append(
             ChangeBlock(
-                t(_FIELD_LABEL_KEYS["audio"]),
+                setting_label("audio", t),
                 _audio_value(previous) if previous else "",
                 _audio_value(changes),
             )
         )
     for field, value in changes.items():
-        if field.startswith(("translation.", "audio.")):
+        if field in {
+            "translation.model",
+            "translation.connection",
+            "audio.input_host_api",
+            "audio.input_device",
+        }:
             continue
         if field == "languages" and isinstance(value, dict):
             before_languages = (
@@ -277,23 +271,23 @@ def change_blocks(card: dict) -> list[ChangeBlock]:
             )
             for name, language in value.items():
                 path = f"languages.{name}"
-                label_key = _FIELD_LABEL_KEYS.get(path)
-                if label_key is None:
-                    continue
-                after, _ = _value_text(path, language)
+                label = setting_label(path, t)
+                after, _ = _value_text(path, language, labels_for(path))
                 before = (
-                    _value_text(path, before_languages[name])[0] if name in before_languages else ""
+                    _value_text(path, before_languages[name], labels_for(path))[0]
+                    if name in before_languages
+                    else ""
                 )
-                blocks.append(ChangeBlock(t(label_key), before, after))
+                blocks.append(ChangeBlock(label, before, after))
             continue
-        label_key = _FIELD_LABEL_KEYS.get(field)
-        if label_key is None:
-            continue
-        after, long_text = _value_text(field, value)
-        before = _value_text(field, previous[field])[0] if field in previous else ""
+        label = setting_label(field, t)
+        after, long_text = _value_text(field, value, labels_for(field))
+        before = (
+            _value_text(field, previous[field], labels_for(field))[0] if field in previous else ""
+        )
         if long_text and field in previous and previous[field] in (None, ""):
             before = t("agent_chat.value.default")
-        blocks.append(ChangeBlock(t(label_key), before, after, long_text))
+        blocks.append(ChangeBlock(label, before, after, long_text))
     return blocks
 
 
@@ -467,6 +461,11 @@ class HistoryRow:
     key: str = ""
 
 
+def _minute_label(label: str) -> str:
+    parts = label.split(":")
+    return ":".join(parts[:2]) if len(parts) == 3 else label
+
+
 def history_rows(records: Sequence[object]) -> list[HistoryRow]:
     groups: dict[object, dict] = {}
     for position, record in enumerate(records):
@@ -484,7 +483,7 @@ def history_rows(records: Sequence[object]) -> list[HistoryRow]:
                 "translations": [],
                 "translation_languages": [],
                 "failed": False,
-                "time": getattr(record, "timestamp_label", "") or "",
+                "time": _minute_label(getattr(record, "timestamp_label", "") or ""),
                 "key": ":".join(str(part) for part in key),
             },
         )

@@ -675,6 +675,33 @@ def test_input_and_hint_keep_each_language_typeface(
     assert card._input_field.text_style.letter_spacing == 0.4
 
 
+@pytest.mark.parametrize(
+    ("input_font", "input_spacing"),
+    [("MPLUSRounded1c", 0.5), ("ResourceHanRoundedCN", 0.4), ("NanumSquareRound", None)],
+)
+def test_hint_does_not_inherit_input_language_typeface(
+    monkeypatch: pytest.MonkeyPatch,
+    input_font: str,
+    input_spacing: float | None,
+) -> None:
+    card = DisplayCard(on_submit=lambda _text: None)
+    monkeypatch.setattr(type(card._input_field), "update", lambda self: None)
+    _mute_display_updates(monkeypatch, card)
+
+    for display_font in ("NanumSquareRound", None):
+        card.apply_locale(
+            display_font_family=display_font,
+            input_font_family="NanumSquareRound",
+            display_letter_spacing=None,
+            input_letter_spacing=None,
+        )
+        card.set_input_font(input_font, letter_spacing=input_spacing)
+
+        hint = card._input_field.hint_style
+        assert hint.font_family == (display_font or "")
+        assert hint.letter_spacing == 0
+
+
 def test_display_updates_preserve_unsubmitted_input(monkeypatch: pytest.MonkeyPatch) -> None:
     submitted: list[str] = []
     card = DisplayCard(on_submit=submitted.append)

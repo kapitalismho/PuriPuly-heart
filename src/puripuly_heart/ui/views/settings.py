@@ -16,6 +16,7 @@ from typing import Awaitable, Callable, Mapping
 
 import flet as ft
 
+from puripuly_heart.app.control_presentation import setting_value_text
 from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretKey,
@@ -580,9 +581,7 @@ class SettingsView(ft.Column):
             for field in self._api_keys_column.controls
             if isinstance(field, ApiKeyField)
             and field.bind_verification_completion(
-                callback
-                if callback is not None and callable(self.on_verify_api_key)
-                else None
+                callback if callback is not None and callable(self.on_verify_api_key) else None
             )
         )
         return self._verification_providers
@@ -3735,9 +3734,13 @@ class SettingsView(ft.Column):
 
         # VAD
         self._vad_slider.value = general.self_vad_speech_threshold
-        self._vad_slider.label = f"{general.self_vad_speech_threshold:.2f}"
+        self._vad_slider.label = setting_value_text(
+            "self_vad.speech_threshold", general.self_vad_speech_threshold, t
+        )
         self._peer_vad_slider.value = general.peer_vad_speech_threshold
-        self._peer_vad_slider.label = f"{general.peer_vad_speech_threshold:.2f}"
+        self._peer_vad_slider.label = setting_value_text(
+            "peer_vad.speech_threshold", general.peer_vad_speech_threshold, t
+        )
         self._vrc_mic_text.content.value = t(
             "settings.vrc_mic.on" if general.vrc_mic_intercept else "settings.vrc_mic.off"
         )
@@ -5644,8 +5647,7 @@ class SettingsView(ft.Column):
 
     def _desktop_overlay_background_alpha_label_for(self, value: object) -> str:
         alpha = self._normalize_desktop_overlay_background_alpha(value)
-        transparency = 1.0 - alpha
-        return f"{int(round(transparency * 100))}%"
+        return setting_value_text("overlay.background_alpha", alpha, t)
 
     def _desktop_overlay_size_label_for(self, size_preset: object) -> str:
         normalized = self._normalize_desktop_overlay_size_preset(size_preset)

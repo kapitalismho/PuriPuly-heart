@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
+from puripuly_heart.app.control_presentation import SETTINGS_PRESENTATION
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.managed_gemma_translation import ManagedGemmaTranslationSelection
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretValuesSnapshot
@@ -508,6 +509,31 @@ def _json(
     if isinstance(value, (str, bool, int, float)) or value is None:
         return value
     return str(value)
+
+
+def _private_settings_presence(canonical: object | None) -> dict[str, bool]:
+    if canonical is None:
+        return {}
+    intent = canonical_snapshot_values(canonical)["intent"]
+    result = {}
+    for name, descriptor in SETTINGS_PRESENTATION.items():
+        if not descriptor.local_only:
+            continue
+        if name == "custom_vocabulary":
+            result[name] = any(bool(terms) for terms in intent["stt"]["custom_terms"].values())
+            continue
+        path = (
+            "prompts.system_prompt_override"
+            if name == "prompts.value"
+            else descriptor.canonical_path
+        )
+        if path is None:
+            continue
+        value = intent
+        for part in path.split("."):
+            value = value[part]
+        result[name] = bool(value)
+    return result
 
 
 def _redact(value: object) -> object:
@@ -1040,7 +1066,11 @@ class ApplicationControlOwner:
         gpu_owner = self.gpu()
         gpu_snapshot = getattr(gpu_owner, "snapshot", None)
         gpu_devices = [
-            {"value": str(device.device_id), "available": True}
+            {
+                "value": str(device.device_id),
+                "display_name": device.description.strip() or device.name,
+                "available": True,
+            }
             for device in getattr(gpu_snapshot, "devices", ())
         ]
         gpu_device_ids = {item["value"] for item in gpu_devices}
@@ -1455,6 +1485,7 @@ class ApplicationControlOwner:
         if name == "settings.current":
             return {
                 **base,
+                "private_presence": _private_settings_presence(canonical),
                 "settings": (
                     _redact(canonical_snapshot_values(canonical)) if canonical is not None else None
                 ),

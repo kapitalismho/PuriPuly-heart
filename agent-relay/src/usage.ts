@@ -25,6 +25,7 @@ export type Accounting = {
   owner: string;
   finalAdmission: boolean;
   deadline: number;
+  protocol?: number;
 };
 type AdmissionError = 'service_allowance_exhausted' | 'service_turn_exhausted' | 'service_busy';
 export type Admission = { accounting: Accounting } | { error: AdmissionError };
@@ -138,7 +139,7 @@ export async function recordUsage(accounting: Accounting, result: unknown, class
   const cost = (usage.uncached * rates.input + usage.read * rates.cache_read + usage.write * rates.cache_write
     + usage.output * (classification ? rates.decisions_output : rates.responses_output)) / 1_000_000;
   if (!Number.isFinite(cost)) throw new Error('accounting_unavailable');
-  const written = await accounting.db.batch([accounting.db.prepare(`
+  const statements = [accounting.db.prepare(`
     INSERT INTO usage_daily (installation_hash, utc_date, uncached_input_tokens, cache_read_tokens, cache_write_tokens,
       decisions_output_tokens, responses_output_tokens, decisions_calls, responses_calls, missing_usage_count, cost_usd)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -154,8 +155,15 @@ export async function recordUsage(accounting: Accounting, result: unknown, class
       cost_usd = cost_usd + excluded.cost_usd
   `).bind(accounting.installation, accounting.day, usage.uncached, usage.read, usage.write,
     classification ? usage.output : 0, classification ? 0 : usage.output,
-    classification ? 1 : 0, classification ? 0 : 1, usage.missing, cost),
-  accounting.db.prepare('DELETE FROM request_slots WHERE installation_hash = ? AND slot < 2 AND owner = ?')
-    .bind(accounting.installation, accounting.owner)]);
-  if (written.length !== 2 || written.some((result) => !result.success)) throw new Error('accounting_unavailable');
+    classification ? 1 : 0, classification ? 0 : 1, usage.missing, cost)];
+  if (accounting.protocol !== undefined) {
+    statements.push(accounting.db.prepare(`
+      INSERT INTO protocol_daily (installation_hash, utc_date, agent_protocol, requests) VALUES (?, ?, ?, 1)
+      ON CONFLICT(installation_hash, utc_date, agent_protocol) DO UPDATE SET requests = requests + 1
+    `).bind(accounting.installation, accounting.day, accounting.protocol));
+  }
+  statements.push(accounting.db.prepare('DELETE FROM request_slots WHERE installation_hash = ? AND slot < 2 AND owner = ?')
+    .bind(accounting.installation, accounting.owner));
+  const written = await accounting.db.batch(statements);
+  if (written.length !== statements.length || written.some((result) => !result.success)) throw new Error('accounting_unavailable');
 }

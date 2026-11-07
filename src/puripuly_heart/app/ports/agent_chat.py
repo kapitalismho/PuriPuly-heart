@@ -4,11 +4,12 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol, TypedDict
 
-AGENT_CHAT_PROTOCOL = 4
+AGENT_CHAT_PROTOCOL = 5
 
 AgentEffort = Literal["low", "high", "xhigh"]
 AgentRoute = Literal["work", "social", "out_of_scope", "unclear"]
 AgentDecisionEntry = Literal["message", "error", "notice"]
+AgentContextMode = Literal["selected", "full"]
 AgentReportStatus = Literal[
     "pending", "offered", "rejected", "cancelled", "sending", "sent", "failed"
 ]

@@ -4,7 +4,7 @@ import relay from '../src/index';
 import { authHeaders, installationHash, responseEvents, testEnv, turnId } from './fixtures';
 
 const env = testEnv();
-const body = { agent_protocol: 4, turn_id: turnId, input: [{ role: 'user', content: '{"current_message":"synthetic request","recent_messages":[],"active_task":null,"last_puri_action":null}' }] };
+const body = { agent_protocol: 5, turn_id: turnId, input: [{ role: 'user', content: '{"current_message":"synthetic request","recent_messages":[],"active_task":null,"previous_modules":[],"last_puri_action":null}' }] };
 
 function request(value: unknown = body, path = '/v1/classify', host = 'http://127.0.0.1'): Request {
   return new Request(`${host}${path}`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(value) });
@@ -13,7 +13,7 @@ function request(value: unknown = body, path = '/v1/classify', host = 'http://12
 afterEach(() => vi.restoreAllMocks());
 
 describe('entry classification relay', () => {
-  it('makes one native Decisions request with only two named choice questions and passes native answers through', async () => {
+  it('makes one native Decisions request with server-owned route, effort and context questions and passes native answers through', async () => {
     const returned = { model: 'gpt-6-luna', answers: [
       { type: 'choice', name: 'effort', choice: 'xhigh' },
       { type: 'choice', name: 'route', choice: 'work' },
@@ -27,15 +27,56 @@ describe('entry classification relay', () => {
     const [url, init] = fetch.mock.calls[0];
     expect(url).toBe('https://api.openai.com/v1/decisions');
     const sent = JSON.parse(init?.body as string);
-    expect(Object.keys(sent).sort()).toEqual(['input', 'model', 'questions', 'safety_identifier']);
+    expect(Object.keys(sent).sort()).toEqual(['input', 'model', 'prompt_cache_options', 'questions', 'safety_identifier']);
     expect(sent.safety_identifier).toBe(installationHash);
     expect(sent.model).toBe('gpt-6-luna');
-    expect(sent.input).toEqual(body.input);
+    expect(sent.prompt_cache_options).toEqual({ mode: 'explicit', ttl: '30m' });
+    expect(sent.input).toHaveLength(2);
+    expect(sent.input.slice(1)).toEqual(body.input);
+    const [policy] = sent.input;
+    expect(policy.role).toBe('developer');
+    expect(policy.content).toHaveLength(1);
+    expect(policy.content[0]).toMatchObject({ type: 'input_text', prompt_cache_breakpoint: { mode: 'explicit' } });
+    for (const heading of ['## Input', '## Route', '## Effort', '## Context modules', '## Task relation']) {
+      expect(policy.content[0].text).toContain(heading);
+    }
+    for (const module of ['audio', 'recognition', 'translation', 'accounts', 'languages', 'output', 'general']) {
+      expect(policy.content[0].text).toContain(`- ${module}: `);
+    }
+    expect(policy.content[0].text).not.toContain('{{');
     expect(sent.questions.map(({ name, type }: { name: string; type: string }) => ({ name, type }))).toEqual([
       { name: 'route', type: 'choice' }, { name: 'effort', type: 'choice' },
+      { name: 'context_audio', type: 'choice' }, { name: 'context_recognition', type: 'choice' },
+      { name: 'context_translation', type: 'choice' }, { name: 'context_accounts', type: 'choice' },
+      { name: 'context_languages', type: 'choice' }, { name: 'context_output', type: 'choice' },
+      { name: 'context_general', type: 'choice' }, { name: 'context_relation', type: 'choice' },
     ]);
     expect(sent.questions[0].choices.map(({ value }: { value: string }) => value)).toEqual(['work', 'social', 'out_of_scope', 'unclear']);
     expect(sent.questions[1].choices.map(({ value }: { value: string }) => value)).toEqual(['low', 'high', 'xhigh']);
+    for (const question of sent.questions.slice(2, -1)) {
+      expect(question.choices.map(({ value }: { value: string }) => value)).toEqual(['include', 'omit', 'unclear']);
+    }
+    expect(sent.questions.at(-1).choices.map(({ value }: { value: string }) => value)).toEqual(['new', 'continue', 'unclear']);
+  });
+
+  it('keeps every fixed classifier rule in one identical cacheable prefix rather than in uncached questions', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ answers: [], usage: { input_tokens: 1, output_tokens: 0 } }));
+    const other = { ...body, input: [{ role: 'user', content: '{"current_message":"다른 합성 요청","recent_messages":[{"role":"assistant","content":"synthetic"}],"active_task":"synthetic task","previous_modules":["core","audio"],"last_puri_action":null}' }] };
+    expect((await relay.fetch(request(), env)).status).toBe(200);
+    expect((await relay.fetch(request(other), env)).status).toBe(200);
+    const [first, second] = fetch.mock.calls.map(([, init]) => JSON.parse(init?.body as string));
+    expect(second.input[0]).toEqual(first.input[0]);
+    expect(second.questions).toEqual(first.questions);
+    expect(second.input.slice(1)).toEqual(other.input);
+    const policy = first.input[0].content[0].text as string;
+    for (const question of first.questions) {
+      const section = /by the (.+) section\.$/.exec(question.instructions)?.[1];
+      expect(policy).toContain(`\n## ${section}\n`);
+      for (const choice of question.choices) {
+        expect(Object.keys(choice)).toEqual(['value']);
+        expect(policy).toContain(`\n- ${choice.value}: `);
+      }
+    }
   });
 
   it('requires authentication and rejects protocol or client configuration overrides without an upstream call', async () => {

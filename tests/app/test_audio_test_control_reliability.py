@@ -35,7 +35,7 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureTargetStatus,
 )
 from puripuly_heart.core.self_capture import SelfCaptureAdmission, SelfCaptureAdmissionStatus
-from tests.app.test_agent_chat import Responses, answer, tool
+from tests.app.test_agent_chat import Responses, answer, context_of, tool
 from tests.app.test_audio_test_session_owner import CaptureControl, FeedSource, LoudnessEngine
 from tests.app.test_audio_test_sources import Resolver, _route
 from tests.core.runtime.test_self_capture_session import build_owner
@@ -905,7 +905,9 @@ async def test_paid_route_requires_current_user_card_before_real_settings_persis
         emit_event=lambda _event: False,
     )
     try:
-        context = await collect_agent_context(control, activity=AgentActivity(), topic="settings")
+        context = await collect_agent_context(
+            control, activity=AgentActivity(), topic="translation"
+        )
         tools.observe_context(context)
         changes = {"translation.model": "gpt_6_luna", "translation.connection": "official_byok"}
         proposed = await tools.execute("change_settings", {"changes": changes})
@@ -966,6 +968,10 @@ async def test_agent_readonly_context_observes_real_encrypted_store_without_rele
     events = tuple(control.events.history)
     transport = Responses(
         {"status": "completed", "output": [tool("audio", arguments='{"topic":"audio"}')]},
+        {
+            "status": "completed",
+            "output": [tool("translation", arguments='{"topic":"translation"}')],
+        },
         {"status": "completed", "output": [tool("accounts", arguments='{"topic":"accounts"}')]},
         answer("Read-only application evidence."),
     )
@@ -974,14 +980,10 @@ async def test_agent_readonly_context_observes_real_encrypted_store_without_rele
     try:
         result = await owner.send("Inspect the synthetic audio and account state without changes.")
         assert result.status == "completed"
-        outputs = {
-            item["call_id"]: json.loads(item["output"])["context"]
-            for item in transport.requests[-1]["input"]
-            if item.get("type") == "function_call_output"
-        }
-        assert outputs["audio"]["secret_presence"]["openai_api_key"] is True
-        assert outputs["audio"]["audio"]["microphones"][0]["input_device"] == "Synthetic input"
-        assert outputs["accounts"]["accounts"]["chatgpt"]["signed_in"] is not True
+        context = context_of(transport.requests[-1])
+        assert context["translation"]["keys"]["openai_api_key"] is True
+        assert context["audio"]["devices"]["microphones"][0]["input_device"] == "Synthetic input"
+        assert context["accounts"]["chatgpt"]["signed_in"] is not True
         assert "PRIVATE-SYNTHETIC-KEY" not in json.dumps(transport.requests)
         assert (path.read_bytes(), secrets_path.read_bytes()) == saved
         assert (await control.query("settings.current", {}))["revision"] == revision

@@ -14,6 +14,7 @@ const requiredColumns = {
   support_daily: ['installation_hash', 'utc_date', 'reports'],
   prompt_turns: ['installation_hash', 'turn_id', 'utc_date', 'expires_at', 'model_admissions', 'classifier_admitted'],
   request_slots: ['installation_hash', 'slot', 'owner', 'turn_id', 'classification', 'expires_at'],
+  protocol_daily: ['installation_hash', 'utc_date', 'agent_protocol', 'requests'],
 };
 
 function required(env, name) {

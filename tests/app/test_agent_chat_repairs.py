@@ -7,8 +7,8 @@ import pytest
 
 from puripuly_heart.app.ports.agent_chat import AgentServiceError
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
-from tests.app.test_agent_chat import Records, Responses, answer
-from tests.app.test_agent_chat_lifecycle import context_of, notices_done, watch
+from tests.app.test_agent_chat import Records, Responses, answer, context_of
+from tests.app.test_agent_chat_lifecycle import notices_done, watch
 from tests.app.test_agent_chat_tools import Control
 from tests.app.test_agent_chat_tools import catalog as catalog
 
@@ -124,7 +124,7 @@ async def test_approved_noop_has_no_actual_change_fact(catalog, status):
         assert not owner._actions
         assert len(control.submissions) == 1
         await owner.send("What actually changed?")
-        assert context_of(owner._transport.requests[-1])["recent_agent_actions"] == []
+        assert context_of(owner._transport.requests[-1])["core"]["recent_actions"] == []
         owner.new_conversation()
         assert not owner._actions
         operations = [row for row in owner.report_archive if row.get("type") == "app_operation"]
@@ -186,6 +186,6 @@ async def test_noop_preserves_five_real_changes_and_approved_revert(catalog, noo
         assert retained[-1]["tool"] == "change_settings"
         assert retained[-1]["result"]["changes"] == {"overlay.background_alpha": 0.4}
         await owner.send("What actually changed?")
-        assert context_of(owner._transport.requests[-1])["recent_agent_actions"] == retained
+        assert context_of(owner._transport.requests[-1])["core"]["recent_actions"] == retained
     finally:
         await owner.close()

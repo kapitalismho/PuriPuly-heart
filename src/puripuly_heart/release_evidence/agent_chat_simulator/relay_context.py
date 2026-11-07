@@ -122,7 +122,7 @@ def validate_relay_context(value: object, *, relay_build: str | None) -> dict:
                     and all(
                         isinstance(choice, dict)
                         and _text(choice.get("value"))
-                        and _text(choice.get("description"))
+                        and ("description" not in choice or _text(choice["description"]))
                         for choice in question["choices"]
                     )
                     for question in questions

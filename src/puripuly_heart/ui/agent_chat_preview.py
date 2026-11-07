@@ -33,6 +33,8 @@ _CHANGE_STEPS = (
         {"audio.input_device": ""},
     ),
     ({"overlay.translation.enabled": True}, {}),
+    ({"secrets.deepgram_api_key": False}, {"secrets.deepgram_api_key": True}),
+    ({"accounts.chatgpt": False}, {"accounts.chatgpt": True}),
 )
 _KEY_STEPS = ("create", "entry", "verifying", "failed")
 _ACCOUNT_STEPS = ("account_setup", "public_usage")

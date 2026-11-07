@@ -140,7 +140,7 @@ export async function exportRelayContext({ emitted, relayBuild, migrations = mig
     for (const [number, sample] of samples().entries()) {
       pending = { sample, bodies: [] };
       const classification = sample.id === 'classify';
-      const request = { agent_protocol: 4, turn_id: (number + 1).toString(16).padStart(32, '0'), input: sample.input,
+      const request = { agent_protocol: 5, turn_id: (number + 1).toString(16).padStart(32, '0'), input: sample.input,
         ...(classification ? {} : { route: sample.route, effort: sample.effort, allow_tools: sample.allow_tools }) };
       const response = await runtime.dispatchFetch(`http://context-export.invalid/v1/${classification ? 'classify' : 'respond'}`, {
         method: 'POST', headers: { authorization: `Bearer ${signedToken()}`, 'content-type': 'application/json' },
@@ -168,7 +168,7 @@ export async function exportRelayContext({ emitted, relayBuild, migrations = mig
     await runtime.dispose();
   }
   return {
-    format: 'puri-agent-relay-context-1', agent_protocol: 4, relay_build: build, bundle_hashes: hashes, contexts,
+    format: 'puri-agent-relay-context-1', agent_protocol: 5, relay_build: build, bundle_hashes: hashes, contexts,
     export_provenance: {
       mode: 'controlled_no_network', diagnostic_only: true, external_model_calls: 0,
       source: 'observed_emitted_worker_outbound_requests', entry_module: relative(root, entry).replaceAll('\\', '/'),

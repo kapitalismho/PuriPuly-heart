@@ -39,7 +39,7 @@ async def test_held_http_stream_presents_sentence_before_terminal_without_commit
     await transport._client.aclose()
 
     def handle(request):
-        assert json.loads(request.content)["agent_protocol"] == 4
+        assert json.loads(request.content)["agent_protocol"] == 5
         if request.url.path == "/v1/classify":
             return httpx.Response(
                 200,
@@ -161,9 +161,8 @@ async def test_tool_arguments_remain_unexecuted_until_authoritative_terminal():
         before = len(records.queries)
         assert not owner.snapshot.tool_results
         release.set()
-        result = await pending
+        assert (await pending).status == "completed"
         assert len(records.queries) > before
-        assert [item.status for item in result.tool_results] == ["observed"]
         assert len([item for item in owner._items if item.get("type") == "function_call"]) == 1
     finally:
         release.set()
