@@ -112,21 +112,23 @@ class FinalLiveSession(_FakeLiveSession):
 async def test_native_stream_waits_for_final_unit_not_input_submission(
     monkeypatch, channel, text, succeeded
 ):
-    def prepare(api_key, language_codes, custom_vocabulary):
-        return gemini._GeminiClientResources(
-            client=_StubClient(),
-            sync_transport=_StubSyncTransport(),
-            async_transport=_StubAsyncTransport(),
-            config=gemini._build_live_config_sync(language_codes, custom_vocabulary),
-        )
-
-    monkeypatch.setattr(gemini, "_prepare_gemini_resources_sync", prepare)
     transport = FinalLiveSession(text)
     backend = gemini.GeminiTranscribeSTTBackend(
         "offline-controlled",
         live_connect_factory=_RecordingFactory(transport),
         drain_timeout_s=0.01,
     )
+    config = gemini._build_live_config_sync(backend.language_codes, backend.custom_vocabulary)
+
+    def prepare(api_key, language_codes, custom_vocabulary):
+        return gemini._GeminiClientResources(
+            client=_StubClient(),
+            sync_transport=_StubSyncTransport(),
+            async_transport=_StubAsyncTransport(),
+            config=config,
+        )
+
+    monkeypatch.setattr(gemini, "_prepare_gemini_resources_sync", prepare)
     retained = []
 
     async def factory(snapshot, epoch):
