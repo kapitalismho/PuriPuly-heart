@@ -22,7 +22,11 @@ from puripuly_heart.ui.agent_chat_model import (
     select_left,
 )
 from puripuly_heart.ui.components.power_button import PowerButton
-from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
+from puripuly_heart.ui.flet_runtime import (
+    is_hover_active,
+    run_control_method,
+    update_control_if_mounted,
+)
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.i18n import provider_label, t
 from puripuly_heart.ui.motion import press
@@ -942,6 +946,7 @@ class AgentChatView(ft.Row):
         self._input_edits += 1
         edits = self._input_edits
         update_control_if_mounted(self._input)
+        run_control_method(self._input, "focus")
         result = await self._owner.send(text)
         if result.status in {"rejected", "unavailable"} and self._input_edits == edits:
             self._input.value = text
