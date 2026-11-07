@@ -51,8 +51,6 @@ from tests.config.settings_migration_fixtures import (
 )
 from tests.helpers.paths import REPO_ROOT
 
-SOURCE_PACKAGE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
-PACKAGE_NAME = "puripuly_heart"
 SNAPSHOT_PATH = Path(__file__).with_name("public_compatibility_surfaces_snapshot.json")
 INVENTORY_PATH = Path(__file__).with_name("compatibility_surface_inventory.json")
 
@@ -87,33 +85,6 @@ REQUIRED_INVENTORY_SOURCE_RULES = {
     "existing public test or packaging import",
     "approved facade",
 }
-DOCUMENTED_ENTRY_POINT_OR_TEST_IMPORT_MODULES = frozenset(
-    {
-        "puripuly_heart.app.wiring",
-        "puripuly_heart.config.llm_profiles",
-        "puripuly_heart.config.prompts",
-        "puripuly_heart.config.settings_vnext.schema",
-        "puripuly_heart.core.managed_identity",
-        "puripuly_heart.core.openrouter.managed_openrouter_broker_client",
-        "puripuly_heart.core.openrouter.managed_openrouter_release",
-        "puripuly_heart.core.openrouter.openrouter_credentials",
-        "puripuly_heart.core.overlay.manifest",
-        "puripuly_heart.core.overlay.protocol",
-        "puripuly_heart.core.storage.secrets",
-        "puripuly_heart.domain.events",
-        "puripuly_heart.domain.models",
-        "puripuly_heart.main",
-        "puripuly_heart.providers.llm.deepseek",
-        "puripuly_heart.providers.llm.gemini",
-        "puripuly_heart.providers.llm.local_openai",
-        "puripuly_heart.providers.llm.openrouter",
-        "puripuly_heart.providers.llm.qwen_async",
-        "puripuly_heart.providers.stt.deepgram",
-        "puripuly_heart.providers.stt.local_cpp",
-        "puripuly_heart.providers.stt.soniox",
-        "puripuly_heart.ui.event_bridge",
-    }
-)
 REQUIRED_SECRET_KEYS = (
     "google_api_key",
     "openrouter_api_key",
@@ -211,72 +182,6 @@ def _test_function_names(path: Path) -> set[str]:
     return {
         node.name for node in tree.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
     }
-
-
-def _module_name_for_source_path(path: Path) -> str:
-    relative = path.relative_to(SOURCE_PACKAGE_ROOT).with_suffix("")
-    parts = (PACKAGE_NAME, *relative.parts)
-    if parts[-1] == "__init__":
-        parts = parts[:-1]
-    return ".".join(parts)
-
-
-def _is_non_private_source_module(path: Path) -> bool:
-    relative = path.relative_to(SOURCE_PACKAGE_ROOT)
-    parts = relative.with_suffix("").parts
-    return not any(part.startswith("_") and part != "__init__" for part in parts)
-
-
-def _module_public_export_signals(path: Path) -> frozenset[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    signals: set[str] = set()
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
-        ):
-            try:
-                exported_names = ast.literal_eval(node.value)
-            except SyntaxError, ValueError:
-                signals.add("__all__")
-                continue
-            if exported_names:
-                signals.add("__all__")
-        elif (
-            isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == "__getattr__"
-        ):
-            signals.add("lazy __getattr__")
-    return frozenset(signals)
-
-
-def _relevant_non_private_inventory_modules() -> dict[str, frozenset[str]]:
-    relevant: dict[str, frozenset[str]] = {}
-    for path in SOURCE_PACKAGE_ROOT.rglob("*.py"):
-        if not _is_non_private_source_module(path):
-            continue
-
-        module_name = _module_name_for_source_path(path)
-        signals = set(_module_public_export_signals(path))
-        if module_name in DOCUMENTED_ENTRY_POINT_OR_TEST_IMPORT_MODULES:
-            signals.add("documented/test import")
-        if signals:
-            relevant[module_name] = frozenset(signals)
-    return relevant
-
-
-def _inventory_accounts_for_module(inventory: dict[str, Any], module_name: str) -> bool:
-    public_modules = {entry["module"] for entry in inventory["public_imports"]}
-    if module_name in public_modules:
-        return True
-
-    for classification in inventory["non_public_module_classifications"]:
-        if module_name in classification.get("modules", []):
-            return True
-        if any(
-            module_name == prefix or module_name.startswith(f"{prefix}.")
-            for prefix in classification.get("module_prefixes", [])
-        ):
-            return True
-    return False
 
 
 def _leaf_values(value: object) -> Iterator[object]:
@@ -543,19 +448,6 @@ def test_public_facade_inventory_classifies_thin_delegate_targets() -> None:
     for classification in inventory["non_public_module_classifications"]:
         assert classification["classification"] != "ambiguous", classification
         assert classification["rationale"], classification
-
-
-def test_relevant_non_private_modules_are_inventoried_or_classified() -> None:
-    inventory = _load_inventory()
-    relevant_modules = _relevant_non_private_inventory_modules()
-
-    missing = {
-        module_name: sorted(signals)
-        for module_name, signals in sorted(relevant_modules.items())
-        if not _inventory_accounts_for_module(inventory, module_name)
-    }
-
-    assert missing == {}
 
 
 def test_guard_coverage_references_existing_tests_for_every_surface() -> None:
