@@ -33,11 +33,11 @@ impl Default for TemporaryInteractionConfig {
             grab_m: 0.07,
             icon_width_m: 0.03,
             photo_width_m: 0.375,
-            facing_show_deg: 40.0,
-            forward_show_deg: 25.0,
+            facing_show_deg: 45.0,
+            forward_show_deg: 40.0,
             facing_hide_deg: 55.0,
-            forward_hide_deg: 35.0,
-            dwell_ms: 200,
+            forward_hide_deg: 45.0,
+            dwell_ms: 50,
             wrist_transform: [
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.035],
@@ -181,8 +181,9 @@ pub struct PhotoInteraction {
     roles: Option<(u32, u32)>,
     grip: bool,
     armed: bool,
-    gaze_since: Option<Instant>,
+    change_since: Option<Instant>,
     gaze: bool,
+    shown_at: Option<Instant>,
     icon_alpha: f32,
     grab: Option<Grab>,
     returning: Option<Return>,
@@ -203,8 +204,9 @@ impl PhotoInteraction {
             roles: None,
             grip: false,
             armed: false,
-            gaze_since: None,
+            change_since: None,
             gaze: false,
+            shown_at: None,
             icon_alpha: 0.0,
             grab: None,
             returning: None,
@@ -272,7 +274,8 @@ impl PhotoInteraction {
             self.held = false;
             self.photo_alpha = 0.0;
             self.gaze = false;
-            self.gaze_since = None;
+            self.change_since = None;
+            self.shown_at = None;
             self.icon_alpha = 0.0;
             self.frame = InteractionFrame {
                 hidden: prior_held,
@@ -290,7 +293,8 @@ impl PhotoInteraction {
             self.photo_alpha = 0.0;
             self.returning = None;
             self.gaze = false;
-            self.gaze_since = None;
+            self.change_since = None;
+            self.shown_at = None;
             self.icon_alpha = 0.0;
         }
         if !input.grip {
@@ -319,41 +323,46 @@ impl PhotoInteraction {
                 self.config.forward_show_deg
             },
         );
-        let prior_gaze = self.gaze;
-        if looking {
-            let since = self.gaze_since.get_or_insert(now);
-            if now.saturating_duration_since(*since) >= Duration::from_millis(self.config.dwell_ms)
-            {
-                self.gaze = true;
-            }
+        let want = if self.returning.is_some() {
+            true
+        } else if self.grab.is_some() {
+            self.gaze
         } else {
-            self.gaze = false;
-            self.gaze_since = None;
+            looking
+        };
+        if want == self.gaze {
+            self.change_since = None;
+        } else {
+            let since = self.change_since.get_or_insert(now);
+            let wait = if want { self.config.dwell_ms } else { 300 };
+            if now.saturating_duration_since(*since) >= Duration::from_millis(wait) {
+                self.gaze = want;
+                self.change_since = None;
+                if want {
+                    self.shown_at = Some(now);
+                }
+            }
         }
         self.icon_alpha = approach(
             self.icon_alpha,
-            if self.gaze || self.grab.is_some() {
-                1.0
-            } else {
-                0.0
-            },
-            if self.gaze != prior_gaze {
-                0.0
-            } else {
-                dt / 0.15
-            },
+            if self.gaze { 1.0 } else { 0.0 },
+            dt.min(0.1) / 0.1,
         );
+        let interactive = self.icon_alpha >= 1.0
+            && self.shown_at.is_some_and(|shown| {
+                now.saturating_duration_since(shown) >= Duration::from_millis(200)
+            });
         let photo = photo.unwrap();
         let current_distance = distance(input.left, wrist);
         let near = current_distance <= self.config.grab_m;
         let mut out = InteractionFrame {
-            glow: near && self.gaze && photo.can_pull(),
+            glow: near && interactive && photo.can_pull(),
             hidden: prior_held && !self.held,
             ..Default::default()
         };
         if pressed
             && near
-            && self.gaze
+            && interactive
             && photo.can_pull()
             && (photo.attempt_id > 0 || !self.offer_pulled)
             && self.grab.is_none()

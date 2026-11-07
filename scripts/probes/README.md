@@ -26,7 +26,20 @@ Verification used 23 photos × four experimental conditions at the default 1920�
 
 `x3_photo_preview.py` launches the actual native photo role and uses its authenticated loopback bridge. It offers an explicitly selected existing PNG, without provider calls, credentials, OCR or pixel processing in Python. Native decodes and draws the image. A recorded translated composite is shown as a **base-image preview with zero translation blocks**; it cannot produce a genuine first-translated-block notification. Test right-hand notification through the actual block path, not by pretending this prerecorded image is a newly translated block.
 
-Native's optional manifest `interaction` object exposes `grab_m`, `icon_width_m`, `photo_width_m`, `facing_show_deg`, `forward_show_deg`, `facing_hide_deg`, `forward_hide_deg`, `dwell_ms`, `wrist_transform` and `photo_transform`. The transforms are rigid 3×4 controller-relative matrices in metres. The owner selected a default held-photo width of **37.5 cm**, matching the serialized VRChat Print prefab's width only. Preserve the source aspect ratio without adding card borders or letterboxing: a 16:9 photo is 37.5 × 21.09375 cm. An explicit `photo_width_m` still overrides the default for temporary tuning. Other defaults remain temporary candidates: 7 cm grab range, 3 cm icon, 40°/25° show angles, 55°/35° hide angles and 200 ms dwell. Appearance/release is linear over 150 ms; icon return is 225 ms ease-out. See the [interaction owner](../../native/overlay/src/photo/interaction.rs). Physical wrist/hand alignment and comfort remain to be observed rather than inferred from these defaults.
+Native's optional manifest `interaction` object exposes `grab_m`, `icon_width_m`, `photo_width_m`, `facing_show_deg`, `forward_show_deg`, `facing_hide_deg`, `forward_hide_deg`, `dwell_ms`, `wrist_transform` and `photo_transform`. The transforms are rigid 3×4 controller-relative matrices in metres. The owner selected a default held-photo width of **37.5 cm**, matching the serialized VRChat Print prefab's width only. Preserve the source aspect ratio without adding card borders or letterboxing: a 16:9 photo is 37.5 × 21.09375 cm. An explicit `photo_width_m` still overrides the default for temporary tuning. Grab range remains 7 cm and icon width remains 3 cm. Held-photo appearance/release remains linear over 150 ms; icon return remains 225 ms ease-out.
+
+The owner selected VRCT's wrist visibility and input timing policy, based on its pinned [constants](https://github.com/misyaguziya/VRCT/blob/61e153aca43c011d65afb05357c9ad4b9120915f/src-python/models/overlay/overlay.py#L77-L89) and [visibility logic](https://github.com/misyaguziya/VRCT/blob/61e153aca43c011d65afb05357c9ad4b9120915f/src-python/models/overlay/overlay.py#L2232-L2286):
+
+| Gate or transition | Default |
+| --- | --- |
+| Head-forward angle toward wrist | Show within 40°; retain within 45° |
+| Icon face-normal angle toward head | Show within 45°; retain within 55° |
+| Show dwell (`dwell_ms`) | 50 ms; the existing temporary override remains supported |
+| Hide dwell | 300 ms |
+| Icon fade | 100 ms linear; per-frame delta capped at 100 ms |
+| New grab | Fully opaque and at least 200 ms since the shown transition, with a fresh grip press |
+
+Both angle conditions must hold; this uses HMD orientation, not eye tracking. Interrupted show dwell resets. Reentering both retain cones cancels pending hide. An active grab or icon return keeps the icon visible despite looking away. Tracking/input loss, controller-role changes and photo invalidation still cancel immediately: VRCT's stale-pose retention, ray hover, intro and always-visible mode are not imported. A grip pressed before input readiness does not activate later while held; release and press again. See the [interaction owner](../../native/overlay/src/photo/interaction.rs). Physical wrist/hand alignment, visibility and comfort remain to be observed rather than inferred from software checks.
 
 Size provenance: read-only inspection of VRChat `2026.4.1p1-1937-299983b13b-Release` (Steam build `26309255`) found `Print Prefab` in `VRChat_Data/resources.assets` (GameObject 26792, root Transform 49493). Its root scale is 0.75; child `Mesh` Transform 47927 has X/Z scale 0.05/0.03515625 and references the built-in `Plane` mesh 10209, whose X/Z bounds are 10/10 units. The serialized outer card is therefore nominally 0.375 × 0.263671875 metres. `resources.assets` SHA-256: `a7db7942724288a4afb09f9c16777cdf43fff56537af06a5d304d40b773b6c1b`. The owner selected width-only matching, not this outer card's aspect ratio. Runtime spawn/avatar scaling and native portrait behavior were not observed; this is an asset-derived target, not proof of an in-headset size match. The [official Print documentation](https://wiki.vrchat.com/wiki/Prints) supplies pixel margins, not physical dimensions.
 
@@ -43,7 +56,7 @@ python scripts/probes/x3_photo_preview.py --executable $overlay --image $image -
 
 Use a Python environment with the project's existing dependencies. No new project dependency is required. The launcher prints the exact executable identity and a private evidence directory. It refuses OpenVR launch when SteamVR is not already running.
 
-After native readiness, this command creates one synthetic offer after five seconds. Look at the right wrist and start the left grip inside the highlighted grab range. Pull the left hand 12 cm farther from the wrist anchor:
+After native readiness, this command creates one synthetic offer after five seconds. Look at the right wrist, wait for the icon's input-ready highlight with the left hand nearby, then start a fresh left grip inside the grab range. Pull the left hand 12 cm farther from the wrist anchor:
 
 - Grab-start is silent. The valid pull requests one left-hand pulse. The icon returns to the wrist; the first pull authorizes the preview but does not leave the photo held.
 - Release, then grab and pull again to open the retained preview in the left hand. It appears over 150 ms; releasing reverses alpha and width over 150 ms, then hides it. Reopening does not resend or regenerate anything.
