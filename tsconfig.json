@@ -7,11 +7,11 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noEmit": true,
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "types": ["@cloudflare/workers-types", "node", "vitest/globals"],
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["broker/src/**/*.ts", "broker/tests/**/*.ts", "vitest.config.ts"]
+  "include": ["broker/src/**/*.ts", "broker/tests/**/*.ts", "agent-relay/src/**/*.ts", "agent-relay/tests/**/*.ts", "vitest.config.ts"]
 }

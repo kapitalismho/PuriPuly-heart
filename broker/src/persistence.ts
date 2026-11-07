@@ -62,6 +62,9 @@ export interface BrokerAbuseControlsConfigValue {
   managedOperationResumeIp: BrokerEndpointRateLimitConfig;
   managedOperationResumeInstallation: BrokerEndpointRateLimitConfig;
   managedKeyDeliveryAckIp: BrokerEndpointRateLimitConfig;
+  puriTokenIp: BrokerEndpointRateLimitConfig;
+  puriTokenRegistrationIp: BrokerEndpointRateLimitConfig;
+  puriTokenInstallation: BrokerEndpointRateLimitConfig;
   pendingDiscordOAuthSessions: BrokerPendingDiscordOAuthSessionsConfig;
   newActiveEntitlementsPerDay: BrokerDailyIssuanceCapConfig;
   immediateAlerts: BrokerImmediateAlertsConfig;
@@ -70,6 +73,24 @@ export interface BrokerAbuseControlsConfigValue {
 }
 
 export const DEFAULT_BROKER_ABUSE_CONTROLS: BrokerAbuseControlsConfigValue = {
+  puriTokenIp: {
+    endpoint: 'POST /v1/puri/token',
+    scope: 'ip',
+    maxRequests: 600,
+    windowMinutes: 15,
+  },
+  puriTokenRegistrationIp: {
+    endpoint: 'POST /v1/puri/token',
+    scope: 'ip',
+    maxRequests: 20,
+    windowMinutes: 15,
+  },
+  puriTokenInstallation: {
+    endpoint: 'POST /v1/puri/token',
+    scope: 'installation_id',
+    maxRequests: 8,
+    windowMinutes: 15,
+  },
   trialChallenge: {
     endpoint: 'POST /v1/trial/challenge',
     scope: 'ip',

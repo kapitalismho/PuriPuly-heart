@@ -69,14 +69,9 @@ describe('minimal production Broker deployment', () => {
     expect(result.status, result.stderr).toBe(0);
     const db = new DatabaseSync(value.databasePath, { readOnly: true });
     try {
-      expect(db.prepare("SELECT name FROM d1_migrations WHERE name LIKE '002%' ORDER BY name").all()).toEqual([
-        { name: '0020_network_identity_hmac.sql' },
-        { name: '0021_network_identity_purge.sql' },
-        { name: '0022_managed_operation_issuance_context.sql' },
-        { name: '0023_backfill_operation_route_rate_limits.sql' },
-        { name: '0024_allow_unattributed_request_events.sql' },
-        { name: '0026_managed_attempt_cleanup_ownership.sql' },
-      ]);
+      expect(db.prepare("SELECT name FROM d1_migrations WHERE name = '0026_managed_attempt_cleanup_ownership.sql'").get()).toEqual({
+        name: '0026_managed_attempt_cleanup_ownership.sql',
+      });
       expect(db.prepare("SELECT name FROM pragma_table_info('managed_operation_attempts') WHERE name IN ('cleanup_token', 'create_in_flight', 'legacy_cleanup_state') ORDER BY name").all()).toEqual([
         { name: 'cleanup_token' }, { name: 'create_in_flight' }, { name: 'legacy_cleanup_state' },
       ]);

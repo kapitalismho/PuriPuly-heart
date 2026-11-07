@@ -315,6 +315,19 @@ TASK_CREATION_REVIEWS = (
         "LocalSTTDownloadRuntime is the named lifecycle owner for download tasks",
     ),
     *_reviews(
+        "app/wiring/wiring_audio_test.py",
+        {"AudioTestRuntime._diagnostic_candidates": 1},
+        "AudioTestRuntime retains read-only microphone enumeration independently of operation cancellation and drains it on stop or close",
+    ),
+    *_reviews(
+        "app/services/audio_test.py",
+        {
+            "AudioTestSessionOwner._release_diagnostic_resources": 1,
+            "AudioTestSessionOwner._pause_diagnostic_capture": 1,
+        },
+        "AudioTestSessionOwner retains bounded diagnostic cleanup until drained; cancellation cannot release capture restoration before source cleanup",
+    ),
+    *_reviews(
         "core/runtime/audio_test.py",
         {"AudioTestCaptureRuntime.start": 1, "AudioTestCaptureRuntime.create_frame_task": 1},
         "AudioTestCaptureRuntime is the named lifecycle owner for each audio test channel's tasks",
@@ -515,6 +528,12 @@ TASK_CREATION_REVIEWS = (
         family=ASYNCIO_ENSURE_FUTURE,
     ),
     *_reviews(
+        "ui/components/agent_secure_entry.py",
+        {"AgentSecureEntryController.submit": 1},
+        "AgentSecureEntryController retains verification in _pending, cancels it on replacement or unbind, and submit awaits settlement before clearing completion callbacks and secret input",
+        family=ASYNCIO_ENSURE_FUTURE,
+    ),
+    *_reviews(
         "ui/components/settings/api_key_field.py",
         {"ApiKeyField._handle_blur": 1},
         "Flet API-key field callback uses page.run_task at the UI boundary for async verification",
@@ -600,6 +619,12 @@ TASK_CREATION_REVIEWS = (
         "SettingsView uses page.run_task at the UI boundary for bounded asynchronous UI callbacks, including credential saving, while keeping the modal responsive",
         classification="legacy_exception",
         family=RUN_TASK,
+    ),
+    *_reviews(
+        "release_evidence/agent_chat_simulator/execution.py",
+        {"AttemptScheduler.run": 1},
+        "AttemptScheduler retains bounded per-attempt tasks, stops admission on failure/cancellation, "
+        "and shield-drains each attempt's model close and checkpoint before returning",
     ),
 )
 REVIEWED_TASK_CREATION = dict(TASK_CREATION_REVIEWS)

@@ -1,2 +1,3 @@
 packages:
   - broker
+  - agent-relay

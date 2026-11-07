@@ -7,11 +7,22 @@ from unittest.mock import AsyncMock
 import pytest
 
 from puripuly_heart.app.adapters.ui_runtime import UiProviderRuntimeAdapter
-from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
+from puripuly_heart.app.ports.provider_verifier import (
+    ProviderCredentialVerificationOutcome,
+    ProviderVerifierPort,
+)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("outcome", [(True, ""), (False, "provider.failure")])
+@pytest.mark.parametrize(
+    "outcome",
+    [
+        ProviderCredentialVerificationOutcome(status="verified", provider="openai"),
+        ProviderCredentialVerificationOutcome(
+            status="error", provider="openai", error_text="provider.failure"
+        ),
+    ],
+)
 async def test_ui_interactive_verification_returns_the_owner_result(outcome) -> None:
     verification = SimpleNamespace(verify=AsyncMock(return_value=outcome))
     adapter = UiProviderRuntimeAdapter(
@@ -24,7 +35,7 @@ async def test_ui_interactive_verification_returns_the_owner_result(outcome) -> 
         build_byok_target_settings=lambda _settings: None,
     )
 
-    assert await adapter.verify_api_key("openai", "synthetic-secret") == outcome
+    assert await adapter.verify_api_key("openai", "synthetic-secret") is outcome
     verification.verify.assert_awaited_once_with("openai", "synthetic-secret")
 
 

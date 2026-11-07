@@ -256,6 +256,7 @@ describe('broker direct deploy automation', () => {
       db.close();
     }
   });
+
   it.skipIf(!bashAvailable)('renders configured daily-cap maintenance and changes only the cap before reading it back', () => {
     const script = dailyCapWorkflowScript();
     for (const [current, previous, cap] of [

@@ -197,13 +197,6 @@ GPU推論はVulkanを使用しています。RadeonでもArcでも、ベンダ�
 
 7. VRChatでOSCを有効化: Action menu → Settings → OSC → Enable
 
-### 音声がキャプチャされない場合
-音声がキャプチャされない場合は、**設定 > 一般** で次の手順を行ってください。
-
-1. **オーディオホストAPI** を **自動選択** または **MME** に変更
-2. 正しいマイクを選択
-3. アプリを再起動
-
 ---
 
 ### 中国のユーザーへ向けた案内
@@ -407,10 +400,6 @@ PuriPulyはクラウドSTTと組み合わせると最良の体験になります
 ## アーキテクチャ
 
 [`docs/architecture.md`](../architecture.md) を参照してください。
-
-## ロードマップ
-
-今後の作業は [PuriPulyプロジェクトボード](https://github.com/users/kapitalismho/projects/2)で公開管理されています。
 
 ---
 

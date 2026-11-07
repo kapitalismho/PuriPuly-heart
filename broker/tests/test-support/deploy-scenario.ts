@@ -49,7 +49,11 @@ export function createDeployScenario(options: {
       INSERT INTO managed_operation_attempts (operation_id, attempt_index, provider_key_name, outcome)
       VALUES ('ph-mop-v1_synthetic', 1, 'synthetic-provider-key-name', 'unknown');
     `);
-    if (!options.pendingMigration) db.exec(readFileSync(join(brokerRoot, 'migrations/0026_managed_attempt_cleanup_ownership.sql'), 'utf8'));
+    for (const name of BROKER_MIGRATION_FILENAMES) {
+      if (name <= '0024_allow_unattributed_request_events.sql' || name.startsWith('0025_')
+        || name.startsWith('0027_') || (options.pendingMigration && name.startsWith('0026_'))) continue;
+      db.exec(readFileSync(join(brokerRoot, 'migrations', name), 'utf8'));
+    }
     db.exec('CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, applied_at TEXT DEFAULT CURRENT_TIMESTAMP)');
     for (const name of BROKER_MIGRATION_FILENAMES) {
       if (name.startsWith('0025_') || name.startsWith('0027_') || (options.pendingMigration && name.startsWith('0026_'))) continue;

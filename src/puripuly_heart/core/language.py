@@ -73,6 +73,9 @@ SUPPORTED_LANGUAGES: dict[str, LanguageInfo] = {
     "zh-CN": LanguageInfo(code="zh-CN", name="Chinese (Simplified)"),
     "zh-TW": LanguageInfo(code="zh-TW", name="Chinese (Traditional)"),
 }
+_SUPPORTED_LANGUAGES_BY_LOWER_CODE = {
+    code.lower(): info for code, info in SUPPORTED_LANGUAGES.items()
+}
 
 
 def get_language_info(code: str) -> LanguageInfo | None:
@@ -102,7 +105,7 @@ def map_detected_language_for_llm(language: str) -> DetectedLanguageForLLM | Non
     normalized = language.strip().replace("_", "-").lower()
     if normalized == "zh":
         return DetectedLanguageForLLM(code="zh", name="Chinese")
-    info = get_language_info(normalized)
+    info = _SUPPORTED_LANGUAGES_BY_LOWER_CODE.get(normalized) or get_language_info(normalized)
     if info is None:
         return None
     return DetectedLanguageForLLM(code=info.code, name=info.name)

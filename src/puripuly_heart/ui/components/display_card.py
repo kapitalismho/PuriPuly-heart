@@ -41,6 +41,7 @@ DISPLAY_INPUT_HINT_KEYS: tuple[str, ...] = (
     "display.input_hint_tip.cloud_stt",
     "display.input_hint_tip.tab_swap",
     "display.input_hint_tip.earmuffs",
+    "display.input_hint_tip.puri_help",
 )
 
 

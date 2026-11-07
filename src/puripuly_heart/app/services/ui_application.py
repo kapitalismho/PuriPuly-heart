@@ -13,6 +13,7 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.ports.agent_chat import AgentChatPort
 from puripuly_heart.app.ports.application_control import ApplicationControl
 from puripuly_heart.app.ports.application_runtime_logging import (
     ApplicationRuntimeLoggingPort,
@@ -26,6 +27,7 @@ from puripuly_heart.app.ports.chatgpt_account import (
     ChatGptConnectResult,
     ChatGptSignOutResult,
 )
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretsPort
 from puripuly_heart.app.ports.settings_view import (
     AlibabaConnectionApplyResult,
@@ -153,6 +155,7 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "start_github_star_prompt",
         "start_managed_auth_task",
         "start_audio_test",
+        "diagnose_audio",
         "start_qq_managed_auth_from_dialog",
         "stop_audio_test",
         "submit_text",
@@ -203,8 +206,14 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
     if inspect.iscoroutinefunction(method):
 
         async def invoke_ordered(self, *args: Any, **kwargs: Any) -> Any:
+            admission_current = kwargs.pop("admission_current", None)
+            if admission_current is not None and not admission_current():
+                return False
             self._admit_application_intent(method.__name__)
-            if method.__name__ == "start_audio_test" and kwargs.get("admission_revision") is None:
+            if (
+                method.__name__ in {"start_audio_test", "diagnose_audio"}
+                and kwargs.get("admission_revision") is None
+            ):
                 kwargs["admission_revision"] = self.audio_test_start_revision()
             control = self._control
             toggle_resource = {
@@ -224,6 +233,8 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
                 activity.has_authority = lambda: control.runtime_toggle_is_current(toggle_intent)
 
             async def apply() -> Any:
+                if admission_current is not None and not admission_current():
+                    return False
                 if activity is not None:
                     activity.has_authority = lambda: True
                 return await method(self, *args, **kwargs)
@@ -375,6 +386,7 @@ class UiApplicationBoundary:
         )
         self._application_lifecycle: ApplicationShutdownCoordinator | None = None
         self._control: ApplicationControl | None = None
+        self._agent_chat: AgentChatPort | None = None
         self._presentation_close: Callable[[], Awaitable[None]] | None = None
 
     def _boundary_application_shutdown_callbacks(
@@ -424,6 +436,12 @@ class UiApplicationBoundary:
 
     def attach_control(self, control: ApplicationControl) -> None:
         self._control = control
+
+    def agent_chat(self) -> AgentChatPort | None:
+        return self._agent_chat
+
+    def attach_agent_chat(self, owner: AgentChatPort) -> None:
+        self._agent_chat = owner
 
     def osc_pending_controls(self) -> tuple[tuple[str, bool], ...]:
         pending = []
@@ -523,6 +541,8 @@ class UiApplicationBoundary:
         try:
             if self._startup_closed:
                 raise asyncio.CancelledError
+            if self._agent_chat is not None:
+                await self._agent_chat.start()
             task = asyncio.create_task(self._startup.start(), name="application-startup")
             self._startup_task = task
             await task
@@ -862,6 +882,11 @@ class UiApplicationBoundary:
             await self._audio_test.start_audio_test(observation_callback=observation_callback)
         )
 
+    async def diagnose_audio(self, *, admission_revision: int | None = None) -> dict[str, object]:
+        return await self._audio_test.diagnose_audio(
+            is_current=lambda: admission_revision == self._audio_test_start_revision
+        )
+
     def audio_test_snapshot(self) -> dict[str, object]:
         return self._audio_test.audio_test_snapshot()
 
@@ -912,6 +937,12 @@ class UiApplicationBoundary:
 
     def dashboard_managed_auth_prompt_kind(self) -> str:
         return str(self._managed.dashboard_managed_auth_prompt_kind())
+
+    def managed_account_snapshot(self) -> dict:
+        snapshot = self._managed.managed_account_snapshot()
+        if self._managed_auth_runtime.external_task_names:
+            snapshot["in_progress"] = True
+        return snapshot
 
     def managed_auth_last_failure_kind(self) -> str:
         accessor = getattr(self._managed, "managed_auth_last_failure_kind", None)
@@ -1169,7 +1200,9 @@ class UiApplicationBoundary:
     def cancel_alibaba_connection_draft(self, *, token: str) -> None:
         self._provider.cancel_alibaba_connection_draft(token=token)
 
-    async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
+    async def verify_api_key(
+        self, provider: str, key: str
+    ) -> ProviderCredentialVerificationOutcome:
         return await self._provider.verify_api_key(provider, key)
 
     def persist_api_key_verification(self, provider: str, key: str, success: bool) -> None:

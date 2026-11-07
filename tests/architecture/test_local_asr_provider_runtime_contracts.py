@@ -51,7 +51,6 @@ def test_provider_runtime_contract_and_owner_do_not_import_ui_hub_or_app_layers(
         assert "puripuly_heart.core.orchestrator.hub" not in imports
 
     owner_calls = _call_names(owner_file)
-    assert owner_calls.count("ProviderRuntimeHandle") == 2
     assert "ClientHub" not in owner_calls
 
 

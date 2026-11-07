@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationName,
     OscControlPresentationState,
 )
+from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresence
 from puripuly_heart.app.services.canonical_settings_persistence import (
     materialize_canonical_translation_settings,
 )
@@ -215,6 +217,17 @@ class DelayedDiscoveryService(FakeService):
         return await super().discover_vrchat()
 
 
+class RetryDiscoveryService(DelayedDiscoveryService):
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.fail_discovery = True
+
+    async def discover_vrchat(self) -> OscQueryServiceInfo | None:
+        if self.fail_discovery:
+            raise OSError("controlled discovery failure")
+        return await super().discover_vrchat()
+
+
 class DelayedAdvertiseService(FakeService):
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -319,6 +332,254 @@ async def test_output_snapshot_separates_local_bind_and_discovery_from_remote_de
     assert degraded["effective_send_port"] == 9000
     assert degraded["remote_delivery"] == "unacknowledged"
     await fallback.close()
+
+
+@pytest.mark.asyncio
+async def test_failed_automatic_discovery_retry_preserves_settings_and_is_not_remote_success() -> (
+    None
+):
+    class NoChatboxSender(FakeSender):
+        def send_chatbox(self, _text: str) -> None:
+            pytest.fail("Discovery retry must not send chatbox text")
+
+    settings = AppSettingsVNext()
+    before = deepcopy(settings)
+    receiver = FakeReceiverOwner()
+    sender = NoChatboxSender()
+    service = RetryDiscoveryService(
+        OscQueryServiceInfo(
+            service_id="controlled-VRChat",
+            host="127.0.0.1",
+            osc_send_port=19000,
+            is_vrchat=True,
+        )
+    )
+    integration = _integration(settings, receiver, sender, service)
+    try:
+        await integration.configure(enabled=False)
+        initial_receiver = receiver.receiver
+        await integration.wait_automatic_query_start()
+        assert receiver.receiver is initial_receiver
+        failed = integration.output_snapshot()
+        assert failed["query_failure"] == "oscquery_unavailable"
+        assert failed["local_availability"] == "available"
+        assert failed["discovered_remote_present"] is False
+        assert sender.destinations[-1] == ("127.0.0.1", 9000)
+        service.fail_discovery = False
+        service.block_discovery = True
+        bound_receiver = receiver.receiver
+        control_calls = list(receiver.control_calls)
+        messages = list(sender.messages)
+        pending = asyncio.create_task(integration.retry_automatic_discovery())
+        await asyncio.wait_for(service.discovery_started.wait(), timeout=1)
+        assert not pending.done()
+        duplicate = await integration.retry_automatic_discovery()
+        assert duplicate["status"] == "rejected"
+        assert duplicate["reason"] == "discovery_in_progress"
+        assert service.started == 2
+        service.discovery_gate.set()
+        first = await pending
+        assert first["status"] == "applied"
+        assert first["retry_started"] is True
+        assert first["effect"] == "discovery_target_applied"
+        assert first["output"]["query_service_started"] is True
+        assert first["output"]["remote_delivery"] == "unacknowledged"
+        assert receiver.receiver is bound_receiver
+        assert receiver.control_calls == control_calls
+        assert sender.messages == messages
+        recovered = integration.output_snapshot()
+        assert recovered["query_service_started"] is True
+        assert recovered["query_failure"] is None
+        assert recovered["discovered_remote_present"] is True
+        assert recovered["remote_delivery"] == "unacknowledged"
+        assert sender.destinations[-1] == ("127.0.0.1", 19000)
+        assert settings == before
+        assert recovered["configured_send_port"] == before.intent.osc.send_port
+        assert recovered["configured_receive_port"] == before.intent.osc.receive_port
+        calls = len(receiver.control_calls), service.started, service.stopped
+        assert (await integration.retry_automatic_discovery())["status"] == "applied"
+        assert (len(receiver.control_calls), service.started, service.stopped) == calls
+    finally:
+        service.discovery_gate.set()
+        await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_discovery_retry_failure_remains_visible_and_retryable() -> None:
+    settings = AppSettingsVNext()
+    service = RetryDiscoveryService(None)
+    integration = _integration(settings, FakeReceiverOwner(), FakeSender(), service)
+    try:
+        await integration.configure(enabled=False)
+        await integration.wait_automatic_query_start()
+        for _ in range(2):
+            result = await integration.retry_automatic_discovery()
+            assert result["retry_started"] is True
+            assert result["status"] == "degraded"
+            assert result["effect"] == "discovery_unavailable"
+            assert result["reason"] == "oscquery_unavailable"
+            await integration.wait_automatic_query_start()
+            observed = integration.output_snapshot()
+            assert observed["query_failure"] == "oscquery_unavailable"
+            assert observed["query_service_started"] is False
+            assert observed["local_availability"] == "available"
+            assert observed["remote_delivery"] == "unacknowledged"
+        assert service.started == 3
+    finally:
+        await integration.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ("manual", "off"))
+async def test_discovery_retry_does_not_reset_ineligible_connections(mode) -> None:
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(settings.intent, osc=replace(settings.intent.osc, connection_mode=mode)),
+    )
+    receiver = FakeReceiverOwner()
+    sender = FakeSender()
+    service = FakeService(None)
+    integration = _integration(settings, receiver, sender, service)
+    try:
+        await integration.configure(enabled=False)
+        await integration.wait_automatic_query_start()
+        before = integration.output_snapshot()
+        calls = (
+            list(receiver.control_calls),
+            list(sender.destinations),
+            service.started,
+            service.stopped,
+        )
+        result = await integration.retry_automatic_discovery()
+        assert result["status"] == "rejected"
+        assert result["retry_started"] is False
+        assert result["reason"] == "automatic_mode_required"
+        assert integration.output_snapshot() == before
+        assert (
+            receiver.control_calls,
+            sender.destinations,
+            service.started,
+            service.stopped,
+        ) == calls
+    finally:
+        await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_discovery_retry_rechecks_authoritative_connection_after_waiting() -> None:
+    settings = AppSettingsVNext()
+    receiver = FakeReceiverOwner()
+    service = RetryDiscoveryService(None)
+    integration = _integration(settings, receiver, FakeSender(), service)
+    try:
+        await integration.configure(enabled=False)
+        await integration.wait_automatic_query_start()
+        calls = len(receiver.control_calls), service.started
+        async with integration._connection_lock:
+            retry = asyncio.create_task(integration.retry_automatic_discovery())
+            await asyncio.sleep(0)
+            changed = replace(
+                settings,
+                intent=replace(
+                    settings.intent,
+                    osc=replace(settings.intent.osc, connection_mode="manual"),
+                ),
+            )
+            integration._settings_provider = lambda: changed
+        result = await retry
+        assert result["status"] == "rejected"
+        assert result["reason"] == "connection_changed"
+        assert (len(receiver.control_calls), service.started) == calls
+        integration._settings_provider = lambda: None
+        assert (await integration.retry_automatic_discovery())["reason"] == "settings_unavailable"
+        integration.stop_ingress()
+        assert (await integration.retry_automatic_discovery())["reason"] == "lifecycle_stopped"
+    finally:
+        await integration.close()
+    assert (await integration.retry_automatic_discovery())["reason"] == "lifecycle_stopped"
+
+
+@pytest.mark.asyncio
+async def test_stopped_configuration_does_not_wait_on_shutdown_connection_lock() -> None:
+    receiver = FakeReceiverOwner()
+    integration = _integration(AppSettingsVNext(), receiver, FakeSender(), FakeService(None))
+    try:
+        await integration.configure_connection(mode="manual", send_port=19000, receive_port=19001)
+        calls = list(receiver.control_calls)
+        integration.stop_ingress()
+        async with integration._connection_lock:
+            await asyncio.wait_for(
+                integration.configure_connection(mode="off", send_port=19000, receive_port=19001),
+                timeout=1,
+            )
+        assert receiver.control_calls == calls
+    finally:
+        await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_shutdown_fences_retry_during_receiver_ensure() -> None:
+    class HeldReceiver(FakeReceiverOwner):
+        hold = False
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.entered = asyncio.Event()
+            self.release = asyncio.Event()
+
+        async def ensure_receiver(self) -> object | None:
+            if self.hold:
+                self.entered.set()
+                await self.release.wait()
+            return await super().ensure_receiver()
+
+    receiver = HeldReceiver()
+    service = RetryDiscoveryService(None)
+    integration = _integration(AppSettingsVNext(), receiver, FakeSender(), service)
+    await integration.configure(enabled=False)
+    await integration.wait_automatic_query_start()
+    service.fail_discovery = False
+    receiver.hold = True
+    retry = asyncio.create_task(integration.retry_automatic_discovery())
+    await receiver.entered.wait()
+    closing = asyncio.create_task(integration.close())
+    await asyncio.sleep(0)
+    receiver.release.set()
+    result = await retry
+    await closing
+    assert result["status"] == "rejected"
+    assert result["reason"] == "lifecycle_stopped"
+    assert service.started == 2
+    assert receiver.receiver is None
+    assert receiver.closed is True
+    assert integration.output_snapshot()["local_availability"] == "closed"
+
+
+@pytest.mark.asyncio
+async def test_shutdown_cancels_inflight_retry_without_late_destination_or_publication() -> None:
+    receiver = FakeReceiverOwner()
+    sender = FakeSender()
+    service = RetryDiscoveryService(None)
+    integration = _integration(AppSettingsVNext(), receiver, sender, service)
+    await integration.configure(enabled=False)
+    await integration.wait_automatic_query_start()
+    service.fail_discovery = False
+    service.block_discovery = True
+    retry = asyncio.create_task(integration.retry_automatic_discovery())
+    await service.discovery_started.wait()
+    destinations = list(sender.destinations)
+    messages = list(sender.messages)
+    await integration.close()
+    service.discovery_gate.set()
+    result = await retry
+    assert result["status"] == "rejected"
+    assert result["reason"] == "lifecycle_stopped"
+    assert sender.destinations == destinations
+    assert sender.messages == messages
+    assert receiver.receiver is None
+    assert integration.query_runtime.started is False
+    assert integration.output_snapshot()["remote_delivery"] == "unacknowledged"
 
 
 @pytest.mark.asyncio
@@ -1463,3 +1724,391 @@ async def test_failed_cached_full_resync_requires_observed_obligation_completion
             udp_sender.close()
         if endpoint is not None:
             endpoint.close()
+
+
+@pytest.mark.asyncio
+async def test_running_discovery_retry_recovers_lost_target_and_reapplies_without_publication() -> (
+    None
+):
+    settings = AppSettingsVNext()
+    receiver = FakeReceiverOwner()
+    sender = FakeSender()
+    service = FakeService(
+        OscQueryServiceInfo(
+            service_id="VRChat", host="127.0.0.1", osc_send_port=19000, is_vrchat=True
+        )
+    )
+    integration = _integration(settings, receiver, sender, service)
+    try:
+        await integration.configure(enabled=False)
+        await integration.wait_automatic_query_start()
+        bound_receiver = receiver.receiver
+        service.info = None
+        await integration.query_runtime.refresh(publish_snapshot=False)
+        assert integration.output_snapshot()["destination_source"] == "fallback"
+        service.info = OscQueryServiceInfo(
+            service_id="VRChat", host="127.0.0.1", osc_send_port=19002, is_vrchat=True
+        )
+        messages = list(sender.messages)
+        control_calls = list(receiver.control_calls)
+        for _ in range(2):
+            receipt = await integration.retry_automatic_discovery()
+            assert receipt["status"] == "applied"
+            assert receipt["effect"] == "discovery_target_applied"
+            assert receipt["output"]["destination_source"] == "discovered"
+            assert receipt["output"]["remote_delivery"] == "unacknowledged"
+            assert sender.destinations[-1] == ("127.0.0.1", 19002)
+            assert receiver.receiver is bound_receiver
+            assert receiver.control_calls == control_calls
+            assert sender.messages == messages
+        assert service.started == 1
+        assert service.stopped == 0
+        assert len(service.advertisements) == 1
+    finally:
+        await integration.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("started", [False, True])
+async def test_retry_timeout_settles_discovery_resources_without_replacing_receiver(
+    started,
+) -> None:
+    settings = AppSettingsVNext()
+    receiver = FakeReceiverOwner()
+    sender = FakeSender()
+    service = RetryDiscoveryService(None)
+    service.fail_discovery = not started
+    integration = _integration(settings, receiver, sender, service)
+    integration._discovery_timeout_seconds = 0.02
+    try:
+        await integration.configure(enabled=False)
+        await integration.wait_automatic_query_start()
+        bound_receiver = receiver.receiver
+        messages = list(sender.messages)
+        calls = list(receiver.control_calls)
+        service.fail_discovery = False
+        service.block_discovery = True
+        result = await integration.retry_automatic_discovery()
+        assert result["status"] == "degraded"
+        assert result["effect"] == "discovery_unavailable"
+        assert result["reason"] == "discovery_timeout"
+        assert integration.query_runtime.started is started
+        assert receiver.receiver is bound_receiver
+        assert receiver.control_calls == calls
+        assert sender.messages == messages
+        assert integration._discovery_retry_task is None
+        service.discovery_gate.set()
+        service.info = OscQueryServiceInfo(
+            service_id="VRChat", host="127.0.0.1", osc_send_port=19002, is_vrchat=True
+        )
+        assert (await integration.retry_automatic_discovery())["status"] == "applied"
+        assert receiver.receiver is bound_receiver
+    finally:
+        service.discovery_gate.set()
+        await integration.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["manual", "off"])
+async def test_background_refresh_and_retry_drop_results_after_saved_connection_changes(
+    mode,
+) -> None:
+    settings = AppSettingsVNext()
+    receiver = FakeReceiverOwner()
+    sender = FakeSender()
+    service = DelayedDiscoveryService(None)
+    integration = _integration(settings, receiver, sender, service)
+    tasks = []
+    try:
+        await integration.configure(enabled=False)
+        await integration.wait_automatic_query_start()
+        before = list(sender.destinations)
+        service.block_discovery = True
+        service.info = OscQueryServiceInfo(
+            service_id="retired-VRChat", host="127.0.0.1", osc_send_port=19003, is_vrchat=True
+        )
+        background = asyncio.create_task(integration.query_runtime.refresh())
+        tasks.append(background)
+        await service.discovery_started.wait()
+        retry = asyncio.create_task(integration.retry_automatic_discovery())
+        tasks.append(retry)
+        await asyncio.sleep(0)
+        duplicate = await integration.retry_automatic_discovery()
+        assert duplicate["reason"] == "discovery_in_progress"
+        changed = replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                osc=replace(settings.intent.osc, connection_mode=mode, send_port=19004),
+            ),
+        )
+        integration._settings_provider = lambda: changed
+        configuring = asyncio.create_task(
+            integration.configure_connection(
+                mode=mode, send_port=19004, receive_port=changed.intent.osc.receive_port
+            )
+        )
+        tasks.append(configuring)
+        service.discovery_gate.set()
+        await asyncio.wait_for(background, timeout=1)
+        receipt = await asyncio.wait_for(retry, timeout=1)
+        await asyncio.wait_for(configuring, timeout=1)
+        assert receipt["status"] == "rejected"
+        assert receipt["reason"] == "connection_changed"
+        assert ("127.0.0.1", 19003) not in sender.destinations[len(before) :]
+        assert integration.output_snapshot()["effective_mode"] == mode
+        assert integration.query_runtime.started is False
+        assert service.started == 1
+    finally:
+        service.discovery_gate.set()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_recovery_listener_observation_is_retained_and_invalidated_by_destination_and_settings() -> (
+    None
+):
+    settings = AppSettingsVNext()
+    service = FakeService(
+        OscQueryServiceInfo(
+            service_id="VRChat", host="127.0.0.1", osc_send_port=19000, is_vrchat=True
+        )
+    )
+    integration = _integration(settings, FakeReceiverOwner(), FakeSender(), service)
+    observed = []
+
+    async def observe(host, port):
+        observed.append((host, port))
+        return VrchatOscPresence(True, True, "matched")
+
+    integration._local_listener_probe = observe
+    try:
+        await integration.configure(enabled=False)
+        await integration.wait_automatic_query_start()
+        assert integration.output_snapshot()["local_listener"]["observed_at"] is None
+        receipt = await integration.retry_automatic_discovery()
+        listener = receipt["output"]["local_listener"]
+        assert listener["status"] == "matched"
+        assert listener["vrchat_running"] is True
+        assert isinstance(listener["observed_at"], float)
+        assert listener["observed_at"] > 0
+        for _ in range(20):
+            assert integration.output_snapshot()["local_listener"] == listener
+        assert observed == [("127.0.0.1", 19000)]
+        service.info = replace(service.info, osc_send_port=19001)
+        await integration.query_runtime.refresh(publish_snapshot=False)
+        assert integration.output_snapshot()["local_listener"]["status"] == "unknown"
+        assert integration.output_snapshot()["local_listener"]["observed_at"] is None
+        await integration.retry_automatic_discovery()
+        changed = replace(
+            settings,
+            intent=replace(
+                settings.intent, osc=replace(settings.intent.osc, connection_mode="off")
+            ),
+        )
+        integration._settings_provider = lambda: changed
+        assert integration.output_snapshot()["local_listener"]["status"] == "unknown"
+        assert len(observed) == 2
+    finally:
+        await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_completed_retry_without_target_and_unavailable_observation_is_degraded_not_delivery_failure() -> (
+    None
+):
+    receiver = FakeReceiverOwner()
+    sender = FakeSender()
+    service = FakeService(None)
+    integration = _integration(AppSettingsVNext(), receiver, sender, service)
+
+    async def unavailable(_host, _port):
+        raise PermissionError("controlled local observation failure")
+
+    integration._local_listener_probe = unavailable
+    try:
+        await integration.configure(enabled=False)
+        await integration.wait_automatic_query_start()
+        bound_receiver = receiver.receiver
+        messages = list(sender.messages)
+        result = await integration.retry_automatic_discovery()
+        assert result["status"] == "degraded"
+        assert result["effect"] == "discovery_unavailable"
+        assert result["reason"] == "target_not_found"
+        output = result["output"]
+        assert output["destination_source"] == "fallback"
+        assert output["query_service_started"] is True
+        assert output["query_failure"] is None
+        assert output["local_availability"] == "available"
+        assert output["local_listener"]["status"] == "unknown"
+        assert output["local_listener"]["vrchat_running"] is None
+        assert isinstance(output["local_listener"]["observed_at"], float)
+        assert output["remote_delivery"] == "unacknowledged"
+        assert receiver.receiver is bound_receiver
+        assert sender.messages == messages
+    finally:
+        await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_stopped_discovery_rejects_retry_even_while_initial_start_is_unsettled() -> None:
+    service = DelayedDiscoveryService(None)
+    service.block_discovery = True
+    integration = _integration(AppSettingsVNext(), FakeReceiverOwner(), FakeSender(), service)
+    try:
+        await integration.configure(enabled=False)
+        await service.discovery_started.wait()
+        integration.stop_ingress()
+        result = await integration.retry_automatic_discovery()
+        assert result["status"] == "rejected"
+        assert result["reason"] == "lifecycle_stopped"
+        assert result["retry_started"] is False
+    finally:
+        await integration.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("during_probe", "expected_status", "expected_reason"),
+    [
+        ("target_lost", "degraded", "target_not_found"),
+        ("target_changed", "degraded", "target_not_found"),
+        ("unchanged", "applied", None),
+        ("config_changed", "rejected", "connection_changed"),
+        ("shutdown", "rejected", "lifecycle_stopped"),
+    ],
+)
+async def test_retry_receipt_correlates_target_after_held_listener_observation(
+    during_probe, expected_status, expected_reason
+) -> None:
+    settings = AppSettingsVNext()
+    receiver = FakeReceiverOwner()
+    sender = FakeSender()
+    target = OscQueryServiceInfo(
+        service_id="VRChat", host="127.0.0.1", osc_send_port=19000, is_vrchat=True
+    )
+    service = FakeService(target)
+    integration = _integration(settings, receiver, sender, service)
+    integration.query_runtime.discovery_poll_interval_seconds = 3600
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    retry = None
+
+    async def observe(_host, _port):
+        entered.set()
+        await release.wait()
+        return VrchatOscPresence(None, None)
+
+    integration._local_listener_probe = observe
+    try:
+        await integration.configure(enabled=False)
+        await integration.wait_automatic_query_start()
+        bound_receiver = receiver.receiver
+        resources = list(receiver.control_calls), service.started, service.stopped
+        messages = list(sender.messages)
+        retry = asyncio.create_task(integration.retry_automatic_discovery())
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        assert not retry.done()
+        if during_probe in {"target_lost", "target_changed", "unchanged"}:
+            service.info = (
+                None
+                if during_probe == "target_lost"
+                else (
+                    replace(target, osc_send_port=19001)
+                    if during_probe == "target_changed"
+                    else target
+                )
+            )
+            await integration.query_runtime.refresh(publish_snapshot=False)
+        elif during_probe == "config_changed":
+            changed = replace(
+                settings,
+                intent=replace(
+                    settings.intent,
+                    osc=replace(settings.intent.osc, connection_mode="manual"),
+                ),
+            )
+            integration._settings_provider = lambda: changed
+        else:
+            integration.stop_ingress()
+        avatar_queries = service.avatar_queries
+        release.set()
+        result = await asyncio.wait_for(retry, timeout=1)
+        assert result["status"] == expected_status
+        assert result.get("reason") == expected_reason
+        assert result["retry_started"] is True
+        if expected_status == "applied":
+            assert result["effect"] == "discovery_target_applied"
+            assert result["output"]["local_listener"]["status"] == "unknown"
+            assert isinstance(result["output"]["local_listener"]["observed_at"], float)
+        elif expected_status == "degraded":
+            assert result["effect"] == "discovery_unavailable"
+        else:
+            assert "effect" not in result
+        if during_probe == "target_lost":
+            assert result["output"]["discovered_remote_present"] is False
+            assert result["output"]["destination_source"] == "fallback"
+            assert sender.destinations[-1] == ("127.0.0.1", 9000)
+        assert result["output"]["remote_delivery"] == "unacknowledged"
+        assert receiver.receiver is bound_receiver
+        assert (receiver.control_calls, service.started, service.stopped) == resources
+        assert sender.messages == messages
+        assert service.avatar_queries == avatar_queries
+    finally:
+        release.set()
+        if retry is not None:
+            await asyncio.gather(retry, return_exceptions=True)
+        await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_retry_terminal_target_confirmation_wait_is_bounded() -> None:
+    target = OscQueryServiceInfo(
+        service_id="VRChat", host="127.0.0.1", osc_send_port=19000, is_vrchat=True
+    )
+    service = DelayedAvatarService(target)
+    receiver = FakeReceiverOwner()
+    sender = FakeSender()
+    integration = _integration(AppSettingsVNext(), receiver, sender, service)
+    integration.query_runtime.discovery_poll_interval_seconds = 3600
+    integration._discovery_timeout_seconds = 0.05
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    retry = None
+    background = None
+
+    async def observe(_host, _port):
+        entered.set()
+        await release.wait()
+        return VrchatOscPresence(None, None)
+
+    integration._local_listener_probe = observe
+    try:
+        await integration.configure(enabled=False)
+        await integration.wait_automatic_query_start()
+        bound_receiver = receiver.receiver
+        messages = list(sender.messages)
+        retry = asyncio.create_task(integration.retry_automatic_discovery())
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        service.info = replace(target, osc_send_port=19001)
+        service.block_avatar_queries = True
+        background = asyncio.create_task(integration.query_runtime.refresh(publish_snapshot=False))
+        await asyncio.wait_for(service.query_started.wait(), timeout=1)
+        release.set()
+        result = await asyncio.wait_for(retry, timeout=1)
+        assert result["status"] == "degraded"
+        assert result["effect"] == "discovery_unavailable"
+        assert result["reason"] == "discovery_timeout"
+        assert not background.done()
+        assert receiver.receiver is bound_receiver
+        assert integration.query_runtime.started is True
+        assert sender.messages == messages
+    finally:
+        release.set()
+        service.query_gate.set()
+        await asyncio.gather(
+            *(task for task in (retry, background) if task is not None),
+            return_exceptions=True,
+        )
+        await integration.close()

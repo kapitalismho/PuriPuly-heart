@@ -1,6 +1,8 @@
 ## General
 
 - Code comments are added only when explicitly requested.
+- Do not modify README files, architecture.md, PRIVACY.md, or CONTRIBUTING.md unless explicitly requested.
+- Report drift in these documents caused by your changes, including the affected file and mismatch.
 - Use `docs/architecture.md` as the system map when a task requires reasoning about how the system fits together.
 - Report suspected architecture drift introduced by your changes to the user.
 - Report any user-visible changes after completing the work.

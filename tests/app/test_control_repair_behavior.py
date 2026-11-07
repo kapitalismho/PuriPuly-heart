@@ -732,7 +732,7 @@ async def test_install_cancel_still_targets_started_owner_work(offline):
 
 @pytest.mark.asyncio
 async def test_manual_output_wait_allows_safe_mutations_but_orders_provider_transition(
-    offline, monkeypatch
+    offline, monkeypatch, memory_osc_transports
 ):
     app = compose_headless_application(offline)
     entered = asyncio.Event()
@@ -741,6 +741,7 @@ async def test_manual_output_wait_allows_safe_mutations_but_orders_provider_tran
 
     from uuid import uuid4
 
+    from puripuly_heart.app.ports.osc_control import SECONDARY_LANGUAGE_ID_BY_CODE
     from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
 
     async def slow_output(_text):
@@ -756,6 +757,7 @@ async def test_manual_output_wait_allows_safe_mutations_but_orders_provider_tran
         await app.start()
         control = app.control()
         control.bind_instance("isolated-manual-wait")
+        osc_runtime = await memory_osc_transports.enable_manual(app)
         monkeypatch.setattr(app, "submit_text", slow_output)
         monkeypatch.setattr(app, "set_translation_enabled", translation)
         manual = await control.submit("text.submit", {"text": "safe text"}, request_id="manual")
@@ -787,10 +789,11 @@ async def test_manual_output_wait_allows_safe_mutations_but_orders_provider_tran
         )
         assert (await control.wait(conflicting["operation_id"], timeout=0.01))["terminal"] is False
         assert (await control.wait(stale["operation_id"], timeout=0.01))["terminal"] is False
-        osc_runtime = app._runtime_shutdown.vrc_mic_sync()
-        assert osc_runtime is not None
         osc_change = asyncio.create_task(
-            osc_runtime.router._application.set_secondary_target_language("zh-CN")
+            osc_runtime.router.dispatch_packet(
+                "/avatar/parameters/PuriPuly_SelfDstLang2",
+                SECONDARY_LANGUAGE_ID_BY_CODE["zh-CN"],
+            )
         )
         await asyncio.sleep(0)
         assert not osc_change.done()
@@ -806,7 +809,9 @@ async def test_manual_output_wait_allows_safe_mutations_but_orders_provider_tran
         }
         assert (await control.wait(conflicting["operation_id"], timeout=5))["status"] == "applied"
         assert translated == [False]
-        await asyncio.wait_for(osc_change, 5)
+        osc_result = await asyncio.wait_for(osc_change, 5)
+        assert osc_result.applied is True
+        assert osc_result.error is None
         assert (await control.query("settings.current", {}))["settings"]["intent"]["languages"][
             "secondary_target_language"
         ] == "zh-CN"

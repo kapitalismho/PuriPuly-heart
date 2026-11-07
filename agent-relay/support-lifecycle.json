@@ -1,0 +1,12 @@
+{
+  "rules": [
+    {
+      "id": "support-report-retention-30d",
+      "enabled": true,
+      "conditions": { "prefix": "support/" },
+      "deleteObjectsTransition": {
+        "condition": { "type": "Age", "maxAge": 2592000 }
+      }
+    }
+  ]
+}

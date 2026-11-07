@@ -159,6 +159,8 @@ class LocalASRProviderRuntimeOwner:
         self._operation_tasks: dict[asyncio.Task[object], int] = {}
         self._provider_build_tasks: dict[ProviderRuntimeChannel, set[asyncio.Task[object]]] = {}
         self._callback_tasks: set[asyncio.Task[object]] = set()
+        self._probe_locks = {channel: asyncio.Lock() for channel in _CHANNELS}
+        self._probe_handles: dict[ProviderRuntimeChannel, ProviderRuntimeHandle] = {}
         self._scope = LifecycleScope("local-asr-provider-runtime")
         self._gpu_generation = 0
         self._gpu_phase: ProviderRuntimeGpuPhase = "inactive"
@@ -486,6 +488,49 @@ class LocalASRProviderRuntimeOwner:
     def current_provider(self, channel: ProviderRuntimeChannel) -> object | None:
         self._validate_channel(channel)
         return self._handles[channel].provider
+
+    def recognition_probe_handle(self, channel: ProviderRuntimeChannel) -> ProviderRuntimeHandle:
+        self._validate_channel(channel)
+        return self._handles[channel]
+
+    @asynccontextmanager
+    async def recognition_probe_provider(
+        self,
+        channel: ProviderRuntimeChannel,
+        request: ProviderRuntimeBuildRequest | None,
+    ):
+        self._require_open("probe recognition")
+        self._validate_channel(channel)
+        async with self._probe_locks[channel]:
+            async with self._operation():
+                self._require_open("probe recognition")
+                if channel in self._probe_handles or self._channel_phases[channel] == "building":
+                    yield None, self._handles[channel].generation
+                    return
+                handle = self._handles[channel]
+                with handle.retain_current_provider() as (provider, generation):
+                    if provider is not None or request is None or handle.has_resources:
+                        yield provider, generation
+                        return
+                    provider = await self._provider_factory.create(
+                        request, gpu_runtime=self._gpu_runtime
+                    )
+                    temporary = ProviderRuntimeHandle(
+                        name=f"{channel}_recognition_probe", provider=provider
+                    )
+                    self._probe_handles[channel] = temporary
+                    try:
+                        yield provider, generation
+                    finally:
+                        await self._close_probe_handle(channel)
+
+    async def _close_probe_handle(self, channel: ProviderRuntimeChannel) -> None:
+        handle = self._probe_handles[channel]
+        provider = handle.provider
+        if isinstance(provider, ScopedRecognitionEngine):
+            await provider.close_backend_and_wait()
+        await handle.close()
+        self._probe_handles.pop(channel)
 
     async def replace_prebuilt_provider(
         self,
@@ -1183,6 +1228,11 @@ class LocalASRProviderRuntimeOwner:
                     await self._discard_pending_candidate(channel, provider)
                 except Exception as exc:
                     failures.append(exc)
+            for channel in tuple(self._probe_handles):
+                try:
+                    await self._close_probe_handle(channel)
+                except Exception as exc:
+                    failures.append(exc)
             try:
                 await self._gpu_runtime.close()
             except Exception as exc:
@@ -1292,6 +1342,17 @@ class LocalASRProviderRuntimeOwner:
         *,
         on_terminal_failure: ProviderRuntimeTerminalFailureSink | None,
     ) -> tuple[object | None, str | None, str | None, str | None, ErrorDiagnostics | None]:
+        async with self._probe_locks[request.channel]:
+            return await self._build_provider_at_capacity(
+                request, on_terminal_failure=on_terminal_failure
+            )
+
+    async def _build_provider_at_capacity(
+        self,
+        request: ProviderRuntimeBuildRequest,
+        *,
+        on_terminal_failure: ProviderRuntimeTerminalFailureSink | None,
+    ) -> tuple[object | None, str | None, str | None, str | None, ErrorDiagnostics | None]:
         channel = request.channel
         previous_phase = self._channel_phases[channel]
         self._channel_phases[channel] = "building"
@@ -1302,6 +1363,10 @@ class LocalASRProviderRuntimeOwner:
         failure_stage = "provider_build"
         try:
             await self._publish_state()
+            retained_probe = self._probe_handles.get(channel)
+            if retained_probe is not None:
+                failure_stage = "provider_reclaim"
+                await self._close_probe_handle(channel)
             if request.provider_id == "qwen_audio":
                 failure_stage = "provider_reclaim"
                 await self._handles[channel].reclaim_qwen_resources(

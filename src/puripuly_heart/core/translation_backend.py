@@ -1,11 +1,33 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
 from puripuly_heart.domain.models import Translation
+
+_probe_active: ContextVar[bool] = ContextVar("translation_probe_active", default=False)
+
+
+class TranslationProbePreparationRequired(RuntimeError):
+    pass
+
+
+def require_translation_preparation_allowed() -> None:
+    if _probe_active.get():
+        raise TranslationProbePreparationRequired
+
+
+@contextmanager
+def translation_probe_scope():
+    token = _probe_active.set(True)
+    try:
+        yield
+    finally:
+        _probe_active.reset(token)
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,5 +106,8 @@ __all__ = [
     "LlmTranslationBackend",
     "TranslationBackend",
     "TranslationBackendRequest",
+    "TranslationProbePreparationRequired",
     "TranslationSecretResolver",
+    "require_translation_preparation_allowed",
+    "translation_probe_scope",
 ]

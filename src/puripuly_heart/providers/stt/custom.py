@@ -14,6 +14,7 @@ import httpx
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
+from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
@@ -108,12 +109,17 @@ class CustomSTTBackend(STTBackend):
     extra: Mapping[str, object] = field(default_factory=dict)
     http_client_factory: Callable[..., httpx.AsyncClient] = httpx.AsyncClient
     websocket_connect: Callable[..., Any] | None = None
+    _starting_sessions: list[STTBackendSession] = field(
+        init=False, default_factory=list, repr=False
+    )
+    _startup_scope: LifecycleScope = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         validate_mode_compatibility(self.mode, self.compatibility)
         if self.sample_rate_hz <= 0:
             raise ValueError("sample_rate_hz must be > 0")
         self.extra = normalize_custom_stt_extra(self.extra)
+        self._startup_scope = LifecycleScope(f"custom-stt-startup:{id(self):x}")
 
     async def open_session(
         self,
@@ -152,9 +158,44 @@ class CustomSTTBackend(STTBackend):
                 websocket_connect=self.websocket_connect,
                 projection=projection,
             )
-            await session.start()
+            self._starting_sessions.append(session)
+            try:
+                await session.start()
+            except BaseException:
+                await self._close_starting_session(session)
+                raise
+            self._starting_sessions.remove(session)
             return session
         raise CustomSTTConfigurationError(f"unsupported Custom STT mode: {self.mode}")
+
+    async def _close_starting_session(self, session: STTBackendSession) -> None:
+        async def close_session():
+            try:
+                await session.close()
+                return None
+            except (Exception, asyncio.CancelledError) as exc:
+                return exc
+
+        closing = start_lifecycle_task(
+            self._startup_scope, close_session(), name=f"close:{id(session):x}"
+        )
+        cancelled = False
+        while not closing.done():
+            try:
+                await asyncio.shield(closing)
+            except asyncio.CancelledError:
+                cancelled = True
+        failure = closing.result()
+        if failure is not None:
+            raise RuntimeError("custom_stt_startup_cleanup_failed") from failure
+        self._starting_sessions.remove(session)
+        if cancelled:
+            raise asyncio.CancelledError
+
+    async def close(self) -> None:
+        for session in tuple(self._starting_sessions):
+            await self._close_starting_session(session)
+        await self._startup_scope.close()
 
 
 @dataclass(slots=True)
@@ -534,9 +575,6 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         try:
             await self._send_json(self._session_update_payload())
         except Exception as exc:
-            with contextlib.suppress(Exception):
-                await self._ws.close()
-            self._ws = None
             raise CustomSTTRequestError(
                 f"Custom STT endpoint unreachable ({sanitize_endpoint_for_display(self._url)})",
                 category=CUSTOM_STT_VALIDATION_UNREACHABLE,
@@ -748,7 +786,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 retire=True,
                 provenance=STTNativeProvenance(barrier="close"),
             )
-        if self._stopped:
+        if self._stopped and self._ws is None and self._recv_task is None:
             return
         self._stopped = True
         recv_task = self._recv_task
@@ -758,10 +796,9 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await recv_task
         ws = self._ws
-        self._ws = None
         if ws is not None:
-            with contextlib.suppress(Exception):
-                await ws.close()
+            await ws.close()
+            self._ws = None
         self._event_projection.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:

@@ -8,6 +8,7 @@ from puripuly_heart.app.ports.audio_test import (
     AudioTestSourceUnavailable,
 )
 from puripuly_heart.core.audio.source import (
+    AudioSourceOpenFailure,
     MicrophoneTestRouteObservation,
     SelfMicCaptureChannelDecision,
 )
@@ -35,6 +36,8 @@ class MicrophoneAudioTestSourceOpener:
     channel_decision: MicrophoneChannelDecision
     source_factory: MicrophoneSourceFactory
     log_sink: AudioTestLogSink
+    expected_device_name: str | None = None
+    allow_channel_fallback: bool = True
 
     async def open(self, *, on_acquired: Callable[[object], None]) -> AudioTestOpenedSource:
         source: object | None = None
@@ -50,11 +53,20 @@ class MicrophoneAudioTestSourceOpener:
                     "input_route_unavailable",
                     observation.resolution_exception_class or "unavailable",
                 )
+            if (
+                self.expected_device_name is not None
+                and observation.resolved_device_name != self.expected_device_name
+            ):
+                raise AudioTestSourceUnavailable("input_route_changed")
             decision = self.channel_decision(
                 device_idx=observation.resolved_device_idx,
                 internal_channels=self.internal_channels,
             )
-            source = self._open(observation, decision.preferred_capture_channels)
+            try:
+                source = self._open(observation, decision.preferred_capture_channels)
+            except AudioSourceOpenFailure as exc:
+                source = exc.source
+                raise
             return AudioTestOpenedSource(source=source, device=self._device(source, observation))
 
         try:
@@ -75,8 +87,10 @@ class MicrophoneAudioTestSourceOpener:
 
         try:
             return open_channels(channels)
+        except AudioSourceOpenFailure:
+            raise
         except Exception as exc:
-            if channels <= self.internal_channels:
+            if not self.allow_channel_fallback or channels <= self.internal_channels:
                 raise
             self.log_sink(
                 "[AudioTest] channel=self capture channel fallback "

@@ -296,8 +296,14 @@ class PeerCaptionOwner:
             started = (
                 transcript.created_at if transcript.created_at is not None else self.clock.now()
             )
+            caption = self._new_caption(transcript, provider_id, scope)
+            if provider_id == "qwen_audio":
+                caption.speaker_assignment = SpeakerAssignment(
+                    SpeakerAttribution("non_diarized"),
+                    scope_order=(caption.generation, caption.source_order, 0),
+                )
             segment = _Segment(
-                self._new_caption(transcript, provider_id, scope),
+                caption,
                 started,
                 started + 5.0,
                 transcript.text,
@@ -340,7 +346,14 @@ class PeerCaptionOwner:
             prepared = self._prepare(segment.caption, source, "preview", segment.config)
             await self._slots.acquire()
             await self._execute(
-                segment.caption, source, "preview", revision, segment.config, prepared, segment
+                segment.caption,
+                source,
+                "preview",
+                revision,
+                segment.config,
+                prepared,
+                segment,
+                assignment=segment.caption.speaker_assignment,
             )
 
     def abandon(self, utterance_id: UUID) -> None:

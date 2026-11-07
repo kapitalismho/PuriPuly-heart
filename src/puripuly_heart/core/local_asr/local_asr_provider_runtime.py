@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 import numpy as np
 
@@ -18,6 +19,9 @@ from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.stt.backend import STTProviderTurnEvent
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
+
+if TYPE_CHECKING:
+    from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 
 ProviderRuntimeChannel = Literal["self", "peer"]
 ProviderRuntimeChannelPhase = Literal[
@@ -327,6 +331,16 @@ class LocalASRProviderRuntimePort(Protocol):
         operation_id: str | None = None,
         request_id: str | None = None,
     ) -> None: ...
+
+    def recognition_probe_handle(
+        self, channel: ProviderRuntimeChannel
+    ) -> ProviderRuntimeHandle: ...
+
+    def recognition_probe_provider(
+        self,
+        channel: ProviderRuntimeChannel,
+        request: ProviderRuntimeBuildRequest | None,
+    ) -> AbstractAsyncContextManager[tuple[object | None, int]]: ...
 
     async def handle_vad_event(
         self,

@@ -33,6 +33,7 @@ from puripuly_heart.app.ports.ui_application_intents import (
 from puripuly_heart.app.ports.ui_application_state import (
     UiApplicationStateRuntimePort,
 )
+from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.app.services.application_control import ApplicationControlOwner
 from puripuly_heart.app.services.application_control_events import ControlEvents
 from puripuly_heart.app.services.application_shutdown import (
@@ -522,23 +523,23 @@ def compose_test_ui_application_boundary(
         runtime_control_authority=runtime_control_authority,
         runtime_control_activity=runtime_control_activity,
     )
-    boundary.attach_control(
-        ApplicationControlOwner(
-            application=boundary,
-            settings=None,
-            pipeline=None,
-            results=None,
-            events=ControlEvents(),
-            provisioning=lambda: None,
-            gpu=lambda: None,
-            peer=lambda: None,
-            calibration=lambda: None,
-            gemma=lambda: None,
-            sync_ui=lambda: None,
-            locale_choices=("en",),
-            localize=lambda key: key,
-            gemma_selection=lambda _settings: None,
-            instance_id="00000000-0000-0000-0000-000000000231",
-        ),
+    control = ApplicationControlOwner(
+        application=boundary,
+        settings=None,
+        pipeline=None,
+        results=None,
+        events=ControlEvents(),
+        provisioning=lambda: None,
+        gpu=lambda: None,
+        peer=lambda: None,
+        calibration=lambda: None,
+        gemma=lambda: None,
+        sync_ui=lambda: None,
+        locale_choices=("en",),
+        localize=lambda key: key,
+        gemma_selection=lambda _settings: None,
+        instance_id="00000000-0000-0000-0000-000000000231",
     )
+    boundary.attach_control(control)
+    boundary.attach_agent_chat(AgentChatOwner(control, None, localize=lambda key: key))
     return boundary

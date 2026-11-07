@@ -1,0 +1,16 @@
+{
+  "name": "@puripuly-heart/agent-relay",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --ip 127.0.0.1 --port 8788 --inspector-port 9230 --config wrangler.jsonc",
+    "typecheck": "tsc --noEmit --project ../tsconfig.json",
+    "test": "vitest run --root .. agent-relay/tests",
+    "support:storage": "node operations/support-storage.mjs",
+    "context:export": "node operations/export-context.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.153.0"
+  }
+}

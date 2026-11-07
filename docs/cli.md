@@ -114,7 +114,35 @@ The GUI dashboard's “Ready!” means Self/TALK capture is active and its recog
 
 Use the terminal operation receipt together with `providers.status`, `models status`, `overlay status`, `osc status`, or the relevant owner's query. Correct the reported cause before explicitly retrying. A failed/cancelled current translation warmup turns effective translation off while retaining the selection and failure details.
 
+An explicit SteamVR runtime shutdown turns CAPTIONS off after native cleanup, without a Desktop fallback or automatic restart. The saved VR target and calibration remain unchanged; capture and translation continue independently. Start SteamVR and use `overlay set on` to enable captions again. Initial enable without SteamVR retains the existing Desktop fallback; genuine crashes and cleanup failures remain failures. If runtime shutdown interrupts an enable operation, its receipt can be `degraded` because ON was not reached; use `overlay status` to distinguish the resulting clean OFF state from an overlay failure.
+
 Matching `translation set off` or `capture set <channel> off` can revoke pending startup. Shared model demand may keep resources alive for another channel. Runtime stops are distinct from cancelling an explicit model download/import.
+
+`osc discovery retry` performs one bounded automatic-discovery attempt using the saved connection. It refreshes/reapplies target information for a running discovery service or restarts failed discovery resources; it does not rebuild a healthy receiver or change saved destinations. Manual/off, in-flight, changed connections and stopped lifecycles are rejected. The terminal receipt distinguishes `applied` with `discovery_target_applied` from `degraded` with `discovery_unavailable`; acceptance or scheduling alone is not recovery. `osc status` exposes the current destination source and a retained, timestamped local-listener observation. Unknown ownership/access remains unknown; the narrow local probe is not applicable to non-loopback destinations. Finding/applying a target or matching a listener does not prove VRChat health, receipt or display. Remote delivery remains unacknowledged; the operation submits no chatbox text and replays no old translations.
+
+### Independent Component Checks
+
+These commands use application-owned synthetic inputs, not the microphone, loopback, speaker playback, or normal conversation/output pipeline:
+
+| Command | Arguments | Successful terminal result establishes |
+| --- | --- | --- |
+| `recognition.probe` | `{"channel":"self"}` or `{"channel":"peer"}` | A nonempty authoritative final recognition result for that configured recognizer's isolated test session |
+| `translation.probe` | `{}` | A nonempty synthetic translation through the currently attached shared translation backend |
+
+```powershell
+puripuly.exe command recognition.probe --arguments '{"channel":"self"}'
+puripuly.exe command recognition.probe --arguments '{"channel":"peer"}'
+puripuly.exe command translation.probe
+```
+
+Read the terminal receipt, not admission or readiness. Recognition reports `recognition_result`, final-event authority, configured/exercised provider, and captured/current revision and generation. It uses the bundled 1.194-second Korean speech sample without changing the configured language; `language_coverage: korean_fixture_only` is a limitation, not an accuracy guarantee. For `rolling_free`, `recognition_scope: single_eligible_rolling_member` identifies only the tested member, not full rolling-route health.
+
+An inactive configured recognition channel can use a probe-owned backend without enabling capture. An attached channel keeps its live sessions/model capacity; the probe owns only its isolated session. Missing assets/authentication/readiness return a prerequisite or failure, without provisioning, login, provider switching, or settings changes. Translation requires an already attached usable backend and reports `translation_result`; managed preparation is not silently performed. Existing selected-provider routing can involve more than one transport attempt and may incur its normal cost.
+
+Cold recognition probe success also includes temporary-backend cleanup. Pending or failed cleanup remains runtime-owned and reserves that channel's construction capacity until reclaimed; a cancelled operation does not by itself prove resource release.
+
+Empty, failed, cancelled, or stale results are not successful tests. Receipts omit recognized/translated text and explicitly mark untested stages: real capture, recognition accuracy, translation after recognition, output delivery, and display as applicable. A successful component check does not certify the whole Self/Listen path. The sample duration is not a completion-time guarantee.
+
 
 ### Peer Capture and Audio Tests
 
@@ -125,6 +153,17 @@ A capture-target change that is saved while requested Peer capture remains pendi
 After a capture failure, explicitly applying a valid target reports `applied` once the requested provider and capture configuration are ready and active. Resubmitting that unchanged healthy target also reports `applied`. Prior safe failure evidence remains available through bounded current-instance `diagnostics.history`; it does not make recovered capture degraded. Pending recovery and new current failures still prevent successful convergence.
 
 `audio test on|off` runs VAD without recognition or translation. It pauses normal capture and restores only still-valid prior intent; inspect `app status` → `audio_test` for readiness, failures, and VAD readings. Stopping waits for owned input release, not just a visual toggle.
+
+`audio diagnose` runs the cancellable `audio.diagnose {}` operation. It tests up to four actually enumerated microphone/host pairs sequentially, current route first, with a bounded three-second observation window per candidate. Present Virtual Desktop, Steam Link, Meta Link/Air Link and PICO microphone-driver routes are considered before unrelated alternatives; distinct driver routes precede duplicate host-API views of the same driver. Names only affect test order, never the measured choice or saved settings. Playback-only endpoints are excluded. A driver can remain installed while its headset session, microphone permission or passthrough is unavailable, so enumeration alone does not establish working input. The operation pauses normal capture through the same owner and restores only still-authorized intent; it never tests loopback, performs recognition, calls a cloud service, saves audio or changes the selected route.
+
+```powershell
+puripuly.exe audio diagnose
+puripuly.exe audio diagnose --no-wait
+```
+
+Read each candidate's open/readiness, frame count, signal level, VAD evidence, failure and cleanup fields. The diagnosis owner alone ends the observation window; reaching that bound preserves measured frames without inventing a no-audio failure. The best measured candidate without a source or cleanup failure is a suggestion for a separate settings change, not a recovery certificate. Equal evidence preserves test order, including the current route; silence-only frames do not prove microphone speech works. Actual source and cleanup failures remain failures even after frames arrive and exclude that candidate from selection. Silence, missing frames and recognition failure are distinct. A cancelled operation can retain unresolved native cleanup debt, which blocks conflicting capture until release. A later explicit capture-off is never undone by restoration.
+
+Diagnostic history records bounded numeric evidence without raw audio, device labels or exception prose. Audio-test logging adds phase, frame/level/VAD and cleanup observations. These establish only the exercised input/VAD path, not recognition, translation or physical caption display.
 
 ### Manual Text
 
@@ -272,7 +311,7 @@ puripuly.exe query diagnostics.health
 Use returned identities, not invented placeholders. `capabilities.query_arguments` describes supported history filters and limits.
 
 - Records preserve safe typed causes and known relationships. Missing relationships remain unknown; secondary cleanup failures do not replace the primary cause. Owner state and terminal receipts remain authoritative.
-- History is bounded, in-memory, and current-instance only. Inspect gaps, eviction/truncation, and lookup outcomes. `not_retained`, `foreign_instance`, or `invalid_cursor` does not mean an operation succeeded or never failed.
+- History is bounded, in-memory, and current-instance only. Inspect gaps, eviction/truncation, and lookup outcomes. An unfiltered cursor at the current tail returns `no_new_records`: no newer retained diagnostic at that snapshot, not proof of recovery. Missing requested identities remain `not_retained`; neither that nor `foreign_instance` or `invalid_cursor` proves an operation succeeded or never failed.
 - History's `next_after` is a diagnostic cursor. An event's `sequence` is a replay cursor. They are not interchangeable; retain the originating instance with either.
 - `diagnostics.health` reports history/event/file/output delivery health independently of a working file sink. Enqueued is not written; written is not durable. Aggregate counters do not prove persistence of an individual record.
 - Terminal file records trigger delivery without waiting for ordinary batch expiry; their severity is unchanged. This does not bypass a blocked sink or the bounded close deadline: a timeout remains visible and cleanup stays listener-owned.

@@ -198,6 +198,7 @@ class OverlayApplicationOwner:
     _recovering_from_crash: bool = field(init=False, default=False, repr=False)
     _recovery_episode_started_at: float | None = field(init=False, default=None, repr=False)
     _recovery_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _normal_stop_pending: bool = field(init=False, default=False, repr=False)
     _shutting_down: bool = field(init=False, default=False, repr=False)
     _active_target: str | None = field(init=False, default=None, repr=False)
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
@@ -432,15 +433,25 @@ class OverlayApplicationOwner:
 
     async def wait_start_outcome(self) -> dict[str, object]:
         seen: set[asyncio.Task[object]] = set()
-        while self._state in {"starting", "recovering"} and not self._ingress_stopped:
+        while (
+            self._state in {"starting", "recovering"} or self._normal_stop_pending
+        ) and not self._ingress_stopped:
             runtime = self._runtime
             start_task = runtime.start_task if runtime is not None else None
             fallback_task = self._fallback_owner.task if self._fallback_owner.active else None
-            recovery_task = self._startup_recovery_task
+            manager = runtime.process_manager if runtime is not None else None
+            recovery_task = self._startup_recovery_task or (
+                self._recovery_task if self._normal_stop_pending else None
+            )
+            terminal_watcher = (
+                runtime.monitor_task
+                if runtime is not None and getattr(manager, "runtime_stop_completed", False)
+                else None
+            )
             task = next(
                 (
                     candidate
-                    for candidate in (start_task, fallback_task, recovery_task)
+                    for candidate in (start_task, fallback_task, terminal_watcher, recovery_task)
                     if candidate is not None and candidate not in seen
                 ),
                 None,
@@ -456,7 +467,7 @@ class OverlayApplicationOwner:
                     raise
                 if self._ingress_stopped:
                     break
-            if (
+            if not self._normal_stop_pending and (
                 self._state == "connected"
                 or self._state in {"failed", "off"}
                 and not (self._fallback_owner.active and self._fallback_owner.task is not None)
@@ -495,6 +506,14 @@ class OverlayApplicationOwner:
                 intent_generation=generation,
             )
             return
+        manager = runtime.process_manager if runtime is not None else None
+        if getattr(manager, "runtime_stop_reason", None) is not None:
+            await self.shutdown(
+                preserve_failure_reason=not getattr(manager, "runtime_stop_completed", False),
+                drain_retired=False,
+            )
+            if not self._intent_is_current(generation, enabled=True):
+                return
         try:
             await self.begin_start(intent_generation=generation)
         finally:
@@ -1055,7 +1074,7 @@ class OverlayApplicationOwner:
     async def watch_runtime(
         self,
         manager: OverlayProcessManager,
-        monitor_task: asyncio.Task[None],
+        monitor_task: asyncio.Future[None],
         *,
         runtime: OverlayRuntimeHandle | None = None,
         overlay_instance_id: str | None = None,
@@ -1070,14 +1089,22 @@ class OverlayApplicationOwner:
                 return
             if runtime is None or runtime.process_manager is not manager:
                 return
-            if manager.state != "failed":
+            normal_stop = getattr(manager, "runtime_stop_completed", False)
+            if manager.state != "failed" and not normal_stop:
                 return
             if self._ingress_stopped or self._shutting_down:
                 return
             if self._recovery_task is not None and not self._recovery_task.done():
                 return
+            self._normal_stop_pending = normal_stop
             self._recovery_task = asyncio.create_task(
-                self._handle_runtime_failure(manager, runtime, runtime.monitor_task),
+                (
+                    self._handle_runtime_stop(
+                        manager, runtime, runtime.monitor_task, self._intent_generation
+                    )
+                    if normal_stop
+                    else self._handle_runtime_failure(manager, runtime, runtime.monitor_task)
+                ),
                 name="overlay-application-recovery",
             )
             self._recovery_task.add_done_callback(self._clear_recovery_task)
@@ -1087,11 +1114,46 @@ class OverlayApplicationOwner:
     def _clear_recovery_task(self, task: asyncio.Task[None]) -> None:
         if self._recovery_task is task:
             self._recovery_task = None
+            self._normal_stop_pending = False
         if not task.cancelled() and (error := task.exception()) is not None:
             self.log_basic(
                 f"[Overlay] Recovery task failed: exception_type={type(error).__name__}",
                 logging.ERROR,
             )
+
+    async def _handle_runtime_stop(
+        self,
+        manager: OverlayProcessManager,
+        runtime: OverlayRuntimeHandle,
+        watcher: asyncio.Task[object] | None,
+        intent_generation: int,
+    ) -> None:
+        for task in (watcher, runtime.start_task):
+            if task is not None and task is not asyncio.current_task():
+                await asyncio.shield(task)
+        if (
+            self._ingress_stopped
+            or self._shutting_down
+            or not self.runtime_is_current(runtime)
+            or runtime.process_manager is not manager
+            or intent_generation != self._intent_generation
+            or not manager.runtime_stop_completed
+        ):
+            return
+        self._intent_generation += 1
+        generation = self._intent_generation
+        self.overlay_intent_sink(False)
+        self._pending_enable_generation = None
+        self.clear_fallback()
+        self._cancel_startup_recovery()
+        self._recovering_from_crash = False
+        self._recovery_episode_started_at = None
+        self._terminal_restart_attempts = 0
+        await self.shutdown(
+            preserve_failure_reason=False,
+            drain_retired=False,
+            intent_generation=generation,
+        )
 
     async def _handle_runtime_failure(
         self,
@@ -1123,6 +1185,7 @@ class OverlayApplicationOwner:
             await asyncio.gather(task, return_exceptions=True)
             if self._recovery_task is task:
                 self._recovery_task = None
+                self._normal_stop_pending = False
 
     def _desktop_startup_recovery_candidate(
         self,

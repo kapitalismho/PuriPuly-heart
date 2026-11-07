@@ -74,6 +74,8 @@ def _deliver_record(logger: logging.Logger, record: logging.LogRecord) -> bool:
 class RuntimeLoggingAdapterPort(Protocol):
     log_file: Path
 
+    def support_log_snapshot(self) -> bytes: ...
+
     def configure_diagnostics(self, *, instance_id: str | None = None, event_sink=None) -> None: ...
 
     def diagnostic_history(self, arguments: dict) -> dict: ...
@@ -189,6 +191,9 @@ class RuntimeLoggingService:
     @property
     def log_file(self) -> Path:
         return self._session.log_file
+
+    def support_log_snapshot(self) -> bytes:
+        return self._session.support_log_snapshot()
 
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {

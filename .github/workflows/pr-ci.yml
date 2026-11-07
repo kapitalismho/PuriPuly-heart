@@ -146,6 +146,17 @@ jobs:
       - name: Run broker tests
         run: pnpm exec vitest run broker/tests --exclude "broker/tests/deploy-smoke/**"
 
+      - name: Run agent relay tests
+        run: pnpm --filter @puripuly-heart/agent-relay test
+
+      - name: Build agent relay bundle offline
+        env:
+          WRANGLER_SEND_METRICS: "false"
+          CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: "false"
+        run: |
+          pnpm --filter @puripuly-heart/agent-relay exec wrangler deploy --dry-run --config wrangler.jsonc --outdir "${{ runner.temp }}/agent-relay-bundle"
+          test -s "${{ runner.temp }}/agent-relay-bundle/index.js"
+
   native-overlay:
     name: Overlay
     runs-on: windows-latest

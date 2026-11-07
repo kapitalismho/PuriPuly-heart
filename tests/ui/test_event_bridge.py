@@ -214,6 +214,7 @@ def make_bridge(app: object, **kwargs: object) -> UIEventBridge:
         on_overlay_state_changed=kwargs.pop(
             "on_overlay_state_changed", getattr(app, "on_overlay_state_changed", None)
         ),
+        on_error_presented=kwargs.pop("on_error_presented", None),
     )
 
 
@@ -744,6 +745,48 @@ async def test_event_bridge_preserves_typed_error_payload_identity_for_error_des
         assert error_destination.events[index] is events[index]
     assert dashboard.errors == []
     assert app.view_dashboard.display_calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("shown", [True, False])
+async def test_displayed_error_report_offers_its_diagnostic_id_to_the_app(shown) -> None:
+    app = DummyApp()
+    dashboard = RecordingDashboardDestination()
+    presented: list[tuple[str, str]] = []
+    bridge = make_bridge(
+        app,
+        dashboard_destination=dashboard,
+        error_destination=RecordingErrorDestination(show_dashboard_error=shown),
+        on_error_presented=lambda text, diagnostic_id: presented.append((text, diagnostic_id)),
+    )
+    report = messages.UserErrorReport(
+        message=messages.UserMessageRef(
+            key="stt.failure", params={"provider": "soniox"}, severity=messages.SEVERITY_ERROR
+        ),
+        diagnostics=messages.ErrorDiagnostics(
+            component="provider.stt",
+            operation="open_session",
+            code="stt.timeout",
+            category=messages.DIAGNOSTIC_CATEGORY_TIMEOUT,
+            visibility=messages.DIAGNOSTIC_VISIBILITY_BASIC,
+            content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
+            status_code=None,
+            retry_after_ms=None,
+            fields={"provider": "soniox"},
+        ),
+    )
+
+    await bridge._handle_event(
+        UIEvent(type=UIEventType.ERROR, payload=report, runtime_log_handled=True)
+    )
+    await bridge._handle_event(
+        UIEvent(type=UIEventType.ERROR, payload="raw failure", runtime_log_handled=True)
+    )
+
+    if shown:
+        assert presented == [(dashboard.errors[0], report.diagnostics.diagnostic_id)]
+    else:
+        assert presented == [] and dashboard.errors == []
 
 
 @pytest.mark.asyncio

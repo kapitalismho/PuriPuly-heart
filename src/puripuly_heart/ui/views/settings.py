@@ -16,6 +16,7 @@ from typing import Awaitable, Callable, Mapping
 
 import flet as ft
 
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretKey,
     SettingsSecretLoadResult,
@@ -142,6 +143,9 @@ from puripuly_heart.ui.components.settings import (
     PromptEditor,
     SettingsModal,
     SettingsUnitCard,
+)
+from puripuly_heart.ui.components.settings.api_key_verification_controller import (
+    CompletionHandler,
 )
 from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 from puripuly_heart.ui.components.subtab_shell import TextSubtab, TextSubtabShell
@@ -433,8 +437,13 @@ class SettingsView(ft.Column):
         self.on_local_llm_secret_changed: Callable[[], None] | None = None
         self.on_custom_stt_secret_changed: Callable[[], None] | None = None
         self.on_request_openrouter_pkce: Callable[[OpenRouterPkceTarget], None] | None = None
-        self.on_verify_api_key: Callable[[str, str], object] | None = None
+        self.on_verify_api_key: (
+            Callable[[str, str], Awaitable[ProviderCredentialVerificationOutcome]] | None
+        ) = None
         self.on_provider_secret_change: Callable[[str, str], object] | None = None
+        self._verification_completion: CompletionHandler | None = None
+        self._verification_providers: frozenset[str] = frozenset()
+        self._agent_guidance_provider: str | None = None
         self.on_secret_cleared: Callable[[str], None] | None = None  # key name
         self.on_overlay_calibration_begin: Callable[[], OverlayCalibration] | None = None
         self.on_overlay_calibration_change: Callable[[str, object], OverlayCalibration] | None = (
@@ -565,6 +574,114 @@ class SettingsView(ft.Column):
 
     def api_keys_control(self) -> ft.Control:
         return self._api_keys_card
+
+    def bind_verification_completion(self, callback: CompletionHandler | None) -> frozenset[str]:
+        self._verification_completion = callback
+        self._verification_providers = frozenset(
+            field._provider
+            for field in self._api_keys_column.controls
+            if isinstance(field, ApiKeyField)
+            and field.bind_verification_completion(
+                self._key_verification_completed
+                if callback is not None and callable(self.on_verify_api_key)
+                else None
+            )
+        )
+        return self._verification_providers
+
+    def _key_verification_completed(self, provider: str, success: bool, code: str | None) -> None:
+        if self._verification_completion is None:
+            return
+        if self._agent_guidance_provider == provider:
+            self._agent_navigation_guidance.value = (
+                f"{provider}: 키 저장과 확인을 마쳤어요. Puri에서 다음 안내를 확인할 수 있어요."
+                if success
+                else f"{provider}: 저장 또는 확인에 실패했어요. 보안 입력란에서 다시 시도할 수 있어요."
+            )
+            _update_control_if_mounted(self._agent_navigation_banner)
+        self._verification_completion(provider, success, code)
+
+    def open_agent_section(
+        self,
+        section: str,
+        provider: str | None,
+        *,
+        show_settings: Callable[[], None],
+    ) -> dict:
+        tab_key = {
+            "api": "api",
+            "general": "general",
+            "overlay": "overlay",
+            "prompts": "prompt",
+        }.get(section)
+        key_fields = {
+            field._provider: field
+            for field in self._api_keys_column.controls
+            if isinstance(field, ApiKeyField)
+        }
+        if tab_key is None or (
+            provider is not None and (section != "api" or provider not in key_fields)
+        ):
+            return {
+                "opened": False,
+                "field_visible": False,
+                "completion_observable": False,
+                "verification_available": False,
+                "guidance": "지원하지 않는 설정 화면 요청이에요.",
+            }
+        show_settings()
+        self._settings_subtab_shell.select_tab(tab_key)
+        self._agent_guidance_provider = provider
+        self._update_api_visibility()
+        field = key_fields.get(provider)
+        field_visible = field is not None and self._agent_control_visible(self, field._text_field)
+        verification_available = (
+            field_visible
+            and callable(field.controller._on_verify)
+            and callable(self.on_verify_api_key)
+        )
+        completion_observable = provider in self._verification_providers
+        if provider is None:
+            guidance = f"{self._settings_subtab_label(tab_key)} 설정 화면을 열었어요."
+        elif field_visible:
+            guidance = f"{provider}: 표시된 보안 입력란에서 키를 입력하고 확인해 주세요."
+        else:
+            guidance = f"{provider}: 요청한 보안 입력란을 표시하지 못했어요."
+        if provider is not None and not completion_observable:
+            guidance += " 완료를 자동으로 확인할 수 없어요. Puri에게 완료 여부를 알려 주세요."
+        self._agent_navigation_guidance.value = guidance
+        self._agent_navigation_banner.visible = True
+        _update_control_if_mounted(self)
+        return {
+            "opened": True,
+            "field_visible": field_visible,
+            "completion_observable": completion_observable,
+            "verification_available": verification_available,
+            "guidance": guidance,
+        }
+
+    @staticmethod
+    def _agent_control_visible(control: ft.Control, target: ft.Control) -> bool:
+        if control.visible is False:
+            return False
+        if control is target:
+            return True
+        content = getattr(control, "content", None)
+        if isinstance(content, ft.Control) and SettingsView._agent_control_visible(content, target):
+            return True
+        return any(
+            SettingsView._agent_control_visible(child, target)
+            for child in getattr(control, "controls", ())
+            if isinstance(child, ft.Control)
+        )
+
+    def _return_to_agent(self, _event) -> None:
+        self._agent_navigation_banner.visible = False
+        self._agent_guidance_provider = None
+        self._update_api_visibility()
+        _update_control_if_mounted(self)
+        if self.on_view_logs is not None:
+            self.on_view_logs()
 
     def bind_settings_intents(
         self,
@@ -2445,7 +2562,24 @@ class SettingsView(ft.Column):
                 "overlay": list(self._overlay_surface.rows),
             }
         )
-        self.controls = [self._settings_subtab_shell]
+        self._agent_navigation_guidance = ft.Text(expand=True)
+        self._agent_navigation_banner = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("Temporary Puri guidance"),
+                    ft.Row(
+                        [
+                            self._agent_navigation_guidance,
+                            ft.TextButton("Puri로 돌아가기", on_click=self._return_to_agent),
+                        ]
+                    ),
+                ],
+                spacing=4,
+            ),
+            padding=16,
+            visible=False,
+        )
+        self.controls = [self._agent_navigation_banner, self._settings_subtab_shell]
 
     def _gpu_llm_selected(self, settings: ProviderSettingsSnapshot) -> bool:
         model = settings.translation.model
@@ -4168,6 +4302,9 @@ class SettingsView(ft.Column):
         )
         self._alibaba_key_beijing.visible = QwenRegion.BEIJING in qwen_regions
         self._alibaba_key_singapore.visible = QwenRegion.SINGAPORE in qwen_regions
+        for field in self._api_keys_column.controls:
+            if isinstance(field, ApiKeyField) and field._provider == self._agent_guidance_provider:
+                field.visible = True
         qwen_api_host_row = getattr(self, "_qwen_api_host_row", None)
         if qwen_api_host_row is not None:
             qwen_api_host_row.visible = self._qwen_region_btn.visible
@@ -4181,6 +4318,7 @@ class SettingsView(ft.Column):
                     getattr(self, "_gemini_transcribe_key", None),
                     self._soniox_key,
                     self._google_key,
+                    self._openrouter_key,
                     self._deepseek_key,
                     self._openai_key,
                     self._alibaba_key_beijing,
@@ -6527,15 +6665,19 @@ class SettingsView(ft.Column):
             return
         self._set_custom_vocabulary_terms_for_current_language(current_terms)
 
-    async def _verify_key(self, provider: str, key: str) -> tuple[bool, str]:
+    async def _verify_key(self, provider: str, key: str) -> ProviderCredentialVerificationOutcome:
         """Verify API key."""
         if self.on_verify_api_key:
             result = await self.on_verify_api_key(provider, key)
-            if provider == "openrouter" and self._provider_snapshot is not None:
+            if (
+                provider == "openrouter"
+                and self._provider_snapshot is not None
+                and self._openrouter_key.value == key
+            ):
                 current = self._provider_draft or self._provider_snapshot
                 updated = replace(
                     current,
-                    verified=replace(current.verified, openrouter=bool(result[0])),
+                    verified=replace(current.verified, openrouter=result.status == "verified"),
                 )
                 if self._provider_draft is None:
                     self._provider_snapshot = updated
@@ -6543,7 +6685,9 @@ class SettingsView(ft.Column):
                     self._provider_draft = updated
                 self._sync_openrouter_pkce_button_state()
             return result
-        return False, "Verification not available"
+        return ProviderCredentialVerificationOutcome(
+            status="unknown", provider=provider, error_text="Verification not available"
+        )
 
     def _emit_settings_changed(self, intent: ImmediateSettingsIntent) -> None:
         if self.on_settings_changed:

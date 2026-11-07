@@ -699,6 +699,7 @@ INPUT_HINT_POOL = {
     "display.input_hint_tip.cloud_stt",
     "display.input_hint_tip.tab_swap",
     "display.input_hint_tip.earmuffs",
+    "display.input_hint_tip.puri_help",
 }
 
 
@@ -752,6 +753,10 @@ def test_launch_input_hint_reaches_the_dashboard_input(monkeypatch: pytest.Monke
     adapter.set_dashboard_launch_input_hint(first_launch=True)
     assert field.hint_text == "메시지를 입력하세요"
 
-    monkeypatch.setattr(display_card_module.random, "choice", lambda keys: keys[-1])
+    monkeypatch.setattr(
+        display_card_module.random,
+        "choice",
+        lambda keys: "display.input_hint_tip.puri_help",
+    )
     adapter.set_dashboard_launch_input_hint(first_launch=False)
-    assert field.hint_text == "듣기 번역이 잘 안될 땐 VRChat의 Earmuff 기능을 써보세요."
+    assert field.hint_text == "문제가 생겼나요? Puri에게 맡겨보세요."

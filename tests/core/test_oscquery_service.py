@@ -388,3 +388,38 @@ async def _request(port: int | None, target: str) -> bytes:
     writer.close()
     await writer.wait_closed()
     return response
+
+
+@pytest.mark.asyncio
+async def test_host_info_result_cannot_resurrect_removed_or_updated_candidate(monkeypatch) -> None:
+    for change in ("remove", "update"):
+        service = ZeroconfOscQueryService()
+        candidate = OscQueryServiceInfo(
+            service_id="VRChat",
+            host="127.0.0.1",
+            query_port=19010,
+            osc_send_port=19000,
+            is_vrchat=True,
+        )
+        service._services[candidate.service_id] = candidate
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def resolve(info):
+            entered.set()
+            await release.wait()
+            return info
+
+        monkeypatch.setattr(service, "_resolve_host_info", resolve)
+        pending = asyncio.create_task(service.discover_vrchat())
+        await entered.wait()
+        service._forget_service(candidate.service_id)
+        if change == "update":
+            service._services[candidate.service_id] = OscQueryServiceInfo(
+                service_id="VRChat",
+                host="127.0.0.1",
+                osc_send_port=19001,
+                is_vrchat=True,
+            )
+        release.set()
+        assert await pending is None

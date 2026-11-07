@@ -1343,15 +1343,19 @@ def _value_contains_sensitive_extra_body_key(value: object) -> bool:
     return False
 
 
+def contains_known_secret_pattern(text: str) -> bool:
+    return bool(
+        _SENSITIVE_TOKEN_ASSIGNMENT_TEXT_RE.search(text)
+        or any(pattern.search(text) for pattern in _SECRET_VALUE_PATTERNS)
+    )
+
+
 def _contains_unredacted_secret_pattern(key: str, value: object) -> bool:
     if _is_safe_redaction_marker(value):
         return False
     if _is_sensitive_key(key):
         return True
-    return isinstance(value, str) and (
-        bool(_SENSITIVE_TOKEN_ASSIGNMENT_TEXT_RE.search(value))
-        or any(pattern.search(value) for pattern in _SECRET_VALUE_PATTERNS)
-    )
+    return isinstance(value, str) and contains_known_secret_pattern(value)
 
 
 def _contains_unredacted_unsafe_text_payload(key: str, value: object) -> bool:

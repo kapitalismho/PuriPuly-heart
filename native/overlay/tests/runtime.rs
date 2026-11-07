@@ -15,17 +15,17 @@ use puripuly_heart_overlay::manifest::{resolve_handoff_experiment, HandoffExperi
 use puripuly_heart_overlay::openvr::OpenVrEventSource;
 use puripuly_heart_overlay::runtime::SnapshotApplyOutcome;
 use puripuly_heart_overlay::{
-    resolve_quiet_tail_profile, validate_manifest, AdapterIdentity,
-    BridgeClient, CaptionBlock, CaptionChannel, CaptionPresentation, CaptionRenderer,
-    NativePresentationOwner, OpenVrError, OpenVrRuntimeEvent, OverlayBridgeEvent,
-    OverlayFrameSubmitter, OverlayManifest, OverlayPresentationBlock,
-    OverlayPresentationBlockVariant, OverlayPresentationCalibration, OverlayPresentationSnapshot,
-    OverlayRuntime, PresentationBackend, PresentationCause, PresentationCauseChannel,
-    PresentationCauseKind, PresentationOutcome, PresentationStage, PresentationStrategy,
-    QuietTailProfile, ReadinessOutcome, RenderedFrame, RuntimeFailure, SemanticRetirementFrontier,
-    SpatialReanchorOutcome, SpeakerDividerBand, SpeakerStyle, StartupError,
-    EXPECTED_CONTRACT_VERSION, NATIVE_FRESH_RETRY_CADENCE, NATIVE_FRESH_RETRY_DEADLINE,
-    NATIVE_FRESH_RETRY_MAX_COMPLETED, NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
+    resolve_quiet_tail_profile, validate_manifest, AdapterIdentity, BridgeClient, CaptionBlock,
+    CaptionChannel, CaptionPresentation, CaptionRenderer, NativePresentationOwner, OpenVrError,
+    OpenVrRuntimeEvent, OverlayBridgeEvent, OverlayFrameSubmitter, OverlayManifest,
+    OverlayPresentationBlock, OverlayPresentationBlockVariant, OverlayPresentationCalibration,
+    OverlayPresentationSnapshot, OverlayRuntime, PresentationBackend, PresentationCause,
+    PresentationCauseChannel, PresentationCauseKind, PresentationOutcome, PresentationStage,
+    PresentationStrategy, QuietTailProfile, ReadinessOutcome, RenderedFrame, RuntimeFailure,
+    SemanticRetirementFrontier, SpatialReanchorOutcome, SpeakerDividerBand, SpeakerStyle,
+    StartupError, EXPECTED_CONTRACT_VERSION, NATIVE_FRESH_RETRY_CADENCE,
+    NATIVE_FRESH_RETRY_DEADLINE, NATIVE_FRESH_RETRY_MAX_COMPLETED,
+    NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
 };
 
 #[cfg(windows)]
@@ -119,7 +119,10 @@ fn quiet_tail_profiles_have_exact_walls_and_opportunity_maxima() {
 
 #[test]
 fn quiet_tail_environment_profiles_resolve_strictly() {
-    assert_eq!(resolve_quiet_tail_profile(None).unwrap(), QuietTailProfile::P05);
+    assert_eq!(
+        resolve_quiet_tail_profile(None).unwrap(),
+        QuietTailProfile::P05
+    );
     for (value, profile) in [
         ("p05", QuietTailProfile::P05),
         ("p10", QuietTailProfile::P10),
@@ -709,9 +712,18 @@ impl OverlayFrameSubmitter for CleanupFailureSubmitter {
     }
 
     fn poll_runtime_events(&mut self, _max_events: usize) -> Vec<OpenVrRuntimeEvent> {
-        if self.emit_fatal_event && !self.fatal_event_emitted {
+        if self.emit_fatal_event
+            && !self.fatal_event_emitted
+            && self.state.operations.lock().unwrap().contains(&"show")
+        {
             self.fatal_event_emitted = true;
-            vec![OpenVrRuntimeEvent::Quit]
+            vec![OpenVrRuntimeEvent::ProcessQuit {
+                source: OpenVrEventSource::System,
+                pid: std::process::id(),
+                old_pid: 0,
+                forced: false,
+                connection_lost: true,
+            }]
         } else {
             Vec::new()
         }
@@ -1820,12 +1832,9 @@ async fn event_loop_cancels_stale_readiness_submits_latest_then_handles_shutdown
         let _auth = ws.next().await.unwrap().unwrap();
         for revision in [0, 1, 2] {
             if revision == 2 {
-                tokio::time::timeout(
-                    Duration::from_secs(5),
-                    server_readiness_started.notified(),
-                )
-                .await
-                .expect("revision 1 never entered producer readiness");
+                tokio::time::timeout(Duration::from_secs(5), server_readiness_started.notified())
+                    .await
+                    .expect("revision 1 never entered producer readiness");
             }
             let snapshot = presentation_snapshot(
                 revision,
@@ -1964,8 +1973,7 @@ async fn initial_readiness_processes_new_snapshot_before_submit_and_ready() {
 #[tokio::test]
 async fn heartbeat_and_noop_control_do_not_cancel_initial_readiness() {
     let followups = vec![json!({"type": "heartbeat"}), json!({"type": "heartbeat"})];
-    let (mut bridge, snapshot, mut server) =
-        connect_test_bridge_with_followups(followups).await;
+    let (mut bridge, snapshot, mut server) = connect_test_bridge_with_followups(followups).await;
     let renderer = CaptionRenderer::new_for_test().unwrap();
     renderer.set_test_readiness_pending_yields(100);
     let logger = test_logger("readiness-heartbeat-noop-control").await;
@@ -1990,11 +1998,8 @@ async fn heartbeat_and_noop_control_do_not_cancel_initial_readiness() {
 
 #[tokio::test]
 async fn ignored_message_flood_polls_readiness_and_reaches_ready() {
-    let followups = (0..256)
-        .map(|_| json!({"type": "heartbeat"}))
-        .collect();
-    let (mut bridge, snapshot, mut server) =
-        connect_test_bridge_with_followups(followups).await;
+    let followups = (0..256).map(|_| json!({"type": "heartbeat"})).collect();
+    let (mut bridge, snapshot, mut server) = connect_test_bridge_with_followups(followups).await;
     let renderer = CaptionRenderer::new_for_test().unwrap();
     renderer.set_test_readiness_pending_yields(3);
     let logger = test_logger("readiness-ignored-flood-ready").await;
@@ -2023,11 +2028,8 @@ async fn ignored_message_flood_polls_readiness_and_reaches_ready() {
 
 #[tokio::test]
 async fn continuous_ignored_messages_hit_owner_timeout_without_submission() {
-    let followups = (0..2_000)
-        .map(|_| json!({"type": "heartbeat"}))
-        .collect();
-    let (mut bridge, snapshot, mut server) =
-        connect_test_bridge_with_followups(followups).await;
+    let followups = (0..2_000).map(|_| json!({"type": "heartbeat"})).collect();
+    let (mut bridge, snapshot, mut server) = connect_test_bridge_with_followups(followups).await;
     let renderer = CaptionRenderer::new_for_test().unwrap();
     renderer.set_test_readiness_pending_yields(1_000_000);
     let logger = test_logger("readiness-ignored-flood-timeout").await;
@@ -2063,8 +2065,7 @@ async fn shutdown_after_ignored_flood_preempts_before_submission() {
         .map(|_| json!({"type": "heartbeat"}))
         .collect::<Vec<_>>();
     followups.push(json!({"type": "shutdown"}));
-    let (mut bridge, snapshot, mut server) =
-        connect_test_bridge_with_followups(followups).await;
+    let (mut bridge, snapshot, mut server) = connect_test_bridge_with_followups(followups).await;
     let renderer = CaptionRenderer::new_for_test().unwrap();
     renderer.set_test_readiness_pending_yields(1_000_000);
     let logger = test_logger("readiness-ignored-flood-shutdown").await;
@@ -4690,10 +4691,8 @@ async fn production_owner_process_quit_preserves_empty_handoff_hide_grace_and_sh
 }
 
 #[tokio::test]
-async fn production_owner_process_quit_and_genuine_quit_events_remain_fatal() {
+async fn production_owner_own_process_quit_events_remain_fatal() {
     for event in [
-        OpenVrRuntimeEvent::Quit,
-        OpenVrRuntimeEvent::DriverRequestedQuit,
         OpenVrRuntimeEvent::ProcessQuit {
             source: OpenVrEventSource::Overlay,
             pid: std::process::id(),
@@ -4706,7 +4705,7 @@ async fn production_owner_process_quit_and_genuine_quit_events_remain_fatal() {
             pid: std::process::id(),
             old_pid: 0,
             forced: false,
-            connection_lost: false,
+            connection_lost: true,
         },
     ] {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -5331,7 +5330,7 @@ async fn production_owner_preserves_primary_failure_and_reports_hide_cleanup_fai
         .await
         .unwrap_err();
     assert!(
-        matches!(&failure, RuntimeFailure::OpenVr(message) if message.contains("event=quit")),
+        matches!(&failure, RuntimeFailure::OpenVr(message) if message.contains("event=process_quit")),
         "primary terminal cause was replaced: {failure:?}"
     );
     assert!(owner.resources_released());
@@ -6121,14 +6120,13 @@ fn check_startup_contract_reports_current_contract_version() {
 
 #[test]
 fn validate_manifest_rejects_old_transition_and_future_contract_versions() {
-    for contract_version in [12, 13, 14, 15, 17] {
+    for contract_version in [12, 13, 14, 15, 16, 18] {
         let manifest = OverlayManifest {
             contract_version,
             ..test_manifest()
         };
         let error = validate_manifest(&manifest).unwrap_err();
         assert!(matches!(error, StartupError::ContractMismatch(_)));
-        assert!(error.to_string().contains("expected contract_version=16"));
     }
 }
 

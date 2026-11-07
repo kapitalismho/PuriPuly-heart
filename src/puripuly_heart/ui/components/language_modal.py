@@ -12,6 +12,7 @@ import flet as ft
 from puripuly_heart.app.language_selection import RECENT_LANGUAGE_QUEUE_LIMIT
 from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.i18n import language_name, t
+from puripuly_heart.ui.motion import close_modal, press_event, show_modal
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_NEUTRAL_DARK,
@@ -186,7 +187,7 @@ class LanguageModal:
             bgcolor=ft.Colors.TRANSPARENT,
         )
 
-        self._page.show_dialog(self._dialog)
+        show_modal(self._page, self._dialog)
 
     def _build_recent_grid(self, recent: list[str], current: str) -> ft.Control | None:
         """Build the recent chips in stored order, up to the queue limit.
@@ -280,6 +281,7 @@ class LanguageModal:
                 alignment=ft.Alignment.CENTER,
                 on_click=None if is_disabled else lambda e, selected=code: self._select(selected),
                 on_hover=None if is_disabled else self._on_item_hover,
+                on_tap_down=None if is_disabled else press_event,
                 animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
                 height=110,
             )
@@ -328,5 +330,5 @@ class LanguageModal:
         """Handle language selection."""
         logger.info("[LanguageModal] Selection requested: %s", name)
         if self._dialog:
-            self._page.pop_dialog()
+            close_modal(self._page, self._dialog)
         self._on_select(name)

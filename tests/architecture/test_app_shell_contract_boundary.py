@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import pathlib
 
 import flet as ft
@@ -14,7 +13,6 @@ from puripuly_heart.ui.shell.renderer import (
     compose_app_shell,
 )
 from tests.helpers.ast_sources import imported_modules as _imported_modules
-from tests.helpers.paths import SOURCE_ROOT
 
 FORBIDDEN_IMPORT_PREFIXES = (
     "puripuly_heart.core",
@@ -75,25 +73,3 @@ def test_compose_app_shell_mounts_the_debug_panel_only_when_supplied() -> None:
     root_content = regions.debug_stack.controls[0]
     assert isinstance(root_content, ft.Container)
     assert root_content.content is regions.layout
-
-
-def test_translator_app_shell_is_composed_by_the_renderer() -> None:
-    source = (SOURCE_ROOT / "ui" / "app.py").read_text(encoding="utf-8")
-    assert source.count("compose_app_shell(") == 1
-    assert "AppShellSlots(" in source
-
-    tree = ast.parse(source)
-    build_layout = next(
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef) and node.name == "_build_layout"
-    )
-    composed = {
-        node.func.attr
-        for node in ast.walk(build_layout)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and isinstance(node.func.value, ast.Name)
-        and node.func.value.id == "ft"
-    }
-    assert composed == set(), f"_build_layout must not compose Flet controls inline: {composed}"

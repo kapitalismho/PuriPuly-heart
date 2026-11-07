@@ -577,6 +577,8 @@ class _BatchingRotatingFileHandler(RotatingFileHandler):
                         pending = []
                         pending_bytes = 0
                         self.doRollover()
+                        if self.stream is None:
+                            self.stream = self._open()
                         current_bytes = 0
                     pending.append(text)
                     pending_bytes += encoded_size
@@ -860,6 +862,11 @@ class RuntimeLoggingSinks:
     abandoned_records: int = 0
     _closed: bool = False
 
+    def support_log_snapshot(self) -> bytes:
+        with self.file_handler.lock:
+            self.file_handler.flush()
+            return self.log_file.read_bytes()
+
     def close(self, *, force: bool = False) -> None:
         if self._closed and not force:
             return
@@ -1033,6 +1040,9 @@ class SessionRuntimeLoggingService:
     @property
     def log_file(self) -> Path:
         return self._sinks.log_file
+
+    def support_log_snapshot(self) -> bytes:
+        return self._sinks.support_log_snapshot()
 
     def configure_diagnostics(
         self,
