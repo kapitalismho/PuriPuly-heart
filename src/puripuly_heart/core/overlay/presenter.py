@@ -1002,14 +1002,14 @@ class OverlayPresenter(OverlaySink):
             if entry is None:
                 continue
             if entry.speaker_style is None:
-                entry.speaker_style, entry.speaker_gray_reason = self._first_readable_speaker_style(
+                entry.speaker_style, entry.speaker_gray_reason = self._speaker_style_for_assignment(
                     entry,
                     colored_old_scope=colored_old_scope,
                 )
             styled.append((key, replace(block, speaker_style=entry.speaker_style)))
         return styled
 
-    def _first_readable_speaker_style(
+    def _speaker_style_for_assignment(
         self,
         entry: _LogicalTurnEntry,
         *,
@@ -1026,7 +1026,12 @@ class OverlayPresenter(OverlaySink):
         if attribution.key is None:
             return "gray", "malformed"
         scope = (attribution.source, attribution.speaker_scope_id)
-        if scope != self._active_speaker_scope or colored_old_scope:
+        if (
+            scope == entry.speaker_handoff_scope
+            or scope != self._active_speaker_scope
+            or colored_old_scope
+        ):
+            entry.speaker_handoff_scope = scope
             return "gray", "scope_handoff"
         index = assignment.palette_index
         if index is not None and 0 <= index < len(SPEAKER_IDENTITY_STYLES):

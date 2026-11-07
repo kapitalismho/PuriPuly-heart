@@ -3,11 +3,33 @@ from __future__ import annotations
 from uuid import UUID
 
 from puripuly_heart.domain.models import (
+    FinalSpeakerRun,
     SpeakerAssignment,
     SpeakerAttribution,
     SpeakerKey,
     Transcript,
 )
+
+
+def native_soniox_attribution(text: str, runs: tuple[FinalSpeakerRun, ...]) -> SpeakerAttribution:
+    scopes = {run.session_scope for run in runs if run.source == "soniox"}
+    scope = next(iter(scopes)) if len(scopes) == 1 else ""
+    fallback = SpeakerAttribution("mixed", source="soniox", speaker_scope_id=scope)
+    if not runs or "".join(run.text for run in runs) != text:
+        return SpeakerAttribution("malformed", source="soniox", speaker_scope_id=scope)
+    if len(scopes) != 1 or not scope or any(run.source != "soniox" for run in runs):
+        return fallback
+    meaningful = tuple(run for run in runs if any(character.isalnum() for character in run.text))
+    attributions = tuple(run.attribution for run in meaningful)
+    if any(item.state not in ("identified", "missing") for item in attributions):
+        state = "malformed" if any(item.state == "malformed" for item in attributions) else "mixed"
+        return SpeakerAttribution(state, source="soniox", speaker_scope_id=scope)
+    keys = {item.key for item in attributions if item.key is not None}
+    if len(keys) > 1:
+        return fallback
+    if keys:
+        return SpeakerAttribution("identified", next(iter(keys)), "soniox", scope)
+    return SpeakerAttribution("missing", source="soniox", speaker_scope_id=scope)
 
 
 class PeerSpeakerIdentityAllocator:
@@ -25,9 +47,13 @@ class PeerSpeakerIdentityAllocator:
         self._assignments.clear()
         self._last_order = None
 
-    def observe(self, transcript: Transcript, *, child_sequence: int) -> SpeakerAssignment:
+    def observe(
+        self, transcript: Transcript, *, child_sequence: int, native_soniox: bool = False
+    ) -> SpeakerAssignment:
         run = transcript.final_speaker_runs[0] if len(transcript.final_speaker_runs) == 1 else None
-        if run is not None:
+        if native_soniox:
+            attribution = native_soniox_attribution(transcript.text, transcript.final_speaker_runs)
+        elif run is not None:
             attribution = run.attribution
         elif transcript.final_speaker_runs:
             attribution = SpeakerAttribution("mixed")

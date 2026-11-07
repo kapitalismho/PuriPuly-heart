@@ -926,7 +926,7 @@ async def test_multispeaker_final_settles_preview_and_keeps_every_attributed_spa
         assert events[1].utterance_id != events[0].utterance_id
         assert [event.speaker_assignment.palette_index for event in events] == [0, 1]
         assert [event.speaker_assignment.source_text_range for event in events] == [(0, 6), (6, 10)]
-        assert presenter.snapshot().blocks[0].speaker_style == "gray"
+        assert presenter.snapshot().blocks[0].speaker_style == "gold"
         assert presenter.snapshot().blocks[1].speaker_style == "cyan"
         assert [entry.text for entry in harness.peer_runtime.translation_history] == [
             "Alice ",
@@ -990,21 +990,30 @@ async def test_cross_final_merge_retains_honest_attribution_and_cumulative_sourc
             await _wait_for_peer_idle(harness)
             repair = overlay.events[-1]
             assignment = repair.speaker_assignment
-            assert repair.utterance_id == first.utterance_id
-            assert repair.peer_caption_revision == order
-            assert assignment.source_text_range is None
-            assert assignment.source_text_revision is None
-            if incoming_speaker == "A":
-                assert assignment.attribution == first.speaker_assignment.attribution
+            if incoming_speaker == "B":
+                assert repair.utterance_id == receipt.identity.segment_id
+                assert repair.peer_caption_revision == 1
+                assert assignment.source_text_range == (0, len(text))
+                assert assignment.attribution.key.local_speaker_id == speaker
             else:
-                assert assignment.attribution.state == "mixed"
-                assert assignment.attribution.key is None
-            assert presenter.snapshot().blocks[0].speaker_style == first_style
-        assert provider.calls == ["alpha,", "alpha, beta", "alpha, beta Alice"]
-        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
-            "alpha, beta Alice"
-        ]
-        assert len(overlay.events[-1].peer_superseded_unit_ids) == 2
+                assert repair.utterance_id == first.utterance_id
+                assert repair.peer_caption_revision == order
+                assert assignment.source_text_range is None
+                assert assignment.source_text_revision is not None
+                assert assignment.attribution == first.speaker_assignment.attribution
+                assert presenter.snapshot().blocks[0].speaker_style == first_style
+        expected = (
+            ["alpha,", "beta", "Alice"]
+            if incoming_speaker == "B"
+            else ["alpha,", "alpha, beta", "alpha, beta Alice"]
+        )
+        assert provider.calls == expected
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == (
+            expected if incoming_speaker == "B" else [expected[-1]]
+        )
+        assert len(overlay.events[-1].peer_superseded_unit_ids) == (
+            0 if incoming_speaker == "B" else 2
+        )
         assert first.speaker_assignment.source_text_range == (0, 6)
     finally:
         await harness.stop()

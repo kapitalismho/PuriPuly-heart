@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import re
 from collections import OrderedDict
 from collections.abc import Coroutine
@@ -26,11 +27,21 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
     _final_transcript_fragment,
     _final_transcript_segments,
+    _native_soniox_source_groups,
     _translation_turn_child_id,
 )
 from puripuly_heart.core.overlay.peer_caption_layout import estimate_peer_translation_lines
-from puripuly_heart.core.speaker_identity import PeerSpeakerIdentityAllocator
-from puripuly_heart.domain.models import SpeakerAssignment, SpeakerAttribution, Transcript
+from puripuly_heart.core.speaker_identity import (
+    PeerSpeakerIdentityAllocator,
+    native_soniox_attribution,
+)
+from puripuly_heart.domain.models import (
+    FinalSpeakerRun,
+    SpeakerAssignment,
+    SpeakerAttribution,
+    SpeakerKey,
+    Transcript,
+)
 
 CLOUD_PEER_PROVIDERS = frozenset({"soniox", "deepgram", "gemini_transcribe", "qwen_audio"})
 PeerRequestKind = Literal["final", "preview", "repair", "continuation"]
@@ -126,6 +137,9 @@ class _Caption:
     sealed: AudioSegmentSnapshot | None = None
     superseded: tuple[UUID, ...] = ()
     speaker_assignment: SpeakerAssignment | None = None
+    native_soniox: bool = False
+    source_runs: tuple[FinalSpeakerRun, ...] = ()
+    continuity_key: SpeakerKey | None = None
     admitted: asyncio.Event = field(default_factory=asyncio.Event)
     predecessor: asyncio.Event | None = None
     absorbed_admissions: dict[UUID, asyncio.Event] = field(default_factory=dict)
@@ -354,6 +368,8 @@ class PeerCaptionOwner:
                 prepared,
                 segment,
                 assignment=segment.caption.speaker_assignment,
+                admitted=segment.caption.admitted,
+                predecessor=segment.caption.predecessor,
             )
 
     def abandon(self, utterance_id: UUID) -> None:
@@ -430,6 +446,14 @@ class PeerCaptionOwner:
             await self.retire(transcript.utterance_id)
             return
         target = self.requests.target_language_for("peer", config.value)
+        native_soniox = provider_id == "soniox" and any(
+            run.source == "soniox" for run in transcript.final_speaker_runs
+        )
+        source_groups = (
+            _native_soniox_source_groups(transcript)
+            if native_soniox
+            else _final_transcript_segments(transcript, split_speakers=True)
+        )
         fragments = tuple(
             _final_transcript_fragment(
                 transcript,
@@ -447,18 +471,19 @@ class PeerCaptionOwner:
                         primary_uses_parent_identity=False,
                     )
                 ),
+                preserve_speaker_runs=native_soniox,
             )
             for sequence, segment in enumerate(
-                segment
-                for segment in _final_transcript_segments(transcript, split_speakers=True)
-                if segment.text.strip()
+                segment for segment in source_groups if segment.text.strip()
             )
         )
         if not fragments:
             await self.retire(transcript.utterance_id)
             return
         assignments = tuple(
-            self.speaker_identities.observe(fragment, child_sequence=sequence)
+            self.speaker_identities.observe(
+                fragment, child_sequence=sequence, native_soniox=native_soniox
+            )
             for sequence, fragment in enumerate(fragments)
         )
         for fragment in fragments:
@@ -472,6 +497,7 @@ class PeerCaptionOwner:
                 scope=scope,
                 config=config,
                 sealed=sealed,
+                native_soniox=native_soniox,
             )
 
     async def _final_fragment(
@@ -483,6 +509,7 @@ class PeerCaptionOwner:
         scope: tuple[object, ...],
         config: TranslationRuntimeConfigSnapshot,
         sealed: AudioSegmentSnapshot | None,
+        native_soniox: bool,
     ) -> None:
         segment = self._segments.pop(transcript.utterance_id, None)
         if segment is not None:
@@ -496,7 +523,14 @@ class PeerCaptionOwner:
             if segment is not None
             else self._new_caption(transcript, provider_id, scope)
         )
+        request_admission = caption.admitted
+        if native_soniox and segment is not None:
+            request_admission = asyncio.Event()
+            self._tail = request_admission
         caption.speaker_assignment = assignment
+        caption.native_soniox = native_soniox
+        caption.source_runs = transcript.final_speaker_runs
+        caption.continuity_key = assignment.attribution.key
         languages = {run.language for run in transcript.final_language_runs if run.language}
         caption.source_language = next(iter(languages)) if len(languages) == 1 else None
         source = transcript.text
@@ -513,6 +547,22 @@ class PeerCaptionOwner:
                 if segment is None or previous.last_final_at is None
                 else segment.first_partial_at - previous.last_final_at
             )
+            native_compatible = not (previous.native_soniox or native_soniox) or (
+                previous.native_soniox
+                and native_soniox
+                and previous.generation == caption.generation
+                and previous.source_language == caption.source_language
+                and previous.speaker_assignment is not None
+                and previous.speaker_assignment.attribution.state in ("identified", "missing")
+                and assignment.attribution.state in ("identified", "missing")
+                and previous.speaker_assignment.attribution.speaker_scope_id
+                == assignment.attribution.speaker_scope_id
+                and (
+                    previous.continuity_key is None
+                    or assignment.attribution.key is None
+                    or previous.continuity_key == assignment.attribution.key
+                )
+            )
             action = (
                 join_action(
                     previous.source,
@@ -528,9 +578,10 @@ class PeerCaptionOwner:
                     provider_id=provider_id,
                     sealed=previous.sealed,
                 )
-                if len(merged) <= self.max_source_chars
+                if native_compatible and len(merged) <= self.max_source_chars
                 else "independent"
             )
+            continuity_key = previous.continuity_key or assignment.attribution.key
             if action == "merge":
                 previous.superseded = tuple(
                     dict.fromkeys((*previous.superseded, caption.utterance_id, *caption.superseded))
@@ -539,7 +590,42 @@ class PeerCaptionOwner:
                 caption = previous
                 source = merged
                 kind = "repair"
-                if previous.speaker_assignment is not None:
+                if native_soniox:
+                    prior = previous.speaker_assignment
+                    if prior is None:
+                        raise RuntimeError("Native Peer repair requires source attribution")
+                    representative = prior if prior.attribution.key is not None else assignment
+                    caption.speaker_assignment = replace(
+                        representative,
+                        scope_order=prior.scope_order,
+                        source_text_range=None,
+                        source_text_revision=hashlib.sha256(merged.encode("utf-8")).hexdigest()[
+                            :16
+                        ],
+                    )
+                    caption.source_runs = (
+                        *previous.source_runs,
+                        *(
+                            (
+                                FinalSpeakerRun(
+                                    separator,
+                                    None,
+                                    assignment.attribution.speaker_scope_id,
+                                    source="soniox",
+                                    attribution_state="missing",
+                                ),
+                            )
+                            if separator
+                            else ()
+                        ),
+                        *transcript.final_speaker_runs,
+                    )
+                    caption.speaker_assignment = replace(
+                        caption.speaker_assignment,
+                        attribution=native_soniox_attribution(merged, caption.source_runs),
+                    )
+                    caption.continuity_key = continuity_key
+                elif previous.speaker_assignment is not None:
                     prior = previous.speaker_assignment
                     incoming = assignment.attribution
                     attribution = (
@@ -560,9 +646,11 @@ class PeerCaptionOwner:
                         source_text_range=None,
                         source_text_revision=None,
                     )
-                self._tail = caption.admitted
+                if not native_soniox:
+                    self._tail = caption.admitted
             elif action == "continuation":
                 kind = "continuation"
+                caption.continuity_key = continuity_key
                 current = list(self._context(config))
                 if current and current[-1] == previous.source:
                     current[-1] = previous.source
@@ -596,6 +684,7 @@ class PeerCaptionOwner:
         superseded = caption.superseded
         request_assignment = caption.speaker_assignment
         request_language = caption.source_language
+        request_predecessor = caption.predecessor
         admission_epoch = self._epoch
         await self.output.supersede_peer_caption_previews((caption.utterance_id, *superseded))
         await self._slots.acquire()
@@ -613,6 +702,8 @@ class PeerCaptionOwner:
                 superseded=superseded,
                 assignment=request_assignment,
                 detected_language=request_language,
+                admitted=request_admission,
+                predecessor=request_predecessor,
             ),
             f"peer:{kind}:{caption.utterance_id}:{revision}",
         )
@@ -629,6 +720,9 @@ class PeerCaptionOwner:
         superseded: tuple[UUID, ...] = (),
         assignment: SpeakerAssignment | None = None,
         detected_language: str | None = None,
+        *,
+        admitted: asyncio.Event,
+        predecessor: asyncio.Event | None,
     ) -> None:
         epoch = self._epoch
         source_language = prepared.source_language if prepared is not None else detected_language
@@ -705,8 +799,8 @@ class PeerCaptionOwner:
                 submission.translation is None or revision < caption.revision
             ):
                 return
-            if caption.predecessor is not None and not caption.admitted.is_set():
-                await caption.predecessor.wait()
+            if predecessor is not None and not admitted.is_set():
+                await predecessor.wait()
             if (
                 epoch != self._epoch
                 or revision < caption.shown_revision
@@ -719,9 +813,10 @@ class PeerCaptionOwner:
             await self.output.project_peer_caption(submission)
         finally:
             if kind != "preview" or caption.shown_revision:
+                admitted.set()
                 caption.admitted.set()
                 for utterance_id in superseded:
-                    admitted = caption.absorbed_admissions.pop(utterance_id, None)
-                    if admitted is not None:
-                        admitted.set()
+                    absorbed = caption.absorbed_admissions.pop(utterance_id, None)
+                    if absorbed is not None:
+                        absorbed.set()
             self._slots.release()

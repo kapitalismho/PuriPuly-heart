@@ -392,6 +392,206 @@ def overflow_assignment(speaker: str, *, revision: str = "first-final") -> Speak
     )
 
 
+def native_assignment(speaker: str | None, *, scope: str = "same-scope", order: int = 1):
+    return SpeakerAssignment(
+        SpeakerAttribution(
+            "identified" if speaker is not None else "missing",
+            SpeakerKey("soniox", scope, speaker) if speaker is not None else None,
+            "soniox",
+            scope,
+        ),
+        scope_order=(1, order, 0),
+        palette_index=1 if speaker is not None else None,
+    )
+
+
+@pytest.mark.asyncio
+async def test_native_preview_final_and_source_only_repair_settle_matching_presentation() -> None:
+    timeline, surface = Timeline(), Surface()
+    presenter = presenter_for(timeline, surface)
+    unit = uuid4()
+    known = native_assignment("B")
+    try:
+        await presenter.emit(
+            caption(1, unit, "preview", final=False, source="provisional", assignment=known)
+        )
+        assert presenter.snapshot().blocks[0].speaker_style == "gray"
+        await presenter.emit(
+            caption(2, unit, "확정 번역", revision=2, source="final source", assignment=known)
+        )
+        settled = surface.snapshots[-1]
+        assert settled.blocks[0].primary_text == "확정 번역"
+        assert settled.blocks[0].secondary_text == "final source"
+        assert settled.blocks[0].speaker_style == "cyan"
+        assert presenter._entries[("peer", unit)].speaker_assignment == known
+        assert presenter._entries[("peer", unit)].speaker_gray_reason is None
+        await presenter.emit(
+            caption(3, unit, "", revision=3, source="source-only repair", assignment=known)
+        )
+        repaired = presenter.snapshot()
+        assert repaired.blocks[0].primary_text == "source-only repair"
+        assert repaired.blocks[0].speaker_style == "cyan"
+        assert presenter._entries[("peer", unit)].peer_source_only is True
+        stale = await presenter.emit(
+            caption(4, unit, "obsolete", revision=2, assignment=native_assignment(None))
+        )
+        assert stale.outcome == "stale"
+        assert presenter.snapshot() == repaired
+        payload = repaired.to_dict()
+        assert payload["blocks"][0]["speaker_style"] == "cyan"
+        assert "speaker_scope_id" not in str(payload)
+        assert "local_speaker_id" not in str(payload)
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_native_attribution_repair_and_duplicate_preserve_current_page_and_lifetime() -> None:
+    timeline, surface = Timeline(), Surface()
+    presenter = presenter_for(timeline, surface)
+    unit = uuid4()
+    text = "가" * 56 + "나" * 56 + "다" * 20
+    try:
+        await presenter.emit(caption(1, unit, text, assignment=native_assignment(None)))
+        await timeline.advance(3.0)
+        entry = presenter._entries[("peer", unit)]
+        assert entry.peer_page_index == 1
+        before = (
+            entry.peer_page_due_at,
+            entry.last_meaningful_visible_at,
+            entry.visible_since,
+            entry.appearance_seq,
+            surface.expirations[f"peer:{unit}"],
+        )
+        await timeline.advance(0.5)
+        known = native_assignment("B")
+        accepted = caption(2, unit, text, revision=2, assignment=known)
+        assert (await presenter.emit(accepted)).outcome == "applied"
+        assert entry.speaker_style == "cyan"
+        assert entry.speaker_gray_reason is None
+        assert entry.peer_page_index == 1
+        assert presenter.snapshot().blocks[0].primary_text == peer_translation_pages(text)[1]
+        assert before == (
+            entry.peer_page_due_at,
+            entry.last_meaningful_visible_at,
+            entry.visible_since,
+            entry.appearance_seq,
+            surface.expirations[f"peer:{unit}"],
+        )
+        snapshot = presenter.snapshot()
+        duplicate = replace(
+            accepted, event_id=str(uuid4()), seq=3, speaker_assignment=native_assignment(None)
+        )
+        assert (await presenter.emit(duplicate)).outcome == "stale"
+        assert presenter.snapshot() == snapshot
+        assert entry.speaker_assignment == known
+        await timeline.advance(2.5)
+        assert entry.peer_page_index == 2
+        await timeline.advance(30.0)
+        assert not presenter.snapshot().blocks
+        late = await presenter.emit(caption(4, unit, text, revision=3, assignment=known))
+        assert late.outcome == "stale"
+        assert not presenter.snapshot().blocks
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_native_gray_repairs_gain_overflow_divider_without_extending_reading() -> None:
+    timeline, surface = Timeline(), Surface()
+    presenter = presenter_for(timeline, surface)
+    first, second = uuid4(), uuid4()
+    try:
+        await presenter.emit(caption(1, first, "first", assignment=native_assignment(None)))
+        await presenter.emit(caption(2, second, "second", assignment=native_assignment(None)))
+        deadlines = dict(surface.expirations)
+        await timeline.advance(0.5)
+        await presenter.emit(
+            caption(3, first, "first", revision=2, assignment=overflow_assignment("E"))
+        )
+        assert presenter.snapshot().speaker_divider is False
+        await presenter.emit(
+            caption(4, second, "second", revision=2, assignment=overflow_assignment("F"))
+        )
+        snapshot = presenter.snapshot()
+        assert [block.speaker_style for block in snapshot.blocks] == ["gray", "gray"]
+        assert snapshot.speaker_divider is True
+        assert surface.snapshots[-1].to_dict()["speaker_divider"] is True
+        assert surface.expirations == deadlines
+        assert all(
+            entry.speaker_gray_reason == "palette_overflow" for entry in presenter._entries.values()
+        )
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_native_revisions_preserve_handoff_gray_after_old_color_leaves() -> None:
+    timeline = Timeline()
+    presenter = presenter_for(timeline)
+    old, handoff, later = uuid4(), uuid4(), uuid4()
+    old_assignment = native_assignment("A", scope="old", order=1)
+    new_assignment = native_assignment("A", scope="new", order=2)
+    try:
+        await presenter.emit(caption(1, old, "old", assignment=old_assignment))
+        await presenter.emit(caption(2, handoff, "new", assignment=new_assignment))
+        assert presenter._entries[("peer", handoff)].speaker_gray_reason == "scope_handoff"
+        await presenter.emit(
+            caption(3, old, "old corrected", revision=2, assignment=old_assignment)
+        )
+        assert presenter._entries[("peer", old)].speaker_style == "cyan"
+        await timeline.advance(1)
+        await presenter.emit(
+            caption(4, later, "later", assignment=replace(new_assignment, scope_order=(1, 3, 0)))
+        )
+        assert ("peer", old) not in presenter._entries
+        await presenter.emit(
+            caption(
+                5,
+                handoff,
+                "new corrected",
+                revision=2,
+                assignment=replace(new_assignment, source_text_revision="corrected"),
+            )
+        )
+        assert presenter._entries[("peer", handoff)].speaker_gray_reason == "scope_handoff"
+        assert presenter._entries[("peer", handoff)].speaker_style == "gray"
+        assert presenter._entries[("peer", later)].speaker_style == "cyan"
+        await presenter.emit(
+            caption(
+                6,
+                handoff,
+                "now unknown",
+                revision=3,
+                assignment=native_assignment(None, scope="new", order=2),
+            )
+        )
+        assert presenter._entries[("peer", handoff)].speaker_gray_reason == "missing"
+        await presenter.emit(
+            caption(7, handoff, "known again", revision=4, assignment=new_assignment)
+        )
+        assert presenter._entries[("peer", handoff)].speaker_gray_reason == "scope_handoff"
+        assert presenter._entries[("peer", handoff)].speaker_style == "gray"
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_other_provider_caption_revisions_keep_first_readable_style() -> None:
+    timeline = Timeline()
+    presenter = presenter_for(timeline)
+    unit = uuid4()
+    missing = SpeakerAssignment(SpeakerAttribution("missing", source="other"))
+    known = replace(native_assignment("B"), attribution=SpeakerAttribution("non_diarized"))
+    try:
+        await presenter.emit(caption(1, unit, "first", assignment=missing))
+        await presenter.emit(caption(2, unit, "repaired", revision=2, assignment=known))
+        assert presenter._entries[("peer", unit)].speaker_style == "gray"
+        assert presenter.snapshot().blocks[0].primary_text == "repaired"
+    finally:
+        await presenter.close()
+
+
 @pytest.mark.asyncio
 async def test_cross_final_mixed_repair_clears_semantic_ranges_and_overflow_divider() -> None:
     timeline = Timeline()
@@ -399,7 +599,7 @@ async def test_cross_final_mixed_repair_clears_semantic_ranges_and_overflow_divi
     repaired, other = uuid4(), uuid4()
     initial_assignment = overflow_assignment("speaker-5")
     mixed = SpeakerAssignment(
-        attribution=SpeakerAttribution("mixed"),
+        attribution=SpeakerAttribution("mixed", source="soniox", speaker_scope_id="same-scope"),
         scope_order=(1, 1, 1),
     )
     try:
@@ -422,7 +622,7 @@ async def test_cross_final_mixed_repair_clears_semantic_ranges_and_overflow_divi
         assert first.speaker_assignment.attribution.state == "mixed"
         assert first.speaker_assignment.source_text_range is None
         assert first.speaker_assignment.source_text_revision is None
-        assert first.speaker_style == initial_style
+        assert first.speaker_gray_reason == "mixed"
         assert presenter.snapshot().speaker_divider is False
         stale = await presenter.emit(
             caption(4, repaired, "obsolete", revision=1, assignment=initial_assignment)
@@ -435,7 +635,7 @@ async def test_cross_final_mixed_repair_clears_semantic_ranges_and_overflow_divi
 
 
 @pytest.mark.asyncio
-async def test_identity_corrections_refresh_divider_inputs_without_recoloring() -> None:
+async def test_authoritative_identity_corrections_refresh_style_and_divider_together() -> None:
     timeline = Timeline()
     presenter = presenter_for(timeline)
     corrected, other = uuid4(), uuid4()
@@ -462,10 +662,20 @@ async def test_identity_corrections_refresh_divider_inputs_without_recoloring() 
             caption(5, corrected, "allocated speaker", revision=4, assignment=allocated)
         )
         assert entry.speaker_assignment is allocated
-        assert entry.speaker_style == "gray"
+        assert entry.speaker_style == "cyan"
+        assert entry.speaker_gray_reason is None
         assert presenter.snapshot().speaker_divider is False
-        await presenter.emit(caption(6, corrected, "unknown speaker", revision=5, assignment=None))
-        assert entry.speaker_assignment is None
+        missing = replace(
+            allocated,
+            attribution=SpeakerAttribution(
+                "missing", source="soniox", speaker_scope_id="same-scope"
+            ),
+            palette_index=None,
+        )
+        await presenter.emit(
+            caption(6, corrected, "unknown speaker", revision=5, assignment=missing)
+        )
+        assert entry.speaker_assignment is missing
         assert entry.speaker_style == "gray"
         assert presenter.snapshot().speaker_divider is False
     finally:
