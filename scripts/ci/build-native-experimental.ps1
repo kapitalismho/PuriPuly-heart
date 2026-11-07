@@ -348,7 +348,7 @@ company = "salee"
     $cmakeCommand = (Get-Command cmake -ErrorAction Stop).Source
     Invoke-Checked -FilePath $cmakeCommand -ArgumentList @(
         "-S", (Join-Path $repoRoot "native\windows_host\console"),
-        "-B", $consoleBuildRoot, "-G", "Visual Studio 17 2022", "-A", "x64"
+        "-B", $consoleBuildRoot, "-A", "x64"
     ) -WorkingDirectory $repoRoot
     Invoke-Checked -FilePath $cmakeCommand -ArgumentList @(
         "--build", $consoleBuildRoot, "--config", "Release"
