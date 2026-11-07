@@ -240,6 +240,7 @@ DOMAIN_CODES = (
             "chatgpt_loopback_close_failed",
             "chatgpt_remote_revocation_unconfirmed",
             "chatgpt_local_credential_delete_failed",
+            "chatgpt_logout_superseded",
             "chatgpt_secret_read_failed",
             "chatgpt_refresh_failed",
         }

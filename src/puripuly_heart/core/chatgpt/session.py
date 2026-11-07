@@ -6,6 +6,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from threading import Lock
 from typing import Final, Protocol
 
 import httpx
@@ -23,6 +24,7 @@ from puripuly_heart.core.chatgpt.oauth import (
 )
 from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.storage.secrets import SecretStore
 
 logger = logging.getLogger(__name__)
@@ -131,6 +133,9 @@ class ChatGptSession:
     _http: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _generation: int = field(init=False, default=0, repr=False)
     _refresh_phase: str = field(init=False, default="secret_read", repr=False)
+    _credential_lock: Lock = field(init=False, default_factory=Lock, repr=False)
+    _credential_epoch: int = field(init=False, default=0, repr=False)
+    _retired: bool = field(init=False, default=False, repr=False)
 
     @property
     def token_generation(self) -> int:
@@ -180,6 +185,17 @@ class ChatGptSession:
         tokens: ChatGptTokenSet,
         identity: ChatGptIdentity,
     ) -> None:
+        with self._credential_lock:
+            self._store_sign_in(client_id=client_id, tokens=tokens, identity=identity)
+            self._credential_epoch += 1
+
+    def _store_sign_in(
+        self,
+        *,
+        client_id: str,
+        tokens: ChatGptTokenSet,
+        identity: ChatGptIdentity,
+    ) -> None:
         store = self.secret_store()
         before = {
             key: store.get(key)
@@ -221,6 +237,7 @@ class ChatGptSession:
                 diagnostics=primary,
                 secondary_diagnostics=tuple(secondary),
             ) from exc
+        self._retired = False
         self._tokens = tokens
         self._generation += 1
 
@@ -249,16 +266,28 @@ class ChatGptSession:
         client_id = None
         refresh_token = None
         store = None
+        epoch = None
+
+        def retire() -> None:
+            nonlocal epoch, store, client_id, refresh_token
+            with self._credential_lock:
+                self._credential_epoch += 1
+                epoch = self._credential_epoch
+                self._retired = True
+                self._tokens = None
+                self._generation += 1
+                store = self.secret_store()
+                client_id = store.get(CHATGPT_CLIENT_ID_SECRET)
+                refresh_token = store.get(CHATGPT_REFRESH_TOKEN_SECRET)
+
         try:
-            store = self.secret_store()
-            client_id = store.get(CHATGPT_CLIENT_ID_SECRET)
-            refresh_token = store.get(CHATGPT_REFRESH_TOKEN_SECRET)
+            await self._owned_credential_call(
+                retire, code="chatgpt_secret_read_failed", phase="secret_read"
+            )
         except Exception as exc:
             primary = _session_diagnostics("chatgpt_secret_read_failed", "secret_read", exc)
             emit_failure(logger, primary)
             if store is None:
-                self._tokens = None
-                self._generation += 1
                 return ChatGptSessionSignOutResult(False, False, primary)
         if client_id and refresh_token:
             try:
@@ -280,9 +309,36 @@ class ChatGptSession:
                     exc,
                     remote_revoked=False,
                 )
+
+        def remove() -> bool:
+            with self._credential_lock:
+                if epoch != self._credential_epoch:
+                    return False
+                store.delete(CHATGPT_REFRESH_TOKEN_SECRET)
+                return True
+
         try:
-            await asyncio.to_thread(store.delete, CHATGPT_REFRESH_TOKEN_SECRET)
-            removed = True
+            removed = await self._owned_credential_call(
+                remove,
+                code="chatgpt_local_credential_delete_failed",
+                phase="local_credential_delete",
+                cause=primary,
+                local_credentials_removed=False,
+                remote_revoked=revoked,
+            )
+            if not removed:
+                cause = replace(
+                    _session_diagnostics(
+                        "chatgpt_logout_superseded",
+                        "local_credential_delete",
+                        local_credentials_removed=False,
+                    ),
+                    category="lifecycle",
+                )
+                if primary is None:
+                    primary = cause
+                else:
+                    secondary.append(replace(cause, cause_id=primary.diagnostic_id))
         except Exception as exc:
             cause = _session_diagnostics(
                 "chatgpt_local_credential_delete_failed",
@@ -294,8 +350,6 @@ class ChatGptSession:
                 primary = cause
             else:
                 secondary.append(replace(cause, cause_id=primary.diagnostic_id))
-        self._tokens = None
-        self._generation += 1
         if primary is not None:
             primary = replace(
                 primary,
@@ -335,9 +389,21 @@ class ChatGptSession:
             raise ChatGptAuthError("refresh_failed", diagnostics=diagnostics) from exc
 
     async def _refresh_owned(self) -> ChatGptTokenSet:
-        store = self.secret_store()
-        client_id = store.get(CHATGPT_CLIENT_ID_SECRET)
-        refresh_token = store.get(CHATGPT_REFRESH_TOKEN_SECRET)
+        def read() -> tuple[int, SecretStore, str | None, str | None]:
+            with self._credential_lock:
+                if self._retired:
+                    raise ChatGptReauthRequired("signed_out")
+                store = self.secret_store()
+                return (
+                    self._credential_epoch,
+                    store,
+                    store.get(CHATGPT_CLIENT_ID_SECRET),
+                    store.get(CHATGPT_REFRESH_TOKEN_SECRET),
+                )
+
+        epoch, store, client_id, refresh_token = await self._owned_credential_call(
+            read, code="chatgpt_secret_read_failed", phase="secret_read"
+        )
         if not client_id or not refresh_token:
             raise ChatGptReauthRequired("signed_out")
         self._refresh_phase = "refresh_request"
@@ -353,10 +419,26 @@ class ChatGptSession:
                 status_code=exc.status_code,
                 local_credentials_removed=False,
             )
-            self._tokens = None
-            self._generation += 1
+
+            def reject() -> bool:
+                with self._credential_lock:
+                    if epoch != self._credential_epoch:
+                        return False
+                    self._credential_epoch += 1
+                    self._retired = True
+                    self._tokens = None
+                    self._generation += 1
+                    store.delete(CHATGPT_REFRESH_TOKEN_SECRET)
+                    return True
+
             try:
-                await asyncio.to_thread(store.delete, CHATGPT_REFRESH_TOKEN_SECRET)
+                removed = await self._owned_credential_call(
+                    reject,
+                    code="chatgpt_local_credential_delete_failed",
+                    phase="local_credential_delete",
+                    cause=primary,
+                    local_credentials_removed=False,
+                )
             except Exception as delete_exc:
                 exc.secondary_diagnostics = (
                     replace(
@@ -371,7 +453,7 @@ class ChatGptSession:
                 )
             else:
                 primary = replace(
-                    primary, fields={**primary.fields, "local_credentials_removed": True}
+                    primary, fields={**primary.fields, "local_credentials_removed": removed}
                 )
             exc.diagnostics = primary
             raise
@@ -384,11 +466,50 @@ class ChatGptSession:
         if not tokens.plan_usage_granted:
             raise ChatGptReauthRequired("plan_scope_missing")
         self._refresh_phase = "refresh_store"
-        if tokens.refresh_token != refresh_token:
-            await asyncio.to_thread(store.set, CHATGPT_REFRESH_TOKEN_SECRET, tokens.refresh_token)
-        self._tokens = tokens
-        self._generation += 1
-        return tokens
+
+        def persist() -> ChatGptTokenSet:
+            with self._credential_lock:
+                if epoch != self._credential_epoch:
+                    raise ChatGptReauthRequired("signed_out")
+                if tokens.refresh_token != refresh_token:
+                    store.set(CHATGPT_REFRESH_TOKEN_SECRET, tokens.refresh_token)
+                self._tokens = tokens
+                self._generation += 1
+                return tokens
+
+        return await self._owned_credential_call(
+            persist, code="chatgpt_refresh_failed", phase="refresh_store"
+        )
+
+    async def _owned_credential_call[T](
+        self,
+        operation: Callable[[], T],
+        *,
+        code: str,
+        phase: str,
+        cause: ErrorDiagnostics | None = None,
+        **fields: bool,
+    ) -> T:
+        failure = None
+
+        def run() -> T:
+            nonlocal failure
+            try:
+                return operation()
+            except Exception as exc:
+                failure = exc
+                raise
+
+        try:
+            return await run_owned_thread_call(run)
+        except asyncio.CancelledError:
+            if failure is not None:
+                diagnostic = _session_diagnostics(code, phase, failure, **fields)
+                if cause is not None:
+                    emit_failure(logger, cause)
+                    diagnostic = replace(diagnostic, cause_id=cause.diagnostic_id)
+                emit_failure(logger, diagnostic)
+            raise
 
     @staticmethod
     def _stored_email(store: SecretStore) -> str | None:

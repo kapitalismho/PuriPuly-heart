@@ -3,13 +3,35 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Mapping
+from dataclasses import replace
+from pathlib import Path
+from threading import Event
 from types import SimpleNamespace
 from uuid import uuid4
 
+import httpx
+import pytest
+
+from puripuly_heart.app.adapters.ui_runtime import UiProviderRuntimeAdapter
+from puripuly_heart.app.services.chatgpt_account import ChatGptAccountOwner
 from puripuly_heart.app.services.llm_connection_readiness import (
     LlmConnectionReadinessOwner,
     apply_llm_connection_mode,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.chatgpt.oauth import (
+    CHATGPT_PLAN_SCOPE,
+    CHATGPT_REVOKE_URL,
+    ChatGptIdentity,
+    ChatGptTokenSet,
+)
+from puripuly_heart.core.chatgpt.session import (
+    CHATGPT_CLIENT_ID_SECRET,
+    CHATGPT_HOST_ID_SECRET,
+    CHATGPT_REFRESH_TOKEN_SECRET,
+    ChatGptSession,
+)
+from puripuly_heart.core.storage.secrets import EncryptedFileSecretStore
 from puripuly_heart.providers.llm.chatgpt_plan import ChatGptPlanLLMProvider
 
 
@@ -420,3 +442,155 @@ async def test_close_releases_replaced_provider_before_queued_cleanup_runs() -> 
     finally:
         await owner.close()
         await provider.close()
+
+
+@pytest.mark.parametrize("refresh_state", ["completed", "network", "store"])
+async def test_logout_durably_retires_standby_refresh(tmp_path: Path, refresh_state: str) -> None:
+    loop = asyncio.get_running_loop()
+    write_entered = asyncio.Event()
+    write_finished = asyncio.Event()
+    write_gate = Event()
+    network_entered = asyncio.Event()
+    network_finished = asyncio.Event()
+    network_gate = asyncio.Event()
+    path = tmp_path / "secrets.json"
+
+    class GatedStore(EncryptedFileSecretStore):
+        def set(self, key: str, value: str) -> None:
+            if key == CHATGPT_REFRESH_TOKEN_SECRET and value == "rotated":
+                loop.call_soon_threadsafe(write_entered.set)
+                try:
+                    if refresh_state == "store" and not write_gate.wait(10):
+                        raise TimeoutError("Rotation gate was not released")
+                    super().set(key, value)
+                finally:
+                    loop.call_soon_threadsafe(write_finished.set)
+            else:
+                super().set(key, value)
+
+    store = GatedStore(path, passphrase="synthetic")
+    store.set(CHATGPT_CLIENT_ID_SECRET, "synthetic-client")
+    store.set(CHATGPT_REFRESH_TOKEN_SECRET, "original")
+    store.set(CHATGPT_HOST_ID_SECRET, "synthetic-host")
+    store.set("unrelated", "keep")
+    requests: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == CHATGPT_REVOKE_URL:
+            requests.append("revoke")
+            return httpx.Response(200)
+        requests.append("refresh")
+        network_entered.set()
+        try:
+            if refresh_state == "network":
+                await network_gate.wait()
+            return httpx.Response(
+                200,
+                json={
+                    "access_token": "access",
+                    "refresh_token": "rotated",
+                    "expires_in": 3600,
+                    "scope": CHATGPT_PLAN_SCOPE,
+                },
+            )
+        finally:
+            network_finished.set()
+
+    session = ChatGptSession(
+        secret_store=lambda: store,
+        http_factory=lambda: httpx.AsyncClient(
+            transport=httpx.MockTransport(handler), trust_env=False
+        ),
+    )
+    account = ChatGptAccountOwner(session=session)
+    server = _Server()
+    provider = ChatGptPlanLLMProvider(session=session, connector=server.connect)
+    current: list[object | None] = [provider]
+    owner = LlmConnectionReadinessOwner(
+        llm_provider=lambda: current[0], translation_enabled=lambda: False
+    )
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation, model="gpt_6_luna", connection="chatgpt"
+            ),
+        ),
+    )
+
+    async def apply(*_args: object, **_kwargs: object) -> bool:
+        current[0] = None
+        await provider.close()
+        return True
+
+    adapter = UiProviderRuntimeAdapter(
+        settings=SimpleNamespace(canonical=settings),
+        provider_application=SimpleNamespace(apply=apply),
+        gpu=object(),
+        managed=object(),
+        credential_verification=object(),
+        provider_settings=object(),
+        build_byok_target_settings=lambda _settings: None,
+        chatgpt=account,
+        connection_readiness=owner,
+    )
+    logout = None
+    premature_removal = False
+    try:
+        owner.sync()
+        if refresh_state == "completed":
+            await server.wait_connected()
+        elif refresh_state == "network":
+            await asyncio.wait_for(network_entered.wait(), 5)
+        else:
+            await asyncio.wait_for(write_entered.wait(), 5)
+        logout = asyncio.create_task(adapter.sign_out_chatgpt())
+        if refresh_state == "store":
+            try:
+                result = await asyncio.wait_for(asyncio.shield(logout), 0.2)
+            except TimeoutError:
+                pass
+            else:
+                premature_removal = result.local_credentials_removed
+            write_gate.set()
+            await asyncio.wait_for(write_finished.wait(), 5)
+        result = await asyncio.wait_for(asyncio.shield(logout), 5)
+        await asyncio.wait_for(network_finished.wait(), 5)
+        fresh = EncryptedFileSecretStore(path, passphrase="synthetic")
+        assert fresh.get(CHATGPT_REFRESH_TOKEN_SECRET) is None
+        assert adapter.chatgpt_account_snapshot().signed_in is False
+        assert not premature_removal
+        assert result.local_credentials_removed is True
+        assert result.remote_revoked is True
+        assert requests == ["refresh", "revoke"]
+        assert fresh.get(CHATGPT_CLIENT_ID_SECRET) == "synthetic-client"
+        assert fresh.get(CHATGPT_HOST_ID_SECRET) == "synthetic-host"
+        assert fresh.get("unrelated") == "keep"
+        assert server.requests == []
+        assert len(server.sockets) == (1 if refresh_state == "completed" else 0)
+        network_gate.set()
+        session.store_sign_in(
+            client_id="synthetic-client",
+            tokens=ChatGptTokenSet(
+                access_token="authorized-access",
+                refresh_token="authorized-refresh",
+                expires_at=0,
+                scopes=(CHATGPT_PLAN_SCOPE,),
+            ),
+            identity=ChatGptIdentity(subject="synthetic-user", email="synthetic@example.invalid"),
+        )
+        assert await asyncio.wait_for(session.access_token(), 5) == "access"
+        assert account.snapshot().signed_in is True
+        assert fresh.get(CHATGPT_REFRESH_TOKEN_SECRET) == "rotated"
+        assert fresh.get("unrelated") == "keep"
+    finally:
+        write_gate.set()
+        network_gate.set()
+        if logout is not None:
+            await asyncio.wait_for(asyncio.gather(logout, return_exceptions=True), 5)
+        await asyncio.wait_for(owner.close(), 5)
+        await asyncio.wait_for(provider.close(), 5)
+        await account.close()
+    assert all(socket.close_code == 1000 for socket in server.sockets)
