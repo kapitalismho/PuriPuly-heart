@@ -183,7 +183,7 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 
 ---
 
-# 如果遇到问题，请通过 [Twitter/X](https://x.com/kapitalismho) 发 DM 联系我。
+# 想知道的事，问问内置智能体 Puri 吧！
 
 ## 使用方法
 

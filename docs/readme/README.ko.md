@@ -203,7 +203,7 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 
 ---
 
-# 문제가 생기면 [트위터](https://x.com/kapitalismho)로 DM을 보내주세요.
+# 내장 에이전트 Puri에게 궁금한걸 물어보세요!
 
 ## 사용법
 

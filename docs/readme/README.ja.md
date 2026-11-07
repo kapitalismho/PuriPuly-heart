@@ -182,7 +182,7 @@ GPU推論はVulkanを使用しています。RadeonでもArcでも、ベンダ�
 
 ---
 
-# 問題が起きたら、[Twitter/X](https://x.com/kapitalismho)でDMを送ってください。
+# 気になることは、内蔵エージェントのPuriに聞いてみてください！
 
 ## 使い方
 

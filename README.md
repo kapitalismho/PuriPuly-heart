@@ -182,7 +182,7 @@ GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Ar
 
 ---
 
-# If you run into problems, please DM me on [Twitter/X](https://x.com/kapitalismho).
+# Ask the built-in agent Puri anything you're curious about!
 
 ## Usage
 
