@@ -895,22 +895,22 @@ async def test_parallel_context_reads_wait_for_all_and_publish_in_call_order(
     ],
 )
 @pytest.mark.parametrize("invalid_first", [False, True])
-async def test_invalid_context_batch_arguments_reject_every_member(arguments, invalid_first):
+async def test_invalid_context_batch_arguments_reject_every_member_and_continue(
+    arguments, invalid_first
+):
     invalid = tool("invalid", arguments=arguments)
     valid = tool("valid")
     calls = [invalid, valid] if invalid_first else [valid, invalid]
-    records, transport = Records(), Responses({"status": "completed", "output": calls})
+    records, transport = Records(), Responses({"status": "completed", "output": calls}, answer())
     owner = AgentChatOwner(records, transport, localize=str)
     await owner.start()
     try:
         result = await owner.send("Check output")
-        assert result.status == "interrupted"
+        assert result.status == "completed"
         assert len(records.queries) == 10
         assert [item.call_id for item in result.tool_results] == [call["call_id"] for call in calls]
-        assert [item.result for item in result.tool_results] == [
-            {"status": "rejected", "code": "invalid_tool_call"}
-        ] * 2
-        assert len(transport.requests) == 1
+        assert [item.result["code"] for item in result.tool_results] == ["invalid_tool_batch"] * 2
+        assert len(transport.requests) == 2
         assert not owner.snapshot.setup_actions
     finally:
         await owner.close()
@@ -940,7 +940,7 @@ async def test_invalid_context_batch_arguments_reject_every_member(arguments, in
     ],
 )
 @pytest.mark.parametrize("non_read_first", [False, True])
-async def test_mixed_context_batches_never_execute_or_stage_actions(
+async def test_mixed_context_batches_continue_without_executing_or_staging_actions(
     name, arguments, non_read_first
 ):
     non_read = {**tool("non-read"), "arguments": json.dumps(arguments)}
@@ -950,22 +950,99 @@ async def test_mixed_context_batches_never_execute_or_stage_actions(
         non_read["name"] = name
     read = tool("read")
     calls = [non_read, read] if non_read_first else [read, non_read]
-    records, transport = Records(), Responses({"status": "completed", "output": calls})
+    records, transport = Records(), Responses({"status": "completed", "output": calls}, answer())
     owner = AgentChatOwner(records, transport, localize=str)
     navigations = []
     owner.bind_navigation(lambda *args: navigations.append(args) or {"opened": True})
     await owner.start()
     try:
         result = await owner.send("Check output and configure the app")
-        assert result.status == "interrupted"
+        assert result.status == "completed"
         assert len(records.queries) == 10
         assert [item.status for item in result.tool_results] == ["rejected"] * 2
+        assert [item.result["code"] for item in result.tool_results] == ["invalid_tool_batch"] * 2
+        assert len(transport.requests) == 2
         assert not navigations
         assert not owner.snapshot.setup_actions
         assert not owner.snapshot.secure_entry_requests
         assert not owner.snapshot.report_offers
         assert not owner.snapshot.recent_changes
         assert owner.snapshot.confirmation is None
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_corrected_tool_after_rejected_batch_executes_once_and_finishes():
+    records = Records()
+    read = tool("read", arguments='{"topic":"diagnostics"}')
+    navigation = {**tool("open"), "name": "open_settings", "arguments": '{"section":"api"}'}
+    transport = Responses(
+        {"status": "completed", "output": [read, navigation]},
+        {"status": "completed", "output": [{**read, "call_id": "read-corrected"}]},
+        {"status": "completed", "output": [{**navigation, "call_id": "open-corrected"}]},
+        answer(),
+    )
+    owner = AgentChatOwner(records, transport, localize=str)
+    navigations = []
+    owner.bind_navigation(lambda *args: navigations.append(args) or {"opened": True})
+    await owner.start()
+    try:
+        result = await owner.send("Check recent errors and open settings")
+        assert result.status == "completed"
+        assert navigations == [("api", None)]
+        assert [item.status for item in result.tool_results] == [
+            "rejected",
+            "rejected",
+            "observed",
+            "opened",
+        ]
+        assert [item.call_id for item in result.tool_results] == [
+            "read",
+            "open",
+            "read-corrected",
+            "open-corrected",
+        ]
+        assert all(message.role != "notice" for message in owner.snapshot.messages)
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_rejected_batches_consume_tool_budget_before_final_answer():
+    batches = [
+        [
+            tool(f"read-{index}"),
+            {
+                **tool(f"open-{index}"),
+                "name": "open_settings",
+                "arguments": '{"section":"api"}',
+            },
+        ]
+        for index in range(5)
+    ]
+    records = Records()
+    transport = Responses(
+        *[{"status": "completed", "output": batch} for batch in batches],
+        answer(),
+    )
+    owner = AgentChatOwner(records, transport, localize=str)
+    navigations = []
+    owner.bind_navigation(lambda *args: navigations.append(args) or {"opened": True})
+    await owner.start()
+    try:
+        result = await owner.send("Check output and open settings")
+        assert result.status == "completed"
+        assert not navigations
+        assert all(item.status == "rejected" for item in result.tool_results)
+        assert [request["allow_tools"] for request in transport.requests] == [
+            True,
+            True,
+            True,
+            True,
+            True,
+            False,
+        ]
     finally:
         await owner.close()
 

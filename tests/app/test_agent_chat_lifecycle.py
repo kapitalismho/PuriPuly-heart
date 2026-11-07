@@ -245,6 +245,44 @@ async def test_only_active_confirmation_result_resumes_without_reclassification(
 
 
 @pytest.mark.asyncio
+async def test_batch_recovery_preserves_confirmation_gate_until_user_approval(catalog):
+    control = Control(catalog)
+    change = call("change_settings", {"changes": {"stt.provider": "deepgram"}})
+    transport = Responses(
+        {"status": "completed", "output": [tool("read"), *change["output"]]},
+        call("change_settings", {"changes": {"stt.provider": "deepgram"}}, "corrected"),
+        call("open_settings", {"section": "api"}, "blocked"),
+        answer("The approved setting is saved."),
+    )
+    owner = AgentChatOwner(control, transport, localize=str)
+    navigations = []
+    owner.bind_navigation(lambda *args: navigations.append(args) or {"opened": True})
+    await owner.start()
+    try:
+        result = await owner.send("Check the app and change recognition to Deepgram")
+        assert result.status == "needs_confirmation"
+        assert not control.submissions
+        assert not navigations
+        assert [item.status for item in result.tool_results] == [
+            "rejected",
+            "rejected",
+            "needs_confirmation",
+            "not_executed",
+        ]
+        assert transport.requests[-1]["allow_tools"] is False
+        card = owner.snapshot.confirmation
+        assert card["changes"] == {"stt.provider": "deepgram"}
+        confirmed = await owner.confirm(card["id"], True)
+        await notices_done(owner)
+        assert confirmed["status"] == "applied"
+        assert control.context()["settings"]["stt.provider"] == "deepgram"
+        assert len(control.submissions) == 1
+        assert owner.snapshot.confirmation is None
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_model_withdrawal_uses_current_card_context_without_notice_continuation(catalog):
     control = Control(catalog)
     transport = Responses(

@@ -1273,6 +1273,7 @@ class AgentChatOwner:
                             )
                         return self._finish("interrupted", self._localize("agent_chat.tool_limit"))
                     if len(function_calls) > 1:
+                        calls += len(function_calls)
                         batch_arguments = [self._arguments(call) for call in function_calls]
                         if any(
                             call.get("name") != "get_app_context" or parsed is None
@@ -1280,12 +1281,19 @@ class AgentChatOwner:
                         ):
                             for call in function_calls:
                                 self._record_result(
-                                    call, None, {"status": "rejected", "code": "invalid_tool_call"}
+                                    call,
+                                    None,
+                                    {
+                                        "status": "rejected",
+                                        "code": "invalid_tool_batch",
+                                        "guidance": (
+                                            "No tools in this batch were executed. Only valid "
+                                            "get_app_context calls may be batched. Submit other "
+                                            "tools one at a time with valid arguments."
+                                        ),
+                                    },
                                 )
-                            return self._finish(
-                                "interrupted", self._localize("agent_chat.interrupted")
-                            )
-                        calls += len(function_calls)
+                            continue
                         self._active_tool = ("get_app_context", batch_arguments[0]["topic"])
                         self._publish("working")
                         self._require_current(generation)
