@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 import threading
 from dataclasses import replace
 from types import SimpleNamespace
@@ -8,10 +9,16 @@ from types import SimpleNamespace
 import janus
 import pytest
 
+import puripuly_heart.core.audio.desktop_source as desktop_source_module
+import puripuly_heart.core.audio.process_source as process_source_module
+import puripuly_heart.core.audio.source as audio_source_module
 from puripuly_heart.app.adapters.audio_test_sources import LoopbackAudioTestSourceOpener
 from puripuly_heart.app.services.capture.peer_capture_target_application import (
     PeerCaptureTargetApplicationOwner,
 )
+from puripuly_heart.config.process_capture_platform import ProcessCapturePlatformAvailability
+from puripuly_heart.config.process_capture_resolution import ResolvedProcessCaptureIdentity
+from puripuly_heart.config.settings_vnext.schema import ProcessCaptureTargetIntent
 from puripuly_heart.core.audio.desktop_source import DesktopLoopbackAudioSource
 from puripuly_heart.core.audio.process_source import ProcessAudioCaptureSource
 from puripuly_heart.core.audio.source import SoundDeviceAudioSource
@@ -150,6 +157,93 @@ async def test_blocking_vad_factory_drains_before_cancelled_session_retires() ->
         await harness.owner.close()
 
 
+@pytest.fixture
+def native_close_source_factory(monkeypatch):
+    def create(source_type, close_native):
+        queues = []
+        queue_close_threads = []
+        queue_wait_loops = []
+
+        def create_queue(**kwargs):
+            queue = janus.Queue(**kwargs)
+            close_queue = queue.close
+            wait_closed = queue.wait_closed
+
+            def close():
+                queue_close_threads.append(threading.get_ident())
+                close_queue()
+
+            async def wait():
+                queue_wait_loops.append(asyncio.get_running_loop())
+                await wait_closed()
+
+            monkeypatch.setattr(queue, "close", close)
+            monkeypatch.setattr(queue, "wait_closed", wait)
+            queues.append(queue)
+            return queue
+
+        module = {
+            SoundDeviceAudioSource: audio_source_module,
+            DesktopLoopbackAudioSource: desktop_source_module,
+            ProcessAudioCaptureSource: process_source_module,
+        }[source_type]
+        monkeypatch.setattr(module, "janus", SimpleNamespace(Queue=create_queue))
+        if source_type is SoundDeviceAudioSource:
+            stream = SimpleNamespace(
+                samplerate=48000,
+                start=lambda: None,
+                stop=close_native,
+                close=lambda: None,
+            )
+            monkeypatch.setitem(
+                sys.modules,
+                "sounddevice",
+                SimpleNamespace(InputStream=lambda **_kwargs: stream),
+            )
+            source = SoundDeviceAudioSource()
+        elif source_type is DesktopLoopbackAudioSource:
+            device = {
+                "index": 7,
+                "name": "Controlled Loopback",
+                "maxInputChannels": 2,
+                "defaultSampleRate": 48000.0,
+            }
+            stream = SimpleNamespace(
+                start_stream=lambda: None,
+                stop_stream=close_native,
+                close=lambda: None,
+            )
+            manager = SimpleNamespace(
+                get_loopback_device_info_generator=lambda: iter((device,)),
+                get_default_wasapi_loopback=lambda: device,
+                open=lambda **_kwargs: stream,
+                terminate=lambda: None,
+            )
+            monkeypatch.setattr(desktop_source_module.platform, "system", lambda: "Windows")
+            monkeypatch.setitem(
+                sys.modules,
+                "pyaudiowpatch",
+                SimpleNamespace(PyAudio=lambda: manager, paContinue=0, paFloat32=1),
+            )
+            source = DesktopLoopbackAudioSource(device_name=device["name"])
+        else:
+            capture = SimpleNamespace(start=lambda: None, close=close_native)
+            watch = SimpleNamespace(identity_verified=True, close=lambda: None)
+            source = ProcessAudioCaptureSource(
+                identity=ResolvedProcessCaptureIdentity(
+                    pid=123,
+                    target=ProcessCaptureTargetIntent.generic_executable(r"C:\Controlled\App.exe"),
+                    instance_id="controlled-instance",
+                ),
+                watcher=SimpleNamespace(watch=lambda _identity, _on_terminal: watch),
+                capture_factory=SimpleNamespace(create=lambda **_kwargs: capture),
+                platform_availability=lambda: ProcessCapturePlatformAvailability(available=True),
+            )
+        return source, queues[0], queue_close_threads, queue_wait_loops
+
+    return create
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "source_type",
@@ -160,33 +254,25 @@ async def test_blocking_vad_factory_drains_before_cancelled_session_retires() ->
     ),
 )
 async def test_native_close_uses_owned_worker_and_keeps_janus_on_application_loop(
-    source_type,
+    source_type, native_close_source_factory
 ) -> None:
-    source = object.__new__(source_type)
-    queue = janus.Queue()
-    await queue.async_q.put(None)
-    source._queue = queue
-    source._closed = False
     entered = threading.Event()
     release = threading.Event()
     close_calls: list[None] = []
+    native_threads = []
+    application_thread = threading.get_ident()
+    application_loop = asyncio.get_running_loop()
 
     def close_native():
         close_calls.append(None)
+        native_threads.append(threading.get_ident())
         entered.set()
         assert release.wait(5)
 
-    if source_type is SoundDeviceAudioSource:
-        source._stream = SimpleNamespace(stop=close_native, close=lambda: None)
-    elif source_type is DesktopLoopbackAudioSource:
-        source._stream = SimpleNamespace(stop_stream=close_native, close=lambda: None)
-        source._manager = SimpleNamespace(terminate=lambda: None)
-    else:
-        source._lock = threading.RLock()
-        source._terminal_reason = None
-        source._terminal_diagnostics = None
-        source._watch = None
-        source._capture = SimpleNamespace(close=close_native)
+    source, queue, queue_close_threads, queue_wait_loops = native_close_source_factory(
+        source_type, close_native
+    )
+    await queue.async_q.put(None)
     task = asyncio.create_task(source.close())
     try:
         assert await asyncio.to_thread(entered.wait, 2)
@@ -202,6 +288,10 @@ async def test_native_close_uses_owned_worker_and_keeps_janus_on_application_loo
             await task
         assert queue.closed
         assert len(close_calls) == 1
+        assert len(native_threads) == 1
+        assert native_threads[0] != application_thread
+        assert queue_close_threads == [application_thread]
+        assert queue_wait_loops == [application_loop]
         await source.close()
     finally:
         release.set()

@@ -11,6 +11,7 @@ from puripuly_heart.config.audio_host_api import (
     normalize_input_host_api,
 )
 from puripuly_heart.core.audio.source import (
+    AudioSourceOpenFailure,
     SelfMicCaptureChannelDecision,
     SoundDeviceInputMetadata,
 )
@@ -156,3 +157,24 @@ def test_adapter_exhausts_primary_name_and_system_default_in_order() -> None:
         for attempt in range(1, 4)
         for message in error_messages
     )
+
+
+def test_partial_native_open_cleanup_debt_prevents_mono_and_route_fallbacks():
+    calls = []
+    partial_source = object()
+    failure = AudioSourceOpenFailure(partial_source, OSError("retained native close failure"))
+
+    def create_source(**kwargs):
+        calls.append(kwargs)
+        raise failure
+
+    harness = AdapterHarness(
+        resolve_device=lambda **_kwargs: 7,
+        source_factory=create_source,
+        preferred_channels=2,
+    )
+    with pytest.raises(AudioSourceOpenFailure) as raised:
+        harness.adapter()(_config())
+    assert raised.value is failure
+    assert len(calls) == 1 and calls[0]["channels"] == 2
+    assert harness.wrapped == []

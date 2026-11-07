@@ -28,6 +28,10 @@ PRIMARY_ACTION_KEYS = [
     "founder_letter",
     "github_star_snackbar",
     "foundation_primitives",
+    "agent_report_cycle",
+    "agent_change_cycle",
+    "agent_key_cycle",
+    "agent_account_cycle",
     "http_extension_form",
 ]
 EXTENDED_ACTION_KEYS = [
@@ -91,6 +95,7 @@ def test_debug_preview_panel_starts_with_curated_actions_and_collapsed_diagnosti
 
 def test_debug_preview_panel_expands_diagnostics_with_bounded_scroll_height() -> None:
     panel = DebugPreviewPanel(**_callbacks([]))
+    collapsed = panel._popover.content.height
 
     panel._toggle_extended_actions(None)
 
@@ -100,7 +105,7 @@ def test_debug_preview_panel_expands_diagnostics_with_bounded_scroll_height() ->
 
     panel._toggle_extended_actions(None)
     assert panel._extended_actions_container.visible is False
-    assert panel._popover.content.height < DEBUG_PREVIEW_POPOVER_MAX_HEIGHT
+    assert panel._popover.content.height == collapsed
 
 
 def test_debug_preview_panel_omits_optional_http_and_extended_actions() -> None:

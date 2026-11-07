@@ -23,6 +23,7 @@ Paths below are navigation entry points, not an exhaustive class inventory.
 | Area | Responsibility | Entry points |
 | --- | --- | --- |
 | Application boundary | UI intents; typed control operations, queries, and mutation ordering | [UI boundary](../src/puripuly_heart/app/services/ui_application.py), [control owner](../src/puripuly_heart/app/services/application_control.py) |
+| Agent conversation | Conversation lifetime, app-context projection, and model tool dispatch | [Chat owner](../src/puripuly_heart/app/services/agent_chat/owner.py), [context adapter](../src/puripuly_heart/app/services/agent_chat/context.py), [context modules](../src/puripuly_heart/app/services/agent_chat/modules.py) |
 | Local control host | Authenticated endpoint and instance lifetime | [Host](../src/puripuly_heart/cli/host.py), [instance ownership](../src/puripuly_heart/core/control_instance.py) |
 | Settings | Canonical intent, persistence, and runtime application coordination | [Persistence](../src/puripuly_heart/app/services/canonical_settings_persistence.py), [settings application](../src/puripuly_heart/app/services/settings/settings_application.py) |
 | Capture | Source authority, audio ordering, segmentation, and capture lifecycle | [Self](../src/puripuly_heart/core/runtime/self_capture.py), [Peer](../src/puripuly_heart/core/runtime/peer_channel.py) |
@@ -39,6 +40,8 @@ Paths below are navigation entry points, not an exhaustive class inventory.
 | Shutdown | Ordered teardown across owners | [Shutdown adapter](../src/puripuly_heart/app/adapters/application_runtime_shutdown.py) |
 
 An owner may span several processing stages. GUI, CLI, and OSC mutations share application ordering and resource-conflict boundaries; operations belong to the application, not the requesting connection. Queries distinguish saved intent from effective runtime state. Presentation and notifications are never state authorities.
+
+OSC discovery and recovery share the existing monitor, runtime lock, and connection fences. Recovery awaits bounded target reapplication; passive queries read retained observations without starting probes.
 
 ## Data Handoffs
 
@@ -65,7 +68,7 @@ flowchart LR
 - Peer segment snapshots carry capture-boundary evidence through recognition settlement into caption joining.
 - Dashboard readiness is a projection of the Self capture owner's lifecycle, not recognition-result/session events. Presentation retains readiness independently of conversation content and specific errors/notices; it does not own runtime state.
 - Source completion drains admitted input. Stop, discontinuity, and replacement revoke affected authority so late results cannot enter current work.
-- VAD-only audio tests exclude normal capture. The application owner handles admission, input release, and restoration of still-authorized capture.
+- VAD-only audio tests and microphone diagnosis share the audio-test owner and exclude normal capture. The owner releases input before restoring still-authorized capture; unfinished cleanup prevents conflicting reuse.
 
 Contracts: [audio ownership](../src/puripuly_heart/core/audio/ownership.py), [audio delivery](../src/puripuly_heart/core/audio/listen_delivery.py), [audio-test owner](../src/puripuly_heart/app/services/audio_test.py). Behavior: [scoped recognition tests](../tests/core/test_stt_scoped_engine.py).
 
@@ -114,6 +117,18 @@ Behavior: [output runtime](../tests/core/runtime/test_output_runtime.py), [Self 
 Contracts: [photo bridge](../src/puripuly_heart/core/photo/bridge.py), [provider adapters](../src/puripuly_heart/providers/photo.py), [native ownership and verification](../native/overlay/README.md#photo-runtime-boundary). Product sequencing and image-composition obligations remain in [#338](https://github.com/kapitalismho/PuriPuly-heart/issues/338) and its child issues.
 
 
+### Agent conversation
+
+- Python owns conversation lifetime and tool execution. The relay owns model requests, trusted instructions, and tool definitions; Broker supplies installation authentication. The relay keeps serving supported app protocols; a contract change adds a protocol and reaches the relay before the app release.
+- App context is an allowlisted projection through the application control boundary. Tools use existing application owners and the current settings catalog; model output cannot expand their permissions.
+- Every settings change requires approval of the proposed values. The settings-tool owner queues coupled changes and advances after successful application. Cancellation discards unapproved work without undoing saved changes or cancelling accepted operations.
+- Only completed model responses admit tool calls. Generation fences reject interrupted text and late results. UI renders owner snapshots; active model context is bounded separately from the chat archive.
+- Provider setup and account actions reuse existing authentication, secret storage, and verification owners. Credentials use secure app controls, not chat. Support uploads require an explicit user click.
+- Recognition and translation probes are isolated application operations using existing runtime owners. Their results stay outside normal transcript/output publication, and resources remain owned until settlement.
+- The [scenario simulator](../src/puripuly_heart/release_evidence/agent_chat_simulator/) substitutes synthetic application state beneath the production chat adapters. It is a development caller, not a second runtime or evidence of real device/UI behavior.
+
+Service boundaries and development: [Agent relay](../agent-relay/README.md).
+
 ## Settings and Credentials
 
 | State | Authority |
@@ -132,6 +147,7 @@ Contracts: [photo bridge](../src/puripuly_heart/core/photo/bridge.py), [provider
 - Secret-store instances observe one backend, not independent credential snapshots. Mutations preserve unrelated entries across instances/processes; unreadable storage is unknown state, not proof of absent credentials.
 - Managed identity authority belongs to the settings owner. Credential storage, remote acknowledgment, authentication completion, and provider activation are separate transitions. Modern credentials require matching durable delivery proof and canonical authority; recovery resumes the same operation rather than issuing a replacement on uncertainty.
 - ChatGPT authentication is separate from Broker and survives provider replacement. Refresh credentials use the secret store; access tokens remain in memory.
+- The ChatGPT session owns credential mutations through cancellation. Logout retires refresh admission and orders local removal after started mutations; only a successfully persisted explicit sign-in establishes new authority that stale refresh persistence and rejection cleanup cannot overwrite or delete. A failed sign-in rolled back to prior credentials does not supersede pending removal. Removal results describe the logout attempt, not credentials established by a later authorization.
 
 Entry points: [provider application](../src/puripuly_heart/app/services/provider/provider_runtime_apply.py), [secret storage](../src/puripuly_heart/core/storage/secrets.py), [managed authentication](../src/puripuly_heart/app/services/managed/), [credential proof](../src/puripuly_heart/core/managed_credential.py). Behavior: [control contract](../tests/app/test_application_control_contract.py), [provider application](../tests/app/test_stt_provider_apply_vertical.py), [secret persistence](../tests/core/test_encrypted_secret_store.py).
 
@@ -139,7 +155,8 @@ Entry points: [provider application](../src/puripuly_heart/app/services/provider
 
 - Every task, source, process, and provider session has an owner before work starts. That owner stops ingress, cancels or drains work, rejects late callbacks, and releases resources.
 - Generations, attachment tokens, and request identities fence retired work. Replacement revokes old authority; retired resources remain owned until cleanup completes. Caller cancellation is not proof that native/thread/process work settled.
-- Application state and async clients stay on the Python event loop. Blocking device/model/storage/startup work uses owned threads, executors, or child processes; [owned-thread cancellation](../src/puripuly_heart/core/owned_thread.py) drains started synchronous work before resource release.
+- Application orchestration and async clients stay on the Python event loop. Blocking device/model/storage/startup work uses owned threads, executors, or child processes; [owned-thread cancellation](../src/puripuly_heart/core/owned_thread.py) drains started synchronous work before resource release.
+- ChatGPT credential transactions serialize session-owned authority and token-cache publication with synchronous storage under one mutation lock, extending the existing worker-thread sign-in boundary. Cached-token observations are not transactional snapshots.
 - Events cross ports, callbacks, or owned queues. Receivers mutate their own state. Ordering is local to the owner/channel, not global across UI, Self, Peer, and providers.
 - Matching stops may preempt pending starts, while cleanup fences older queued starts and later replacements. Removing one channel's demand does not revoke another channel's shared resource.
 - Shutdown freezes ingress and startup, drains/cancels owned work, closes external resources, then clears runtime references. Primary operational failures and secondary cleanup failures remain distinct; failed cleanup stays owned and visible.

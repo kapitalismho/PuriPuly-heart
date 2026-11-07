@@ -30,6 +30,8 @@ def test_title_bar_window_controls_and_hover() -> None:
     close_calls: list[str] = []
     bar = TitleBar(page, on_close=lambda: close_calls.append("close"))
 
+    assert bar.border is None
+
     bar._minimize(None)
     assert page.window.minimized is True
     assert not hasattr(bar, "_maximize_btn")

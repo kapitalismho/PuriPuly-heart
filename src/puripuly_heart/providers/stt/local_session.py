@@ -119,6 +119,12 @@ class LocalOfflineSTTBackend(STTBackend):
         self._session_handoff_tail = session.handoff_complete_event
         return session
 
+    async def open_probe_session(self, *, projection: STTSessionProjection) -> STTBackendSession:
+        await self._ensure_recognizer()
+        if self._closed:
+            raise RuntimeError("Local STT backend is closed")
+        return LocalOfflineSTTSession(backend=self, projection=projection)
+
     async def reconfigure_session_options(self, options: LocalASRSessionOptions) -> None:
         self.language_hint = options.language_hint
 

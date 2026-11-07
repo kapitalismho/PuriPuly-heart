@@ -16,6 +16,8 @@ from typing import Awaitable, Callable, Mapping
 
 import flet as ft
 
+from puripuly_heart.app.control_presentation import setting_value_text
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretKey,
     SettingsSecretLoadResult,
@@ -142,6 +144,9 @@ from puripuly_heart.ui.components.settings import (
     PromptEditor,
     SettingsModal,
     SettingsUnitCard,
+)
+from puripuly_heart.ui.components.settings.api_key_verification_controller import (
+    CompletionHandler,
 )
 from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 from puripuly_heart.ui.components.subtab_shell import TextSubtab, TextSubtabShell
@@ -430,8 +435,12 @@ class SettingsView(ft.Column):
         self.on_local_llm_secret_changed: Callable[[], None] | None = None
         self.on_custom_stt_secret_changed: Callable[[], None] | None = None
         self.on_request_openrouter_pkce: Callable[[OpenRouterPkceTarget], None] | None = None
-        self.on_verify_api_key: Callable[[str, str], object] | None = None
+        self.on_verify_api_key: (
+            Callable[[str, str], Awaitable[ProviderCredentialVerificationOutcome]] | None
+        ) = None
         self.on_provider_secret_change: Callable[[str, str], object] | None = None
+        self._verification_providers: frozenset[str] = frozenset()
+        self._agent_settings_provider: str | None = None
         self.on_secret_cleared: Callable[[str], None] | None = None  # key name
         self.on_overlay_calibration_begin: Callable[[], OverlayCalibration] | None = None
         self.on_overlay_calibration_change: Callable[[str, object], OverlayCalibration] | None = (
@@ -562,6 +571,79 @@ class SettingsView(ft.Column):
 
     def api_keys_control(self) -> ft.Control:
         return self._api_keys_card
+
+    def bind_verification_completion(self, callback: CompletionHandler | None) -> frozenset[str]:
+        self._verification_providers = frozenset(
+            field._provider
+            for field in self._api_keys_column.controls
+            if isinstance(field, ApiKeyField)
+            and field.bind_verification_completion(
+                callback if callback is not None and callable(self.on_verify_api_key) else None
+            )
+        )
+        return self._verification_providers
+
+    def open_agent_section(
+        self,
+        section: str,
+        provider: str | None,
+        *,
+        show_settings: Callable[[], None],
+    ) -> dict:
+        tab_key = {
+            "api": "api",
+            "general": "general",
+            "overlay": "overlay",
+            "prompts": "prompt",
+        }.get(section)
+        key_fields = {
+            field._provider: field
+            for field in self._api_keys_column.controls
+            if isinstance(field, ApiKeyField)
+        }
+        if tab_key is None or (
+            provider is not None and (section != "api" or provider not in key_fields)
+        ):
+            return {
+                "opened": False,
+                "field_visible": False,
+                "completion_observable": False,
+                "verification_available": False,
+            }
+        show_settings()
+        self._settings_subtab_shell.select_tab(tab_key)
+        self._agent_settings_provider = provider
+        self._update_api_visibility()
+        field = key_fields.get(provider)
+        field_visible = field is not None and self._agent_control_visible(self, field._text_field)
+        verification_available = (
+            field_visible
+            and callable(field.controller._on_verify)
+            and callable(self.on_verify_api_key)
+        )
+        completion_observable = provider in self._verification_providers
+        _update_control_if_mounted(self)
+        return {
+            "opened": True,
+            "field_visible": field_visible,
+            "completion_observable": completion_observable,
+            "verification_available": verification_available,
+        }
+
+    @staticmethod
+    def _agent_control_visible(control: ft.Control, target: ft.Control) -> bool:
+        if control.visible is False:
+            return False
+        if control is target:
+            return True
+        content = getattr(control, "content", None)
+        if isinstance(content, ft.Control) and SettingsView._agent_control_visible(content, target):
+            return True
+        return any(
+            SettingsView._agent_control_visible(child, target)
+            for child in getattr(control, "controls", ())
+            if isinstance(child, ft.Control)
+        )
 
     def bind_settings_intents(
         self,
@@ -3636,9 +3718,13 @@ class SettingsView(ft.Column):
 
         # VAD
         self._vad_slider.value = general.self_vad_speech_threshold
-        self._vad_slider.label = f"{general.self_vad_speech_threshold:.2f}"
+        self._vad_slider.label = setting_value_text(
+            "self_vad.speech_threshold", general.self_vad_speech_threshold, t
+        )
         self._peer_vad_slider.value = general.peer_vad_speech_threshold
-        self._peer_vad_slider.label = f"{general.peer_vad_speech_threshold:.2f}"
+        self._peer_vad_slider.label = setting_value_text(
+            "peer_vad.speech_threshold", general.peer_vad_speech_threshold, t
+        )
         self._vrc_mic_text.content.value = t(
             "settings.vrc_mic.on" if general.vrc_mic_intercept else "settings.vrc_mic.off"
         )
@@ -4146,6 +4232,9 @@ class SettingsView(ft.Column):
         )
         self._alibaba_key_beijing.visible = QwenRegion.BEIJING in qwen_regions
         self._alibaba_key_singapore.visible = QwenRegion.SINGAPORE in qwen_regions
+        for field in self._api_keys_column.controls:
+            if isinstance(field, ApiKeyField) and field._provider == self._agent_settings_provider:
+                field.visible = True
         qwen_api_host_row = getattr(self, "_qwen_api_host_row", None)
         if qwen_api_host_row is not None:
             qwen_api_host_row.visible = self._qwen_region_btn.visible
@@ -4158,6 +4247,7 @@ class SettingsView(ft.Column):
                     getattr(self, "_elevenlabs_scribe_key", None),
                     getattr(self, "_gemini_key", None),
                     self._soniox_key,
+                    self._openrouter_key,
                     self._deepseek_key,
                     self._openai_key,
                     self._alibaba_key_beijing,
@@ -5524,8 +5614,7 @@ class SettingsView(ft.Column):
 
     def _desktop_overlay_background_alpha_label_for(self, value: object) -> str:
         alpha = self._normalize_desktop_overlay_background_alpha(value)
-        transparency = 1.0 - alpha
-        return f"{int(round(transparency * 100))}%"
+        return setting_value_text("overlay.background_alpha", alpha, t)
 
     def _desktop_overlay_size_label_for(self, size_preset: object) -> str:
         normalized = self._normalize_desktop_overlay_size_preset(size_preset)
@@ -6494,15 +6583,19 @@ class SettingsView(ft.Column):
             return
         self._set_custom_vocabulary_terms_for_current_language(current_terms)
 
-    async def _verify_key(self, provider: str, key: str) -> tuple[bool, str]:
+    async def _verify_key(self, provider: str, key: str) -> ProviderCredentialVerificationOutcome:
         """Verify API key."""
         if self.on_verify_api_key:
             result = await self.on_verify_api_key(provider, key)
-            if provider == "openrouter" and self._provider_snapshot is not None:
+            if (
+                provider == "openrouter"
+                and self._provider_snapshot is not None
+                and self._openrouter_key.value == key
+            ):
                 current = self._provider_draft or self._provider_snapshot
                 updated = replace(
                     current,
-                    verified=replace(current.verified, openrouter=bool(result[0])),
+                    verified=replace(current.verified, openrouter=result.status == "verified"),
                 )
                 if self._provider_draft is None:
                     self._provider_snapshot = updated
@@ -6510,7 +6603,9 @@ class SettingsView(ft.Column):
                     self._provider_draft = updated
                 self._sync_openrouter_pkce_button_state()
             return result
-        return False, "Verification not available"
+        return ProviderCredentialVerificationOutcome(
+            status="unknown", provider=provider, error_text="Verification not available"
+        )
 
     def _emit_settings_changed(self, intent: ImmediateSettingsIntent) -> None:
         if self.on_settings_changed:

@@ -587,6 +587,37 @@ async def test_qwen_empty_partial_retains_last_nonempty_and_text_capacity_is_exp
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("configured_source", "expected_name"),
+    [("zh-CN", "Chinese (Simplified)"), ("zh-TW", "Chinese (Traditional)"), ("ja", "Japanese")],
+)
+async def test_manual_regional_source_translates_final_without_detected_language(
+    configured_source, expected_name
+):
+    harness, backend, events, _ = setup()
+    harness.configuration.replace(
+        replace(
+            harness.configuration.snapshot().value,
+            peer_source_mode="manual",
+            peer_source_language=configured_source,
+            peer_target_language="ko",
+        )
+    )
+    try:
+        await harness.start()
+        await final(harness, transcript("你好。", 1), provider="qwen_audio")
+        await idle(harness)
+        assert [request.text for request in backend.calls] == ["你好。"]
+        assert backend.calls[0].source_language == configured_source
+        assert expected_name in backend.calls[0].system_prompt
+        assert events[-1].type == "translation_final"
+        assert events[-1].text == "translated:你好。"
+        assert events[-1].source_language == configured_source
+    finally:
+        await harness.stop()
+
+
+@pytest.mark.asyncio
 async def test_local_peer_uses_unchanged_per_final_translation_without_preview_or_join(monkeypatch):
     harness, backend, events, clock = setup()
     monkeypatch.setattr(
@@ -998,6 +1029,72 @@ async def test_retraction_cancels_running_preview_and_later_growth_can_progress(
         assert events[-1].source_text == "A longer replacement hypothesis"
     finally:
         await harness.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider", ["soniox", "qwen_audio"])
+async def test_empty_partial_fences_late_preview_without_blocking_replacement(provider):
+    initial_tasks = asyncio.all_tasks()
+    harness, backend, events, clock = setup()
+    entered, cancelled, release = (asyncio.Event() for _ in range(3))
+    item = transcript("Old hypothesis", 1)
+    idle_waiter = None
+
+    async def late_translation(request):
+        backend.calls.append(request)
+        if request.text == item.text:
+            entered.set()
+            while not release.is_set():
+                try:
+                    await release.wait()
+                except asyncio.CancelledError:
+                    cancelled.set()
+        return Translation(
+            utterance_id=request.utterance_id,
+            text="translated:" + request.text,
+        )
+
+    backend.translate = late_translation
+    try:
+        await harness.start()
+        await partial(harness, item, provider=provider)
+        clock.advance(5)
+        await harness.peer_owner.cloud_captions.check_previews()
+        await asyncio.wait_for(entered.wait(), 1)
+        await partial(harness, replace(item, text=""), provider=provider)
+        if provider == "qwen_audio":
+            await turn_loop()
+            assert not cancelled.is_set()
+        else:
+            await asyncio.wait_for(cancelled.wait(), 1)
+
+        idle_waiter = asyncio.create_task(harness.peer_owner.cloud_captions.wait_for_idle())
+        await turn_loop()
+        assert not idle_waiter.done()
+        release.set()
+        await asyncio.wait_for(idle_waiter, 1)
+        await asyncio.wait_for(idle(harness), 1)
+        retained = [item.text] if provider == "qwen_audio" else []
+        assert [event.source_text for event in events] == retained
+
+        replacement = "A longer replacement hypothesis"
+        await partial(harness, replace(item, text=replacement), provider=provider)
+        clock.advance(4)
+        await harness.peer_owner.cloud_captions.check_previews()
+        await asyncio.wait_for(idle(harness), 1)
+        assert [event.source_text for event in events] == [*retained, replacement]
+        assert events[-1].type == "translation_stream_update"
+        assert events[-1].text == "translated:" + replacement
+        assert [request.text for request in backend.calls] == [item.text, replacement]
+        assert harness.peer_runtime.translation_history == []
+        assert harness.osc.messages == []
+    finally:
+        release.set()
+        if idle_waiter is not None:
+            await asyncio.wait_for(idle_waiter, 1)
+        await asyncio.wait_for(harness.stop(), 2)
+        await turn_loop()
+        assert not {task for task in asyncio.all_tasks() - initial_tasks if not task.done()}
 
 
 @pytest.mark.asyncio

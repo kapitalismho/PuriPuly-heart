@@ -206,16 +206,16 @@ class _PolicyWebSocketConnect(connect):
         kwargs["proxy"] = self.route.url
         super().__init__(url, **kwargs)
 
-    async def create_connection(self) -> Any:
+    async def open_tcp_connection(self) -> Any:
         self.route = self.policy.route(self.uri)
         self.proxy = self.route.url
         if self.uri.startswith("wss:"):
-            self.connection_kwargs["ssl"] = self.tls.context
+            self.create_connection_kwargs["ssl"] = self.tls.context
         if self.route.url and self.route.url.startswith("https:"):
-            self.connection_kwargs["proxy_ssl"] = self.tls.context
+            self.create_connection_kwargs["proxy_ssl"] = self.tls.context
         else:
-            self.connection_kwargs.pop("proxy_ssl", None)
-        return await super().create_connection()
+            self.create_connection_kwargs.pop("proxy_ssl", None)
+        return await super().open_tcp_connection()
 
 
 class ExternalWebSocketConnect:

@@ -72,6 +72,399 @@ def isolated_settings(path):
     path.write_text(json.dumps(to_dict(settings)), encoding="utf-8")
 
 
+class ObservedLock(asyncio.Lock):
+    def __init__(self):
+        super().__init__()
+        self.waiters = asyncio.Queue()
+
+    async def acquire(self):
+        if self.locked():
+            self.waiters.put_nowait(asyncio.current_task())
+        return await super().acquire()
+
+
+@pytest.mark.asyncio
+async def test_native_osc_discovery_retry_uses_owner_without_settings_or_remote_success(
+    tmp_path, monkeypatch, memory_osc_transports
+) -> None:
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
+    path = tmp_path / "settings.json"
+    isolated_settings(path)
+    service = memory_osc_transports.service
+    app = compose_headless_application(path)
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance("osc-retry-control")
+        osc = app._runtime_shutdown.vrc_mic_sync()
+        assert osc is not None
+        configured = await control.submit(
+            "settings.apply",
+            {"changes": {"osc.connection": {"mode": "automatic", "receive_port": 19001}}},
+            request_id="osc-auto-config",
+        )
+        assert (await control.wait(configured["operation_id"], timeout=5))["status"] == "applied"
+        await osc.wait_automatic_query_start()
+        failed = (await control.query("osc.status", {}))["output"]
+        assert failed["query_failure"] == "oscquery_unavailable"
+        assert failed["local_availability"] == "available"
+        before = await control.query("settings.current", {})
+        assert osc._receiver_owner is memory_osc_transports.receiver
+        assert osc.query_runtime.service is service
+        assert control.pipeline.sender in memory_osc_transports.senders
+        chatboxes = list(control.pipeline.sender.chatboxes)
+        persisted = path.read_bytes()
+        assert control.capabilities()["commands"]["osc.discovery.retry"]["arguments"] == {}
+        invalid = await control.submit(
+            "osc.discovery.retry",
+            {"send_port": 19000},
+            request_id="osc-retry-invalid",
+        )
+        assert (await control.wait(invalid["operation_id"], timeout=5))["status"] == "rejected"
+        assert service.started == 1
+        service.fail_discovery = False
+        service.block_discovery = True
+        accepted = await control.submit("osc.discovery.retry", {}, request_id="osc-retry")
+        await asyncio.wait_for(service.discovery_started.wait(), timeout=5)
+        pending = await control.wait(accepted["operation_id"], timeout=0)
+        assert pending["terminal"] is False
+        service.discovery_gate.set()
+        result = await control.wait(accepted["operation_id"], timeout=5)
+        assert result["status"] == "applied"
+        assert result["terminal"] is True
+        assert result["retry_started"] is True
+        assert result["effect"] == "discovery_target_applied"
+        assert result["output"]["query_service_started"] is True
+        assert result["output"]["remote_delivery"] == "unacknowledged"
+        recovered = (await control.query("osc.status", {}))["output"]
+        assert recovered["query_service_started"] is True
+        assert recovered["discovered_remote_present"] is True
+        assert recovered["query_failure"] is None
+        assert recovered["effective_send_port"] == 19000
+        assert recovered["remote_delivery"] == "unacknowledged"
+        after = await control.query("settings.current", {})
+        assert after["settings"] == before["settings"]
+        assert after["revision"] == before["revision"] == result["revision"]
+        assert path.read_bytes() == persisted
+        assert control.pipeline.sender.chatboxes == chatboxes
+        healthy = await control.submit("osc.discovery.retry", {}, request_id="osc-retry-healthy")
+        rejected = await control.wait(healthy["operation_id"], timeout=5)
+        assert rejected["status"] == "applied"
+        assert rejected["retry_started"] is True
+        assert rejected["effect"] == "discovery_target_applied"
+        assert service.started == 2
+    finally:
+        service.discovery_gate.set()
+        await app.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ("retry", "manual", "off", "same_off"))
+@pytest.mark.parametrize("packet_kind", ("settings", "runtime"))
+async def test_shared_osc_configuration_orders_queued_packets_without_lock_cycle_or_stale_mutation(
+    tmp_path, monkeypatch, memory_osc_transports, operation, packet_kind
+) -> None:
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
+    path = tmp_path / "settings.json"
+    isolated_settings(path)
+    app = compose_headless_application(path)
+    service = memory_osc_transports.service
+    tasks = []
+    held = False
+    lock = None
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance("osc-lock-order")
+        osc = app._runtime_shutdown.vrc_mic_sync()
+        assert osc is not None
+        configured = await control.submit(
+            "settings.apply",
+            {"changes": {"osc.connection": {"mode": "automatic", "receive_port": 19001}}},
+            request_id="osc-lock-order-config",
+        )
+        assert (await control.wait(configured["operation_id"], timeout=5))["status"] == "applied"
+        await osc.wait_automatic_query_start()
+        assert osc.output_snapshot()["query_failure"] == "oscquery_unavailable"
+        before = (await control.query("settings.current", {}))["settings"]["intent"]["osc"]
+        requested_source = not before["chatbox_include_source"]
+        runtime_calls = []
+        original_translation = type(app._input_runtime).set_translation_enabled
+
+        async def record_translation(runtime, enabled, **arguments):
+            runtime_calls.append(enabled)
+            return await original_translation(runtime, enabled, **arguments)
+
+        monkeypatch.setattr(type(app._input_runtime), "set_translation_enabled", record_translation)
+        lock = ObservedLock()
+        control._resource_lock = lock
+        await lock.acquire()
+        held = True
+        if operation == "retry":
+            service.fail_discovery = False
+            command, arguments = "osc.discovery.retry", {}
+        else:
+            connection = {
+                "mode": "manual" if operation == "manual" else "off",
+                "receive_port": 19003 if operation == "manual" else before["receive_port"],
+            }
+            if operation == "manual":
+                connection["send_port"] = 19002
+            command, arguments = "settings.apply", {"changes": {"osc.connection": connection}}
+        if operation == "same_off":
+            first_off = await control.submit(
+                command, arguments, request_id="osc-lock-order-first-off"
+            )
+            first_task = control._operations[first_off["operation_id"]].task
+            tasks.append(first_task)
+            assert await asyncio.wait_for(lock.waiters.get(), timeout=5) is first_task
+        submitted = await control.submit(command, arguments, request_id="osc-lock-order-operation")
+        operation_task = control._operations[submitted["operation_id"]].task
+        tasks.append(operation_task)
+        assert await asyncio.wait_for(lock.waiters.get(), timeout=5) is operation_task
+        address, value = (
+            ("/avatar/parameters/PuriPuly_ChatboxSource", requested_source)
+            if packet_kind == "settings"
+            else ("/avatar/parameters/PuriPuly_Trans", False)
+        )
+        if packet_kind == "runtime":
+            osc._peer_comparison.pop("PuriPuly_Trans", None)
+        packet = asyncio.create_task(osc.router.dispatch_packet(address, value))
+        tasks.append(packet)
+        await asyncio.wait_for(lock.waiters.get(), timeout=5)
+        assert packet in osc.router._active_invocation_tasks
+        following = None
+        if packet_kind == "settings":
+            following = asyncio.create_task(osc.router.dispatch_packet(address, value))
+            tasks.append(following)
+            await asyncio.sleep(0)
+            assert following not in osc.router._active_invocation_tasks
+            assert len(osc.router._unsettled_commands) == 2
+        lock.release()
+        held = False
+        result, packet_result = await asyncio.wait_for(
+            asyncio.gather(control.wait(submitted["operation_id"], timeout=5), packet),
+            timeout=5,
+        )
+        assert result["terminal"] is True
+        assert result["status"] == "applied"
+        fenced = operation in {"off", "same_off"}
+        assert packet_result.applied is (not fenced)
+        assert packet_result.error == ("router_disabled" if fenced else None)
+        if following is not None:
+            following_result = await asyncio.wait_for(following, timeout=5)
+            assert following_result.applied is (not fenced)
+            assert following_result.error == ("router_disabled" if fenced else None)
+        after = (await control.query("settings.current", {}))["settings"]["intent"]["osc"]
+        expected_source = (
+            requested_source
+            if packet_kind == "settings" and not fenced
+            else before["chatbox_include_source"]
+        )
+        assert after["chatbox_include_source"] is expected_source
+        assert runtime_calls == ([False] if packet_kind == "runtime" and not fenced else [])
+        assert after["connection_mode"] == (
+            "automatic" if operation == "retry" else "manual" if operation == "manual" else "off"
+        )
+        assert after["send_port"] == (19002 if operation == "manual" else before["send_port"])
+        assert after["receive_port"] == (19003 if operation == "manual" else before["receive_port"])
+        assert osc._receiver_owner is memory_osc_transports.receiver
+        assert osc.query_runtime.service is service
+        assert control.pipeline.sender in memory_osc_transports.senders
+        assert osc.output_snapshot()["remote_delivery"] == "unacknowledged"
+    finally:
+        if held:
+            lock.release()
+        for task in tasks:
+            if task is not None and not task.done():
+                task.cancel()
+        await asyncio.gather(*(task for task in tasks if task is not None), return_exceptions=True)
+        service.discovery_gate.set()
+        await app.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ("retry", "off"))
+async def test_shared_osc_configuration_waits_for_started_runtime_stop_without_resource_lock_cycle(
+    tmp_path, monkeypatch, memory_osc_transports, operation
+) -> None:
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
+    path = tmp_path / "settings.json"
+    isolated_settings(path)
+    app = compose_headless_application(path)
+    service = memory_osc_transports.service
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    trace = []
+    tasks = []
+    held = False
+    lock = None
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance("osc-started-stop-order")
+        osc = app._runtime_shutdown.vrc_mic_sync()
+        configured = await control.submit(
+            "settings.apply",
+            {"changes": {"osc.connection": {"mode": "automatic", "receive_port": 19001}}},
+            request_id="osc-started-stop-config",
+        )
+        assert (await control.wait(configured["operation_id"], timeout=5))["status"] == "applied"
+        await osc.wait_automatic_query_start()
+        original_stop = type(app._input_runtime).set_stt_enabled
+
+        async def held_stop(runtime, enabled):
+            assert enabled is False
+            trace.append("runtime_entered")
+            entered.set()
+            await release.wait()
+            result = await original_stop(runtime, enabled)
+            trace.append("runtime_settled")
+            return result
+
+        monkeypatch.setattr(type(app._input_runtime), "set_stt_enabled", held_stop)
+        lock = ObservedLock()
+        control._resource_lock = lock
+        await lock.acquire()
+        held = True
+        service.fail_discovery = False
+        command, arguments = (
+            ("osc.discovery.retry", {})
+            if operation == "retry"
+            else (
+                "settings.apply",
+                {"changes": {"osc.connection": {"mode": "off", "receive_port": 19001}}},
+            )
+        )
+        submitted = await control.submit(
+            command, arguments, request_id="osc-started-stop-operation"
+        )
+        operation_task = control._operations[submitted["operation_id"]].task
+        tasks.append(operation_task)
+        assert await asyncio.wait_for(lock.waiters.get(), timeout=5) is operation_task
+        osc._peer_comparison.pop("PuriPuly_Talk", None)
+        packet = asyncio.create_task(
+            osc.router.dispatch_packet("/avatar/parameters/PuriPuly_Talk", False)
+        )
+        tasks.append(packet)
+        await asyncio.wait_for(entered.wait(), timeout=5)
+        assert control._lock_owner is packet
+        assert lock.waiters.empty()
+        lock.release()
+        held = False
+        await asyncio.sleep(0)
+        assert not operation_task.done()
+        assert not osc._connection_lock.locked()
+        release.set()
+        result, packet_result = await asyncio.wait_for(
+            asyncio.gather(control.wait(submitted["operation_id"], timeout=5), packet),
+            timeout=5,
+        )
+        trace.append("configuration_acknowledged")
+        assert trace == ["runtime_entered", "runtime_settled", "configuration_acknowledged"]
+        assert result["status"] == "applied"
+        assert result["terminal"] is True
+        if operation == "retry":
+            assert packet_result.applied is True
+        elif not packet_result.applied:
+            assert packet_result.error == "router_disabled"
+        assert osc.output_snapshot()["remote_delivery"] == "unacknowledged"
+    finally:
+        release.set()
+        if held:
+            lock.release()
+        for task in tasks:
+            if task is not None and not task.done():
+                task.cancel()
+        await asyncio.gather(*(task for task in tasks if task is not None), return_exceptions=True)
+        await app.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("lifecycle", ("stop_ingress", "close"))
+@pytest.mark.parametrize("packet_kind", ("settings", "runtime"))
+async def test_shared_osc_lifecycle_fences_waiting_mutations_before_execution(
+    tmp_path, monkeypatch, memory_osc_transports, lifecycle, packet_kind
+) -> None:
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
+    path = tmp_path / "settings.json"
+    isolated_settings(path)
+    app = compose_headless_application(path)
+    tasks = []
+    held = False
+    lock = None
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance("osc-lifecycle-order")
+        osc = app._runtime_shutdown.vrc_mic_sync()
+        configured = await control.submit(
+            "settings.apply",
+            {"changes": {"osc.connection": {"mode": "automatic", "receive_port": 19001}}},
+            request_id="osc-lifecycle-config",
+        )
+        assert (await control.wait(configured["operation_id"], timeout=5))["status"] == "applied"
+        await osc.wait_automatic_query_start()
+        before = await control.query("settings.current", {})
+        runtime_calls = []
+        original_translation = type(app._input_runtime).set_translation_enabled
+
+        async def record_translation(runtime, enabled, **arguments):
+            runtime_calls.append(enabled)
+            return await original_translation(runtime, enabled, **arguments)
+
+        monkeypatch.setattr(type(app._input_runtime), "set_translation_enabled", record_translation)
+        lock = ObservedLock()
+        control._resource_lock = lock
+        await lock.acquire()
+        held = True
+        address, value = (
+            (
+                "/avatar/parameters/PuriPuly_ChatboxSource",
+                not before["settings"]["intent"]["osc"]["chatbox_include_source"],
+            )
+            if packet_kind == "settings"
+            else ("/avatar/parameters/PuriPuly_Trans", False)
+        )
+        if packet_kind == "runtime":
+            osc._peer_comparison.pop("PuriPuly_Trans", None)
+        packet = asyncio.create_task(osc.router.dispatch_packet(address, value))
+        tasks.append(packet)
+        await asyncio.wait_for(lock.waiters.get(), timeout=5)
+        following = None
+        if packet_kind == "settings":
+            following = asyncio.create_task(osc.router.dispatch_packet(address, value))
+            tasks.append(following)
+            await asyncio.sleep(0)
+        if lifecycle == "close":
+            await asyncio.wait_for(osc.close(), timeout=5)
+        else:
+            osc.stop_ingress()
+        lock.release()
+        held = False
+        results = await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=5)
+        if lifecycle == "close":
+            assert isinstance(results[0], asyncio.CancelledError)
+            if following is not None:
+                assert results[1].applied is False
+                assert results[1].error == "router_closed"
+        else:
+            assert all(result.applied is False for result in results)
+            assert all(result.error == "router_disabled" for result in results)
+        after = await control.query("settings.current", {})
+        assert after["settings"] == before["settings"]
+        assert after["revision"] == before["revision"]
+        assert runtime_calls == []
+    finally:
+        if held:
+            lock.release()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await app.stop()
+
+
 @pytest.mark.asyncio
 async def test_cli_model_only_selection_restores_saved_luna_connection(
     tmp_path, monkeypatch
@@ -1327,7 +1720,7 @@ async def test_interleaved_transactions_retain_per_operation_outcome() -> None:
 
 @pytest.mark.asyncio
 async def test_control_translation_enable_never_starts_implicit_authorization(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, memory_osc_transports
 ):
     import webbrowser
 
@@ -1369,6 +1762,7 @@ async def test_control_translation_enable_never_starts_implicit_authorization(
         assert release is not None
         release.discord_oauth_listener_factory = forbidden_authorization
         app.control().bind_instance("offline-control")
+        osc_runtime = await memory_osc_transports.enable_manual(app)
         receipt = await app.control().submit(
             "translation.set", {"enabled": True}, request_id="enable-without-auth"
         )
@@ -1376,9 +1770,11 @@ async def test_control_translation_enable_never_starts_implicit_authorization(
         assert result["status"] == "action_required"
         assert result["terminal"] is True
         assert (await app.control().query("app.status", {}))["translation_enabled"] is False
-        osc_runtime = app._runtime_shutdown.vrc_mic_sync()
-        assert osc_runtime is not None
-        await osc_runtime.router._application.set_translation(True)
+        osc_result = await osc_runtime.router.dispatch_packet(
+            "/avatar/parameters/PuriPuly_Trans", True
+        )
+        assert osc_result.applied is False
+        assert osc_result.error == "application_rejected"
         assert (await app.control().query("app.status", {}))["translation_enabled"] is False
         assert authorization_attempts == []
     finally:
@@ -1387,8 +1783,9 @@ async def test_control_translation_enable_never_starts_implicit_authorization(
 
 @pytest.mark.asyncio
 async def test_gui_cli_and_osc_mutations_share_revision_and_preserve_focused_edits(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, memory_osc_transports
 ):
+    from puripuly_heart.app.ports.osc_control import SECONDARY_LANGUAGE_ID_BY_CODE
     from puripuly_heart.app.ports.settings_view import LocaleSettingsIntent
     from puripuly_heart.app.wiring import wiring_managed_account
     from puripuly_heart.core.openrouter.managed_openrouter_release import (
@@ -1411,10 +1808,8 @@ async def test_gui_cli_and_osc_mutations_share_revision_and_preserve_focused_edi
         await app.start()
         control = app.control()
         control.bind_instance("concurrent-control")
+        osc_runtime = await memory_osc_transports.enable_manual(app)
         initial = await control.query("settings.current", {})
-        osc_runtime = app._runtime_shutdown.vrc_mic_sync()
-        assert osc_runtime is not None
-        osc = osc_runtime.router._application
 
         await control._lock.acquire()
         try:
@@ -1427,14 +1822,21 @@ async def test_gui_cli_and_osc_mutations_share_revision_and_preserve_focused_edi
                 expected_revision=initial["revision"],
             )
             await asyncio.sleep(0)
-            osc_mutation = asyncio.create_task(osc.set_secondary_target_language("zh-CN"))
+            osc_mutation = asyncio.create_task(
+                osc_runtime.router.dispatch_packet(
+                    "/avatar/parameters/PuriPuly_SelfDstLang2",
+                    SECONDARY_LANGUAGE_ID_BY_CODE["zh-CN"],
+                )
+            )
             await asyncio.sleep(0)
             assert not gui.done() and not osc_mutation.done()
         finally:
             control._lock.release()
         await gui
         cli_result = await control.wait(cli["operation_id"], timeout=5)
-        await osc_mutation
+        osc_result = await osc_mutation
+        assert osc_result.applied is True
+        assert osc_result.error is None
         final = await control.query("settings.current", {})
         assert cli_result["status"] == "rejected"
         assert cli_result["error"]["code"] == "revision_conflict"

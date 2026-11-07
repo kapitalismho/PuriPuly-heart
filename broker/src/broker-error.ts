@@ -28,7 +28,7 @@ export interface PublicErrorResponseOptions {
 
 export function errorResponse(
   c: Context<BrokerEnv>,
-  status: 400 | 401 | 404 | 409 | 410 | 429 | 500 | 503,
+  status: 400 | 401 | 404 | 409 | 410 | 413 | 429 | 500 | 503,
   options: PublicErrorResponseOptions,
 ): Response {
   return c.json(

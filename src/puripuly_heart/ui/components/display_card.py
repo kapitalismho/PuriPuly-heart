@@ -41,6 +41,7 @@ DISPLAY_INPUT_HINT_KEYS: tuple[str, ...] = (
     "display.input_hint_tip.cloud_stt",
     "display.input_hint_tip.tab_swap",
     "display.input_hint_tip.earmuffs",
+    "display.input_hint_tip.puri_help",
 )
 
 
@@ -403,7 +404,7 @@ class DisplayCard(ft.Container):
         self._input_field.hint_text = t(self._input_hint_key)
         # Explicitly set hint font to UI font (Display font)
         self._input_field.hint_style = text_style(
-            _content_face(display_font_family, display_letter_spacing),
+            _content_face(display_font_family or "", _display_tracking(display_letter_spacing)),
             color=COLOR_SECONDARY,
             italic=True,
         )

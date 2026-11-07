@@ -22,6 +22,7 @@ from puripuly_heart.core.audio.ownership import (
     OwnedVadEvent,
     PeerAudioSegmentLedger,
 )
+from puripuly_heart.core.audio.source import AudioSourceOpenFailure
 from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
 from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
@@ -1209,6 +1210,7 @@ class SelfCaptureSessionOwner:
             if (
                 not restart
                 and self._state is SelfCaptureSessionState.RUNNING
+                and not self._retired_sources
                 and self._config is not None
             ):
                 self._rebind_capture_generation(generation)
@@ -1219,6 +1221,7 @@ class SelfCaptureSessionOwner:
                 self._source is not None
                 or self._loop_task is not None
                 or self._vad is not None
+                or self._retired_sources
                 or (
                     self._config is not None
                     and self._config.provider_id == "qwen_audio"
@@ -1354,6 +1357,17 @@ class SelfCaptureSessionOwner:
                 source = await source
         except asyncio.CancelledError:
             raise
+        except AudioSourceOpenFailure as exc:
+            self._retain_source(exc.source)
+            self._last_cleanup_exception = exc
+            await self._fail_start(
+                generation,
+                config,
+                SelfCaptureFailureReason.SOURCE_OPEN_FAILED,
+                exc,
+                release_provider=True,
+            )
+            return
         except Exception as exc:
             await self._fail_start(
                 generation,

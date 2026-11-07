@@ -301,7 +301,7 @@ ELEVENLABS_SCRIBE_STT_MODEL: Final = "scribe_v2_realtime"
 ELEVENLABS_SCRIBE_STT_MAX_KEYTERMS: Final = 50
 ELEVENLABS_SCRIBE_STT_MAX_KEYTERM_CHARS: Final = 20
 QWEN_AUDIO_STT_MODEL: Final = "qwen-audio-3.1-asr-flash-streaming"
-SONIOX_STT_MODEL_RT_V5: Final = "stt-rt-v5"
+SONIOX_STT_MODEL_RT_V6: Final = "stt-rt-v6"
 SONIOX_STT_DEFAULT_ENDPOINT: Final = "wss://stt-rt.soniox.com/transcribe-websocket"
 SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S: Final = 10.0
 SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS: Final = 100
@@ -747,7 +747,7 @@ class STTRuntimeIntent:
     elevenlabs_scribe_auto_language: bool = False
     qwen_region: str = QWEN_REGION_BEIJING
     qwen_connection: AlibabaConnection | None = None
-    soniox_model: str = SONIOX_STT_MODEL_RT_V5
+    soniox_model: str = SONIOX_STT_MODEL_RT_V6
     soniox_endpoint: str = SONIOX_STT_DEFAULT_ENDPOINT
     soniox_keepalive_interval_s: float = SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S
     soniox_trailing_silence_ms: int = SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS
@@ -1729,7 +1729,7 @@ __all__ = [
     "SONIOX_STT_DEFAULT_ENDPOINT",
     "SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S",
     "SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS",
-    "SONIOX_STT_MODEL_RT_V5",
+    "SONIOX_STT_MODEL_RT_V6",
     "STT_DEFAULT_CHANNELS",
     "STT_DEFAULT_DRAIN_TIMEOUT_S",
     "STT_DEFAULT_LOW_LATENCY_ENABLED",

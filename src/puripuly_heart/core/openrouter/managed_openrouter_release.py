@@ -64,6 +64,7 @@ from puripuly_heart.core.openrouter.managed_operation_identity import is_valid_o
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.storage.secrets import SecretStore
+from puripuly_heart.core.translation_backend import require_translation_preparation_allowed
 from puripuly_heart.domain.models import Translation
 
 from .openrouter_credentials import (
@@ -1721,6 +1722,7 @@ class ManagedOpenRouterLLMProvider(LLMProvider):
         async with self._delegate_lock:
             if self._delegate is not None:
                 return self._delegate
+            require_translation_preparation_allowed()
             ensure_key = getattr(self.release_service, "ensure_key_for_llm_start")
             try:
                 result = await ensure_key()

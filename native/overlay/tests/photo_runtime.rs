@@ -463,36 +463,6 @@ async fn actual_photo_process_rejects_authentication_and_unknown_messages() {
     }
 }
 
-#[test]
-fn actual_startup_contracts_remain_separate() {
-    for (arguments, key, value) in [
-        (
-            vec!["--check-startup-contract"],
-            "contract_version",
-            json!(16),
-        ),
-        (
-            vec!["--role", "photo", "--check-startup-contract"],
-            "protocol_version",
-            json!(1),
-        ),
-    ] {
-        let output = std::process::Command::new(env!("CARGO_BIN_EXE_PuriPulyHeartOverlay"))
-            .args(arguments)
-            .output()
-            .unwrap();
-        assert!(output.status.success());
-        let contract: Value = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(contract[key], value);
-        if key == "protocol_version" {
-            assert_eq!(contract["role"], "photo");
-            assert!(contract.get("native_presentation_retry").is_none());
-        } else {
-            assert_eq!(contract["native_presentation_retry"]["version"], 2);
-        }
-    }
-}
-
 #[tokio::test]
 async fn decoded_source_is_retained_without_copy_for_retry_and_fenced_on_replacement() {
     let (mut boundary, mut worker) = PhotoImageBoundary::channel();

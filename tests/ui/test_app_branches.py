@@ -25,6 +25,7 @@ from puripuly_heart.app.ports.chatgpt_account import (
     ChatGptAccountSnapshot,
     ChatGptConnectResult,
 )
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_view import (
     OpenRouterPkceTarget,
     OverlaySettingsSnapshot,
@@ -779,6 +780,9 @@ class ConstructionDummyDashboardView(ft.Container):
 
 
 class ConstructionDummySettingsView(ft.Container):
+    def bind_verification_completion(self, callback):
+        return frozenset()
+
     def __init__(self, *, http_extension_registry=None) -> None:
         super().__init__()
         self.on_settings_changed = None
@@ -851,6 +855,8 @@ class ConstructionDummySettingsView(ft.Container):
 
 
 class ConstructionDummyLogsView(ft.Container):
+    conversation_records = ()
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -954,7 +960,7 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.view_settings.on_desktop_overlay_position_reset == (
         app._on_desktop_overlay_position_reset
     )
-    assert app.view_settings.on_view_logs == app._open_logs_tab
+    assert app.view_settings.on_view_logs == app._open_agent_tab
     assert app.view_settings.runtime_log_basic == app.application.log_basic
     assert isinstance(app.application, UiApplicationBoundary)
     assert app.application is app._ui_application
@@ -1387,6 +1393,10 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_founder_letter",
         "on_github_star_snackbar",
         "on_foundation_primitives",
+        "on_agent_report_cycle",
+        "on_agent_change_cycle",
+        "on_agent_key_cycle",
+        "on_agent_account_cycle",
         "on_http_extension_form",
         "on_brake_notice",
         "on_revoked_notice",
@@ -1443,6 +1453,30 @@ def test_debug_preview_display_turn_cycles_source_and_translation_examples() -> 
     ]
 
 
+def test_debug_preview_agent_cards_open_agent_tab_and_hand_back_the_live_owner() -> None:
+    from tests.ui.test_agent_chat_view import Owner, snapshot
+
+    app = TranslatorApp.__new__(TranslatorApp)
+    live = Owner(snapshot())
+    owners: list[object] = []
+    opened: list[bool] = []
+    app._agent_navigation_owner = live
+    app.view_agent = SimpleNamespace(use_owner=owners.append)
+    app._open_agent_tab = lambda: opened.append(True)
+
+    app._cycle_debug_agent_card("report")
+    preview = owners[-1]
+    app._cycle_debug_agent_card("account")
+
+    assert opened == [True, True]
+    assert owners[-1] is preview
+    assert preview.snapshot.report_offers == ()
+    assert preview.snapshot.setup_actions[0].kind == "account_setup"
+    preview.reject_report("unused")
+    assert owners[-1] is live
+    assert live.calls == []
+
+
 def test_debug_preview_http_extension_form_writes_demo_extension_and_selects_it(
     tmp_path: Path,
 ) -> None:
@@ -1459,7 +1493,7 @@ def test_debug_preview_http_extension_form_writes_demo_extension_and_selects_it(
         _on_llm_selected=lambda value: llm_values.append(value),
         _on_http_extension_selected=lambda value: extension_values.append(value),
     )
-    app._current_tab = 1
+    app._current_tab = app._tab_index("settings")
 
     app._preview_http_extension_form()
 
@@ -1674,16 +1708,12 @@ def test_translator_app_4x3_window_keeps_shell_navigation_usable(
     assert app.content_area.content is app.view_dashboard
 
     app._on_nav_change(1)
-    assert app.content_area.content is app.view_settings
-    assert app.content_area.padding == 0
+    assert app.content_area.content is app.view_agent
+    assert app.content_area.padding == app_module.APP_CONTENT_PADDING
 
     app._on_nav_change(2)
-    assert app.content_area.content is app.view_logs
-    assert app.content_area.padding == app_module.APP_LOGS_CONTENT_PADDING
-    assert app.content_area.padding.left == 0
-    assert app.content_area.padding.right == 0
-    assert app.content_area.padding.top == app_module.APP_CONTENT_PADDING
-    assert app.content_area.padding.bottom == app_module.APP_CONTENT_PADDING
+    assert app.content_area.content is app.view_settings
+    assert app.content_area.padding == 0
 
     app._on_nav_change(3)
     assert app.content_area.content is app.view_about
@@ -1692,7 +1722,6 @@ def test_translator_app_4x3_window_keeps_shell_navigation_usable(
     app._on_nav_change(0)
     assert app.content_area.content is app.view_dashboard
     assert app.content_area.padding == app_module.APP_CONTENT_PADDING
-    assert len(page.tasks) == 1
 
 
 def test_app_tab_key_reverses_message_input_languages_only_on_dashboard() -> None:
@@ -2929,7 +2958,7 @@ def test_peer_translation_disable_does_not_open_eula() -> None:
 def test_gpu_provider_selection_alone_does_not_start_install() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    app._current_tab = 1
+    app._current_tab = 2
     app.view_dashboard = object()
     app.view_logs = SimpleNamespace(scroll_to_bottom=lambda: asyncio.sleep(0))
     app.view_about = object()
@@ -2944,39 +2973,10 @@ def test_gpu_provider_selection_alone_does_not_start_install() -> None:
     )
     app._ui_application = compose_test_ui_application_boundary(controller)
 
-    app._on_nav_change(1)
+    app._on_nav_change(2)
 
     assert app.page.tasks == []
     assert app.view_settings.has_provider_changes is True
-
-
-@pytest.mark.asyncio
-async def test_navigation_to_logs_scrolls_after_rendering() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app._current_tab = 0
-    scrolled = {"count": 0}
-
-    async def fake_scroll_to_bottom() -> None:
-        scrolled["count"] += 1
-
-    app.view_dashboard = object()
-    app.view_settings = SimpleNamespace(
-        has_provider_changes=False,
-        refresh_prompt_if_empty=lambda: None,
-    )
-    app.view_logs = SimpleNamespace(scroll_to_bottom=fake_scroll_to_bottom)
-    app.view_about = object()
-    app.content_area = DummyContent()
-    app._close_open_dialog_for_navigation = lambda: None
-    app._run_page_task = lambda task_factory: app.page.run_task(task_factory)
-
-    app._on_nav_change(1)
-    app._on_nav_change(2)
-    await app.page.tasks[0]()
-
-    assert app.content_area.content is app.view_logs
-    assert scrolled["count"] == 1
 
 
 @pytest.mark.asyncio
@@ -3374,7 +3374,7 @@ def test_on_nav_change_closes_open_dialog_before_switching_tabs() -> None:
     controller = SimpleNamespace(apply_providers=lambda _settings=None: asyncio.sleep(0))
     app._ui_application = compose_test_ui_application_boundary(controller)
 
-    app._on_nav_change(1)
+    app._on_nav_change(2)
 
     assert events[:3] == [
         ("close", dialog),
@@ -3660,7 +3660,11 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
 
     async def fake_verify(provider: str, key: str):
         _ = key
-        return provider in {"deepgram", "deepseek"}, "ok"
+        return ProviderCredentialVerificationOutcome(
+            status="verified" if provider in {"deepgram", "deepseek"} else "failed",
+            provider=provider,
+            error_text="ok",
+        )
 
     settings = SimpleNamespace(
         api_key_verified=SimpleNamespace(
@@ -3692,10 +3696,18 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
     openrouter_result = await app._on_verify_api_key("openrouter", "k")
     deepseek_result = await app._on_verify_api_key("deepseek", "k")
 
-    assert deepgram_result == (True, "ok")
-    assert gemini_result == (False, "ok")
-    assert openrouter_result == (False, "ok")
-    assert deepseek_result == (True, "ok")
+    assert deepgram_result == ProviderCredentialVerificationOutcome(
+        status="verified", provider="deepgram", error_text="ok"
+    )
+    assert gemini_result == ProviderCredentialVerificationOutcome(
+        status="failed", provider="gemini", error_text="ok"
+    )
+    assert openrouter_result == ProviderCredentialVerificationOutcome(
+        status="failed", provider="openrouter", error_text="ok"
+    )
+    assert deepseek_result == ProviderCredentialVerificationOutcome(
+        status="verified", provider="deepseek", error_text="ok"
+    )
     assert settings.api_key_verified.deepgram is True
     assert settings.api_key_verified.gemini is False
     assert settings.api_key_verified.openrouter is False
@@ -3724,7 +3736,9 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
 
     async def fake_verify(provider: str, key: str):
         assert (provider, key) == ("gemini", "old-key")
-        return True, "ok"
+        return ProviderCredentialVerificationOutcome(
+            status="verified", provider=provider, error_text="ok"
+        )
 
     settings = SimpleNamespace(
         api_key_verified=SimpleNamespace(
@@ -3744,7 +3758,9 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
 
     result = await app._on_verify_api_key("gemini", "old-key")
 
-    assert result == (True, "ok")
+    assert result == ProviderCredentialVerificationOutcome(
+        status="verified", provider="gemini", error_text="ok"
+    )
     assert settings.api_key_verified.gemini is False
     assert saves == []
     assert app.view_dashboard.stt_calls == []

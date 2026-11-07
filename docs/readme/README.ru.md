@@ -198,14 +198,6 @@ GPU-инференс работает на Vulkan. Подходит для лю�
 
 7. Включите OSC в VRChat: Меню действий → Настройки → OSC → Включить.
 
-### Если захват звука не работает
-
-Откройте **Настройки > Основные** и выполните следующее:
-
-1. Измените **Audio Host API** на **Auto** или **MME**.
-2. Выберите правильный микрофон.
-3. Перезапустите приложение.
-
 ---
 
 ### Пользователям из Китая
@@ -409,10 +401,6 @@ PuriPuly работает лучше всего с облачным STT.
 
 См. [`docs/architecture.md`](../architecture.md).
 
-## Дорожная карта
-
-Предстоящая работа отслеживается публично на [доске проекта PuriPuly](https://github.com/users/kapitalismho/projects/2).
-
 ---
 
 ## Разработка
@@ -451,16 +439,11 @@ uv run python -m pytest
 
 ---
 
-## Разработчик
-
-[salee](https://github.com/kapitalismho)
-
----
-
 ## Участники
 
-[RICHARDwuxiaofei](https://github.com/RICHARDwuxiaofei)
-[fzcfweasdferttgg-png](https://github.com/fzcfweasdferttgg-png)
+<a href="https://github.com/kapitalismho/PuriPuly-heart/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=kapitalismho/PuriPuly-heart" alt="Contributors" />
+</a>
 
 ---
 

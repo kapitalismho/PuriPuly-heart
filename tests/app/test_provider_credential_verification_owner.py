@@ -14,6 +14,9 @@ from puripuly_heart.app.services.provider.provider_credential_verification impor
     ProviderCredentialVerificationOwner,
     ProviderCredentialVerificationRequest,
 )
+from puripuly_heart.app.wiring.wiring_composition import (
+    create_provider_credential_verification_interaction_owner,
+)
 
 
 @dataclass
@@ -151,17 +154,77 @@ async def test_interaction_owner_maps_empty_unknown_failed_and_error_results() -
         error_sink=lambda provider, error: error_calls.append((provider, error)),
     )
 
-    assert await owner.verify("gemini", "") == (False, "API Key is empty")
-    assert await owner.verify("unknown", "secret") == (
-        False,
-        "Unknown provider: unknown",
-    )
-    assert await owner.verify("deepseek", "secret") == (
-        False,
-        "Verification failed (check logs/console for details)",
-    )
+    empty = await owner.verify("gemini", "")
+    assert empty.status == PROVIDER_CREDENTIAL_EMPTY
+    assert empty.error_text == "API Key is empty"
+    unknown = await owner.verify("unknown", "secret")
+    assert unknown.status == PROVIDER_CREDENTIAL_UNKNOWN
+    assert unknown.error_text == "Unknown provider: unknown"
+    failed = await owner.verify("deepseek", "secret")
+    assert failed.status == PROVIDER_CREDENTIAL_FAILED
+    assert failed.error_text == "Verification failed (check logs/console for details)"
     verifier.failure = RuntimeError("provider failure")
-    assert await owner.verify("deepseek", "secret") == (False, "provider.failure")
+    error = await owner.verify("deepseek", "secret")
+    assert error.status == PROVIDER_CREDENTIAL_ERROR
+    assert error.error_text == "provider.failure"
+    assert error.diagnostics is not None
     assert error_calls == [("deepseek", "provider.failure")]
 
 
+def test_interaction_owner_factory_composes_verifier_and_callbacks() -> None:
+    verifier = RecordingVerifier()
+    owner = create_provider_credential_verification_interaction_owner(
+        verifier=verifier,
+        selected_model_provider=lambda provider: f"{provider}-model",
+        low_latency=True,
+    )
+
+    assert isinstance(owner, ProviderCredentialVerificationInteractionOwner)
+    assert owner.verification_owner.verifier is verifier
+    assert owner.selected_model_provider("gemini") == "gemini-model"
+    assert owner.low_latency is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("verified", [True, False])
+@pytest.mark.parametrize(
+    ("provider", "secret_name"),
+    (("openrouter", "openrouter_api_key"), ("gemini", "gemini_api_key")),
+)
+async def test_control_verification_preserves_public_receipt_with_typed_outcome(
+    verified: bool,
+    provider: str,
+    secret_name: str,
+) -> None:
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
+    from puripuly_heart.app.services.application_control import ApplicationControlOwner
+
+    secret = "synthetic-private-credential"
+    application = SimpleNamespace(
+        verify_api_key=AsyncMock(
+            return_value=ProviderCredentialVerificationOutcome(
+                status="verified" if verified else "failed", provider=provider
+            )
+        ),
+        http_extension_registry=lambda: None,
+    )
+    control = ApplicationControlOwner.__new__(ApplicationControlOwner)
+    control.application = application
+    control.locale_choices = ()
+
+    result = await control._dispatch(
+        "secrets.verify",
+        {"name": secret_name, "value": secret},
+        operation_id="synthetic",
+    )
+
+    assert result == {
+        "status": "applied" if verified else "rejected",
+        "verification": "verified" if verified else "failed",
+        "reason": "Verification successful" if verified else "verification_failed",
+    }
+    application.verify_api_key.assert_awaited_once_with(provider, secret)
+    assert secret not in repr(result)

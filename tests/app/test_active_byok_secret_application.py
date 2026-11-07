@@ -151,9 +151,9 @@ async def _submit(app, command, arguments):
 
 
 async def _verify_explicitly(app, route, credential):
-    verified, _reason = await app.verify_api_key(route.provider, credential)
-    assert verified is True
-    app.persist_api_key_verification(route.provider, credential, verified)
+    outcome = await app.verify_api_key(route.provider, credential)
+    assert outcome.status == "verified"
+    app.persist_api_key_verification(route.provider, credential, True)
     assert _verification(app, route).status == "verified"
     assert await app.apply_providers(force_rebuild_llm=True, persist_settings=False) is True
     assert _presentation(app).projections["translation_needs_key"] is False
@@ -532,9 +532,9 @@ async def test_gui_key_flow_verifies_persisted_key_after_runtime_degradation(com
             return persisted
 
         async def verify(provider, value):
-            verified, message = await app.verify_api_key(provider, value)
-            app.persist_api_key_verification(provider, value, verified)
-            return verified, message
+            outcome = await app.verify_api_key(provider, value)
+            app.persist_api_key_verification(provider, value, outcome.status == "verified")
+            return outcome
 
         monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", fail_backend)
         controller = ApiKeyVerificationController(

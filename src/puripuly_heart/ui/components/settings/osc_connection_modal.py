@@ -10,6 +10,7 @@ from puripuly_heart.ui.flet_runtime import (
     update_control_if_mounted,
 )
 from puripuly_heart.ui.i18n import t
+from puripuly_heart.ui.motion import PRESS, close_modal, press_event, show_modal
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_NEUTRAL_DARK,
@@ -167,7 +168,7 @@ class OscConnectionModal:
         )
         self._refresh_mode_display()
         self._repaint_mode_cards()
-        self._page.show_dialog(self._dialog)
+        show_modal(self._page, self._dialog)
 
     def _build_port_field(self, *, value: str) -> ft.TextField:
         return ft.TextField(
@@ -236,7 +237,10 @@ class OscConnectionModal:
                 alignment=ft.Alignment.CENTER,
                 on_click=lambda e, mode=value: self._select_mode(mode),
                 on_hover=self._on_mode_hover,
+                on_tap_down=press_event,
                 animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
+                animate_scale=PRESS,
+                scale=1.0,
                 height=_OPTION_CARD_HEIGHT,
             )
             cards[value] = card
@@ -376,7 +380,7 @@ class OscConnectionModal:
 
     def _close(self) -> None:
         try:
-            self._page.pop_dialog()
+            close_modal(self._page, self._dialog)
         except Exception:
             return
 

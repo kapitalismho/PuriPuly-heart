@@ -164,6 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
     audio_test = audio_sub.add_parser("test")
     audio_test.add_argument("state", choices=("on", "off"))
     audio_test.add_argument("--no-wait", action="store_true")
+    audio_sub.add_parser("diagnose").add_argument("--no-wait", action="store_true")
     settings = sub.add_parser("settings", help="Inspect choices and apply typed settings changes")
     settings_sub = settings.add_subparsers(dest="action", required=True)
     for name in ("current", "choices"):
@@ -237,8 +238,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     calibrate.add_argument("--value", help="Anchor name or finite numeric calibration value")
     calibrate.add_argument("--no-wait", action="store_true")
-    osc = sub.add_parser("osc", help="Inspect effective OSC connection")
-    osc.add_subparsers(dest="action", required=True).add_parser("status")
+    osc = sub.add_parser(
+        "osc", help="Inspect OSC output or run bounded automatic discovery recovery"
+    )
+    osc_sub = osc.add_subparsers(dest="action", required=True)
+    osc_sub.add_parser("status")
+    osc_discovery = osc_sub.add_parser("discovery")
+    osc_discovery_sub = osc_discovery.add_subparsers(dest="step", required=True)
+    osc_discovery_sub.add_parser("retry").add_argument("--no-wait", action="store_true")
     auth = sub.add_parser("auth", help="Inspect, authorize and remove account login")
     auth_sub = auth.add_subparsers(dest="action", required=True)
     auth_sub.add_parser("status")
@@ -718,6 +725,7 @@ async def _run(args: argparse.Namespace) -> int:
         "gemma",
         "gpu",
         "overlay",
+        "osc",
         "auth",
     ):
         if args.domain == "command":
@@ -762,6 +770,8 @@ async def _run(args: argparse.Namespace) -> int:
                 name, values = "audio.target.set", {"value": args.value}
             elif args.action == "test":
                 name, values = "audio.test", {"enabled": args.state == "on"}
+            elif args.action == "diagnose":
+                name, values = "audio.diagnose", {}
             else:
                 name, values = "audio.retry", {}
         elif args.domain == "models" and args.action in ("download", "import", "delete"):
@@ -782,6 +792,8 @@ async def _run(args: argparse.Namespace) -> int:
             name, values = f"gemma.{args.action}", {}
         elif args.domain == "gpu":
             name, values = "gpu.discover", {}
+        elif args.domain == "osc":
+            name, values = "osc.discovery.retry", {}
         elif args.domain == "overlay":
             name = {
                 "reset-position": "overlay.position.reset",

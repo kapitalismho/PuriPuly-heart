@@ -378,7 +378,7 @@ impl PhotoRuntime {
             let photo = runtime.state.photo().unwrap();
             for (ms, grip, distance) in [
                 (0, false, 0.0),
-                (200, false, 0.0),
+                (50, false, 0.0),
                 (350, false, 0.0),
                 (360, true, 0.0),
                 (380, true, 0.12),
@@ -473,6 +473,7 @@ impl PhotoRuntime {
         runtime.interaction_tick(&mut bridge).await.unwrap();
         tokio::time::sleep(Duration::from_millis(350)).await;
         runtime.interaction_tick(&mut bridge).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(210)).await;
         set_input(true, 0.0);
         runtime.interaction_tick(&mut bridge).await.unwrap();
         assert!(runtime.interaction.frame.grab);

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
@@ -9,9 +10,17 @@ from puripuly_heart.app.adapters.audio_test_sources import (
     MicrophoneAudioTestSourceOpener,
 )
 from puripuly_heart.app.ports.audio_test import (
+    AudioDiagnosticCandidate,
     AudioTestCaptureControlPort,
     AudioTestCaptureState,
     AudioTestChannel,
+)
+from puripuly_heart.app.services.application_audio_devices import (
+    enumerate_microphone_diagnostic_candidates,
+)
+from puripuly_heart.app.services.audio_diagnosis import (
+    AUDIO_DIAGNOSE_MAX_CANDIDATES,
+    audio_diagnosis_receipt,
 )
 from puripuly_heart.app.services.audio_test import (
     AudioTestChannelPlan,
@@ -25,6 +34,8 @@ from puripuly_heart.core.audio.source import (
     determine_self_mic_capture_channels,
     observe_microphone_test_route,
 )
+from puripuly_heart.core.diagnostics import safe_exception_fields
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.peer_capture import (
     PeerCaptureResolvedTarget,
     PeerCaptureTargetIntent,
@@ -50,6 +61,8 @@ from .wiring_stt_factory import (
 logger = logging.getLogger(__name__)
 
 MICROPHONE_FRAME_TIMEOUT_S = 5.0
+DIAGNOSTIC_ENUMERATION_TIMEOUT_S = 3.0
+DIAGNOSTIC_ENUMERATION_DRAIN_TIMEOUT_S = 5.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,6 +203,10 @@ class AudioTestRuntime:
     )
     vad_engine_factory: Callable[[], object] = create_audio_test_vad_engine
     _owner: AudioTestSessionOwner | None = field(default=None, init=False, repr=False)
+    _diagnose_revision: int = field(default=0, init=False, repr=False)
+    _diagnose_enumeration_task: asyncio.Task[tuple[AudioDiagnosticCandidate, ...]] | None = field(
+        default=None, init=False, repr=False
+    )
 
     @property
     def owner_if_created(self) -> AudioTestSessionOwner | None:
@@ -237,13 +254,146 @@ class AudioTestRuntime:
             return False
         return await self.owner().start(observation_callback=observation_callback)
 
+    async def diagnose(self, *, is_current: Callable[[], bool]) -> dict[str, object]:
+        audio = audio_test_settings_from_vnext(self._settings())
+        revision = self._diagnose_revision
+        if not is_current():
+            result = audio_diagnosis_receipt(
+                input_host_api=audio.input_host_api,
+                input_device=audio.input_device,
+                failure_code="cancelled",
+            )
+            result["status"] = "cancelled"
+            result["diagnosis"]["state"] = "cancelled"
+            return result
+        try:
+            candidates = await self._diagnostic_candidates(audio)
+        except asyncio.CancelledError:
+            result = audio_diagnosis_receipt(
+                input_host_api=audio.input_host_api,
+                input_device=audio.input_device,
+                failure_code="cancelled",
+            )
+            result["status"] = "cancelled"
+            result["diagnosis"]["state"] = "cancelled"
+            result["diagnosis"]["cleanup_complete"] = self._enumeration_complete()
+            return result
+        except Exception:
+            result = audio_diagnosis_receipt(
+                input_host_api=audio.input_host_api,
+                input_device=audio.input_device,
+                failure_code="enumeration_failed",
+            )
+            result["diagnosis"]["cleanup_complete"] = self._enumeration_complete()
+            if not result["diagnosis"]["cleanup_complete"]:
+                result["status"] = "failed"
+            return result
+        if revision != self._diagnose_revision or not is_current():
+            result = audio_diagnosis_receipt(
+                input_host_api=audio.input_host_api,
+                input_device=audio.input_device,
+                failure_code="cancelled",
+            )
+            result["status"] = "cancelled"
+            result["diagnosis"]["state"] = "cancelled"
+            return result
+        return await self.owner().diagnose(
+            candidates=candidates,
+            plan_factory=self.diagnostic_plan,
+            input_host_api=audio.input_host_api,
+            input_device=audio.input_device,
+        )
+
+    async def _diagnostic_candidates(
+        self, audio: AudioTestAudioSettings
+    ) -> tuple[AudioDiagnosticCandidate, ...]:
+        if not self._enumeration_complete():
+            raise RuntimeError("Microphone enumeration cleanup is incomplete")
+        task = asyncio.create_task(
+            run_owned_thread_call(
+                lambda: enumerate_microphone_diagnostic_candidates(
+                    input_host_api=audio.input_host_api,
+                    input_device=audio.input_device,
+                    max_candidates=AUDIO_DIAGNOSE_MAX_CANDIDATES,
+                )
+            ),
+            name="AudioTestRuntime:diagnose-enumeration",
+        )
+        self._diagnose_enumeration_task = task
+        task.add_done_callback(self._on_diagnostic_enumeration_done)
+        done, _pending = await asyncio.wait({task}, timeout=DIAGNOSTIC_ENUMERATION_TIMEOUT_S)
+        if not done:
+            raise TimeoutError("Microphone enumeration exceeded its deadline")
+        return task.result()
+
+    def _enumeration_complete(self) -> bool:
+        task = self._diagnose_enumeration_task
+        return task is None or task.done()
+
+    def _on_diagnostic_enumeration_done(
+        self, task: asyncio.Task[tuple[AudioDiagnosticCandidate, ...]]
+    ) -> None:
+        if self._diagnose_enumeration_task is task:
+            self._diagnose_enumeration_task = None
+        if not task.cancelled():
+            task.exception()
+
+    async def _drain_diagnostic_enumeration(self) -> None:
+        task = self._diagnose_enumeration_task
+        if task is None:
+            return
+        task.cancel()
+        done, _pending = await asyncio.wait({task}, timeout=DIAGNOSTIC_ENUMERATION_DRAIN_TIMEOUT_S)
+        if not done:
+            raise RuntimeError("Microphone enumeration cleanup is incomplete")
+
+    def diagnostic_plan(self, candidate: AudioDiagnosticCandidate) -> AudioTestChannelPlan:
+        return AudioTestChannelPlan(
+            opener=MicrophoneAudioTestSourceOpener(
+                saved_host_api=candidate.input_host_api,
+                requested_device=str(candidate.device_index),
+                internal_channels=1,
+                route_observer=observe_microphone_test_route,
+                channel_decision=determine_self_mic_capture_channels,
+                source_factory=self.microphone_source_factory,
+                log_sink=self.log_sink,
+                expected_device_name=candidate.input_device,
+                allow_channel_fallback=False,
+            ),
+            probe_factory=lambda settings: AudioTestVadProbe(
+                engine=self.vad_engine_factory(), settings=settings
+            ),
+        )
+
     async def stop(self) -> None:
+        self._diagnose_revision += 1
+        failures: list[Exception] = []
+        try:
+            await self._drain_diagnostic_enumeration()
+        except Exception as exc:
+            failures.append(exc)
         if self._owner is not None:
-            await self._owner.stop()
+            try:
+                await self._owner.stop()
+            except Exception as exc:
+                failures.append(exc)
+        if failures:
+            raise ExceptionGroup("Audio test cleanup failed", failures)
 
     async def close(self) -> None:
+        self._diagnose_revision += 1
+        failures: list[Exception] = []
+        try:
+            await self._drain_diagnostic_enumeration()
+        except Exception as exc:
+            failures.append(exc)
         if self._owner is not None:
-            await self._owner.close()
+            try:
+                await self._owner.close()
+            except Exception as exc:
+                failures.append(exc)
+        if failures:
+            raise ExceptionGroup("Audio test cleanup failed", failures)
 
     def release_capture_restore(self, channel: AudioTestChannel) -> None:
         if self._owner is not None:
@@ -290,6 +440,21 @@ class AudioTestRuntime:
         exception: BaseException | None,
     ) -> None:
         channel = metadata.get("channel")
+        if self._owner is not None and self._owner.diagnosing:
+            stage = {
+                "diagnose_started": "begin",
+                "diagnose_opened": "readiness",
+            }.get(event, "audio_diagnosis")
+            fields = safe_exception_fields(exception) if exception is not None else {}
+            exception_class = fields.get("exception_class", "none")
+            target_index = metadata.get("target_index", 0)
+            self.diagnostic_sink(
+                "[Capture] audio_diagnose_candidate "
+                f"phase={stage} target_index={target_index} exception_class={exception_class}",
+                logging.WARNING if exception is not None else logging.INFO,
+                None,
+            )
+            return
         if event == "session_failed":
             self.error_sink(f"Audio test error channel={channel}: {exception}")
             return

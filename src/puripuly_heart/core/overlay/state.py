@@ -66,6 +66,7 @@ class OverlayLogicalTurnEntry:
     speaker_assignment: SpeakerAssignment | None = None
     speaker_style: str | None = None
     speaker_gray_reason: str | None = None
+    speaker_handoff_scope: tuple[str, str] | None = None
     translation_seq: int | None = None
     occupant_key: str = ""
     appearance_seq: int | None = None
@@ -1009,6 +1010,11 @@ class OverlayPresentationState:
                 )
             return OverlayReductionResult(True)
 
+        native_caption = (
+            event.peer_caption_revision > 0
+            and event.speaker_assignment is not None
+            and event.speaker_assignment.attribution.source == "soniox"
+        )
         self._remember_entry_input_seq(entry, event_seq=event.seq)
         if event.source_text.strip():
             entry.original_text = event.source_text
@@ -1026,14 +1032,33 @@ class OverlayPresentationState:
         entry.translation_text = event.text
         entry.peer_caption_revision = event.peer_caption_revision
         entry.peer_caption_final = isinstance(event, TranslationFinal)
-        entry.peer_source_only = source_only
-        entry.peer_pages = peer_translation_pages(
+        next_pages = peer_translation_pages(
             event.source_text if source_only else event.text, text_scale=self.peer_text_scale
         )
-        entry.peer_page_index = 0
-        entry.peer_page_due_at = None
+        if not native_caption or next_pages != entry.peer_pages:
+            entry.peer_page_index = 0
+            entry.peer_page_due_at = None
+        entry.peer_source_only = source_only
+        entry.peer_pages = next_pages
         if event.text.strip() or source_only:
-            if event.peer_caption_revision > 0 or entry.speaker_style is None:
+            if native_caption:
+                assignment = event.speaker_assignment if event.is_final else None
+                previous = entry.speaker_assignment
+                previous_style = (
+                    (previous.attribution, previous.palette_index, previous.palette_overflow)
+                    if previous is not None
+                    else None
+                )
+                next_style = (
+                    (assignment.attribution, assignment.palette_index, assignment.palette_overflow)
+                    if assignment is not None
+                    else None
+                )
+                if previous_style != next_style:
+                    entry.speaker_style = None
+                    entry.speaker_gray_reason = None
+                entry.speaker_assignment = assignment
+            elif event.peer_caption_revision > 0 or entry.speaker_style is None:
                 entry.speaker_assignment = event.speaker_assignment
             entry.translation_language = None if source_only else event_target_language
             entry.translation_update_id = event.update_id

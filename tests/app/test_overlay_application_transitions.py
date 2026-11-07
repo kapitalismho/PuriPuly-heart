@@ -1107,3 +1107,236 @@ async def test_latest_toggle_during_fallback_retirement_wins(
         release_cancellation.set()
         await asyncio.gather(*toggles, return_exceptions=True)
         await owner.close()
+
+
+@pytest.mark.parametrize("reason", ["runtime_quit", "driver_requested_quit"])
+async def test_runtime_stop_publishes_normal_off_preserving_vr_and_independent_peer(reason):
+    recorder = Recorder()
+    recorder.peer_effective_enabled = True
+    owner = make_owner(recorder)
+    runtime = owner.new_runtime()
+    runtime.adopt_presenter(OverlayPresenter(calibration=OverlayCalibration(), clock=owner.clock))
+    stopped = 0
+
+    async def stop():
+        nonlocal stopped
+        stopped += 1
+
+    manager = SimpleNamespace(
+        state="off",
+        runtime_stop_completed=True,
+        runtime_stop_reason=reason,
+        failure_reason=None,
+        restart_scheduled=False,
+        stop=stop,
+    )
+    runtime.attach_process_manager(manager)
+    owner.state = "connected"
+    owner.active_target = "steamvr"
+    owner.failure_reason = "render_failed"
+    monitor = asyncio.create_task(_noop_async())
+    watcher = runtime.create_monitor_task(owner.watch_runtime(manager, monitor, runtime=runtime))
+    await watcher
+    completion = owner._recovery_task
+    assert completion is not None
+    await asyncio.wait_for(completion, 2)
+    assert runtime.is_closed
+    assert runtime.child_task_names == ()
+    assert stopped == 1
+    assert owner.state == "off"
+    assert owner.state_provider().overlay_intent_enabled is False
+    assert owner.state_provider().configured_target == "steamvr"
+    assert owner.failure_reason is None
+    assert owner.auto_restart_scheduled is False
+    assert owner.snapshot.fallback_active is False
+    assert owner.snapshot.recovery_active is False
+    assert recorder.states[-1] == ("off", None)
+    assert recorder.peer_snapshot().desired_active is True
+    assert recorder.peer_snapshot().effective_enabled is True
+    assert owner.translation_enabled_provider() is True
+
+
+@pytest.mark.parametrize("newer_intent", ["enable", "off", "shutdown", "replacement"])
+async def test_normal_stop_completion_cannot_override_newer_intent(monkeypatch, newer_intent):
+    owner = make_owner(Recorder())
+    runtime = owner.new_runtime()
+    manager = SimpleNamespace(
+        state="off",
+        runtime_stop_completed=True,
+        runtime_stop_reason="runtime_quit",
+        failure_reason=None,
+        restart_scheduled=False,
+        stop=_noop_async,
+    )
+    runtime.attach_process_manager(manager)
+    owner.state = "connected"
+    gate = asyncio.Event()
+    watcher = runtime.create_monitor_task(gate.wait())
+    completion = asyncio.create_task(
+        owner._handle_runtime_stop(manager, runtime, watcher, owner._intent_generation)
+    )
+    await asyncio.sleep(0)
+    if newer_intent == "replacement":
+        replacement = owner.new_runtime()
+        owner.mark_connected()
+    elif newer_intent == "shutdown":
+        await owner.close()
+    elif newer_intent == "off":
+        await owner.set_enabled(False)
+    else:
+
+        async def start_new(self, replacement):
+            self.mark_connected()
+
+        monkeypatch.setattr(OverlayApplicationOwner, "run_start", start_new)
+        await owner.set_enabled(True)
+        replacement = owner.runtime
+        if replacement is not None and replacement.start_task is not None:
+            await replacement.start_task
+    gate.set()
+    await asyncio.gather(completion, return_exceptions=True)
+    if newer_intent in {"enable", "replacement"}:
+        assert owner.runtime is replacement
+        assert owner.state == "connected"
+        assert owner.state_provider().overlay_intent_enabled is True
+        assert replacement is not runtime
+    else:
+        assert owner.state == "off"
+    await runtime.close(preserve_presenter_state=False)
+    await owner.close()
+
+
+async def test_runtime_stop_keeps_active_peer_capture_independent():
+    harness = PeerOverlayHarness()
+    await harness.activate_peer()
+    harness.capture_runtime.activate_capture()
+    harness.peer.sync_effective_flags()
+    harness.overlay.mark_connected()
+    runtime = harness.overlay.new_runtime()
+    manager = SimpleNamespace(
+        state="off",
+        runtime_stop_completed=True,
+        runtime_stop_reason="runtime_quit",
+        failure_reason=None,
+        restart_scheduled=False,
+        stop=_noop_async,
+    )
+    runtime.attach_process_manager(manager)
+    monitor = asyncio.create_task(_noop_async())
+    watcher = runtime.create_monitor_task(
+        harness.overlay.watch_runtime(manager, monitor, runtime=runtime)
+    )
+    await watcher
+    completion = harness.overlay._recovery_task
+    assert completion is not None
+    await completion
+    assert harness.overlay.state == "off"
+    assert harness.overlay_intent_enabled is False
+    assert harness.peer.snapshot().intent_enabled is True
+    assert harness.peer.snapshot().desired_active is True
+    assert harness.peer.snapshot().effective_enabled is True
+    assert harness.capture_runtime.snapshot.effective_active is True
+    assert harness.capture_runtime.close_calls == 0
+    assert all(desired for desired, _mode in harness.capture_runtime.policy_calls)
+    await harness.peer.close()
+
+
+@pytest.mark.parametrize("action", ["enable", "off", "shutdown"])
+async def test_new_intent_during_normal_stop_cleanup_owns_settlement(monkeypatch, action):
+    owner = make_owner(Recorder())
+    runtime = owner.new_runtime()
+    reached = asyncio.Event()
+    stop_calls = 0
+
+    async def stop():
+        nonlocal stop_calls
+        stop_calls += 1
+        if stop_calls == 1:
+            reached.set()
+            await asyncio.Event().wait()
+
+    manager = SimpleNamespace(
+        state="off",
+        runtime_stop_completed=True,
+        runtime_stop_reason="runtime_quit",
+        failure_reason=None,
+        restart_scheduled=False,
+        stop=stop,
+    )
+    runtime.attach_process_manager(manager)
+    owner.state = "connected"
+    monitor = asyncio.create_task(_noop_async())
+    runtime.create_monitor_task(owner.watch_runtime(manager, monitor, runtime=runtime))
+    await asyncio.wait_for(reached.wait(), 2)
+    completion = owner._recovery_task
+    assert completion is not None
+    if action == "enable":
+
+        async def start_new(self, replacement):
+            self.mark_connected()
+
+        monkeypatch.setattr(OverlayApplicationOwner, "run_start", start_new)
+        await asyncio.wait_for(owner.set_enabled(True), 2)
+        replacement = owner.runtime
+        assert replacement is not runtime
+        if replacement is not None and replacement.start_task is not None:
+            await replacement.start_task
+        assert owner.state == "connected"
+        assert owner.state_provider().overlay_intent_enabled is True
+    elif action == "off":
+        await asyncio.wait_for(owner.set_enabled(False), 2)
+        assert owner.state == "off"
+        assert owner.state_provider().overlay_intent_enabled is False
+    else:
+        await asyncio.wait_for(owner.close(), 2)
+        assert owner.state == "off"
+    assert completion.done()
+    assert runtime.is_closed
+    assert runtime.child_task_names == ()
+    await owner.close()
+
+
+@pytest.mark.parametrize("cleanup_fails", [False, True])
+async def test_start_outcome_waits_through_normal_stop_application_cleanup(cleanup_fails):
+    owner = make_owner(Recorder())
+    runtime = owner.new_runtime()
+    reached = asyncio.Event()
+    release = asyncio.Event()
+
+    async def stop():
+        reached.set()
+        await release.wait()
+        if cleanup_fails:
+            raise RuntimeError("synthetic process cleanup failure")
+
+    manager = SimpleNamespace(
+        state="off",
+        runtime_stop_completed=True,
+        runtime_stop_reason="runtime_quit",
+        failure_reason=None,
+        restart_scheduled=False,
+        stop=stop,
+    )
+    runtime.attach_process_manager(manager)
+    owner.state = "starting"
+    completed = asyncio.get_running_loop().create_future()
+    completed.set_result(None)
+    watcher = runtime.create_monitor_task(owner.watch_runtime(manager, completed, runtime=runtime))
+    waiting = asyncio.create_task(owner.wait_start_outcome())
+    await asyncio.wait_for(reached.wait(), 2)
+    assert owner.state == "stopping"
+    assert not waiting.done()
+    release.set()
+    outcome = await asyncio.wait_for(waiting, 2)
+    assert watcher.done()
+    assert outcome["lifecycle"] == ("failed" if cleanup_fails else "off")
+    assert outcome["desired_enabled"] is False
+    assert outcome["auto_restart_scheduled"] is False
+    assert outcome["fallback_active"] is False
+    if cleanup_fails:
+        assert outcome["failure_reason"] is not None
+        assert runtime.is_closed is False
+    else:
+        assert outcome["failure_reason"] is None
+        assert runtime.is_closed
+    await owner.close()

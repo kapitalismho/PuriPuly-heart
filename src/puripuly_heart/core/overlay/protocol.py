@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Literal
 
 ChannelId = Literal["self", "peer"]
@@ -11,6 +12,11 @@ SpeakerStyle = Literal["gray", "gold", "cyan", "coral", "blue"]
 # `active_peer` remains a reserved compatibility/fallback variant. Normal
 # product peer rows are primary-visible only after translation arrival.
 BlockVariant = Literal["active_self", "active_peer", "finalized"]
+
+
+class RuntimeStopReason(StrEnum):
+    RUNTIME_QUIT = "runtime_quit"
+    DRIVER_REQUESTED_QUIT = "driver_requested_quit"
 
 
 @dataclass(frozen=True, slots=True)

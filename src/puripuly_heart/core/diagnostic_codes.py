@@ -8,12 +8,38 @@ from puripuly_heart.core.diagnostic_validation import stt_startup_failure_code
 from puripuly_heart.core.messages import DIAGNOSTIC_CATEGORIES, TRANSACTION_RESULT_STATUSES
 from puripuly_heart.core.qq_auth_diagnostics import CODES as QQ_AUTH_CODES
 
+AUDIO_DIAGNOSE_FAILURE_CODES = frozenset(
+    {
+        "input_route_unavailable",
+        "input_route_changed",
+        "enumeration_failed",
+        "no_input_candidates",
+        "audio_test_busy",
+        "owner_closed",
+        "capture_pause_failed",
+        "resource_release_incomplete",
+        "restore_failed",
+        "source_open_failed",
+        "session_start_failed",
+        "vad_unavailable",
+        "capture_failed",
+        "capture_ended",
+        "source_close_failed",
+        "no_audio_frames",
+        "candidate_timeout",
+        "cancelled",
+        "unavailable",
+    }
+)
+
 DOMAIN_CODES = (
     frozenset(
         {
             "unclassified_failure",
             "diagnostic_builder_failed",
             "application_operation_failed",
+            "audio_diagnose_candidate",
+            "audio_diagnose_completed",
             "presentation_sync_failed",
             "provider_receive_failed",
             "output_cleanup_failed",
@@ -240,6 +266,7 @@ DOMAIN_CODES = (
             "chatgpt_loopback_close_failed",
             "chatgpt_remote_revocation_unconfirmed",
             "chatgpt_local_credential_delete_failed",
+            "chatgpt_logout_superseded",
             "chatgpt_secret_read_failed",
             "chatgpt_refresh_failed",
         }

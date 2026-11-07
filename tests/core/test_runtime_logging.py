@@ -13,10 +13,12 @@ from collections.abc import Awaitable
 from concurrent.futures import ThreadPoolExecutor
 from logging.handlers import QueueHandler, RotatingFileHandler
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 
+from puripuly_heart.app.services.application_runtime_logging import ApplicationRuntimeLoggingOwner
 from puripuly_heart.app.services.local_asr.local_asr_diagnostics import LocalASRDiagnosticsOwner
 from puripuly_heart.app.wiring.wiring_capture_runtime import CaptureDiagnosticsAdapter
 from puripuly_heart.core import runtime_logging as runtime_logging_module
@@ -520,6 +522,188 @@ def test_configure_main_logging_names_single_backup_with_log_extension(tmp_path)
         assert (tmp_path / "puripuly_heart.backup.log").exists()
         assert not (tmp_path / "puripuly_heart.log.1").exists()
     finally:
+        sinks.close()
+
+
+def test_support_log_snapshot_flushes_exact_current_bytes_without_backup(tmp_path) -> None:
+    root = logging.getLogger(f"test.runtime_logging.snapshot.{uuid4()}")
+    root.propagate = False
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    try:
+        (tmp_path / "puripuly_heart.backup.log").write_bytes(b"backup-only\n")
+        sinks.file_handler.stream = sinks.file_handler._open()
+        sinks.file_handler.stream.write("current 한글\n")
+        snapshot = sinks.support_log_snapshot()
+        assert snapshot == sinks.log_file.read_bytes()
+        assert snapshot.decode("utf-8").splitlines() == ["current 한글"]
+        assert b"backup-only" not in snapshot
+    finally:
+        sinks.close()
+
+
+@pytest.mark.parametrize("failure", [FileNotFoundError, PermissionError])
+def test_support_log_snapshot_propagates_current_file_failure(
+    tmp_path, monkeypatch, failure
+) -> None:
+    root = logging.getLogger(f"test.runtime_logging.snapshot.failure.{uuid4()}")
+    root.propagate = False
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    try:
+        (tmp_path / "puripuly_heart.backup.log").write_bytes(b"not-a-fallback\n")
+        if failure is PermissionError:
+
+            def unreadable(_path):
+                raise PermissionError("synthetic unreadable current log")
+
+            monkeypatch.setattr(Path, "read_bytes", unreadable)
+        with pytest.raises(failure):
+            sinks.support_log_snapshot()
+        assert sinks.file_handler.stream is None
+        assert not sinks.log_file.exists()
+    finally:
+        sinks.close()
+
+
+def test_support_log_snapshot_excludes_concurrent_batch_rotation(tmp_path, monkeypatch) -> None:
+    root = logging.getLogger(f"test.runtime_logging.snapshot.rotation.{uuid4()}")
+    root.propagate = False
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    handler = sinks.file_handler
+    handler.filters.clear()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    handler.maxBytes = 12
+    handler.emit_batch([root.makeRecord(root.name, logging.INFO, "", 0, "old-current", (), None)])
+    reading = threading.Event()
+    release = threading.Event()
+    writing = threading.Event()
+    read_bytes = Path.read_bytes
+
+    def blocked_read(path):
+        if path == sinks.log_file:
+            reading.set()
+            assert release.wait(5.0)
+        return read_bytes(path)
+
+    def rotate():
+        writing.set()
+        handler.emit_batch(
+            [root.makeRecord(root.name, logging.INFO, "", 0, "new-current", (), None)]
+        )
+
+    monkeypatch.setattr(Path, "read_bytes", blocked_read)
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            snapshot = pool.submit(sinks.support_log_snapshot)
+            try:
+                assert reading.wait(2.0)
+                rotation = pool.submit(rotate)
+                assert writing.wait(2.0)
+                with pytest.raises(TimeoutError):
+                    rotation.result(timeout=0.05)
+            finally:
+                release.set()
+            assert snapshot.result(timeout=2.0) == f"old-current{os.linesep}".encode()
+            rotation.result(timeout=2.0)
+        assert sinks.support_log_snapshot() == f"new-current{os.linesep}".encode()
+        assert read_bytes(tmp_path / "puripuly_heart.backup.log") == (
+            f"old-current{os.linesep}".encode()
+        )
+    finally:
+        release.set()
+        sinks.close()
+
+
+def test_support_log_snapshot_real_service_smoke_preserves_masked_conversation(tmp_path) -> None:
+    root = logging.getLogger(f"test.runtime_logging.snapshot.smoke.{uuid4()}")
+    root.propagate = False
+    root.addHandler(logging.StreamHandler(io.StringIO()))
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    session = SessionRuntimeLoggingService(
+        root_logger=root,
+        session_logger=logging.getLogger(f"test.runtime_logging.snapshot.session.{uuid4()}"),
+        sinks=sinks,
+    )
+    service = RuntimeLoggingService(session_service=session)
+    owner = ApplicationRuntimeLoggingOwner(
+        presentation=SimpleNamespace(attach_runtime_log_sink=lambda _service: None),
+        service_factory=lambda: service,
+        fallback_logger=root,
+    )
+    try:
+        (tmp_path / "puripuly_heart.backup.log").write_bytes(b"backup-only-sentinel\n")
+        for utterance, source, translation in (
+            ("speech", "synthetic spoken sentence", None),
+            ("translation", None, "synthetic translated sentence"),
+            ("masked-speech", "api_key=synthetic-secret-speech", None),
+            ("masked-translation", None, "token=synthetic-secret-translation"),
+        ):
+            service.record_conversation_observation(
+                utterance_id=utterance,
+                speaker_channel="self",
+                transcript_text=source,
+                translation_text=translation,
+                source_language="en",
+                target_language="ko",
+            )
+        _wait_for_log_text(sinks.log_file, "synthetic translated sentence")
+        _wait_for_log_text(sinks.log_file, "Content redacted")
+        snapshot = owner.support_log_snapshot()
+        assert snapshot == sinks.log_file.read_bytes()
+        assert b"synthetic spoken sentence" in snapshot
+        assert b"synthetic translated sentence" in snapshot
+        assert snapshot.count(b"Content redacted") == 2
+        assert b"synthetic-secret" not in snapshot
+        assert b"backup-only-sentinel" not in snapshot
+        sinks.file_handler.maxBytes = len(snapshot)
+        service.record_conversation_observation(
+            utterance_id="post-rotation",
+            speaker_channel="self",
+            transcript_text="post-rotation spoken sentence",
+            translation_text=None,
+            source_language="en",
+            target_language="ko",
+        )
+        _wait_for_log_text(sinks.log_file, "post-rotation spoken sentence")
+        rotated_snapshot = owner.support_log_snapshot()
+        assert rotated_snapshot == sinks.log_file.read_bytes()
+        assert b"post-rotation spoken sentence" in rotated_snapshot
+        assert b"synthetic spoken sentence" not in rotated_snapshot
+        assert b"synthetic translated sentence" not in rotated_snapshot
+        assert (tmp_path / "puripuly_heart.backup.log").read_bytes() == snapshot
+        assert not service.is_closed
+        assert sinks.file_queue_listener._thread.is_alive()
+    finally:
+        service.close()
+        sinks.close()
+
+
+def test_support_log_snapshot_does_not_wait_for_queued_records(tmp_path) -> None:
+    root = logging.getLogger(f"test.runtime_logging.snapshot.queued.{uuid4()}")
+    root.propagate = False
+    root.addHandler(logging.StreamHandler(io.StringIO()))
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    session = SessionRuntimeLoggingService(root_logger=root, sinks=sinks)
+    blocking = _BlockingForwardingHandler(
+        sinks.file_handler,
+        blocked_message="queued-only-sentinel",
+    )
+    try:
+        session.emit_basic("already-written-sentinel")
+        _wait_for_log_text(sinks.log_file, "already-written-sentinel")
+        sinks.file_queue_listener.handlers = (blocking,)
+        session.emit_basic("queued-only-sentinel")
+        assert blocking.started.wait(2.0)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            snapshot = pool.submit(session.support_log_snapshot).result(timeout=2.0)
+        assert b"already-written-sentinel" in snapshot
+        assert b"queued-only-sentinel" not in snapshot
+        assert sinks.file_queue_listener._thread.is_alive()
+        blocking.release.set()
+        _wait_for_log_text(sinks.log_file, "queued-only-sentinel")
+        assert b"queued-only-sentinel" in session.support_log_snapshot()
+    finally:
+        blocking.release.set()
+        session.close()
         sinks.close()
 
 

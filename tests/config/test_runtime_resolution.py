@@ -385,17 +385,6 @@ def test_stt_runtime_resolution_emits_canonical_local_provider_identity(
     assert config.credential.required is False
 
 
-def test_soniox_runtime_default_uses_realtime_v5_model() -> None:
-    runtime_resolution = _runtime_resolution_module()
-
-    config = runtime_resolution.resolve_stt_config(
-        runtime_resolution.STTRuntimeIntent(provider=runtime_resolution.STT_PROVIDER_SONIOX)
-    )
-
-    assert config.model == "stt-rt-v5"
-    assert runtime_resolution.SONIOX_STT_MODEL_RT_V5 == "stt-rt-v5"
-
-
 def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -> None:
     runtime_resolution = _runtime_resolution_module()
     resolved = _resolved_module()
@@ -917,9 +906,7 @@ def test_retired_or_unknown_translation_runtime_selection_is_rejected(
 ) -> None:
     runtime_resolution = _runtime_resolution_module()
     with pytest.raises(ValueError):
-        runtime_resolution.normalize_translation_runtime_intent(
-            model=model, connection=connection
-        )
+        runtime_resolution.normalize_translation_runtime_intent(model=model, connection=connection)
 
 
 @pytest.mark.parametrize("provider", ["gemini", "unknown", "", None, 123])
@@ -939,9 +926,7 @@ def test_retired_or_unknown_alias_cannot_select_a_paid_route(alias: str) -> None
             provider_llm="openrouter", selection_alias=alias
         )
     with pytest.raises(ValueError):
-        runtime_resolution.OpenRouterRuntimeIntent(
-            selected_source="byok", selection_alias=alias
-        )
+        runtime_resolution.OpenRouterRuntimeIntent(selected_source="byok", selection_alias=alias)
 
 
 @pytest.mark.parametrize(

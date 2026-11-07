@@ -46,6 +46,16 @@ def test_detected_language_mapper_preserves_generic_chinese() -> None:
     assert map_detected_language_for_llm("xx") is None
 
 
+@pytest.mark.parametrize("code", sorted(SUPPORTED_LANGUAGES))
+def test_detected_language_mapper_accepts_every_supported_code(code: str) -> None:
+    info = SUPPORTED_LANGUAGES[code]
+
+    for spelling in (code, code.lower(), code.upper(), code.replace("-", "_")):
+        mapped = map_detected_language_for_llm(spelling)
+        assert mapped is not None
+        assert (mapped.code, mapped.name) == (info.code, info.name)
+
+
 def test_qwen3_asr_language_normalization() -> None:
     assert get_qwen3_asr_language("zh-TW") == "zh"
     assert get_qwen3_asr_language("ko-KR") == "ko"

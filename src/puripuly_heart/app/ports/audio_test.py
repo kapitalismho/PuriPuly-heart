@@ -18,6 +18,15 @@ class AudioTestSourceUnavailable(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
+class AudioDiagnosticCandidate:
+    input_host_api: str
+    input_device: str
+    device_index: int
+    max_input_channels: int
+    current_route: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class AudioTestOpenedSource:
     source: object
     device: Mapping[str, object] = field(default_factory=dict)
@@ -93,6 +102,7 @@ class AudioTestCaptureControlPort(Protocol):
 
 
 __all__ = [
+    "AudioDiagnosticCandidate",
     "AUDIO_TEST_CHANNELS",
     "AudioTestCaptureControlPort",
     "AudioTestCaptureState",

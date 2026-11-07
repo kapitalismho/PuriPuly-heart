@@ -216,14 +216,6 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
   > 상대 음성 번역 기능이 제대로 작동하기 위해서는 시끄럽지 않은 공간이 필요해요. VRChat에서 사용할 경우 Earmuff 기능을 사용해서 환경을 통제해주세요.
 7. VRChat에서 OSC 활성화: Action menu → Settings → OSC → Enable
 
-### 오디오 캡쳐가 되지 않는다면
-
-오디오 캡쳐가 되지 않는다면 **설정 &gt; 일반**에서 다음 절차를 따라주세요.
-
-1. **오디오 호스트 API**를 **자동선택** 혹은 **MME**로 변경
-2. 알맞은 마이크 선택
-3. 앱 재시작
-
 ---
 
 ### 중국 사용자를 위한 안내
@@ -506,22 +498,17 @@ uv run python -m pytest
 
 ---
 
-## 개발자
-
-[salee](https://github.com/kapitalismho)
-
----
-
 ## 기여자
 
-[RICHARDwuxiaofei](https://github.com/RICHARDwuxiaofei)
-[fzcfweasdferttgg-png](https://github.com/fzcfweasdferttgg-png)
+<a href="https://github.com/kapitalismho/PuriPuly-heart/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=kapitalismho/PuriPuly-heart" alt="Contributors" />
+</a>
 
 ---
 
 ## Special Thanks
 
-SUI32C, Nagikokoro, motoka96, Ykol魚, kascr, Just Monika V, FLUVIA, Han โชเล่ย์, EAPE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
+SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
 
 ---
 

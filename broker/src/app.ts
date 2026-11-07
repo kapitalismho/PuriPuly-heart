@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 
-import { internalErrorResponse } from './broker-error';
+import { errorResponse, internalErrorResponse } from './broker-error';
 import {
   BROKER_SERVICE_NAME,
   FOUNDATION_RESPONSE,
@@ -21,6 +22,7 @@ import { handleAppActiveDay } from './telemetry';
 import { handleManagedKeyDeliveryAck } from './managed-key-delivery';
 import { handleManagedOperationResume } from './managed-operation-resume';
 import { handleManagedOperationStatus } from './managed-operation';
+import { handlePuriToken } from './puri-token';
 
 export const app = new Hono<BrokerEnv>();
 
@@ -39,6 +41,15 @@ app.get('/v1/foundation', (c: Context<BrokerEnv>) => {
   return c.json(FOUNDATION_RESPONSE);
 });
 
+app.post('/v1/puri/token', bodyLimit({
+  maxSize: 4096,
+  onError: (c) => {
+    c.header('Cache-Control', 'no-store');
+    return errorResponse(c, 413, {
+      code: 'invalid_request', class: 'terminal', message: 'Puri authentication request is too large',
+    });
+  },
+}), handlePuriToken);
 app.post('/v1/trial/challenge', handleTrialChallenge);
 app.post('/v1/trial/challenge/verify', handleTrialChallengeVerify);
 app.get('/v1/trial/status', handleTrialStatus);

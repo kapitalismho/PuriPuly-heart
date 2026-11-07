@@ -38,7 +38,7 @@ from puripuly_heart.config.runtime_resolution import (
     QWEN_AUDIO_STT_MODEL,
     SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S,
     SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS,
-    SONIOX_STT_MODEL_RT_V5,
+    SONIOX_STT_MODEL_RT_V6,
     STT_CUSTOM_PROVIDERS,
     STT_PROVIDER_DEEPGRAM,
     STT_PROVIDER_ELEVENLABS_SCRIBE,
@@ -1171,9 +1171,7 @@ def create_stt_backend_from_resolved_config(
     if config.provider == STT_PROVIDER_GEMINI_TRANSCRIBE:
         from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
 
-        api_key = _gemini_api_key_for_resolved_credential(
-            config.credential, secrets=secrets
-        )
+        api_key = _gemini_api_key_for_resolved_credential(config.credential, secrets=secrets)
         language_codes_value = config.provider_options.get("language_codes")
         language_codes = (
             tuple(language_codes_value)
@@ -1235,7 +1233,7 @@ def create_stt_backend_from_resolved_config(
         api_key = _soniox_api_key_for_resolved_credential(config.credential, secrets=secrets)
         return SonioxRealtimeSTTBackend(
             api_key=api_key,
-            model=config.model or SONIOX_STT_MODEL_RT_V5,
+            model=config.model or SONIOX_STT_MODEL_RT_V6,
             endpoint=config.endpoint or "wss://stt-rt.soniox.com/transcribe-websocket",
             language_hints=_resolved_soniox_language_hints(config),
             sample_rate_hz=config.sample_rate_hz,

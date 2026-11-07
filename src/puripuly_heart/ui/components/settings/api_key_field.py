@@ -14,6 +14,8 @@ from flet import Icons as icons
 
 from puripuly_heart.ui.components.settings.api_key_verification_controller import (
     ApiKeyVerificationController,
+    CompletionHandler,
+    VerifyHandler,
 )
 from puripuly_heart.ui.flet_runtime import control_page, update_control_if_mounted
 from puripuly_heart.ui.i18n import provider_label, t
@@ -55,10 +57,11 @@ class ApiKeyField(ft.Row):
         label_key: str,
         secret_key: str,
         provider: str,
-        on_verify: Callable[[str, str], object] | None = None,
+        on_verify: VerifyHandler | None = None,
         on_save: Callable[[str, str], object] | None = None,
         show_snackbar: Callable[[str, str], None] | None = None,
         show_status: bool = True,
+        on_complete: CompletionHandler | None = None,
     ):
         self._label_key = label_key
         self._secret_key = secret_key
@@ -112,6 +115,7 @@ class ApiKeyField(ft.Row):
             on_status=self._apply_status,
             on_message=self._show_controller_message,
             show_status=show_status,
+            on_complete=on_complete,
         )
         self._controller.set_value_getter(lambda: self._text_field.value or "")
 
@@ -130,6 +134,11 @@ class ApiKeyField(ft.Row):
     @property
     def controller(self) -> ApiKeyVerificationController:
         return self._controller
+
+    def bind_verification_completion(self, callback: CompletionHandler | None) -> bool:
+        connected = self._show_status and callable(self._controller._on_verify)
+        self._controller.bind_completion(callback if connected else None)
+        return callback is not None and connected
 
     @property
     def _last_verified_hash(self) -> str:

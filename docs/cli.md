@@ -31,6 +31,8 @@ uv run python -m puripuly_heart.main cli --config C:\work\puripuly-dev.json app 
 - `app stop` waits for the original endpoint and observed process identity to disappear. `cleanup_outcome: unobserved` does not certify every teardown callback or resource release. `--no-wait` returns only shutdown acceptance.
 - `--timeout <seconds>` bounds client waiting, not operation lifetime, and never retries a mutation. `Ctrl+C` exits 130; a background host remains independent.
 
+Source changes are not hot-reloaded. Restart a running source host after changing code or bundled resource names; installed builds require a rebuilt application payload.
+
 ## Discover Before Acting
 
 | Need | Authority |
@@ -93,6 +95,25 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 - Apply a translation model and its connection together using a combination from `settings choices`. For ASR, `asr set --channel self|peer|both --provider <choice>` is the convenience form.
 - Explicit provider fields can retry pending provider application; unrelated general settings edits do not. Observe committed settings and effective provider state separately, including after restart when checking persistence.
 
+### GUI Settings Selection
+
+- An enabled modal option applies on its first click. Single-select dialogs close after selection; multi-select dialogs stay open and retain at least one selection.
+- Puri can still open settings and reveal a provider's secure key field without changing the selected provider. Settings no longer show the temporary Puri guidance banner or its return button; use the main navigation to return to Puri.
+
+### Agent Chat Control
+
+- Puri uses the same application-control owners as the CLI through finite typed tools, not shell commands. It controls only the current application instance and exposes a subset of the CLI: settings changes, capture/translation/overlay switches, recognition/translation probes, microphone diagnosis, OSC discovery retry, Peer capture retry, GPU activation retry, stored-key deletion, account sign-out, desktop overlay position reset, and read-only status queries.
+- CLI-only actions remain available from the CLI but not from Puri: shutdown and restart, model download/install/import/deletion and cancellation, Gemma preparation, GPU discovery, standalone credential save/verify, account login, manual text submission, Audio Test, Peer target selection, overlay size/lock/calibration, operation status/wait/cancel, and event/log observation.
+- Puri receives app state as modules: `core` (switches, channels, pending card, operations, recent diagnostics) plus `audio`, `recognition`, `translation`, `accounts`, `languages`, `output`, and `general`. For work requests, D independently selects relevant modules and whether the task continues; `core` is always observed. Missing, ambiguous or invalid selection and classification timeouts select all modules. Omitted modules are not absent or disabled; `missing` records failed local observations. A `get_app_context` read observes `core` plus the requested module, and `overview` observes all of them.
+- Localized setting labels, descriptions and static options are sent in per-module `catalogs`; current values remain in module `settings`, private presence in `private`, and device/host/GPU/extension choices and availability in `options`. Later contexts append only new or changed catalogs and complete module states; `unchanged` confirms fresh observations matching retained evidence. Included module states and catalogs replace their earlier versions, rather than merging omitted fields. Failed observations are never reported as unchanged. When supporting history is trimmed or the conversation resets, needed evidence is sent again. Filtered diagnostics remain separate query-scoped evidence. An explicit accounts read still stages current account-action controls even when the account facts are already known.
+- Same-task follow-ups retain selected and additionally read modules; new tasks, conversation reset/expiry and trimmed task history clear the previous selection. Approval and key-verification continuations use code-selected modules and their originating task, without another D call. Social requests receive display dialogue only; out-of-scope requests receive only the current message. Neither receives app snapshots, tool results or reasoning history.
+- Simulator `run` and `smoke` accept `--context-mode selected|full` (default `selected`) for comparison, and record the mode and effective context decisions. Both modes use the same relay instructions and tools. Regenerate the classifier's module list from the Python module registry with `uv run python agent-relay/generate-context.py`; rebuild the relay after generation. This does not authorize deployment.
+- Option labels, short descriptions, choices, and approval values come from a shared catalog localized to the current UI language (English, Korean, Japanese, Simplified Chinese, or Russian). The response language does not rename UI controls. `chatbox.activation_notice.enabled` controls the `PuriPuly ON!` notice; `stt.soniox.enable_speaker_diarization` controls Soniox speaker separation.
+- CLI/API `overlay.background_alpha` remains opacity in `[0, 1]`. Both Settings and Puri's approval card show background **transparency** as `(1 - alpha) × 100%`; `0.6` therefore displays as `40%`.
+- Settings changes, stored-key deletion, account sign-out, and desktop overlay position reset use the same revision-bound change card with before and after values. Settings cards show at most two logical changes; coupled model/connection and microphone host/device selections remain grouped. After approval the app waits for the terminal result and then shows a fixed result line; pending operations are not reported as completed.
+- Recognition/translation originals, user-authored prompts, vocabulary, custom endpoints, free-text settings, and secret values are not provided to the agent model. Private settings editing and raw-content inspection use existing app screens; there is no separate agent settings editor or local input form. Key entry uses the existing provider-setup save-and-verify card. Turning on Peer capture before its terms are accepted returns `action_required`; the terms are accepted through the dashboard LISTEN switch.
+- `settings.current` includes `private_presence` boolean metadata for protected settings. A missing presence observation is unknown, not evidence that a value is empty.
+
 ### GUI Autosave
 
 - GUI settings edits are coalesced and attempted once per submitted edit. There are no timed retries or automatic runtime-only replays after failure. Saved-but-unapplied edits remain saved; persistence and effective runtime state are separate results.
@@ -114,7 +135,35 @@ The GUI dashboard's “Ready!” means Self/TALK capture is active and its recog
 
 Use the terminal operation receipt together with `providers.status`, `models status`, `overlay status`, `osc status`, or the relevant owner's query. Correct the reported cause before explicitly retrying. A failed/cancelled current translation warmup turns effective translation off while retaining the selection and failure details.
 
+An explicit SteamVR runtime shutdown turns CAPTIONS off after native cleanup, without a Desktop fallback or automatic restart. The saved VR target and calibration remain unchanged; capture and translation continue independently. Start SteamVR and use `overlay set on` to enable captions again. Initial enable without SteamVR retains the existing Desktop fallback; genuine crashes and cleanup failures remain failures. If runtime shutdown interrupts an enable operation, its receipt can be `degraded` because ON was not reached; use `overlay status` to distinguish the resulting clean OFF state from an overlay failure.
+
 Matching `translation set off` or `capture set <channel> off` can revoke pending startup. Shared model demand may keep resources alive for another channel. Runtime stops are distinct from cancelling an explicit model download/import.
+
+`osc discovery retry` performs one bounded automatic-discovery attempt using the saved connection. It refreshes/reapplies target information for a running discovery service or restarts failed discovery resources; it does not rebuild a healthy receiver or change saved destinations. Manual/off, in-flight, changed connections and stopped lifecycles are rejected. The terminal receipt distinguishes `applied` with `discovery_target_applied` from `degraded` with `discovery_unavailable`; acceptance or scheduling alone is not recovery. `osc status` exposes the current destination source and a retained, timestamped local-listener observation. Unknown ownership/access remains unknown; the narrow local probe is not applicable to non-loopback destinations. Finding/applying a target or matching a listener does not prove VRChat health, receipt or display. Remote delivery remains unacknowledged; the operation submits no chatbox text and replays no old translations.
+
+### Independent Component Checks
+
+These commands use application-owned synthetic inputs, not the microphone, loopback, speaker playback, or normal conversation/output pipeline:
+
+| Command | Arguments | Successful terminal result establishes |
+| --- | --- | --- |
+| `recognition.probe` | `{"channel":"self"}` or `{"channel":"peer"}` | A nonempty authoritative final recognition result for that configured recognizer's isolated test session |
+| `translation.probe` | `{}` | A nonempty synthetic translation through the currently attached shared translation backend |
+
+```powershell
+puripuly.exe command recognition.probe --arguments '{"channel":"self"}'
+puripuly.exe command recognition.probe --arguments '{"channel":"peer"}'
+puripuly.exe command translation.probe
+```
+
+Read the terminal receipt, not admission or readiness. Recognition reports `recognition_result`, final-event authority, configured/exercised provider, and captured/current revision and generation. It uses the bundled 1.194-second `data/diagnostics/eung.wav` sample without changing the configured language. `configured_language` reports the language applied to that recognition session, not a detected sample language or an accuracy guarantee. For `rolling_free`, `recognition_scope: single_eligible_rolling_member` identifies only the tested member, not full rolling-route health.
+
+An inactive configured recognition channel can use a probe-owned backend without enabling capture. An attached channel keeps its live sessions/model capacity; the probe owns only its isolated session. Missing assets/authentication/readiness return a prerequisite or failure, without provisioning, login, provider switching, or settings changes. Translation requires an already attached usable backend and reports `translation_result`; managed preparation is not silently performed. Existing selected-provider routing can involve more than one transport attempt and may incur its normal cost.
+
+Cold recognition probe success also includes temporary-backend cleanup. Pending or failed cleanup remains runtime-owned and reserves that channel's construction capacity until reclaimed; a cancelled operation does not by itself prove resource release.
+
+Empty, failed, cancelled, or stale results are not successful tests. Receipts omit recognized/translated text and explicitly mark untested stages: real capture, recognition accuracy, translation after recognition, output delivery, and display as applicable. A successful component check does not certify the whole Self/Listen path. The sample duration is not a completion-time guarantee.
+
 
 ### Peer Capture and Audio Tests
 
@@ -125,6 +174,17 @@ A capture-target change that is saved while requested Peer capture remains pendi
 After a capture failure, explicitly applying a valid target reports `applied` once the requested provider and capture configuration are ready and active. Resubmitting that unchanged healthy target also reports `applied`. Prior safe failure evidence remains available through bounded current-instance `diagnostics.history`; it does not make recovered capture degraded. Pending recovery and new current failures still prevent successful convergence.
 
 `audio test on|off` runs VAD without recognition or translation. It pauses normal capture and restores only still-valid prior intent; inspect `app status` → `audio_test` for readiness, failures, and VAD readings. Stopping waits for owned input release, not just a visual toggle.
+
+`audio diagnose` runs the cancellable `audio.diagnose {}` operation. It tests up to four actually enumerated microphone/host pairs sequentially, current route first, with a bounded three-second observation window per candidate. Present Virtual Desktop, Steam Link, Meta Link/Air Link and PICO microphone-driver routes are considered before unrelated alternatives; distinct driver routes precede duplicate host-API views of the same driver. Names only affect test order, never the measured choice or saved settings. Playback-only endpoints are excluded. A driver can remain installed while its headset session, microphone permission or passthrough is unavailable, so enumeration alone does not establish working input. The operation pauses normal capture through the same owner and restores only still-authorized intent; it never tests loopback, performs recognition, calls a cloud service, saves audio or changes the selected route.
+
+```powershell
+puripuly.exe audio diagnose
+puripuly.exe audio diagnose --no-wait
+```
+
+Read each candidate's open/readiness, frame count, signal level, VAD evidence, failure and cleanup fields. The diagnosis owner alone ends the observation window; reaching that bound preserves measured frames without inventing a no-audio failure. The best measured candidate without a source or cleanup failure is a suggestion for a separate settings change, not a recovery certificate. Equal evidence preserves test order, including the current route; silence-only frames do not prove microphone speech works. Actual source and cleanup failures remain failures even after frames arrive and exclude that candidate from selection. Silence, missing frames and recognition failure are distinct. A cancelled operation can retain unresolved native cleanup debt, which blocks conflicting capture until release. A later explicit capture-off is never undone by restoration.
+
+Diagnostic history records bounded numeric evidence without raw audio, device labels or exception prose. Audio-test logging adds phase, frame/level/VAD and cleanup observations. These establish only the exercised input/VAD path, not recognition, translation or physical caption display.
 
 ### Manual Text
 
@@ -239,6 +299,7 @@ puripuly.exe auth logout chatgpt
 - For `resolve_pending_authorization` / `remote_delivery_ack_pending`, preserve settings/secrets and explicitly retry the same source's login after correcting the cause. Saved authority resumes reconciliation; it does not prove a recovery task is running. A retained unacknowledged modern key is not automatically usable after restart.
 - Storage-read failure is unknown state (`signed_in: null`), not logout. Do not delete settings, encrypted secrets, or their `.lock` file as a recovery shortcut. If authentication succeeded but provider activation failed, retry translation enablement after correcting the runtime cause.
 - Logout is local-only except ChatGPT, which also requests refresh-token revocation. Inspect the reported scope; local deletion alone does not prove remote revocation.
+- ChatGPT logout waits for already-started credential mutations before confirming local removal. A cancelled refresh cannot restore the removed credential. If a later successful explicit login supersedes removal, its credentials are preserved and the earlier logout reports `local_credentials_removed: false`; remote revocation is reported independently. A failed login with rolled-back credentials does not cancel removal.
 - Browser authorization and app-to-service traffic can use different routes. Correct proxy/TLS configuration rather than disabling certificate verification. Share only sanitized diagnostic fields, never OAuth codes, keys, tokens, proxy URLs, or full settings/secret files.
 
 ### Proxy Changes
@@ -275,7 +336,7 @@ puripuly.exe query diagnostics.health
 Use returned identities, not invented placeholders. `capabilities.query_arguments` describes supported history filters and limits.
 
 - Records preserve safe typed causes and known relationships. Missing relationships remain unknown; secondary cleanup failures do not replace the primary cause. Owner state and terminal receipts remain authoritative.
-- History is bounded, in-memory, and current-instance only. Inspect gaps, eviction/truncation, and lookup outcomes. `not_retained`, `foreign_instance`, or `invalid_cursor` does not mean an operation succeeded or never failed.
+- History is bounded, in-memory, and current-instance only. Inspect gaps, eviction/truncation, and lookup outcomes. An unfiltered cursor at the current tail returns `no_new_records`: no newer retained diagnostic at that snapshot, not proof of recovery. Missing requested identities remain `not_retained`; neither that nor `foreign_instance` or `invalid_cursor` proves an operation succeeded or never failed.
 - History's `next_after` is a diagnostic cursor. An event's `sequence` is a replay cursor. They are not interchangeable; retain the originating instance with either.
 - `diagnostics.health` reports history/event/file/output delivery health independently of a working file sink. Enqueued is not written; written is not durable. Aggregate counters do not prove persistence of an individual record.
 - Terminal file records trigger delivery without waiting for ordinary batch expiry; their severity is unchanged. This does not bypass a blocked sink or the bounded close deadline: a timeout remains visible and cleanup stays listener-owned.

@@ -129,6 +129,7 @@ class FletUiPresentationAdapter:
                 None,
             ),
             on_overlay_state_changed=getattr(self._app, "on_overlay_state_changed", None),
+            on_error_presented=getattr(self._app, "on_error_presented", None),
         )
 
     def set_dashboard_translation_enabled(self, enabled: bool) -> None:

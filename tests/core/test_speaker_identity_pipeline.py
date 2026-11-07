@@ -17,11 +17,18 @@ from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
+    STTProviderTurnRequest,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTSessionProjection,
 )
 from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
 from puripuly_heart.domain.models import Translation
+from puripuly_heart.providers.stt.qwen_audio import (
+    QwenAudioStreamingSTTBackend,
+    _QwenAudioSession,
+    _QwenTask,
+)
 from puripuly_heart.providers.stt.soniox import _FinalizeRequest, _SonioxSession
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from tests.helpers.fakes import RecordingOscQueue
@@ -102,7 +109,7 @@ class _RecordingOverlaySink:
 def _soniox_session() -> _SonioxSession:
     return _SonioxSession(
         api_key="test",
-        model="stt-rt-v5",
+        model="stt-rt-v6",
         endpoint="wss://example.invalid",
         sample_rate_hz=16000,
         language_hints=["en"],
@@ -159,7 +166,7 @@ async def _terminal_from_soniox_tokens(
             }
         ]
     )
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": message_tokens + [{"text": "<fin>", "is_final": True}],
@@ -234,6 +241,216 @@ async def _partial_before_final(harness, terminal: STTProviderTurnTerminal) -> N
             observed_at=harness.peer_owner.clock.now(),
         )
     )
+
+
+async def _qwen_caption_input(
+    now: float,
+) -> tuple[AudioSegmentTerminalReceipt, STTProviderTurnUpdate, STTProviderTurnTerminal]:
+    settings = replace(
+        _settings(),
+        provider_id="qwen_audio",
+        provider_signature=("qwen_audio",),
+        runtime_signature=("qwen_audio",),
+    )
+    identity = STTProviderTurnIdentity(
+        AudioSegmentIdentity(1, 1, uuid4(), 1),
+        "qwen-epoch",
+        "qwen-turn",
+        settings_scope=(
+            settings.provider_id,
+            settings.provider_signature,
+            settings.runtime_signature,
+        ),
+    )
+    session = _QwenAudioSession(
+        QwenAudioStreamingSTTBackend(api_key="synthetic", channel="peer"),
+        STTSessionProjection("scoped", identity.provider_epoch_id),
+    )
+    session._event_projection.begin(STTProviderTurnRequest(identity, settings))
+    task = _QwenTask("synthetic-task", identity, session._slots[0])
+    normalizer = STTScopedTurnNormalizer(identity)
+    events = session.turn_events()
+    try:
+        await session._sentence(task, {"payload": {"output": {"sentence": {"text": "alpha,"}}}})
+        update = normalizer.apply_update(
+            replace(await anext(events), observed_at=now, first_nonempty_at=now)
+        )
+        assert update is not None
+        await session._sentence(
+            task,
+            {
+                "payload": {
+                    "output": {
+                        "sentence": {
+                            "text": "alpha, beta Alice",
+                            "sentence_id": 1,
+                            "sentence_end": True,
+                        }
+                    }
+                }
+            },
+        )
+        normalizer.apply_update(await anext(events))
+        await session._complete(task)
+        terminal = normalizer.apply_terminal(await anext(events))
+    finally:
+        await events.aclose()
+        await session.close()
+    snapshot = AudioSegmentSnapshot(
+        identity=identity.segment,
+        settings=settings,
+        content_ranges=(),
+        context_ranges=(),
+        failed_ranges=(),
+        content_sample_count=0,
+        context_sample_count=0,
+        failed_normalized_sample_count=0,
+        failed_source_sample_count=0,
+        prefix_context_sample_count=0,
+        synthetic_context_sample_count=0,
+        genuine_onset=True,
+        state="terminal",
+        opened_at_monotonic_s=now,
+        sealed_at_monotonic_s=now + 6,
+        seal_reason="silence",
+    )
+    receipt = AudioSegmentTerminalReceipt(
+        identity=identity.segment,
+        outcome="final",
+        segment=snapshot,
+        terminal_at_monotonic_s=now + 6,
+        provider_epoch_id=identity.provider_epoch_id,
+        provider_turn_id=identity.provider_turn_id,
+        text_authority="authoritative",
+    )
+    assert terminal.final_speaker_runs == ()
+    return receipt, update, terminal
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["readable", "refreshed", "final-first", "cancelled"])
+async def test_qwen_audio_preview_and_authoritative_final_stay_gold(phase: str) -> None:
+    clock = FakeClock(_now=100.0)
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    provider = _SegmentTranslationProvider()
+    overlay = _RecordingOverlaySink(presenter)
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=RecordingOscQueue(),
+        peer_translation_enabled=True,
+        overlay_sink=overlay,
+        clock=clock,
+    )
+    if phase == "cancelled":
+        provider.release["alpha,"] = asyncio.Event()
+        provider.entered["alpha,"] = asyncio.Event()
+    await harness.start()
+    try:
+        receipt, update, terminal = await _qwen_caption_input(clock.now())
+        await harness.peer_owner.handle_provider_update(update)
+        if phase != "final-first":
+            clock.advance(5.01)
+            await harness.peer_owner.cloud_captions.check_previews()
+            if phase == "cancelled":
+                await asyncio.wait_for(provider.entered["alpha,"].wait(), timeout=1)
+                assert presenter.snapshot().blocks == []
+            else:
+                await _wait_for_peer_idle(harness)
+                preview = overlay.events[-1]
+                assert preview.type == "translation_stream_update"
+                assert preview.speaker_assignment is not None
+                assert preview.speaker_assignment.attribution.state == "non_diarized"
+                assert preview.speaker_assignment.palette_index is None
+                assert presenter.snapshot().blocks[0].speaker_style == "gold"
+                assert harness.peer_runtime.translation_history == []
+                if phase == "refreshed":
+                    await harness.peer_owner.handle_provider_update(
+                        replace(update, sequence=2, text=terminal.text)
+                    )
+                    clock.advance(4.01)
+                    await harness.peer_owner.cloud_captions.check_previews()
+                    await _wait_for_peer_idle(harness)
+                    refresh = overlay.events[-1]
+                    assert refresh.peer_caption_revision == preview.peer_caption_revision + 1
+                    assert refresh.speaker_assignment == preview.speaker_assignment
+                    assert presenter.snapshot().blocks[0].speaker_style == "gold"
+                    assert harness.peer_runtime.translation_history == []
+        await harness.peer_owner.handle_provider_turn_terminal(receipt, terminal)
+        await _wait_for_peer_idle(harness)
+        await harness.peer_owner.handle_provider_turn_terminal(receipt, terminal)
+        await _wait_for_peer_idle(harness)
+        finals = [event for event in overlay.events if event.type == "translation_final"]
+        assert len(finals) == 1
+        final = finals[0]
+        assert final.source_text == terminal.text
+        assert final.speaker_assignment.attribution.state == "non_diarized"
+        assert presenter.snapshot().blocks[0].speaker_style == "gold"
+        assert presenter.snapshot().blocks[0].primary_text == "First, Second Again"
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [terminal.text]
+        assert harness.osc.messages == []
+        if phase in ("cancelled", "final-first"):
+            assert [event.type for event in overlay.events] == ["translation_final"]
+        if phase == "cancelled":
+            assert provider.cancelled == {"alpha,"}
+    finally:
+        for gate in provider.release.values():
+            gate.set()
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("rejection", ["obsolete", "retired-generation", "unknown-provider"])
+async def test_rejected_provider_updates_do_not_seed_qwen_preview_style(rejection: str) -> None:
+    clock = FakeClock(_now=100.0)
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    provider = _SegmentTranslationProvider()
+    overlay = _RecordingOverlaySink(presenter)
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=RecordingOscQueue(),
+        peer_translation_enabled=True,
+        overlay_sink=overlay,
+        clock=clock,
+    )
+    await harness.start()
+    try:
+        receipt, update, terminal = await _qwen_caption_input(clock.now())
+        if rejection == "obsolete":
+            rejected = replace(update, is_current=lambda: False)
+        elif rejection == "retired-generation":
+            rejected = replace(
+                update,
+                identity=replace(
+                    update.identity,
+                    segment=replace(update.identity.segment, activation_generation=0),
+                ),
+            )
+        else:
+            rejected = replace(
+                update, identity=replace(update.identity, settings_scope=("unknown-provider",))
+            )
+        await harness.peer_owner.handle_provider_update(rejected)
+        clock.advance(5.01)
+        await harness.peer_owner.cloud_captions.check_previews()
+        await _wait_for_peer_idle(harness)
+        assert provider.calls == []
+        assert overlay.events == []
+        assert presenter.snapshot().blocks == []
+        await harness.peer_owner.handle_provider_update(update)
+        await harness.peer_owner.cloud_captions.check_previews()
+        await _wait_for_peer_idle(harness)
+        assert presenter.snapshot().blocks[0].speaker_style == "gold"
+        await harness.peer_owner.handle_provider_turn_terminal(receipt, terminal)
+        await _wait_for_peer_idle(harness)
+        assert presenter.snapshot().blocks[0].speaker_style == "gold"
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [terminal.text]
+        assert harness.osc.messages == []
+    finally:
+        await harness.stop()
+        await presenter.close()
 
 
 @pytest.mark.asyncio
@@ -695,6 +912,8 @@ async def test_multispeaker_final_settles_preview_and_keeps_every_attributed_spa
         assert [event.type for event in overlay.events] == ["translation_stream_update"]
         preview = overlay.events[0]
         assert harness.peer_runtime.translation_history == []
+        assert preview.speaker_assignment is None
+        assert presenter.snapshot().blocks[0].speaker_style == "gray"
         await harness.peer_owner.handle_provider_turn_terminal(receipt, terminal)
         await _wait_for_peer_idle(harness)
         events = [
@@ -707,6 +926,8 @@ async def test_multispeaker_final_settles_preview_and_keeps_every_attributed_spa
         assert events[1].utterance_id != events[0].utterance_id
         assert [event.speaker_assignment.palette_index for event in events] == [0, 1]
         assert [event.speaker_assignment.source_text_range for event in events] == [(0, 6), (6, 10)]
+        assert presenter.snapshot().blocks[0].speaker_style == "gold"
+        assert presenter.snapshot().blocks[1].speaker_style == "cyan"
         assert [entry.text for entry in harness.peer_runtime.translation_history] == [
             "Alice ",
             "Beto",
@@ -769,21 +990,30 @@ async def test_cross_final_merge_retains_honest_attribution_and_cumulative_sourc
             await _wait_for_peer_idle(harness)
             repair = overlay.events[-1]
             assignment = repair.speaker_assignment
-            assert repair.utterance_id == first.utterance_id
-            assert repair.peer_caption_revision == order
-            assert assignment.source_text_range is None
-            assert assignment.source_text_revision is None
-            if incoming_speaker == "A":
-                assert assignment.attribution == first.speaker_assignment.attribution
+            if incoming_speaker == "B":
+                assert repair.utterance_id == receipt.identity.segment_id
+                assert repair.peer_caption_revision == 1
+                assert assignment.source_text_range == (0, len(text))
+                assert assignment.attribution.key.local_speaker_id == speaker
             else:
-                assert assignment.attribution.state == "mixed"
-                assert assignment.attribution.key is None
-            assert presenter.snapshot().blocks[0].speaker_style == first_style
-        assert provider.calls == ["alpha,", "alpha, beta", "alpha, beta Alice"]
-        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
-            "alpha, beta Alice"
-        ]
-        assert len(overlay.events[-1].peer_superseded_unit_ids) == 2
+                assert repair.utterance_id == first.utterance_id
+                assert repair.peer_caption_revision == order
+                assert assignment.source_text_range is None
+                assert assignment.source_text_revision is not None
+                assert assignment.attribution == first.speaker_assignment.attribution
+                assert presenter.snapshot().blocks[0].speaker_style == first_style
+        expected = (
+            ["alpha,", "beta", "Alice"]
+            if incoming_speaker == "B"
+            else ["alpha,", "alpha, beta", "alpha, beta Alice"]
+        )
+        assert provider.calls == expected
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == (
+            expected if incoming_speaker == "B" else [expected[-1]]
+        )
+        assert len(overlay.events[-1].peer_superseded_unit_ids) == (
+            0 if incoming_speaker == "B" else 2
+        )
         assert first.speaker_assignment.source_text_range == (0, 6)
     finally:
         await harness.stop()

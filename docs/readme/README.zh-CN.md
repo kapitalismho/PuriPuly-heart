@@ -198,13 +198,6 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 
 7. 在 VRChat 中启用 OSC：Action menu → Settings → OSC → Enable
 
-### 如果无法捕获音频
-如果无法捕获音频，请在 **设置 > 常规** 中按以下步骤操作。
-
-1. 将 **应用音频接口** 改为 **自动选择** 或 **MME**
-2. 选择正确的麦克风
-3. 重启应用
-
 ---
 
 ### 中国大陆用户指南
@@ -406,10 +399,6 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 
 参见 [`docs/architecture.md`](../architecture.md)。
 
-## 路线图
-
-后续工作在 [PuriPuly 项目看板](https://github.com/users/kapitalismho/projects/2)中公开跟踪。
-
 ---
 
 ## 开发
@@ -446,16 +435,11 @@ uv run python -m pytest
 
 ---
 
-## 开发者
-
-[salee](https://github.com/kapitalismho)
-
----
-
 ## 贡献者
 
-[RICHARDwuxiaofei](https://github.com/RICHARDwuxiaofei)
-[fzcfweasdferttgg-png](https://github.com/fzcfweasdferttgg-png)
+<a href="https://github.com/kapitalismho/PuriPuly-heart/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=kapitalismho/PuriPuly-heart" alt="Contributors" />
+</a>
 
 ---
 

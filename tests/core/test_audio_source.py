@@ -15,6 +15,7 @@ from puripuly_heart.config.audio_host_api import (
     WINDOWS_WASAPI_HOST_API,
 )
 from puripuly_heart.core.audio.source import (
+    AudioSourceOpenFailure,
     SelfMicCaptureChannelDecision,
     SoundDeviceAudioSource,
     SoundDeviceInputMetadata,
@@ -907,3 +908,160 @@ def test_sounddevice_audio_source_rejects_wasapi_settings_when_unavailable(monke
         SoundDeviceAudioSource(wasapi_auto_convert=True)
 
     assert stream_created is False
+
+
+@pytest.mark.asyncio
+async def test_native_close_failure_is_observable_retryable_and_success_is_idempotent(monkeypatch):
+    streams = []
+
+    class Stream:
+        samplerate = 48000
+
+        def __init__(self, **kwargs):
+            self.callback = kwargs["callback"]
+            self.stop_calls = 0
+            self.close_calls = 0
+            streams.append(self)
+
+        def start(self):
+            pass
+
+        def stop(self):
+            self.stop_calls += 1
+
+        def close(self):
+            self.close_calls += 1
+            if self.close_calls == 1:
+                raise OSError("private native close detail")
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "sounddevice", SimpleNamespace(InputStream=Stream)
+    )
+    source = SoundDeviceAudioSource()
+    stream = streams[0]
+    with pytest.raises(OSError):
+        await source.close()
+    assert source._closed and not source._close_complete
+    stream.callback(np.ones((4,), dtype=np.float32), None, None, None)
+    await source.close()
+    assert source._close_complete
+    assert stream.close_calls == 2 and stream.stop_calls == 2
+    await source.close()
+    assert stream.close_calls == 2 and stream.stop_calls == 2
+
+
+@pytest.mark.asyncio
+async def test_native_stop_failure_does_not_hide_confirmed_close_or_repeat_closed_stream_calls(
+    monkeypatch,
+):
+    calls = []
+
+    class Stream:
+        samplerate = 48000
+
+        def __init__(self, **_kwargs):
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self):
+            calls.append("stop")
+            raise OSError("stop failed")
+
+        def close(self):
+            calls.append("close")
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "sounddevice", SimpleNamespace(InputStream=Stream)
+    )
+    source = SoundDeviceAudioSource()
+    with pytest.raises(OSError, match="stop failed"):
+        await source.close()
+    assert source._native_close_complete and not source._close_complete
+    await source.close()
+    await source.close()
+    assert source._close_complete and calls == ["stop", "close"]
+
+
+@pytest.mark.asyncio
+async def test_partial_native_open_retains_both_failures_and_a_retryable_source(monkeypatch):
+    streams = []
+
+    class Stream:
+        samplerate = 48000
+
+        def __init__(self, **_kwargs):
+            self.release_allowed = False
+            streams.append(self)
+
+        def start(self):
+            raise RuntimeError("primary native open failure")
+
+        def stop(self):
+            pass
+
+        def close(self):
+            if not self.release_allowed:
+                raise OSError("secondary native close failure")
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "sounddevice", SimpleNamespace(InputStream=Stream)
+    )
+    with pytest.raises(AudioSourceOpenFailure) as raised:
+        SoundDeviceAudioSource()
+    failure = raised.value
+    assert isinstance(failure.failure, ExceptionGroup)
+    assert [type(exc) for exc in failure.failure.exceptions] == [RuntimeError, OSError]
+    source = failure.source
+    assert source._closed and not source._close_complete
+    with pytest.raises(OSError):
+        await source.close()
+    streams[0].release_allowed = True
+    await source.close()
+    assert source._close_complete
+
+
+@pytest.mark.asyncio
+async def test_cancelled_native_close_preserves_cleanup_failure_for_the_owner(monkeypatch):
+    import threading
+
+    entered = threading.Event()
+    release = threading.Event()
+    streams = []
+
+    class Stream:
+        samplerate = 48000
+
+        def __init__(self, **_kwargs):
+            self.fail_close = True
+            streams.append(self)
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+        def close(self):
+            entered.set()
+            release.wait(timeout=3)
+            if self.fail_close:
+                raise OSError("native close failed after cancellation")
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "sounddevice", SimpleNamespace(InputStream=Stream)
+    )
+    source = SoundDeviceAudioSource()
+    task = asyncio.create_task(source.close())
+    try:
+        assert await asyncio.to_thread(entered.wait, 2)
+        task.cancel()
+        release.set()
+        with pytest.raises(OSError):
+            await task
+        assert not source._close_complete
+    finally:
+        release.set()
+        streams[0].fail_close = False
+        await source.close()

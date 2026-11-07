@@ -48,6 +48,7 @@ _REVERSE_CONTROL_TYPES = {
     "desktop_first_visible",
     "shutdown_ack",
     "shutdown_complete",
+    "runtime_stop_requested",
     "window_bounds_changed",
     "interaction_mode_changed",
     "reset_to_bottom_center",

@@ -1,39 +1,39 @@
 from __future__ import annotations
 
+import ipaddress
 import sys
-from dataclasses import dataclass
 from typing import Callable
 
-
-@dataclass(frozen=True, slots=True)
-class VrchatOscPresence:
-    vrchat_running: bool
-    osc_listening: bool | None
-
-    @property
-    def should_prompt_enable_osc(self) -> bool:
-        return self.vrchat_running and self.osc_listening is False
-
+from puripuly_heart.core.osc.vrchat_osc_presence_contract import VrchatOscPresence
 
 _VRCHAT_PROCESS_NAMES = frozenset({"vrchat.exe"})
 
 
 def probe_vrchat_osc_presence(
     *,
+    host: str = "127.0.0.1",
     port: int = 9000,
     process_iter: Callable[..., object] | None = None,
     net_connections: Callable[..., object] | None = None,
 ) -> VrchatOscPresence:
+    try:
+        destination = ipaddress.ip_address("127.0.0.1" if host == "localhost" else host)
+    except ValueError:
+        return VrchatOscPresence(vrchat_running=None, osc_listening=None)
+    if not destination.is_loopback:
+        return VrchatOscPresence(
+            vrchat_running=None, osc_listening=None, listener_status="not_applicable"
+        )
     if port <= 0 or port > 65535:
-        return VrchatOscPresence(vrchat_running=False, osc_listening=None)
+        return VrchatOscPresence(vrchat_running=None, osc_listening=None)
     if process_iter is None and net_connections is None and sys.platform != "win32":
-        return VrchatOscPresence(vrchat_running=False, osc_listening=None)
+        return VrchatOscPresence(vrchat_running=None, osc_listening=None)
 
     if process_iter is None or net_connections is None:
         try:
             psutil = _import_psutil()
         except Exception:
-            return VrchatOscPresence(vrchat_running=False, osc_listening=None)
+            return VrchatOscPresence(vrchat_running=None, osc_listening=None)
         iter_processes = process_iter or psutil.process_iter
         list_connections = net_connections or psutil.net_connections
     else:
@@ -44,50 +44,64 @@ def probe_vrchat_osc_presence(
         vrchat_pids = _collect_windows_vrchat_pids()
     else:
         vrchat_pids = _collect_vrchat_pids(iter_processes)
+    if vrchat_pids is None:
+        return VrchatOscPresence(vrchat_running=None, osc_listening=None)
     if not vrchat_pids:
-        return VrchatOscPresence(vrchat_running=False, osc_listening=None)
+        return VrchatOscPresence(
+            vrchat_running=False, osc_listening=None, listener_status="vrchat_not_running"
+        )
 
+    unknown = False
+    other_process = False
     try:
-        connections = list_connections(kind="udp")
-    except Exception:
-        return VrchatOscPresence(vrchat_running=True, osc_listening=None)
-
-    for connection in connections:
-        try:
+        for connection in list_connections(kind="udp"):
             laddr = getattr(connection, "laddr", None)
-            if laddr is None:
-                continue
             connection_port = getattr(laddr, "port", None)
-            if connection_port is None and isinstance(laddr, (tuple, list)) and laddr:
-                connection_port = laddr[-1]
+            address = getattr(laddr, "ip", None)
+            if isinstance(laddr, (tuple, list)) and len(laddr) >= 2:
+                address, connection_port = laddr[:2]
             if connection_port != port:
+                continue
+            try:
+                binding = ipaddress.ip_address(address)
+            except TypeError, ValueError:
+                unknown = True
+                continue
+            if binding.is_unspecified and binding.version == 6 and destination.version == 4:
+                unknown = True
+                continue
+            if binding != destination and not (
+                binding.is_unspecified and binding.version == destination.version
+            ):
                 continue
             pid = getattr(connection, "pid", None)
             if isinstance(pid, int) and pid in vrchat_pids:
-                return VrchatOscPresence(vrchat_running=True, osc_listening=True)
-            if pid is None:
-                # Port is bound but pid unavailable; treat as listening when VRChat is running.
-                return VrchatOscPresence(vrchat_running=True, osc_listening=True)
-        except Exception:
-            continue
+                return VrchatOscPresence(
+                    vrchat_running=True, osc_listening=True, listener_status="matched"
+                )
+            if not isinstance(pid, int) or pid <= 0:
+                unknown = True
+            else:
+                other_process = True
+    except Exception:
+        return VrchatOscPresence(vrchat_running=True, osc_listening=None)
+    if unknown:
+        return VrchatOscPresence(vrchat_running=True, osc_listening=None)
+    return VrchatOscPresence(
+        vrchat_running=True,
+        osc_listening=False,
+        listener_status="other_process" if other_process else "not_listening",
+    )
 
-    return VrchatOscPresence(vrchat_running=True, osc_listening=False)
 
-
-def _collect_vrchat_pids(process_iter: Callable[..., object]) -> set[int]:
+def _collect_vrchat_pids(process_iter: Callable[..., object]) -> set[int] | None:
     pids: set[int] = set()
     try:
-        iterator = process_iter(["pid", "name"])
-    except TypeError:
         try:
+            iterator = process_iter(["pid", "name"])
+        except TypeError:
             iterator = process_iter()
-        except Exception:
-            return pids
-    except Exception:
-        return pids
-
-    for process in iterator:
-        try:
+        for process in iterator:
             info = getattr(process, "info", None)
             if isinstance(info, dict):
                 name = info.get("name")
@@ -96,21 +110,21 @@ def _collect_vrchat_pids(process_iter: Callable[..., object]) -> set[int]:
                 name = process.name() if callable(getattr(process, "name", None)) else None
                 pid = getattr(process, "pid", None)
             if not isinstance(name, str) or not isinstance(pid, int):
-                continue
+                return None
             if name.casefold() in _VRCHAT_PROCESS_NAMES:
                 pids.add(pid)
-        except Exception:
-            continue
+    except Exception:
+        return None
     return pids
 
 
-def _collect_windows_vrchat_pids() -> set[int]:
+def _collect_windows_vrchat_pids() -> set[int] | None:
     from puripuly_heart.core.audio.windows_process_table import list_windows_processes
 
     try:
         entries = list_windows_processes()
     except OSError:
-        return set()
+        return None
     return {entry.pid for entry in entries if entry.image_name.casefold() in _VRCHAT_PROCESS_NAMES}
 
 

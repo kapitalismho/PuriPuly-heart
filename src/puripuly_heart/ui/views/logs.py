@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -368,6 +369,7 @@ class LogsView(ft.Column):
         self._conversation_button: ft.TextButton | None = None
         self._showing_conversation = False
         self._conversation_model = ConversationViewModel()
+        self._self_turn_observers: list[Callable[[SelfTurnPresentation, str], None]] = []
 
         # Log buffer and throttling state
         self._model = LiveLogViewModel()
@@ -486,6 +488,12 @@ class LogsView(ft.Column):
     def conversation_records(self) -> tuple[ConversationRecord, ...]:
         return tuple(self._conversation_model.records)
 
+    def observe_self_turns(
+        self, callback: Callable[[SelfTurnPresentation, str], None]
+    ) -> Callable[[], None]:
+        self._self_turn_observers.append(callback)
+        return lambda: self._self_turn_observers.remove(callback)
+
     def append_conversation_record(
         self,
         *,
@@ -534,6 +542,8 @@ class LogsView(ft.Column):
 
     def update_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
         self._conversation_model.update_self_turn(snapshot, source=source)
+        for callback in tuple(self._self_turn_observers):
+            callback(snapshot, source)
         if self._showing_conversation:
             self._render_conversation_text()
             if self._log_text is not None:

@@ -121,6 +121,13 @@ class STTProviderTurnTerminal:
     is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
 
 
+class STTScopedWriteFailure(RuntimeError):
+    def __init__(self, terminal: STTProviderTurnTerminal, cause: BaseException | None) -> None:
+        super().__init__(terminal.failure_reason or "provider_write_failed")
+        self.terminal = terminal
+        self.__cause__ = cause
+
+
 _ProviderEvent = TypeVar("_ProviderEvent")
 
 
@@ -310,7 +317,7 @@ class STTScopedTurnSession(Protocol):
         observed_trailing_silence_ms: int | None,
     ) -> None: ...
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None: ...
-    async def turn_events(self) -> AsyncIterator[STTProviderTurnEvent]: ...
+    def turn_events(self) -> AsyncIterator[STTProviderTurnEvent]: ...
     async def stop(self) -> None: ...
     async def close(self) -> None: ...
 

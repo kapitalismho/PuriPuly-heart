@@ -77,7 +77,7 @@ impl QuietTailProfile {
     }
 }
 
-pub const EXPECTED_CONTRACT_VERSION: u32 = 16;
+pub const EXPECTED_CONTRACT_VERSION: u32 = 17;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

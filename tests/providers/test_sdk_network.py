@@ -343,5 +343,3 @@ async def test_genai_live_same_route_relative_redirect_retains_sdk_flow(
         assert requests[-1].headers["x-goog-api-key"] == "test-key"
         assert "setup" in messages[0]
         assert messages[1]["realtime_input"]["audio"]["data"] == "AAA="
-
-

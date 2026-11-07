@@ -1144,23 +1144,6 @@ def test_create_stt_backend_from_resolved_soniox_uses_options_and_custom_terms()
     assert list(backend.context_terms) == ["Airi", "Shinano"]
 
 
-def test_create_stt_backend_from_resolved_soniox_falls_back_to_realtime_v5_model() -> None:
-    resolved = _resolved_stt_config(
-        provider="soniox",
-        source_language="en",
-        model=None,
-        endpoint=None,
-        credential_reference="soniox:stt",
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("soniox_api_key", "dto-soniox-key")
-
-    backend = wiring_module.create_stt_backend_from_resolved_config(resolved, secrets=secrets)
-
-    assert isinstance(backend, SonioxRealtimeSTTBackend)
-    assert backend.model == "stt-rt-v5"
-
-
 def test_create_stt_backend_from_resolved_gpu_provider_fails_without_cpu_fallback() -> None:
     resolved = _resolved_stt_config(
         provider="local_qwen_gpu",

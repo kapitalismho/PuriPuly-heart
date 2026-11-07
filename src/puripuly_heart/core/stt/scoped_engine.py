@@ -39,6 +39,7 @@ from puripuly_heart.core.stt.backend import (
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
     STTScopedTurnSession,
+    STTScopedWriteFailure,
     scoped_event_for_delivery,
 )
 from puripuly_heart.core.stt.diagnostics import recognition_cause, recognition_failure_diagnostics
@@ -98,6 +99,10 @@ def _log_recognition_terminal(
 STTScopedSessionFactory = Callable[
     [AudioSegmentSettingsSnapshot, str],
     Awaitable[STTScopedTurnSession],
+]
+STTProbeSessionFactory = Callable[
+    [AudioSegmentSettingsSnapshot, str],
+    Awaitable[tuple[STTScopedTurnSession, str]],
 ]
 STTScopedTurnEventSink = Callable[[STTProviderTurnEvent], Awaitable[None] | None]
 STTScopedDiagnosticSink = Callable[[object], Awaitable[None] | None]
@@ -218,6 +223,9 @@ class ScopedRecognitionEngine:
         Callable[[Exception | ErrorDiagnostics], Awaitable[None] | None] | None
     ) = None
     session_lifetime_enabled: bool = True
+    probe_session_factory: STTProbeSessionFactory | None = None
+    probe_settings: AudioSegmentSettingsSnapshot | None = None
+    probe_sessions: list[STTScopedTurnSession] = field(init=False, default_factory=list, repr=False)
     exclusive_provider_ids: frozenset[str] = frozenset(
         {
             "local_cpu_auto",
@@ -319,6 +327,7 @@ class ScopedRecognitionEngine:
         repr=False,
     )
     _event_dispatching: bool = field(init=False, default=False, repr=False)
+    _event_delivery_failed: bool = field(init=False, default=False, repr=False)
     _event_drained: asyncio.Event = field(init=False, repr=False)
     _backend_closed: bool = field(init=False, default=False, repr=False)
     _backend_close_task: asyncio.Task[None] | None = field(
@@ -351,10 +360,11 @@ class ScopedRecognitionEngine:
             sum(not task.done() for task in self._cleanup_tasks)
             + sum(not task.done() for task in self._factory_tasks)
             + int(self._quarantined_session is not None)
+            + len(self.probe_sessions)
         )
         if session_debt:
             return session_debt
-        return int(self._backend_close_task is not None and not self._backend_close_task.done())
+        return int(self._backend_close_task is not None)
 
     @property
     def is_at_utterance_boundary(self) -> bool:
@@ -392,10 +402,12 @@ class ScopedRecognitionEngine:
         self._deferred_event_sink = sink
         task = self._event_dispatch_task
         if task is None or task.done():
+            self._event_delivery_failed = False
             self._event_dispatch_task = asyncio.create_task(
                 self._dispatch_events(),
                 name="scoped-stt-output",
             )
+            self._event_dispatch_task.add_done_callback(self._consume_task_result)
 
     async def wait_for_event_ingress_drain(self) -> None:
         await self._event_drained.wait()
@@ -881,6 +893,7 @@ class ScopedRecognitionEngine:
         ):
             self._delivery_generation += 1
         self._authority_generation += 1
+        self._revoke_soniox_admission()
         if reason in {
             "cancelled",
             "closed",
@@ -991,20 +1004,34 @@ class ScopedRecognitionEngine:
 
     async def close_backend(self) -> None:
         await self.close()
+        for session in tuple(self.probe_sessions):
+            await session.close()
+            self.probe_sessions.remove(session)
         if self._backend_closed:
             return
-        self._backend_closed = True
-        if self.backend_close is None:
-            return
-        task = asyncio.create_task(
-            self._close_backend_after_cleanup(),
-            name="scoped-stt-backend-close",
-        )
-        self._backend_close_task = task
-        task.add_done_callback(self._backend_close_done)
+        task = self._backend_close_task
+        if task is None or task.done():
+            if self.backend_close is None:
+                self._backend_closed = True
+                return
+            task = asyncio.create_task(
+                self._close_backend_after_cleanup(),
+                name="scoped-stt-backend-close",
+            )
+            self._backend_close_task = task
+            task.add_done_callback(self._backend_close_done)
         done, _pending = await asyncio.wait({task}, timeout=self.event_drain_timeout_s)
         if task in done:
             self._consume_task_result(task)
+
+    async def close_backend_and_wait(self) -> None:
+        await self.close_backend()
+        task = self._backend_close_task
+        if task is not None:
+            await asyncio.shield(task)
+            if self._backend_close_task is task:
+                self._backend_closed = True
+                self._backend_close_task = None
 
     async def _handle_start(
         self,
@@ -2040,13 +2067,28 @@ class ScopedRecognitionEngine:
             task.result()
         except BaseException as exc:
             if self._has_write_authority(session, turn):
-                self._set_turn_failure(
-                    turn,
-                    f"provider_{operation}_failed",
-                    exception=exc,
-                    operation=operation,
-                    failure_retryable=isinstance(exc, OSError),
-                )
+                recovered = False
+                if (
+                    turn.settings.provider_id == "soniox"
+                    and isinstance(exc, STTScopedWriteFailure)
+                    and exc.terminal.identity == turn.identity
+                ):
+                    try:
+                        terminal = turn.normalizer.apply_terminal(exc.terminal)
+                    except STTNormalizationError:
+                        pass
+                    else:
+                        if not turn.terminal_ready.done():
+                            turn.terminal_ready.set_result(terminal)
+                        recovered = True
+                if not recovered:
+                    self._set_turn_failure(
+                        turn,
+                        f"provider_{operation}_failed",
+                        exception=exc,
+                        operation=operation,
+                        failure_retryable=isinstance(exc, OSError),
+                    )
                 turn.write_failed = True
                 self._retire_current_session(turn.watchdogs)
             return False
@@ -2694,6 +2736,15 @@ class ScopedRecognitionEngine:
                 self._lifetime_task = None
                 self._lifetime_deadline_s = None
 
+    def _revoke_soniox_admission(self) -> None:
+        self._event_buffer.wake_admission()
+        if self._session_scope is None or self._session_scope[0] != "soniox":
+            return
+        self._event_buffer.discard_updates()
+        revoke = getattr(self._session, "revoke_event_admission", None)
+        if revoke is not None:
+            revoke()
+
     def _cancel_lifetime_check(self) -> None:
         task = self._lifetime_task
         self._lifetime_task = None
@@ -2705,7 +2756,7 @@ class ScopedRecognitionEngine:
         if (
             isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal)
             and event.identity.settings_scope
-            and event.identity.settings_scope[0] == "qwen_audio"
+            and event.identity.settings_scope[0] in {"qwen_audio", "soniox"}
             and not (isinstance(event, STTProviderTurnTerminal) and event.outcome == "cancelled")
         ):
             generation = self._delivery_generation
@@ -2722,8 +2773,29 @@ class ScopedRecognitionEngine:
                 self._record_delivery_failure(exc, getattr(event, "identity", None))
                 raise
             return
+        soniox = (
+            isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal)
+            and bool(event.identity.settings_scope)
+            and event.identity.settings_scope[0] == "soniox"
+        )
+        if soniox and not (
+            isinstance(event, STTProviderTurnTerminal) and event.outcome == "cancelled"
+        ):
+            if self._event_delivery_failed:
+                raise RuntimeError("provider_event_delivery_failed")
+            admitted = await self._event_buffer.wait_for_capacity(
+                event,
+                is_current=lambda: (
+                    not self._event_delivery_failed
+                    and (event.is_current is None or event.is_current())
+                ),
+            )
+            if not admitted:
+                event = scoped_event_for_delivery(event)
+                if event is None:
+                    return
         self._event_drained.clear()
-        accepted = self._event_buffer.put(event)
+        accepted = self._event_buffer.put(event, preserve_observations=soniox)
         if not accepted and isinstance(
             event, (STTRecognitionUnitTerminal, STTProviderInputTerminal)
         ):
@@ -2771,6 +2843,22 @@ class ScopedRecognitionEngine:
                     ),
                 )
                 emit_failure(logger, diagnostics, stage="event_loop")
+                self._event_delivery_failed = True
+                self._event_buffer.wake_admission()
+                failed_soniox = (
+                    isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal)
+                    and bool(event.identity.settings_scope)
+                    and event.identity.settings_scope[0] == "soniox"
+                )
+                if failed_soniox:
+                    self._event_buffer.discard_updates(epoch_id=event.identity.provider_epoch_id)
+                if (self._session_scope is not None and self._session_scope[0] == "soniox") or (
+                    failed_soniox and self._session_scope is None
+                ):
+                    self._revoke_soniox_admission()
+                    await self.abort(
+                        reason="provider_event_delivery_failed", failure_diagnostics=diagnostics
+                    )
                 raise
             finally:
                 self._event_dispatching = False
@@ -2895,7 +2983,8 @@ class ScopedRecognitionEngine:
             await close_result
 
     def _backend_close_done(self, task: asyncio.Task[None]) -> None:
-        if self._backend_close_task is task:
+        if self._backend_close_task is task and not task.cancelled() and task.exception() is None:
+            self._backend_closed = True
             self._backend_close_task = None
         self._observe_cleanup_task(task)
 

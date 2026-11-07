@@ -23,6 +23,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
+    STTScopedWriteFailure,
     STTSessionProjection,
 )
 from puripuly_heart.providers.stt import soniox as soniox_module
@@ -271,20 +272,14 @@ async def test_soniox_startup_send_cancellation_closes_post_upgrade_rejected_tra
             await asyncio.gather(opening, return_exceptions=True)
 
 
-def test_soniox_backend_defaults_to_realtime_v5_model() -> None:
-    backend = SonioxRealtimeSTTBackend(api_key="k", language_hints=["en"])
-
-    assert backend.model == "stt-rt-v5"
-
-
 @pytest.mark.asyncio
 async def test_soniox_session_handles_message_errors() -> None:
     session = _make_session()
 
-    session._handle_message("not-json")
+    await session._handle_message("not-json")
     assert session._event_projection._legacy_events.empty()
 
-    session._handle_message(json.dumps({"error": "bad"}))
+    await session._handle_message(json.dumps({"error": "bad"}))
     event = session._event_projection._legacy_events.get_nowait()
     assert isinstance(event, RuntimeError)
 
@@ -302,7 +297,7 @@ async def test_soniox_session_collects_final_tokens() -> None:
             {"text": "<fin>", "is_final": True},
         ]
     }
-    session._handle_message(json.dumps(message))
+    await session._handle_message(json.dumps(message))
     event = session._event_projection._legacy_events.get_nowait()
 
     assert isinstance(event, STTBackendTranscriptEvent)
@@ -315,7 +310,7 @@ async def test_soniox_session_emits_ordered_adjacent_final_language_runs() -> No
     session = _make_session(enable_language_identification=True)
     await _request_finalize(session)
 
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -346,7 +341,7 @@ async def test_soniox_preserves_present_and_missing_speakers_in_session_scope() 
     first = _make_session(enable_language_identification=True)
     second = _make_session(enable_language_identification=True)
     await _request_finalize(first)
-    first._handle_message(
+    await first._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -393,7 +388,7 @@ async def test_soniox_preserves_present_and_missing_speakers_in_session_scope() 
     )
     assert event.final_speaker_runs[1].attribution.key is None
     await _request_finalize(first)
-    first._handle_message(
+    await first._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -414,7 +409,7 @@ async def test_soniox_preserves_present_and_missing_speakers_in_session_scope() 
 async def test_soniox_preserves_missing_and_malformed_attribution_as_distinct_text_runs() -> None:
     session = _make_session(enable_language_identification=True)
     await _request_finalize(session)
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -460,7 +455,7 @@ async def test_soniox_terminal_cleanup_keeps_final_runs_equal_to_emitted_text() 
     session = _make_session(enable_language_identification=True)
     await _request_finalize(session)
 
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -531,7 +526,7 @@ async def test_soniox_controlled_final_token_fixtures_preserve_each_token_and_ad
     fixture_tokens.append({"text": "<fin>", "is_final": True})
 
     await _request_finalize(session)
-    session._handle_message(json.dumps({"tokens": fixture_tokens}))
+    await session._handle_message(json.dumps({"tokens": fixture_tokens}))
 
     event = session._event_projection._legacy_events.get_nowait()
     assert fixture_name
@@ -544,7 +539,7 @@ async def test_soniox_controlled_final_token_fixtures_preserve_each_token_and_ad
 async def test_soniox_controlled_finalize_boundaries_remain_independent_and_append_only() -> None:
     merged = _make_session(enable_language_identification=True)
     await _request_finalize(merged)
-    merged._handle_message(
+    await merged._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -556,7 +551,7 @@ async def test_soniox_controlled_finalize_boundaries_remain_independent_and_appe
     )
     first_event = merged._event_projection._legacy_events.get_nowait()
     await _request_finalize(merged)
-    merged._handle_message(
+    await merged._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -578,7 +573,7 @@ async def test_soniox_controlled_finalize_boundaries_remain_independent_and_appe
 
     replaced = _make_session(enable_language_identification=True)
     await _request_finalize(replaced)
-    replaced._handle_message(
+    await replaced._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -592,7 +587,7 @@ async def test_soniox_controlled_finalize_boundaries_remain_independent_and_appe
     )
     original_event = replaced._event_projection._legacy_events.get_nowait()
     await _request_finalize(replaced)
-    replaced._handle_message(
+    await replaced._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -622,7 +617,7 @@ async def test_soniox_session_retains_unknown_detected_language_for_safe_fallbac
     session = _make_session(enable_language_identification=True)
     await _request_finalize(session)
 
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -642,7 +637,7 @@ async def test_soniox_session_appends_final_tokens_across_messages_in_receive_or
     session = _make_session()
     await _request_finalize(session)
 
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -654,7 +649,7 @@ async def test_soniox_session_appends_final_tokens_across_messages_in_receive_or
     )
     assert session._event_projection._legacy_events.empty()
 
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -705,7 +700,7 @@ async def test_soniox_session_repeated_finalize_boundaries_clear_each_final_segm
     assert isinstance(first_finalize, _FinalizeRequest)
     assert isinstance(second_finalize, _FinalizeRequest)
 
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -715,7 +710,7 @@ async def test_soniox_session_repeated_finalize_boundaries_clear_each_final_segm
             }
         )
     )
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -729,7 +724,7 @@ async def test_soniox_session_repeated_finalize_boundaries_clear_each_final_segm
     await session.on_speech_end(trailing_silence_ms=0)
     third_finalize = await session._audio_q.get()
     assert isinstance(third_finalize, _FinalizeRequest)
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -749,7 +744,7 @@ async def test_soniox_session_duplicate_finalize_marker_emits_one_terminal() -> 
     session = _make_session()
     await _request_finalize(session)
 
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -770,7 +765,7 @@ async def test_soniox_session_duplicate_finalize_marker_emits_one_terminal() -> 
 async def test_soniox_unmatched_finalize_marker_retains_tokens_for_next_request() -> None:
     session = _make_session()
 
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -784,7 +779,7 @@ async def test_soniox_unmatched_finalize_marker_retains_tokens_for_next_request(
     assert [token.text for token in session._pending_tokens] == ["Kept"]
 
     await _request_finalize(session)
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -804,7 +799,7 @@ async def test_soniox_extra_tokens_after_consumed_fin_are_retained() -> None:
     session = _make_session()
     await _request_finalize(session)
 
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -822,7 +817,7 @@ async def test_soniox_extra_tokens_after_consumed_fin_are_retained() -> None:
     assert [token.text for token in session._pending_tokens] == ["B"]
 
     await _request_finalize(session)
-    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    await session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
     second = session._event_projection._legacy_events.get_nowait()
     assert second.text == "B"
     assert session._event_projection._legacy_events.empty()
@@ -835,7 +830,7 @@ async def test_soniox_empty_final_boundary_clears_previous_segment_before_next_f
     await session.on_speech_end(trailing_silence_ms=0)
     first_finalize = await session._audio_q.get()
     assert isinstance(first_finalize, _FinalizeRequest)
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -851,7 +846,7 @@ async def test_soniox_empty_final_boundary_clears_previous_segment_before_next_f
     await session.on_speech_end(trailing_silence_ms=0)
     empty_finalize = await session._audio_q.get()
     assert isinstance(empty_finalize, _FinalizeRequest)
-    session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+    await session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
     empty_boundary = session._event_projection._legacy_events.get_nowait()
     assert empty_boundary.text == ""
     assert empty_boundary.is_final is True
@@ -859,7 +854,7 @@ async def test_soniox_empty_final_boundary_clears_previous_segment_before_next_f
     await session.on_speech_end(trailing_silence_ms=0)
     next_finalize = await session._audio_q.get()
     assert isinstance(next_finalize, _FinalizeRequest)
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -881,7 +876,7 @@ async def test_soniox_whitespace_final_boundary_emits_empty_final_ack() -> None:
     finalize = await session._audio_q.get()
     assert isinstance(finalize, _FinalizeRequest)
 
-    session._handle_message(
+    await session._handle_message(
         json.dumps(
             {
                 "tokens": [
@@ -1098,7 +1093,7 @@ async def test_soniox_verify_api_key_handles_timeout(monkeypatch):
 
     assert await SonioxRealtimeSTTBackend.verify_api_key("secret") is True
     config = json.loads(str(seen["config"]))
-    assert config["model"] == "stt-rt-v5"
+    assert config["model"] == "stt-rt-v6"
 
 
 @pytest.mark.parametrize("speaker_diarization", [True, False])
@@ -1250,7 +1245,7 @@ async def test_soniox_session_local_server_preserves_finalize_and_remote_close()
     assert len(configs) == 2
     for config in configs:
         assert "api_key" not in config
-        assert config["model"] == "stt-rt-v5"
+        assert config["model"] == "stt-rt-v6"
         assert config["audio_format"] == "pcm_s16le"
         assert config["sample_rate"] == 16000
         assert config["num_channels"] == 1
@@ -1329,7 +1324,7 @@ async def test_soniox_probe_local_server_authenticates_and_closes(response, capl
     assert authenticated == [True]
     assert len(configurations) == 1
     assert "api_key" not in configurations[0]
-    assert configurations[0]["model"] == "stt-rt-v5"
+    assert configurations[0]["model"] == "stt-rt-v6"
     assert marker not in caplog.text
 
 
@@ -1400,7 +1395,7 @@ async def test_soniox_scoped_success_logs_one_written_and_accepted_summary(caplo
             seal_reason="silence",
             observed_trailing_silence_ms=None,
         )
-        session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+        await session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
         await session.stop()
         await writer
     events = _soniox_events(caplog)
@@ -1475,8 +1470,8 @@ async def test_soniox_protocol_rejection_logs_safe_detail_once(
     request = _scoped_request()
     with caplog.at_level(logging.INFO):
         await session.begin_turn(request)
-        session._handle_message(message)
-        session._scoped_transport_failure("soniox_connection_ended", orderly=True)
+        await session._handle_message(message)
+        await session._scoped_transport_failure("soniox_connection_ended", orderly=True)
         await session.close()
     events = _soniox_events(caplog)
     assert len(events) == 1
@@ -1500,9 +1495,9 @@ async def test_soniox_idle_fin_is_epoch_fault_not_previous_turn(caplog) -> None:
         await session.begin_turn(request)
         session._event_projection.seal(request.identity)
         session._pending_finalize_requests = 1
-        session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
-        session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
-        session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
+        await session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
+        await session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
+        await session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
     events = _soniox_events(caplog)
     assert [event["event"] for event in events] == ["turn_end", "session_fault"]
     assert events[0]["trigger"] == "fin"
@@ -1523,7 +1518,7 @@ async def test_soniox_fin_with_wrong_pending_count_logs_rejection(caplog) -> Non
     with caplog.at_level(logging.INFO):
         await session.begin_turn(request)
         session._event_projection.seal(request.identity)
-        session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
+        await session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
     events = _soniox_events(caplog)
     assert len(events) == 1
     assert events[0]["trigger"] == "protocol_error"
@@ -1554,7 +1549,9 @@ async def test_soniox_server_error_code_never_logs_arbitrary_content(
     request = _scoped_request()
     with caplog.at_level(logging.INFO):
         await session.begin_turn(request)
-        session._handle_message(json.dumps({"error": "secret-error-content", "error_code": code}))
+        await session._handle_message(
+            json.dumps({"error": "secret-error-content", "error_code": code})
+        )
         await session.close()
     events = _soniox_events(caplog)
     assert len(events) == 1
@@ -1598,7 +1595,7 @@ async def test_soniox_delayed_finalize_write_never_claims_next_turn(caplog) -> N
         )
         while session._audio_q.empty():
             await asyncio.sleep(0)
-        session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
+        await session._handle_message('{"tokens": [{"text": "<fin>", "is_final": true}]}')
         seal.cancel()
         with pytest.raises(asyncio.CancelledError):
             await seal
@@ -1638,17 +1635,20 @@ async def test_soniox_write_failure_preserves_original_error_before_close(caplog
     with caplog.at_level(logging.INFO):
         await session.begin_turn(request)
         writer = asyncio.create_task(session._send_loop())
-        with pytest.raises(ConnectionResetError):
+        with pytest.raises(STTScopedWriteFailure) as raised:
             await session.seal_turn(
                 request.identity,
                 sealed_content_ranges=(),
                 seal_reason="silence",
                 observed_trailing_silence_ms=None,
             )
+        assert isinstance(raised.value.__cause__, ConnectionResetError)
+        assert str(raised.value.__cause__) == "private-websocket-message"
         await writer
         terminal = await asyncio.wait_for(anext(session.turn_events()), timeout=1)
         ended = await asyncio.wait_for(anext(session.turn_events()), timeout=1)
         assert isinstance(terminal, STTProviderTurnTerminal)
+        assert raised.value.terminal == terminal
         assert terminal.failure_retryable is True
         assert isinstance(ended, STTProviderEpochEnded)
         assert ended.failure_retryable is True

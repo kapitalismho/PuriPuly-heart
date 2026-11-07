@@ -367,8 +367,16 @@ pub const OPENVR_EVENT_DRIVER_REQUESTED_QUIT: u32 = 704;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenVrEventClass {
     Fatal,
+    StopRequested(RuntimeStopReason),
     Reconfigure,
     Ignore,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeStopReason {
+    RuntimeQuit,
+    DriverRequestedQuit,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -417,7 +425,10 @@ impl OpenVrRuntimeEvent {
 
     pub fn classify(self) -> OpenVrEventClass {
         match self {
-            Self::Quit | Self::DriverRequestedQuit => OpenVrEventClass::Fatal,
+            Self::Quit => OpenVrEventClass::StopRequested(RuntimeStopReason::RuntimeQuit),
+            Self::DriverRequestedQuit => {
+                OpenVrEventClass::StopRequested(RuntimeStopReason::DriverRequestedQuit)
+            }
             Self::ProcessQuit { pid, .. } if pid != 0 && pid == std::process::id() => {
                 OpenVrEventClass::Fatal
             }
@@ -465,6 +476,14 @@ pub trait OverlayFrameSubmitter {
     fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
         let _ = max_events;
         Vec::new()
+    }
+
+    fn acknowledge_quit_exiting(&mut self) -> Result<(), OpenVrError> {
+        Ok(())
+    }
+
+    fn release_resources(&mut self) -> Result<(), OpenVrError> {
+        Ok(())
     }
 
     fn sample_frame_timing(&self) -> Option<FrameTimingSample> {
@@ -678,6 +697,14 @@ impl OverlayFrameSubmitter for OpenVrOverlay {
 
     fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
         self.backend.poll_runtime_events(max_events)
+    }
+
+    fn acknowledge_quit_exiting(&mut self) -> Result<(), OpenVrError> {
+        self.backend.acknowledge_quit_exiting()
+    }
+
+    fn release_resources(&mut self) -> Result<(), OpenVrError> {
+        self.backend.release_resources()
     }
 
     fn sample_frame_timing(&self) -> Option<FrameTimingSample> {
@@ -992,6 +1019,24 @@ impl OpenVrBackend {
         }
     }
 
+    fn acknowledge_quit_exiting(&mut self) -> Result<(), OpenVrError> {
+        match self {
+            #[cfg(windows)]
+            Self::Windows(openvr) => openvr.acknowledge_quit_exiting(),
+            #[cfg(not(windows))]
+            Self::Test(openvr) => openvr.acknowledge_quit_exiting(),
+        }
+    }
+
+    fn release_resources(&mut self) -> Result<(), OpenVrError> {
+        match self {
+            #[cfg(windows)]
+            Self::Windows(openvr) => openvr.release_resources(),
+            #[cfg(not(windows))]
+            Self::Test(openvr) => openvr.release_resources(),
+        }
+    }
+
     fn display_refresh_rate_hz(&self) -> Option<f32> {
         match self {
             #[cfg(windows)]
@@ -1137,6 +1182,32 @@ impl WindowsOpenVrOverlay {
         Some(unsafe { is_visible(self.overlay_handle) })
     }
 
+    fn acknowledge_quit_exiting(&mut self) -> Result<(), OpenVrError> {
+        let acknowledge = self
+            .system_api()
+            .AcknowledgeQuit_Exiting
+            .ok_or_else(|| OpenVrError::Submit("AcknowledgeQuit_Exiting unavailable".into()))?;
+        unsafe { acknowledge() };
+        Ok(())
+    }
+
+    fn release_resources(&mut self) -> Result<(), OpenVrError> {
+        if self.overlay_api.is_null() {
+            return Ok(());
+        }
+        let result = self
+            .overlay_api()
+            .DestroyOverlay
+            .ok_or_else(missing_overlay_method("DestroyOverlay"))
+            .and_then(|destroy| {
+                let error = unsafe { destroy(self.overlay_handle) };
+                map_overlay_init_error(self.overlay_api(), "DestroyOverlay", error)
+            });
+        self.overlay_api = std::ptr::null_mut();
+        self.system_api = std::ptr::null_mut();
+        self.compositor_api = None;
+        result
+    }
     fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
         let mut events = Vec::new();
         if max_events == 0 {
@@ -1477,14 +1548,7 @@ impl OverlayFrameSubmitter for FakeOpenVr {
 #[cfg(windows)]
 impl Drop for WindowsOpenVrOverlay {
     fn drop(&mut self) {
-        if self.overlay_api.is_null() {
-            return;
-        }
-        if let Some(destroy_overlay) = self.overlay_api().DestroyOverlay {
-            unsafe {
-                destroy_overlay(self.overlay_handle);
-            }
-        }
+        let _ = self.release_resources();
     }
 }
 
@@ -2120,10 +2184,13 @@ mod tests {
     #[test]
     fn openvr_runtime_events_classify_fatal_reconfigure_and_ignore() {
         for (event, class) in [
-            (OpenVrRuntimeEvent::Quit, OpenVrEventClass::Fatal),
+            (
+                OpenVrRuntimeEvent::Quit,
+                OpenVrEventClass::StopRequested(super::RuntimeStopReason::RuntimeQuit),
+            ),
             (
                 OpenVrRuntimeEvent::DriverRequestedQuit,
-                OpenVrEventClass::Fatal,
+                OpenVrEventClass::StopRequested(super::RuntimeStopReason::DriverRequestedQuit),
             ),
             (
                 OpenVrRuntimeEvent::OverlayShown,
@@ -2216,12 +2283,12 @@ mod tests {
                 (
                     OPENVR_EVENT_QUIT,
                     OpenVrRuntimeEvent::Quit,
-                    OpenVrEventClass::Fatal,
+                    OpenVrEventClass::StopRequested(super::RuntimeStopReason::RuntimeQuit),
                 ),
                 (
                     OPENVR_EVENT_DRIVER_REQUESTED_QUIT,
                     OpenVrRuntimeEvent::DriverRequestedQuit,
-                    OpenVrEventClass::Fatal,
+                    OpenVrEventClass::StopRequested(super::RuntimeStopReason::DriverRequestedQuit),
                 ),
                 (
                     OPENVR_EVENT_OVERLAY_SHOWN,

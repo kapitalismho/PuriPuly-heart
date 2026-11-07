@@ -1,0 +1,35 @@
+{
+  "name": "puripuly-heart-agent-relay",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-08",
+  "compatibility_flags": ["enable_request_signal"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "rules": [
+    { "type": "Text", "globs": ["**/*.md?raw"], "fallthrough": true }
+  ],
+  "observability": {
+    "enabled": false
+  },
+  "secrets": {
+    "required": ["OPENAI_API_KEY", "PURI_TOKEN_SECRET"]
+  },
+  "vars": {
+    "AGENT_SERVICE_ENABLED": "false",
+    "SUPPORT_REPORTS_ENABLED": "false"
+  },
+  "d1_databases": [
+    {
+      "binding": "AGENT_USAGE_DB",
+      "database_name": "puripuly-heart-agent-usage",
+      "database_id": "REQUIRED_AT_DEPLOY_TIME",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "SUPPORT_REPORTS",
+      "bucket_name": "puripuly-heart-support-reports"
+    }
+  ]
+}
