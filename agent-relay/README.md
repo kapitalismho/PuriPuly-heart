@@ -2,7 +2,7 @@
 
 Puri's model-request service: a TypeScript Cloudflare Worker with D1 usage accounting and optional R2 support storage. Python owns conversations, app context, and tool execution; Relay owns model requests, instructions, and tool definitions. [Broker](../broker/README.md) supplies installation authentication.
 
-This guide covers service boundaries and development/deployment entry points. Request schemas, policy values, and evaluation details belong in the [owning implementation](#source-map) and [content decisions](prompts/agent/decisions.md). See the [architecture](../docs/architecture.md#agent-conversation) for application ownership and [Privacy Policy](../PRIVACY.md#6-puri-assistant-and-voluntary-support-reports) for data handling.
+This guide covers service boundaries and development/deployment entry points. Request schemas, policy values, and evaluation details belong in the [owning implementation](#source-map). See the [architecture](../docs/architecture.md#agent-conversation) for application ownership and [Privacy Policy](../PRIVACY.md#6-puri-assistant-and-voluntary-support-reports) for data handling.
 
 ## Scope and Boundaries
 
@@ -19,7 +19,7 @@ This guide covers service boundaries and development/deployment entry points. Re
 
 All user-facing language, register, length and formatting guidance lives in the system's `Identity and voice` section. Its style examples are grouped in English, Korean, Chinese and Japanese order, with Chinese kept as one group of the existing Simplified Chinese examples. Work, social and out-of-scope requests share that complete section; the user's requested response language and writing system, or their current message, choose the reply language and script rather than examples, UI settings or earlier conversation.
 
-The relay bundle contains the authoritative English sources; Python does not fetch or duplicate them. Prompt changes require rebuilding and restarting or deploying the Worker. App and Relay protocol changes must roll out together with fresh conversations. Content changes follow the existing [evaluation decisions](prompts/agent/decisions.md), not a new acceptance checklist in this README.
+The relay bundle contains the authoritative English sources; Python does not fetch or duplicate them. Prompt changes require rebuilding and restarting or deploying the Worker. App and Relay protocol changes must roll out together with fresh conversations.
 
 ## Authentication, Usage and Stop Control
 
@@ -121,7 +121,7 @@ uv run --no-sync python -m puripuly_heart.release_evidence.agent_chat_simulator 
 
 `smoke` uses controlled model responses. Live evaluation requires an isolated Relay/Broker and a context manifest from the [exact emitted Worker](operations/export-context.mjs). Freeze source, context, cases, and judge; preserve failed/blocked attempts and historical reports. Benchmark authentication is separate from the app's account. HTML export reads saved results without model calls or rejudgment.
 
-[Evaluation scope](https://github.com/kapitalismho/PuriPuly-heart/issues/332) and [owner decisions](prompts/agent/decisions.md) define the cases and accepted limits. Human calibration remains tracked in [#365](https://github.com/kapitalismho/PuriPuly-heart/issues/365); final GUI verification belongs to [#333](https://github.com/kapitalismho/PuriPuly-heart/issues/333).
+[Evaluation scope](https://github.com/kapitalismho/PuriPuly-heart/issues/332) defines the cases and accepted limits. Human calibration remains tracked in [#365](https://github.com/kapitalismho/PuriPuly-heart/issues/365); final GUI verification belongs to [#333](https://github.com/kapitalismho/PuriPuly-heart/issues/333).
 
 ## Source Map
 
