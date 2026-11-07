@@ -283,6 +283,7 @@ class PeerCaptionOwner:
         segment = self._segments.get(transcript.utterance_id)
         if not transcript.text.strip():
             if segment is not None and provider_id != "qwen_audio":
+                segment.caption.revision += 1
                 segment.partial = ""
                 segment.pending = None
                 if segment.preview_task is not None:

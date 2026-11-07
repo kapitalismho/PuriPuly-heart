@@ -1001,6 +1001,72 @@ async def test_retraction_cancels_running_preview_and_later_growth_can_progress(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("provider", ["soniox", "qwen_audio"])
+async def test_empty_partial_fences_late_preview_without_blocking_replacement(provider):
+    initial_tasks = asyncio.all_tasks()
+    harness, backend, events, clock = setup()
+    entered, cancelled, release = (asyncio.Event() for _ in range(3))
+    item = transcript("Old hypothesis", 1)
+    idle_waiter = None
+
+    async def late_translation(request):
+        backend.calls.append(request)
+        if request.text == item.text:
+            entered.set()
+            while not release.is_set():
+                try:
+                    await release.wait()
+                except asyncio.CancelledError:
+                    cancelled.set()
+        return Translation(
+            utterance_id=request.utterance_id,
+            text="translated:" + request.text,
+        )
+
+    backend.translate = late_translation
+    try:
+        await harness.start()
+        await partial(harness, item, provider=provider)
+        clock.advance(5)
+        await harness.peer_owner.cloud_captions.check_previews()
+        await asyncio.wait_for(entered.wait(), 1)
+        await partial(harness, replace(item, text=""), provider=provider)
+        if provider == "qwen_audio":
+            await turn_loop()
+            assert not cancelled.is_set()
+        else:
+            await asyncio.wait_for(cancelled.wait(), 1)
+
+        idle_waiter = asyncio.create_task(harness.peer_owner.cloud_captions.wait_for_idle())
+        await turn_loop()
+        assert not idle_waiter.done()
+        release.set()
+        await asyncio.wait_for(idle_waiter, 1)
+        await asyncio.wait_for(idle(harness), 1)
+        retained = [item.text] if provider == "qwen_audio" else []
+        assert [event.source_text for event in events] == retained
+
+        replacement = "A longer replacement hypothesis"
+        await partial(harness, replace(item, text=replacement), provider=provider)
+        clock.advance(4)
+        await harness.peer_owner.cloud_captions.check_previews()
+        await asyncio.wait_for(idle(harness), 1)
+        assert [event.source_text for event in events] == [*retained, replacement]
+        assert events[-1].type == "translation_stream_update"
+        assert events[-1].text == "translated:" + replacement
+        assert [request.text for request in backend.calls] == [item.text, replacement]
+        assert harness.peer_runtime.translation_history == []
+        assert harness.osc.messages == []
+    finally:
+        release.set()
+        if idle_waiter is not None:
+            await asyncio.wait_for(idle_waiter, 1)
+        await asyncio.wait_for(harness.stop(), 2)
+        await turn_loop()
+        assert not {task for task in asyncio.all_tasks() - initial_tasks if not task.done()}
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(("scale", "expected"), [(1.0, "repair"), (1.2, "continuation")])
 async def test_join_uses_supported_effective_calibration_scale_without_estimator_replacement(
     scale, expected
