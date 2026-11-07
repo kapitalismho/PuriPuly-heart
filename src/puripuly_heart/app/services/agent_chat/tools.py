@@ -63,7 +63,11 @@ def _approval_groups(changes: dict) -> list[dict]:
             if prefix not in coupled:
                 coupled.add(prefix)
                 blocks.append(
-                    {field: item for field, item in changes.items() if field.startswith(prefix + ".")}
+                    {
+                        field: item
+                        for field, item in changes.items()
+                        if field.startswith(prefix + ".")
+                    }
                 )
         elif key == "languages":
             blocks.extend({"languages": {field: item}} for field, item in value.items())
@@ -1123,7 +1127,9 @@ class AgentTools:
     ) -> dict:
         require_current()
         if proposal_id != self._proposal_id:
-            return _rejected("confirmation_unavailable", "This confirmation card is no longer active.")
+            return _rejected(
+                "confirmation_unavailable", "This confirmation card is no longer active."
+            )
         task = self._scope.create_task(
             self._apply(
                 changes,
@@ -1154,7 +1160,9 @@ class AgentTools:
         request_id = uuid4().hex
         require_current()
         if proposal_id != self._proposal_id:
-            return _rejected("confirmation_unavailable", "This confirmation card is no longer active.")
+            return _rejected(
+                "confirmation_unavailable", "This confirmation card is no longer active."
+            )
         try:
             receipt = await self._control.submit(
                 "settings.apply",

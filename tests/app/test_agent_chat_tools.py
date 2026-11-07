@@ -2469,9 +2469,9 @@ async def test_stopping_later_card_preserves_completed_changes_and_clears_remain
         if resolution == "decline":
             assert (await tools.confirm(card["id"], False))["status"] == "declined"
         elif resolution == "withdraw":
-            assert (
-                await tools.execute("withdraw_confirmation", {"card_id": card["id"]})
-            )["status"] == "withdrawn"
+            assert (await tools.execute("withdraw_confirmation", {"card_id": card["id"]}))[
+                "status"
+            ] == "withdrawn"
         else:
             tools.cancel_confirmation()
         assert tools.confirmation is None
