@@ -203,6 +203,8 @@ SELF translations can appear in the chatbox while a speech turn is still in prog
 
 SELF overlay captions keep one caption per speech turn. On the merged speech route, the original appears at a speech-end boundary, when a translation completes, or when the source closes—not on every stable recognition update. Resumed speech grows that caption in place, keeping its previous same-turn translation until the new one arrives. Late translations update retained captions without taking focus from newer speech; expired or displaced captions are not revived. Chatbox progression and PEER captions keep their existing policies.
 
+Cloud PEER captions do not publish late preview translations after recognition fully retracts the provisional text. Qwen's empty partial updates deliberately retain the last nonempty hypothesis instead. Retraction does not prevent a later valid replacement or authoritative final from being translated.
+
 ### If audio capture does not work
 If audio capture does not work, open **Settings > General** and follow these steps.
 
