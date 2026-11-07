@@ -149,3 +149,128 @@ def test_timeout_stops_process_tree(tmp_path: Path, runner: Path) -> None:
                     psutil.Process(int(pid_file.read_text())).kill()
                 except psutil.NoSuchProcess:
                     pass
+
+
+@pytest.fixture
+def isolated_runner(tmp_path: Path) -> Path:
+    script = tmp_path / "run-isolated.ps1"
+    script.write_text(
+        """param([string]$Source, [string]$Python, [string]$ArgumentsFile, [string]$StateRoot, [int]$TimeoutSeconds)
+$ErrorActionPreference = 'Stop'
+$tokens = $null
+$errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($Source, [ref]$tokens, [ref]$errors)
+if ($errors.Count) { throw ($errors | Out-String) }
+$function = $ast.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Invoke-IsolatedProcess'
+}, $true)
+. ([scriptblock]::Create($function.Extent.Text))
+$arguments = @(Get-Content -LiteralPath $ArgumentsFile -Raw -Encoding utf8 | ConvertFrom-Json)
+$result = Invoke-IsolatedProcess -FilePath $Python -ArgumentList $arguments -StateRoot $StateRoot -TimeoutSeconds $TimeoutSeconds
+$result | ConvertTo-Json -Compress
+""",
+        encoding="utf-8",
+    )
+    return script
+
+
+def _invoke_isolated(
+    runner: Path, state: Path, arguments: list[str], timeout: int = 15
+) -> subprocess.CompletedProcess:
+    arguments_file = runner.with_suffix(".json")
+    arguments_file.write_text(json.dumps(arguments), encoding="utf-8")
+    return subprocess.run(
+        [
+            str(POWERSHELL),
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(runner),
+            "-Source",
+            str(REPO_ROOT / "scripts/ci/build-native-release-artifacts.ps1"),
+            "-Python",
+            sys.executable,
+            "-ArgumentsFile",
+            str(arguments_file),
+            "-StateRoot",
+            str(state),
+            "-TimeoutSeconds",
+            str(timeout),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30,
+        check=False,
+    )
+
+
+def test_release_startup_uses_only_synthetic_state(
+    tmp_path: Path, isolated_runner: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("PURIPULY_TEST_PARENT_STATE", "must not escape")
+    state = tmp_path / "설정 with spaces"
+    completed = _invoke_isolated(
+        isolated_runner,
+        state,
+        [
+            "-c",
+            "import json, os; print(json.dumps({"
+            "'cwd': os.getcwd(), 'home': os.environ['USERPROFILE'],"
+            "'appdata': os.environ['APPDATA'], 'local': os.environ['LOCALAPPDATA'],"
+            "'inherited': os.environ.get('PURIPULY_TEST_PARENT_STATE')}))",
+        ],
+    )
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout.splitlines()[-1])
+    state_report = json.loads(result["Output"])
+    assert Path(state_report["cwd"]) == state
+    assert Path(state_report["home"]) == state / "profile"
+    assert Path(state_report["appdata"]) == state / "profile/appdata"
+    assert Path(state_report["local"]) == state / "profile/localappdata"
+    assert state_report["inherited"] is None
+
+
+def test_release_startup_failure_preserves_diagnostics(
+    tmp_path: Path, isolated_runner: Path
+) -> None:
+    completed = _invoke_isolated(
+        isolated_runner,
+        tmp_path / "state",
+        [
+            "-c",
+            "import sys; print('startup output'); print('startup error', file=sys.stderr); sys.exit(7)",
+        ],
+    )
+    assert completed.returncode != 0
+    assert "exit 7" in completed.stderr
+    assert "startup output" in completed.stderr
+    assert "startup error" in completed.stderr
+
+
+def test_release_startup_timeout_stops_the_process(tmp_path: Path, isolated_runner: Path) -> None:
+    pid_file = tmp_path / "startup.pid"
+    try:
+        completed = _invoke_isolated(
+            isolated_runner,
+            tmp_path / "state",
+            [
+                "-c",
+                "import os, pathlib, sys, time; pathlib.Path(sys.argv[1]).write_text(str(os.getpid())); time.sleep(60)",
+                str(pid_file),
+            ],
+            timeout=2,
+        )
+        assert completed.returncode != 0
+        assert "timed out after 2 seconds" in completed.stderr
+        pid = int(pid_file.read_text())
+        assert not psutil.pid_exists(pid)
+    finally:
+        if pid_file.exists():
+            try:
+                psutil.Process(int(pid_file.read_text())).kill()
+            except psutil.NoSuchProcess:
+                pass

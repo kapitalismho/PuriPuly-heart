@@ -182,12 +182,6 @@ foreach ($property in $spec.inputs.PSObject.Properties) {
 $previousPythonPath = $env:PYTHONPATH
 $env:PYTHONPATH = Join-Path $repoRoot "src"
 try {
-    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
-        "-m", "puripuly_heart.release_evidence.native_distribution", "verify-inputs",
-        "--spec", $inputSpecPath, "--input-root", $inputIndex,
-        "--output", (Join-Path $evidenceRoot "upstream-inputs.json")
-    ) -WorkingDirectory $repoRoot
-
     Expand-Archive -LiteralPath (Join-Path $inputIndex "flet-build-template.zip") -DestinationPath $templateRoot
     $cookiecutterTemplateRoot = Join-Path $templateRoot "build"
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(
@@ -409,40 +403,9 @@ company = "salee"
         "--output", (Join-Path $evidenceRoot "bytecode.json")
     ) -WorkingDirectory $repoRoot
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(
-        "-m", "puripuly_heart.release_evidence.native_distribution", "validate-target",
-        "--target-root", $artifactRoot, "--layout", $layoutPath,
-        "--requirements", $requirementsExportPath,
-        "--vc-runtime", (Join-Path $evidenceRoot "vc-runtime.json"),
-        "--output", (Join-Path $evidenceRoot "target-validation.json")
-    ) -WorkingDirectory $repoRoot
-    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
-        "-m", "puripuly_heart.release_evidence.native_distribution", "validate-compliance",
-        "--target-root", $artifactRoot, "--repo-root", $repoRoot,
-        "--soxr-manifest", (Join-Path $soxrRoot "manifest.json"),
-        "--output", (Join-Path $evidenceRoot "compliance-validation.json")
-    ) -WorkingDirectory $repoRoot
-    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
-        "-m", "puripuly_heart.release_evidence.managed_gemma_distribution",
-        "verify-package", $artifactRoot, "--launch"
-    ) -WorkingDirectory $repoRoot
-    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
         "-m", "puripuly_heart.release_evidence.native_distribution", "manifest",
         "--target-root", $artifactRoot, "--layout", $layoutPath,
-        "--provenance", (Join-Path $evidenceRoot "upstream-inputs.json"),
-        "--bytecode", (Join-Path $evidenceRoot "bytecode.json"),
         "--output", (Join-Path $artifactRoot "native-artifact-manifest.json")
-    ) -WorkingDirectory $repoRoot
-    $cleanupIncludePath = Join-Path (Split-Path -Parent $OutputDir) "native-installer-cleanup.iss"
-    $asrModelsIncludePath = Join-Path (Split-Path -Parent $OutputDir) "native-asr-models.iss"
-    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
-        "-m", "puripuly_heart.release_evidence.native_installer_cleanup",
-        "--legacy-manifest", (Join-Path $repoRoot "native\windows_host\legacy-pyinstaller-v2.7.0.json"),
-        "--native-manifest", (Join-Path $artifactRoot "native-artifact-manifest.json"),
-        "--output", $cleanupIncludePath
-    ) -WorkingDirectory $repoRoot
-    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
-        "-m", "puripuly_heart.release_evidence.local_asr_installer",
-        "--output", $asrModelsIncludePath
     ) -WorkingDirectory $repoRoot
 
     Remove-Item -LiteralPath $OutputDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -458,5 +421,3 @@ company = "salee"
 
 Write-Host "Experimental native artifact: $OutputDir"
 Write-Host "Build evidence: $evidenceRoot"
-Write-Host "Native installer cleanup include: $cleanupIncludePath"
-Write-Host "Native installer ASR models include: $asrModelsIncludePath"

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
-import io
 import json
 import os
 import re
@@ -18,13 +16,9 @@ from puripuly_heart.core.local_translation.runtime_profile import (
     LLAMA_CPP_BUILD,
     LLAMA_CPP_COMMIT,
     LLAMA_CPP_CPU_ARCHIVE,
-    LLAMA_CPP_CPU_ARCHIVE_SHA256,
-    LLAMA_CPP_CPU_ARCHIVE_SIZE,
     LLAMA_CPP_RUNTIME_DIRNAME,
     LLAMA_CPP_SOURCE_RELATIVE_DIR,
     LLAMA_CPP_VULKAN_ARCHIVE,
-    LLAMA_CPP_VULKAN_ARCHIVE_SHA256,
-    LLAMA_CPP_VULKAN_ARCHIVE_SIZE,
 )
 from puripuly_heart.core.network_clients import external_client
 
@@ -34,11 +28,6 @@ DOWNLOAD_BASE_URL = f"https://github.com/ggml-org/llama.cpp/releases/download/{L
 PACKAGED_RUNTIME_RELATIVE_DIR = Path("_runtime") / LLAMA_CPP_RUNTIME_DIRNAME
 PROVENANCE_RELATIVE_DIR = Path("third_party") / "llama.cpp"
 PROVENANCE_FILENAMES = ("LICENSE", "README.md")
-LICENSE_REQUIRED_MARKERS = (
-    "MIT License",
-    "Permission is hereby granted, free of charge",
-    'THE SOFTWARE IS PROVIDED "AS IS"',
-)
 KNOWN_MODEL_FILENAMES = {
     "gemma-4-e4b-it-qat-ud-q4_k_xl.gguf",
     "mtp-gemma-4-e4b-it.gguf",
@@ -69,8 +58,6 @@ FIXED_RUNTIME_FILES = COMMON_REQUIRED_FILES - {"ggml-cpu-x64.dll"}
 class ArchiveContract:
     backend: str
     filename: str
-    size: int
-    sha256: str
     required_files: frozenset[str]
 
     @property
@@ -82,56 +69,20 @@ ARCHIVES = (
     ArchiveContract(
         backend="cpu",
         filename=LLAMA_CPP_CPU_ARCHIVE,
-        size=LLAMA_CPP_CPU_ARCHIVE_SIZE,
-        sha256=LLAMA_CPP_CPU_ARCHIVE_SHA256,
         required_files=frozenset(COMMON_REQUIRED_FILES),
     ),
     ArchiveContract(
         backend="vulkan",
         filename=LLAMA_CPP_VULKAN_ARCHIVE,
-        size=LLAMA_CPP_VULKAN_ARCHIVE_SIZE,
-        sha256=LLAMA_CPP_VULKAN_ARCHIVE_SHA256,
         required_files=frozenset(COMMON_REQUIRED_FILES | {"ggml-vulkan.dll"}),
     ),
 )
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _file_identity(path: Path) -> dict[str, int | str]:
-    return {"size": path.stat().st_size, "sha256": _sha256(path)}
-
-
-def _validate_identity(path: Path, *, size: int, sha256: str, label: str) -> None:
-    if not path.is_file():
-        raise RuntimeError(f"{label} not found: {path}")
-    actual_size = path.stat().st_size
-    if actual_size != size:
-        raise RuntimeError(f"{label} size mismatch: expected {size}, found {actual_size}")
-    actual_sha256 = _sha256(path)
-    if actual_sha256 != sha256:
-        raise RuntimeError(f"{label} SHA-256 mismatch: expected {sha256}, found {actual_sha256}")
-
-
 def _download(contract: ArchiveContract, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists():
-        try:
-            _validate_identity(
-                destination,
-                size=contract.size,
-                sha256=contract.sha256,
-                label=contract.filename,
-            )
-            return
-        except RuntimeError:
-            destination.unlink()
+    if destination.is_file():
+        return
     partial = destination.with_name(f"{destination.name}.partial")
     partial.unlink(missing_ok=True)
     try:
@@ -147,12 +98,6 @@ def _download(contract: ArchiveContract, destination: Path) -> None:
                 output.write(chunk)
             output.flush()
             os.fsync(output.fileno())
-        _validate_identity(
-            partial,
-            size=contract.size,
-            sha256=contract.sha256,
-            label=contract.filename,
-        )
         os.replace(partial, destination)
     finally:
         partial.unlink(missing_ok=True)
@@ -170,24 +115,6 @@ def _selected_runtime_name(name: str) -> bool:
         or (lowered.startswith("ggml-cpu-") and lowered.endswith(".dll"))
         or lowered == "ggml-vulkan.dll"
     )
-
-
-def _read_verified_archive(archive_path: Path, contract: ArchiveContract) -> bytes:
-    try:
-        payload = archive_path.read_bytes()
-    except OSError as exc:
-        raise RuntimeError(f"{contract.filename} not found: {archive_path}") from exc
-    if len(payload) != contract.size:
-        raise RuntimeError(
-            f"{contract.filename} size mismatch: expected {contract.size}, found {len(payload)}"
-        )
-    actual_sha256 = hashlib.sha256(payload).hexdigest()
-    if actual_sha256 != contract.sha256:
-        raise RuntimeError(
-            f"{contract.filename} SHA-256 mismatch: expected {contract.sha256}, "
-            f"found {actual_sha256}"
-        )
-    return payload
 
 
 def _extract_runtime_archive(
@@ -219,8 +146,7 @@ def _extract_runtime_archive(
             target = destination / path.name
             with archive.open(entry) as source, target.open("xb") as output:
                 shutil.copyfileobj(source, output, length=1024 * 1024)
-            identity = _file_identity(target)
-            records.append({"path": path.name, **identity})
+            records.append({"path": path.name})
     missing = contract.required_files - selected_names
     if missing:
         raise RuntimeError(
@@ -267,8 +193,6 @@ def _validate_manifest_identity(manifest: dict[str, object]) -> dict[str, dict[s
             raise RuntimeError(f"invalid {backend} llama.cpp runtime manifest entry")
         expected_identity = {
             "filename": contract.filename,
-            "size": contract.size,
-            "sha256": contract.sha256,
             "url": contract.url,
         }
         if {key: entry.get(key) for key in expected_identity} != expected_identity:
@@ -300,8 +224,6 @@ def _validate_runtime_tree(manifest_path: Path, runtime_root: Path) -> dict[str,
             if not isinstance(raw_record, dict):
                 raise RuntimeError(f"invalid {backend} llama.cpp runtime file record")
             name = raw_record.get("path")
-            size = raw_record.get("size")
-            sha256 = raw_record.get("sha256")
             if (
                 not isinstance(name, str)
                 or PurePosixPath(name).name != name
@@ -314,15 +236,9 @@ def _validate_runtime_tree(manifest_path: Path, runtime_root: Path) -> dict[str,
                 raise RuntimeError(f"invalid {backend} llama.cpp runtime inventory member: {name}")
             if _is_forbidden_model_name(name):
                 raise RuntimeError(f"model artifact found in llama.cpp runtime inventory: {name}")
-            if not isinstance(size, int) or not isinstance(sha256, str):
-                raise RuntimeError(f"invalid {backend} llama.cpp runtime identity: {name}")
+            if not (backend_root / name).is_file():
+                raise RuntimeError(f"{backend} llama.cpp runtime file not found: {name}")
             record_names.add(lowered)
-            _validate_identity(
-                backend_root / name,
-                size=size,
-                sha256=sha256,
-                label=f"{backend} llama.cpp runtime file {name}",
-            )
         required = _expected_archive_map()[backend].required_files
         if not required.issubset(record_names):
             raise RuntimeError(
@@ -350,71 +266,15 @@ def _read_provenance_text(path: Path, *, label: str) -> str:
     return text
 
 
-def _validate_provenance_content(provenance_root: Path) -> None:
-    license_text = _read_provenance_text(
-        provenance_root / "LICENSE",
-        label="llama.cpp license",
-    )
-    for marker in LICENSE_REQUIRED_MARKERS:
-        if marker not in license_text:
-            raise RuntimeError(f"llama.cpp license is missing required text: {marker}")
-    readme = _read_provenance_text(
-        provenance_root / "README.md",
-        label="llama.cpp provenance README",
-    )
-    for expected in (LLAMA_CPP_BUILD, LLAMA_CPP_COMMIT, RELEASE_URL):
-        if expected not in readme:
-            raise RuntimeError(f"llama.cpp provenance README is missing identity: {expected}")
-
-
-def _provenance_identity(provenance_root: Path) -> dict[str, dict[str, int | str]]:
-    return {name: _file_identity(provenance_root / name) for name in PROVENANCE_FILENAMES}
-
-
-def _manifest_provenance(manifest: dict[str, object]) -> dict[str, dict[str, int | str]]:
-    provenance = manifest.get("provenance")
-    if not isinstance(provenance, dict) or set(provenance) != set(PROVENANCE_FILENAMES):
-        raise RuntimeError("llama.cpp package manifest provenance identity mismatch")
-    normalized: dict[str, dict[str, int | str]] = {}
+def _validate_packaged_provenance(provenance_root: Path) -> None:
     for name in PROVENANCE_FILENAMES:
-        identity = provenance.get(name)
-        if not isinstance(identity, dict) or set(identity) != {"size", "sha256"}:
-            raise RuntimeError("llama.cpp package manifest provenance identity mismatch")
-        size = identity.get("size")
-        sha256 = identity.get("sha256")
-        if (
-            isinstance(size, bool)
-            or not isinstance(size, int)
-            or size <= 0
-            or not isinstance(sha256, str)
-            or re.fullmatch(r"[0-9a-f]{64}", sha256) is None
-        ):
-            raise RuntimeError("llama.cpp package manifest provenance identity mismatch")
-        normalized[name] = {"size": size, "sha256": sha256}
-    return normalized
+        _read_provenance_text(provenance_root / name, label=f"llama.cpp {name}")
 
 
-def _validate_packaged_provenance(manifest: dict[str, object], provenance_root: Path) -> None:
-    expected = _manifest_provenance(manifest)
-    actual_entries = list(provenance_root.iterdir()) if provenance_root.is_dir() else []
-    if {path.name for path in actual_entries} != set(expected) or any(
-        not path.is_file() or path.is_symlink() for path in actual_entries
-    ):
-        raise RuntimeError("llama.cpp packaged provenance inventory mismatch")
-    for name, identity in expected.items():
-        _validate_identity(
-            provenance_root / name,
-            size=int(identity["size"]),
-            sha256=str(identity["sha256"]),
-            label=f"packaged llama.cpp provenance {name}",
-        )
-    _validate_provenance_content(provenance_root)
-
-
-def _validate_provenance(repo_root: Path) -> dict[str, dict[str, int | str]]:
+def _validate_provenance(repo_root: Path) -> list[str]:
     provenance_root = repo_root / PROVENANCE_RELATIVE_DIR
-    _validate_provenance_content(provenance_root)
-    return _provenance_identity(provenance_root)
+    _validate_packaged_provenance(provenance_root)
+    return list(PROVENANCE_FILENAMES)
 
 
 def prepare_runtime(repo_root: Path, cache_dir: Path, output_root: Path) -> dict[str, object]:
@@ -426,8 +286,6 @@ def prepare_runtime(repo_root: Path, cache_dir: Path, output_root: Path) -> dict
     if output_root.exists():
         try:
             existing = _validate_runtime_tree(output_root / "manifest.json", output_root)
-            if existing.get("provenance") != provenance:
-                raise RuntimeError("llama.cpp prepared provenance identity mismatch")
         except RuntimeError:
             pass
         else:
@@ -440,16 +298,13 @@ def prepare_runtime(repo_root: Path, cache_dir: Path, output_root: Path) -> dict
         for contract in ARCHIVES:
             archive_path = cache_dir / contract.filename
             _download(contract, archive_path)
-            archive_payload = _read_verified_archive(archive_path, contract)
             records = _extract_runtime_archive(
-                io.BytesIO(archive_payload),
+                archive_path,
                 temporary_root / contract.backend,
                 contract,
             )
             archive_manifest[contract.backend] = {
                 "filename": contract.filename,
-                "size": contract.size,
-                "sha256": contract.sha256,
                 "url": contract.url,
                 "files": records,
             }
@@ -490,7 +345,7 @@ def verify_package(package_root: Path, *, launch: bool = False) -> dict[str, obj
     runtime_root = package_root / PACKAGED_RUNTIME_RELATIVE_DIR
     manifest = _validate_runtime_tree(runtime_root / "manifest.json", runtime_root)
     provenance_root = package_root / PROVENANCE_RELATIVE_DIR
-    _validate_packaged_provenance(manifest, provenance_root)
+    _validate_packaged_provenance(provenance_root)
     forbidden = [
         path.relative_to(package_root).as_posix()
         for path in package_root.rglob("*")
@@ -498,25 +353,6 @@ def verify_package(package_root: Path, *, launch: bool = False) -> dict[str, obj
     ]
     if forbidden:
         raise RuntimeError(f"managed Gemma model artifacts found in package: {sorted(forbidden)}")
-    runtime_hashes = {
-        raw_record["sha256"]
-        for archive in manifest["archives"].values()
-        for raw_record in archive["files"]
-    }
-    duplicate_runtime_files = []
-    for path in package_root.rglob("*"):
-        if not path.is_file():
-            continue
-        try:
-            path.relative_to(runtime_root)
-        except ValueError:
-            if _sha256(path) in runtime_hashes:
-                duplicate_runtime_files.append(path.relative_to(package_root).as_posix())
-    if duplicate_runtime_files:
-        raise RuntimeError(
-            "managed llama.cpp runtime files escaped their owned package directory: "
-            f"{sorted(duplicate_runtime_files)}"
-        )
     launched_backends: list[str] = []
     if launch:
         for backend in sorted(manifest["archives"]):

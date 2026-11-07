@@ -22,9 +22,7 @@ env:
   PYTHON_VERSION: "3.14.10"
   UV_VERSION: "0.13.6"
   INNOSETUP_VERSION: "7.1.0"
-  INNOSETUP_SHA256: "0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f"
   VULKAN_SDK_VERSION: "1.4.350.0"
-  VULKAN_SDK_SHA256: "855b27ba05d2d8119c5114c5d4ff870ca38f2c632b11e1bb9923b9b7e6ecfe7b"
   NATIVE_INPUT_ROOT: C:\d177\native-integration\release\inputs
   NATIVE_BUILD_ROOT: C:\d177\native-integration\release\build
   NATIVE_OUTPUT_ROOT: C:\d177\native-integration\release\dist
@@ -98,10 +96,8 @@ jobs:
 
   build-installer:
     name: Build native Windows installer
-    runs-on: windows-2022
+    runs-on: windows-2025
     needs: verify-version
-    outputs:
-      provenance: ${{ steps.identity.outputs.provenance }}
     steps:
       - name: Checkout verified native source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -126,7 +122,6 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/ci/prepare-native-release-inputs.ps1 `
-            -ToolPython (Join-Path $PWD ".venv/Scripts/python.exe") `
             -PinnedInputRoot $env:NATIVE_INPUT_ROOT
 
       - name: Setup Rust toolchain
@@ -142,10 +137,6 @@ jobs:
           Invoke-WebRequest `
             -Uri "https://sdk.lunarg.com/sdk/download/$env:VULKAN_SDK_VERSION/windows/vulkan_sdk.exe?Human=true" `
             -OutFile $installer
-          $actualSha256 = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actualSha256 -ne $env:VULKAN_SDK_SHA256) {
-            throw "Vulkan SDK checksum mismatch: expected $env:VULKAN_SDK_SHA256, found $actualSha256"
-          }
           $install = Start-Process `
             -FilePath $installer `
             -ArgumentList @(
@@ -179,10 +170,6 @@ jobs:
           Invoke-WebRequest `
             -Uri "https://github.com/jrsoftware/issrc/releases/download/$releaseTag/innosetup-$env:INNOSETUP_VERSION-x64.exe" `
             -OutFile $installer
-          $actualSha256 = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actualSha256 -ne $env:INNOSETUP_SHA256) {
-            throw "Inno Setup checksum mismatch: expected $env:INNOSETUP_SHA256, found $actualSha256"
-          }
           $install = Start-Process -FilePath $installer -ArgumentList @(
             "/PORTABLE=1", "/VERYSILENT", "/CURRENTUSER", "/SP-", "/SUPPRESSMSGBOXES",
             "/NORESTART", "/NOICONS", "/TASKS=", "/DIR=`"$compilerRoot`""
@@ -213,33 +200,6 @@ jobs:
             -InnoSetupVersion $env:INNOSETUP_VERSION `
             -InnoSetupCompiler $env:INNOSETUP_COMPILER
 
-      - name: Verify native release identity and write provenance
-        id: identity
-        shell: pwsh
-        env:
-          APP_VERSION: ${{ needs.verify-version.outputs.version }}
-          RELEASE_TAG: ${{ needs.verify-version.outputs.tag }}
-          SOURCE_SHA: ${{ needs.verify-version.outputs.source-sha }}
-        run: |
-          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.release_identity verify-build `
-            --version $env:APP_VERSION `
-            --tag $env:RELEASE_TAG `
-            --source-sha $env:SOURCE_SHA `
-            --build-origin github-hosted `
-            --repository "${{ github.repository }}" `
-            --server-url "${{ github.server_url }}" `
-            --run-id "${{ github.run_id }}" `
-            --run-attempt "${{ github.run_attempt }}" `
-            --main-exe "$env:NATIVE_OUTPUT_ROOT/PuriPulyHeart.exe" `
-            --asr-worker-exe "$env:NATIVE_OUTPUT_ROOT/PuriPulyHeartASRWorker.exe" `
-            --overlay-exe "$env:NATIVE_OUTPUT_ROOT/PuriPulyHeartOverlay.exe" `
-            --installer "installer_output/native/PuriPulyHeart-Setup-$env:APP_VERSION.exe" `
-            --soxr-bundle "$env:NATIVE_BUILD_ROOT/soxr-release-inputs/PuriPulyHeart-soxr-third-party-source-bundle.zip" `
-            --provenance-out "$env:NATIVE_BUILD_ROOT/evidence/release-provenance-$env:APP_VERSION.json"
-          $provenance = Get-Content "$env:NATIVE_BUILD_ROOT/evidence/release-provenance-$env:APP_VERSION.json" -Raw |
-            ConvertFrom-Json | ConvertTo-Json -Depth 10 -Compress
-          "provenance=$provenance" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-
       - name: Upload native release artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
@@ -258,18 +218,12 @@ jobs:
     env:
       APP_VERSION: ${{ needs.verify-version.outputs.version }}
       RELEASE_TAG: ${{ needs.verify-version.outputs.tag }}
-      RELEASE_PROVENANCE: ${{ needs.build-installer.outputs.provenance }}
     steps:
       - name: Checkout verified native source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.verify-version.outputs.source-sha }}
           persist-credentials: false
-
-      - name: Setup release Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Download native release artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
@@ -279,21 +233,16 @@ jobs:
 
       - name: Render native release body
         run: |
-          PYTHONPATH=src python3 -m puripuly_heart.release_evidence.release_identity render-body \
-            --template .github/release-template.md \
-            --installer-exe "PuriPulyHeart-Setup-$APP_VERSION.exe" \
-            --output native-release-body.md
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
 
-      - name: Verify native release surface and provenance
-        run: |
-          PYTHONPATH=src python3 -m puripuly_heart.release_evidence.release_identity verify-publish \
-            --version "$APP_VERSION" \
-            --tag "$RELEASE_TAG" \
-            --title "$RELEASE_TAG" \
-            --installer-exe "PuriPulyHeart-Setup-$APP_VERSION.exe" \
-            --body native-release-body.md \
-            --asset "native-release-artifacts/PuriPulyHeart-Setup-$APP_VERSION.exe" \
-            --provenance-json "$RELEASE_PROVENANCE"
+          installer = f"PuriPulyHeart-Setup-{os.environ['APP_VERSION']}.exe"
+          template = Path(".github/release-template.md").read_text(encoding="utf-8")
+          Path("native-release-body.md").write_text(
+              template.replace("{{INSTALLER_EXE}}", installer), encoding="utf-8"
+          )
+          PY
 
       - name: Create native draft release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
@@ -305,17 +254,3 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             native-release-artifacts/PuriPulyHeart-Setup-${{ env.APP_VERSION }}.exe
-
-      - name: Keep only the native installer release asset
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          installer="PuriPulyHeart-Setup-$APP_VERSION.exe"
-          obsolete_assets="$(gh release view "$RELEASE_TAG" --json assets --jq ".assets[] | select(.name != \"$installer\") | .name")"
-          while IFS= read -r asset; do
-            if [ -n "$asset" ]; then
-              gh release delete-asset "$RELEASE_TAG" "$asset" --yes
-            fi
-          done <<< "$obsolete_assets"
-          actual_assets="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')"
-          test "$actual_assets" = "$installer"

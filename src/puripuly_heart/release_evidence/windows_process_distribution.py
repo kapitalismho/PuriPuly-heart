@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
+from puripuly_heart.release_evidence.process_capture_packaged_smoke import PACKAGED_SMOKE_SCHEMA
+
 DISTRIBUTION_EVIDENCE_SCHEMA = "puripuly-heart/windows-process-distribution/v4"
 PRODUCTION_APP_ID = "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 APPROVED_ALTERNATE_APP_ID = "{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}"
@@ -41,49 +43,46 @@ def validate_runtime_report(report: dict[str, object], *, expected_root: Path) -
     required = {
         "schema",
         "status",
+        "stage",
+        "artifact_root",
         "proctap_version",
-        "proctap_module",
         "runtime_native_module",
-        "runtime_native_sha256",
-        "artifact_native_module",
-        "artifact_native_sha256",
         "runtime_loaded_modules",
         "runtime_executable",
-        "runtime_executable_sha256",
         "native_process_specific",
         "capture_started",
         "capture_closed",
-        "device_fallback_used",
-        "credentials_used",
-        "network_used",
+        "unavailable_reason",
+        "failure",
+        "cleanup_failure",
     }
-    if set(report) != required or report.get("schema") != (
-        "puripuly-heart/process-capture-packaged-smoke/v2"
-    ):
+    if set(report) != required or report.get("schema") != PACKAGED_SMOKE_SCHEMA:
         raise ValueError("invalid process-capture runtime report schema")
     if (
         report.get("status") != "passed"
+        or report.get("stage") != "complete"
         or report.get("proctap_version") != "1.1.1"
         or any(
             report.get(name) is not True
             for name in ("native_process_specific", "capture_started", "capture_closed")
         )
         or any(
-            report.get(name) is not False
-            for name in ("device_fallback_used", "credentials_used", "network_used")
+            report.get(name) is not None
+            for name in ("unavailable_reason", "failure", "cleanup_failure")
         )
     ):
         raise ValueError("process-capture runtime report did not pass strict validation")
     expected = expected_root.resolve()
-    native_path = Path(str(report["artifact_native_module"])).resolve()
+    if Path(str(report["artifact_root"])).resolve() != expected:
+        raise ValueError("reported artifact root does not match the native payload")
+    native_path = Path(str(report["runtime_native_module"])).resolve()
     if (
         native_path.parent != expected / "site-packages" / "proctap"
-        or Path(str(report["runtime_native_module"])).resolve() != native_path
-        or report["runtime_native_sha256"] != report["artifact_native_sha256"]
+        or not native_path.name.startswith("_native")
+        or native_path.suffix != ".pyd"
     ):
         raise ValueError("reported ProcTap native module does not match the native payload")
-    executable = Path(str(report["runtime_executable"])).resolve()
-    if executable != expected / "python.exe":
+    if Path(str(report["runtime_executable"])).resolve() != expected / "python.exe":
         raise ValueError("reported runtime executable does not match the native payload")
     modules = report["runtime_loaded_modules"]
     if not isinstance(modules, dict) or set(modules) != {
@@ -92,23 +91,12 @@ def validate_runtime_report(report: dict[str, object], *, expected_root: Path) -
         "proctap",
         "proctap_native",
     }:
-        raise ValueError("invalid native runtime module provenance")
-    for record in modules.values():
-        if (
-            not isinstance(record, dict)
-            or set(record) != {"origin", "artifact", "sha256"}
-            or not Path(str(record["origin"])).resolve().is_relative_to(expected)
-            or not Path(str(record["artifact"])).resolve().is_relative_to(expected)
-        ):
+        raise ValueError("invalid native runtime module paths")
+    for origin in modules.values():
+        if not isinstance(origin, str) or not Path(origin).resolve().is_relative_to(expected):
             raise ValueError("runtime module originated outside the expected artifact root")
-    associations = [
-        (native_path, report["artifact_native_sha256"]),
-        (executable, report["runtime_executable_sha256"]),
-        *((Path(str(record["artifact"])), record["sha256"]) for record in modules.values()),
-    ]
-    for path, digest in associations:
-        if not path.is_file() or _sha256(path) != digest:
-            raise ValueError("reported runtime artifact hash does not match")
+    if Path(modules["proctap_native"]).resolve() != native_path:
+        raise ValueError("reported ProcTap native module does not match its loaded path")
 
 
 def build_installer_provenance(

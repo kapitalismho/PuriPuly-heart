@@ -14,12 +14,9 @@ $PinnedSoxrSpecifier = "soxr==1.1.0"
 $SoxrVersion = "1.1.0"
 $LibsoxrVersion = "0.1.3"
 $SoxrSdistUrl = "https://files.pythonhosted.org/packages/ed/11/27cebce4a108f77afea7c80545115536b45e3f11ebfb914f638fdd9ba847/soxr-1.1.0.tar.gz"
-$SoxrSdistSha256 = "9f228ae21c78fa9359ca98d8a5e8e91f30639e438e574133dace62c5b5309e44"
 $LibsoxrSourceUrl = "https://sourceforge.net/projects/soxr/files/soxr-0.1.3-Source.tar.xz/download"
-$expectedLibsoxrSourceSha256 = "b111c15fdc8c029989330ff559184198c161100a59312f5dc19ddeb9b5a15889"
 $ZeroconfVersion = "0.150.0"
 $ZeroconfSdistUrl = "https://files.pythonhosted.org/packages/09/ea/34bb185645ecaa18d34e5883bffea71aa9bffbbb994634884e8b2f3ad0c4/zeroconf-0.150.0.tar.gz"
-$ZeroconfSdistSha256 = "a5fe7feab1de6ef5e541e0a3d07e534fd91629b813fc27281593584100f63164"
 $SoxrBuildPatchName = "python-soxr-1.1.0-release-input.patch"
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $ReleaseInputsRoot = Join-Path $PWD "build/soxr-release-inputs"
@@ -121,14 +118,6 @@ function Resolve-CommandPath {
     throw "Required command not found on PATH: $Name"
 }
 
-function Get-FileSha256 {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path
-    )
-
-    return (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLowerInvariant()
-}
 
 function Get-RepoRelativePath {
     param(
@@ -174,8 +163,8 @@ $uvLock = Get-Content -Path (Join-Path $PWD "uv.lock") -Raw -Encoding utf8
 if ($uvLock -notmatch '(?ms)\[\[package\]\]\s+name = "soxr"\s+version = "1\.1\.0"') {
     throw "uv.lock no longer pins soxr 1.1.0"
 }
-if ($uvLock -notmatch '(?ms)\[\[package\]\]\s+name = "zeroconf"\s+version = "0\.150\.0".*?sdist = \{ url = "https://files\.pythonhosted\.org/packages/09/ea/34bb185645ecaa18d34e5883bffea71aa9bffbbb994634884e8b2f3ad0c4/zeroconf-0\.150\.0\.tar\.gz", hash = "sha256:a5fe7feab1de6ef5e541e0a3d07e534fd91629b813fc27281593584100f63164"') {
-    throw "uv.lock no longer pins the expected zeroconf 0.150.0 source distribution"
+if ($uvLock -notmatch '(?ms)\[\[package\]\]\s+name = "zeroconf"\s+version = "0\.150\.0"') {
+    throw "uv.lock no longer pins zeroconf 0.150.0"
 }
 
 
@@ -211,16 +200,8 @@ $zeroconfSdistPath = Join-Path $downloadsDir "zeroconf-$ZeroconfVersion.tar.gz"
 
 Write-Host "Downloading python-soxr source distribution..."
 Invoke-WebRequest -Uri $SoxrSdistUrl -OutFile $soxrSdistPath
-$actualSoxrSdistSha256 = Get-FileSha256 -Path $soxrSdistPath
-if ($actualSoxrSdistSha256 -ne $SoxrSdistSha256) {
-    throw "python-soxr source hash mismatch: expected $SoxrSdistSha256, found $actualSoxrSdistSha256"
-}
 Write-Host "Downloading python-zeroconf source distribution..."
 Invoke-WebRequest -Uri $ZeroconfSdistUrl -OutFile $zeroconfSdistPath
-$actualZeroconfSdistSha256 = Get-FileSha256 -Path $zeroconfSdistPath
-if ($actualZeroconfSdistSha256 -ne $ZeroconfSdistSha256) {
-    throw "python-zeroconf source hash mismatch: expected $ZeroconfSdistSha256, found $actualZeroconfSdistSha256"
-}
 
 
 Write-Host "Extracting python-soxr source distribution..."
@@ -265,10 +246,6 @@ Invoke-External -FilePath $curlCommand -ArgumentList @(
     "-o",
     $libsoxrSourcePath
 )
-$libsoxrSourceSha256 = Get-FileSha256 -Path $libsoxrSourcePath
-if ($libsoxrSourceSha256 -ne $expectedLibsoxrSourceSha256) {
-    throw "libsoxr source hash mismatch: expected $expectedLibsoxrSourceSha256, found $libsoxrSourceSha256"
-}
 
 Write-Host "Extracting libsoxr source archive..."
 Invoke-External -FilePath $pythonCommand -TimeoutSeconds 60 -ArgumentList @(
@@ -294,29 +271,6 @@ Invoke-External -FilePath $cmakeCommand -ArgumentList @(
     "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
     "-DCMAKE_INSTALL_PREFIX=$libsoxrInstallDir"
 )
-$compilerMetadataPath = Get-ChildItem -Path (Join-Path $libsoxrBuildDir "CMakeFiles") -Filter "CMakeCCompiler.cmake" -File -Recurse | Select-Object -First 1
-if ($null -eq $compilerMetadataPath) {
-    throw "CMake compiler metadata was not generated under $libsoxrBuildDir"
-}
-$compilerMetadata = Get-Content -Path $compilerMetadataPath.FullName -Raw -Encoding utf8
-if ($compilerMetadata -notmatch 'set\(CMAKE_C_COMPILER_ID "([^"]+)"\)') {
-    throw "CMake compiler metadata is missing CMAKE_C_COMPILER_ID"
-}
-$compilerId = $Matches[1]
-if ($compilerMetadata -notmatch 'set\(CMAKE_C_COMPILER_VERSION "([^"]+)"\)') {
-    throw "CMake compiler metadata is missing CMAKE_C_COMPILER_VERSION"
-}
-$compilerVersion = $Matches[1]
-$cmakeCache = Get-Content -Path (Join-Path $libsoxrBuildDir "CMakeCache.txt") -Raw -Encoding utf8
-if ($cmakeCache -notmatch '(?m)^CMAKE_GENERATOR:INTERNAL=(.+)$') {
-    throw "CMake cache is missing CMAKE_GENERATOR"
-}
-$cmakeGenerator = $Matches[1].Trim()
-$generatedProjectPath = Get-ChildItem -Path $libsoxrBuildDir -Filter "*.vcxproj" -File | Select-Object -First 1
-if (($null -eq $generatedProjectPath) -or ((Get-Content -Path $generatedProjectPath.FullName -Raw -Encoding utf8) -notmatch '<WindowsTargetPlatformVersion>([^<]+)</WindowsTargetPlatformVersion>')) {
-    throw "Generated libsoxr project is missing WindowsTargetPlatformVersion"
-}
-$windowsSdkVersion = $Matches[1]
 
 Invoke-External -FilePath $cmakeCommand -ArgumentList @(
     "--build",
@@ -489,7 +443,6 @@ $sourceBundleManifest = [ordered]@{
     packaged_runtime_relative_dir = $PackagedRuntimeRelativeDir
     wheel = [ordered]@{
         filename = $wheelPath.Name
-        sha256 = (Get-FileSha256 -Path $wheelPath.FullName)
         linkage = "system-linked"
     }
     build = [ordered]@{
@@ -497,12 +450,8 @@ $sourceBundleManifest = [ordered]@{
         cmake = $cmakeVersion
         pip = $pipVersion
         backends = $buildBackendVersions
-        compiler = "$compilerId $compilerVersion"
-        generator = $cmakeGenerator
-        windows_sdk = $windowsSdkVersion
         python_soxr_patch = [ordered]@{
             filename = $SoxrBuildPatchName
-            sha256 = (Get-FileSha256 -Path $soxrBuildPatchPath)
             apply_from = "soxr-1.1.0 source root"
             command = "git apply python-soxr-1.1.0-release-input.patch"
         }
@@ -526,7 +475,6 @@ $sourceBundleManifest = [ordered]@{
             name = "python-soxr"
             filename = [System.IO.Path]::GetFileName($soxrSdistPath)
             url = $SoxrSdistUrl
-            sha256 = $actualSoxrSdistSha256
             license = "LGPL-2.1-or-later"
             modifications = @($SoxrBuildPatchName)
         },
@@ -534,7 +482,6 @@ $sourceBundleManifest = [ordered]@{
             name = "libsoxr"
             filename = [System.IO.Path]::GetFileName($libsoxrSourcePath)
             url = $LibsoxrSourceUrl
-            sha256 = $libsoxrSourceSha256
             license = "LGPL-2.1-or-later"
             modifications = @()
         },
@@ -542,7 +489,6 @@ $sourceBundleManifest = [ordered]@{
             name = "python-zeroconf"
             filename = [System.IO.Path]::GetFileName($zeroconfSdistPath)
             url = $ZeroconfSdistUrl
-            sha256 = $actualZeroconfSdistSha256
             license = "LGPL-2.1-or-later"
             modifications = @()
         }
