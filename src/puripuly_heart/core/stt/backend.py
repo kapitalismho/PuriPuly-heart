@@ -5,8 +5,6 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import AsyncIterator, Literal, Protocol, TypeVar, runtime_checkable
 
-import numpy as np
-
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import (
     AudioSegmentIdentity,
@@ -14,7 +12,6 @@ from puripuly_heart.core.audio.ownership import (
     SegmentTerminalOutcome,
 )
 from puripuly_heart.core.messages import ErrorDiagnostics
-from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
 from puripuly_heart.domain.recognition import (
@@ -101,6 +98,8 @@ class STTProviderTurnUpdate:
     contribution: STTTextContribution | None = None
     recognition_origins: tuple[RecognitionTextOrigin, ...] = ()
     is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
+    observed_at: float | None = None
+    first_nonempty_at: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +119,13 @@ class STTProviderTurnTerminal:
     failure_diagnostics: ErrorDiagnostics | None = None
     recognition_origins: tuple[RecognitionTextOrigin, ...] = ()
     is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
+
+
+class STTScopedWriteFailure(RuntimeError):
+    def __init__(self, terminal: STTProviderTurnTerminal, cause: BaseException | None) -> None:
+        super().__init__(terminal.failure_reason or "provider_write_failed")
+        self.terminal = terminal
+        self.__cause__ = cause
 
 
 _ProviderEvent = TypeVar("_ProviderEvent")
@@ -261,6 +267,8 @@ class STTRecognitionUnit:
     final_language_runs: tuple[FinalLanguageRun, ...] = ()
     final_speaker_runs: tuple[FinalSpeakerRun, ...] = ()
     estimated_last_speech_at: float | None = None
+    is_final: bool = True
+    observed_at: float | None = None
 
     @property
     def retained_bytes(self) -> int:
@@ -309,7 +317,7 @@ class STTScopedTurnSession(Protocol):
         observed_trailing_silence_ms: int | None,
     ) -> None: ...
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None: ...
-    async def turn_events(self) -> AsyncIterator[STTProviderTurnEvent]: ...
+    def turn_events(self) -> AsyncIterator[STTProviderTurnEvent]: ...
     async def stop(self) -> None: ...
     async def close(self) -> None: ...
 
@@ -353,19 +361,9 @@ class STTBackendSession(Protocol):
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]: ...
 
 
-@runtime_checkable
-class STTBackendFloat32Session(Protocol):
-    async def send_audio_f32(self, samples_f32: np.ndarray) -> None: ...
-
-
 class STTBackend(Protocol):
     async def open_session(
         self,
         *,
         projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
     ) -> STTBackendSession: ...
-
-
-@runtime_checkable
-class LocalASRReconfigurableBackend(Protocol):
-    async def reconfigure_session_options(self, options: LocalASRSessionOptions) -> None: ...

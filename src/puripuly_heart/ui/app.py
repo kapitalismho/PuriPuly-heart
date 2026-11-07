@@ -4,6 +4,7 @@ import inspect
 import json
 import logging
 import tempfile
+import time
 import webbrowser
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -11,24 +12,28 @@ from typing import Any
 from uuid import uuid4
 
 import flet as ft
-from puripuly_heart.core.discord_oauth_loopback import (
-    render_discord_oauth_callback_completion_page,
-)
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.chatgpt_account import (
     CHATGPT_USAGE_SETTINGS_URL,
     ChatGptConnectResult,
 )
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_view import (
     ImmediateSettingsIntent,
+    LoopbackCaptureSettingsIntent,
     OpenRouterPkceTarget,
     PromptApplyIntent,
-    TranslationSelectionEdit,
+    ProviderApplyIntent,
+    TelemetrySettingsIntent,
 )
 from puripuly_heart.app.ports.ui_application import (
     UiApplicationFactoryPort,
     UiApplicationPort,
+)
+from puripuly_heart.app.services.agent_chat.provider_setup import (
+    ACCOUNT_SETUP_ACTIONS,
+    official_link_destination,
 )
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCallback,
@@ -42,6 +47,9 @@ from puripuly_heart.core.diagnostics import (
     emit_failure,
     safe_exception_fields,
 )
+from puripuly_heart.core.discord.discord_oauth_loopback import (
+    render_discord_oauth_callback_completion_page,
+)
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
@@ -49,15 +57,14 @@ from puripuly_heart.core.lifecycle import (
 )
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.qq_auth_diagnostics import exception_fields, log_qq_auth
+from puripuly_heart.ui.agent_chat_preview import AgentChatPreview, PreviewFamily
+from puripuly_heart.ui.components.agent_secure_entry import AgentSecureEntryController
 from puripuly_heart.ui.components.audio_test_dialog import AudioTestDialog
 from puripuly_heart.ui.components.bottom_nav import BottomNavBar
 from puripuly_heart.ui.components.chatgpt_auth_dialog import ChatGptAuthDialog
 from puripuly_heart.ui.components.debug_preview_panel import DebugPreviewPanel
 from puripuly_heart.ui.components.discord_managed_auth_dialog import DiscordManagedAuthDialog
 from puripuly_heart.ui.components.founder_letter_dialog import FounderLetterDialog
-from puripuly_heart.ui.components.local_qwen_hallucination_dialog import (
-    LocalQwenHallucinationDialog,
-)
 from puripuly_heart.ui.components.model_assets_dialog import ModelAssetsDialog
 from puripuly_heart.ui.components.peer_translation_eula_dialog import PeerTranslationEulaDialog
 from puripuly_heart.ui.components.qq_managed_auth_dialog import QqManagedAuthDialog
@@ -92,6 +99,7 @@ from puripuly_heart.ui.settings.contract import (
     SettingsProviderIntents,
     SettingsSurfaceIntents,
 )
+from puripuly_heart.ui.settings_queue import SettingsQueue
 from puripuly_heart.ui.shell.contract import AppShellSlots
 from puripuly_heart.ui.shell.renderer import compose_app_shell
 from puripuly_heart.ui.theme import (
@@ -103,6 +111,7 @@ from puripuly_heart.ui.theme import (
     text_style,
 )
 from puripuly_heart.ui.views.about import AboutView
+from puripuly_heart.ui.views.agent_chat import AgentChatHooks, AgentChatView
 from puripuly_heart.ui.views.dashboard import DashboardView
 from puripuly_heart.ui.views.logs import LogsView
 from puripuly_heart.ui.views.settings import SettingsView
@@ -112,8 +121,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_WINDOW_WIDTH = FOUNDATION_DESIGN_TOKENS.window.width
 DEFAULT_WINDOW_HEIGHT = FOUNDATION_DESIGN_TOKENS.window.height
 APP_CONTENT_PADDING = FOUNDATION_DESIGN_TOKENS.spacing.page
-APP_LOGS_CONTENT_PADDING = ft.Padding.symmetric(vertical=APP_CONTENT_PADDING)
-FOUNDER_CONTACT_URL = "https://x.com/kapitalismho"
 FOUNDER_README_BASE_URL = "https://github.com/kapitalismho/PuriPuly-heart/blob/dev"
 FOUNDER_README_PATH_BY_LOCALE = {
     "ko": "docs/readme/README.ko.md",
@@ -131,6 +138,42 @@ FOUNDER_README_DEFAULT_API_KEYS_ANCHOR = "using-your-own-api-keys"
 GITHUB_STAR_REPOSITORY_URL = "https://github.com/kapitalismho/PuriPuly-heart"
 GITHUB_STAR_PROMPT_DELAY_S = 2.5
 GITHUB_STAR_PROMPT_DURATION_MS = 8000
+TAB_KEYS = ("home", "agent", "settings", "about")
+AGENT_ERROR_SNACKBAR_DURATION_MS = 8000
+AGENT_ERROR_SNACKBAR_REPEAT_S = 30.0
+
+
+class _AgentDictationSource:
+    """Feeds the app's own self-recognition text into Agent Chat dictation."""
+
+    def __init__(self, app: "TranslatorApp") -> None:
+        self._app = app
+
+    def observe(self, callback):  # noqa: ANN001, ANN201
+        started = time.monotonic()
+        seen: set[str] = set()
+
+        def turn(snapshot, source: str) -> None:  # noqa: ANN001
+            if source not in {"Mic", None}:
+                return
+            identity = str(snapshot.utterance_id)
+            if identity not in seen and snapshot.created_at < started:
+                return
+            seen.add(identity)
+            callback(identity, snapshot.source_text, bool(snapshot.source_closed))
+
+        return self._app.view_logs.observe_self_turns(turn)
+
+    def ensure_capture(self):  # noqa: ANN201
+        dashboard = self._app.view_dashboard
+        if getattr(dashboard, "is_stt_on", False):
+            return lambda: None
+        self._app._on_stt_toggle(True)
+
+        def restore() -> None:
+            self._app._on_stt_toggle(False)
+
+        return restore
 
 
 async def _prepare_and_show_main_window(page: ft.Page) -> None:
@@ -147,16 +190,6 @@ async def _prepare_and_show_main_window(page: ft.Page) -> None:
     finally:
         page.window.visible = True
         page.update()
-
-
-def _callable_accepts_keyword(callable_obj: object, keyword: str) -> bool:
-    try:
-        parameters = inspect.signature(callable_obj).parameters
-    except TypeError, ValueError:
-        return True
-    return keyword in parameters or any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
-    )
 
 
 def founder_readme_url_for_locale(locale: str | None) -> str:
@@ -309,19 +342,21 @@ class TranslatorApp:
             ),
             prompt=SettingsPromptIntents(
                 prompt_apply_settings=self._on_prompt_apply_settings,
+                pending_prompt_changed=self._on_pending_prompt_changed,
             ),
             overlay=SettingsOverlayIntents(
                 desktop_overlay_lock_change=self._on_desktop_overlay_lock_change,
                 desktop_overlay_size_change=self._on_desktop_overlay_size_change,
                 desktop_overlay_recovery_action=self._on_desktop_overlay_recovery_action,
                 desktop_overlay_position_reset=self._on_desktop_overlay_position_reset,
-                view_logs=self._open_logs_tab,
+                view_logs=self._open_agent_tab,
                 calibration_begin=(calibration_begin if callable(calibration_begin) else None),
                 calibration_change=(calibration_change if callable(calibration_change) else None),
                 calibration_apply=(calibration_apply if callable(calibration_apply) else None),
                 calibration_cancel=(calibration_cancel if callable(calibration_cancel) else None),
             ),
         )
+        self._bind_agent_navigation()
 
         set_overlay_calibration = getattr(self.view_settings, "set_overlay_calibration", None)
         overlay_calibration = self.application.overlay_calibration
@@ -429,11 +464,16 @@ class TranslatorApp:
     def _freeze_ui_ingress(self) -> None:
         self._shutting_down = True
         self._settings_mutation_queue = []
+        self._unbind_agent_navigation()
+        settings_queue = getattr(self, "_settings_queue", None)
+        if settings_queue is not None:
+            settings_queue.stop()
 
     async def _on_page_lifecycle_end(self, _event=None) -> None:
         await self.shutdown()
 
     async def close_presentation(self) -> None:
+        self._unbind_agent_navigation()
         self._window_close_requested = True
         result = self.page.window.destroy()
         if inspect.isawaitable(result):
@@ -449,6 +489,7 @@ class TranslatorApp:
         if self._window_close_requested:
             return
         self._window_close_requested = True
+        self._unbind_agent_navigation()
         try:
             self.page.window.visible = False
             self.page.update()
@@ -500,13 +541,26 @@ class TranslatorApp:
         )
         self.view_settings.bind_recent_language_queue(self.view_dashboard)
         self.view_logs = LogsView()
+        agent_chat = self.application.agent_chat()
+        if agent_chat is None:
+            raise RuntimeError("Agent Chat is not composed")
+        self._agent_navigation_owner = agent_chat
+        self.view_agent = AgentChatView(
+            agent_chat,
+            AgentChatHooks(
+                open_folder=lambda: self.view_logs._open_log_folder(None),
+                show_snackbar=self._show_snackbar,
+                conversation_records=lambda: self.view_logs.conversation_records,
+                dictation=_AgentDictationSource(self),
+            ),
+        )
         self.view_about = AboutView()
         self.view_settings.set_overlay_runtime_state(self.overlay_state)
 
         # Custom title bar
         self.title_bar = TitleBar(self.page, on_close=self._request_window_close)
 
-        # Bottom navigation (order: Home, Settings, Logs, About)
+        # Bottom navigation: Home, Agent Chat, Settings, About
         self.bottom_nav = BottomNavBar(on_change=self._on_nav_change)
 
         self.debug_preview_panel = (
@@ -542,9 +596,12 @@ class TranslatorApp:
             on_qq_auth_translation_gated=self._preview_qq_auth_translation_gated,
             on_discord_callback_page=self._preview_discord_callback_page,
             on_founder_letter=self._preview_founder_letter,
-            on_local_qwen_hallucination_modal=self._preview_local_qwen_hallucination_modal,
             on_github_star_snackbar=self._preview_github_star_snackbar,
             on_foundation_primitives=self._preview_foundation_primitives,
+            on_agent_report_cycle=lambda: self._cycle_debug_agent_card("report"),
+            on_agent_change_cycle=lambda: self._cycle_debug_agent_card("change"),
+            on_agent_key_cycle=lambda: self._cycle_debug_agent_card("key"),
+            on_agent_account_cycle=lambda: self._cycle_debug_agent_card("account"),
             on_http_extension_form=self._preview_http_extension_form,
             on_brake_notice=self._preview_brake_notice,
             on_revoked_notice=self._preview_revoked_notice,
@@ -556,6 +613,16 @@ class TranslatorApp:
             on_gpu_state_cycle=self._cycle_debug_preview_gpu_state,
             on_stt_loading_button_cycle=self._cycle_debug_preview_stt_loading_button,
         )
+
+    def _cycle_debug_agent_card(self, family: PreviewFamily) -> None:
+        live = self._agent_navigation_owner
+        preview = getattr(self, "_agent_chat_preview", None)
+        if preview is None:
+            preview = AgentChatPreview(live, on_finish=lambda: self.view_agent.use_owner(live))
+            self._agent_chat_preview = preview
+        self.view_agent.use_owner(preview)
+        preview.cycle(family)
+        self._open_agent_tab()
 
     def _cycle_debug_preview_display_turn(self) -> None:
         dashboard = getattr(self, "view_dashboard", None)
@@ -901,9 +968,6 @@ class TranslatorApp:
     def _preview_peer_translation_eula(self) -> None:
         self._show_peer_translation_eula(self._debug_preview_noop)
 
-    def _preview_local_qwen_hallucination_modal(self) -> None:
-        self.show_local_qwen_hallucination_dialog()
-
     def _preview_capture_fault_cycle(self) -> None:
         profile = self.application.cycle_debug_capture_fault_profile()
         self._show_snackbar(
@@ -971,7 +1035,7 @@ class TranslatorApp:
         select_extension = getattr(view, "_on_http_extension_selected", None)
         if callable(select_extension):
             select_extension("debug_demo")
-        if self._current_tab != 1:
+        if self._tab_key(self._current_tab) != "settings":
             self._open_settings_tab()
 
     def _show_peer_translation_eula(self, on_accept) -> None:
@@ -984,18 +1048,8 @@ class TranslatorApp:
         dialog.open()
 
     def _on_telemetry_enabled_change(self, enabled: bool) -> None:
-        self._telemetry_reporting_owner().apply_telemetry_enabled(enabled)
-
-    def show_local_qwen_hallucination_dialog(self) -> None:
-        dialog = LocalQwenHallucinationDialog(
-            self.page,
-            on_open_guide=self._open_local_qwen_guide,
-        )
-        self._local_qwen_hallucination_dialog = dialog
-        dialog.open()
-
-    def _open_local_qwen_guide(self) -> None:
-        webbrowser.open(founder_readme_url_for_locale(get_locale()))
+        if isinstance(enabled, bool):
+            self._queue_settings_apply(TelemetrySettingsIntent(enabled))
 
     def _open_api_keys_guide(self) -> None:
         webbrowser.open(founder_readme_url_for_locale(get_locale()))
@@ -1043,7 +1097,7 @@ class TranslatorApp:
                             result = await next_task()
                         if result is False:
                             self._show_snackbar(
-                                t("settings.mutation.failed_pending"), COLOR_WARNING
+                                t("settings.mutation.operation_failed"), COLOR_WARNING
                             )
                     except Exception as exc:
                         emit_failure(
@@ -1065,7 +1119,7 @@ class TranslatorApp:
                         )
                         try:
                             self._show_snackbar(
-                                t("settings.mutation.failed_pending"), COLOR_WARNING
+                                t("settings.mutation.operation_failed"), COLOR_WARNING
                             )
                         except Exception:
                             pass
@@ -1074,11 +1128,46 @@ class TranslatorApp:
 
         self._run_page_task(_worker)
 
+    def _ensure_settings_queue(self) -> SettingsQueue:
+        settings_queue = getattr(self, "_settings_queue", None)
+        if settings_queue is None:
+            settings_queue = SettingsQueue(
+                self.application.apply_settings_change,
+                self._on_settings_committed,
+            )
+            self._settings_queue = settings_queue
+        return settings_queue
+
+    def _queue_settings_apply(self, intent: object, *, resubmit: bool = True) -> None:
+        if getattr(self, "_shutting_down", False):
+            return
+        settings_queue = self._ensure_settings_queue()
+        if settings_queue.submit(intent, resubmit=resubmit):
+            self._queue_settings_mutation_task(settings_queue.drain)
+
+    def _on_settings_committed(self, intent: object) -> None:
+        view = getattr(self, "view_settings", None)
+        if isinstance(intent, ProviderApplyIntent) and view is not None:
+            view.acknowledge_provider_apply_settings(intent)
+            consume = getattr(view, "consume_alibaba_key_verification", None)
+            verification = consume() if callable(consume) else None
+            if verification is not None:
+                self._run_page_task(verification)
+        elif isinstance(intent, PromptApplyIntent) and view is not None:
+            view.acknowledge_prompt_apply_settings(intent)
+        self.application.refresh_settings_projection()
+        self._sync_audio_test_dialog_if_stopped()
+
+    def _tab_key(self, index: int) -> str:
+        return TAB_KEYS[index] if 0 <= index < len(TAB_KEYS) else "home"
+
+    def _tab_index(self, key: str) -> int:
+        return TAB_KEYS.index(key) if key in TAB_KEYS else 0
+
     def _content_padding_for_index(self, index: int) -> int | ft.Padding:
-        if index == 1:
+        key = self._tab_key(index)
+        if key == "settings":
             return 0
-        if index == 2:
-            return APP_LOGS_CONTENT_PADDING
         return APP_CONTENT_PADDING
 
     def _on_nav_change(self, index: int):
@@ -1088,62 +1177,101 @@ class TranslatorApp:
             self._close_open_dialog_for_navigation()
         self._current_tab = index
 
-        # Auto-apply Settings changes when leaving Settings (tab 1)
-        if previous_tab == 1 and index != 1:
+        # Auto-apply Settings changes when leaving Settings
+        if self._tab_key(previous_tab) == "settings" and self._tab_key(index) != "settings":
             if self.view_settings.has_provider_changes:
                 pending_settings = self.view_settings.build_provider_apply_settings()
                 if pending_settings is not None:
-
-                    async def _task():
-                        result = await self.application.apply_provider_intent(pending_settings)
-                        if result:
-                            self.view_settings.acknowledge_provider_apply_settings(pending_settings)
-                            self.application.refresh_settings_projection()
-                        return bool(result)
-
-                    self._queue_settings_mutation_task(_task)
+                    self._queue_settings_apply(pending_settings, resubmit=False)
             elif getattr(self.view_settings, "has_pending_prompt_changes", False):
                 pending = PromptApplyIntent(self.view_settings._prompt_editor.value)
 
-                async def _task():
-                    result = await self.application.apply_prompt_intent(pending)
-                    if result:
-                        self.view_settings.acknowledge_prompt_apply_settings(pending)
-                        self.application.refresh_settings_projection()
-                    return bool(result)
+                self._queue_settings_apply(pending, resubmit=False)
 
-                self._queue_settings_mutation_task(_task)
-
-        if index == 0:
+        key = self._tab_key(index)
+        if key == "home":
             self.content_area.content = self.view_dashboard
-        elif index == 1:
+        elif key == "settings":
             self.content_area.content = self.view_settings
-        elif index == 2:
-            self.content_area.content = self.view_logs
-        elif index == 3:
+        elif key == "agent":
+            self.content_area.content = self.view_agent
+        elif key == "about":
             self.content_area.content = self.view_about
 
         self.content_area.padding = self._content_padding_for_index(index)
         self.content_area.update()
-        if index == 1:
+        if key == "settings":
             self.view_settings.refresh_prompt_if_empty()
-        elif index == 2:
-            # Async scroll after rendering completes
-            async def _scroll():
-                import asyncio
 
-                await asyncio.sleep(0.05)
-                await self.view_logs.scroll_to_bottom()
-
-            self._run_page_task(_scroll)
-
-    def _open_logs_tab(self) -> None:
-        self._on_nav_change(2)
-        self._set_bottom_nav_selected(2)
+    def _open_agent_tab(self) -> None:
+        index = self._tab_index("agent")
+        self._on_nav_change(index)
+        self._set_bottom_nav_selected(index)
 
     def _open_settings_tab(self) -> None:
-        self._on_nav_change(1)
-        self._set_bottom_nav_selected(1)
+        index = self._tab_index("settings")
+        self._on_nav_change(index)
+        self._set_bottom_nav_selected(index)
+
+    def _open_agent_settings(self, section: str, provider: str | None) -> dict:
+        if self._shutting_down:
+            return {
+                "opened": False,
+                "field_visible": False,
+                "completion_observable": False,
+                "verification_available": False,
+            }
+        return self.view_settings.open_agent_section(
+            section,
+            provider,
+            show_settings=self._open_settings_tab,
+        )
+
+    def _activate_agent_setup_action(self, action_id: str) -> dict:
+        if self._shutting_down:
+            return {"status": "unavailable"}
+        destination = official_link_destination(action_id)
+        if destination is not None:
+            return {"status": "opened" if webbrowser.open(destination) else "failed"}
+        action = ACCOUNT_SETUP_ACTIONS.get(action_id)
+        if action is None or action.kind != "account_setup":
+            return {"status": "unavailable"}
+        if action.provider == "chatgpt":
+            self.show_chatgpt_auth_dialog(enable_translation=False)
+        elif action.provider == "qq":
+            self.show_qq_managed_auth_dialog()
+        elif action.provider == "discord":
+            self.show_discord_managed_auth_dialog(preview=False)
+        else:
+            return {"status": "unavailable"}
+        return {"status": "opened"}
+
+    def _bind_agent_navigation(self) -> None:
+        owner = self._agent_navigation_owner
+        if owner is not None:
+            providers = self.view_settings.bind_verification_completion(
+                owner.key_verification_completed
+            )
+            owner.bind_verification_providers(providers)
+            owner.bind_navigation(self._open_agent_settings)
+            owner.bind_setup_actions(self._activate_agent_setup_action)
+            owner.bind_secure_entry(
+                AgentSecureEntryController(
+                    save=self.application.persist_provider_secret_change,
+                    verify=self.application.verify_api_key,
+                    persist_verification=self.application.persist_api_key_verification,
+                )
+            )
+
+    def _unbind_agent_navigation(self) -> None:
+        owner = getattr(self, "_agent_navigation_owner", None)
+        if owner is not None:
+            self.view_settings.bind_verification_completion(None)
+            owner.bind_verification_providers(frozenset())
+            owner.bind_navigation(None)
+            owner.bind_setup_actions(None)
+            owner.bind_secure_entry(None)
+            self._agent_navigation_owner = None
 
     def _set_bottom_nav_selected(self, index: int) -> None:
         selected_attr = getattr(self.bottom_nav, "_selected", None)
@@ -1415,10 +1543,7 @@ class TranslatorApp:
         self._queue_settings_mutation_task(_task)
 
     def _on_apply_loopback_capture_option(self, value: str) -> None:
-        async def _task():
-            await self.application.apply_loopback_capture_option(value)
-
-        self._queue_settings_mutation_task(_task)
+        self._queue_settings_apply(LoopbackCaptureSettingsIntent(value))
 
     def _on_gpu_discovery_requested(self) -> None:
         self._run_page_task(self.application.ensure_gpu_device_discovery)
@@ -1454,16 +1579,17 @@ class TranslatorApp:
             self._mark_launch_high_priority_feedback_shown("stt_compatibility", snackbar)
             self.page.show_dialog(snackbar)
 
-        async def _task():
-            await self.application.on_dashboard_language_change(change)
-
-        self._queue_settings_mutation_task(_task)
+        self._queue_settings_apply(change)
 
     def _on_settings_changed(self, intent: ImmediateSettingsIntent) -> None:
+        if getattr(self, "_shutting_down", False):
+            return
+
         async def _task():
-            await self.application.apply_settings_intent(intent)
+            await self._ensure_settings_queue().drain()
             self._sync_audio_test_dialog_if_stopped()
 
+        self._ensure_settings_queue().submit(intent)
         self._queue_settings_mutation_task(_task)
 
     def _on_start_audio_test(self) -> None:
@@ -1534,14 +1660,15 @@ class TranslatorApp:
         self._close_audio_test_dialog()
 
     def _on_prompt_apply_settings(self, intent: PromptApplyIntent) -> None:
-        async def _task():
-            result = await self.application.apply_prompt_intent(intent)
-            if result:
-                self.view_settings.acknowledge_prompt_apply_settings(intent)
-                self.application.refresh_settings_projection()
-            return bool(result)
+        self._queue_settings_apply(intent)
 
-        self._queue_settings_mutation_task(_task)
+    def _on_pending_prompt_changed(self, intent: PromptApplyIntent) -> None:
+        settings_queue = getattr(self, "_settings_queue", None)
+        if settings_queue is not None and settings_queue.replace_pending_prompt(intent):
+            view = getattr(self, "view_settings", None)
+            if view is not None:
+                view.has_pending_prompt_changes = True
+            self._queue_settings_mutation_task(settings_queue.drain)
 
     def _on_providers_changed(self) -> None:
         view_settings = getattr(self, "view_settings", None)
@@ -1549,7 +1676,6 @@ class TranslatorApp:
             view_settings, "consume_immediate_provider_apply_settings", None
         )
         pending_intent = consume_immediate() if callable(consume_immediate) else None
-        focused_intent = pending_intent
         consume_http_extension_runtime_reload = getattr(
             view_settings,
             "consume_http_extension_runtime_reload",
@@ -1561,14 +1687,7 @@ class TranslatorApp:
             else False
         )
         if pending_intent is None and runtime_reload:
-
-            async def _runtime_only_task():
-                await self.application.apply_providers(
-                    persist_settings=False,
-                    refresh_ui=False,
-                )
-
-            self._queue_settings_mutation_task(_runtime_only_task)
+            self._queue_settings_apply(None)
             return
 
         build_provider_apply_settings = getattr(
@@ -1583,46 +1702,7 @@ class TranslatorApp:
         if pending_intent is not None:
             self._log_basic("[Settings] Applying staged provider intent")
 
-        async def _task():
-            if pending_intent is None:
-                await self.application.apply_providers()
-                return
-            result = await self.application.apply_provider_intent(pending_intent)
-            if not result and focused_intent is not None:
-                committed = self.application.compatibility_settings()
-                selection_edit = next(
-                    (
-                        edit
-                        for edit in focused_intent.edits
-                        if isinstance(edit, TranslationSelectionEdit)
-                    ),
-                    None,
-                )
-                if (
-                    committed is not None
-                    and selection_edit is not None
-                    and committed.intent.translation.model == selection_edit.selection.model.value
-                    and committed.intent.translation.connection
-                    == selection_edit.selection.connection.value
-                ):
-                    view_settings.acknowledge_provider_apply_settings(focused_intent)
-                    self.application.refresh_settings_projection()
-            if result:
-                view_settings.acknowledge_provider_apply_settings(pending_intent)
-                self.application.refresh_settings_projection()
-                consume_alibaba_key_verification = getattr(
-                    view_settings, "consume_alibaba_key_verification", None
-                )
-                verification = (
-                    consume_alibaba_key_verification()
-                    if callable(consume_alibaba_key_verification)
-                    else None
-                )
-                if verification is not None:
-                    self._run_page_task(verification)
-            return bool(result)
-
-        self._queue_settings_mutation_task(_task)
+        self._queue_settings_apply(pending_intent)
 
     def _on_local_llm_secret_changed(self) -> None:
         async def _task():
@@ -1672,25 +1752,27 @@ class TranslatorApp:
 
         self._queue_settings_mutation_task(_task)
 
-    def show_chatgpt_auth_dialog(self) -> None:
+    def show_chatgpt_auth_dialog(self, *, enable_translation: bool = True) -> None:
         dialog = getattr(self, "_chatgpt_auth_dialog", None)
         if dialog is not None and dialog.is_open:
             return
         self._mark_launch_high_priority_feedback_shown("auth_required")
         dialog = ChatGptAuthDialog(
             self.page,
-            on_continue=self._start_chatgpt_auth_from_dialog,
+            on_continue=lambda: self._start_chatgpt_auth_from_dialog(
+                enable_translation=enable_translation
+            ),
             on_close=lambda: None,
             on_cancel=self.application.cancel_chatgpt_sign_in,
         )
         self._chatgpt_auth_dialog = dialog
         dialog.open()
 
-    def _start_chatgpt_auth_from_dialog(self) -> None:
+    def _start_chatgpt_auth_from_dialog(self, *, enable_translation: bool = True) -> None:
         dialog = getattr(self, "_chatgpt_auth_dialog", None)
         if dialog is not None:
             dialog.set_waiting()
-        self._run_chatgpt_connect(enable_translation=True)
+        self._run_chatgpt_connect(enable_translation=enable_translation)
 
     def _on_chatgpt_connect_from_settings(self) -> None:
         if self.application.chatgpt_account_snapshot().in_progress:
@@ -2152,25 +2234,12 @@ class TranslatorApp:
     def _build_managed_openrouter_byok_target(self) -> OpenRouterPkceTarget | None:
         return self.application.build_managed_openrouter_byok_target()
 
-    def _build_founder_letter_target(self) -> OpenRouterPkceTarget | None:
-        return self._build_managed_openrouter_byok_target()
-
     def _on_discord_managed_auth_byok(self) -> None:
         target = self._build_managed_openrouter_byok_target()
         if target is None:
             self._show_snackbar(t("openrouter.pkce.failed"), COLOR_WARNING)
             return
         self._on_request_openrouter_pkce(target, launch_source="discord_auth")
-
-    def _on_founder_letter_connect(self) -> None:
-        target = self._build_founder_letter_target()
-        if target is None:
-            self._show_snackbar(t("openrouter.pkce.failed"), COLOR_WARNING)
-            return
-        self._on_request_openrouter_pkce(target, launch_source="letter")
-
-    def _on_founder_letter_contact(self) -> None:
-        webbrowser.open(FOUNDER_CONTACT_URL)
 
     def _on_founder_letter_readme(self) -> None:
         webbrowser.open(founder_readme_url_for_locale(get_locale()))
@@ -2298,11 +2367,14 @@ class TranslatorApp:
         except Exception:
             return False
 
-    async def _on_verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
-        success, msg = await self.application.verify_api_key(provider, key)
+    async def _on_verify_api_key(
+        self, provider: str, key: str
+    ) -> ProviderCredentialVerificationOutcome:
+        outcome = await self.application.verify_api_key(provider, key)
+        success = outcome.status == "verified"
 
         if not self._api_key_verification_matches_current_field(provider, key):
-            return success, msg
+            return outcome
 
         self.application.persist_api_key_verification(provider, key, success)
 
@@ -2345,7 +2417,7 @@ class TranslatorApp:
             else:
                 self.view_dashboard.set_peer_needs_key(not success, update_ui=False)
 
-        return success, msg
+        return outcome
 
     async def _on_provider_secret_change(self, key: str, value: str) -> bool:
         succeeded = await self.application.persist_provider_secret_change(key, value)
@@ -2480,6 +2552,59 @@ class TranslatorApp:
 
     def show_snackbar(self, message: str, bgcolor) -> None:
         self._show_snackbar(message, bgcolor)
+
+    def on_error_presented(self, text: str, diagnostic_id: str) -> None:
+        view = getattr(self, "view_agent", None)
+        if view is None or getattr(self, "_shutting_down", False):
+            return
+        now = time.monotonic()
+        last = getattr(self, "_last_agent_error_snackbar", None)
+        if last is not None and last[0] == text and now - last[1] < AGENT_ERROR_SNACKBAR_REPEAT_S:
+            return
+        self._last_agent_error_snackbar = (text, now)
+
+        def _ask(_event) -> None:  # noqa: ANN001
+            with contextlib.suppress(Exception):
+                self.page.pop_dialog()
+            self._open_agent_tab()
+            view.ask_about_error(text, diagnostic_id)
+
+        snackbar = self._build_agent_error_snackbar(text, _ask)
+        self._mark_launch_high_priority_feedback_shown("snackbar", snackbar)
+        self.page.show_dialog(snackbar)
+
+    def _build_agent_error_snackbar(self, text: str, on_click) -> ft.SnackBar:  # noqa: ANN001
+        return ft.SnackBar(
+            content=ft.Row(
+                controls=[
+                    ft.Text(
+                        text,
+                        size=18,
+                        color=ft.Colors.WHITE,
+                        font_family=font_for_language(get_locale()),
+                        expand=True,
+                    ),
+                    ft.TextButton(
+                        content=t("agent_chat.ask_puri"),
+                        on_click=on_click,
+                        style=ft.ButtonStyle(
+                            color=ft.Colors.WHITE,
+                            text_style=text_style(size=18),
+                            overlay_color=COLOR_PRIMARY,
+                        ),
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.START,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=12,
+            ),
+            bgcolor=ft.Colors.RED_400,
+            duration=AGENT_ERROR_SNACKBAR_DURATION_MS,
+            behavior=ft.SnackBarBehavior.FLOATING,
+            elevation=0,
+            margin=ft.Margin.only(bottom=90),
+            padding=ft.Padding.only(left=20, top=12, right=12, bottom=12),
+        )
 
     def clear_managed_auth_pending_state(self) -> None:
         self.application.clear_managed_auth_pending_state()

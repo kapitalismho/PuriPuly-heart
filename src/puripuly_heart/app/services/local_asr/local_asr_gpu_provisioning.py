@@ -6,12 +6,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
-from puripuly_heart.core.local_asr_provisioning import (
+from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRInstallRequest,
     LocalASRInstallResult,
     LocalASRProvisioningPort,
 )
-from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
+from puripuly_heart.core.local_asr.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
 
 LocalASRGpuProvisioningUiState = Literal[

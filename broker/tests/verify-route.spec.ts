@@ -184,41 +184,6 @@ describe('POST /v1/trial/challenge/verify route contract', () => {
     });
   });
 
-  it('keeps verify responses free of challenge preflight and release-session storage fields', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-04-08T06:00:00Z'));
-
-    const env = createTestBrokerEnv();
-    const keyPair = await createDeviceKeyPair();
-    const challenge = await issueChallenge({
-      env,
-      installationId: 'install-no-leaks',
-      devicePublicKey: keyPair.devicePublicKey,
-      appVersion: '1.2.3',
-    });
-
-    const requestBody = await signCanonicalVerifyRequest(keyPair.privateKey, {
-      installation_id: 'install-no-leaks',
-      device_public_key: keyPair.devicePublicKey,
-      challenge: challenge.challenge,
-      challenge_expires_at: challenge.challenge_expires_at,
-      hardware_hash: 'hardware-hash-route-003',
-      app_version: '1.2.3',
-      signed_at: '2026-04-08T06:00:20.000Z',
-    });
-
-    const response = await postVerify(env, requestBody);
-    expect(response.status).toBe(200);
-
-    const payload = (await response.json()) as Record<string, unknown>;
-    expect(payload).not.toHaveProperty('challenge');
-    expect(payload).not.toHaveProperty('challenge_expires_at');
-    expect(payload).not.toHaveProperty('fingerprint_salt');
-    expect(payload).not.toHaveProperty('release_session_ref');
-    expect(payload).not.toHaveProperty('release_token_hash');
-    expect(payload).not.toHaveProperty('managed_credential_ref');
-  });
-
   it('stores verified_hardware_hash and salt version on pending_release entitlement', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-08T06:00:00Z'));

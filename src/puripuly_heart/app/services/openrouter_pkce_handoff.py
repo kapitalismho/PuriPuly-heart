@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -20,6 +19,9 @@ from puripuly_heart.app.services.operational_state_payloads import (
 from puripuly_heart.app.services.secret_settings_transaction import (
     SecretSetRequest,
     SecretSettingsTransaction,
+    _is_sensitive_evidence_key,
+    _sanitize_verification_fields,
+    _secret_fingerprint,
 )
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
@@ -33,22 +35,6 @@ from puripuly_heart.core.messages import (
     DiagnosticFieldValue,
     ErrorDiagnostics,
     TransactionResult,
-)
-
-_VERIFICATION_EVIDENCE_SENSITIVE_KEY_FRAGMENTS = (
-    "api_key",
-    "apikey",
-    "authorization",
-    "bearer",
-    "body",
-    "credential_value",
-    "password",
-    "payload",
-    "private_key",
-    "raw",
-    "refresh_token",
-    "secret",
-    "token",
 )
 
 
@@ -249,21 +235,6 @@ def _copy_settings_value(value: object) -> object:
     return value
 
 
-def _normalized_evidence_key(key: str) -> str:
-    return "".join(character.lower() if character.isalnum() else "_" for character in key)
-
-
-def _is_sensitive_evidence_key(key: str) -> bool:
-    normalized = _normalized_evidence_key(key)
-    return any(
-        fragment in normalized for fragment in _VERIFICATION_EVIDENCE_SENSITIVE_KEY_FRAGMENTS
-    )
-
-
-def _is_safe_diagnostic_field_value(value: object) -> bool:
-    return value is None or isinstance(value, str | int | float | bool)
-
-
 def _caller_settings_values_are_unsafe(
     value: object,
     *,
@@ -294,32 +265,6 @@ def _caller_settings_key_is_unsafe(
     if secret_value and secret_value in key:
         return True
     return _is_sensitive_evidence_key(key)
-
-
-def _sanitize_verification_fields(
-    values: Mapping[str, DiagnosticFieldValue],
-    *,
-    secret_value: str,
-) -> dict[str, DiagnosticFieldValue]:
-    sanitized: dict[str, DiagnosticFieldValue] = {}
-    for raw_key, raw_value in values.items():
-        if not isinstance(raw_key, str):
-            continue
-        if secret_value and secret_value in raw_key:
-            continue
-        if _is_sensitive_evidence_key(raw_key):
-            continue
-        if not _is_safe_diagnostic_field_value(raw_value):
-            continue
-        if isinstance(raw_value, str) and secret_value and secret_value in raw_value:
-            continue
-        sanitized[raw_key] = raw_value
-    return sanitized
-
-
-def _secret_fingerprint(secret_value: str) -> str:
-    digest = hashlib.sha256(secret_value.encode("utf-8")).hexdigest()
-    return f"sha256:{digest}"
 
 
 def _provider_verification_failed_result(

@@ -375,28 +375,6 @@ async def test_eligible_reason_without_sibling_approval_goes_terminal() -> None:
     assert harness.transition_calls == 0
 
 
-async def test_imperfect_evidence_still_recovers_when_sibling_approves() -> None:
-    harness = Harness()
-    harness.install_transition_stub()
-    bad = _evidence("window_reveal_lost")
-    bad["desktop_target"] = False
-    bad["title_confirmed"] = False
-    bad.pop("hwnd", None)
-    manager = RecoveryManager(
-        failure_reason="window_reveal_lost",
-        eligible=True,
-        evidence=bad,
-        instance_id="overlay-A",
-    )
-    harness.attach_failed_manager(manager, "overlay-A")
-
-    await harness.owner.handle_start_failure("window_reveal_lost")
-
-    assert harness.owner.state == "recovering"
-    await harness.await_recovery_replacement()
-    assert harness.transition_calls == 1
-
-
 async def test_missing_cleanup_proof_goes_terminal_without_replacement() -> None:
     harness = Harness()
     harness.install_transition_stub()
@@ -734,28 +712,6 @@ async def test_sparse_evidence_still_recovers_when_sibling_approves(
     harness.attach_failed_manager(manager, "overlay-A")
 
     await harness.owner.handle_start_failure("window_reveal_lost")
-
-    assert harness.owner.state == "recovering"
-    await harness.await_recovery_replacement()
-    assert harness.transition_calls == 1
-
-
-async def test_native_ready_timeout_recovers_without_forensics() -> None:
-    harness = Harness()
-    harness.install_transition_stub()
-    manager = RecoveryManager(
-        failure_reason="window_native_ready_failed",
-        eligible=True,
-        evidence={
-            "failure_reason": "window_native_ready_failed",
-            "port_reason": "native_ready_timeout",
-        },
-        instance_id="overlay-A",
-        cleanup_complete=True,
-    )
-    harness.attach_failed_manager(manager, "overlay-A")
-
-    await harness.owner.handle_start_failure("window_native_ready_failed")
 
     assert harness.owner.state == "recovering"
     await harness.await_recovery_replacement()

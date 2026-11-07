@@ -16,6 +16,7 @@ from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     ProviderVerificationEntry,
 )
+from puripuly_heart.core.local_asr.retired_cpu_assets import cleanup_retired_cpu_asr_assets
 from puripuly_heart.core.local_translation.assets import remove_retired_managed_gemma_installs
 
 logger = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ class SettingsVNextCanonicalPersistenceAdapter:
     ) -> None:
         self._retired_asset_cleanup_logging = retired_asset_cleanup_logging
 
-    def load_active(self, path: Path) -> CanonicalSettingsLoadResult:
+    def load_active(self, path: Path, *, startup: bool = False) -> CanonicalSettingsLoadResult:
         result = load_vnext_settings(path)
         if result.settings is None:
             status = getattr(result.status, "value", result.status)
@@ -41,6 +42,27 @@ class SettingsVNextCanonicalPersistenceAdapter:
                 secondary_diagnostics=result.error.secondary_diagnostics if result.error else (),
                 secondary_omitted_count=result.error.secondary_omitted_count if result.error else 0,
             )
+        if startup:
+            cleanup = cleanup_retired_cpu_asr_assets()
+            if cleanup.removed_count or cleanup.pending_count or cleanup.error_codes:
+                level = (
+                    logging.WARNING
+                    if cleanup.pending_count or cleanup.error_codes
+                    else logging.INFO
+                )
+                message = (
+                    "[Settings][RetiredCPUASRCleanup] "
+                    f"removed={cleanup.removed_count} pending={cleanup.pending_count} "
+                    f"error_codes={','.join(cleanup.error_codes[:3]) or 'none'}"
+                )
+                cleanup_logging = self._retired_asset_cleanup_logging
+                if cleanup_logging is not None:
+                    try:
+                        cleanup_logging.emit_basic(message, level=level)
+                    except Exception:
+                        logger.log(level, "%s", message)
+                else:
+                    logger.log(level, "%s", message)
         if result.migrated:
             failure_types: set[str] = set()
             failed_count = 0

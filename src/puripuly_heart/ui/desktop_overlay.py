@@ -1024,6 +1024,10 @@ class FletDesktopRendererWindow:
         async with self._interaction_mode_lock:
             self._interaction_generation += 1
             try:
+                self._window_z_order_port.stop_topmost_watch()
+            except Exception as exc:
+                failures.append(exc)
+            try:
                 await self._cancel_window_z_order_task()
             except Exception as exc:
                 failures.append(exc)
@@ -1960,31 +1964,6 @@ class FletDesktopRendererWindow:
             tight=True,
         )
 
-    def _build_preview_surface_backdrop(self, ft: Any, caption_surface: Any) -> Any:
-        surface = self._preview_selected_background_surface()
-        size_preset = self._preview_selected_size_preset()
-        controls: list[Any] = []
-        if surface.id == "busy":
-            controls.append(self._build_preview_busy_background(ft, size_preset))
-        controls.append(caption_surface)
-        content: Any = caption_surface
-        if len(controls) > 1:
-            content = ft.Stack(
-                controls=controls,
-                width=size_preset.window_width,
-                height=size_preset.window_height,
-                alignment=ft.Alignment.CENTER,
-            )
-        return ft.Container(
-            content=content,
-            width=size_preset.window_width,
-            height=size_preset.window_height,
-            bgcolor=surface.bgcolor,
-            padding=24,
-            border_radius=20,
-            alignment=ft.Alignment.CENTER,
-        )
-
     def _build_preview_busy_background(
         self,
         ft: Any,
@@ -2171,6 +2150,7 @@ class FletDesktopRendererWindow:
             self._interaction_mode = mode
             self._interaction_generation += 1
             generation = self._interaction_generation
+            self._window_z_order_port.stop_topmost_watch()
             await self._cancel_window_z_order_task()
             if self._closed.is_set():
                 return
@@ -3291,12 +3271,13 @@ class DesktopOverlayRenderer:
                 )
 
         if committed_snapshot is not None:
-            await self._emit_renderer_diagnostic(
-                event_type="render_start",
-                snapshot=committed_snapshot,
-                disposition="committed",
-                visual_state=self._renderer_visual_state_for_snapshot(committed_snapshot),
-            )
+            if not isinstance(self.diagnostic_port, DisabledRendererDiagnosticPort):
+                await self._emit_renderer_diagnostic(
+                    event_type="render_start",
+                    snapshot=committed_snapshot,
+                    disposition="committed",
+                    visual_state=self._renderer_visual_state_for_snapshot(committed_snapshot),
+                )
             try:
                 await self.window.dispatch_snapshot(committed_snapshot)
             except Exception:
@@ -3306,6 +3287,8 @@ class DesktopOverlayRenderer:
                     disposition="failed",
                 )
                 raise
+            if isinstance(self.diagnostic_port, DisabledRendererDiagnosticPort):
+                return barrier
             acknowledgement = RendererCommitAcknowledgement(committed_snapshot.revision)
             await self._emit_renderer_diagnostic(
                 event_type="render_commit",
@@ -3355,6 +3338,8 @@ class DesktopOverlayRenderer:
         acknowledgement: RendererCommitAcknowledgement | None = None,
         render_commit_acknowledged: bool = False,
     ) -> None:
+        if isinstance(self.diagnostic_port, DisabledRendererDiagnosticPort):
+            return
         safe_visual_state = dict(visual_state or self._renderer_visual_state_for_snapshot(snapshot))
         record = validate_desktop_renderer_event(
             {

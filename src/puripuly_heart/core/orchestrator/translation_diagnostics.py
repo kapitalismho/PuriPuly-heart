@@ -27,6 +27,7 @@ from puripuly_heart.domain.models import ChannelId
 
 _LATENCY_SUMMARY_OUTPUT_STAGES = (
     ("self", "self_chatbox_send", "chatbox_send"),
+    ("self", "self_chatbox_final_accepted", "chatbox_final_accepted"),
     ("peer", "peer_overlay_applied", "overlay_applied"),
 )
 
@@ -38,7 +39,6 @@ class RuntimeDiagnostic:
     level: int = logging.INFO
     fallback_level: int | None = None
     diagnostic_only: bool = False
-    safe_exceptions: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,23 +255,12 @@ class TranslationLatencyDiagnosticsOwner:
     def emit(self, diagnostic: RuntimeDiagnostic) -> bool:
         if diagnostic.diagnostic_only:
             return False
-        args = diagnostic.args
-        if diagnostic.safe_exceptions:
-            args = tuple(self._safe_log_arg(arg) for arg in args)
-        formatted = self._format_log_message(diagnostic.message, *args)
+        formatted = self._format_log_message(diagnostic.message, *diagnostic.args)
         if self.runtime_logging is not None:
             self.runtime_logging.emit_basic(formatted, level=diagnostic.level)
             return True
         level = diagnostic.level if diagnostic.fallback_level is None else diagnostic.fallback_level
         self.fallback_logger.log(level, formatted)
-        return True
-
-    def emit_metric(self, message: str, *args: object) -> bool:
-        formatted = self._format_log_message(message, *args)
-        if self.runtime_logging is not None:
-            self.runtime_logging.emit_basic(formatted)
-        else:
-            self.fallback_logger.info(formatted)
         return True
 
     def _emit_failure(
@@ -807,14 +796,6 @@ class TranslationLatencyDiagnosticsOwner:
             return None
         return max(0, int(round((end_at - start_at) * 1000)))
 
-    def _emit_latency_trace(
-        self,
-        channel: ChannelId,
-        utterance_id: UUID,
-        stage: str,
-    ) -> None:
-        _ = (channel, utterance_id, stage)
-
     def _emit_latency_summary(
         self,
         channel: ChannelId,
@@ -859,12 +840,6 @@ class TranslationLatencyDiagnosticsOwner:
     @staticmethod
     def _format_log_message(message: str, *args: object) -> str:
         return message % args if args else message
-
-    @staticmethod
-    def _safe_log_arg(value: object) -> object:
-        if isinstance(value, BaseException):
-            return type(value).__name__
-        return value
 
 
 __all__ = [

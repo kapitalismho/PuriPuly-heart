@@ -22,6 +22,7 @@ class _ResultScope:
     current: TransactionResult | None = None
     revision: Callable[[], int] | None = None
     committed_revision: int | None = None
+    reverted: bool = False
 
 
 class SettingsTransactionResultOwner:
@@ -91,6 +92,11 @@ class SettingsTransactionResultOwner:
             TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
             TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED,
         }
+
+    def mark_settings_reverted(self) -> None:
+        scope = self._scope.get()
+        if scope is not None:
+            scope.reverted = True
 
 
 __all__ = ["SettingsTransactionResultOwner"]

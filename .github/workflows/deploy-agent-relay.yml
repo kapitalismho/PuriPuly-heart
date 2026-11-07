@@ -1,0 +1,126 @@
+name: Deploy Agent Relay
+
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_commit:
+        description: Full reviewed dev commit SHA; must equal the immutable dispatch commit
+        required: true
+        type: string
+      confirm_production_deploy:
+        description: Type `deploy puripuly-heart-agent-relay from dev` to confirm production deployment
+        required: true
+        type: string
+      apply_migrations:
+        description: Apply ordinary migrations to an already initialized relay database before deploying code
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-agent-relay-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy canonical Agent Relay
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      NODE_VERSION: '22.23.4'
+      AGENT_RELAY_CANONICAL_WORKERS_DEV_URL: ${{ vars.AGENT_RELAY_CANONICAL_WORKERS_DEV_URL }}
+      REVIEWED_COMMIT: ${{ inputs.reviewed_commit }}
+      CONFIRM_PRODUCTION_DEPLOY: ${{ inputs.confirm_production_deploy }}
+      AGENT_SERVICE_ENABLED: ${{ vars.AGENT_SERVICE_ENABLED }}
+      SUPPORT_REPORTS_ENABLED: ${{ vars.SUPPORT_REPORTS_ENABLED }}
+      APPLY_MIGRATIONS: ${{ inputs.apply_migrations }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: ${{ secrets.AGENT_USAGE_D1_DATABASE_ID_PRODUCTION }}
+      BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
+      RELAY_SCHEMA_QUERY: SELECT 'migration' AS kind, name, '' AS table_name FROM d1_migrations UNION ALL SELECT 'column', p.name, s.name FROM sqlite_schema AS s JOIN pragma_table_info(s.name) AS p WHERE s.type = 'table' AND s.name IN ('usage_daily', 'support_daily', 'prompt_turns', 'request_slots', 'protocol_daily');
+      WRANGLER_SEND_METRICS: 'false'
+      CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false'
+    steps:
+      - name: Checkout immutable dispatch commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+        with:
+          version: 10.34.9
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Guard manual dev deployment and exact reviewed source
+        run: node agent-relay/operations/prepare-deployment.mjs guard
+
+      - name: Select isolated temporary deployment directory
+        run: |
+          directory="$(mktemp -d "$RUNNER_TEMP/agent-relay-XXXXXXXX")"
+          printf 'DEPLOY_DIR=%s\n' "$directory" >> "$GITHUB_ENV"
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare production configuration
+        timeout-minutes: 3
+        env:
+          PURI_TOKEN_SECRET_PRODUCTION: ${{ secrets.PURI_TOKEN_SECRET_PRODUCTION }}
+        run: node agent-relay/operations/prepare-deployment.mjs prepare "$DEPLOY_DIR"
+
+      - name: Require initialized relay database
+        timeout-minutes: 3
+        working-directory: agent-relay
+        run: |
+          pnpm exec wrangler d1 execute AGENT_USAGE_DB --remote --config "$DEPLOY_DIR/wrangler.json" \
+            --command "$RELAY_SCHEMA_QUERY" --json > "$DEPLOY_DIR/schema.json"
+          node operations/prepare-deployment.mjs initialized "$DEPLOY_DIR/schema.json"
+
+      - name: Apply explicitly selected relay migrations
+        if: inputs.apply_migrations
+        timeout-minutes: 5
+        working-directory: agent-relay
+        run: pnpm exec wrangler d1 migrations apply AGENT_USAGE_DB --remote --config "$DEPLOY_DIR/wrangler.json"
+
+      - name: Require deploy-ready relay schema
+        timeout-minutes: 3
+        working-directory: agent-relay
+        run: |
+          pnpm exec wrangler d1 execute AGENT_USAGE_DB --remote --config "$DEPLOY_DIR/wrangler.json" \
+            --command "$RELAY_SCHEMA_QUERY" --json > "$DEPLOY_DIR/schema.json"
+          node operations/prepare-deployment.mjs schema "$DEPLOY_DIR/schema.json"
+
+      - name: Deploy canonical workers.dev relay
+        timeout-minutes: 5
+        working-directory: agent-relay
+        run: >-
+          pnpm exec wrangler deploy --keep-vars --config "$DEPLOY_DIR/wrangler.json"
+          --experimental-provision=false --experimental-auto-create=false --no-autoconfig
+          --tag "$GITHUB_SHA" --message "Reviewed source $GITHUB_SHA; run $GITHUB_RUN_ID attempt $GITHUB_RUN_ATTEMPT"
+
+      - name: Smoke endpoint authentication and protocol rejection without model calls
+        timeout-minutes: 3
+        env:
+          PURI_TOKEN_SECRET_PRODUCTION: ${{ secrets.PURI_TOKEN_SECRET_PRODUCTION }}
+        run: node agent-relay/operations/smoke-deployment.mjs
+
+      - name: Remove ephemeral deployment files
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${DEPLOY_DIR:-}" ]]; then
+            rm -rf -- "$DEPLOY_DIR"
+          fi

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from puripuly_heart.app.adapters.self_capture_vad import SelfCaptureVadAdapter
-
+from puripuly_heart.app.adapters.self_capture.self_capture_vad import SelfCaptureVadAdapter
 from puripuly_heart.config.resolved import vad_exit_threshold
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
 

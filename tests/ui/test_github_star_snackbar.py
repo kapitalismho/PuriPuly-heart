@@ -11,7 +11,6 @@ import pytest
 
 pytest.importorskip("flet")
 import flet as ft
-from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
 
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
@@ -23,6 +22,7 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 from puripuly_heart.app.services.github_star_prompt_settings import (
     compose_github_star_prompt_owner,
 )
+from puripuly_heart.app.services.managed.managed_usage import ManagedUsageOwner
 from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.settings_vnext.serialization import to_dict as canonical_to_dict
@@ -30,7 +30,6 @@ from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata
 from puripuly_heart.ui import app as app_module
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
-from puripuly_heart.ui.components.debug_preview_panel import DebugPreviewPanel
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 
@@ -215,10 +214,6 @@ def _eligible_app(
     )
     app._ui_application = compose_test_ui_application_boundary(backend)
     return app, page, backend
-
-
-async def _async_noop(*_args: object, **_kwargs: object) -> None:
-    return None
 
 
 @pytest.mark.parametrize(
@@ -1039,34 +1034,6 @@ def test_stt_compatibility_snackbar_marks_launch_high_priority_feedback(
 
     assert len(app.page.opened) == 1
     assert app._launch_feedback_conflicts_with_github_star_prompt() is True
-
-
-def test_debug_preview_panel_includes_github_star_snackbar_action() -> None:
-    invoked: list[str] = []
-
-    def noop() -> None:
-        return None
-
-    panel = DebugPreviewPanel(
-        on_founder_letter=noop,
-        on_discord_auth=noop,
-        on_discord_callback_page=noop,
-        on_qq_auth=noop,
-        on_qq_auth_recoverable_error=noop,
-        on_qq_auth_translation_gated=noop,
-        on_peer_translation_eula=noop,
-        on_local_qwen_hallucination_modal=noop,
-        on_foundation_primitives=noop,
-        on_display_turn_cycle=noop,
-        on_github_star_snackbar=lambda: invoked.append("github-star"),
-    )
-
-    action = panel._action_buttons["github_star_snackbar"]  # noqa: SLF001
-    assert action.content == i18n_module.t("debug_preview.github_star_snackbar")
-
-    action.on_click(None)
-
-    assert invoked == ["github-star"]
 
 
 def test_debug_preview_github_star_snackbar_opens_without_mutating_prompt_state(

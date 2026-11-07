@@ -1,5 +1,8 @@
 import type { Context } from 'hono';
 
+import { randomBase64Url } from './crypto';
+import { readJsonBody } from './public-input';
+
 import { instrumentPublicPostRoute } from './abuse-controls';
 import { errorResponse as publicErrorResponse } from './broker-error';
 import type { BrokerEnv } from './contract';
@@ -7,13 +10,13 @@ import { finalizeDiscordManagedKeyDeliveryAck } from './discord-managed-issue';
 import type { BrokerIssueSuccessSource, ManagedKeyDeliveryRecord } from './persistence';
 import { finalizeQqManagedKeyDeliveryAck } from './qq-managed-issue';
 import { timingSafeEqualHex } from './network-identity';
+import { MANAGED_CLEANUP_CLAIM_TTL_MS, MANAGED_CLEANUP_RETRY_MS } from './managed-cleanup';
 
 const DELIVERY_ID_PREFIX = 'ph-delivery-v1_';
 const ACK_TOKEN_HASH_PREFIX = 'ph-delivery-ack-token-v1_';
 const DELIVERY_RANDOM_BYTES = 32;
 const ACK_TOKEN_RANDOM_BYTES = 32;
 export const STALE_DELIVERY_CLEANUP_CLAIM_REASON = 'stale_delivery_cleanup_claimed';
-const STALE_DELIVERY_CLEANUP_CLAIM_TTL_MS = 16 * 60_000;
 
 type ManagedKeyDeliveryIssueSource = BrokerIssueSuccessSource;
 
@@ -102,74 +105,6 @@ export async function createManagedKeyDelivery(
   return { deliveryId, deliveryAckToken, ackTokenHash };
 }
 
-export async function acknowledgeManagedKeyDelivery(
-  db: D1Database,
-  input: {
-    deliveryId: string;
-    managedCredentialRef: string;
-    deliveryAckToken: string;
-    now: Date;
-  },
-): Promise<ManagedKeyDeliveryAckResult> {
-  const row = await db
-    .prepare(
-      `SELECT delivery_id, managed_credential_ref, ack_token_hash, status, expires_at
-         FROM managed_key_deliveries
-        WHERE delivery_id = ?`,
-    )
-    .bind(input.deliveryId)
-    .first<Pick<ManagedKeyDeliveryRecord, 'delivery_id' | 'managed_credential_ref' | 'ack_token_hash' | 'status' | 'expires_at'>>();
-
-  if (!row) {
-    return { ok: false, reason: 'invalid' };
-  }
-  const candidateHash = await hashDeliveryAckToken(input.deliveryAckToken);
-  if (!(await timingSafeEqualHex(candidateHash, row.ack_token_hash))) {
-    return { ok: false, reason: 'invalid' };
-  }
-
-  if (row.managed_credential_ref !== input.managedCredentialRef) {
-    return { ok: false, reason: 'mismatched' };
-  }
-
-  if (row.status === 'acknowledged') {
-    return { ok: true, status: 'already_acknowledged' };
-  }
-
-  if (row.status === 'expired') {
-    return { ok: false, reason: 'expired' };
-  }
-
-  if (row.status === 'cleanup_required') {
-    return { ok: false, reason: 'failed' };
-  }
-
-  if (input.now.toISOString() > row.expires_at) {
-    return { ok: false, reason: 'expired' };
-  }
-
-  const acknowledgedAt = input.now.toISOString();
-  const result = await db
-    .prepare(
-      `UPDATE managed_key_deliveries
-          SET status = 'acknowledged', acknowledged_at = ?
-        WHERE delivery_id = ?
-          AND status = 'pending'`,
-    )
-    .bind(acknowledgedAt, input.deliveryId)
-    .run();
-
-  if ((result.meta?.changes ?? 0) === 0) {
-    const latest = await getManagedKeyDelivery(db, input.deliveryId);
-    if (latest?.status === 'acknowledged') {
-      return { ok: true, status: 'already_acknowledged' };
-    }
-    return { ok: false, reason: 'failed' };
-  }
-
-  return { ok: true, status: 'acknowledged' };
-}
-
 export async function validateManagedKeyDeliveryAck(
   db: D1Database,
   input: {
@@ -244,28 +179,42 @@ export async function listStalePendingManagedKeyDeliveries(
 ): Promise<ManagedKeyDeliveryRecord[]> {
   const result = await db
     .prepare(
-      `SELECT delivery_id, issue_source, subject_ref, installation_id, managed_credential_ref,
-              ack_token_hash, status, created_at, expires_at, acknowledged_at, failed_at, failure_reason, operation_id, attempt_index
-         FROM managed_key_deliveries
-        WHERE (
-                status = 'pending'
-                AND expires_at <= ?
-              )
-           OR (
-                status = 'expired'
-                AND failure_reason = ?
-                AND failed_at <= ?
-              )
-           OR status = 'cleanup_required'
-        ORDER BY expires_at ASC
+      `SELECT delivery.delivery_id, delivery.issue_source, delivery.subject_ref, delivery.installation_id, delivery.managed_credential_ref,
+              delivery.ack_token_hash, delivery.status, delivery.created_at, delivery.expires_at, delivery.acknowledged_at,
+              delivery.failed_at, delivery.failure_reason, delivery.operation_id, delivery.attempt_index
+         FROM managed_key_deliveries delivery
+         LEFT JOIN managed_operations operation ON operation.operation_id = delivery.operation_id
+           AND operation.current_attempt_index = delivery.attempt_index
+        WHERE (delivery.status = 'acknowledged' AND operation.state IN ('DELIVERY_PENDING', 'FAILED'))
+           OR ((delivery.operation_id IS NULL OR delivery.attempt_index IS NULL OR (
+          EXISTS (SELECT 1 FROM broker_issue_success_events event
+            WHERE event.issue_source = delivery.issue_source AND event.managed_credential_ref = delivery.managed_credential_ref)
+          AND (
+            (delivery.issue_source = 'qq' AND EXISTS (SELECT 1 FROM qq_managed_entitlements entitlement
+              WHERE entitlement.managed_credential_ref = delivery.managed_credential_ref
+                AND entitlement.status = 'active' AND entitlement.delivered_at IS NOT NULL))
+            OR (delivery.issue_source = 'discord' AND EXISTS (
+              SELECT 1 FROM openrouter_entitlements entitlement JOIN discord_identities identity
+                ON identity.entitlement_installation_id = entitlement.installation_id
+                  AND identity.discord_user_ref = entitlement.discord_user_ref
+              WHERE entitlement.managed_credential_ref = delivery.managed_credential_ref
+                AND entitlement.status = 'active' AND entitlement.discord_issue_status = 'active'
+                AND entitlement.discord_issue_delivered_at IS NOT NULL AND identity.status = 'active'))
+          )
+        ))
+          AND (
+          (delivery.status = 'pending' AND delivery.expires_at < ?)
+          OR (delivery.status = 'expired' AND delivery.failure_reason = ? AND delivery.failed_at <= ?)
+          OR (delivery.status = 'cleanup_required' AND (delivery.failed_at IS NULL OR delivery.failed_at <= ?))
+        ))
+        ORDER BY COALESCE(delivery.failed_at, delivery.expires_at), delivery.delivery_id
         LIMIT ?`,
     )
     .bind(
       input.now.toISOString(),
       STALE_DELIVERY_CLEANUP_CLAIM_REASON,
-      new Date(
-        input.now.getTime() - STALE_DELIVERY_CLEANUP_CLAIM_TTL_MS,
-      ).toISOString(),
+      new Date(input.now.getTime() - MANAGED_CLEANUP_CLAIM_TTL_MS).toISOString(),
+      new Date(input.now.getTime() - MANAGED_CLEANUP_RETRY_MS).toISOString(),
       input.limit,
     )
     .all<ManagedKeyDeliveryRecord>();
@@ -299,9 +248,9 @@ export async function claimStaleManagedKeyDeliveryCleanup(
         SET status = 'expired', failed_at = ?, failure_reason = ?
       WHERE delivery_id = ? AND managed_credential_ref = ?
         AND (
-          (status = 'pending' AND expires_at <= ?)
-          OR status = 'cleanup_required'
-          OR (status = 'expired' AND failure_reason = ? AND failed_at IS ?)
+          (status = 'pending' AND expires_at < ?)
+          OR (status = 'cleanup_required' AND (failed_at IS NULL OR failed_at <= ?))
+          OR (status = 'expired' AND failure_reason = ? AND failed_at IS ? AND failed_at <= ?)
         )
         ${activeOwnerGuard}`,
   ).bind(
@@ -310,8 +259,10 @@ export async function claimStaleManagedKeyDeliveryCleanup(
     input.delivery.delivery_id,
     input.delivery.managed_credential_ref,
     input.claimedAt,
+    new Date(Date.parse(input.claimedAt) - MANAGED_CLEANUP_RETRY_MS).toISOString(),
     STALE_DELIVERY_CLEANUP_CLAIM_REASON,
     input.delivery.failed_at,
+    new Date(Date.parse(input.claimedAt) - MANAGED_CLEANUP_CLAIM_TTL_MS).toISOString(),
     input.delivery.managed_credential_ref,
   ).run();
 
@@ -353,7 +304,14 @@ export async function handleManagedKeyDeliveryAck(
 ): Promise<Response> {
   const body = await readJsonBody<ManagedKeyDeliveryAckRequestBody>(c);
   if (!body.ok) {
-    return ackErrorResponse(c, 400, 'malformed', body.reason);
+    return ackErrorResponse(
+      c,
+      400,
+      'malformed',
+      body.reason === 'invalid_json'
+        ? 'request body must be valid JSON'
+        : 'request body must be a JSON object',
+    );
   }
 
   const deliveryId = nonEmptyString(body.value.delivery_id);
@@ -446,24 +404,6 @@ async function getManagedKeyDelivery(
     .first<ManagedKeyDeliveryRecord>();
 }
 
-async function readJsonBody<T>(
-  c: Context<BrokerEnv>,
-): Promise<
-  | { ok: true; value: T }
-  | { ok: false; reason: 'request body must be valid JSON' | 'request body must be a JSON object' }
-> {
-  try {
-    const value = await c.req.json();
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      return { ok: false, reason: 'request body must be a JSON object' };
-    }
-
-    return { ok: true, value: value as T };
-  } catch {
-    return { ok: false, reason: 'request body must be valid JSON' };
-  }
-}
-
 function ackErrorResponse(
   c: Context<BrokerEnv>,
   status: 400 | 404 | 409 | 410 | 429,
@@ -480,16 +420,6 @@ function ackErrorResponse(
 
 function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
-}
-
-function randomBase64Url(byteLength: number): string {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }
 
 function toHex(bytes: Uint8Array): string {

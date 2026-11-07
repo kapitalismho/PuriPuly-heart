@@ -15,7 +15,7 @@ from puripuly_heart.app.ports.ui_models import (
 from puripuly_heart.config.runtime_resolution import stt_supports_peer_auto_detection
 from puripuly_heart.core.language import get_all_language_options
 from puripuly_heart.domain.events import SelfTurnPresentation
-from puripuly_heart.ui.components.display_card import DisplayCard
+from puripuly_heart.ui.components.display_card import DisplayCard, choose_input_hint_key
 from puripuly_heart.ui.components.language_card import LanguageCard
 from puripuly_heart.ui.components.language_modal import LanguageModal
 from puripuly_heart.ui.components.power_button import PowerButton
@@ -292,7 +292,7 @@ class DashboardView(ft.Column):
             self.is_connected = status == "connected"
             self.set_display_text("")
             return
-        self.set_status(status)
+        self.set_status(status, replace_content=True)
 
     def _dismiss_api_key_warning_display(self) -> None:
         if self._stt_showing_warning:
@@ -362,6 +362,9 @@ class DashboardView(ft.Column):
     def _on_message_input_activity(self, has_text: bool) -> None:
         if self.on_message_input_activity:
             self.on_message_input_activity(bool(has_text))
+
+    def apply_launch_input_hint(self, *, first_launch: bool) -> None:
+        self.display_card.set_input_hint_key(choose_input_hint_key(first_launch=first_launch))
 
     def handle_message_input_tab_key(self) -> bool:
         if not self._message_input_focused:
@@ -564,17 +567,18 @@ class DashboardView(ft.Column):
             ),
         )
 
-    def set_status(self, status: str) -> None:
+    def set_status(self, status: str, *, replace_content: bool = False) -> None:
         self._connection_status = status
         self.is_connected = status == "connected"
-        self._primary_display_revision += 1
-        self._current_display_text = None
         status_face = self._typeface(None)
-        self.display_card.set_status(
+        if self.display_card.set_status(
             status,
             font_family=status_face.font_family,
             letter_spacing=status_face.letter_spacing,
-        )
+            replace_content=replace_content,
+        ):
+            self._primary_display_revision += 1
+            self._current_display_text = None
 
     def set_languages_from_codes(
         self,

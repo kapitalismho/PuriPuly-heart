@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     ProviderRuntimeBuildRequest,
 )

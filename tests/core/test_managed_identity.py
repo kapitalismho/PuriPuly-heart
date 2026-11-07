@@ -4,7 +4,9 @@ import base64
 import hashlib
 import json
 import re
+import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -14,14 +16,6 @@ from cryptography.hazmat.primitives.serialization import (
     NoEncryption,
     PrivateFormat,
     PublicFormat,
-)
-from puripuly_heart.core.openrouter_credentials import (
-    OPENROUTER_BYOK_API_KEY_SECRET,
-    OPENROUTER_MANAGED_API_KEY_SECRET,
-    OPENROUTER_MANAGED_USER_ID_SECRET,
-    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
-    OpenRouterCredentialRuntimeConfig,
-    load_managed_openrouter_user_identifier,
 )
 
 from puripuly_heart.app.wiring import ManagedIdentityStateAdapter
@@ -34,7 +28,16 @@ from puripuly_heart.core.managed_identity import (
     canonical_verify_payload,
     decode_base64url,
     ensure_managed_identity_bundle,
+    load_existing_managed_identity_bundle,
     regenerate_managed_identity_bundle,
+)
+from puripuly_heart.core.openrouter.openrouter_credentials import (
+    OPENROUTER_BYOK_API_KEY_SECRET,
+    OPENROUTER_MANAGED_API_KEY_SECRET,
+    OPENROUTER_MANAGED_USER_ID_SECRET,
+    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
+    OpenRouterCredentialRuntimeConfig,
+    load_managed_openrouter_user_identifier,
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from tests.helpers.release_settings import (
@@ -128,6 +131,107 @@ def test_ensure_managed_identity_bundle_reuses_existing_valid_bundle() -> None:
     assert second.installation_id == first.installation_id
     assert second.device_public_key == first.device_public_key
     assert store.get(MANAGED_DEVICE_PRIVATE_KEY_SECRET) == private_before
+
+
+def test_unassigned_identity_requirement_reuses_a_valid_existing_bundle() -> None:
+    settings = ReleaseSettings()
+    store = InMemorySecretStore()
+    first = ensure_managed_identity_bundle(_managed_state(settings), store)
+    before = dict(store._items)
+
+    second = ensure_managed_identity_bundle(
+        _managed_state(settings), store, require_empty_installation_id=True
+    )
+
+    assert second.installation_id == first.installation_id
+    assert second.device_public_key == first.device_public_key
+    assert store._items == before
+
+
+@pytest.mark.parametrize(
+    ("installation_id", "partial_secret"),
+    [
+        ("01961ad7-a7c1-7000-8000-0123456789ab", None),
+        ("", MANAGED_DEVICE_PRIVATE_KEY_SECRET),
+        ("", MANAGED_DEVICE_PUBLIC_KEY_SECRET),
+        ("", "managed_identity_binding"),
+        ("", OPENROUTER_MANAGED_API_KEY_SECRET),
+        ("", "openrouter_managed_qq_api_key"),
+    ],
+)
+def test_unassigned_identity_requirement_preserves_partial_state(
+    installation_id: str, partial_secret: str | None
+) -> None:
+    settings = ReleaseSettings()
+    settings.managed_identity.installation_id = installation_id
+    store = InMemorySecretStore()
+    store.set(OPENROUTER_BYOK_API_KEY_SECRET, "preserved-byok")
+    if partial_secret is not None:
+        store.set(partial_secret, "preserved-partial-value")
+    before_settings = managed_identity_payload(settings)
+    before_secrets = dict(store._items)
+
+    with pytest.raises(ValueError, match="requires recovery"):
+        ensure_managed_identity_bundle(
+            _managed_state(settings), store, require_empty_installation_id=True
+        )
+
+    assert managed_identity_payload(settings) == before_settings
+    assert store._items == before_secrets
+
+
+@pytest.mark.parametrize("regenerate", [False, True])
+def test_identity_reader_waits_for_complete_creation_or_explicit_regeneration(
+    monkeypatch, regenerate: bool
+) -> None:
+    from puripuly_heart.core import managed_identity
+
+    settings = ReleaseSettings()
+    store = InMemorySecretStore()
+    state = _managed_state(settings)
+    if regenerate:
+        ensure_managed_identity_bundle(state, store)
+    private_written = threading.Event()
+    reader_waiting = threading.Event()
+    finish_write = threading.Event()
+
+    class ObservedLock:
+        def __init__(self):
+            self.lock = managed_identity._identity_lock
+
+        def __enter__(self):
+            if not self.lock.acquire(blocking=False):
+                reader_waiting.set()
+                self.lock.acquire()
+
+        def __exit__(self, *_args):
+            self.lock.release()
+
+    monkeypatch.setattr(managed_identity, "_identity_lock", ObservedLock())
+    real_set = InMemorySecretStore.set
+
+    def gated_set(self, key, value):
+        real_set(self, key, value)
+        if key == MANAGED_DEVICE_PRIVATE_KEY_SECRET:
+            private_written.set()
+            assert finish_write.wait(5)
+
+    monkeypatch.setattr(InMemorySecretStore, "set", gated_set)
+    operation = regenerate_managed_identity_bundle if regenerate else ensure_managed_identity_bundle
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        writer = executor.submit(operation, state, store)
+        try:
+            assert private_written.wait(5)
+            reader = executor.submit(load_existing_managed_identity_bundle, state, store)
+            assert reader_waiting.wait(5)
+            assert not reader.done()
+        finally:
+            finish_write.set()
+        created = writer.result(timeout=5)
+        loaded = reader.result(timeout=5)
+    assert loaded is not None
+    assert loaded.installation_id == created.installation_id
+    assert loaded.device_public_key == created.device_public_key
 
 
 def test_ensure_managed_identity_bundle_generates_when_port_persistence_is_available() -> None:

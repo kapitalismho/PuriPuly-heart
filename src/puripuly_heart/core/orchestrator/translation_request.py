@@ -5,7 +5,7 @@ import json
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
-from typing import Protocol, cast
+from typing import Literal, Protocol, cast
 from uuid import UUID
 
 from puripuly_heart.config.prompts import (
@@ -18,13 +18,15 @@ from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.language import get_llm_language_name, map_detected_language_for_llm
 from puripuly_heart.core.llm.latency import observe_request
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
-from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterUserFacingError
 from puripuly_heart.core.messages import (
     SEVERITY_ERROR,
     ErrorDiagnostics,
     SafeMessageParam,
     UserErrorReport,
     UserMessageRef,
+)
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
+    ManagedOpenRouterUserFacingError,
 )
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime, ContextEntry
 from puripuly_heart.core.orchestrator.configuration import (
@@ -71,6 +73,7 @@ def render_translation_system_prompt(
     source_name: str | None = None,
     input_channel: ChannelId = "self",
     source_specified: bool = True,
+    peer_request_kind: Literal["final", "preview", "repair", "continuation"] = "final",
 ) -> str:
     return render_translation_prompt_template(
         template,
@@ -78,6 +81,9 @@ def render_translation_system_prompt(
         target_name=get_llm_language_name(target_language),
         input_channel=input_channel,
         source_specified=source_specified,
+        peer_request_kind=(
+            peer_request_kind if peer_request_kind in {"preview", "continuation"} else "normal"
+        ),
     )
 
 
@@ -157,6 +163,8 @@ class TranslationRequestPort(Protocol):
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
         parent_utterance_id: UUID | None = None,
         target_index: int | None = None,
+        peer_request_kind: Literal["final", "preview", "repair", "continuation"] = "final",
+        peer_context_texts: tuple[str, ...] | None = None,
     ) -> PreparedTranslationRequest: ...
 
     def admit(
@@ -241,6 +249,9 @@ class TranslationProcessRequest:
     prestarted: bool = False
     operation_id: str | None = None
     request_id: str | None = None
+    peer_request_kind: Literal["final", "preview", "repair", "continuation"] = "final"
+    peer_caption_revision: int = 0
+    peer_superseded_unit_ids: tuple[UUID, ...] = ()
     terminal_failure: TerminalTranslationFailure | None = field(
         default=None, repr=False, compare=False
     )
@@ -314,7 +325,6 @@ class TranslationRequestOwner:
     presentation: TranslationRequestPresentationPort = field(repr=False)
     clock: Clock
     scene_provider: SceneSnapshotProvider | None = None
-    settled_failure_sink: Callable[[BaseException], None] | None = None
 
     def __post_init__(self) -> None:
         warm_prompt_cache()
@@ -452,6 +462,8 @@ class TranslationRequestOwner:
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
         parent_utterance_id: UUID | None = None,
         target_index: int | None = None,
+        peer_request_kind: Literal["final", "preview", "repair", "continuation"] = "final",
+        peer_context_texts: tuple[str, ...] | None = None,
     ) -> PreparedTranslationRequest:
         config_snapshot = config_snapshot or self.config_snapshot()
         configuration = config_snapshot.value
@@ -479,6 +491,14 @@ class TranslationRequestOwner:
             other_target_language=self.target_language_for(other_channel, configuration),
             configuration=configuration,
         )
+        if channel == "peer" and peer_context_texts is not None:
+            context_texts = peer_context_texts
+            context = self.format_context(
+                [
+                    ContextEntry(item, source_language, target_language, self.clock.now(), "peer")
+                    for item in context_texts
+                ]
+            )
         return PreparedTranslationRequest(
             system_prompt=render_translation_system_prompt(
                 configuration.system_prompt,
@@ -487,6 +507,7 @@ class TranslationRequestOwner:
                 source_name=source_name,
                 input_channel=channel,
                 source_specified=source_specified,
+                peer_request_kind=peer_request_kind,
             ),
             context=context,
             requested_at=self.clock.now(),
@@ -636,10 +657,8 @@ class TranslationRequestOwner:
                             ),
                         )
                     )
-                except Exception as exc:
+                except Exception:
                     self._raise_if_stale_provider_request(backend, generation)
-                    if request.record_latency and self.settled_failure_sink is not None:
-                        self.settled_failure_sink(exc)
                     raise
                 self._raise_if_stale_provider_request(backend, generation)
                 if request.record_latency:
@@ -740,6 +759,7 @@ class TranslationRequestOwner:
                     config_snapshot=request.config_snapshot,
                     parent_utterance_id=request.parent_utterance_id,
                     target_index=request.target_index,
+                    peer_request_kind=request.peer_request_kind,
                 )
                 self.remember_context(
                     request.text,
@@ -769,7 +789,11 @@ class TranslationRequestOwner:
                 utterance_id=request.utterance_id,
                 parent_utterance_id=request.parent_utterance_id,
                 channel=request.channel,
-                kind=request.turn_kind or request.channel,
+                kind=(
+                    f"peer_{request.peer_request_kind}"
+                    if request.peer_caption_revision
+                    else request.turn_kind or request.channel
+                ),
                 source_language=source_language,
                 target_language=request.target_language,
                 provider_generation=generation,
@@ -847,15 +871,6 @@ class TranslationRequestOwner:
             )
             if not request.prestarted:
                 await self._publish_failure(request, self._translation_error_payload(exc, report))
-            if (
-                self.settled_failure_sink is not None
-                and (not request.prestarted or terminal_failure is None)
-                and self.provider_runtime.is_current_provider_generation(
-                    provider=backend, generation=generation
-                )
-                and not (cancellation_requested is not None and cancellation_requested())
-            ):
-                self.settled_failure_sink(exc)
             return self._result(
                 request,
                 "failed",
@@ -890,6 +905,9 @@ class TranslationRequestOwner:
                 context_texts=context_texts,
                 operation_id=request.operation_id,
                 request_id=request.request_id,
+                peer_request_kind=request.peer_request_kind,
+                peer_caption_revision=request.peer_caption_revision,
+                peer_superseded_unit_ids=request.peer_superseded_unit_ids,
             ),
         )
 
@@ -1102,6 +1120,9 @@ class TranslationRequestOwner:
                 operation_id=request.operation_id,
                 request_id=request.request_id,
                 failure_diagnostics=failure_diagnostics,
+                peer_request_kind=request.peer_request_kind,
+                peer_caption_revision=request.peer_caption_revision,
+                peer_superseded_unit_ids=request.peer_superseded_unit_ids,
             ),
             failure_diagnostics=failure_diagnostics,
             terminal_failure=terminal_failure,

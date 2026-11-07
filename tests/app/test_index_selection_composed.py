@@ -299,11 +299,12 @@ async def test_background_failure_persists_managed_and_waiting_trans_requires_no
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("credential_available", [False, True])
 @pytest.mark.parametrize(
-    "credential_available,metadata_status", [(False, 200), (True, 200), (True, 503)]
+    "status_code,category", [(429, "rate_limit"), (503, "service_unavailable")]
 )
-async def test_settled_real_request_failure_switches_once_without_replaying_failed_turn(
-    composed, credential_available, metadata_status
+async def test_real_request_failure_preserves_index_and_reports_error(
+    composed, credential_available, status_code, category
 ):
     from puripuly_heart.app.wiring.wiring_secrets_factory import create_secret_store
     from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
@@ -313,43 +314,44 @@ async def test_settled_real_request_failure_switches_once_without_replaying_fail
         seed = load_vnext_settings(path).settings
         store = create_secret_store(seed.intent.secrets, config_path=path)
         store.set("openrouter_managed_api_key", "synthetic-managed-key")
-    http.metadata_status = metadata_status
     http.index_release.set()
     app, presentation = create()
     await app.start()
     enabled = await operation(app, "translation.set", {"enabled": True}, "initial-enable")
     assert enabled["status"] == "applied"
     assert len(http.index_requests) == 1
-    http.index_status = 503
+    http.index_status = status_code
     admitted = await operation(app, "text.submit", {"text": "synthetic user text"}, "failed-turn")
     assert admitted["status"] == "applied"
-    await wait_until(
-        lambda: app.compatibility_settings().intent.translation.model == "gemma4_26b_31b"
-    )
-    await wait_until(
-        lambda: any(
-            key == "messages.index_api_fallback_managed" for key, _ in presentation.messages
-        )
-    )
-    assert len(http.index_requests) == 3
-    assert not [
-        request
-        for request in http.requests
-        if request[0] == "openrouter.ai" and request[1].endswith("/chat/completions")
+    await wait_until(lambda: presentation.dashboard.issue is not None)
+    history = await app.control().query("diagnostics.history", {"limit": 20})
+    failures = [
+        record
+        for record in history["records"]
+        if record["component"] == "provider.llm" and record["operation"] == "translate"
     ]
+    assert len(failures) == 1
+    assert failures[0]["status_code"] == status_code
+    assert failures[0]["category"] == category
+    assert len(http.index_requests) == 3
+    assert all(request[0] == "index-translate.bilibili.com" for request in http.requests)
     assert presentation.dashboard.translation is None
-    assert [key for key, _ in presentation.messages].count(
-        "messages.index_api_fallback_managed"
-    ) == 1
-    assert app.state().translation_enabled is credential_available
-    status = await app.control().query("app.status", {})
-    for channel in ("self", "peer"):
-        assert status["channels"][channel]["desired_active"] is False
-        assert status["channels"][channel]["effective_active"] is False
-    if not credential_available:
-        resumed = await operation(app, "translation.set", {"enabled": True}, "normal-later-auth")
-        assert resumed["status"] == "action_required"
-        assert any(key == "discord_auth.error.action_required" for key, _ in presentation.messages)
+    assert not [
+        key for key, _ in presentation.messages if key.startswith("messages.index_api_fallback_")
+    ]
+    current = app.compatibility_settings().intent.translation
+    persisted = load_vnext_settings(path).settings.intent.translation
+    assert (current.model, current.connection) == ("index_translate_35b", "public_api")
+    assert (persisted.model, persisted.connection) == (current.model, current.connection)
+    assert app.state().translation_enabled is True
+    http.index_status = 200
+    resumed = await operation(
+        app, "text.submit", {"text": "synthetic recovery text"}, "next-index-turn"
+    )
+    assert resumed["status"] == "applied"
+    await wait_until(lambda: presentation.dashboard.translation == "Synthetic translation")
+    assert len(http.index_requests) == 4
+    assert "synthetic recovery text" in http.index_requests[-1][3]["messages"][1]["content"]
 
 
 @pytest.mark.asyncio

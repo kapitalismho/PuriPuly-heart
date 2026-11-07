@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from puripuly_heart.config.audio_host_api import InputHostApiProfile
-from puripuly_heart.core.audio.source import SelfMicCaptureChannelDecision
+from puripuly_heart.core.audio.source import AudioSourceOpenFailure, SelfMicCaptureChannelDecision
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
 
 SelfCaptureHostApiNormalizer = Callable[[str | None], InputHostApiProfile]
@@ -52,6 +52,8 @@ class SelfCaptureSourceAdapter:
                 f"wasapi_auto_convert={host_api_profile.wasapi_auto_convert} "
                 f"wasapi_exclusive={host_api_profile.wasapi_exclusive}"
             )
+        except AudioSourceOpenFailure:
+            raise
         except Exception as exc:
             self.log_diagnostic(
                 f"[STT] Microphone open failed cause={type(exc).__name__}",
@@ -71,6 +73,8 @@ class SelfCaptureSourceAdapter:
                     self.log_diagnostic(
                         f"[STT] Microphone opened with fallback: device_idx={fallback_idx}"
                     )
+                except AudioSourceOpenFailure:
+                    raise
                 except Exception as exc:
                     self.log_diagnostic(
                         f"[STT] Fallback microphone failed cause={type(exc).__name__}",
@@ -86,6 +90,8 @@ class SelfCaptureSourceAdapter:
                     device_for_log="",
                 )
                 self.log_diagnostic("[STT] Microphone opened with system default")
+            except AudioSourceOpenFailure:
+                raise
             except Exception as exc:
                 self.log_diagnostic(
                     f"[STT] System default microphone failed cause={type(exc).__name__}",
@@ -132,6 +138,8 @@ class SelfCaptureSourceAdapter:
                 wasapi_auto_convert=wasapi_auto_convert,
                 wasapi_exclusive=wasapi_exclusive,
             )
+        except AudioSourceOpenFailure:
+            raise
         except Exception as exc:
             if decision.preferred_capture_channels <= config.internal_channels:
                 raise

@@ -124,29 +124,6 @@ def test_native_python_child_environment_is_installed_only_and_non_recursive(
     assert "FLET_DART_BRIDGE_EXIT_PORT" not in environment
 
 
-def test_frozen_package_resources_and_child_environment_preserve_runtime_boundary(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    extraction_root = tmp_path / "frozen 한글"
-    notices = extraction_root / "puripuly_heart" / "data" / "THIRD_PARTY_NOTICES.txt"
-    notices.parent.mkdir(parents=True)
-    shutil.copy2(SOURCE_ROOT / "data" / "THIRD_PARTY_NOTICES.txt", notices)
-    monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
-    monkeypatch.setattr(sys, "frozen", True, raising=False)
-    monkeypatch.setattr(sys, "_MEIPASS", str(extraction_root), raising=False)
-
-    layout = current_runtime_layout()
-
-    assert layout.host_kind == "pyinstaller"
-    assert layout.package_resource("data", "THIRD_PARTY_NOTICES.txt") == notices
-    assert notices.read_text(encoding="utf-8") == (
-        SOURCE_ROOT / "data" / "THIRD_PARTY_NOTICES.txt"
-    ).read_text(encoding="utf-8")
-    environment = {"PYTHONPATH": "inherited", "PATH": "inherited"}
-    assert layout.python_child_environment(environment) == environment
-
-
 def test_native_child_consumes_production_bundle_resources_without_installed_writes(
     tmp_path: Path,
     staged_archive_runtime: tuple[Path, Path, dict[str, object]],
@@ -163,8 +140,10 @@ def test_native_child_consumes_production_bundle_resources_without_installed_wri
         "data/vad/silero_vad.onnx",
         "data/fonts/NotoSansCJK-Medium.ttc",
         "data/THIRD_PARTY_NOTICES.txt",
-        "data/licenses/PYTHON-3.14.7-LICENSE.txt",
-        "data/models/qwen3-asr-0.6b-int8-sherpa.manifest.json",
+        "data/licenses/PYTHON-3.14.10-LICENSE.txt",
+        "data/models/granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu.manifest.json",
+        "data/models/gigaam-v3-e2e-ctc-q8-0-transcribe-cpu.manifest.json",
+        "data/diagnostics/eung.wav",
     )
     for relative in resource_paths:
         destination = package / relative
@@ -187,7 +166,7 @@ def test_native_child_consumes_production_bundle_resources_without_installed_wri
         if path.is_file()
     }
     script = (
-        "import hashlib, json, os, sys, zipimport\n"
+        "import hashlib, json, os, sys, wave, zipimport\n"
         f"sys.path[:0] = {[str(archive_path), str(app_root), str(tmp_path / 'site-packages')]!r}\n"
         f"os.environ['PURIPULY_HEART_NATIVE_RESOURCE_ROOT'] = {str(app_root)!r}\n"
         f"os.environ['PURIPULY_HEART_NATIVE_RUNTIME_ROOT'] = {str(tmp_path)!r}\n"
@@ -209,9 +188,12 @@ resources = [
     model,
     font,
     layout.package_resource("data", "THIRD_PARTY_NOTICES.txt"),
-    layout.package_resource("data", "licenses", "PYTHON-3.14.7-LICENSE.txt"),
+    layout.package_resource("data", "licenses", "PYTHON-3.14.10-LICENSE.txt"),
+    layout.package_resource("data", "diagnostics", "eung.wav"),
 ]
 manifest = local_stt_assets.load_local_stt_asset_manifest()
+with wave.open(str(resources[-1]), "rb") as speech:
+    speech_format = [speech.getnchannels(), speech.getsampwidth(), speech.getframerate(), speech.getnframes()]
 print(json.dumps({
     "host_kind": layout.host_kind,
     "origins": [runtime_layout.__file__, bundled.__file__, fonts.__file__, i18n.__file__,
@@ -224,6 +206,7 @@ print(json.dumps({
     "manifest_id": manifest.model_id,
     "locales": i18n.available_locales(),
     "title": i18n.t("app.title"),
+    "speech_format": speech_format,
 }))
 """
     )
@@ -253,8 +236,9 @@ print(json.dumps({
             "path": str(app_root / "puripuly_heart" / relative),
             "sha256": hashlib.sha256((SOURCE_ROOT / relative).read_bytes()).hexdigest(),
         }
-        for relative in resource_paths[:4]
+        for relative in (*resource_paths[:4], resource_paths[-1])
     ]
+    assert result["speech_format"] == [1, 2, 22050, 26336]
     assert result["font_url"] == "/fonts/NotoSansCJK-Medium.ttc"
     assert (
         result["manifest_id"]

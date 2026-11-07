@@ -4,6 +4,8 @@ import asyncio
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import MappingProxyType
 
 import pytest
 
@@ -51,6 +53,34 @@ def _write_certifying_artifacts(directory: Path, cycles: int = 100) -> None:
     )
     artifacts.write_repro_artifacts(directory, records, result)
     (directory / artifacts.REPRO_CAPTURE_NAME).write_bytes(b"capture")
+
+
+@pytest.fixture(scope="module")
+def certifying_artifact_seeds(tmp_path_factory):
+    seeds = {}
+    with TemporaryDirectory(
+        prefix="repro-artifact-seeds-", dir=tmp_path_factory.getbasetemp()
+    ) as directory:
+        for cycles in (100, 99):
+            seed_dir = Path(directory) / str(cycles)
+            seed_dir.mkdir()
+            _write_certifying_artifacts(seed_dir, cycles)
+            seeds[cycles] = tuple(
+                (name, (seed_dir / name).read_bytes())
+                for name in (
+                    artifacts.REPRO_JSONL_NAME,
+                    artifacts.REPRO_RESULT_NAME,
+                    artifacts.REPRO_CAPTURE_NAME,
+                )
+            )
+    return MappingProxyType(seeds)
+
+
+def _restore_certifying_artifacts(
+    directory: Path, certifying_artifact_seeds, cycles: int = 100
+) -> None:
+    for name, content in certifying_artifact_seeds[cycles]:
+        (directory / name).write_bytes(content)
 
 
 def test_normative_schedule_is_base_adjusted_fifo_with_exact_dispositions() -> None:
@@ -154,8 +184,10 @@ def test_unwritable_preflight_writes_no_artifacts(
     assert not (output / artifacts.REPRO_RESULT_NAME).exists()
 
 
-def test_artifact_validator_accepts_only_complete_certifying_artifacts(tmp_path: Path) -> None:
-    _write_certifying_artifacts(tmp_path)
+def test_artifact_validator_accepts_only_complete_certifying_artifacts(
+    tmp_path: Path, certifying_artifact_seeds
+) -> None:
+    _restore_certifying_artifacts(tmp_path, certifying_artifact_seeds)
 
     assert artifacts.verify_desktop_overlay_repro(output_dir=tmp_path) == 0
 
@@ -172,8 +204,9 @@ def test_artifact_validator_accepts_only_complete_certifying_artifacts(tmp_path:
 
 def test_artifact_validator_rejects_tampered_safe_visual_facts_and_returns_capture_metadata(
     tmp_path: Path,
+    certifying_artifact_seeds,
 ) -> None:
-    _write_certifying_artifacts(tmp_path)
+    _restore_certifying_artifacts(tmp_path, certifying_artifact_seeds)
 
     metadata = artifacts.validate_repro_artifacts(tmp_path)
 
@@ -191,12 +224,14 @@ def test_artifact_validator_rejects_tampered_safe_visual_facts_and_returns_captu
     assert artifacts.verify_desktop_overlay_repro(output_dir=tmp_path) == 1
 
 
-def test_artifact_validator_rejects_short_runs_and_empty_capture(tmp_path: Path) -> None:
-    _write_certifying_artifacts(tmp_path, cycles=99)
+def test_artifact_validator_rejects_short_runs_and_empty_capture(
+    tmp_path: Path, certifying_artifact_seeds
+) -> None:
+    _restore_certifying_artifacts(tmp_path, certifying_artifact_seeds, cycles=99)
 
     assert artifacts.verify_desktop_overlay_repro(output_dir=tmp_path) == 1
 
-    _write_certifying_artifacts(tmp_path, cycles=100)
+    _restore_certifying_artifacts(tmp_path, certifying_artifact_seeds, cycles=100)
     (tmp_path / artifacts.REPRO_CAPTURE_NAME).write_bytes(b"")
 
     assert artifacts.verify_desktop_overlay_repro(output_dir=tmp_path) == 1
@@ -204,8 +239,9 @@ def test_artifact_validator_rejects_short_runs_and_empty_capture(tmp_path: Path)
 
 def test_artifact_validator_rejects_nested_missing_reordered_and_failed_artifacts(
     tmp_path: Path,
+    certifying_artifact_seeds,
 ) -> None:
-    _write_certifying_artifacts(tmp_path)
+    _restore_certifying_artifacts(tmp_path, certifying_artifact_seeds)
     lines = (tmp_path / artifacts.REPRO_JSONL_NAME).read_text(encoding="utf-8").splitlines()
     nested = json.loads(lines[0])
     nested["slot_count"] = {"value": 0}
@@ -214,14 +250,14 @@ def test_artifact_validator_rejects_nested_missing_reordered_and_failed_artifact
 
     assert artifacts.verify_desktop_overlay_repro(output_dir=tmp_path) == 1
 
-    _write_certifying_artifacts(tmp_path)
+    _restore_certifying_artifacts(tmp_path, certifying_artifact_seeds)
     lines = (tmp_path / artifacts.REPRO_JSONL_NAME).read_text(encoding="utf-8").splitlines()
     lines[0], lines[1] = lines[1], lines[0]
     (tmp_path / artifacts.REPRO_JSONL_NAME).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     assert artifacts.verify_desktop_overlay_repro(output_dir=tmp_path) == 1
 
-    _write_certifying_artifacts(tmp_path)
+    _restore_certifying_artifacts(tmp_path, certifying_artifact_seeds)
     result = json.loads((tmp_path / artifacts.REPRO_RESULT_NAME).read_text(encoding="utf-8"))
     result["outcome"] = "failed"
     result["reason"] = "render_failed"
@@ -262,8 +298,9 @@ def test_verifier_is_artifact_only_and_main_dispatches_both_diagnostic_routes(
 def test_verifier_rejects_noninteger_or_nonscalar_schema_and_enums(
     tmp_path: Path,
     invalid: object,
+    certifying_artifact_seeds,
 ) -> None:
-    _write_certifying_artifacts(tmp_path)
+    _restore_certifying_artifacts(tmp_path, certifying_artifact_seeds)
     lines = (tmp_path / artifacts.REPRO_JSONL_NAME).read_text(encoding="utf-8").splitlines()
     record = json.loads(lines[0])
     record["schema_version"] = invalid
@@ -272,7 +309,7 @@ def test_verifier_rejects_noninteger_or_nonscalar_schema_and_enums(
 
     assert artifacts.verify_desktop_overlay_repro(output_dir=tmp_path) == 1
 
-    _write_certifying_artifacts(tmp_path)
+    _restore_certifying_artifacts(tmp_path, certifying_artifact_seeds)
     lines = (tmp_path / artifacts.REPRO_JSONL_NAME).read_text(encoding="utf-8").splitlines()
     record = json.loads(lines[0])
     record["actual_disposition"] = invalid
@@ -281,7 +318,7 @@ def test_verifier_rejects_noninteger_or_nonscalar_schema_and_enums(
 
     assert artifacts.verify_desktop_overlay_repro(output_dir=tmp_path) == 1
 
-    _write_certifying_artifacts(tmp_path)
+    _restore_certifying_artifacts(tmp_path, certifying_artifact_seeds)
     result = json.loads((tmp_path / artifacts.REPRO_RESULT_NAME).read_text(encoding="utf-8"))
     result["reason"] = invalid
     result["outcome"] = "failed"
@@ -307,8 +344,10 @@ def test_diagnostic_main_dispatch_bypasses_main_logging(
     "wall_clock",
     ["2026-02-30T00:00:00Z", "2026-01-01T24:00:00Z", "2026-01-01 00:00:00Z"],
 )
-def test_verifier_rejects_semantically_invalid_rfc3339_utc(tmp_path: Path, wall_clock: str) -> None:
-    _write_certifying_artifacts(tmp_path)
+def test_verifier_rejects_semantically_invalid_rfc3339_utc(
+    tmp_path: Path, wall_clock: str, certifying_artifact_seeds
+) -> None:
+    _restore_certifying_artifacts(tmp_path, certifying_artifact_seeds)
     lines = (tmp_path / artifacts.REPRO_JSONL_NAME).read_text(encoding="utf-8").splitlines()
     record = json.loads(lines[0])
     record["wall_clock_utc"] = wall_clock

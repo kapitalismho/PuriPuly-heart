@@ -209,19 +209,6 @@ class HttpxQwenClient:
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _client_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
 
-    @staticmethod
-    def _normalize_language_code(code: str) -> str:
-        if not code:
-            return "auto"
-        normalized = code.lower()
-        if normalized in {"auto"}:
-            return "auto"
-        if normalized in {"zh-cn", "zh-hans", "zh"}:
-            return "zh"
-        if normalized in {"zh-tw", "zh-hant", "zh_tw"}:
-            return "zh_tw"
-        return normalized.split("-")[0]
-
     async def _get_http_client(self) -> httpx.AsyncClient:
         if self._client is not None:
             return self._client

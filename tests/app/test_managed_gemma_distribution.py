@@ -232,33 +232,6 @@ def test_package_verifier_rejects_nested_runtime_content(tmp_path: Path) -> None
         distribution.verify_package(tmp_path)
 
 
-def test_pyinstaller_normalization_keeps_owned_layout_and_removes_root_duplicates(
-    tmp_path: Path,
-) -> None:
-    prepared = tmp_path / "build" / "llama.cpp" / distribution.LLAMA_CPP_RUNTIME_DIRNAME / "cpu"
-    prepared.mkdir(parents=True)
-    source = prepared / "llama.dll"
-    source.write_bytes(b"runtime")
-    external = tmp_path / "external.dll"
-    external.write_bytes(b"external")
-    binaries = [
-        (
-            f"{distribution.PACKAGED_RUNTIME_RELATIVE_DIR.as_posix()}/cpu/llama.dll",
-            str(source),
-            "BINARY",
-        ),
-        ("llama.dll", str(source), "BINARY"),
-        ("external.dll", str(external), "BINARY"),
-    ]
-
-    distribution.normalize_pyinstaller_binaries(binaries, tmp_path)
-
-    assert [binary[0] for binary in binaries] == [
-        f"{distribution.PACKAGED_RUNTIME_RELATIVE_DIR.as_posix()}/cpu/llama.dll",
-        "external.dll",
-    ]
-
-
 def test_package_verifier_rejects_runtime_copy_outside_owned_directory(tmp_path: Path) -> None:
     _write_package(tmp_path)
     nested = tmp_path / distribution.PACKAGED_RUNTIME_RELATIVE_DIR / "cpu" / "llama-server-impl.dll"

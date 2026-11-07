@@ -34,13 +34,6 @@ def _artifact_entries(paths: list) -> list[dict[str, object]]:
     return entries
 
 
-def test_rendered_body_references_produced_installer() -> None:
-    body = identity.render_release_body("Download `{{INSTALLER_EXE}}` below.", INSTALLER_EXE)
-
-    assert INSTALLER_EXE in body
-    assert "{{INSTALLER_EXE}}" not in body
-
-
 def test_release_surface_accepts_matching_tag_title_body_and_assets() -> None:
     body = f"Download `{INSTALLER_EXE}` from the Assets section below, then run it."
 
@@ -112,23 +105,11 @@ def test_release_surface_rejects_missing_extra_and_duplicate_assets(asset_names)
         )
 
 
-def test_release_surface_rejects_tag_version_disagreement() -> None:
-    with pytest.raises(RuntimeError, match="tag mismatch"):
-        identity.verify_release_surface(
-            version="2.6.2",
-            tag=TAG,
-            title=TAG,
-            installer_exe="PuriPulyHeart-Setup-2.6.2.exe",
-            body_text="Download `PuriPulyHeart-Setup-2.6.2.exe` below.",
-            asset_names=["PuriPulyHeart-Setup-2.6.2.exe"],
-        )
-
-
 @pytest.fixture
 def native_release_inputs(tmp_path: Path) -> tuple[dict[str, Path], Path]:
     names = {
         "main-executable": "PuriPulyHeart.exe",
-        "gpu-worker-executable": "PuriPulyHeartGpuWorker.exe",
+        "asr-worker-executable": "PuriPulyHeartASRWorker.exe",
         "overlay-executable": "PuriPulyHeartOverlay.exe",
         "installer": INSTALLER_EXE,
     }
@@ -150,8 +131,22 @@ def native_release_inputs(tmp_path: Path) -> tuple[dict[str, Path], Path]:
 def _identity_cli(tmp_path: Path, arguments: list[str]) -> subprocess.CompletedProcess[str]:
     environment = dict(os.environ)
     environment["LOCALAPPDATA"] = str(tmp_path / "profile")
+    bootstrap = (
+        "import runpy, sys; "
+        "sys.path.insert(0, sys.argv.pop(1)); "
+        "runpy.run_module(sys.argv.pop(1), run_name='__main__', alter_sys=True)"
+    )
     return subprocess.run(
-        [sys.executable, "-I", "-B", "-m", identity.__name__, *arguments],
+        [
+            sys.executable,
+            "-I",
+            "-B",
+            "-c",
+            bootstrap,
+            str(Path(identity.__file__).resolve().parents[2]),
+            identity.__name__,
+            *arguments,
+        ],
         cwd=tmp_path,
         env=environment,
         capture_output=True,
@@ -175,8 +170,8 @@ def _build_arguments(paths: dict[str, Path], provenance_path: Path) -> list[str]
         "local",
         "--main-exe",
         str(paths["main-executable"]),
-        "--gpu-worker-exe",
-        str(paths["gpu-worker-executable"]),
+        "--asr-worker-exe",
+        str(paths["asr-worker-executable"]),
         "--overlay-exe",
         str(paths["overlay-executable"]),
         "--installer",
@@ -275,7 +270,7 @@ def test_verify_build_cli_rejects_wrong_pe_metadata_without_emitting_provenance(
 ) -> None:
     paths, provenance_path = native_release_inputs
     write_pe(
-        paths["gpu-worker-executable"],
+        paths["asr-worker-executable"],
         version=version,
         metadata={"ProductName": product, "ProductVersion": VERSION},
     )
@@ -284,7 +279,7 @@ def test_verify_build_cli_rejects_wrong_pe_metadata_without_emitting_provenance(
 
     assert rejected.returncode != 0
     assert error in rejected.stderr
-    assert paths["gpu-worker-executable"].name in rejected.stderr
+    assert paths["asr-worker-executable"].name in rejected.stderr
     assert not provenance_path.exists()
 
 
@@ -354,8 +349,6 @@ def test_publish_rejects_detached_inline_provenance(tmp_path, mutation) -> None:
 @pytest.mark.parametrize("tag", ["native-v2.8.0", "v2.8.1", "2.8.0", "V2.8.0"])
 def test_release_identity_rejects_nonstandard_and_version_mismatched_tags(tag) -> None:
     with pytest.raises(RuntimeError, match="tag mismatch"):
-        identity.check_tag_matches_version(tag, "2.8.0")
-    with pytest.raises(RuntimeError, match="tag mismatch"):
         identity.build_provenance(
             version="2.8.0",
             tag=tag,
@@ -376,8 +369,6 @@ def test_release_identity_rejects_nonstandard_and_version_mismatched_tags(tag) -
 @pytest.mark.parametrize("version", ["2.8.beta", "2.8.0-native", "2..0"])
 def test_release_identity_rejects_nonnumeric_versions(version) -> None:
     tag = f"v{version}"
-    with pytest.raises(ValueError):
-        identity.check_tag_matches_version(tag, version)
     with pytest.raises(ValueError):
         identity.build_provenance(
             version=version,

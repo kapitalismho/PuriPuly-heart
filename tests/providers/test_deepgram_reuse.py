@@ -90,27 +90,27 @@ def _result(
 
 
 def _installed_empty_alternatives_result(*, metadata_ack: bool):
-    from deepgram.extensions.types.sockets import ListenV1ResultsEvent
-    from deepgram.extensions.types.sockets.listen_v1_results_event import (
-        ListenV1Channel,
-        ListenV1ModelInfo,
+    from deepgram.listen.v1.types import (
+        ListenV1Results,
+        ListenV1ResultsChannel,
         ListenV1ResultsMetadata,
+        ListenV1ResultsMetadataModelInfo,
     )
 
     metadata = ListenV1ResultsMetadata(
         request_id="connection-request",
-        model_info=ListenV1ModelInfo(name="nova-3", version="1", arch="nova"),
+        model_info=ListenV1ResultsMetadataModelInfo(name="nova-3", version="1", arch="nova"),
         model_uuid="model",
         from_finalize=metadata_ack,
     )
-    return ListenV1ResultsEvent(
+    return ListenV1Results(
         type="Results",
         channel_index=[0, 1],
         duration=0.1,
         start=0.0,
         is_final=True,
         speech_final=False,
-        channel=ListenV1Channel(alternatives=[]),
+        channel=ListenV1ResultsChannel(alternatives=[]),
         metadata=metadata,
         from_finalize=not metadata_ack,
     )
@@ -389,10 +389,16 @@ class _InstalledSdkWire:
         return self
 
     async def __anext__(self):
-        return await self.messages.get()
+        message = await self.messages.get()
+        if message is None:
+            raise StopAsyncIteration
+        return message
 
     async def send(self, payload):
         self.writes.append(payload)
+
+    async def close(self):
+        self.messages.put_nowait(None)
 
 
 def _installed_callback_payload(channel, *, finalize=False):
@@ -501,6 +507,12 @@ async def test_installed_sdk_malformed_callback_fails_scoped_turn_and_epoch(
             update = await _next(session)
             assert isinstance(update, STTProviderTurnUpdate)
             assert update.identity == request.identity
+            snapshot = await _next(session)
+            assert isinstance(snapshot, STTProviderTurnUpdate)
+            assert snapshot.identity == request.identity
+            assert snapshot.stability == "provisional"
+            assert snapshot.text == update.text
+            assert snapshot.first_nonempty_at == update.first_nonempty_at
         await _seal(session, request)
         observations["processed"].clear()
         payload = {
@@ -544,7 +556,7 @@ async def test_installed_sdk_malformed_callback_fails_scoped_turn_and_epoch(
             assert isinstance(observations["causes"][0], json.JSONDecodeError)
         else:
             assert isinstance(observations["causes"][0], ValueError | TypeError)
-            assert observations["callbacks"][-1] == "ListenV1ResultsEvent"
+            assert observations["callbacks"][-1] == "ListenV1Results"
         safe = normalize_diagnostic(
             diagnostics,
             instance_id=uuid4().hex,
@@ -558,6 +570,7 @@ async def test_installed_sdk_malformed_callback_fails_scoped_turn_and_epoch(
         assert "PRIVATE_" not in json.dumps(safe)
         assert session._scoped_drain_task is None
     finally:
+        await wire.close()
         await session.close()
 
 
@@ -628,4 +641,5 @@ async def test_installed_sdk_valid_callbacks_preserve_empty_and_cancellation_sem
         assert ended.reason == "cancelled"
         assert ended.failure_diagnostics is None
     finally:
+        await wire.close()
         await session.close()

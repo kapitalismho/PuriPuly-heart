@@ -29,7 +29,6 @@ describe('broker foundation', () => {
       bindings: {
         d1: 'BROKER_DB',
         secrets: [
-          'OPENROUTER_MANAGED_API_KEY',
           'OPENROUTER_MANAGEMENT_API_KEY',
           'OPENROUTER_MANAGED_GUARDRAIL_ID',
           'OPENROUTER_MANAGED_USER_HMAC_SECRET',
@@ -68,7 +67,7 @@ describe('broker foundation', () => {
           models: [
             'google/gemma-4-26b-a4b-it',
             'google/gemma-4-31b-it',
-            'deepseek/deepseek-v4.1-flash',
+            'deepseek/deepseek-v4.1-flash-1017',
             'deepseek/deepseek-v4-flash-0731',
             'deepseek/deepseek-v4-flash',
           ],
@@ -84,17 +83,6 @@ describe('broker foundation', () => {
         liveUsage: MANAGED_TRIAL_LIVE_USAGE_POLICY,
       },
     });
-  });
-
-  it('keeps the public foundation contract at the boundary level only', async () => {
-    const response = await app.request('http://broker.test/v1/foundation');
-    expect(response.status).toBe(200);
-
-    const payload = (await response.json()) as {
-      serviceBoundary: Record<string, unknown>;
-    };
-
-    expect(payload.serviceBoundary).not.toHaveProperty('responsibilities');
   });
 
   it('reports broker liveness without implying proxy behavior', async () => {

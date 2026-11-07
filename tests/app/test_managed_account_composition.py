@@ -7,43 +7,43 @@ from typing import cast
 from unittest.mock import AsyncMock
 
 import pytest
-from puripuly_heart.app.services.managed_auth import ManagedAuthOwner
-from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
-from puripuly_heart.app.services.provider_runtime_apply import ProviderRuntimeOwner
-from puripuly_heart.app.services.provider_settings import ProviderSettingsOwner
-from puripuly_heart.app.services.settings_transaction_result import (
-    SettingsTransactionResultOwner,
-)
-from puripuly_heart.app.wiring_managed_account import (
-    ManagedOpenRouterReleaseRuntime,
-    ManagedTranslationRuntimeAccess,
-    compose_managed_account,
-)
-from puripuly_heart.core.managed_openrouter_broker_client import (
-    HttpManagedOpenRouterBrokerClient,
-)
-from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterReleaseService,
-    UnavailableManagedOpenRouterReleaseClient,
-)
-from puripuly_heart.core.openrouter_credentials import OPENROUTER_BYOK_API_KEY_SECRET
 
-from puripuly_heart.app import wiring_managed_account as managed_account_module
 from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.app.services.canonical_settings_persistence import (
     compose_settings_owner,
     materialize_canonical_translation_settings,
 )
+from puripuly_heart.app.services.managed.managed_auth import ManagedAuthOwner
+from puripuly_heart.app.services.managed.managed_usage import ManagedUsageOwner
 from puripuly_heart.app.services.openrouter_pkce_flow import (
     OpenRouterPkceApplicationOwner,
     OpenRouterPkceFlowOwner,
 )
+from puripuly_heart.app.services.provider.provider_runtime_apply import ProviderRuntimeOwner
+from puripuly_heart.app.services.provider.provider_settings import ProviderSettingsOwner
+from puripuly_heart.app.services.settings.settings_transaction_result import (
+    SettingsTransactionResultOwner,
+)
 from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
+from puripuly_heart.app.wiring import wiring_managed_account as managed_account_module
+from puripuly_heart.app.wiring.wiring_managed_account import (
+    ManagedOpenRouterReleaseRuntime,
+    ManagedTranslationRuntimeAccess,
+    compose_managed_account,
+)
 from puripuly_heart.config.provider_values import OpenRouterCredentialSource
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
+from puripuly_heart.core.openrouter.managed_openrouter_broker_client import (
+    HttpManagedOpenRouterBrokerClient,
+)
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
+    ManagedOpenRouterReleaseService,
+    UnavailableManagedOpenRouterReleaseClient,
+)
+from puripuly_heart.core.openrouter.openrouter_credentials import OPENROUTER_BYOK_API_KEY_SECRET
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigurationOwner,

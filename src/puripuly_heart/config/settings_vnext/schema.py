@@ -13,14 +13,17 @@ from puripuly_heart.config.alibaba_connection import AlibabaRegionalSettings, no
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.prompts import normalize_system_prompt_override
-from puripuly_heart.config.provider_values import normalize_cloud_free_tier_providers
+from puripuly_heart.config.provider_values import (
+    normalize_cloud_free_tier_providers,
+    normalize_stt_provider,
+)
 from puripuly_heart.config.resolved import normalize_legacy_vad_onset_threshold
 from puripuly_heart.core.translation_policy import (
     FIXED_TRANSLATION_POLICY,
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 53
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 54
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -370,11 +373,15 @@ class ElevenLabsScribeSTTIntent:
 
 @dataclass(frozen=True, slots=True)
 class SonioxSTTIntent:
-    model: str = "stt-rt-v5"
+    model: str = "stt-rt-v6"
     endpoint: str = "wss://stt-rt.soniox.com/transcribe-websocket"
     keepalive_interval_s: float = 10.0
     trailing_silence_ms: int = 100
     enable_speaker_diarization: bool = True
+
+    def __post_init__(self) -> None:
+        if self.model == "stt-rt-v5":
+            object.__setattr__(self, "model", "stt-rt-v6")
 
 
 @dataclass(frozen=True, slots=True)
@@ -406,6 +413,7 @@ class STTIntent:
     custom: CustomSTTIntent = field(default_factory=CustomSTTIntent)
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "provider", normalize_stt_provider(self.provider))
         device_id = self.gpu_device_id if isinstance(self.gpu_device_id, str) else "auto"
         object.__setattr__(self, "gpu_device_id", device_id.strip() or "auto")
         object.__setattr__(
@@ -426,6 +434,9 @@ class STTIntent:
 @dataclass(frozen=True, slots=True)
 class PeerSTTIntent:
     provider: str = "local_cpu_auto"
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "provider", normalize_stt_provider(self.provider))
 
 
 @dataclass(frozen=True, slots=True)
@@ -973,6 +984,11 @@ class IntegratedContextState:
 
 
 @dataclass(frozen=True, slots=True)
+class MainInputHintState:
+    first_launch_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class TelemetryOperationalState:
     anonymous_id: str | None = field(default_factory=new_anonymous_telemetry_identifier)
     last_sent_date_utc: str | None = None
@@ -995,6 +1011,7 @@ class PersistedOperationalState:
     github_star_prompt: GithubStarPromptState = field(default_factory=GithubStarPromptState)
     peer_translation: PeerTranslationState = field(default_factory=PeerTranslationState)
     integrated_context: IntegratedContextState = field(default_factory=IntegratedContextState)
+    main_input_hint: MainInputHintState = field(default_factory=MainInputHintState)
     telemetry: TelemetryOperationalState = field(default_factory=TelemetryOperationalState)
 
 
@@ -1105,6 +1122,7 @@ __all__ = [
     "is_safe_compatibility_extension_key",
     "LanguageIntent",
     "LocalLLMIntent",
+    "MainInputHintState",
     "ManagedConnectionState",
     "MANAGED_AUTH_CLAIM_SOURCE_DISCORD",
     "MANAGED_AUTH_CLAIM_SOURCE_QQ",

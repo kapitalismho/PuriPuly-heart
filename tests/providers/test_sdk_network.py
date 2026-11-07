@@ -5,7 +5,6 @@ import json
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from websockets.asyncio.server import serve
 from websockets.exceptions import SecurityError
 
 from puripuly_heart.core import network_clients
@@ -15,7 +14,7 @@ from tests.core.test_external_network import certificates as certificates
 from tests.core.test_external_network import (
     isolated_network_environment as isolated_network_environment,
 )
-from tests.core.test_external_network import recording_proxy
+from tests.core.test_external_network import loopback_websocket_server, recording_proxy
 
 
 @pytest.mark.parametrize("https_proxy", [False, True])
@@ -33,7 +32,7 @@ async def test_scribe_sdk_verified_proxy_audio_event_flow(certificates, monkeypa
 
     async with recording_proxy(contexts["valid"] if https_proxy else None) as (proxy, recorded):
         monkeypatch.setenv("ALL_PROXY", proxy)
-        async with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
+        async with loopback_websocket_server(handler, ssl=contexts["valid"]) as server:
             scribe = ExternalScribeRealtime(
                 api_key="test-key", base_url=f"wss://localhost:{server.sockets[0].getsockname()[1]}"
             )
@@ -73,6 +72,7 @@ async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatc
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     requests = []
+    controls = []
 
     async def handler(ws):
         requests.append((ws.request.path, ws.request.headers, await ws.recv()))
@@ -98,11 +98,13 @@ async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatc
                 }
             )
         )
+        for _ in range(3):
+            controls.append(json.loads(await ws.recv()))
         await ws.wait_closed()
 
     async with recording_proxy(contexts["valid"] if https_proxy else None) as (proxy, recorded):
         monkeypatch.setenv("ALL_PROXY", proxy)
-        async with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
+        async with loopback_websocket_server(handler, ssl=contexts["valid"]) as server:
             url = f"wss://localhost:{server.sockets[0].getsockname()[1]}"
 
             async def operation():
@@ -110,7 +112,9 @@ async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatc
                     client = AsyncDeepgramClient(
                         api_key="test-key",
                         httpx_client=http_client,
-                        environment=DeepgramClientEnvironment(base=url, production=url, agent=url),
+                        environment=DeepgramClientEnvironment(
+                            base=url, production=url, agent=url, agent_rest=url
+                        ),
                     )
                     async with deepgram_listen_connect(
                         client,
@@ -126,7 +130,11 @@ async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatc
                         keyterm=["first", "second"],
                     ) as connection:
                         await connection.send_media(b"\0\0")
-                        return (await connection.recv()).channel["alternatives"][0]["transcript"]
+                        result = (await connection.recv()).channel.alternatives[0].transcript
+                        await connection.send_finalize()
+                        await connection.send_keep_alive()
+                        await connection.send_close_stream()
+                        return result
 
             assert await asyncio.wait_for(operation(), 10) == "recognized"
     path, headers, audio = requests[0]
@@ -138,6 +146,11 @@ async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatc
     assert headers["Authorization"] == "Token test-key"
     assert headers["x-deepgram-session-id"]
     assert audio == b"\0\0"
+    assert controls == [
+        {"type": "Finalize"},
+        {"type": "KeepAlive"},
+        {"type": "CloseStream"},
+    ]
     assert len(recorded) == 1
 
 
@@ -168,7 +181,7 @@ async def test_genai_live_verified_proxy_setup_audio_flow(certificates, monkeypa
 
     async with recording_proxy(contexts["valid"] if https_proxy else None) as (proxy, recorded):
         monkeypatch.setenv("ALL_PROXY", proxy)
-        async with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
+        async with loopback_websocket_server(handler, ssl=contexts["valid"]) as server:
             url = f"https://localhost:{server.sockets[0].getsockname()[1]}"
             options = types.HttpOptions(**network_clients.genai_http_options(), base_url=url)
             client = genai.Client(api_key="test-key", http_options=options)
@@ -177,13 +190,15 @@ async def test_genai_live_verified_proxy_setup_audio_flow(certificates, monkeypa
                 async with client.aio.live.connect(
                     model="gemini-test", config={"response_modalities": ["TEXT"]}
                 ) as session:
+                    transcripts = []
                     await session.send_realtime_input(
                         audio=types.Blob(data=b"\0\0", mime_type="audio/pcm;rate=16000")
                     )
                     async for event in session.receive():
                         if event.server_content and event.server_content.input_transcription:
-                            assert event.server_content.input_transcription.text == "recognized"
+                            transcripts.append(event.server_content.input_transcription.text)
                             break
+                    assert transcripts == ["recognized"]
             finally:
                 await client.aio.aclose()
                 client.close()
@@ -223,8 +238,8 @@ async def test_genai_live_cross_route_redirect_rejects_before_contact(
             pytest.fail("GenAI redirect source must not complete its handshake")
 
         async with recording_proxy() as (proxy, recorded):
-            async with serve(
-                unused, "127.0.0.1", 0, ssl=contexts["valid"], process_request=redirect
+            async with loopback_websocket_server(
+                unused, ssl=contexts["valid"], process_request=redirect
             ) as source:
                 source_port = source.sockets[0].getsockname()[1]
                 monkeypatch.setenv("HTTPS_PROXY", proxy)
@@ -295,8 +310,8 @@ async def test_genai_live_same_route_relative_redirect_retains_sdk_flow(
 
     async with recording_proxy(contexts["valid"] if https_proxy else None) as (proxy, recorded):
         monkeypatch.setenv("HTTPS_PROXY", proxy)
-        async with serve(
-            handler, "127.0.0.1", 0, ssl=contexts["valid"], process_request=redirect
+        async with loopback_websocket_server(
+            handler, ssl=contexts["valid"], process_request=redirect
         ) as server:
             options = types.HttpOptions(
                 **network_clients.genai_http_options(),
@@ -308,16 +323,15 @@ async def test_genai_live_same_route_relative_redirect_retains_sdk_flow(
                 async with client.aio.live.connect(
                     model="gemini-test", config={"response_modalities": ["TEXT"]}
                 ) as session:
+                    transcripts = []
                     await session.send_realtime_input(
                         audio=types.Blob(data=b"\0\0", mime_type="audio/pcm;rate=16000")
                     )
                     async for event in session.receive():
                         if event.server_content and event.server_content.input_transcription:
-                            assert (
-                                event.server_content.input_transcription.text
-                                == "redirect-recognized"
-                            )
+                            transcripts.append(event.server_content.input_transcription.text)
                             break
+                    assert transcripts == ["redirect-recognized"]
             finally:
                 await client.aio.aclose()
                 client.close()

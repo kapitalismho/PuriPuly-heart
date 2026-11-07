@@ -119,7 +119,7 @@
     }
   },
   "overlay": {
-    "contract_version": 16,
+    "contract_version": 17,
     "manifest_fields": [
       "app_version",
       "bridge_url",
@@ -142,12 +142,6 @@
         "{python_executable}",
         "-m",
         "puripuly_heart.ui.desktop_overlay",
-        "--config",
-        "{manifest_path}"
-      ],
-      "desktop_frozen_runner_command": [
-        "{app_executable}",
-        "run-desktop-overlay",
         "--config",
         "{manifest_path}"
       ],
@@ -214,8 +208,6 @@
       "MyAppURL": "https://github.com/kapitalismho/PuriPuly-heart",
       "MyAppExeName": "PuriPulyHeart.exe",
       "MyOverlayExeName": "PuriPulyHeartOverlay.exe",
-      "MyPackagedAppDir": "dist\\PuriPulyHeart",
-      "MyStagedOverlayDir": "build\\overlay",
       "MyAppId": "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
     },
     "setup_lines": [
@@ -226,25 +218,6 @@
       "DefaultGroupName={#MyAppGroupName}",
       "UsePreviousAppDir=yes",
       "UsePreviousGroup=yes"
-    ],
-    "production_installer_build": "Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @(\"installer.iss\") -WorkingDirectory $PWD",
-    "smoke_alternate_app_id": "{{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}",
-    "smoke_guard_lines": [
-      "$InstallerSmokeDir = Join-Path $actualLocalApplicationData \"Programs\\PuriPulyHeart-Installer-Smoke-$InstallerSmokeRunId\"",
-      "$InstallerSmokeAppDataRoot = Join-Path $actualLocalApplicationData $InstallerTestNamespace",
-      "\"/DMyAppId=$InstallerTestAppId\"",
-      "\"/DMyAppDataDirName=$InstallerSmokeAppDataDirName\"",
-      "\"/DInstallerSmokeAppDataRoot=$InstallerSmokeAppDataRootForIscc\"",
-      "$env:LOCALAPPDATA = $InstallerSmokeRedirectedLocalAppData",
-      "$env:APPDATA = $InstallerSmokeRedirectedRoamingAppData",
-      "\"/DMyAppGroupName=$InstallerTestGroupName\"",
-      "\"/O$InstallerSmokeBuildDir\"",
-      "\"/CURRENTUSER\"",
-      "\"/VERYSILENT\"",
-      "\"/SUPPRESSMSGBOXES\"",
-      "\"/DIR=$InstallerSmokeDir\"",
-      "\"/LOG=$InstallerSmokeLogPath\"",
-      "Installer smoke passed and all current-run owned install, data, registry, shortcut, log, and binary byproducts were removed."
     ]
   },
   "prompts": {
@@ -344,7 +317,6 @@
     "secret_store": [
       "tests/config/test_public_compatibility_surfaces.py::test_secret_store_key_registry_snapshot_matches_current_public_keys",
       "tests/config/test_public_compatibility_surfaces.py::test_secret_store_env_lookup_snapshot_matches_current_fallback_behavior",
-      "tests/config/test_public_compatibility_surfaces.py::test_secret_store_accepts_legacy_alibaba_key_and_backfills_current_key",
       "tests/config/test_public_compatibility_surfaces.py::test_settings_serialization_excludes_secret_store_registry_keys",
       "tests/config/test_public_compatibility_surfaces.py::test_secret_store_encrypted_file_fixture_decrypts_and_freezes_wire_format",
       "tests/config/test_public_compatibility_surfaces.py::test_secret_store_encrypted_file_path_resolution_and_env_passphrase",
@@ -353,9 +325,8 @@
       "tests/app/test_wiring_providers.py::test_create_llm_provider_openrouter_uses_env_fallback",
       "tests/app/test_wiring_providers.py::test_create_llm_provider_local_llm_ignores_optional_env_key",
       "tests/app/test_wiring_providers.py::test_create_llm_provider_local_llm_uses_secret_store_key_even_when_env_is_set",
-      "tests/config/test_config_and_secrets.py::test_encrypted_file_secret_store_roundtrip",
+      "tests/core/test_encrypted_secret_store.py::test_retained_stores_observe_new_keys_rotations_and_deletions",
       "tests/config/test_config_and_secrets.py::test_encrypted_file_secret_store_does_not_store_plaintext",
-      "tests/config/test_config_and_secrets.py::test_encrypted_file_secret_store_rejects_wrong_passphrase",
       "tests/core/test_openrouter_credentials.py::test_resolve_openrouter_credentials_uses_selected_byok_key_without_managed_fallback"
     ],
     "broker_v1": [
@@ -368,17 +339,16 @@
       "tests/config/test_public_compatibility_surfaces.py::test_overlay_contract_snapshot_matches_manifest_and_protocol_wire_shape",
       "tests/config/test_public_compatibility_surfaces.py::test_overlay_startup_contract_snapshot_matches_python_runners_and_manifest_handoff",
       "tests/core/test_overlay_manifest.py::test_overlay_manifest_round_trips_contract_fields",
-      "tests/core/test_overlay_manifest.py::test_overlay_manifest_rejects_obsolete_diagnostics_field",
+      "tests/core/test_overlay_manifest.py::test_overlay_manifest_rejects_live_runtime_state_fields",
       "tests/core/test_overlay_protocol.py::test_overlay_presentation_snapshot_round_trips_blocks_and_calibration",
       "tests/core/test_overlay_bridge.py::test_overlay_bridge_sends_authenticated_initial_snapshot",
       "tests/app/test_overlay_process_manager.py::test_overlay_process_manager_waits_for_overlay_ready_before_connected",
       "tests/app/test_desktop_overlay_runner.py::test_overlay_manifest_serialization_omits_target_and_desktop_runtime_fields",
-      "tests/ui/test_desktop_overlay_renderer.py::test_desktop_overlay_snapshot_mapping_table_covers_block_contract_and_emitted_lines"
+      "tests/ui/test_desktop_overlay_renderer.py::test_desktop_overlay_snapshot_mapping_roles_secondary_promotion_and_channel_colors"
     ],
     "prompt_loader": [
       "tests/config/test_public_compatibility_surfaces.py::test_prompt_loader_prefers_named_files_then_defaults",
       "tests/config/test_prompt_loader.py::test_load_prompt_for_llm_providers_uses_shared_translation_prompt",
-      "tests/config/test_prompt_loader.py::test_load_prompt_falls_back_to_default",
       "tests/config/test_prompt_loader.py::test_load_prompt_for_provider_requires_translation_prompt_for_llm_provider",
       "tests/config/test_prompt_loader.py::test_get_default_prompt_reads_translation_prompt"
     ],
@@ -388,17 +358,13 @@
     ],
     "provider_runtime_public_config": [
       "tests/config/test_public_compatibility_surfaces.py::test_provider_runtime_public_config_snapshot_matches_resolved_contracts",
-      "tests/config/test_runtime_resolution.py::test_legacy_openrouter_selection_aliases_normalize_before_resolved_runtime",
-      "tests/config/test_runtime_resolution.py::test_old_openrouter_credential_source_keys_normalize_through_settings_to_resolved_dto",
-      "tests/config/test_runtime_resolution.py::test_runtime_resolution_resolved_llm_path_has_no_legacy_alias_literals"
+      "tests/config/test_runtime_resolution.py::test_legacy_openrouter_selection_aliases_normalize_before_resolved_runtime"
     ],
     "i18n_parity": [
       "tests/ui/test_i18n_key_usage.py::test_i18n_bundles_share_the_same_keys"
     ],
     "packaging": [
-      "tests/config/test_public_compatibility_surfaces.py::test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract",
-
-      "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_parses_in_powershell"
+      "tests/release_evidence/test_local_asr_installer.py::test_compiled_identity_and_current_schema_telemetry_reader"
     ]
   },
   "blockers": []

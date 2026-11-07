@@ -15,10 +15,10 @@ from puripuly_heart.app.ports.local_asr_production_evidence import (
 from puripuly_heart.app.ports.provider_channel_runtime import ProviderChannelResetPort
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
 from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
-from puripuly_heart.app.wiring_local_asr_provider_runtime import (
+from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
 )
-from puripuly_heart.app.wiring_stt_factory import (
+from puripuly_heart.app.wiring.wiring_stt_factory import (
     build_peer_capture_session_config_from_vnext,
     build_peer_stt_provider_request,
     build_self_stt_provider_request_from_vnext,
@@ -27,7 +27,7 @@ from puripuly_heart.composition.application_runtime import (
     compose_application_runtime,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
 )

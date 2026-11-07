@@ -456,52 +456,6 @@ async def test_context_audio_preserves_source_validation(
 
 
 @pytest.mark.asyncio
-async def test_seal_submits_input_without_waiting_for_final_and_next_audio_flows() -> None:
-    session, live = await _session()
-    first, second = _request(1), _request(2)
-    try:
-        await session.begin_turn(first)
-        await session.send_turn_audio(
-            first.identity,
-            b"\x01\x00\x02\x00",
-            payload_sequence=1,
-            source_ranges=_span(0, 2),
-            context_only=False,
-        )
-        await _seal(session, first)
-        submitted = await _next(session)
-        assert isinstance(submitted, STTProviderInputTerminal)
-        assert (submitted.identity, submitted.outcome, submitted.epoch_disposition) == (
-            first.identity,
-            "submitted",
-            "reuse",
-        )
-        await session.begin_turn(second)
-        await session.send_turn_audio(
-            second.identity,
-            b"\x03\x00\x04\x00",
-            payload_sequence=1,
-            source_ranges=_span(2, 4),
-            context_only=False,
-        )
-        assert live.sent == [
-            {"audio": {"data": b"\x01\x00\x02\x00", "mime_type": "audio/pcm;rate=16000"}},
-            {"audio_stream_end": True},
-            {"audio": {"data": b"\x03\x00\x04\x00", "mime_type": "audio/pcm;rate=16000"}},
-        ]
-        await _seal(session, second)
-        assert (await _next(session)).outcome == "submitted"
-        live.push(_message(final="second or first", include_final=True))
-        unit = await _next(session)
-        assert isinstance(unit, STTRecognitionUnit)
-        assert unit.text == "second or first"
-        assert unit.identity.stream.provider_epoch_id == "epoch"
-        assert unit.identity.stream.capture_epoch == 1
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
 async def test_final_before_seal_and_repeated_finals_after_seal_are_independent_units() -> None:
     session, live = await _session()
     request = _request(1)
@@ -644,7 +598,10 @@ async def test_native_activity_end_missing_result_and_interim_do_not_retire_stre
         live.push(_interim("not final"))
         live.push(_message(ack=True))
         await asyncio.sleep(0.03)
-        assert session._event_projection.scoped_event_depth == 0
+        partial = await _next(session)
+        assert isinstance(partial, STTRecognitionUnit)
+        assert (partial.text, partial.is_final) == ("not final", False)
+        assert not session._protocol_failed
         await session.begin_turn(second)
         await session.send_turn_audio(
             second.identity,
@@ -658,7 +615,10 @@ async def test_native_activity_end_missing_result_and_interim_do_not_retire_stre
         live.push(_message(final="actual", include_final=True))
         unit = await _next(session)
         assert isinstance(unit, STTRecognitionUnit)
-        assert unit.text == "actual"
+        assert (unit.text, unit.is_final) == ("actual", True)
+        assert unit.identity.stream == partial.identity.stream
+        assert unit.identity.unit_id == partial.identity.unit_id
+        assert unit.identity.receipt_sequence == partial.identity.receipt_sequence + 1
         assert not session._protocol_failed
     finally:
         await session.close()
@@ -828,9 +788,15 @@ async def test_abort_and_go_away_retire_stream_without_promoting_interim() -> No
         await retiring.begin_turn(request)
         live.push(_interim("partial"))
         live.push(_go_away(final="received", time_left="0.01s"))
+        partial = await _next(retiring)
+        assert isinstance(partial, STTRecognitionUnit)
+        assert (partial.text, partial.is_final) == ("partial", False)
         unit = await _next(retiring)
         assert isinstance(unit, STTRecognitionUnit)
-        assert unit.text == "received"
+        assert (unit.text, unit.is_final) == ("received", True)
+        assert unit.identity.stream == partial.identity.stream
+        assert unit.identity.unit_id == partial.identity.unit_id
+        assert unit.identity.receipt_sequence == partial.identity.receipt_sequence + 1
         terminal = await _next(retiring)
         assert isinstance(terminal, STTProviderInputTerminal)
         assert terminal.failure_reason == "gemini_go_away"

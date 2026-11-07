@@ -406,3 +406,154 @@ def test_empty_cleanup_inventory_succeeds_without_creating_or_deleting_the_root(
     process, detail = _invoke(tmp_path, root, plan)
     assert process.returncode == 0, detail
     assert not root.exists()
+
+
+def _native_worker_upgrade(root: Path) -> tuple[dict, dict[str, bytes], dict[str, bytes]]:
+    root.mkdir()
+    old_names = (
+        "PuriPulyHeartGpuWorker.exe",
+        "transcribe.dll",
+        "ggml.dll",
+        "ggml-base.dll",
+        "ggml-vulkan.dll",
+        "ggml-cpu-x64.dll",
+        "ggml-cpu-retired.dll",
+    )
+    prior = {name: f"prior-owned-{name}".encode() for name in old_names}
+    for name, payload in prior.items():
+        (root / name).write_bytes(payload)
+    current = {
+        name: f"current-owned-{name}".encode()
+        for name in ("PuriPulyHeartASRWorker.exe", *old_names[1:-1])
+    }
+    current["_runtime/local_qwen/onnxruntime.dll"] = b"current-japanese-runtime"
+    current["_runtime/local_qwen/onnxruntime_providers_shared.dll"] = b"current-japanese-shared"
+    for name, payload in current.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+    inventory = {
+        "schema_version": 1,
+        "cpu_selection": "upstream-cpuid",
+        "build_id": "a" * 32,
+        "files": [
+            {"path": name, "sha256": hashlib.sha256(payload).hexdigest()}
+            for name, payload in prior.items()
+        ],
+    }
+    (root / "gpu-worker-runtime.json").write_text(json.dumps(inventory), encoding="utf-8")
+    native_bytes = json.dumps(
+        _manifest(NATIVE_SCHEMA, *(_row(name, payload) for name, payload in current.items()))
+    ).encode()
+    (root / "native-artifact-manifest.json").write_bytes(native_bytes)
+    legacy_bytes = json.dumps(
+        _manifest(
+            LEGACY_SCHEMA,
+            _row("historical-marker.dll"),
+            _row("_runtime/local_qwen/onnxruntime.dll", b"old-cache-bytes"),
+        )
+    ).encode()
+    return cleanup_plan(legacy_bytes, native_bytes), prior, current
+
+
+@WINDOWS
+def test_native_upgrade_retires_only_old_owned_worker_inventory_and_obsolete_dll(tmp_path):
+    root = tmp_path / "installed"
+    plan, prior, current = _native_worker_upgrade(root)
+    protected = {
+        "user.dll": b"unlisted-user-dll",
+        "models/parakeet-tdt-ctc-0.6b-ja-int8-sherpa/sentinel": b"japanese-model",
+        "models/qwen3-asr-1.7b-q6-k-transcribe-vulkan/sentinel": b"gpu-model",
+        "settings.json": b"settings",
+    }
+    for name, payload in protected.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+    process, detail = _invoke(tmp_path, root, plan)
+    assert process.returncode == 0, detail
+    assert not (root / "PuriPulyHeartGpuWorker.exe").exists()
+    assert not (root / "ggml-cpu-retired.dll").exists()
+    assert not (root / "gpu-worker-runtime.json").exists()
+    assert all((root / name).read_bytes() == payload for name, payload in current.items())
+    assert all((root / name).read_bytes() == payload for name, payload in protected.items())
+    process, detail = _invoke(tmp_path, root, plan)
+    assert process.returncode == 0, detail
+    assert all((root / name).read_bytes() == payload for name, payload in current.items())
+
+
+@WINDOWS
+@pytest.mark.parametrize("cause", ["modified", "open-handle"])
+def test_native_upgrade_partial_failure_keeps_old_inventory_for_safe_retry(tmp_path, cause):
+    root = tmp_path / "installed"
+    plan, prior, current = _native_worker_upgrade(root)
+    worker = root / "PuriPulyHeartGpuWorker.exe"
+    handle = None
+    try:
+        if cause == "modified":
+            worker.write_bytes(b"changed-unowned-worker")
+        else:
+            handle = worker.open("rb")
+        process, detail = _invoke(tmp_path, root, plan)
+        assert process.returncode == 0, detail
+        assert worker.exists()
+        assert (root / "gpu-worker-runtime.json").exists()
+        assert not (root / "ggml-cpu-retired.dll").exists()
+        assert all((root / name).read_bytes() == payload for name, payload in current.items())
+    finally:
+        if handle is not None:
+            handle.close()
+    if cause == "modified":
+        worker.write_bytes(prior[worker.name])
+    process, detail = _invoke(tmp_path, root, plan)
+    assert process.returncode == 0, detail
+    assert not worker.exists()
+    assert not (root / "gpu-worker-runtime.json").exists()
+
+
+@WINDOWS
+@pytest.mark.parametrize("defect", ["current-hash", "unknown-entry", "traversal"])
+def test_native_upgrade_rejects_unproven_ownership_before_deleting_anything(tmp_path, defect):
+    root = tmp_path / "installed"
+    plan, prior, current = _native_worker_upgrade(root)
+    if defect == "current-hash":
+        path = root / "native-artifact-manifest.json"
+        path.write_bytes(path.read_bytes() + b"\n")
+    else:
+        inventory_path = root / "gpu-worker-runtime.json"
+        inventory = json.loads(inventory_path.read_text())
+        inventory["files"].append(
+            {
+                "path": "user.dll" if defect == "unknown-entry" else "../outside.dll",
+                "sha256": hashlib.sha256(b"user-content").hexdigest(),
+            }
+        )
+        inventory_path.write_text(json.dumps(inventory))
+    process, detail = _invoke(tmp_path, root, plan)
+    assert process.returncode != 0
+    assert (root / "PuriPulyHeartGpuWorker.exe").read_bytes() == prior["PuriPulyHeartGpuWorker.exe"]
+    assert (root / "ggml-cpu-retired.dll").read_bytes() == prior["ggml-cpu-retired.dll"]
+    assert (root / "gpu-worker-runtime.json").exists()
+    assert all((root / name).read_bytes() == payload for name, payload in current.items())
+
+
+@WINDOWS
+@pytest.mark.parametrize(
+    "inventory_name", ["gpu-worker-runtime.json", "native-artifact-manifest.json"]
+)
+def test_native_upgrade_never_follows_inventory_reparse_targets(tmp_path, inventory_name):
+    root = tmp_path / "installed"
+    plan, prior, current = _native_worker_upgrade(root)
+    path = root / inventory_name
+    target = tmp_path / inventory_name
+    path.rename(target)
+    original = target.read_bytes()
+    try:
+        path.symlink_to(target)
+    except OSError as error:
+        pytest.skip(f"symlink permission unavailable: {type(error).__name__}")
+    process, detail = _invoke(tmp_path, root, plan)
+    assert process.returncode != 0
+    assert target.read_bytes() == original
+    assert (root / "PuriPulyHeartGpuWorker.exe").read_bytes() == prior["PuriPulyHeartGpuWorker.exe"]
+    assert (root / "ggml-cpu-retired.dll").exists()

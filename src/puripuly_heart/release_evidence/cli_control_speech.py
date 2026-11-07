@@ -25,6 +25,7 @@ import numpy as np
 import sounddevice as sd
 
 from puripuly_heart.config.paths import default_settings_path
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 SCHEMA = "puripuly-heart/cli-control-live-speech/v1"
 PHRASE = "The purple lantern is glowing beside the quiet river."
@@ -314,7 +315,7 @@ async def run(report_path: Path) -> int:
         "application": {
             "executable": str(Path(sys.executable).resolve()),
             "executable_sha256": hashlib.sha256(Path(sys.executable).read_bytes()).hexdigest(),
-            "frozen": bool(getattr(sys, "frozen", False)),
+            "host_kind": current_runtime_layout().host_kind,
             "runner_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         },
         "fixture": {

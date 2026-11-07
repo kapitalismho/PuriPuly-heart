@@ -46,9 +46,12 @@ class DebugPreviewPanel(ft.Container):
         on_qq_auth_translation_gated: Callable[[], None],
         on_discord_callback_page: Callable[[], None],
         on_founder_letter: Callable[[], None],
-        on_local_qwen_hallucination_modal: Callable[[], None],
         on_github_star_snackbar: Callable[[], None],
         on_foundation_primitives: Callable[[], None],
+        on_agent_report_cycle: Callable[[], None],
+        on_agent_change_cycle: Callable[[], None],
+        on_agent_key_cycle: Callable[[], None],
+        on_agent_account_cycle: Callable[[], None],
         on_http_extension_form: Callable[[], None] | None = None,
         on_brake_notice: Callable[[], None] | None = None,
         on_revoked_notice: Callable[[], None] | None = None,
@@ -90,11 +93,6 @@ class DebugPreviewPanel(ft.Container):
             ),
             _PreviewAction("founder_letter", "debug_preview.founder_letter", on_founder_letter),
             _PreviewAction(
-                "local_qwen_hallucination_modal",
-                "debug_preview.local_qwen_hallucination_modal",
-                on_local_qwen_hallucination_modal,
-            ),
-            _PreviewAction(
                 "github_star_snackbar",
                 "debug_preview.github_star_snackbar",
                 on_github_star_snackbar,
@@ -103,6 +101,18 @@ class DebugPreviewPanel(ft.Container):
                 "foundation_primitives",
                 "debug_preview.foundation_primitives",
                 on_foundation_primitives,
+            ),
+            _PreviewAction(
+                "agent_report_cycle", "debug_preview.agent_report_cycle", on_agent_report_cycle
+            ),
+            _PreviewAction(
+                "agent_change_cycle", "debug_preview.agent_change_cycle", on_agent_change_cycle
+            ),
+            _PreviewAction("agent_key_cycle", "debug_preview.agent_key_cycle", on_agent_key_cycle),
+            _PreviewAction(
+                "agent_account_cycle",
+                "debug_preview.agent_account_cycle",
+                on_agent_account_cycle,
             ),
         ]
         if on_http_extension_form is not None:

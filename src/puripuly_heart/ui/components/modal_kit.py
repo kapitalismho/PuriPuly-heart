@@ -5,6 +5,7 @@ from collections.abc import Callable
 import flet as ft
 
 from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
+from puripuly_heart.ui.motion import PRESS, press
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_NEUTRAL_DARK,
@@ -133,7 +134,10 @@ class ModalCard(ft.Container):
             alignment=ft.Alignment.CENTER,
             on_click=self._handle_click,
             on_hover=self._handle_hover,
+            on_tap_down=self._handle_tap_down,
             animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
+            animate_scale=PRESS,
+            scale=1.0,
         )
         self._paint()
 
@@ -178,6 +182,10 @@ class ModalCard(ft.Container):
     def _handle_click(self, _event: object) -> None:
         if self._enabled:
             self._on_click()
+
+    def _handle_tap_down(self, _event: object) -> None:
+        if self._enabled:
+            press(self)
 
     def _handle_hover(self, event: ft.ControlEvent) -> None:
         hovered = is_hover_active(event)

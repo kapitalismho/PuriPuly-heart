@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import inspect
 import logging
+import os
 import re
 import socket
 import subprocess
@@ -30,11 +31,23 @@ from puripuly_heart.core.local_translation.runtime_profile import (
     build_gemma_server_command,
     default_gemma_runtime_paths,
 )
+from puripuly_heart.core.translation_backend import require_translation_preparation_allowed
 
 GEMMA_PROMPT_TEMPLATE_VERSION = "translation-prefix-v1"
 GEMMA_SLOT_COUNT = 3
 
 _ServerResult = TypeVar("_ServerResult")
+
+
+def _managed_process_environment() -> dict[str, str]:
+    excluded = {"HF_TOKEN"}
+    if os.name == "nt":
+        excluded.update(("APPDATA", "PROGRAMDATA"))
+    return {
+        name: value
+        for name, value in os.environ.items()
+        if not name.upper().startswith("LLAMA_ARG_") and name.upper() not in excluded
+    }
 
 
 async def validate_gemma_runtime_version(executable: Path) -> None:
@@ -43,6 +56,7 @@ async def validate_gemma_runtime_version(executable: Path) -> None:
         "--version",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        env=_managed_process_environment(),
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     try:
@@ -170,6 +184,7 @@ async def _default_process_factory(
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
         cwd=cwd,
+        env=_managed_process_environment(),
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
 
@@ -497,6 +512,7 @@ class ManagedGemmaRuntimeOwner:
                 or self._unsettled
             )
             if runtime_changed:
+                require_translation_preparation_allowed()
                 self._transitioning = True
                 if not self._unsettled:
                     self._generation += 1
@@ -567,6 +583,7 @@ class ManagedGemmaRuntimeOwner:
                     abort_on_cancel=not self._busy_slots,
                 )
             except Exception as exc:
+                require_translation_preparation_allowed()
                 self._transitioning = True
                 try:
                     await self._drain_locked()

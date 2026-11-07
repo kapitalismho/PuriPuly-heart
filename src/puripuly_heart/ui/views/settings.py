@@ -15,8 +15,9 @@ from pathlib import Path
 from typing import Awaitable, Callable, Mapping
 
 import flet as ft
-from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
 
+from puripuly_heart.app.control_presentation import setting_value_text
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretKey,
     SettingsSecretLoadResult,
@@ -80,6 +81,7 @@ from puripuly_heart.app.ports.ui_models import OscControlPresentationState
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
+from puripuly_heart.app.services.local_asr.local_asr_selection import resolve_local_asr_selection
 from puripuly_heart.config.alibaba_connection import workspace_api_host_region
 from puripuly_heart.config.desktop_overlay_values import (
     DESKTOP_FLET_DEFAULT_BACKGROUND_ALPHA,
@@ -142,6 +144,9 @@ from puripuly_heart.ui.components.settings import (
     PromptEditor,
     SettingsModal,
     SettingsUnitCard,
+)
+from puripuly_heart.ui.components.settings.api_key_verification_controller import (
+    CompletionHandler,
 )
 from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 from puripuly_heart.ui.components.subtab_shell import TextSubtab, TextSubtabShell
@@ -216,9 +221,7 @@ _DRAFT_TRANSLATION_FIELDS: dict[type, str] = {
 }
 
 
-_CJK_START = 0x3000
 _CENTER_ALIGNMENT = ft.Alignment(0, 0)
-_CENTER_RIGHT_ALIGNMENT = ft.Alignment(1, 0)
 _SETTINGS_SUBTAB_ORDER = ("api", "general", "prompt", "overlay")
 _OVERLAY_DISTANCE_MIN = 0.5
 _OVERLAY_DISTANCE_MAX = 2.0
@@ -241,9 +244,11 @@ _CUSTOM_VOCAB_DELIMITER_RE = re.compile(r"\s+")
 _STT_UI_PROVIDERS = (
     STTProviderName.DEEPGRAM,
     STTProviderName.LOCAL_CPU_AUTO,
-    STTProviderName.LOCAL_PARAKEET_V3,
+    STTProviderName.LOCAL_GRANITE,
+    STTProviderName.LOCAL_GIGAAM,
+    STTProviderName.LOCAL_FUN_ASR_NANO,
+    STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
     STTProviderName.LOCAL_PARAKEET_JAPANESE,
-    STTProviderName.LOCAL_QWEN,
     STTProviderName.LOCAL_QWEN_GPU,
     STTProviderName.ROLLING_FREE,
     STTProviderName.ELEVENLABS_SCRIBE,
@@ -280,9 +285,11 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.CUSTOM_OFFLINE: "settings.stt.section.custom",
     STTProviderName.CUSTOM_REALTIME: "settings.stt.section.custom",
     STTProviderName.LOCAL_QWEN_GPU: "settings.stt.section.gpu_inference",
-    STTProviderName.LOCAL_PARAKEET_V3: "settings.stt.section.cpu_inference",
+    STTProviderName.LOCAL_GRANITE: "settings.stt.section.cpu_inference",
+    STTProviderName.LOCAL_GIGAAM: "settings.stt.section.cpu_inference",
+    STTProviderName.LOCAL_FUN_ASR_NANO: "settings.stt.section.cpu_inference",
+    STTProviderName.LOCAL_FUN_ASR_MLT_NANO: "settings.stt.section.cpu_inference",
     STTProviderName.LOCAL_PARAKEET_JAPANESE: "settings.stt.section.cpu_inference",
-    STTProviderName.LOCAL_QWEN: "settings.stt.section.cpu_inference",
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.INDEX_TRANSLATE_35B: "provider.index_translate_35b",
@@ -300,9 +307,11 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
 _LOCAL_STT_PROVIDERS = frozenset(
     {
         STTProviderName.LOCAL_CPU_AUTO,
-        STTProviderName.LOCAL_PARAKEET_V3,
+        STTProviderName.LOCAL_GRANITE,
+        STTProviderName.LOCAL_GIGAAM,
+        STTProviderName.LOCAL_FUN_ASR_NANO,
+        STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
         STTProviderName.LOCAL_PARAKEET_JAPANESE,
-        STTProviderName.LOCAL_QWEN,
         STTProviderName.LOCAL_QWEN_GPU,
     }
 )
@@ -336,15 +345,14 @@ _TRANSLATION_MODELS = (
 )
 _TRANSLATION_MODEL_SECTION_ORDER = (
     "settings.translation_model.section.recommended_cloud",
-    "settings.translation_model.section.cpu_inference",
-    "settings.translation_model.section.gpu_inference",
+    "settings.translation_model.section.local",
     "settings.translation_model.section.user_settings",
     "settings.translation_model.section.others",
 )
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.INDEX_TRANSLATE_35B: "settings.translation_model.section.recommended_cloud",
-    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.cpu_inference",
-    TranslationModel.MANAGED_GEMMA_26B: "settings.translation_model.section.gpu_inference",
+    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.local",
+    TranslationModel.MANAGED_GEMMA_26B: "settings.translation_model.section.local",
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.others",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "settings.translation_model.section.recommended_cloud",
@@ -394,39 +402,6 @@ def _update_control_if_mounted(control: ft.Control) -> None:
     update_control_if_mounted(control)
 
 
-def _make_overlay_anchor_dropdown(value: str, on_change) -> ft.Dropdown:
-    return ft.Dropdown(
-        value=value,
-        options=[
-            ft.dropdown.Option(
-                key=anchor,
-                text=t(f"settings.overlay.calibration.anchor.{anchor}"),
-            )
-            for anchor in OVERLAY_CALIBRATION_ANCHORS
-        ],
-        text_size=14,
-        border_radius=10,
-        border_color=COLOR_DIVIDER,
-        focused_border_color=COLOR_PRIMARY,
-        on_select=on_change,
-    )
-
-
-def _weighted_len(text: str) -> int:
-    return sum(2 if ord(char) >= _CJK_START else 1 for char in text)
-
-
-def _setting_action_text_size(text: str) -> int:
-    length = _weighted_len(text or "")
-    if length <= 6:
-        return 22
-    if length <= 10:
-        return 20
-    if length <= 18:
-        return 18
-    return 16
-
-
 def _derive_openrouter_selection_alias(
     llm_model: OpenRouterLLMModel,
     selected_source: OpenRouterCredentialSource,
@@ -458,12 +433,17 @@ class SettingsView(ft.Column):
         # Callbacks (assigned by App)
         self.on_settings_changed: Callable[[ImmediateSettingsIntent], None] | None = None
         self.on_prompt_apply_settings: Callable[[PromptApplyIntent], None] | None = None
+        self.on_pending_prompt_changed: Callable[[PromptApplyIntent], None] | None = None
         self.on_providers_changed: Callable[[], None] | None = None
         self.on_local_llm_secret_changed: Callable[[], None] | None = None
         self.on_custom_stt_secret_changed: Callable[[], None] | None = None
         self.on_request_openrouter_pkce: Callable[[OpenRouterPkceTarget], None] | None = None
-        self.on_verify_api_key: Callable[[str, str], object] | None = None
+        self.on_verify_api_key: (
+            Callable[[str, str], Awaitable[ProviderCredentialVerificationOutcome]] | None
+        ) = None
         self.on_provider_secret_change: Callable[[str, str], object] | None = None
+        self._verification_providers: frozenset[str] = frozenset()
+        self._agent_settings_provider: str | None = None
         self.on_secret_cleared: Callable[[str], None] | None = None  # key name
         self.on_overlay_calibration_begin: Callable[[], OverlayCalibration] | None = None
         self.on_overlay_calibration_change: Callable[[str, object], OverlayCalibration] | None = (
@@ -595,6 +575,79 @@ class SettingsView(ft.Column):
     def api_keys_control(self) -> ft.Control:
         return self._api_keys_card
 
+    def bind_verification_completion(self, callback: CompletionHandler | None) -> frozenset[str]:
+        self._verification_providers = frozenset(
+            field._provider
+            for field in self._api_keys_column.controls
+            if isinstance(field, ApiKeyField)
+            and field.bind_verification_completion(
+                callback if callback is not None and callable(self.on_verify_api_key) else None
+            )
+        )
+        return self._verification_providers
+
+    def open_agent_section(
+        self,
+        section: str,
+        provider: str | None,
+        *,
+        show_settings: Callable[[], None],
+    ) -> dict:
+        tab_key = {
+            "api": "api",
+            "general": "general",
+            "overlay": "overlay",
+            "prompts": "prompt",
+        }.get(section)
+        key_fields = {
+            field._provider: field
+            for field in self._api_keys_column.controls
+            if isinstance(field, ApiKeyField)
+        }
+        if tab_key is None or (
+            provider is not None and (section != "api" or provider not in key_fields)
+        ):
+            return {
+                "opened": False,
+                "field_visible": False,
+                "completion_observable": False,
+                "verification_available": False,
+            }
+        show_settings()
+        self._settings_subtab_shell.select_tab(tab_key)
+        self._agent_settings_provider = provider
+        self._update_api_visibility()
+        field = key_fields.get(provider)
+        field_visible = field is not None and self._agent_control_visible(self, field._text_field)
+        verification_available = (
+            field_visible
+            and callable(field.controller._on_verify)
+            and callable(self.on_verify_api_key)
+        )
+        completion_observable = provider in self._verification_providers
+        _update_control_if_mounted(self)
+        return {
+            "opened": True,
+            "field_visible": field_visible,
+            "completion_observable": completion_observable,
+            "verification_available": verification_available,
+        }
+
+    @staticmethod
+    def _agent_control_visible(control: ft.Control, target: ft.Control) -> bool:
+        if control.visible is False:
+            return False
+        if control is target:
+            return True
+        content = getattr(control, "content", None)
+        if isinstance(content, ft.Control) and SettingsView._agent_control_visible(content, target):
+            return True
+        return any(
+            SettingsView._agent_control_visible(child, target)
+            for child in getattr(control, "controls", ())
+            if isinstance(child, ft.Control)
+        )
+
     def bind_settings_intents(
         self,
         *,
@@ -631,6 +684,7 @@ class SettingsView(ft.Column):
         self.on_loopback_capture_summary = general.loopback_capture_summary
         self.on_osc_effective_ports = general.osc_effective_ports
         self.on_prompt_apply_settings = prompt.prompt_apply_settings
+        self.on_pending_prompt_changed = prompt.pending_prompt_changed
         self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
         self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
         self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
@@ -720,23 +774,6 @@ class SettingsView(ft.Column):
             on_click=on_click,
             on_hover=self._on_text_hover,
         )
-
-    def _build_setting_action_text(self, text: str, on_click) -> ft.Container:
-        return self._build_clickable_text(
-            text,
-            on_click,
-            size=_setting_action_text_size(text),
-            text_align=ft.TextAlign.RIGHT,
-            alignment=_CENTER_RIGHT_ALIGNMENT,
-            no_wrap=True,
-            max_lines=1,
-            overflow=ft.TextOverflow.ELLIPSIS,
-        )
-
-    def _set_setting_action_text(self, control: ft.Container, text: str) -> None:
-        text_control = control.content
-        text_control.value = text
-        text_control.size = _setting_action_text_size(text)
 
     def _set_unit_card_value_text(
         self, control: ft.Container, text: str, *, size: int = 28
@@ -990,13 +1027,6 @@ class SettingsView(ft.Column):
             subtab_bar_position="bottom",
         )
 
-    def _build_setting_action_row(self, label: ft.Text, action: ft.Control) -> ft.Row:
-        return ft.Row(
-            controls=[label, ft.Container(expand=True), action],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-
     def _emit_runtime_basic(self, message: str, *, level: int = logging.INFO) -> None:
         runtime_log_basic = getattr(self, "runtime_log_basic", None)
         if runtime_log_basic is not None:
@@ -1028,54 +1058,6 @@ class SettingsView(ft.Column):
             height=height,
         )
 
-    def _build_overlay_calibration_field(
-        self,
-        *,
-        value: float,
-        on_blur,
-    ) -> ft.TextField:
-        return ft.TextField(
-            value=self._format_overlay_calibration_number(value),
-            text_size=14,
-            width=120,
-            border_radius=10,
-            border_color=COLOR_DIVIDER,
-            focused_border_color=COLOR_PRIMARY,
-            on_blur=on_blur,
-        )
-
-    def _build_numeric_setting_field(
-        self,
-        *,
-        label: str,
-        value: str,
-        on_change_end,
-    ) -> ft.TextField:
-        return ft.TextField(
-            label=label,
-            value=value,
-            dense=True,
-            expand=True,
-            text_align=ft.TextAlign.CENTER,
-            border_radius=10,
-            border_color=COLOR_DIVIDER,
-            focused_border_color=COLOR_PRIMARY,
-            on_blur=on_change_end,
-            on_submit=on_change_end,
-        )
-
-    def _build_overlay_calibration_column(
-        self,
-        *,
-        label: ft.Text,
-        control: ft.Control,
-    ) -> ft.Column:
-        return ft.Column(
-            controls=[label, control],
-            spacing=6,
-            expand=True,
-        )
-
     def _format_overlay_calibration_number(self, value: float) -> str:
         return f"{value:.2f}"
 
@@ -1101,37 +1083,6 @@ class SettingsView(ft.Column):
             return float(preset_key)
         except TypeError, ValueError:
             return 1.0
-
-    def _parse_setting_float(
-        self,
-        raw_value: str,
-        *,
-        fallback: float,
-        minimum: float,
-        maximum: float | None = None,
-    ) -> float:
-        try:
-            parsed = float(raw_value)
-        except TypeError, ValueError:
-            parsed = fallback
-        if parsed < minimum:
-            parsed = minimum
-        if maximum is not None and parsed > maximum:
-            parsed = maximum
-        return parsed
-
-    def _parse_setting_int(
-        self,
-        raw_value: str,
-        *,
-        fallback: int,
-        minimum: int,
-    ) -> int:
-        try:
-            parsed = int(raw_value)
-        except TypeError, ValueError:
-            parsed = fallback
-        return max(minimum, parsed)
 
     def _build_ui(self) -> None:
         """Build the settings UI with Bento grid layout."""
@@ -1281,12 +1232,6 @@ class SettingsView(ft.Column):
             show_snackbar=lambda msg, bg: (
                 self.show_snackbar(msg, bg) if self.show_snackbar else None
             ),
-        )
-        self._openai_verification_notice = ft.Text(
-            t("settings.openai_verification_charge"),
-            size=15,
-            color=COLOR_SECONDARY,
-            max_lines=2,
         )
         self._openrouter_pkce_button = self._build_action_button(
             t("settings.openrouter_authenticate"),
@@ -1465,11 +1410,7 @@ class SettingsView(ft.Column):
         api_header = ft.Row(
             controls=[
                 self._api_title,
-                ft.Container(
-                    content=self._openai_verification_notice,
-                    expand=True,
-                    padding=ft.Padding.symmetric(horizontal=12),
-                ),
+                ft.Container(expand=True),
                 self._api_guide_btn,
                 self._qwen_region_btn,
             ],
@@ -2747,20 +2688,6 @@ class SettingsView(ft.Column):
         self.has_provider_changes = True
         self._sync_gpu_device_card()
 
-    def _populate_host_apis(self) -> None:
-        """Legacy hook for tests; host APIs are handled by AudioSettings."""
-        return None
-
-    def _refresh_microphones(self) -> None:
-        """Legacy hook for tests; microphone list is handled by AudioSettings."""
-        return None
-
-    def _build_locale_options(self) -> list[ft.dropdown.Option]:
-        """Build locale dropdown options."""
-        return [
-            ft.dropdown.Option(key=code, text=locale_label(code)) for code in available_locales()
-        ]
-
     def _http_extension_modal_options(self) -> list[OptionItem]:
         options = [OptionItem(value="", label=t("settings.http_extension.none"))]
         options.extend(
@@ -3422,11 +3349,12 @@ class SettingsView(ft.Column):
             provider == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available
         )
         description = t(f"provider.{provider.value}.description", default="")
+        if auto_unavailable:
+            description = f"{description} {t('local_stt.cpu_auto_install_hint')}".strip()
         return OptionItem(
             value=provider.value,
             label=provider_label(provider.value).replace("\n", " "),
             description=description,
-            disabled=auto_unavailable,
         )
 
     def _classified_stt_option_item(self, provider: STTProviderName) -> OptionItem:
@@ -3806,9 +3734,13 @@ class SettingsView(ft.Column):
 
         # VAD
         self._vad_slider.value = general.self_vad_speech_threshold
-        self._vad_slider.label = f"{general.self_vad_speech_threshold:.2f}"
+        self._vad_slider.label = setting_value_text(
+            "self_vad.speech_threshold", general.self_vad_speech_threshold, t
+        )
         self._peer_vad_slider.value = general.peer_vad_speech_threshold
-        self._peer_vad_slider.label = f"{general.peer_vad_speech_threshold:.2f}"
+        self._peer_vad_slider.label = setting_value_text(
+            "peer_vad.speech_threshold", general.peer_vad_speech_threshold, t
+        )
         self._vrc_mic_text.content.value = t(
             "settings.vrc_mic.on" if general.vrc_mic_intercept else "settings.vrc_mic.off"
         )
@@ -4293,7 +4225,6 @@ class SettingsView(ft.Column):
                 not is_custom_http and llm == LLMProviderName.CHATGPT
             )
             self._sync_chatgpt_account_card()
-        self._openai_verification_notice.visible = self._openai_key.visible
         self._deepseek_key.visible = bool(not is_custom_http and llm == LLMProviderName.DEEPSEEK)
         self._sync_openrouter_pkce_button_state(settings)
         self._translation_connection_row.visible = not is_custom_http
@@ -4323,6 +4254,9 @@ class SettingsView(ft.Column):
         )
         self._alibaba_key_beijing.visible = QwenRegion.BEIJING in qwen_regions
         self._alibaba_key_singapore.visible = QwenRegion.SINGAPORE in qwen_regions
+        for field in self._api_keys_column.controls:
+            if isinstance(field, ApiKeyField) and field._provider == self._agent_settings_provider:
+                field.visible = True
         qwen_api_host_row = getattr(self, "_qwen_api_host_row", None)
         if qwen_api_host_row is not None:
             qwen_api_host_row.visible = self._qwen_region_btn.visible
@@ -4336,6 +4270,7 @@ class SettingsView(ft.Column):
                     getattr(self, "_gemini_transcribe_key", None),
                     self._soniox_key,
                     self._google_key,
+                    self._openrouter_key,
                     self._deepseek_key,
                     self._openai_key,
                     self._alibaba_key_beijing,
@@ -4386,8 +4321,6 @@ class SettingsView(ft.Column):
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
         selected = STTProviderName(value)
-        if selected == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available:
-            return
         if self._display_stt_choice(current_settings) == selected:
             return
         old_provider = current_settings.stt_provider.value
@@ -4414,13 +4347,11 @@ class SettingsView(ft.Column):
 
         source_lang = self._current_source_language()
         selection = resolve_local_asr_selection(selected.value, source_lang)
-        if selection.fallback_applied:
-            self._show_stt_selection_notice(t("local_stt.language_fallback_qwen"))
-        elif not selection.supported:
+        if not selection.supported:
             self._show_stt_selection_notice(t("local_stt.language_unsupported"))
         warning = (
             None
-            if selection.fallback_applied or not selection.supported
+            if not selection.supported
             else get_stt_compatibility_warning(
                 source_lang,
                 selected.value,
@@ -4470,8 +4401,6 @@ class SettingsView(ft.Column):
         current_settings = self._build_settings_with_provider_draft()
         assert current_settings is not None
         selected = STTProviderName(value)
-        if selected == STTProviderName.LOCAL_CPU_AUTO and not self._local_cpu_auto_available:
-            return
         if self._display_stt_choice(current_settings, peer=True) == selected:
             return
         draft = self._ensure_provider_settings_draft()
@@ -4494,9 +4423,7 @@ class SettingsView(ft.Column):
                 else "en"
             ),
         )
-        if selection.fallback_applied:
-            self._show_stt_selection_notice(t("local_stt.language_fallback_qwen"))
-        elif not selection.supported:
+        if not selection.supported:
             self._show_stt_selection_notice(t("local_stt.language_unsupported"))
         self._sync_stt_provider_labels(self._provider_draft)
         self._update_api_visibility()
@@ -4695,29 +4622,28 @@ class SettingsView(ft.Column):
         for section_key in _TRANSLATION_MODEL_SECTION_ORDER:
             for model in _TRANSLATION_MODELS:
                 if model == TranslationModel.MANAGED_GEMMA:
-                    if section_key == "settings.translation_model.section.cpu_inference":
-                        options.append(
-                            OptionItem(
-                                value="managed_gemma_cpu",
-                                label=t("provider.managed_gemma_cpu"),
-                                description=t(
-                                    "settings.translation_model.managed_gemma_cpu.description",
-                                    default="",
+                    if section_key == "settings.translation_model.section.local":
+                        options.extend(
+                            [
+                                OptionItem(
+                                    value="managed_gemma_cpu",
+                                    label=t("provider.managed_gemma_cpu"),
+                                    description=t(
+                                        "settings.translation_model.managed_gemma_cpu.description",
+                                        default="",
+                                    ),
+                                    section=t(section_key),
                                 ),
-                                section=t(section_key),
-                            )
-                        )
-                    elif section_key == "settings.translation_model.section.gpu_inference":
-                        options.append(
-                            OptionItem(
-                                value="managed_gemma_gpu",
-                                label=t("provider.managed_gemma_gpu"),
-                                description=t(
-                                    "settings.translation_model.managed_gemma_gpu.description",
-                                    default="",
+                                OptionItem(
+                                    value="managed_gemma_gpu",
+                                    label=t("provider.managed_gemma_gpu"),
+                                    description=t(
+                                        "settings.translation_model.managed_gemma_gpu.description",
+                                        default="",
+                                    ),
+                                    section=t(section_key),
                                 ),
-                                section=t(section_key),
-                            )
+                            ]
                         )
                     continue
                 if _TRANSLATION_MODEL_SECTION_BY_MODEL.get(model) != section_key:
@@ -5721,8 +5647,7 @@ class SettingsView(ft.Column):
 
     def _desktop_overlay_background_alpha_label_for(self, value: object) -> str:
         alpha = self._normalize_desktop_overlay_background_alpha(value)
-        transparency = 1.0 - alpha
-        return f"{int(round(transparency * 100))}%"
+        return setting_value_text("overlay.background_alpha", alpha, t)
 
     def _desktop_overlay_size_label_for(self, size_preset: object) -> str:
         normalized = self._normalize_desktop_overlay_size_preset(size_preset)
@@ -6342,15 +6267,6 @@ class SettingsView(ft.Column):
                 self._desktop_overlay_captions_locked = False
         self._sync_overlay_controls()
 
-    def _on_overlay_calibration_reset(self, e) -> None:
-        _ = e
-        self._begin_overlay_calibration_session()
-        self._overlay_calibration_draft = OverlayCalibration()
-        self._sync_overlay_calibration_controls(self._overlay_calibration_draft)
-
-        if is_control_mounted(self):
-            self.update()
-
     def _on_overlay_translation_click(self, e) -> None:
         if self._overlay_snapshot is None or self._overlay_translation_button.disabled:
             return
@@ -6604,9 +6520,11 @@ class SettingsView(ft.Column):
         self._stage_prompt_draft(value)
 
     def _on_prompt_commit(self, value: str) -> None:
+        self._stage_prompt_draft(value)
+        if self.on_pending_prompt_changed is not None:
+            self.on_pending_prompt_changed(PromptApplyIntent(value))
         if not self.has_pending_prompt_changes and value == self._committed_prompt_value():
             return
-        self._stage_prompt_draft(value)
         if self.has_provider_changes:
             return
         if self.has_pending_prompt_changes:
@@ -6698,15 +6616,19 @@ class SettingsView(ft.Column):
             return
         self._set_custom_vocabulary_terms_for_current_language(current_terms)
 
-    async def _verify_key(self, provider: str, key: str) -> tuple[bool, str]:
+    async def _verify_key(self, provider: str, key: str) -> ProviderCredentialVerificationOutcome:
         """Verify API key."""
         if self.on_verify_api_key:
             result = await self.on_verify_api_key(provider, key)
-            if provider == "openrouter" and self._provider_snapshot is not None:
+            if (
+                provider == "openrouter"
+                and self._provider_snapshot is not None
+                and self._openrouter_key.value == key
+            ):
                 current = self._provider_draft or self._provider_snapshot
                 updated = replace(
                     current,
-                    verified=replace(current.verified, openrouter=bool(result[0])),
+                    verified=replace(current.verified, openrouter=result.status == "verified"),
                 )
                 if self._provider_draft is None:
                     self._provider_snapshot = updated
@@ -6714,7 +6636,9 @@ class SettingsView(ft.Column):
                     self._provider_draft = updated
                 self._sync_openrouter_pkce_button_state()
             return result
-        return False, "Verification not available"
+        return ProviderCredentialVerificationOutcome(
+            status="unknown", provider=provider, error_text="Verification not available"
+        )
 
     def _emit_settings_changed(self, intent: ImmediateSettingsIntent) -> None:
         if self.on_settings_changed:
@@ -6920,7 +6844,6 @@ class SettingsView(ft.Column):
         self._managed_trial_usage_bar.apply_locale()
         self._openrouter_key.apply_locale()
         self._openai_key.apply_locale()
-        self._openai_verification_notice.value = t("settings.openai_verification_charge")
         self._deepseek_key.apply_locale()
         self._alibaba_key_beijing.apply_locale()
         self._alibaba_key_singapore.apply_locale()

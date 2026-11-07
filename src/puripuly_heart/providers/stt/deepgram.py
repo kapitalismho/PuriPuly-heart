@@ -1,7 +1,7 @@
-"""Deepgram Realtime STT Backend using official SDK v5.
+"""Deepgram Realtime STT Backend using the official SDK.
 
 WebSocket-based Speech-to-Text using Deepgram's nova-3 model.
-Uses the official deepgram-sdk v5 with manual KeepAlive messages (every 5 seconds)
+Uses the official deepgram-sdk with manual KeepAlive messages (every 5 seconds)
 to prevent the 10-second timeout (NET-0001 error).
 """
 
@@ -37,7 +37,7 @@ _DEEPGRAM_KEYTERM_MODEL = "nova-3"
 
 @dataclass(slots=True)
 class DeepgramRealtimeSTTBackend(STTBackend):
-    """Deepgram Realtime STT Backend using official SDK v5."""
+    """Deepgram Realtime STT Backend using the official SDK."""
 
     api_key: str
     language: str  # Required: passed from wiring.py via get_deepgram_language()
@@ -221,6 +221,21 @@ class _DeepgramSDKSession(STTBackendSession):
                         assembly="append",
                         text=text,
                         provenance=provenance,
+                        observed_at=asyncio.get_running_loop().time(),
+                    )
+                )
+        if self._event_projection.channel == "peer" and not from_finalize:
+            sequence = self._event_projection.next_update_sequence(identity)
+            if sequence is not None:
+                self._event_projection.put_update(
+                    STTProviderTurnUpdate(
+                        identity=identity,
+                        sequence=sequence,
+                        stability="provisional",
+                        assembly="replace",
+                        text=" ".join(self._scoped_fragments + ([] if is_final else [text])),
+                        provenance=provenance,
+                        observed_at=asyncio.get_running_loop().time(),
                     )
                 )
         if from_finalize:
@@ -377,7 +392,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 "encoding": "linear16",
                 "sample_rate": self.sample_rate_hz,
                 "channels": 1,
-                "interim_results": False,
+                "interim_results": self.stream_label == "peer",
                 "punctuate": True,
                 "vad_events": False,
                 "endpointing": False,
@@ -486,8 +501,6 @@ class _DeepgramSDKSession(STTBackendSession):
             )
 
     async def _send_loop(self, connection: Any) -> None:
-        from deepgram.extensions.types.sockets import ListenV1ControlMessage
-
         data: bytes | object | _AudioWrite = _STOP
         try:
             while True:
@@ -499,9 +512,9 @@ class _DeepgramSDKSession(STTBackendSession):
                 payload = data.payload if isinstance(data, _AudioWrite) else data
                 async with self._send_lock:
                     if payload is _FINALIZE:
-                        await connection.send_control(ListenV1ControlMessage(type="Finalize"))
+                        await connection.send_finalize()
                     elif payload is _CLOSE_STREAM:
-                        await connection.send_control(ListenV1ControlMessage(type="CloseStream"))
+                        await connection.send_close_stream()
                     elif isinstance(payload, bytes):
                         await connection.send_media(payload)
                 self._resolve_write(getattr(data, "completion", None), None)
@@ -519,15 +532,13 @@ class _DeepgramSDKSession(STTBackendSession):
             self._fail_pending_writes()
 
     async def _keepalive_loop(self, connection: Any) -> None:
-        from deepgram.extensions.types.sockets import ListenV1ControlMessage
-
         try:
             while not self._stopped:
                 await asyncio.sleep(5.0)
                 if self._stopped:
                     return
                 async with self._send_lock:
-                    await connection.send_control(ListenV1ControlMessage(type="KeepAlive"))
+                    await connection.send_keep_alive()
         except asyncio.CancelledError:
             raise
         except Exception as exc:

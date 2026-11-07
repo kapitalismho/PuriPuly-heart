@@ -5,12 +5,24 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.runtime_resolution import (
+    DEEPGRAM_STT_MODEL_NOVA_3,
+    ELEVENLABS_SCRIBE_STT_MODEL,
+    GEMINI_TRANSCRIBE_STT_MODEL,
+    QWEN_AUDIO_STT_MODEL,
+    SONIOX_STT_MODEL_RT_V6,
+)
 from puripuly_heart.core.diagnostic_validation import (
     stt_startup_failure_code,
     stt_startup_failure_stage,
     stt_startup_failure_type,
 )
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeDiagnostic
+from puripuly_heart.core.local_asr.local_stt_assets import (
+    LOCAL_QWEN_GPU_MODEL_ID,
+    REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
+)
 
 LocalASRBasicLogSink = Callable[[str, int], None]
 LocalASRDiagnosticLogSink = Callable[[str], object]
@@ -19,6 +31,18 @@ LocalASRGpuDiscoveryOriginProvider = Callable[[], str]
 
 _SAFE_TOKEN_CHARS = frozenset(
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.:+-,"
+)
+_PROVIDER_IDENTITIES = frozenset(provider.value for provider in STTProviderName)
+_MODEL_IDENTITIES = frozenset(
+    (
+        *REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
+        LOCAL_QWEN_GPU_MODEL_ID,
+        DEEPGRAM_STT_MODEL_NOVA_3,
+        ELEVENLABS_SCRIBE_STT_MODEL,
+        GEMINI_TRANSCRIBE_STT_MODEL,
+        QWEN_AUDIO_STT_MODEL,
+        SONIOX_STT_MODEL_RT_V6,
+    )
 )
 _FAILURE_CAUSE_LABELS = {
     "activation_failed": "activation failed",
@@ -42,11 +66,17 @@ def _safe_token(value: object, fallback: str = "") -> str:
         return fallback
     if (
         not token
-        or len(token) > 64
+        or len(token) > 128
         or any(character not in _SAFE_TOKEN_CHARS for character in token)
     ):
         return fallback
     return token
+
+
+def _known_identity(value: str | None, identities: frozenset[str]) -> str:
+    if value is None:
+        return "none"
+    return value if value in identities else "unknown"
 
 
 def _finite_nonnegative_seconds(value: object) -> float | None:
@@ -59,13 +89,6 @@ def _finite_nonnegative_seconds(value: object) -> float | None:
     return seconds if math.isfinite(seconds) and seconds >= 0 else None
 
 
-def _seconds_from_milliseconds(value: object) -> float | None:
-    milliseconds = _finite_nonnegative_seconds(value)
-    if milliseconds is None:
-        return None
-    return _finite_nonnegative_seconds(milliseconds / 1000.0)
-
-
 def _channel_label(channel: object) -> str:
     token = _safe_token(channel, "").casefold()
     return {"self": "Self", "peer": "Peer"}.get(token, "Local")
@@ -74,6 +97,14 @@ def _channel_label(channel: object) -> str:
 def _model_label(model_id: object) -> str:
     token = _safe_token(model_id, "")
     normalized = token.casefold()
+    if "granite" in normalized:
+        return "Granite Speech 5.0"
+    if "gigaam" in normalized:
+        return "GigaAM-v3"
+    if "fun-asr-mlt" in normalized:
+        return "Fun-ASR-MLT-Nano"
+    if "fun-asr-nano" in normalized:
+        return "Fun-ASR-Nano"
     if "parakeet" in normalized:
         return "Parakeet"
     if "qwen" in normalized:
@@ -108,10 +139,32 @@ class LocalASRDiagnosticsOwner:
     gpu_effect_sink: LocalASRDiagnosticsGpuEffectSink = field(repr=False)
     gpu_discovery_origin_provider: LocalASRGpuDiscoveryOriginProvider = field(repr=False)
     gpu_provider_id: str
+    _applied_selections: dict[str, tuple[str | None, str | None, str | None]] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     @property
     def owner_name(self) -> str:
         return "LocalASRDiagnosticsOwner"
+
+    def selection_applied(
+        self,
+        *,
+        channel: str,
+        provider_id: str,
+        model_id: str | None,
+        source_language: str,
+    ) -> None:
+        self.provider_runtime_diagnostic(
+            ProviderRuntimeDiagnostic(
+                event="language_selection",
+                outcome="applied",
+                channel=channel,
+                provider_id=provider_id,
+                model_id=model_id,
+                source_language=source_language,
+            )
+        )
 
     def provider_runtime_diagnostic(
         self,
@@ -131,27 +184,40 @@ class LocalASRDiagnosticsOwner:
                 f"failure_code={stt_startup_failure_code(diagnostic.failure_code)} "
                 f"failure_type={stt_startup_failure_type(diagnostic.failure_type)}"
             )
-        if diagnostic.event in {"provider_handoff", "provider_replace"}:
+        if diagnostic.event in {"provider_handoff", "provider_replace", "language_selection"}:
+            previous_provider_id = diagnostic.previous_provider_id
+            previous_model_id = diagnostic.previous_model_id
+            previous_language = diagnostic.previous_source_language
+            if diagnostic.outcome == "applied" and diagnostic.channel in {"self", "peer"}:
+                selection = (
+                    diagnostic.provider_id,
+                    diagnostic.model_id,
+                    diagnostic.source_language,
+                )
+                previous_selection = self._applied_selections.get(diagnostic.channel)
+                if previous_selection == selection:
+                    return
+                if previous_selection is not None:
+                    previous_provider_id, previous_model_id, previous_language = previous_selection
+                self._applied_selections[diagnostic.channel] = selection
+            previous_provider = _known_identity(previous_provider_id, _PROVIDER_IDENTITIES)
+            provider = _known_identity(diagnostic.provider_id, _PROVIDER_IDENTITIES)
+            previous_model = _known_identity(previous_model_id, _MODEL_IDENTITIES)
+            model = _known_identity(diagnostic.model_id, _MODEL_IDENTITIES)
             self.basic_log_sink(
                 "[ASR] provider_transition "
                 f"event={diagnostic.event} "
                 f"channel={_safe_token(diagnostic.channel, 'unknown')} "
-                f"provider={_safe_token(diagnostic.provider_id, 'unknown')} "
+                f"previous_provider={previous_provider} provider={provider} "
+                f"previous_model={previous_model} model={model} "
+                f"previous_language={_safe_token(previous_language, 'none')} "
+                f"language={_safe_token(diagnostic.source_language, 'none')} "
                 f"outcome={_safe_token(diagnostic.outcome, 'unknown')} "
-                f"cause={_safe_token(diagnostic.failure_code, 'none')}",
+                f"cause={stt_startup_failure_code(diagnostic.failure_code)} "
+                f"stage={'selection' if diagnostic.event == 'language_selection' else 'provider'}",
                 logging.WARNING if diagnostic.outcome == "failed" else logging.INFO,
             )
-        if diagnostic.event == "activation_ready":
-            self.log_load_result(
-                channel=diagnostic.channel or "unknown",
-                model_id=diagnostic.model_id or "unknown",
-                backend="Vulkan",
-                device=diagnostic.device_id or "unknown",
-                outcome="ready",
-                load_seconds=diagnostic.model_load_seconds,
-                warmup_seconds=diagnostic.warmup_seconds,
-            )
-        elif diagnostic.event == "activation_failed":
+        if diagnostic.event == "activation_failed":
             self.log_load_result(
                 channel=diagnostic.channel or "unknown",
                 model_id=diagnostic.model_id or "unknown",
@@ -176,7 +242,7 @@ class LocalASRDiagnosticsOwner:
         elif diagnostic.event == "worker_recovery_started":
             cause = _failure_cause(diagnostic.failure_code, "decode failure")
             self.basic_log_sink(
-                "Local ASR worker restarting " f"(cause={cause}; utterance retry=false)",
+                f"Local ASR worker restarting (cause={cause}; utterance retry=false)",
                 logging.WARNING,
             )
         elif diagnostic.event == "worker_recovery_ready":
@@ -246,19 +312,13 @@ class LocalASRDiagnosticsOwner:
         if actual_provider == self.gpu_provider_id:
             return
         outcome = _safe_token(fields.get("outcome"), "")
-        if outcome not in {"applied", "failed"}:
+        if outcome != "failed":
             return
-        self.log_load_result(
-            channel=str(fields.get("channel") or "unknown"),
-            model_id=str(fields.get("model_id") or "unknown"),
-            backend="CPU",
-            outcome="ready" if outcome == "applied" else "failed",
-            load_seconds=_seconds_from_milliseconds(fields.get("load_ms")),
-            failure_type=(
-                _safe_token(fields["failure_type"], "") or None
-                if fields.get("failure_type") is not None
-                else None
-            ),
+        self.basic_log_sink(
+            f"{_channel_label(fields.get('channel'))} recognition provider update failed "
+            f"({_model_label(fields.get('model_id'))}; "
+            f"cause={_failure_cause(fields.get('failure_type'), 'unknown error')})",
+            logging.ERROR,
         )
 
     def log_load_result(
@@ -274,6 +334,8 @@ class LocalASRDiagnosticsOwner:
         warmup_seconds: float | None = None,
         failure_code: str | None = None,
     ) -> None:
+        if outcome != "failed":
+            return
         channel_token = _safe_token(channel, "unknown")
         model_token = _safe_token(model_id, "unknown")
         backend_token = _safe_token(backend, "unknown")
@@ -301,24 +363,12 @@ class LocalASRDiagnosticsOwner:
             fields.append(f"failure_code={failure_code_token}")
         self.diagnostic_log_sink(f"[LocalASR][Load] {' '.join(fields)}")
 
-        if outcome_token == "ready":
-            message = (
-                f"{_channel_label(channel)} recognition model ready " f"({_model_label(model_id)})"
-            )
-            level = logging.INFO
-        elif outcome_token == "failed":
-            message = (
-                f"{_channel_label(channel)} recognition model failed "
-                f"({_model_label(model_id)}; "
-                f"cause={_load_failure_cause(failure_code, failure_type)})"
-            )
-            level = logging.ERROR
-        else:
-            message = (
-                f"{_channel_label(channel)} recognition model update " f"({_model_label(model_id)})"
-            )
-            level = logging.INFO
-        self.basic_log_sink(message, level)
+        self.basic_log_sink(
+            f"{_channel_label(channel)} recognition model failed "
+            f"({_model_label(model_id)}; "
+            f"cause={_load_failure_cause(failure_code, failure_type)})",
+            logging.ERROR,
+        )
 
 
 __all__ = [

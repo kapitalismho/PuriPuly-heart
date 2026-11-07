@@ -1,16 +1,11 @@
 #[cfg(windows)]
-use std::cell::RefCell;
-#[cfg(windows)]
-use std::rc::Rc;
-
-#[cfg(windows)]
-use super::types::{CaptionRenderError, VisualBounds};
+use super::types::CaptionRenderError;
 #[cfg(windows)]
 use windows::core::implement;
 #[cfg(windows)]
 use windows::Win32::Graphics::Direct2D::{
-    Common::{ID2D1SimplifiedGeometrySink, D2D_RECT_F},
-    ID2D1CommandList, ID2D1DeviceContext, ID2D1Factory1, ID2D1Geometry, ID2D1SolidColorBrush,
+    Common::ID2D1SimplifiedGeometrySink, ID2D1CommandList, ID2D1DeviceContext, ID2D1Factory1,
+    ID2D1SolidColorBrush,
 };
 #[cfg(windows)]
 use windows::Win32::Graphics::DirectWrite::{
@@ -26,28 +21,12 @@ use windows_core::BOOL;
 use windows_numerics::Matrix3x2;
 
 #[cfg(windows)]
-#[derive(Debug, Clone)]
-pub(crate) struct GlyphRunVisual {
-    pub command_list: ID2D1CommandList,
-    pub visual_bounds: VisualBounds,
-}
-
-#[cfg(not(windows))]
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, Default)]
-pub(crate) struct GlyphRunVisual;
-
-#[cfg(windows)]
-type SharedBounds = Rc<RefCell<Option<VisualBounds>>>;
-
-#[cfg(windows)]
 #[implement(IDWriteTextRenderer)]
 struct GeometryTextRenderer {
     d2d_context: ID2D1DeviceContext,
     d2d_factory: ID2D1Factory1,
     fill_brush: ID2D1SolidColorBrush,
     outline_brush: ID2D1SolidColorBrush,
-    visual_bounds: SharedBounds,
     outline_stroke_width_px: f32,
 }
 
@@ -143,13 +122,6 @@ impl IDWriteTextRenderer_Impl for GeometryTextRenderer_Impl {
             self.d2d_context.SetTransform(&identity_transform());
         }
 
-        let fill_bounds = unsafe { geometry_bounds(&path, Some(&transform))? };
-        let outline_bounds = unsafe {
-            geometry_widened_bounds(&path, self.outline_stroke_width_px, Some(&transform))?
-        };
-        merge_rect(&self.visual_bounds, fill_bounds);
-        merge_rect(&self.visual_bounds, outline_bounds);
-
         Ok(())
     }
 
@@ -197,7 +169,7 @@ pub(crate) fn render_text_layout_to_command_list(
     fill_brush: &ID2D1SolidColorBrush,
     outline_brush: &ID2D1SolidColorBrush,
     outline_stroke_width_px: f32,
-) -> Result<GlyphRunVisual, CaptionRenderError> {
+) -> Result<ID2D1CommandList, CaptionRenderError> {
     let previous_target = unsafe { cache_context.GetTarget().ok() };
     let command_list = unsafe {
         cache_context
@@ -209,13 +181,11 @@ pub(crate) fn render_text_layout_to_command_list(
         cache_context.BeginDraw();
     }
 
-    let visual_bounds = Rc::new(RefCell::new(None));
     let renderer = GeometryTextRenderer {
         d2d_context: cache_context.clone(),
         d2d_factory: d2d_factory.clone(),
         fill_brush: fill_brush.clone(),
         outline_brush: outline_brush.clone(),
-        visual_bounds: visual_bounds.clone(),
         outline_stroke_width_px,
     };
     let text_renderer: IDWriteTextRenderer = renderer.into();
@@ -242,53 +212,7 @@ pub(crate) fn render_text_layout_to_command_list(
         },
     }
 
-    let visual_bounds = visual_bounds
-        .borrow()
-        .as_ref()
-        .copied()
-        .unwrap_or_else(|| VisualBounds::new(0.0, 0.0, 0.0, 0.0));
-
-    Ok(GlyphRunVisual {
-        command_list,
-        visual_bounds,
-    })
-}
-
-#[cfg(windows)]
-fn merge_rect(bounds: &SharedBounds, rect: D2D_RECT_F) {
-    let next = VisualBounds::new(rect.left, rect.top, rect.right, rect.bottom);
-    let mut guard = bounds.borrow_mut();
-    *guard = Some(match *guard {
-        Some(current) => VisualBounds::new(
-            current.left_px.min(next.left_px),
-            current.top_px.min(next.top_px),
-            current.right_px.max(next.right_px),
-            current.bottom_px.max(next.bottom_px),
-        ),
-        None => next,
-    });
-}
-
-#[cfg(windows)]
-unsafe fn geometry_bounds(
-    geometry: &ID2D1Geometry,
-    transform: Option<&Matrix3x2>,
-) -> windows::core::Result<D2D_RECT_F> {
-    geometry.GetBounds(transform.map(|value| value as *const _))
-}
-
-#[cfg(windows)]
-unsafe fn geometry_widened_bounds(
-    geometry: &ID2D1Geometry,
-    stroke_width_px: f32,
-    transform: Option<&Matrix3x2>,
-) -> windows::core::Result<D2D_RECT_F> {
-    geometry.GetWidenedBounds(
-        stroke_width_px,
-        None,
-        transform.map(|value| value as *const _),
-        0.25,
-    )
+    Ok(command_list)
 }
 
 #[cfg(windows)]

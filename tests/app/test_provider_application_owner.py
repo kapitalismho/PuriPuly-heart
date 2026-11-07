@@ -5,13 +5,13 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.app.services.provider_runtime_apply import ProviderRuntimeApplyPlan
-from puripuly_heart.app.services.provider_settings import ProviderApplicationOwner
-from puripuly_heart.app.services.settings_mutation_legacy import apply_settings_path_patch
-from puripuly_heart.app.services.settings_transaction_result import (
+
+from puripuly_heart.app.services.provider.provider_runtime_apply import ProviderRuntimeApplyPlan
+from puripuly_heart.app.services.provider.provider_settings import ProviderApplicationOwner
+from puripuly_heart.app.services.settings.settings_mutation_legacy import apply_settings_path_patch
+from puripuly_heart.app.services.settings.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
-
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.migration import apply_canonical_delta

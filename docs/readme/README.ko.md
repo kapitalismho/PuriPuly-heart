@@ -10,7 +10,7 @@
 
 <p align="center">
 
-  <img src="https://img.shields.io/badge/version-2.9.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.10.0-blue" alt="Version" />
 
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
 
@@ -70,8 +70,8 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 - **LLM 기반 현지화** — 슬랭, 구어체, 반말/존댓말까지 자연스럽게
 - **맥락 기억** — 문맥을 고려한 자연스러운 대화 흐름 유지
 - **양방향 음성 번역** — 상대 음성도 같이 번역, VR 자막 오버레이 지원
-- **설정 없이 바로 사용** — 복잡한 설정 과정 없이 ChatGPT 혹은 디스코드 인증을 통해 바로 사용 가능
-- **가장 강력한 로컬 풀스택** — Parakeet에서 Gemma 4까지, 지금 가장 효율적인 모델을 탑재
+- **설정 없이 바로 사용** — 직접 복잡하게 설정할 필요 없이 내장 에이전트가 최적의 경험을 제공해요
+- **가장 강력한 로컬 풀스택** — Granite Speech 5.0에서 Gemma 4까지, 지금 가장 효율적인 모델을 탑재
 
 ## 자주 묻는 질문
 
@@ -80,9 +80,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 - **말하고 번역이 되기까지 시간이 얼마나 걸리나요?**
 → 최적의 상황이라면 지연시간은 1초 부근이에요. 상대방의 발화가 끝났을 때가 기준이에요.
 - **사용하는데 돈이 드나요?**
-→ 네, 하지만 나중에요. 신규 사용자에게는 무료 사용량이 주어져요. 그 이후에도 가격은 매우 저렴해요. 1달러에 수천번을 번역할 수 있어요. 또한 로컬 모델을 활용하면 무료로 사용할 수 있어요.
-- **API 키를 발급 받아야 하나요?**
-→ 네, 하지만 이것도 나중에요. 처음에는 그냥 설치하고 디스코드로 인증만하면 쓸 수 있어요.
+→ 무료로 바로 사용할 수 있어요. 무료 옵션만으로도 충분히 좋은 성능이 나와요. 또한 유료 모델들도 매우 저렴하게 사용할 수 있어요. 1달러에 수천번 사용할 수 있어요.
 - **음성 인식이 느려요**
 → 로컬 ASR을 사용할 때 컴퓨팅이 부족한 상황이라면 처리 시간이 늦어 질 수 있어요. 이때는 클라우드 STT 서비스로 바꾸는 걸 추천해요.
 - **개인 데이터는 어떻게 처리되나요?**
@@ -94,11 +92,11 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 
 ## 번역 품질 비교
 
-![음성 인식과 번역을 결합한 전체 파이프라인의 문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 PuriPuly에서 사용할 수 있는 조합: Gemini Transcribe → Luna (0.676), Soniox STT → Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). 평가 모델: Gemini 3.7 Flash.](../images/performance/1.png)
+![음성 인식과 번역을 결합한 전체 파이프라인의 문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 벤치마크 당시 PuriPuly의 구성: Gemini Transcribe → GPT-6 Luna (0.676), Soniox STT → GPT-6 Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). 평가 모델: Gemini 3.7 Flash.](../images/performance/1.png)
 
-![문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 PuriPuly에서 사용할 수 있는 모델: GPT 6 Luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Qwen 3.8, Gemini 3.5, Soniox는 문자 오류율(CER) 5% 이하인 결과만 선별. 평가 모델: Gemini 3.7 Flash.](../images/performance/2.png)
+![문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 PuriPuly에서 사용할 수 있는 모델: GPT-6 Luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Qwen 3.8, Gemini 3.5, Soniox는 문자 오류율(CER) 5% 이하인 결과만 선별. 평가 모델: Gemini 3.7 Flash.](../images/performance/2.png)
 
-- 파란색 막대 그래프들이 PuriPuly에서 사용할 수 있는 모델이에요.
+- 파란색 막대는 벤치마크 당시 PuriPuly의 구성이에요. CPU Qwen3-ASR 0.6B는 이후 제거되었으며, 해당 수치는 아래의 새 모델을 측정한 결과가 아니에요.
 - 마이크로소프트의 Gemba MQM 프레임워크를 사용해서 실험했어요.
 - 실제 대화 환경과 가깝게 맥락을 포함한 멀티턴 환경으로 구성했어요.
 - 전체 실험 결과는 [여기](https://github.com/kapitalismho/korean-llm-context-translation-benchmark)를 참조해주세요.
@@ -115,7 +113,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | **Index-Translate 35B A3B**   | 무제한       | 무제한                 | 5,000회 | 7,260회     |
 | **Gemma 4 26B A4B + 31B** | 13,940회 | 13,940회 | 3,680회 | 4,770회 |
 | **DeepSeek V4.1 Flash**   | 16,800회   | 16,800회             | 3,860회 | 5,070회     |
-| **GPT 6 Luna** | 8,680회 | 8,680회 | 3,170회 | 3,950회 |
+| **GPT-6 Luna** | 8,680회 | 8,680회 | 3,170회 | 3,950회 |
 
 
 #### 기타 모델
@@ -139,7 +137,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | **Index-Translate 35B A3B**   | 0원        | 0원                  | ~0.3원  | ~0.2원      |
 | **Gemma 4 26B A4B + 31B** | ~0.1원 | ~0.1원 | ~0.4원 | ~0.3원 |
 | **DeepSeek V4.1 Flash**   | ~0.08원    | ~0.08원              | ~0.4원  | ~0.3원      |
-| **GPT 6 Luna** | ~0.16원 | ~0.16원 | ~0.4원 | ~0.4원 |
+| **GPT-6 Luna** | ~0.16원 | ~0.16원 | ~0.4원 | ~0.4원 |
 
 
 #### 기타 모델
@@ -157,7 +155,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 - *1달러 당 사용 가능 횟수는 발화당 비용 테이블의 반올림 전 계산값 기준*
 - *모든 비용과 사용 가능 횟수는 근사치 계산*
 - *DeepSeek V4.1 Flash는 캐시 히트율 70%, V4 Flash는 60% 가정 / 피크 타임은 고려하지 않음*
-- *GPT 6 Luna는 OpenAI API 요금 기준, 캐시 할인 미적용 가정 / ChatGPT로 연결하면 API 요금 대신 Codex 한도를 사용해요*
+- *GPT-6 Luna는 OpenAI API 요금 기준, 캐시 할인 미적용 가정 / ChatGPT로 연결하면 API 요금 대신 Codex 한도를 사용해요*
 - *Qwen API 비용은 베이징 리전 기준*
 - *요금표 기준: 2026년 10월 17일*
 - *1 달러 = 1400원*
@@ -186,12 +184,13 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 
 | 모델                         | 실행 환경 | 양자화  |
 | -------------------------- | ----- | ---- |
-| Parakeet TDT 0.6B v3       | CPU   | INT8 |
+| Granite Speech 5.0 Multilingual | CPU | Q8_0 |
+| GigaAM-v3 e2e-CTC | CPU | Q8_0 |
+| Fun-ASR-Nano-2512 | CPU | Q8_0 |
+| Fun-ASR-MLT-Nano-2512 | CPU | Q8_0 |
 | Parakeet TDT-CTC 0.6B (ja) | CPU   | INT8 |
-| Qwen3-ASR 0.6B             | CPU   | INT8 |
 | Qwen3-ASR 1.7B             | GPU   | Q6_K |
 | OpenAI 호환 API              | —     | —    |
-
 
 **LLM**
 
@@ -201,9 +200,6 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
 | Gemma 4 26B A4B IT QAT | GPU 전용 (Vulkan) | UD Q4_K_XL |
 | OpenAI 호환 API      | —         | —          |
-
-모델 파일은 설치 프로그램에 포함되지 않으며, 선택한 모델이 필요할 때 다운로드합니다. 26B 다운로드 크기는 약 14.25 GB입니다. 모델 선택은 재시작 후에도 유지됩니다. 26B는 Vulkan GPU 전용이며 초기화 실패 시 CPU나 E4B로 자동 전환하지 않습니다. GPU 번역은 하나의 런타임에서 Self/Peer 요청을 최대 2개까지 동시에 처리하고, CPU 번역은 순차 처리합니다. [고정 프로필 및 관리형 로컬 번역 계약](../cli.md#managed-local-translation)을 참고하세요.
-
 
 ---
 
@@ -219,14 +215,6 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 6. (선택) **LISTEN** 버튼을 눌러 상대 음성 번역 켜기
   > 상대 음성 번역 기능이 제대로 작동하기 위해서는 시끄럽지 않은 공간이 필요해요. VRChat에서 사용할 경우 Earmuff 기능을 사용해서 환경을 통제해주세요.
 7. VRChat에서 OSC 활성화: Action menu → Settings → OSC → Enable
-
-### 오디오 캡쳐가 되지 않는다면
-
-오디오 캡쳐가 되지 않는다면 **설정 &gt; 일반**에서 다음 절차를 따라주세요.
-
-1. **오디오 호스트 API**를 **자동선택** 혹은 **MME**로 변경
-2. 알맞은 마이크 선택
-3. 앱 재시작
 
 ---
 
@@ -349,21 +337,12 @@ PuriPuly는 클라우드 ASR와 결합했을 때 최상의 경험을 제공해�
    ![step6](../images/gemini/6.png)
 
 <details>
-<summary><h3>번역 엔진으로 제미나이 3.7 Flash를 사용하려면</h3></summary>
-
-7. 노란색으로 강조된 **Set Up Billing** 버튼을 눌러 유료 티어로 전환하세요.
-티어 전환에는 약간의 시간이 필요할 수 있어요.
-   ![step7](../images/gemini/7.png)
-
-</details>
-
-<details>
 <summary><h3>제미나이 유료 구독자라면</h3></summary>
 
-8. [Google Developer Program](https://developers.google.com/program/my-benefits) 에 들어가 프로그램에 참여하세요
+7. [Google Developer Program](https://developers.google.com/program/my-benefits) 에 들어가 프로그램에 참여하세요
    ![step8](../images/gemini/8.png)
 
-9. 7 단계에서 설정한 유료 티어 프로젝트를 선택하세요
+8. 유료 티어 프로젝트를 선택하세요
    ![step9](../images/gemini/9.png)
 
 </details>
@@ -517,26 +496,19 @@ uv run ruff check src tests
 uv run python -m pytest
 ```
 
-[Broker 개발(Linux)](../../broker/README.md) · [VR 오버레이 개발(Windows)](../../native/overlay/README.md)
-
----
-
-## 개발자
-
-[salee](https://github.com/kapitalismho)
-
 ---
 
 ## 기여자
 
-[RICHARDwuxiaofei](https://github.com/RICHARDwuxiaofei)
-[fzcfweasdferttgg-png](https://github.com/fzcfweasdferttgg-png)
+<a href="https://github.com/kapitalismho/PuriPuly-heart/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=kapitalismho/PuriPuly-heart" alt="Contributors" />
+</a>
 
 ---
 
 ## Special Thanks
 
-SUI32C, Nagikokoro, motoka96, Ykol魚, kascr, Just Monika V, FLUVIA, Han โชเล่ย์, EAPE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
+SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
 
 ---
 

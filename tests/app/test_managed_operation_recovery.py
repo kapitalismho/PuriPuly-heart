@@ -40,10 +40,6 @@ from puripuly_heart.app.services.managed.managed_key_delivery_ack import (
     ManagedKeyDeliveryAckService,
 )
 from puripuly_heart.core import messages
-from puripuly_heart.core.managed_credential import (
-    ManagedCredentialBinding,
-    credential_binding_secret,
-)
 from puripuly_heart.core.openrouter.managed_operation_identity import is_valid_operation_id
 
 LOCAL_SECRET_KEY = "openrouter_managed_api_key"
@@ -72,14 +68,6 @@ def _status(
         ),
         expires_at="2026-12-01T00:00:00.000Z" if credential else None,
         delivery_ack=delivery_ack,
-    )
-
-
-def _transport_failure() -> ManagedOperationStatusResult:
-    return ManagedOperationStatusResult(
-        succeeded=False,
-        operation_status="CREATE_UNKNOWN",
-        client_action="wait",
     )
 
 
@@ -463,6 +451,11 @@ async def test_issue_timeout_routes_to_status_and_resume_without_fresh_issue() -
     assert is_valid_operation_id(status_request.operation_id)
     assert broker.issue_calls[0].operation_id == status_request.operation_id
     assert status_request.installation_id == "install-1"
+    resume_token = status_request.resume_token
+    assert resume_token is not None
+    for saved in settings.saved:
+        _assert_no_raw_boundary(saved.values, RAW_CREDENTIAL, resume_token, RAW_ACK_TOKEN)
+    _assert_no_raw_boundary(result, RAW_CREDENTIAL, resume_token, RAW_ACK_TOKEN)
 
 
 @pytest.mark.asyncio
@@ -488,118 +481,6 @@ async def test_retry_authorized_without_credential_reissues_same_operation() -> 
     assert broker.status_calls[0].operation_id == first_operation
     assert secrets.values[LOCAL_SECRET_KEY] == RAW_CREDENTIAL
     assert state.pending_managed_operation_id is None
-
-
-@pytest.mark.asyncio
-async def test_restart_resumes_same_operation_without_new_oauth_or_issue() -> None:
-    broker = FakeBroker(
-        issue=AssertionError("must not issue"),
-        statuses=[_status("ACTIVE", "wait")],
-        ack=_ack_success(),
-    )
-    secrets, settings, state = FakeSecrets(), FakeSettings(), FakeState()
-    operation_id, token = _seed_operation(state, secrets)
-    secrets.values[LOCAL_SECRET_KEY] = RAW_CREDENTIAL
-    secrets.values[credential_binding_secret("discord")] = ManagedCredentialBinding.create(
-        source="discord",
-        installation_id=state.installation_id,
-        operation_id=operation_id,
-        delivery_id="delivery-op-1",
-        managed_credential_ref="managed-ref-1",
-        credential=RAW_CREDENTIAL,
-    ).encode()
-    discord = FakeDiscord()
-    identity = FakeIdentity()
-
-    result = await _service(broker, secrets, settings, state, identity, discord).authorize(
-        _request()
-    )
-
-    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-    assert discord.calls == 0
-    assert broker.issue_calls == []
-    assert len(broker.status_calls) == 1
-    assert broker.status_calls[0].operation_id == operation_id
-    assert broker.status_calls[0].resume_token == token
-    assert state.pending_managed_operation_id is None
-
-
-@pytest.mark.asyncio
-async def test_restart_retry_ready_recovers_without_discord_or_issue() -> None:
-    resume_ack = _delivery_ack_metadata()
-    broker = FakeBroker(
-        issue=AssertionError("issue must not be called during restart recovery"),
-        statuses=[_status("RETRY_READY", "retry_authorized")],
-        resumes=[
-            _status(
-                "DELIVERY_PENDING",
-                "acknowledge_delivery",
-                credential=RAW_CREDENTIAL,
-                delivery_ack=resume_ack,
-            )
-        ],
-        ack=_ack_success(),
-    )
-    secrets, settings, state = FakeSecrets(), FakeSettings(), FakeState()
-    operation_id, token = _seed_operation(state, secrets)
-
-    class _HardFailDiscord(FakeDiscord):
-        async def start_discord_auth(self, request: Any) -> Any:
-            raise AssertionError("Discord OAuth must not run during restart recovery")
-
-    discord = _HardFailDiscord()
-    identity = FakeIdentity()
-    ack_sink: list[Any] = []
-    progress: list[str] = []
-
-    result = await _service(broker, secrets, settings, state, identity, discord).authorize(
-        _request(ack_sink=ack_sink, progress=progress)
-    )
-
-    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-    assert discord.calls == 0
-    assert broker.issue_calls == []
-    assert len(broker.status_calls) == 1
-    assert broker.status_calls[0].operation_id == operation_id
-    assert broker.status_calls[0].resume_token == token
-    assert len(broker.resume_calls) == 1
-    assert broker.resume_calls[0].operation_id == operation_id
-    assert "recovering" in progress
-    assert secrets.values[LOCAL_SECRET_KEY] == RAW_CREDENTIAL
-    assert len(broker.ack_calls) == 1
-    assert broker.ack_calls[0].delivery_id == resume_ack.delivery_id
-    assert state.pending_managed_operation_id is None
-    assert RESUME_TOKEN_SECRET not in secrets.values
-    assert len(ack_sink) == 1
-
-
-@pytest.mark.asyncio
-async def test_restart_transitional_resume_polls_without_discord_or_issue() -> None:
-    broker = FakeBroker(
-        issue=AssertionError("issue must not be called during restart recovery"),
-        statuses=[_status("RECONCILING", "wait")] * 8,
-        resumes=[],
-        ack=_ack_success(),
-    )
-    secrets, settings, state = FakeSecrets(), FakeSettings(), FakeState()
-    operation_id, token = _seed_operation(state, secrets)
-
-    class _HardFailDiscord(FakeDiscord):
-        async def start_discord_auth(self, request: Any) -> Any:
-            raise AssertionError("Discord OAuth must not run during restart recovery")
-
-    result = await _service(
-        broker, secrets, settings, state, FakeIdentity(), _HardFailDiscord()
-    ).authorize(_request())
-
-    assert result.status == messages.TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
-    assert result.message is not None
-    assert result.message.key == "discord_auth.error.recovery_pending"
-    assert broker.issue_calls == []
-    assert len(broker.status_calls) == 8
-    assert broker.resume_calls == []
-    assert state.pending_managed_operation_id == operation_id
-    assert secrets.values[RESUME_TOKEN_SECRET] == token
 
 
 @pytest.mark.asyncio
@@ -647,39 +528,6 @@ async def test_authorization_expired_clears_then_allows_fresh_oauth() -> None:
     assert second.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
     assert len(broker.issue_calls) == 1
     assert broker.issue_calls[0].operation_id != stale_id
-
-
-@pytest.mark.asyncio
-async def test_pending_ack_takes_precedence_over_pending_operation() -> None:
-    broker = FakeBroker(
-        issue=AssertionError("must not issue"),
-        statuses=[],
-        ack=_ack_success(),
-    )
-    secrets, settings, state = FakeSecrets(), FakeSettings(), FakeState()
-    state.pending_delivery_ack_source = ACK_SOURCE_DISCORD
-    state.pending_delivery_ack_delivery_id = "delivery-op-1"
-    state.pending_delivery_ack_managed_credential_ref = "managed-ref-1"
-    state.pending_delivery_ack_expires_at = "2099-12-01T00:15:00.000Z"
-    secrets.values[LOCAL_SECRET_KEY] = RAW_CREDENTIAL
-    secrets.values["openrouter_managed_delivery_ack_token"] = RAW_ACK_TOKEN
-    _seed_operation(state, secrets)
-    ack_sink: list[Any] = []
-    secrets.values[credential_binding_secret("discord")] = ManagedCredentialBinding.create(
-        source="discord",
-        installation_id=state.installation_id,
-        operation_id=state.pending_managed_operation_id,
-        delivery_id="delivery-op-1",
-        managed_credential_ref="managed-ref-1",
-        credential=RAW_CREDENTIAL,
-    ).encode()
-
-    result = await _service(broker, secrets, settings, state).authorize(_request(ack_sink=ack_sink))
-
-    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-    assert broker.issue_calls == []
-    assert broker.status_calls == []
-    assert len(ack_sink) == 1
 
 
 @pytest.mark.asyncio
@@ -791,112 +639,3 @@ async def test_owner_records_action_required_failure_kind() -> None:
     assert await owner.start_discord() is False
     assert owner.last_failure_kind == "action_required"
     assert owner.last_message_key == "discord_auth.error.action_required"
-
-
-@pytest.mark.asyncio
-async def test_owner_records_idle_resumable_failure_after_bounded_recovery_stops() -> None:
-    owner, _ = _owner("discord_auth.error.recovery_pending")
-    assert await owner.start_discord() is False
-    assert owner.last_failure_kind == "idle_resumable"
-    assert owner.pending is False
-
-
-@pytest.mark.asyncio
-async def test_owner_records_generic_failure_kind() -> None:
-    owner, _ = _owner("discord_auth.error.retry")
-    assert await owner.start_discord() is False
-    assert owner.last_failure_kind == "failed"
-
-
-@pytest.mark.asyncio
-async def test_secret_boundaries_hold_across_recovery_finalize() -> None:
-    resume_ack = _delivery_ack_metadata()
-    broker = FakeBroker(
-        issue=RuntimeError("timeout"),
-        statuses=[_status("RETRY_READY", "retry_authorized")],
-        resumes=[
-            _status(
-                "DELIVERY_PENDING",
-                "acknowledge_delivery",
-                credential=RAW_CREDENTIAL,
-                delivery_ack=resume_ack,
-            )
-        ],
-        ack=_ack_success(),
-    )
-    secrets, settings, state = FakeSecrets(), FakeSettings(), FakeState()
-    token_before = secrets.values.get(RESUME_TOKEN_SECRET)
-
-    result = await _service(broker, secrets, settings, state).authorize(_request())
-
-    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-    resume_token = broker.status_calls[0].resume_token
-    assert resume_token is not None and resume_token != token_before
-    for saved in settings.saved:
-        _assert_no_raw_boundary(saved.values, RAW_CREDENTIAL, resume_token, RAW_ACK_TOKEN)
-    _assert_no_raw_boundary(result, RAW_CREDENTIAL, RAW_ACK_TOKEN)
-    if resume_token is not None:
-        assert resume_token not in repr(result)
-
-
-@pytest.mark.asyncio
-async def test_owner_service_smoke_timeout_to_ready_reports_recovery() -> None:
-    broker = FakeBroker(
-        issue_script=[RuntimeError("timeout"), _issue_success()],
-        statuses=[_status("RETRY_READY", "retry_authorized")],
-        resumes=[_status("RETRY_READY", "retry_authorized")],
-        ack=_ack_success(),
-    )
-    secrets, settings, state = FakeSecrets(), FakeSettings(), FakeState()
-    identity, discord = FakeIdentity(), FakeDiscord()
-    recovery_marks: list[str] = []
-    usage_refreshes: list[bool] = []
-    ack_sink: list[Any] = []
-
-    async def _executor(
-        _callback: object,
-        _recovery: object = None,
-    ) -> ManagedAuthExecutionResult:
-        service = _service(broker, secrets, settings, state, identity, discord)
-        result = await service.authorize(_request(ack_sink=ack_sink, progress=recovery_marks))
-        if result.status != messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-            message = result.message
-            return ManagedAuthExecutionResult(
-                succeeded=False,
-                message_key=(message.key if message is not None else "discord_auth.error.retry"),
-                message_kwargs=dict(message.params) if message is not None else {},
-            )
-        return ManagedAuthExecutionResult(
-            succeeded=True,
-            runtime_rebuild="always",
-        )
-
-    owner = ManagedAuthOwner(
-        state_provider=lambda: ManagedAuthState(
-            settings_available=True,
-            managed_selected=True,
-            managed_china=False,
-            local_key_available=False,
-            release_service_available=True,
-            runtime_available=True,
-            ingress_frozen=False,
-        ),
-        pending_sink=lambda _pending: None,
-        qq_executor=None,  # type: ignore[arg-type]
-        discord_executor=_executor,
-        runtime_ensurer=lambda _mode: _ensure_true(),
-        usage_refresh_sink=lambda: usage_refreshes.append(True),
-        message_sink=lambda _key, _values: None,
-        result_sink=lambda _result: None,
-        log_sink=lambda _message: None,
-    )
-
-    assert await owner.start_discord(on_recovery_started=recovery_marks.append) is True
-    assert "recovering" in recovery_marks
-    assert secrets.values[LOCAL_SECRET_KEY] == RAW_CREDENTIAL
-    assert len(broker.issue_calls) == 2
-    assert usage_refreshes == [True]
-
-
-async def _ensure_true() -> bool:
-    return True

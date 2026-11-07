@@ -3,10 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterReleaseBehavior,
-    ManagedOpenRouterReleaseError,
-)
 
 from puripuly_heart.app.ports.broker_client import (
     ManagedKeyDeliveryAckResult,
@@ -18,6 +14,10 @@ from puripuly_heart.app.services.managed.managed_operation import (
     new_managed_operation_resume_token,
 )
 from puripuly_heart.core.managed_identity import ensure_managed_identity_bundle
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
+    ManagedOpenRouterReleaseBehavior,
+    ManagedOpenRouterReleaseError,
+)
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from tests.core.test_managed_openrouter_release import (
     FakeDiscordOAuthHarness,

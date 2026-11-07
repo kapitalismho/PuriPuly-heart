@@ -7,14 +7,6 @@ export const BROKER_MIGRATION_FILENAMES = readdirSync(MIGRATIONS_DIR)
   .filter((name: string) => name.endsWith('.sql'))
   .sort();
 
-export const BROKER_MIGRATION_URLS = BROKER_MIGRATION_FILENAMES.map((name: string) =>
-  new URL(name, MIGRATIONS_DIR),
-);
-
-export const FIRST_BROKER_MIGRATION = BROKER_MIGRATION_URLS[0]!;
-export const LATEST_BROKER_MIGRATION =
-  BROKER_MIGRATION_URLS[BROKER_MIGRATION_URLS.length - 1]!;
-
 export function readBrokerMigrationSql(fileName: string): string {
   return readFileSync(new URL(fileName, MIGRATIONS_DIR), 'utf8');
 }

@@ -16,18 +16,6 @@ from typing import Any
 
 from puripuly_heart.cli.transport import ControlTransportError, follow, request
 
-TERMINAL = frozenset(
-    {
-        "applied",
-        "degraded",
-        "rejected",
-        "persistence_failed",
-        "failed",
-        "action_required",
-        "cancelled",
-        "interrupted",
-    }
-)
 EXIT_CODES = {
     "applied": 0,
     "degraded": 4,
@@ -176,6 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
     audio_test = audio_sub.add_parser("test")
     audio_test.add_argument("state", choices=("on", "off"))
     audio_test.add_argument("--no-wait", action="store_true")
+    audio_sub.add_parser("diagnose").add_argument("--no-wait", action="store_true")
     settings = sub.add_parser("settings", help="Inspect choices and apply typed settings changes")
     settings_sub = settings.add_subparsers(dest="action", required=True)
     for name in ("current", "choices"):
@@ -249,8 +238,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     calibrate.add_argument("--value", help="Anchor name or finite numeric calibration value")
     calibrate.add_argument("--no-wait", action="store_true")
-    osc = sub.add_parser("osc", help="Inspect effective OSC connection")
-    osc.add_subparsers(dest="action", required=True).add_parser("status")
+    osc = sub.add_parser(
+        "osc", help="Inspect OSC output or run bounded automatic discovery recovery"
+    )
+    osc_sub = osc.add_subparsers(dest="action", required=True)
+    osc_sub.add_parser("status")
+    osc_discovery = osc_sub.add_parser("discovery")
+    osc_discovery_sub = osc_discovery.add_subparsers(dest="step", required=True)
+    osc_discovery_sub.add_parser("retry").add_argument("--no-wait", action="store_true")
     auth = sub.add_parser("auth", help="Inspect, authorize and remove account login")
     auth_sub = auth.add_subparsers(dest="action", required=True)
     auth_sub.add_parser("status")
@@ -481,7 +476,7 @@ def _status_code(result: dict[str, Any], *, waiting: bool) -> int:
         if status == "action_required":
             return EXIT_CODES[status]
         return 0 if not waiting and status in ("accepted", "running") else 7
-    if status in TERMINAL:
+    if status in EXIT_CODES:
         return EXIT_CODES[status]
     raise ControlTransportError("malformed_response", "Terminal operation has invalid status")
 
@@ -500,11 +495,8 @@ async def _start_background(path: Path, timeout: float) -> int:
     ready = Path(filename)
     ready.unlink()
     service_args = ["run-headless", "--config", str(path), "--ready-file", str(ready)]
-    if layout.host_kind == "pyinstaller":
-        argv = [str(layout.host_executable), *service_args]
-    else:
-        module = "product_bootstrap" if layout.host_kind == "native" else "puripuly_heart.main"
-        argv = [str(layout.python_executable), "-m", module, *service_args]
+    module = "product_bootstrap" if layout.host_kind == "native" else "puripuly_heart.main"
+    argv = [str(layout.python_executable), "-m", module, *service_args]
     options: dict[str, Any] = {
         "stdin": subprocess.DEVNULL,
         "stdout": subprocess.DEVNULL,
@@ -733,6 +725,7 @@ async def _run(args: argparse.Namespace) -> int:
         "gemma",
         "gpu",
         "overlay",
+        "osc",
         "auth",
     ):
         if args.domain == "command":
@@ -777,6 +770,8 @@ async def _run(args: argparse.Namespace) -> int:
                 name, values = "audio.target.set", {"value": args.value}
             elif args.action == "test":
                 name, values = "audio.test", {"enabled": args.state == "on"}
+            elif args.action == "diagnose":
+                name, values = "audio.diagnose", {}
             else:
                 name, values = "audio.retry", {}
         elif args.domain == "models" and args.action in ("download", "import", "delete"):
@@ -797,6 +792,8 @@ async def _run(args: argparse.Namespace) -> int:
             name, values = f"gemma.{args.action}", {}
         elif args.domain == "gpu":
             name, values = "gpu.discover", {}
+        elif args.domain == "osc":
+            name, values = "osc.discovery.retry", {}
         elif args.domain == "overlay":
             name = {
                 "reset-position": "overlay.position.reset",

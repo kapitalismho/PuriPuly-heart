@@ -1,0 +1,31 @@
+{
+  "manifest_version": 1,
+  "installed_manifest_version": 1,
+  "model_id": "granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu",
+  "engine": "transcribe.cpp-cpu",
+  "license": "Apache-2.0",
+  "upstream_repo": "17slever17/granite-speech-5.0-470m-turboctc-multilingual-GGUF",
+  "install_dirname": "granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu",
+  "installed_manifest_filename": "installed-manifest.json",
+  "sources": {
+    "huggingface": {
+      "name": "huggingface",
+      "repo_id": "17slever17/granite-speech-5.0-470m-turboctc-multilingual-GGUF",
+      "revision": "62f64d9d5ad35989b06caf199cafe7155944a22b",
+      "download_url_template": "https://huggingface.co/17slever17/granite-speech-5.0-470m-turboctc-multilingual-GGUF/resolve/62f64d9d5ad35989b06caf199cafe7155944a22b/{path}"
+    },
+    "hf_mirror": {
+      "name": "hf_mirror",
+      "repo_id": "17slever17/granite-speech-5.0-470m-turboctc-multilingual-GGUF",
+      "revision": "62f64d9d5ad35989b06caf199cafe7155944a22b",
+      "download_url_template": "https://hf-mirror.net/17slever17/granite-speech-5.0-470m-turboctc-multilingual-GGUF/resolve/62f64d9d5ad35989b06caf199cafe7155944a22b/{path}"
+    }
+  },
+  "files": [
+    {
+      "relative_path": "granite-speech-5.0-470m-turboctc-multilingual-Q8_0.gguf",
+      "sha256": "f3efdc05b85b3a764bb5bb7022e69f61cafcecc11605c881c6396a6ed07ec91b",
+      "size_bytes": 505663136
+    }
+  ]
+}

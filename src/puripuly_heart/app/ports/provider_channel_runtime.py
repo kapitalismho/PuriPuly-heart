@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeChannel
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeChannel
 
 
 class ProviderChannelResetPort(Protocol):

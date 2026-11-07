@@ -4,11 +4,11 @@ import asyncio
 from typing import cast
 
 import pytest
-from puripuly_heart.app.services.overlay_application import (
+
+from puripuly_heart.app.services.overlay.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
-
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.resolved import ResolvedOverlayConfig
 from puripuly_heart.core.clock import FakeClock

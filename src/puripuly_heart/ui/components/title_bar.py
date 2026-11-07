@@ -5,7 +5,6 @@ import flet as ft
 from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
-    COLOR_DIVIDER,
     COLOR_ERROR,
     COLOR_NEUTRAL_DARK,
     COLOR_SECONDARY,
@@ -57,7 +56,6 @@ class TitleBar(ft.Container):
             bgcolor=COLOR_BACKGROUND,
             height=48,
             border_radius=ft.BorderRadius.only(top_left=16, top_right=16),
-            border=ft.Border.only(bottom=ft.BorderSide(1, COLOR_DIVIDER)),
         )
 
     def _minimize(self, _):

@@ -26,7 +26,10 @@ def persist_desktop_audio_capture_target(
     owner = compose_settings_owner(path)
     if path.exists():
         try:
-            owner.start()
+            owner.project(
+                owner.persistence.load_active(path).canonical_settings,
+                authoritative=False,
+            )
         except CanonicalSettingsPersistenceError as exc:
             raise CaptureTargetSettingsError(exc.status) from None
         except Exception:

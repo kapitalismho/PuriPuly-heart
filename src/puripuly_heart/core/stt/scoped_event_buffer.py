@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 
 from puripuly_heart.core.stt.backend import (
     STTProviderEpochEnded,
@@ -20,7 +20,7 @@ class STTProviderEventBufferClosed(RuntimeError):
 
 
 class STTProviderEventBuffer:
-    MAX_EVENTS = 256
+    MAX_EVENTS = 512
     MAX_RECOGNITION_BYTES = 1024 * 1024
 
     def __init__(self, *, max_events: int = MAX_EVENTS) -> None:
@@ -30,6 +30,7 @@ class STTProviderEventBuffer:
         self._events: deque[STTProviderTurnEvent] = deque()
         self._recognition_bytes = 0
         self._wake = asyncio.Event()
+        self._space = asyncio.Event()
         self._closed = False
         self._retired_epochs: set[str] = set()
         self._retired_epoch_order: deque[str] = deque()
@@ -42,7 +43,38 @@ class STTProviderEventBuffer:
     def max_events(self) -> int:
         return self._max_events
 
-    def put(self, event: STTProviderTurnEvent) -> bool:
+    async def wait_for_capacity(
+        self, event: STTProviderTurnEvent, *, is_current: Callable[[], bool]
+    ) -> bool:
+        size = _recognition_bytes(event)
+        while not self._closed and is_current():
+            if size > self.MAX_RECOGNITION_BYTES:
+                return True
+            if (
+                len(self._events) < self._max_events
+                and size + self._recognition_bytes <= self.MAX_RECOGNITION_BYTES
+            ):
+                return True
+            self._space.clear()
+            await self._space.wait()
+        return False
+
+    def discard_updates(self, *, epoch_id: str | None = None) -> None:
+        self._events = deque(
+            event
+            for event in self._events
+            if not (
+                isinstance(event, STTProviderTurnUpdate)
+                and (epoch_id is None or _event_epoch_id(event) == epoch_id)
+            )
+        )
+        self._recognition_bytes = sum(_recognition_bytes(event) for event in self._events)
+        self.wake_admission()
+
+    def wake_admission(self) -> None:
+        self._space.set()
+
+    def put(self, event: STTProviderTurnEvent, *, preserve_observations: bool = False) -> bool:
         if self._closed:
             raise STTProviderEventBufferClosed("provider event buffer is closed")
         epoch_id = _event_epoch_id(event)
@@ -52,9 +84,9 @@ class STTProviderEventBuffer:
         if size + self._recognition_bytes > self.MAX_RECOGNITION_BYTES:
             self._fail_epoch(epoch_id)
             return False
-        if _is_provisional_snapshot(event):
+        if not preserve_observations and _is_provisional_snapshot(event):
             self._remove_matching_provisional_snapshots(event)
-        if len(self._events) >= self._max_events:
+        if not preserve_observations and len(self._events) >= self._max_events:
             self._discard_provisional_snapshots_until_room()
         if len(self._events) >= self._max_events:
             if isinstance(event, STTProviderTurnUpdate) and event.stability == "provisional":
@@ -77,12 +109,14 @@ class STTProviderEventBuffer:
     def close(self) -> None:
         self._closed = True
         self._wake.set()
+        self.wake_admission()
 
     async def get(self) -> STTProviderTurnEvent:
         while True:
             if self._events:
                 event = self._events.popleft()
                 self._recognition_bytes -= _recognition_bytes(event)
+                self.wake_admission()
                 if not self._events:
                     self._wake.clear()
                 return event
@@ -159,6 +193,7 @@ class STTProviderEventBuffer:
         self._retire_epoch(epoch_id)
         self._recognition_bytes = sum(_recognition_bytes(queued) for queued in self._events)
         self._wake.set()
+        self.wake_admission()
         return True
 
     def _retire_epoch(self, epoch_id: str) -> None:
@@ -193,11 +228,50 @@ def _recognition_bytes(event: STTProviderTurnEvent) -> int:
         return event.unit.retained_bytes
     if isinstance(event, STTRecognitionUnit):
         return event.retained_bytes
-    if (
-        isinstance(event, (STTProviderTurnUpdate, STTProviderTurnTerminal))
-        and event.recognition_origins
-    ):
-        return len(event.text.encode("utf-8")) + sum(
+    if isinstance(event, (STTProviderTurnUpdate, STTProviderTurnTerminal)):
+        size = len(event.text.encode("utf-8"))
+        size += sum(
+            len(run.text.encode("utf-8")) + len(run.language.encode("utf-8"))
+            for run in event.final_language_runs
+        )
+        size += sum(
+            len(run.text.encode("utf-8"))
+            + sum(
+                len(value.encode("utf-8"))
+                for value in (run.speaker_id, run.session_scope, run.source, run.attribution_state)
+                if value is not None
+            )
+            for run in event.final_speaker_runs
+        )
+        provenance = (
+            (event.provenance,) if isinstance(event, STTProviderTurnUpdate) else event.provenance
+        )
+        size += sum(
+            sum(
+                len(value.encode("utf-8"))
+                for value in (
+                    item.native_event_id,
+                    item.native_request_id,
+                    item.native_item_id,
+                    item.native_task_id,
+                    item.barrier,
+                )
+                if value is not None
+            )
+            + (item.transcription.retained_bytes if item.transcription is not None else 0)
+            for item in provenance
+        )
+        contributions = (
+            (event.contribution,)
+            if isinstance(event, STTProviderTurnUpdate)
+            else event.included_contributions
+        )
+        size += sum(
+            len(item.contribution_id.encode("utf-8")) + 16
+            for item in contributions
+            if item is not None
+        )
+        return size + sum(
             128 + (origin.native.retained_bytes if origin.native is not None else 0)
             for origin in event.recognition_origins
         )

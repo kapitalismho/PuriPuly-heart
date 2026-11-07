@@ -73,6 +73,9 @@ SUPPORTED_LANGUAGES: dict[str, LanguageInfo] = {
     "zh-CN": LanguageInfo(code="zh-CN", name="Chinese (Simplified)"),
     "zh-TW": LanguageInfo(code="zh-TW", name="Chinese (Traditional)"),
 }
+_SUPPORTED_LANGUAGES_BY_LOWER_CODE = {
+    code.lower(): info for code, info in SUPPORTED_LANGUAGES.items()
+}
 
 
 def get_language_info(code: str) -> LanguageInfo | None:
@@ -102,7 +105,7 @@ def map_detected_language_for_llm(language: str) -> DetectedLanguageForLLM | Non
     normalized = language.strip().replace("_", "-").lower()
     if normalized == "zh":
         return DetectedLanguageForLLM(code="zh", name="Chinese")
-    info = get_language_info(normalized)
+    info = _SUPPORTED_LANGUAGES_BY_LOWER_CODE.get(normalized) or get_language_info(normalized)
     if info is None:
         return None
     return DetectedLanguageForLLM(code=info.code, name=info.name)
@@ -182,10 +185,6 @@ def _language_from_map(code: str, language_map: dict[str, str]) -> str:
 
 def get_qwen3_asr_language(code: str) -> str:
     return _language_from_map(code, _QWEN3_ASR_LANGUAGE_MAP)
-
-
-def get_qwen_audio_asr_language(code: str) -> str:
-    return _language_from_map(code, _QWEN_AUDIO_ASR_LANGUAGE_MAP)
 
 
 def qwen_audio_asr_language_hint(code: str) -> str | None:
@@ -430,11 +429,5 @@ def get_stt_compatibility_warning(
     if stt_provider == "qwen_audio":
         if not is_qwen_audio_asr_supported(code) and is_deepgram_supported(code):
             return SttCompatibilityWarning("warning.qwen_suggest_deepgram", lang_code)
-    elif (
-        stt_provider == "local_qwen"
-        and not is_qwen3_asr_supported(code)
-        and is_deepgram_supported(code)
-    ):
-        return SttCompatibilityWarning("warning.qwen_suggest_deepgram", lang_code)
 
     return None

@@ -12,7 +12,11 @@ from websockets.asyncio.server import serve
 
 from puripuly_heart.core.audio.format import float32_to_pcm16le_bytes
 from puripuly_heart.core.audio.ownership import PeerAudioSegmentLedger
-from puripuly_heart.core.stt.backend import STTProviderTurnTerminal, STTSessionProjection
+from puripuly_heart.core.stt.backend import (
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
+    STTSessionProjection,
+)
 from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
@@ -76,7 +80,7 @@ async def run_comparison(channel, overlapping):
     async def finish(socket, task):
         await asyncio.sleep(0.06 if task["order"] == 1 else 0.005)
         await socket.send(
-            json.dumps(native(task["id"], 2, " tail ", begin_time=500, end_time=1000))
+            json.dumps(native(task["id"], 2, " tail. ", begin_time=500, end_time=1000))
         )
         mark("terminal", task)
         await socket.send(json.dumps(control(task["id"], "task-finished")))
@@ -91,7 +95,7 @@ async def run_comparison(channel, overlapping):
                 mark("pcm", task)
                 if len(task["pcm"]) == 1:
                     await socket.send(
-                        json.dumps(native(task["id"], 1, " same ", begin_time=0, end_time=500))
+                        json.dumps(native(task["id"], 1, " Same ", begin_time=0, end_time=500))
                     )
                 continue
             packet = json.loads(message)
@@ -122,15 +126,17 @@ async def run_comparison(channel, overlapping):
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("qwen_audio"))
     inputs, expected = local_inputs(ledger)
     terminals = []
+    updates = []
 
     async def receive(event):
-        if not isinstance(event, STTProviderTurnTerminal):
+        if isinstance(event, STTProviderTurnUpdate):
+            updates.append(event)
             if channel == "self":
                 await harness.self_owner.handle_stt_event(event)
             else:
-                pytest.fail("Peer published before local task completion")
+                await harness.peer_owner.handle_provider_update(event)
             return
-        terminals.append(event)
+        assert isinstance(event, STTProviderTurnTerminal)
         if channel == "self":
             await harness.self_owner.handle_stt_event(event)
         else:
@@ -143,6 +149,7 @@ async def run_comparison(channel, overlapping):
                 text_authority=event.text_authority,
             )
             await harness.peer_owner.handle_provider_turn_terminal(receipt, event)
+        terminals.append(event)
 
     async with serve(handler, "127.0.0.1", 0) as server:
         endpoint = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}/controlled/{channel}"
@@ -173,13 +180,29 @@ async def run_comparison(channel, overlapping):
                 if not overlapping:
                     await wait_until(lambda: len(terminals) == index)
             await wait_until(lambda: len(terminals) == 3)
+            if channel == "peer":
+                await harness.peer_owner.cloud_captions.wait_for_idle()
             await harness.translation_turns.wait_for_idle()
             wire = [b"".join(task["pcm"]) for task in tasks]
             assert wire == expected
             assert len(tasks) == 3 and len(connections) == 2
-            assert [terminal.text for terminal in terminals] == [" same  tail "] * 3
+            assert [terminal.text for terminal in terminals] == [" Same  tail. "] * 3
+            assert all(terminal.outcome == "final" for terminal in terminals)
+            assert [terminal.identity.segment.segment_order for terminal in terminals] == [1, 2, 3]
+            for terminal in terminals:
+                observed = [update for update in updates if update.identity == terminal.identity]
+                assert observed
+                assert all(
+                    update.stability == "stable"
+                    and update.assembly == "replace"
+                    and terminal.text.startswith(update.text)
+                    for update in observed
+                )
+                assert observed[-1].text == terminal.text
+                assert observed[-1].recognition_origins == terminal.recognition_origins
             assert (
-                len(llm.calls) == 3 and [call["text"] for call in llm.calls] == [" same  tail "] * 3
+                len(llm.calls) == 3
+                and [call["text"] for call in llm.calls] == [" Same  tail. "] * 3
             )
             assert all(len(terminal.recognition_origins) == 2 for terminal in terminals)
             a_finish = next(at for event, order, at in trace if event == "finish" and order == 1)
@@ -198,6 +221,7 @@ async def run_comparison(channel, overlapping):
                 "pcm_sha256": [hashlib.sha256(pcm).hexdigest() for pcm in wire],
                 "completed_segments": len(terminals),
                 "native_contributions": sum(len(t.recognition_origins) for t in terminals),
+                "observed_updates": len(updates),
                 "translation_calls": len(llm.calls),
                 "trace": trace,
             }

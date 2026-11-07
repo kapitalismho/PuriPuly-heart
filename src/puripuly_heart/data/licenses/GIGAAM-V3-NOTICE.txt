@@ -1,0 +1,6 @@
+Modifications: handy-computer converted
+https://huggingface.co/ai-sage/GigaAM-v3 at commit cec030b to GGUF for
+transcribe.cpp (https://github.com/handy-computer/transcribe.cpp). Conversion
+repackages the weights, renaming and re-laying-out tensors; the quantized
+files (Q8_0, Q6_K, Q5_K_M, Q4_K_M) also store them at reduced numeric
+precision. The weights were not retrained or fine-tuned.

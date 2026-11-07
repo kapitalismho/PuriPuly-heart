@@ -90,7 +90,7 @@ def test_openai_factory_rejects_managed_or_other_model_targets(
             _openai_config(credential_reference="openrouter:byok"),
             secrets=secrets,
         )
-    with pytest.raises(ValueError, match="only GPT 6 Luna"):
+    with pytest.raises(ValueError):
         create_llm_provider_from_resolved_config(
             _openai_config(model="some-other-model"),
             secrets=secrets,

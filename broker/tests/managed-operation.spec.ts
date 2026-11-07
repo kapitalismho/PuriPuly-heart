@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { buildManagedOperationId, buildManagedOperationResumeToken } from './test-support/managed-operation';
 
 import { app } from '../src/app';
 import {
   authorizeManagedOperationRequest,
   bindOperationForIssue,
-  buildManagedOperationId,
-  buildManagedOperationResumeToken,
   createManagedOperation,
   getManagedOperation,
   hashManagedOperationResumeToken,
@@ -18,8 +17,6 @@ import {
   sweepStaleManagedOperations,
   transitionManagedOperation,
   transitionOperationToPostCreateState,
-  failManagedOperationTerminal,
-  expireManagedOperation,
   findConflictingOperationDelivery,
   markOperationActiveOnAck,
 } from '../src/managed-operation';
@@ -27,6 +24,7 @@ import {
   createTestBrokerEnv,
   type TestBrokerEnv,
 } from './test-support/sqlite-d1';
+import { reconcileStaleManagedKeyDeliveries } from '../src/scheduled';
 
 const NOW = new Date('2026-09-01T10:00:00.000Z');
 const SUBJECT = 'ph-discord-user-v1_operation_subject_test';
@@ -540,7 +538,7 @@ describe('managed operation lifecycle', () => {
     expect(body).toEqual(expect.objectContaining({ state: 'ACTIVE', client_action: 'wait' }));
   });
 
-  it('sweeps a stale delivery-pending operation to active when its delivery was acknowledged', async () => {
+  it('reconciles a stale delivery-pending operation to active when its delivery was acknowledged', async () => {
     const env = createTestBrokerEnv();
     const { operationId, operation } = await createBoundOperation(env);
     const started = await startManagedOperationAttempt(env.BROKER_DB, operation, NOW);
@@ -568,8 +566,8 @@ describe('managed operation lifecycle', () => {
     });
 
     mockProviderList({});
-    const result = await sweepStaleManagedOperations(env, new Date(NOW.getTime() + 16 * 60_000));
-    expect(result.reconciled).toBe(1);
+    await reconcileStaleManagedKeyDeliveries(env, new Date(NOW.getTime() + 16 * 60_000));
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
     const swept = (await getManagedOperation(env.BROKER_DB, operationId))!;
     expect(swept.state).toBe('ACTIVE');
     expect(swept.client_action).toBe('wait');

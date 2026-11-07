@@ -5,25 +5,25 @@ import inspect
 from dataclasses import replace
 
 import pytest
-from puripuly_heart.core.local_asr_provider_runtime import (
+
+from puripuly_heart.app.services.gpu_runtime_interaction import (
+    GpuRuntimeInteractionOwner,
+    GpuRuntimeInteractionState,
+)
+from puripuly_heart.core.asr_worker import ASRWorkerDevice
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimeSnapshot,
     ProviderRuntimeChannelSnapshot,
     ProviderRuntimeGpuSnapshot,
 )
-from puripuly_heart.core.local_asr_provisioning import (
+from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRInstallRequest,
     LocalASRInstallResult,
     LocalASRModelProvisioningState,
     LocalASRProvisioningActivity,
     LocalASRProvisioningSnapshot,
 )
-from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
-
-from puripuly_heart.app.services.gpu_runtime_interaction import (
-    GpuRuntimeInteractionOwner,
-    GpuRuntimeInteractionState,
-)
-from puripuly_heart.core.gpu_worker import GpuWorkerDevice
+from puripuly_heart.core.local_asr.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
 
 
 def _gpu_snapshot(
@@ -41,7 +41,7 @@ def _gpu_snapshot(
         )
         for channel in ("self", "peer")
     )
-    device = GpuWorkerDevice(
+    device = ASRWorkerDevice(
         device_id="vulkan-index-0",
         registry_index=0,
         name="GPU 0",

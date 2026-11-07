@@ -3,10 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { checkEndpointRateLimit } from '../src/abuse-controls';
 import {
-  acknowledgeManagedKeyDelivery,
+  validateManagedKeyDeliveryAck,
   createManagedKeyDelivery,
 } from '../src/managed-key-delivery';
-import { expireManagedOperation } from '../src/managed-operation';
 import {
   deriveStableNetworkIdentityDigest,
   normalizeNetworkIdentityIp,
@@ -15,13 +14,8 @@ import {
 } from '../src/network-identity';
 import { runNetworkIdentityBackfill } from '../src/network-identity-migration';
 import {
-  applyBrokerMigrations,
-  readBrokerMigrationSql,
-} from './test-support/migrations';
-import {
   createTestBrokerEnv,
   testNetworkIdentitySecrets,
-  type TestBrokerEnv,
 } from './test-support/sqlite-d1';
 
 const NOW_ISO = '2026-09-01T10:00:00.000Z';
@@ -48,13 +42,13 @@ describe('managed issuance durability', () => {
     });
 
     await expect(
-      acknowledgeManagedKeyDelivery(env.BROKER_DB, {
+      validateManagedKeyDeliveryAck(env.BROKER_DB, {
         deliveryId: delivery.deliveryId,
         managedCredentialRef: 'hash_ack_boundary',
         deliveryAckToken: delivery.deliveryAckToken,
         now: expiresAt,
       }),
-    ).resolves.toEqual({ ok: true, status: 'acknowledged' });
+    ).resolves.toMatchObject({ ok: true, status: 'pending' });
 
     const second = await createManagedKeyDelivery(env.BROKER_DB, {
       issueSource: 'discord',
@@ -65,7 +59,7 @@ describe('managed issuance durability', () => {
       expiresAt,
     });
     await expect(
-      acknowledgeManagedKeyDelivery(env.BROKER_DB, {
+      validateManagedKeyDeliveryAck(env.BROKER_DB, {
         deliveryId: second.deliveryId,
         managedCredentialRef: 'hash_ack_boundary_late',
         deliveryAckToken: second.deliveryAckToken,

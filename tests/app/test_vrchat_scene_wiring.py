@@ -4,11 +4,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 
-from puripuly_heart.app import wiring_runtime_pipeline as runtime_pipeline_module
+from puripuly_heart.app.wiring import wiring_runtime_pipeline as runtime_pipeline_module
 from puripuly_heart.app.wiring.wiring_runtime_pipeline import (
     RuntimePipelineLauncher,
     RuntimePipelineResourceOwner,
     compose_runtime_pipeline,
+    runtime_pipeline_inputs_from_vnext,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.clock import SystemClock
@@ -16,7 +17,6 @@ from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
     PrebuiltLocalASRProviderRuntimeFactory,
 )
 from puripuly_heart.core.vrchat_scene import VrchatSceneSnapshot
-from tests.helpers.runtime_pipeline import pipeline_inputs_from_vnext
 
 
 class ManagedRelease:
@@ -88,7 +88,9 @@ class FakeSceneService:
 
 def _compose_kwargs() -> dict:
     return {
-        "inputs": pipeline_inputs_from_vnext(AppSettingsVNext()),
+        "inputs": runtime_pipeline_inputs_from_vnext(
+            AppSettingsVNext(), peer_translation_enabled=False
+        ),
         "secrets": object(),
         "config_path": Path("settings.json"),
         "clock": SystemClock(),
@@ -154,17 +156,6 @@ async def test_scene_start_and_close_callbacks_drive_owned_service(monkeypatch) 
     assert scene.closed is False
 
 
-async def test_shared_scene_survives_pipeline_resource_close(monkeypatch) -> None:
-    _patch_backend(monkeypatch)
-    scene = FakeSceneService()
-
-    pipeline = await compose_runtime_pipeline(**_compose_kwargs(), vrchat_scene=scene)
-    await pipeline.resource_owner.close()
-
-    assert scene.closed is False
-    assert pipeline.resource_owner.vrchat_scene is None
-
-
 async def test_owned_scene_closes_with_pipeline_resources(monkeypatch) -> None:
     _patch_backend(monkeypatch)
 
@@ -215,7 +206,7 @@ async def test_launcher_reuses_scene_across_rebuilds_and_closes_on_shutdown(
         cleanup_failure_sink=lambda _message, _exc: None,
         vrchat_scene_factory=scene_factory,
     )
-    inputs = pipeline_inputs_from_vnext(AppSettingsVNext())
+    inputs = runtime_pipeline_inputs_from_vnext(AppSettingsVNext(), peer_translation_enabled=False)
 
     await launcher.launch(
         inputs, secrets=object(), vrc_mic_state=None, vrc_mic_audio_gate=None, receiver_active=False

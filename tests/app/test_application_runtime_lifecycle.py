@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 from uuid import uuid4
 
 import pytest
@@ -290,7 +291,9 @@ async def test_runtime_shutdown_graph_preserves_order_and_logging_last_after_fai
     assert LIFECYCLE_SHUTDOWN_PHASE_ORDER[-1] == SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS
 
 
-def _real_startup_logging_owner(tmp_path) -> tuple[
+def _real_startup_logging_owner(
+    tmp_path,
+) -> tuple[
     ApplicationRuntimeLoggingOwner,
     RuntimeLoggingService,
     SessionRuntimeLoggingService,
@@ -387,7 +390,7 @@ async def test_startup_diagnostics_bracket_completed_application_start() -> None
     class Settings:
         async def prepare_startup_settings(self) -> ApplicationStartupState:
             events.append("settings")
-            return ApplicationStartupState(object(), (), False)
+            return ApplicationStartupState(settings=object())
 
     class Presentation:
         def apply_startup_presentation(self, state: ApplicationStartupState) -> None:
@@ -467,8 +470,6 @@ async def test_startup_partial_allocation_failure_runs_boundary_cleanup(
             events.append("settings")
             return ApplicationStartupState(
                 settings=object(),
-                fallback_channels=(),
-                installation_fallback=False,
             )
 
     class Presentation:
@@ -541,3 +542,106 @@ async def test_startup_partial_allocation_failure_runs_boundary_cleanup(
         "cleanup-logging",
     ]
     assert boundary.application_lifecycle().is_terminal
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancel_start", [False, True])
+async def test_shutdown_cancels_and_drains_startup_before_runtime_teardown(cancel_start) -> None:
+    from types import SimpleNamespace
+
+    from puripuly_heart.app.services.application_shutdown import ApplicationIntentRejectedError
+    from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+    from puripuly_heart.core.owned_thread import run_owned_thread_call
+
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    events = []
+
+    def prepare():
+        loop.call_soon_threadsafe(entered.set)
+        try:
+            assert release.wait(3)
+        finally:
+            finished.set()
+
+    async def settings():
+        return ApplicationStartupState(settings=AppSettingsVNext())
+
+    async def launch(_state):
+        await run_owned_thread_call(prepare)
+        events.append("installed")
+
+    async def start_events():
+        events.append("events")
+
+    class Runtime(ApplicationRuntimeShutdownStub):
+        async def stop_self_capture_ingress(self):
+            assert finished.is_set()
+            events.append("stop-self")
+
+    boundary = compose_test_ui_application_boundary(object(), runtime_shutdown=Runtime(object()))
+    boundary._startup = ApplicationStartupOwner(
+        settings=SimpleNamespace(prepare_startup_settings=settings),
+        presentation=SimpleNamespace(apply_startup_presentation=lambda _state: None),
+        runtime=SimpleNamespace(launch_startup_runtime=launch),
+        events=SimpleNamespace(start_application_events=start_events),
+    )
+    starting = asyncio.create_task(boundary.start())
+    stopping = None
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        if cancel_start:
+            for _ in range(2):
+                starting.cancel()
+                await asyncio.sleep(0)
+        stopping = asyncio.create_task(boundary.stop())
+        await asyncio.sleep(0.02)
+        assert not starting.done()
+        assert not stopping.done()
+        assert not finished.is_set()
+        assert events == []
+        release.set()
+        await asyncio.wait_for(stopping, 1)
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(starting, 1)
+        assert events == ["stop-self"]
+        assert boundary.application_lifecycle().snapshot.state == "completed"
+        assert boundary.application_lifecycle().snapshot.failure_count == 0
+        with pytest.raises(ApplicationIntentRejectedError):
+            await boundary.start()
+        assert events == ["stop-self"]
+    finally:
+        release.set()
+        await asyncio.gather(
+            starting, *(() if stopping is None else (stopping,)), return_exceptions=True
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["absent", "present", "failure"])
+async def test_shutdown_stops_only_existing_self_capture_and_propagates_real_failure(state) -> None:
+    from puripuly_heart.app.adapters.application_runtime_shutdown import (
+        ApplicationRuntimeShutdownAdapter,
+    )
+    from puripuly_heart.app.wiring.wiring_runtime_pipeline import RuntimePipelineHandle
+
+    calls = []
+
+    async def stop():
+        calls.append("stop")
+        if state == "failure":
+            raise RuntimeError("capture drain failed")
+
+    adapter = ApplicationRuntimeShutdownAdapter.__new__(ApplicationRuntimeShutdownAdapter)
+    adapter.pipeline = RuntimePipelineHandle()
+    adapter.stop_self_capture = stop
+    if state != "absent":
+        adapter.pipeline.self_capture = object()
+    if state == "failure":
+        with pytest.raises(RuntimeError, match="capture drain failed"):
+            await adapter.stop_self_capture_ingress()
+    else:
+        await adapter.stop_self_capture_ingress()
+    assert calls == ([] if state == "absent" else ["stop"])

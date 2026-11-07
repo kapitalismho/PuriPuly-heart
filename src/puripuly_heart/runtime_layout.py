@@ -8,7 +8,7 @@ from typing import Literal
 
 from puripuly_heart.config.paths import user_config_dir
 
-RuntimeHostKind = Literal["source", "pyinstaller", "native"]
+RuntimeHostKind = Literal["source", "native"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,12 +88,6 @@ def current_runtime_layout() -> RuntimeLayout:
         host_executable = Path(os.getenv(_NATIVE_HOST_EXECUTABLE_ENV, sys.executable)).resolve()
         python_executable = Path(os.getenv(_NATIVE_PYTHON_EXECUTABLE_ENV, sys.executable)).resolve()
         host_kind: RuntimeHostKind = "native"
-    elif bool(getattr(sys, "frozen", False)):
-        host_executable = Path(sys.executable).resolve()
-        resource_root = Path(getattr(sys, "_MEIPASS", host_executable.parent)).resolve()
-        runtime_root = resource_root
-        python_executable = host_executable
-        host_kind = "pyinstaller"
     else:
         resource_root = Path(__file__).resolve().parents[2]
         runtime_root = resource_root / "build"

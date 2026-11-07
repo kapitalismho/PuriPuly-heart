@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
 
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
+from puripuly_heart.app.services.settings.settings_application import SettingsApplicationOwner
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 

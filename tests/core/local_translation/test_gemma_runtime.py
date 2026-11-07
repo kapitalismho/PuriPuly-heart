@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -21,6 +24,42 @@ from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaRuntimeOwner,
 )
 from puripuly_heart.core.local_translation.runtime_profile import GemmaRuntimePaths
+from puripuly_heart.core.translation_backend import (
+    TranslationProbePreparationRequired,
+    translation_probe_scope,
+)
+
+
+@pytest.mark.asyncio
+async def test_real_managed_child_ignores_inherited_llama_configuration(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLAMA_ARG_MODEL_URL", "http://127.0.0.1:1/remote.gguf")
+    monkeypatch.setenv("LLAMA_ARG_HF_REPO", "hostile/repo")
+    monkeypatch.setenv("LLAMA_ARG_MMPROJ_URL", "http://127.0.0.1:1/mmproj.gguf")
+    monkeypatch.setenv("LLAMA_ARG_RPC", "127.0.0.1:1")
+    monkeypatch.setenv("LLAMA_ARG_OFFLINE", "0")
+    monkeypatch.setenv("HF_TOKEN", "synthetic-token")
+    monkeypatch.setenv("APPDATA", str(tmp_path / "hostile-user-config"))
+    monkeypatch.setenv("PROGRAMDATA", str(tmp_path / "hostile-system-config"))
+    monkeypatch.setenv("PURIPULY_CHILD_SENTINEL", "preserved")
+    inherited = dict(os.environ)
+    script = """
+import json, os, pathlib
+pathlib.Path("child.json").write_text(json.dumps(dict(os.environ)))
+"""
+
+    process = await runtime_module._default_process_factory(
+        (sys.executable, "-c", script), tmp_path
+    )
+    assert await asyncio.wait_for(process.wait(), timeout=10) == 0
+
+    child = json.loads((tmp_path / "child.json").read_text())
+    assert not any(name.upper().startswith("LLAMA_ARG_") for name in child)
+    assert "HF_TOKEN" not in child
+    assert child["PURIPULY_CHILD_SENTINEL"] == "preserved"
+    if os.name == "nt":
+        assert "APPDATA" not in child
+        assert "PROGRAMDATA" not in child
+    assert dict(os.environ) == inherited
 
 
 @pytest.fixture(autouse=True)
@@ -275,6 +314,50 @@ def _runtime(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("prefix_failure", [False, True])
+async def test_probe_uses_prepared_runtime_without_provisioning_or_restart(
+    tmp_path: Path, prefix_failure: bool
+) -> None:
+    owner, commands, processes, transports, provision_calls, _logs = _runtime(tmp_path)
+    try:
+        await owner.prepare(
+            backend="gpu",
+            source_language="ko",
+            target_language="en",
+            system_prompt="existing live prompt",
+        )
+        transport = transports[0]
+        if prefix_failure:
+            transport.prefix_failure = RuntimeError("synthetic prefix failure")
+
+        async def translate():
+            with translation_probe_scope():
+                return await owner.translate(
+                    backend="gpu",
+                    source_language="en",
+                    target_language="es",
+                    system_prompt="fixed synthetic prompt",
+                    user_message="Hello.",
+                )
+
+        if prefix_failure:
+            with pytest.raises(TranslationProbePreparationRequired):
+                await translate()
+            assert transport.translations == []
+        else:
+            response = await translate()
+            assert response.text == "translated"
+            assert transport.translations == [("fixed synthetic prompt", "Hello.")]
+        assert len(provision_calls) == 1
+        assert len(commands) == 1
+        assert len(processes) == 1
+        assert processes[0].terminated is False
+        assert processes[0].killed is False
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_readiness_prefills_once_and_rebuilds_for_language_pair(tmp_path: Path) -> None:
     owner, commands, processes, transports, provision_calls, _logs = _runtime(tmp_path)
 
@@ -319,6 +402,15 @@ async def test_gpu_start_failure_falls_back_internally_to_cpu(tmp_path: Path) ->
         system_prompt="translate",
         vulkan_device="Vulkan1",
     )
+    repeated = await owner.prepare(
+        backend="gpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt="translate",
+        vulkan_device="Vulkan1",
+    )
+
+    assert repeated == readiness
 
     assert readiness.requested_backend == "gpu"
     assert readiness.effective_backend == "cpu"
@@ -426,7 +518,7 @@ async def test_release_stops_process_and_allows_reselection_but_close_is_termina
 
 @pytest.mark.asyncio
 async def test_vulkan_prefill_failure_stops_gpu_and_prepares_cpu_prefix(tmp_path: Path) -> None:
-    owner, commands, processes, transports, _provision_calls, logs = _runtime(
+    owner, commands, processes, transports, provision_calls, logs = _runtime(
         tmp_path,
         transport_failures=(RuntimeError("Vulkan inference failed"), None),
     )
@@ -437,6 +529,15 @@ async def test_vulkan_prefill_failure_stops_gpu_and_prepares_cpu_prefix(tmp_path
         target_language="en",
         system_prompt="translate",
     )
+    repeated = await owner.prepare(
+        backend="gpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt="translate",
+    )
+
+    assert repeated == readiness
+    assert len(provision_calls) == 1
 
     assert readiness.effective_backend == "cpu"
     assert len(commands) == 2
@@ -574,52 +675,6 @@ async def test_cancel_exclusive_prefix_retains_cleanup_failure_until_release_ret
     await owner.release()
     assert transports[0].closed
     await owner.close()
-
-
-@pytest.mark.asyncio
-async def test_repeated_gpu_request_reuses_cpu_fallback_and_prefix(tmp_path: Path) -> None:
-    owner, commands, _processes, transports, provision_calls, _logs = _runtime(
-        tmp_path,
-        fail_gpu=True,
-    )
-    arguments = {
-        "backend": "gpu",
-        "source_language": "ko",
-        "target_language": "en",
-        "system_prompt": "translate",
-    }
-
-    first = await owner.prepare(**arguments)
-    second = await owner.prepare(**arguments)
-
-    assert first == second
-    assert first.effective_backend == "cpu"
-    assert len(commands) == 2
-    assert len(provision_calls) == 1
-    assert transports[0].prefixes == ["translate"]
-
-
-@pytest.mark.asyncio
-async def test_repeated_gpu_request_reuses_cpu_after_prefill_fallback(tmp_path: Path) -> None:
-    owner, commands, _processes, transports, provision_calls, _logs = _runtime(
-        tmp_path,
-        transport_failures=(RuntimeError("Vulkan inference failed"), None),
-    )
-    arguments = {
-        "backend": "gpu",
-        "source_language": "ko",
-        "target_language": "en",
-        "system_prompt": "translate",
-    }
-
-    first = await owner.prepare(**arguments)
-    second = await owner.prepare(**arguments)
-
-    assert first == second
-    assert first.effective_backend == "cpu"
-    assert len(commands) == 2
-    assert len(provision_calls) == 1
-    assert transports[1].prefixes == ["translate"]
 
 
 @pytest.mark.asyncio

@@ -99,7 +99,13 @@ def _targets(command: str) -> list[str]:
         raise SelectionError(f"Expected direct uv run --locked pytest selection: {command!r}")
     targets = []
     for token in tokens[4:]:
-        if token == "-ra" or token.startswith("--junitxml="):
+        if token in {
+            "-ra",
+            "--numprocesses=2",
+            "--dist=loadfile",
+            "--max-worker-restart=0",
+            "--capture=fd",
+        } or token.startswith("--junitxml="):
             continue
         if token.startswith("-"):
             raise SelectionError(f"Unsupported pytest selection option: {token}")

@@ -8,7 +8,7 @@ from typing import Literal
 from puripuly_heart.app.services.application_shutdown import (
     DEFAULT_APPLICATION_SHUTDOWN_CALLBACK_TIMEOUT_SECONDS,
 )
-from puripuly_heart.app.services.local_asr_selection import LOCAL_CPU_PROVIDERS
+from puripuly_heart.app.services.local_asr.local_asr_selection import LOCAL_CPU_PROVIDERS
 from puripuly_heart.app.services.provider.provider_runtime_apply import (
     ProviderRuntimeConvergenceError,
 )
@@ -55,7 +55,6 @@ class PeerApplicationSnapshot:
 
 PeerApplicationStateProvider = Callable[[], PeerApplicationState]
 PeerApplicationConfigFactory = Callable[[], PeerCaptureSessionConfig]
-PeerApplicationManualFallback = Callable[[], bool]
 PeerApplicationEnsureReady = Callable[[int], Awaitable[bool]]
 PeerApplicationEffect = Callable[[], None]
 PeerApplicationIntentSink = Callable[[bool], None]
@@ -80,7 +79,6 @@ class PeerApplicationOwner:
     config_factory: PeerApplicationConfigFactory = field(repr=False)
     peer_intent_sink: PeerApplicationIntentSink = field(repr=False)
     overlay_intent_sink: PeerApplicationIntentSink = field(repr=False)
-    persist_manual_fallback: PeerApplicationManualFallback = field(repr=False)
     ensure_local_ready: PeerApplicationEnsureReady = field(repr=False)
     clear_cpu_pending: PeerApplicationEffect = field(repr=False)
     clear_gpu_pending: PeerApplicationEffect = field(repr=False)
@@ -443,12 +441,6 @@ class PeerApplicationOwner:
         if not state.settings_available or self._ingress_stopped or state.ingress_frozen:
             return
         enabled = bool(enabled)
-        if (
-            enabled
-            and state.peer_provider_id != "local_cpu_auto"
-            and not self.persist_manual_fallback()
-        ):
-            return
         self._activation_generation += 1
         generation = self._activation_generation
         self._mutation_observations[asyncio.current_task()] = _MutationObservation(
@@ -572,6 +564,10 @@ class PeerApplicationOwner:
         await self.refresh_runtime(stop_mode=stop_mode)
         self.sync_effective_flags()
         self.presentation_changed()
+
+    async def refresh_capture_target(self) -> bool:
+        await self.refresh_runtime()
+        return self.capture_runtime_convergence(self.config_factory()) is not False
 
     async def refresh_runtime(
         self,

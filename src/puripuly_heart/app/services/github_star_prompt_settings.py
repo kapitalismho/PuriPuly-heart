@@ -5,11 +5,11 @@ from collections.abc import Callable, Mapping
 from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.github_star_prompt import GithubStarPromptOwner
-from puripuly_heart.app.services.settings_mutation import (
+from puripuly_heart.app.services.settings.settings_mutation import (
     SettingsMutationService,
     UiPromptClipboardStateSettingsMutation,
 )
-from puripuly_heart.app.services.settings_mutation_legacy import (
+from puripuly_heart.app.services.settings.settings_mutation_legacy import (
     build_ui_prompt_clipboard_state_settings_path_patch,
     settings_path_mutation_validator_for_command,
 )

@@ -8,12 +8,12 @@ from puripuly_heart.app.services.canonical_settings_persistence import SettingsO
 from puripuly_heart.app.services.desktop_overlay_application import (
     DesktopOverlayApplicationOwner,
 )
-from puripuly_heart.app.services.overlay_calibration_application import (
+from puripuly_heart.app.services.overlay.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
 )
-from puripuly_heart.app.wiring_audio_test import AudioTestRuntime
-from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
-from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
+from puripuly_heart.app.wiring.wiring_audio_test import AudioTestRuntime
+from puripuly_heart.app.wiring.wiring_managed_account import ManagedAccountComponents
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import RuntimePipelineHandle
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 

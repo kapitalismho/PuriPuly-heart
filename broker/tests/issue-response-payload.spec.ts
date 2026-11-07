@@ -16,7 +16,7 @@ describe('POST /v1/providers/openrouter/issue response payload', () => {
     vi.useRealTimers();
   });
 
-  it('returns the child key once without leaking release-session fields or the shared worker secret', async () => {
+  it('returns the provider-created child key once without leaking release-session fields or management credentials', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-08T06:00:00Z'));
 
@@ -63,7 +63,7 @@ describe('POST /v1/providers/openrouter/issue response payload', () => {
       model: 'google/gemma-4-26b-a4b-it',
     });
     expect(payload.openrouter_api_key).not.toBe(payload.managed_credential_ref);
-    expect(payload.openrouter_api_key).not.toBe(env.OPENROUTER_MANAGED_API_KEY);
+    expect(payload.openrouter_api_key).not.toBe(env.OPENROUTER_MANAGEMENT_API_KEY);
     expect(payload).not.toHaveProperty('release_token');
     expect(payload).not.toHaveProperty('release_session_ref');
     expect(payload).not.toHaveProperty('release_token_hash');

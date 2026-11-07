@@ -671,11 +671,24 @@ class _QwenAudioSession(STTBackendSession):
         payload = message.get("payload")
         output = payload.get("output") if isinstance(payload, Mapping) else None
         sentence = output.get("sentence") if isinstance(output, Mapping) else None
-        if (
-            not isinstance(sentence, Mapping)
-            or sentence.get("heartbeat")
-            or not sentence.get("sentence_end")
-        ):
+        if not isinstance(sentence, Mapping) or sentence.get("heartbeat"):
+            return
+        if not sentence.get("sentence_end"):
+            text = sentence.get("text")
+            identity = task.identity
+            if self.backend.channel == "peer" and identity is not None and isinstance(text, str):
+                sequence = self._event_projection.next_update_sequence(identity)
+                if sequence is not None:
+                    self._event_projection.put_update(
+                        STTProviderTurnUpdate(
+                            identity,
+                            sequence,
+                            "provisional",
+                            "replace",
+                            task.text + _separator(task.text, text) + text,
+                            observed_at=asyncio.get_running_loop().time(),
+                        )
+                    )
             return
         try:
             sentence_id = int(str(sentence.get("sentence_id")))
@@ -760,7 +773,7 @@ class _QwenAudioSession(STTBackendSession):
                     order_basis="source_order",
                 ),
             )
-            if self.backend.channel == "self":
+            if self.backend.channel in {"self", "peer"}:
                 sequence = self._event_projection.next_update_sequence(identity)
                 if sequence is not None and not self._event_projection.put_update(
                     STTProviderTurnUpdate(
@@ -771,6 +784,7 @@ class _QwenAudioSession(STTBackendSession):
                         task.text,
                         provenance=provenance,
                         recognition_origins=task.origins,
+                        observed_at=asyncio.get_running_loop().time(),
                     )
                 ):
                     raise QwenAudioProtocolError("Qwen Audio update capacity exceeded")

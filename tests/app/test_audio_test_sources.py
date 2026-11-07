@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -169,3 +170,36 @@ async def test_loopback_opens_resolved_targets_with_the_live_target_and_device_f
 
     assert opened.device["kind"] == "process"
     assert opened.device["name"] == "VRChat.exe"
+
+
+@pytest.mark.asyncio
+async def test_diagnostic_opener_does_not_hide_explicit_channel_open_failure():
+    calls = []
+
+    def factory(**kwargs):
+        calls.append(kwargs)
+        raise OSError("private native device error")
+
+    opener = replace(
+        _microphone(_route(), factory),
+        expected_device_name="Desk Mic",
+        allow_channel_fallback=False,
+    )
+    with pytest.raises(OSError):
+        await opener.open(on_acquired=lambda _source: pytest.fail("No source was acquired"))
+    assert len(calls) == 1
+    assert calls[0]["device"] == 7 and calls[0]["channels"] == 2
+
+
+@pytest.mark.asyncio
+async def test_diagnostic_opener_rejects_index_reuse_before_opening_a_different_microphone():
+    calls = []
+    opener = replace(
+        _microphone(replace(_route(), resolved_device_name="Different Mic"), calls.append),
+        expected_device_name="Desk Mic",
+        allow_channel_fallback=False,
+    )
+    with pytest.raises(AudioTestSourceUnavailable) as raised:
+        await opener.open(on_acquired=lambda _source: pytest.fail("No source was acquired"))
+    assert raised.value.reason == "input_route_changed"
+    assert calls == []

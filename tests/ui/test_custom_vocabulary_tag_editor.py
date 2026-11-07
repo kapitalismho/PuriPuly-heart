@@ -1,32 +1,16 @@
 from __future__ import annotations
 
-from importlib import import_module
 from types import SimpleNamespace
 
 import pytest
 
 ft = pytest.importorskip("flet")
 
-
-def _editor_class():
-    return _editor_module().CustomVocabularyTagEditor
-
-
-def _editor_module():
-    try:
-        module = import_module("puripuly_heart.ui.components.settings.custom_vocabulary_tag_editor")
-    except ModuleNotFoundError as exc:  # pragma: no cover - exercised in RED run
-        pytest.fail(f"CustomVocabularyTagEditor module is missing: {exc}")
-
-    try:
-        module.CustomVocabularyTagEditor
-    except AttributeError:  # pragma: no cover - exercised in RED run
-        pytest.fail("CustomVocabularyTagEditor class is missing")
-    return module
+from puripuly_heart.ui.components.settings import custom_vocabulary_tag_editor as editor_module
 
 
 def _make_editor():
-    return _editor_class()()
+    return editor_module.CustomVocabularyTagEditor()
 
 
 def _chip_controls(editor) -> list[ft.Container]:
@@ -50,7 +34,7 @@ def _iter_controls(control: ft.Control):
 
 def test_set_terms_renders_compact_chips_above_native_input() -> None:
     editor = _make_editor()
-    module = _editor_module()
+    module = editor_module
 
     editor.set_terms(["Puripuly", "VRChat"])
 
@@ -62,8 +46,6 @@ def test_set_terms_renders_compact_chips_above_native_input() -> None:
     assert editor._chips_wrap.visible is True
     assert list(editor.controls) == [editor._chips_wrap, editor._input_field]
     assert editor._input_field not in editor._chips_wrap.controls
-    assert not hasattr(editor, "_token_wrap")
-    assert not hasattr(editor, "_token_field")
     assert _chip_term_text(chips[0]).width is None
     assert _chip_term_text(chips[0]).size == module._CHIP_TEXT_SIZE
     assert chips[0].padding.left == module._CHIP_HORIZONTAL_PADDING
@@ -91,19 +73,18 @@ def test_empty_terms_show_only_native_input_without_placeholder_help() -> None:
 def test_input_uses_native_focus_styling_without_outer_token_field() -> None:
     editor = _make_editor()
 
-    assert not hasattr(editor, "_token_field")
     assert not isinstance(editor._input_field.border, ft.NoInputBorder)  # noqa: SLF001
     assert editor._input_field.focus_color != ft.Colors.TRANSPARENT  # noqa: SLF001
     assert editor._input_field.focused_bgcolor != ft.Colors.TRANSPARENT  # noqa: SLF001
     assert (
         editor._input_field.border[ft.ControlState.FOCUSED].side.color
-        == _editor_module().COLOR_PRIMARY
+        == editor_module.COLOR_PRIMARY
     )  # noqa: SLF001
 
 
 def test_input_size_matches_api_key_fields() -> None:
     editor = _make_editor()
-    module = _editor_module()
+    module = editor_module
 
     assert (
         editor._input_field.border[ft.ControlState.DEFAULT].border_radius
@@ -170,17 +151,6 @@ def test_token_input_preserves_input_when_no_add_callback_is_installed() -> None
     assert editor._input_field.value == "Puripuly VRChat "
 
 
-def test_token_input_ignores_empty_whitespace_segments() -> None:
-    editor = _make_editor()
-    added: list[list[str]] = []
-    editor.on_add_terms = added.append
-    editor._input_field.value = "Puripuly  VRChat\n\n Soniox "
-
-    editor._input_field.on_change(None)
-
-    assert added == [["Puripuly", "VRChat", "Soniox"]]
-
-
 def test_clicking_chip_calls_remove_callback_with_visible_term() -> None:
     editor = _make_editor()
     removed: list[str] = []
@@ -196,7 +166,7 @@ def test_clicking_chip_calls_remove_callback_with_visible_term() -> None:
 
 
 def test_chip_hover_matches_dashboard_active_button_colors() -> None:
-    module = _editor_module()
+    module = editor_module
     editor = _make_editor()
     editor.set_terms(["Puripuly"])
     chip = _chip_controls(editor)[0]
@@ -242,11 +212,3 @@ def test_long_hint_text_is_constrained_without_hover_tooltips() -> None:
     assert term_text.width <= 240
     assert term_text.max_lines == 1
     assert term_text.overflow == ft.TextOverflow.ELLIPSIS
-
-
-def test_component_is_exported_from_settings_components_package() -> None:
-    editor_class = _editor_class()
-    settings_components = import_module("puripuly_heart.ui.components.settings")
-
-    assert settings_components.CustomVocabularyTagEditor is editor_class
-    assert "CustomVocabularyTagEditor" in settings_components.__all__

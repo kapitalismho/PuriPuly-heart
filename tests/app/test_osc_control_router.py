@@ -79,21 +79,6 @@ class RejectingApplication(FakeApplication):
 
 
 @pytest.mark.asyncio
-async def test_router_routes_boolean_and_language_controls() -> None:
-    application = FakeApplication()
-    router = OscControlRouter(application)
-
-    assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Talk", True)
-    await router.dispatch_packet("/avatar/parameters/PuriPuly_SelfSrcLang", 16)
-
-    assert application.calls == [
-        ("self_capture", True),
-        ("languages", ("ja", "en", "en", "ko")),
-    ]
-    await router.close()
-
-
-@pytest.mark.asyncio
 async def test_router_publishes_canonical_delta_after_successful_application() -> None:
     application = FakeApplication()
     delta_calls = 0
@@ -170,11 +155,34 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("languages", ("ja", "en", "en", "ko")),
         ("languages", ("ja", "en", "en", "ko")),
         ("self_asr", "soniox"),
-        ("peer_asr", "local_parakeet_v3"),
+        ("peer_asr", "local_cpu_auto"),
         ("model", ("gemini_flash", None)),
     ]
     assert projected == [name for name, _value in packets]
     await router.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("parameter", ["PuriPuly_SelfASR", "PuriPuly_PeerASR"])
+@pytest.mark.parametrize(
+    ("identifier", "provider"),
+    [(1, "local_cpu_auto"), (16, "local_granite"), (17, "local_gigaam")],
+)
+async def test_router_applies_canonical_cpu_asr_slot_meanings(
+    parameter: str, identifier: int, provider: str
+) -> None:
+    application = FakeApplication()
+    application.gate.set()
+    router = OscControlRouter(application)
+    try:
+        result = await router.dispatch_packet(f"/avatar/parameters/{parameter}", identifier)
+
+        assert result.applied
+        assert application.calls == [
+            ("self_asr" if parameter == "PuriPuly_SelfASR" else "peer_asr", provider)
+        ]
+    finally:
+        await router.close()
 
 
 @pytest.mark.asyncio
@@ -235,7 +243,7 @@ async def test_router_coalesces_superseded_expensive_controls() -> None:
     assert third_result.applied is True
     assert application.calls[-1] == ("self_asr", "soniox")
     assert projected == [
-        ("PuriPuly_SelfASR", "local_parakeet_v3"),
+        ("PuriPuly_SelfASR", "local_cpu_auto"),
         ("PuriPuly_SelfASR", "soniox"),
     ]
     await router.close()
@@ -379,8 +387,67 @@ async def test_router_does_not_project_when_application_suppresses_close_cancell
     result = await asyncio.wait_for(dispatch_task, timeout=1)
     assert result.applied is False
     assert result.error == "router_closed"
-    assert application.calls == [("cancelled_self_asr", "local_parakeet_v3")]
+    assert application.calls == [("cancelled_self_asr", "local_cpu_auto")]
     assert projected == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("invalidate", (False, True))
+async def test_application_ordered_suspension_separates_admission_pause_from_generation_fence(
+    invalidate,
+) -> None:
+    class GuardedApplication(FakeApplication):
+        async def set_self_asr(self, provider: str) -> object:
+            self.guard = router.current_invocation_guard()
+            self.started.set()
+            await self.gate.wait()
+            if not self.guard():
+                return False
+            self.calls.append(("self_asr", provider))
+
+    application = GuardedApplication()
+    router = OscControlRouter(application, application_orders_mutations=True)
+    packet = asyncio.create_task(router.dispatch_packet("/avatar/parameters/PuriPuly_SelfASR", 1))
+    await application.started.wait()
+    try:
+        generation = router._generation
+        await router.suspend_ingress(invalidate=invalidate)
+        assert not packet.done()
+        assert application.guard() is (not invalidate)
+        assert router._generation == generation + int(invalidate)
+        rejected = await router.dispatch_packet("/avatar/parameters/PuriPuly_ChatboxSource", True)
+        assert rejected.applied is False
+        assert rejected.error == "router_disabled"
+        sequence = router._packet_sequence
+        assert router.handle_packet("/avatar/parameters/PuriPuly_ChatboxSource", True) is False
+        assert router._packet_sequence == sequence
+        router.resume_ingress()
+        application.gate.set()
+        result = await packet
+        assert result.applied is (not invalidate)
+        assert result.error == ("router_disabled" if invalidate else None)
+        assert application.calls == ([] if invalidate else [("self_asr", "local_cpu_auto")])
+        router.set_ingress_enabled(False)
+        assert application.guard() is False
+    finally:
+        application.gate.set()
+        await router.close()
+
+
+@pytest.mark.asyncio
+async def test_application_ordered_packet_scheduling_cannot_cross_an_invalidated_generation() -> (
+    None
+):
+    application = FakeApplication()
+    router = OscControlRouter(application, application_orders_mutations=True)
+    try:
+        assert router.handle_packet("/avatar/parameters/PuriPuly_ChatboxSource", True) is True
+        router.set_ingress_enabled(False)
+        router.resume_ingress()
+        await asyncio.sleep(0)
+        assert application.calls == []
+    finally:
+        await router.close()
 
 
 @pytest.mark.asyncio
@@ -402,7 +469,7 @@ async def test_router_drains_started_command_after_ingress_is_disabled() -> None
     result = await asyncio.wait_for(dispatch_task, timeout=1)
     assert result.applied is False
     assert result.error == "router_disabled"
-    assert ("self_asr", "local_parakeet_v3") in application.calls
+    assert ("self_asr", "local_cpu_auto") in application.calls
     assert projected == []
     await router.close()
 
@@ -429,7 +496,7 @@ async def test_router_rechecks_generation_after_waiting_for_serial_lock() -> Non
     assert first_result.error == "router_disabled"
     assert second_result.applied is False
     assert second_result.error == "router_disabled"
-    assert ("self_asr", "local_parakeet_v3") in application.calls
+    assert ("self_asr", "local_cpu_auto") in application.calls
     assert ("self_capture", True) not in application.calls
     assert projected == []
     await router.close()
@@ -562,7 +629,7 @@ async def test_router_does_not_project_a_cancelled_inflight_coalesced_command() 
     followup = await router.dispatch_packet("/avatar/parameters/PuriPuly_Talk", True)
 
     assert followup.applied is True
-    assert ("self_asr", "local_parakeet_v3") in application.calls
+    assert ("self_asr", "local_cpu_auto") in application.calls
     assert projected == ["PuriPuly_Talk"]
     await router.close()
 

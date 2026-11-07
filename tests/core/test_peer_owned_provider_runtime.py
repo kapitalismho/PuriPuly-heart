@@ -3,13 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, replace
 
-from puripuly_heart.core.local_asr_provider_runtime import (
-    LocalASRProviderRuntimeSnapshot,
-    ProviderRuntimeBuildRequest,
-    ProviderRuntimeChannelSnapshot,
-    ProviderRuntimeGpuSnapshot,
-    ProviderRuntimeMutationResult,
-)
+import pytest
 
 from puripuly_heart.app.wiring import compose_peer_capture_session_owner
 from puripuly_heart.config.resolved import (
@@ -18,6 +12,13 @@ from puripuly_heart.config.resolved import (
     ResolvedSTTConfig,
 )
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
+    LocalASRProviderRuntimeSnapshot,
+    ProviderRuntimeBuildRequest,
+    ProviderRuntimeChannelSnapshot,
+    ProviderRuntimeGpuSnapshot,
+    ProviderRuntimeMutationResult,
+)
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmission,
     PeerCaptureAdmissionStatus,
@@ -247,8 +248,19 @@ def make_config(provider: str) -> PeerCaptureSessionConfig:
         vad_pre_roll_ms=500,
         provider_context=backend,
         model_id=backend.model,
-        local_provider=provider == "local_qwen",
-        release_backend_after=600.0 if provider == "local_qwen" else None,
+        local_provider=provider.startswith("local_"),
+        release_backend_after=(
+            600.0
+            if provider
+            in {
+                "local_cpu_auto",
+                "local_granite",
+                "local_gigaam",
+                "local_fun_asr_nano",
+                "local_fun_asr_mlt_nano",
+            }
+            else None
+        ),
     )
 
 
@@ -301,12 +313,27 @@ async def test_peer_capture_owner_requests_provider_and_never_constructs_it() ->
     assert provider_runtime.releases == [("peer", "abort", None)]
 
 
-async def test_peer_capture_owner_reuses_retained_local_qwen_provider() -> None:
+@pytest.mark.parametrize(
+    ("provider", "retained"),
+    [
+        ("local_cpu_auto", True),
+        ("local_granite", True),
+        ("local_gigaam", True),
+        ("local_fun_asr_nano", True),
+        ("local_fun_asr_mlt_nano", True),
+        ("local_parakeet_ja", False),
+        ("local_qwen_gpu", False),
+        ("soniox", False),
+    ],
+)
+async def test_peer_retain_reuses_new_cpu_models_without_changing_japanese_gpu_or_cloud_stop(
+    provider: str, retained: bool
+) -> None:
     events: list[str] = []
     channel_reset = ChannelReset(events)
     provider_runtime = FakePeerRuntime(events)
     sources: list[DummySource] = []
-    config = make_config("local_qwen")
+    config = make_config(provider)
     runtime = make_runtime(provider_runtime, channel_reset, sources)
 
     await runtime.apply_intent(config, enabled=True)
@@ -314,10 +341,11 @@ async def test_peer_capture_owner_reuses_retained_local_qwen_provider() -> None:
     await runtime.apply_intent(config, enabled=False, stop_mode="retain")
     await runtime.apply_intent(config, enabled=True)
 
-    assert len(provider_runtime.requests) == 1
+    mode = "dormant" if retained else "abort"
+    assert len(provider_runtime.requests) == (1 if retained else 2)
     assert provider_runtime.start_calls == 2
-    assert provider_runtime.releases == [("peer", "dormant", None)]
-    assert events[:2] == ["reset:peer", "release:peer:dormant"]
+    assert provider_runtime.releases == [("peer", mode, None)]
+    assert events[:2] == ["reset:peer", f"release:peer:{mode}"]
     assert len(sources) == 2
     assert sources[0].close_calls == 1
     assert runtime.state is PeerCaptureSessionState.RUNNING

@@ -8,6 +8,7 @@ import pytest
 
 from puripuly_heart.config.process_capture_platform import ProcessCapturePlatformAvailability
 from puripuly_heart.release_evidence import process_capture_packaged_smoke as smoke
+from puripuly_heart.release_evidence.windows_process_distribution import validate_runtime_report
 
 
 class _Capture:
@@ -29,84 +30,82 @@ class _Capture:
 
 @pytest.fixture
 def packaged_smoke(tmp_path: Path, monkeypatch) -> SimpleNamespace:
-    artifact_root = tmp_path / "artifact"
-    artifact_native = artifact_root / "proctap" / "_native.cp314-win_amd64.pyd"
-    runtime_native = artifact_native
-    package_file = artifact_root / "modules.pkg"
-    helper_file = artifact_root / "PuriPulyHeartProcessCaptureSmoke.exe"
+    artifact_root = tmp_path / "설치 with spaces"
+    artifact_native = artifact_root / "site-packages" / "proctap" / "_native.cp314-win_amd64.pyd"
+    archive = artifact_root / "app" / "python.zip"
+    runtime = artifact_root / "python.exe"
     artifact_native.parent.mkdir(parents=True)
+    archive.parent.mkdir()
     artifact_native.write_bytes(b"packaged-native")
-    package_file.write_text("collected-modules", encoding="utf-8")
-    helper_file.write_bytes(b"helper")
+    archive.write_bytes(b"collected-modules")
+    runtime.write_bytes(b"python")
     capture = _Capture()
     platform_module = SimpleNamespace(
-        __file__=package_file,
+        __file__=archive / "puripuly_heart" / "config" / "process_capture_platform.pyc",
         get_process_capture_platform_availability=lambda: ProcessCapturePlatformAvailability(
             available=True
         ),
     )
     source_module = SimpleNamespace(
-        __file__=package_file,
+        __file__=archive / "puripuly_heart" / "core" / "audio" / "process_source.pyc",
         ProcTapProcessAudioCaptureFactory=lambda: SimpleNamespace(create=lambda **_kwargs: capture),
         verify_proctap_process_specific=lambda _capture: True,
     )
-    monkeypatch.setattr(
-        smoke.importlib,
-        "import_module",
-        lambda name: {
-            "puripuly_heart.config.process_capture_platform": platform_module,
-            "puripuly_heart.core.audio.process_source": source_module,
-            "proctap": SimpleNamespace(__file__=package_file),
-            "proctap._native": SimpleNamespace(__file__=runtime_native),
-        }[name],
-    )
+    modules = {
+        "puripuly_heart.config.process_capture_platform": platform_module,
+        "puripuly_heart.core.audio.process_source": source_module,
+        "proctap": SimpleNamespace(__file__=artifact_native.parent / "__init__.py"),
+        "proctap._native": SimpleNamespace(__file__=artifact_native),
+    }
+    monkeypatch.setattr(smoke.importlib, "import_module", modules.__getitem__)
     monkeypatch.setattr(smoke.importlib.metadata, "version", lambda _name: "1.1.1")
-    monkeypatch.setattr(smoke.sys, "executable", str(helper_file))
+    monkeypatch.setattr(smoke.sys, "executable", str(runtime))
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(archive.parent))
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RUNTIME_ROOT", str(artifact_root))
     monkeypatch.setattr(smoke.time, "sleep", lambda _seconds: None)
-
     return SimpleNamespace(
         artifact_root=artifact_root,
         report_path=tmp_path / "report.json",
         capture=capture,
+        modules=modules,
     )
 
 
-def test_release_only_smoke_starts_strict_factory_and_hashes_packaged_native(
-    packaged_smoke: SimpleNamespace,
-) -> None:
+def test_native_smoke_starts_closes_and_validates_packaged_origin(packaged_smoke) -> None:
     assert (
         smoke.run_smoke(
-            artifact_root=packaged_smoke.artifact_root,
-            report_path=packaged_smoke.report_path,
+            artifact_root=packaged_smoke.artifact_root, report_path=packaged_smoke.report_path
         )
         == 0
     )
     report = json.loads(packaged_smoke.report_path.read_text(encoding="utf-8"))
-    assert report["schema"] == smoke.PACKAGED_SMOKE_SCHEMA
-    assert report["status"] == "passed"
+    validate_runtime_report(report, expected_root=packaged_smoke.artifact_root)
     assert report["runtime_native_sha256"] == report["artifact_native_sha256"]
-    assert report["release_only_helper"] is True
-    assert report["native_process_specific"] is True
     assert report["capture_started"] is True
+    assert report["capture_closed"] is True
+    assert report["native_process_specific"] is True
     assert report["device_fallback_used"] is False
-    assert report["credentials_used"] is False
-    assert report["network_used"] is False
     assert packaged_smoke.capture.events == ["start", "close"]
+    for name, value in (("device_fallback_used", True), ("capture_closed", False)):
+        with pytest.raises(ValueError, match="strict validation"):
+            validate_runtime_report(
+                {**report, name: value}, expected_root=packaged_smoke.artifact_root
+            )
+    native = Path(report["artifact_native_module"])
+    native.write_bytes(b"modified-native")
+    with pytest.raises(ValueError, match="hash does not match"):
+        validate_runtime_report(report, expected_root=packaged_smoke.artifact_root)
 
 
-def test_release_only_smoke_start_failure_reports_failure_and_attempts_cleanup(
-    packaged_smoke: SimpleNamespace,
-) -> None:
+def test_native_smoke_start_failure_reports_failure_and_attempts_cleanup(packaged_smoke) -> None:
     packaged_smoke.capture.start_failure = RuntimeError("synthetic capture start failed")
-
-    exit_code = smoke.run_smoke(
-        artifact_root=packaged_smoke.artifact_root,
-        report_path=packaged_smoke.report_path,
+    assert (
+        smoke.run_smoke(
+            artifact_root=packaged_smoke.artifact_root, report_path=packaged_smoke.report_path
+        )
+        == 1
     )
-
-    report = json.loads(packaged_smoke.report_path.read_text(encoding="utf-8"))
-    assert exit_code == 1
-    assert report == {
+    assert json.loads(packaged_smoke.report_path.read_text(encoding="utf-8")) == {
         "schema": smoke.PACKAGED_SMOKE_SCHEMA,
         "status": "failed",
         "failure_type": "RuntimeError",
@@ -114,64 +113,44 @@ def test_release_only_smoke_start_failure_reports_failure_and_attempts_cleanup(
     assert packaged_smoke.capture.events == ["start", "close"]
 
 
-def test_release_only_smoke_cleanup_exception_propagates_instead_of_returning_success(
-    packaged_smoke: SimpleNamespace,
-) -> None:
+def test_native_smoke_cleanup_failure_cannot_publish_success(packaged_smoke) -> None:
     failure = RuntimeError("synthetic capture close failed")
     packaged_smoke.capture.close_failure = failure
-
     with pytest.raises(RuntimeError) as raised:
         smoke.run_smoke(
-            artifact_root=packaged_smoke.artifact_root,
-            report_path=packaged_smoke.report_path,
+            artifact_root=packaged_smoke.artifact_root, report_path=packaged_smoke.report_path
         )
-
     assert raised.value is failure
-    assert packaged_smoke.capture.events == ["start", "close"]
+    assert not packaged_smoke.report_path.exists()
 
 
-def test_release_only_smoke_rejects_helper_outside_artifact_root(
-    tmp_path: Path, monkeypatch
+@pytest.mark.parametrize(
+    "boundary", ["interpreter", "source_host", "native_origin", "code_origin", "strict_mode"]
+)
+def test_native_smoke_rejects_wrong_runtime_without_capture(
+    packaged_smoke, monkeypatch, tmp_path, boundary
 ) -> None:
-    helper = tmp_path / "helper" / "PuriPulyHeartProcessCaptureSmoke.exe"
-    helper.parent.mkdir()
-    helper.write_bytes(b"helper")
-    monkeypatch.setattr(smoke.sys, "executable", str(helper))
-
+    if boundary == "interpreter":
+        monkeypatch.setattr(smoke.sys, "executable", str(tmp_path / "python.exe"))
+    elif boundary == "source_host":
+        monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT")
+    elif boundary == "native_origin":
+        swapped = tmp_path / "_native.pyd"
+        swapped.write_bytes(b"external")
+        packaged_smoke.modules["proctap._native"].__file__ = swapped
+    elif boundary == "code_origin":
+        packaged_smoke.modules["puripuly_heart.core.audio.process_source"].__file__ = (
+            tmp_path / "external.py"
+        )
+    else:
+        packaged_smoke.modules[
+            "puripuly_heart.core.audio.process_source"
+        ].verify_proctap_process_specific = lambda _capture: False
     assert (
-        smoke.run_smoke(artifact_root=tmp_path / "artifact", report_path=tmp_path / "report.json")
+        smoke.run_smoke(
+            artifact_root=packaged_smoke.artifact_root, report_path=packaged_smoke.report_path
+        )
         == 1
     )
-
-
-def test_release_only_smoke_rejects_swapped_runtime_native(tmp_path: Path, monkeypatch) -> None:
-    artifact = tmp_path / "artifact"
-    native = artifact / "proctap" / "_native.cp314-win_amd64.pyd"
-    swapped = artifact / "duplicate" / "_native.cp314-win_amd64.pyd"
-    helper = artifact / "PuriPulyHeartProcessCaptureSmoke.exe"
-    module_artifact = artifact / "modules.pkg"
-    native.parent.mkdir(parents=True)
-    swapped.parent.mkdir()
-    native.write_bytes(b"production")
-    swapped.write_bytes(b"swapped")
-    helper.write_bytes(b"helper")
-    module_artifact.write_bytes(b"modules")
-    platform_module = SimpleNamespace(
-        __file__=module_artifact,
-        get_process_capture_platform_availability=lambda: ProcessCapturePlatformAvailability(
-            available=True
-        ),
-    )
-    monkeypatch.setattr(smoke.sys, "executable", str(helper))
-    monkeypatch.setattr(
-        smoke.importlib,
-        "import_module",
-        lambda name: {
-            "puripuly_heart.config.process_capture_platform": platform_module,
-            "puripuly_heart.core.audio.process_source": SimpleNamespace(__file__=module_artifact),
-            "proctap": SimpleNamespace(__file__=module_artifact),
-            "proctap._native": SimpleNamespace(__file__=swapped),
-        }[name],
-    )
-
-    assert smoke.run_smoke(artifact_root=artifact, report_path=tmp_path / "report.json") == 1
+    assert json.loads(packaged_smoke.report_path.read_text(encoding="utf-8"))["status"] == "failed"
+    assert "start" not in packaged_smoke.capture.events

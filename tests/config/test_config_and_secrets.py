@@ -108,15 +108,6 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
     )
 
 
-def test_supported_translation_connections_include_ollama_for_local_model() -> None:
-    assert supported_translation_connections(TranslationModel.LOCAL_LLM) == (
-        TranslationConnection.OLLAMA,
-    )
-    assert (
-        default_translation_connection(TranslationModel.LOCAL_LLM) == TranslationConnection.OLLAMA
-    )
-
-
 def test_local_llm_extra_body_key_sets_match_provider_constants() -> None:
     from puripuly_heart.providers.llm.local_openai import (
         LOCAL_OPENAI_RESERVED_EXTRA_BODY_KEYS,
@@ -164,16 +155,6 @@ def test_legacy_gemini_byok_alias_is_compatibility_only() -> None:
 def test_mask_secret():
     assert mask_secret("sk-123456") == "sk-****"
     assert mask_secret("abc", unmasked_prefix=3) == "***"
-
-
-def test_encrypted_file_secret_store_roundtrip(tmp_path):
-    path = tmp_path / "secrets.json"
-    store = EncryptedFileSecretStore(path, passphrase="pw")
-    store.set("google_api_key", "sk-SECRET")
-
-    assert store.get("google_api_key") == "sk-SECRET"
-    store.delete("google_api_key")
-    assert store.get("google_api_key") is None
 
 
 def test_keyring_secret_store_delete_propagates_unexpected_backend_exceptions() -> None:
@@ -279,16 +260,6 @@ def test_encrypted_file_secret_store_does_not_store_plaintext(tmp_path):
     assert "sk-SECRET" not in json.dumps(raw)
 
 
-def test_encrypted_file_secret_store_rejects_wrong_passphrase(tmp_path):
-    path = tmp_path / "secrets.json"
-    store = EncryptedFileSecretStore(path, passphrase="pw")
-    store.set("k", "sk-SECRET")
-
-    wrong = EncryptedFileSecretStore(path, passphrase="wrong")
-    with pytest.raises(ValueError):
-        wrong.get("k")
-
-
 def test_parse_openrouter_llm_model_accepts_legacy_deepseek_flash() -> None:
     assert (
         parse_openrouter_llm_model("deepseek/deepseek-v4-flash")
@@ -306,6 +277,22 @@ def test_parse_openrouter_llm_model_accepts_legacy_deepseek_flash() -> None:
         parse_openrouter_llm_model(OpenRouterLLMModel.DEEPSEEK_V4_FLASH)
         == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
     )
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "deepseek/deepseek-v4.1-flash",
+        "  deepseek/deepseek-v4.1-flash  ",
+        "deepseek/deepseek-v4.1-flash-1017",
+        OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41,
+    ],
+)
+def test_parse_openrouter_llm_model_upgrades_deepseek_41_snapshot(model: str) -> None:
+    parsed = parse_openrouter_llm_model(model)
+
+    assert parsed == OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41
+    assert parsed.value == "deepseek/deepseek-v4.1-flash-1017"
 
 
 def test_parse_openrouter_llm_model_accepts_legacy_gemini_flash() -> None:

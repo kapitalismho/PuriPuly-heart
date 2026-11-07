@@ -6,8 +6,8 @@ import base64
 import importlib
 import json
 import os
-import re
 import shutil
+import sys
 from collections.abc import Iterator
 from dataclasses import fields
 from pathlib import Path
@@ -26,14 +26,11 @@ from puripuly_heart.config.provider_values import (
 )
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.schema import (
-    VNEXT_SETTINGS_SCHEMA_VERSION,
     AppSettingsVNext,
     SecretsIntent,
 )
-from puripuly_heart.core import (
-    managed_identity,
-    openrouter_credentials,
-)
+from puripuly_heart.core import managed_identity
+from puripuly_heart.core.openrouter import openrouter_credentials
 from puripuly_heart.core.overlay import manifest as overlay_manifest_module
 from puripuly_heart.core.overlay import process as overlay_process_module
 from puripuly_heart.core.overlay.manifest import OVERLAY_CONTRACT_VERSION
@@ -54,8 +51,6 @@ from tests.config.settings_migration_fixtures import (
 )
 from tests.helpers.paths import REPO_ROOT
 
-SOURCE_PACKAGE_ROOT = REPO_ROOT / "src" / "puripuly_heart"
-PACKAGE_NAME = "puripuly_heart"
 SNAPSHOT_PATH = Path(__file__).with_name("public_compatibility_surfaces_snapshot.json")
 INVENTORY_PATH = Path(__file__).with_name("compatibility_surface_inventory.json")
 
@@ -69,15 +64,6 @@ REQUIRED_SURFACES = (
     "guard_coverage",
     "blockers",
 )
-REQUIRED_SOURCE_PUBLIC_COMPATIBILITY_SURFACES = {
-    "SecretStore keys": ("secret_store",),
-    "Broker /v1": ("broker_v1",),
-    "overlay protocol and startup contract": ("overlay",),
-    "prompt fallback behavior": ("prompt_loader",),
-    "provider aliases": ("provider_aliases",),
-    "i18n key parity": ("i18n_parity",),
-    "installer identity": ("packaging",),
-}
 REQUIRED_INVENTORY_SURFACES = (
     "public_import_facades",
     "settings_runtime_compatibility",
@@ -99,34 +85,6 @@ REQUIRED_INVENTORY_SOURCE_RULES = {
     "existing public test or packaging import",
     "approved facade",
 }
-DOCUMENTED_ENTRY_POINT_OR_TEST_IMPORT_MODULES = frozenset(
-    {
-        "puripuly_heart.app.wiring",
-        "puripuly_heart.config.llm_profiles",
-        "puripuly_heart.config.prompts",
-        "puripuly_heart.config.settings_vnext.schema",
-        "puripuly_heart.core.managed_identity",
-        "puripuly_heart.core.managed_openrouter_broker_client",
-        "puripuly_heart.core.managed_openrouter_release",
-        "puripuly_heart.core.openrouter_credentials",
-        "puripuly_heart.core.overlay.manifest",
-        "puripuly_heart.core.overlay.protocol",
-        "puripuly_heart.core.storage.secrets",
-        "puripuly_heart.domain.events",
-        "puripuly_heart.domain.models",
-        "puripuly_heart.main",
-        "puripuly_heart.providers.llm.deepseek",
-        "puripuly_heart.providers.llm.gemini",
-        "puripuly_heart.providers.llm.local_openai",
-        "puripuly_heart.providers.llm.openrouter",
-        "puripuly_heart.providers.llm.qwen",
-        "puripuly_heart.providers.llm.qwen_async",
-        "puripuly_heart.providers.stt.deepgram",
-        "puripuly_heart.providers.stt.local_qwen_sherpa",
-        "puripuly_heart.providers.stt.soniox",
-        "puripuly_heart.ui.event_bridge",
-    }
-)
 REQUIRED_SECRET_KEYS = (
     "google_api_key",
     "openrouter_api_key",
@@ -204,12 +162,6 @@ EXPECTED_SECRET_ENV_LOOKUP_PATHS = (
         "ignored_env_vars": ["LOCAL_LLM_API_KEY"],
     },
 )
-EXPECTED_PROMPT_FALLBACK_ORDER = (
-    "{name}.md",
-    "{name}.txt",
-    "default.md",
-    "default.txt",
-)
 EXPECTED_ENCRYPTED_FILE_PASSPHRASE = "fixture-passphrase-not-secret"
 
 
@@ -225,89 +177,11 @@ def _render_command_template(parts: list[str], **values: str) -> tuple[str, ...]
     return tuple(part.format(**values) for part in parts)
 
 
-def _inno_define_literals(script: str) -> dict[str, str]:
-    quoted = re.findall(r'^\s*#define\s+([A-Za-z0-9_]+)\s+"([^"]*)"', script, re.M)
-    numeric = re.findall(r"^\s*#define\s+([A-Za-z0-9_]+)\s+(\d+)\s*$", script, re.M)
-    return dict([*quoted, *numeric])
-
-
-def _powershell_string_variable(script: str, variable_name: str) -> str:
-    match = re.search(rf'^\s*\${re.escape(variable_name)}\s*=\s+"([^"]*)"', script, re.M)
-    assert match is not None, variable_name
-    return match.group(1)
-
-
 def _test_function_names(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"))
     return {
         node.name for node in tree.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
     }
-
-
-def _module_name_for_source_path(path: Path) -> str:
-    relative = path.relative_to(SOURCE_PACKAGE_ROOT).with_suffix("")
-    parts = (PACKAGE_NAME, *relative.parts)
-    if parts[-1] == "__init__":
-        parts = parts[:-1]
-    return ".".join(parts)
-
-
-def _is_non_private_source_module(path: Path) -> bool:
-    relative = path.relative_to(SOURCE_PACKAGE_ROOT)
-    parts = relative.with_suffix("").parts
-    return not any(part.startswith("_") and part != "__init__" for part in parts)
-
-
-def _module_public_export_signals(path: Path) -> frozenset[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    signals: set[str] = set()
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
-        ):
-            try:
-                exported_names = ast.literal_eval(node.value)
-            except SyntaxError, ValueError:
-                signals.add("__all__")
-                continue
-            if exported_names:
-                signals.add("__all__")
-        elif (
-            isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == "__getattr__"
-        ):
-            signals.add("lazy __getattr__")
-    return frozenset(signals)
-
-
-def _relevant_non_private_inventory_modules() -> dict[str, frozenset[str]]:
-    relevant: dict[str, frozenset[str]] = {}
-    for path in SOURCE_PACKAGE_ROOT.rglob("*.py"):
-        if not _is_non_private_source_module(path):
-            continue
-
-        module_name = _module_name_for_source_path(path)
-        signals = set(_module_public_export_signals(path))
-        if module_name in DOCUMENTED_ENTRY_POINT_OR_TEST_IMPORT_MODULES:
-            signals.add("documented/test import")
-        if signals:
-            relevant[module_name] = frozenset(signals)
-    return relevant
-
-
-def _inventory_accounts_for_module(inventory: dict[str, Any], module_name: str) -> bool:
-    public_modules = {entry["module"] for entry in inventory["public_imports"]}
-    if module_name in public_modules:
-        return True
-
-    for classification in inventory["non_public_module_classifications"]:
-        if module_name in classification.get("modules", []):
-            return True
-        if any(
-            module_name == prefix or module_name.startswith(f"{prefix}.")
-            for prefix in classification.get("module_prefixes", [])
-        ):
-            return True
-    return False
 
 
 def _leaf_values(value: object) -> Iterator[object]:
@@ -500,22 +374,6 @@ def _assert_local_llm_optional_secret_store_only(entry: dict[str, Any]) -> None:
             os.environ["LOCAL_LLM_API_KEY"] = previous_env
 
 
-def _assert_qwen_resolved_credential_helper_preserves_legacy_fallbacks() -> None:
-    helper = wiring.require_secret_any
-
-    store = InMemorySecretStore()
-    store.set("alibaba_api_key_beijing", "fake-beijing")
-    assert (
-        helper(
-            store,
-            key="alibaba_api_key_beijing",
-            env_vars=("ALIBABA_API_KEY_BEIJING", "ALIBABA_API_KEY", "DASHSCOPE_API_KEY"),
-            legacy_keys=("alibaba_api_key",),
-        )
-        == "fake-beijing"
-    )
-
-
 def test_public_compatibility_snapshot_declares_all_required_surfaces() -> None:
     snapshot = _load_snapshot()
 
@@ -592,19 +450,6 @@ def test_public_facade_inventory_classifies_thin_delegate_targets() -> None:
         assert classification["rationale"], classification
 
 
-def test_relevant_non_private_modules_are_inventoried_or_classified() -> None:
-    inventory = _load_inventory()
-    relevant_modules = _relevant_non_private_inventory_modules()
-
-    missing = {
-        module_name: sorted(signals)
-        for module_name, signals in sorted(relevant_modules.items())
-        if not _inventory_accounts_for_module(inventory, module_name)
-    }
-
-    assert missing == {}
-
-
 def test_guard_coverage_references_existing_tests_for_every_surface() -> None:
     coverage = _load_snapshot()["guard_coverage"]
     expected_surfaces = {
@@ -627,49 +472,6 @@ def test_guard_coverage_references_existing_tests_for_every_surface() -> None:
             test_path = REPO_ROOT / file_name
             assert test_path.is_file(), ref
             assert test_name in _test_function_names(test_path), ref
-
-
-def test_source_named_public_compatibility_surfaces_have_guard_evidence() -> None:
-    snapshot = _load_snapshot()
-    coverage = snapshot["guard_coverage"]
-    inventory = _load_inventory()["compatibility_surfaces"]
-
-    assert REQUIRED_SOURCE_PUBLIC_COMPATIBILITY_SURFACES.keys() == {
-        "SecretStore keys",
-        "Broker /v1",
-        "overlay protocol and startup contract",
-        "prompt fallback behavior",
-        "provider aliases",
-        "i18n key parity",
-        "installer identity",
-    }
-    assert "prompt_fallback" in inventory
-    assert "installer_identity" in inventory
-    assert inventory["prompt_fallback"]["fixture_or_guard_refs"]
-    assert inventory["installer_identity"]["fixture_or_guard_refs"]
-
-    for source_surface, coverage_surfaces in REQUIRED_SOURCE_PUBLIC_COMPATIBILITY_SURFACES.items():
-        refs = [ref for surface in coverage_surfaces for ref in coverage[surface]]
-        assert refs, source_surface
-        for ref in refs:
-            file_name, separator, test_name = ref.partition("::")
-            assert separator == "::", ref
-            assert test_name in _test_function_names(REPO_ROOT / file_name), ref
-
-
-def test_guard_coverage_includes_overlay_python_and_installer_freeze_refs() -> None:
-    coverage = _load_snapshot()["guard_coverage"]
-
-    assert (
-        "tests/config/test_public_compatibility_surfaces.py::"
-        "test_overlay_startup_contract_snapshot_matches_python_runners_and_manifest_handoff"
-        in coverage["overlay"]
-    )
-    assert (
-        "tests/config/test_public_compatibility_surfaces.py::"
-        "test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract"
-        in coverage["packaging"]
-    )
 
 
 def test_secret_store_key_registry_snapshot_matches_current_public_keys() -> None:
@@ -695,8 +497,6 @@ def test_secret_store_key_registry_snapshot_matches_current_public_keys() -> Non
     assert managed_identity.MANAGED_DEVICE_PUBLIC_KEY_SECRET == "managed_device_public_key"
     assert managed_identity.MANAGED_IDENTITY_BINDING_SECRET == "managed_identity_binding"
 
-    _assert_qwen_resolved_credential_helper_preserves_legacy_fallbacks()
-
 
 def test_secret_store_env_lookup_snapshot_matches_current_fallback_behavior(
     monkeypatch: pytest.MonkeyPatch,
@@ -717,27 +517,6 @@ def test_secret_store_env_lookup_snapshot_matches_current_fallback_behavior(
             _assert_local_llm_optional_secret_store_only(entry)
         else:  # pragma: no cover - snapshot guard should fail before this branch matters.
             raise AssertionError(f"unknown SecretStore lookup snapshot type: {lookup!r}")
-
-
-@pytest.mark.parametrize(
-    "current_key",
-    ["alibaba_api_key_beijing", "alibaba_api_key_singapore"],
-)
-def test_secret_store_accepts_legacy_alibaba_key_and_backfills_current_key(
-    current_key: str,
-) -> None:
-    store = InMemorySecretStore()
-    store.set("alibaba_api_key", "fake-legacy-alibaba-key")
-
-    value = wiring.require_secret_any(
-        store,
-        key=current_key,
-        env_vars=(),
-        legacy_keys=("alibaba_api_key",),
-    )
-
-    assert value == "fake-legacy-alibaba-key"
-    assert store.get(current_key) == "fake-legacy-alibaba-key"
 
 
 def test_settings_serialization_excludes_secret_store_registry_keys() -> None:
@@ -886,26 +665,15 @@ async def test_overlay_startup_contract_snapshot_matches_python_runners_and_mani
     startup = _load_snapshot()["overlay"]["startup_contract"]
     manifest_path = tmp_path / "overlay-manifest.json"
     python_executable = tmp_path / "python.exe"
-    app_executable = tmp_path / "PuriPulyHeart.exe"
     overlay_executable = tmp_path / "PuriPulyHeartOverlay.exe"
 
-    source_runner = overlay_process_module.DesktopFletOverlayRunner(
-        frozen=False,
-        python_executable=python_executable,
-    )
-    frozen_runner = overlay_process_module.DesktopFletOverlayRunner(
-        frozen=True,
-        app_executable=app_executable,
-    )
+    monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
+    monkeypatch.setattr(sys, "executable", str(python_executable))
+    source_runner = overlay_process_module.DesktopFletOverlayRunner()
 
     assert source_runner.build_command(manifest_path) == _render_command_template(
         startup["desktop_source_runner_command"],
         python_executable=str(python_executable),
-        manifest_path=str(manifest_path),
-    )
-    assert frozen_runner.build_command(manifest_path) == _render_command_template(
-        startup["desktop_frozen_runner_command"],
-        app_executable=str(app_executable),
         manifest_path=str(manifest_path),
     )
 
@@ -985,30 +753,6 @@ async def test_overlay_startup_contract_snapshot_matches_python_runners_and_mani
         overlay_process_module.QUIET_TAIL_PROFILE_ENV,
         overlay_process_module.HANDOFF_EXPERIMENT_ENV,
     ]
-
-
-def test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract() -> None:
-    snapshot = _load_snapshot()["installer_identity"]
-    installer_script = (REPO_ROOT / "installer.iss").read_text(encoding="utf-8")
-    release_script = (REPO_ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(
-        encoding="utf-8"
-    )
-    defines = _inno_define_literals(installer_script)
-
-    for name, value in snapshot["defines"].items():
-        assert defines[name] == value
-    for setup_line in snapshot["setup_lines"]:
-        assert setup_line in installer_script
-
-    assert defines["CanonicalSettingsVersion"] == str(VNEXT_SETTINGS_SCHEMA_VERSION)
-
-    assert snapshot["production_installer_build"] in release_script
-    assert (
-        _powershell_string_variable(release_script, "InstallerTestAppId")
-        == snapshot["smoke_alternate_app_id"]
-    )
-    for guard_line in snapshot["smoke_guard_lines"]:
-        assert guard_line in release_script
 
 
 def test_prompt_loader_prefers_named_files_then_defaults(

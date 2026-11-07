@@ -6,13 +6,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
-from puripuly_heart.app.services.settings_application import (
-    materialize_immediate_settings_intent,
-    materialize_prompt_apply_intent,
-    materialize_provider_apply_intent,
-    settings_view_surface_snapshots,
-)
-
 from puripuly_heart.app.ports.application_runtime_logging import (
     ApplicationRuntimeLoggingPort,
 )
@@ -40,6 +33,7 @@ from puripuly_heart.app.ports.ui_application_intents import (
 from puripuly_heart.app.ports.ui_application_state import (
     UiApplicationStateRuntimePort,
 )
+from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.app.services.application_control import ApplicationControlOwner
 from puripuly_heart.app.services.application_control_events import ControlEvents
 from puripuly_heart.app.services.application_shutdown import (
@@ -50,12 +44,12 @@ from puripuly_heart.app.services.application_startup import ApplicationStartupOw
 from puripuly_heart.app.services.canonical_settings_persistence import (
     materialize_canonical_translation_settings,
 )
-
-
-def _canonical_settings(settings: object) -> object:
-    return settings
-
-
+from puripuly_heart.app.services.settings.settings_application import (
+    materialize_immediate_settings_intent,
+    materialize_prompt_apply_intent,
+    materialize_provider_apply_intent,
+    settings_view_surface_snapshots,
+)
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
@@ -115,7 +109,7 @@ class UiApplicationRuntimeStub:
         return merge(captured) if callable(merge) else captured
 
     def _compatibility_settings(self):
-        return _canonical_settings(getattr(self._backend, "settings", None))
+        return getattr(self._backend, "settings", None)
 
     def general_snapshot(self):
         settings = self._compatibility_settings()
@@ -309,7 +303,7 @@ class UiApplicationStateRuntimeStub:
 
     @property
     def compatibility_settings(self) -> object | None:
-        return _canonical_settings(getattr(self._backend, "settings", None))
+        return getattr(self._backend, "settings", None)
 
     @property
     def translation_enabled(self) -> bool:
@@ -529,23 +523,23 @@ def compose_test_ui_application_boundary(
         runtime_control_authority=runtime_control_authority,
         runtime_control_activity=runtime_control_activity,
     )
-    boundary.attach_control(
-        ApplicationControlOwner(
-            application=boundary,
-            settings=None,
-            pipeline=None,
-            results=None,
-            events=ControlEvents(),
-            provisioning=lambda: None,
-            gpu=lambda: None,
-            peer=lambda: None,
-            calibration=lambda: None,
-            gemma=lambda: None,
-            sync_ui=lambda: None,
-            locale_choices=("en",),
-            localize=lambda key: key,
-            gemma_selection=lambda _settings: None,
-            instance_id="00000000-0000-0000-0000-000000000231",
-        ),
+    control = ApplicationControlOwner(
+        application=boundary,
+        settings=None,
+        pipeline=None,
+        results=None,
+        events=ControlEvents(),
+        provisioning=lambda: None,
+        gpu=lambda: None,
+        peer=lambda: None,
+        calibration=lambda: None,
+        gemma=lambda: None,
+        sync_ui=lambda: None,
+        locale_choices=("en",),
+        localize=lambda key: key,
+        gemma_selection=lambda _settings: None,
+        instance_id="00000000-0000-0000-0000-000000000231",
     )
+    boundary.attach_control(control)
+    boundary.attach_agent_chat(AgentChatOwner(control, None, localize=lambda key: key))
     return boundary

@@ -1,0 +1,1889 @@
+{
+  "language": "en",
+  "replay_window_id": "followup-en-natural-01",
+  "duration_s": 120,
+  "construction": "Actual continuous original conversation; no concatenation, endpoint rescue, time stretching, reordered turns, synthesized gaps or overlap removal.",
+  "selection_rule": "Frozen in data-selection.json before any followup model outputs; earliest eligible original120s window per new conversation, both edges in speech-annotation gaps>=10ms; majority lexical turn count and>=60% summed lexical duration from0.5-15s turns.",
+  "selection_metrics": {
+    "recording_id": "ES2004d",
+    "conversation_id": "ES2004d",
+    "start_s": 32.368,
+    "end_s": 152.368,
+    "short_medium_lexical_turns": 31,
+    "lexical_annotation_turns": 33,
+    "short_medium_lexical_turn_fraction": 0.9393939393939394,
+    "short_medium_lexical_annotated_duration_fraction": 0.683544751068867,
+    "summed_lexical_annotation_duration_s": 113.20400000000004,
+    "all_turns": 33,
+    "brief_gaps": 7
+  },
+  "source": {
+    "language": "en",
+    "name": "AMI manual1.6.2 headset",
+    "conversation_id": "ES2004d",
+    "recording_id": "ES2004d",
+    "split": "test",
+    "license": "CC-BY-4.0",
+    "source_paths": [
+      "sources/ami/ES2004d.Mix-Headset.wav"
+    ],
+    "annotation_path": "sources/ami/ami_public_manual_1.6.2.zip",
+    "annotation_sha256": "b56e5babb2496b8795deeeda7e71178d7fbc9963f94276cf2a3f4b56ebbc9f9d",
+    "channel_policy": "Original continuous mono Mix-Headset recording; fixed original mix retained. Reconstructed replay source, not recovered arithmetic mean of4individualheadsets. No gaps, reordering, speech removal or speed change.",
+    "files": [
+      {
+        "path": "sources/ami/ES2004d.Mix-Headset.wav",
+        "sha256": "3cfce3297ebb7faeb53c02727eea5e9f2c76e9ed4b62db3b03d73e66836e91f3",
+        "sample_rate_hz": 16000,
+        "channels": 1,
+        "sample_width": 2,
+        "frames": 35556651,
+        "duration_s": 2222.2906875
+      }
+    ],
+    "original_duration_s": 2222.2906875,
+    "window_start_s": 32.368,
+    "window_end_s": 152.368,
+    "window_start_sample": 517888,
+    "window_end_sample": 2437888,
+    "revision": "722d8891643e1e4dc62cfd0d198fa05a1646c3cc",
+    "historical_channel_policy": "Arithmetic mean of four synchronized mono headsets at fixed0.25 gain throughout replay; offline uses original speaker headset.",
+    "reconstructed_channel_policy": true,
+    "attribution": "AMI Consortium; mirrored by FluidInference",
+    "distribution": "https://huggingface.co/datasets/FluidInference/ami-corpus-mirror",
+    "annotation_revision": "AMI manual1.6.2 (original frozen annotations)"
+  },
+  "paths": {
+    "clean": "en/replay-clean.wav",
+    "noise15": "en/replay-noise15.wav"
+  },
+  "turns": [
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.322",
+      "offset_s": 0.336,
+      "duration_s": 2.864,
+      "speech_end_s": 3.0959999999999996,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.5446927374301676
+      },
+      "source_annotation_id": "ES2004d.sync.322",
+      "source_start_s": 32.704,
+      "source_end_s": 35.568,
+      "source_start_sample": 523264,
+      "source_end_sample": 569088,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": true,
+      "reference": "I presume we're good to go . Okay , um",
+      "source_reference": "I presume we're good to go . Okay , um",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words35",
+        "ES2004d.B.words36",
+        "ES2004d.B.words37",
+        "ES2004d.B.words38",
+        "ES2004d.B.words39",
+        "ES2004d.B.words40",
+        "ES2004d.B.words41",
+        "ES2004d.B.words42",
+        "ES2004d.B.words43",
+        "ES2004d.B.words44"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [
+        "agreement_confirmation_lexeme",
+        "hesitation_lexeme"
+      ],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.324",
+      "offset_s": 4.208,
+      "duration_s": 3.072,
+      "speech_end_s": 7.1080000000000005,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.6510416666666666
+      },
+      "source_annotation_id": "ES2004d.sync.324",
+      "source_start_s": 36.576,
+      "source_end_s": 39.648,
+      "source_start_sample": 585216,
+      "source_end_sample": 634368,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": true,
+      "reference": "minutes um we decided to use a kinetic charger ,",
+      "source_reference": "minutes um we decided to use a kinetic charger ,",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words45",
+        "ES2004d.B.words46",
+        "ES2004d.B.words47",
+        "ES2004d.B.words48",
+        "ES2004d.B.words49",
+        "ES2004d.B.words50",
+        "ES2004d.B.words51",
+        "ES2004d.B.words52",
+        "ES2004d.B.words53",
+        "ES2004d.B.words54"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [
+        "number_time_quantity_lexeme",
+        "hesitation_lexeme"
+      ],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.11",
+      "offset_s": 7.44,
+      "duration_s": 0.352,
+      "speech_end_s": 7.760000000000001,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.6818181818181818
+      },
+      "source_annotation_id": "ES2004d.sync.11",
+      "source_start_s": 39.808,
+      "source_end_s": 40.16,
+      "source_start_sample": 636928,
+      "source_end_sample": 642560,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": true,
+      "reference": "Mm-hmm .",
+      "source_reference": "Mm-hmm .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words14",
+        "ES2004d.A.words15"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [
+        "agreement_confirmation_lexeme",
+        "hesitation_lexeme"
+      ],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.326",
+      "offset_s": 8.544,
+      "duration_s": 4.768,
+      "speech_end_s": 13.144,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.33557046979865773
+      },
+      "source_annotation_id": "ES2004d.sync.326",
+      "source_start_s": 40.912,
+      "source_end_s": 45.68,
+      "source_start_sample": 654592,
+      "source_end_sample": 730880,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": true,
+      "reference": "standard chip , um 'cause it can come in various different sizes , it wasn't uh",
+      "source_reference": "standard chip , um 'cause it can come in various different sizes , it wasn't uh",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words55",
+        "ES2004d.B.words56",
+        "ES2004d.B.words57",
+        "ES2004d.B.words58",
+        "ES2004d.B.words59",
+        "ES2004d.B.words60",
+        "ES2004d.B.words61",
+        "ES2004d.B.words62",
+        "ES2004d.B.words63",
+        "ES2004d.B.words64",
+        "ES2004d.B.words65",
+        "ES2004d.B.words66",
+        "ES2004d.B.words67",
+        "ES2004d.B.words68",
+        "ES2004d.B.words69",
+        "ES2004d.B.words70"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [
+        "hesitation_lexeme"
+      ],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.328",
+      "offset_s": 14.704,
+      "duration_s": 35.472,
+      "speech_end_s": 47.084,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.31574199368516015
+      },
+      "source_annotation_id": "ES2004d.sync.328",
+      "source_start_s": 47.072,
+      "source_end_s": 82.544,
+      "source_start_sample": 753152,
+      "source_end_sample": 1320704,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "uh gonna be a problem factor . We wanted a stand-by function . The case material is gonna be soft , rubbery , changeable . Um buttons with a combination of L_C_D_ and rubber according to the design . Um bright funky designs inspired by fruit , keeping with the hip kind of feel . Um and to try and incorporate voice recognition software into our design until we can find out more about the cost of things like that . Um and the rubber buttons that we'll use will be anti-R_S_I_ . Okay ?",
+      "reference_status": "Timing/input coverage only: unavailable/incomplete lexical reference; do not score as known transcript",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words71",
+        "ES2004d.B.words72",
+        "ES2004d.B.words73",
+        "ES2004d.B.words74",
+        "ES2004d.B.words75",
+        "ES2004d.B.words76",
+        "ES2004d.B.words77",
+        "ES2004d.B.words78",
+        "ES2004d.B.words79",
+        "ES2004d.B.words80",
+        "ES2004d.B.words81",
+        "ES2004d.B.words82",
+        "ES2004d.B.words83",
+        "ES2004d.B.words84",
+        "ES2004d.B.words85",
+        "ES2004d.B.words86",
+        "ES2004d.B.words87",
+        "ES2004d.B.words88",
+        "ES2004d.B.words89",
+        "ES2004d.B.words90",
+        "ES2004d.B.words91",
+        "ES2004d.B.words92",
+        "ES2004d.B.words93",
+        "ES2004d.B.words94",
+        "ES2004d.B.words95",
+        "ES2004d.B.words96",
+        "ES2004d.B.words97",
+        "ES2004d.B.words98",
+        "ES2004d.B.words99",
+        "ES2004d.B.words100",
+        "ES2004d.B.words101",
+        "ES2004d.B.words102",
+        "ES2004d.B.words103",
+        "ES2004d.B.words104",
+        "ES2004d.B.words105",
+        "ES2004d.B.words106",
+        "ES2004d.B.words107",
+        "ES2004d.B.words108",
+        "ES2004d.B.words109",
+        "ES2004d.B.words110",
+        "ES2004d.B.words111",
+        "ES2004d.B.words112",
+        "ES2004d.B.words113",
+        "ES2004d.B.words114",
+        "ES2004d.B.words115",
+        "ES2004d.B.words116",
+        "ES2004d.B.words117",
+        "ES2004d.B.words118",
+        "ES2004d.B.words119",
+        "ES2004d.B.words120",
+        "ES2004d.B.words121",
+        "ES2004d.B.words122",
+        "ES2004d.B.words123",
+        "ES2004d.B.words124",
+        "ES2004d.B.words125",
+        "ES2004d.B.words126",
+        "ES2004d.B.words127",
+        "ES2004d.B.words128",
+        "ES2004d.B.words129",
+        "ES2004d.B.words130",
+        "ES2004d.B.words131",
+        "ES2004d.B.words132",
+        "ES2004d.B.words133",
+        "ES2004d.B.words134",
+        "ES2004d.B.words135",
+        "ES2004d.B.words136",
+        "ES2004d.B.words137",
+        "ES2004d.B.words138",
+        "ES2004d.B.words139",
+        "ES2004d.B.words140",
+        "ES2004d.B.words141",
+        "ES2004d.B.words142",
+        "ES2004d.B.words143",
+        "ES2004d.B.words144",
+        "ES2004d.B.words145",
+        "ES2004d.B.words146",
+        "ES2004d.B.words147",
+        "ES2004d.B.words148",
+        "ES2004d.B.words149",
+        "ES2004d.B.words150",
+        "ES2004d.B.words151",
+        "ES2004d.B.words152",
+        "ES2004d.B.words153",
+        "ES2004d.B.words154",
+        "ES2004d.B.words155",
+        "ES2004d.B.words156",
+        "ES2004d.B.words157",
+        "ES2004d.B.words158",
+        "ES2004d.B.words159",
+        "ES2004d.B.words160",
+        "ES2004d.B.words161",
+        "ES2004d.B.words162",
+        "ES2004d.B.words163",
+        "ES2004d.B.words164",
+        "ES2004d.B.words165",
+        "ES2004d.B.words166",
+        "ES2004d.B.words167"
+      ],
+      "annotation_event_types": [
+        "vocalsound",
+        "vocalsound"
+      ],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.330",
+      "offset_s": 56.192,
+      "duration_s": 1.776,
+      "speech_end_s": 57.612,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.3490990990990991
+      },
+      "source_annotation_id": "ES2004d.sync.330",
+      "source_start_s": 88.56,
+      "source_end_s": 90.336,
+      "source_start_sample": 1416960,
+      "source_end_sample": 1445376,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": true,
+      "reference": "Prototype presentation .",
+      "source_reference": "Prototype presentation .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words168",
+        "ES2004d.B.words169",
+        "ES2004d.B.words170"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.682",
+      "offset_s": 58.468,
+      "duration_s": 1.82,
+      "speech_end_s": 60.128,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.7582417582417582
+      },
+      "source_annotation_id": "ES2004d.sync.682",
+      "source_start_s": 90.836,
+      "source_end_s": 92.656,
+      "source_start_sample": 1453376,
+      "source_end_sample": 1482496,
+      "speaker_id": "MEE014",
+      "role": "participant",
+      "source_role": "ID",
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "Is that for us ?",
+      "reference_status": "Timing/input coverage only: unavailable/incomplete lexical reference; do not score as known transcript",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.C.words0",
+        "ES2004d.C.words1",
+        "ES2004d.C.words2",
+        "ES2004d.C.words3",
+        "ES2004d.C.words4",
+        "ES2004d.C.words5"
+      ],
+      "annotation_event_types": [
+        "gap"
+      ],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.332",
+      "offset_s": 60.208,
+      "duration_s": 1.312,
+      "speech_end_s": 61.048,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.4725609756097561
+      },
+      "source_annotation_id": "ES2004d.sync.332",
+      "source_start_s": 92.576,
+      "source_end_s": 93.888,
+      "source_start_sample": 1481216,
+      "source_end_sample": 1502208,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": true,
+      "reference": "I think that would be you .",
+      "source_reference": "I think that would be you .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words171",
+        "ES2004d.B.words172",
+        "ES2004d.B.words173",
+        "ES2004d.B.words174",
+        "ES2004d.B.words175",
+        "ES2004d.B.words176",
+        "ES2004d.B.words177"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.13",
+      "offset_s": 60.464,
+      "duration_s": 0.569,
+      "speech_end_s": 61.033,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.7539543057996485
+      },
+      "source_annotation_id": "ES2004d.sync.13",
+      "source_start_s": 92.832,
+      "source_end_s": 93.401,
+      "source_start_sample": 1485312,
+      "source_end_sample": 1494416,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": true,
+      "reference": "Yep .",
+      "source_reference": "Yep .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words16",
+        "ES2004d.A.words17"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.684",
+      "offset_s": 61.456,
+      "duration_s": 0.912,
+      "speech_end_s": 62.368,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.7368421052631579
+      },
+      "source_annotation_id": "ES2004d.sync.684",
+      "source_start_s": 93.824,
+      "source_end_s": 94.736,
+      "source_start_sample": 1501184,
+      "source_end_sample": 1515776,
+      "speaker_id": "MEE014",
+      "role": "participant",
+      "source_role": "ID",
+      "reference_available": true,
+      "reference": "Okay .",
+      "source_reference": "Okay .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.C.words6",
+        "ES2004d.C.words7"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [
+        "agreement_confirmation_lexeme"
+      ],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.15",
+      "offset_s": 62.288,
+      "duration_s": 4.352,
+      "speech_end_s": 66.628,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.8685661764705882
+      },
+      "source_annotation_id": "ES2004d.sync.15",
+      "source_start_s": 94.656,
+      "source_end_s": 99.008,
+      "source_start_sample": 1514496,
+      "source_end_sample": 1584128,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "Me and William worked on a prototype , and I think William is going to make a p presentation on that .",
+      "reference_status": "Timing/input coverage only: unavailable/incomplete lexical reference; do not score as known transcript",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words18",
+        "ES2004d.A.words19",
+        "ES2004d.A.words20",
+        "ES2004d.A.words21",
+        "ES2004d.A.words22",
+        "ES2004d.A.words23",
+        "ES2004d.A.words24",
+        "ES2004d.A.words25",
+        "ES2004d.A.words26",
+        "ES2004d.A.words27",
+        "ES2004d.A.words28",
+        "ES2004d.A.words29",
+        "ES2004d.A.words30",
+        "ES2004d.A.words31",
+        "ES2004d.A.words32",
+        "ES2004d.A.words33",
+        "ES2004d.A.words34",
+        "ES2004d.A.words35",
+        "ES2004d.A.words36",
+        "ES2004d.A.words37",
+        "ES2004d.A.words38",
+        "ES2004d.A.words39"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.686",
+      "offset_s": 66.528,
+      "duration_s": 10.926,
+      "speech_end_s": 77.28800000000001,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.7029104887424492
+      },
+      "source_annotation_id": "ES2004d.sync.686",
+      "source_start_s": 98.896,
+      "source_end_s": 109.822,
+      "source_start_sample": 1582336,
+      "source_end_sample": 1757152,
+      "speaker_id": "MEE014",
+      "role": "participant",
+      "source_role": "ID",
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "Yeah , shall I show ? I'll show . Though do you do you wanna do you wanna sh do you wanna hold it and I'll I'll show you the presentation . Can I just nick your",
+      "reference_status": "Timing/input coverage only: unavailable/incomplete lexical reference; do not score as known transcript",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.C.words8",
+        "ES2004d.C.words9",
+        "ES2004d.C.words10",
+        "ES2004d.C.words11",
+        "ES2004d.C.words12",
+        "ES2004d.C.words13",
+        "ES2004d.C.words14",
+        "ES2004d.C.words15",
+        "ES2004d.C.words16",
+        "ES2004d.C.words17",
+        "ES2004d.C.words18",
+        "ES2004d.C.words19",
+        "ES2004d.C.words20",
+        "ES2004d.C.words21",
+        "ES2004d.C.words22",
+        "ES2004d.C.words23",
+        "ES2004d.C.words24",
+        "ES2004d.C.words25",
+        "ES2004d.C.words26",
+        "ES2004d.C.words27",
+        "ES2004d.C.words28",
+        "ES2004d.C.words29",
+        "ES2004d.C.words30",
+        "ES2004d.C.words31",
+        "ES2004d.C.words32",
+        "ES2004d.C.words33",
+        "ES2004d.C.words34",
+        "ES2004d.C.words35",
+        "ES2004d.C.words36",
+        "ES2004d.C.words37",
+        "ES2004d.C.words38",
+        "ES2004d.C.words39",
+        "ES2004d.C.words40",
+        "ES2004d.C.words41",
+        "ES2004d.C.words42",
+        "ES2004d.C.words43",
+        "ES2004d.C.words44",
+        "ES2004d.C.words45"
+      ],
+      "annotation_event_types": [
+        "disfmarker"
+      ],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.17",
+      "offset_s": 68.16,
+      "duration_s": 0.683,
+      "speech_end_s": 68.8,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.43923865300146414
+      },
+      "source_annotation_id": "ES2004d.sync.17",
+      "source_start_s": 100.528,
+      "source_end_s": 101.211,
+      "source_start_sample": 1608448,
+      "source_end_sample": 1619376,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": true,
+      "reference": "Yeah .",
+      "source_reference": "Yeah .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words40",
+        "ES2004d.A.words41"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [
+        "agreement_confirmation_lexeme"
+      ],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.334",
+      "offset_s": 70.864,
+      "duration_s": 2.628,
+      "speech_end_s": 73.492,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.7640791476407914
+      },
+      "source_annotation_id": "ES2004d.sync.334",
+      "source_start_s": 103.232,
+      "source_end_s": 105.86,
+      "source_start_sample": 1651712,
+      "source_end_sample": 1693760,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "Make sure the camera's",
+      "reference_status": "Timing/input coverage only: unavailable/incomplete lexical reference; do not score as known transcript",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words178",
+        "ES2004d.B.words179",
+        "ES2004d.B.words180",
+        "ES2004d.B.words181",
+        "ES2004d.B.words182",
+        "ES2004d.B.words183"
+      ],
+      "annotation_event_types": [
+        "disfmarker",
+        "vocalsound"
+      ],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.19",
+      "offset_s": 71.232,
+      "duration_s": 1.2,
+      "speech_end_s": 72.292,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.7166666666666667
+      },
+      "source_annotation_id": "ES2004d.sync.19",
+      "source_start_s": 103.6,
+      "source_end_s": 104.8,
+      "source_start_sample": 1657600,
+      "source_end_sample": 1676800,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "I can hold it like",
+      "reference_status": "Timing/input coverage only: unavailable/incomplete lexical reference; do not score as known transcript",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words42",
+        "ES2004d.A.words43",
+        "ES2004d.A.words44",
+        "ES2004d.A.words45",
+        "ES2004d.A.words46",
+        "ES2004d.A.words47"
+      ],
+      "annotation_event_types": [
+        "disfmarker"
+      ],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.21",
+      "offset_s": 73.664,
+      "duration_s": 2.192,
+      "speech_end_s": 75.856,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.9087591240875912
+      },
+      "source_annotation_id": "ES2004d.sync.21",
+      "source_start_s": 106.032,
+      "source_end_s": 108.224,
+      "source_start_sample": 1696512,
+      "source_end_sample": 1731584,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "Yeah , so",
+      "reference_status": "Timing/input coverage only: unavailable/incomplete lexical reference; do not score as known transcript",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words48",
+        "ES2004d.A.words49",
+        "ES2004d.A.words50",
+        "ES2004d.A.words51"
+      ],
+      "annotation_event_types": [
+        "disfmarker"
+      ],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.336",
+      "offset_s": 76.624,
+      "duration_s": 2.042,
+      "speech_end_s": 78.164,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.3232125367286974
+      },
+      "source_annotation_id": "ES2004d.sync.336",
+      "source_start_s": 108.992,
+      "source_end_s": 111.034,
+      "source_start_sample": 1743872,
+      "source_end_sample": 1776544,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": true,
+      "reference": "Yes , yes you can . Wait a second , I'll get it out .",
+      "source_reference": "Yes , yes you can . Wait a second , I'll get it out .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words184",
+        "ES2004d.B.words185",
+        "ES2004d.B.words186",
+        "ES2004d.B.words187",
+        "ES2004d.B.words188",
+        "ES2004d.B.words189",
+        "ES2004d.B.words190",
+        "ES2004d.B.words191",
+        "ES2004d.B.words192",
+        "ES2004d.B.words193",
+        "ES2004d.B.words194",
+        "ES2004d.B.words195",
+        "ES2004d.B.words196",
+        "ES2004d.B.words197",
+        "ES2004d.B.words198"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [
+        "agreement_confirmation_lexeme"
+      ],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.688",
+      "offset_s": 82.24,
+      "duration_s": 0.832,
+      "speech_end_s": 83.07199999999999,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.5913461538461539
+      },
+      "source_annotation_id": "ES2004d.sync.688",
+      "source_start_s": 114.608,
+      "source_end_s": 115.44,
+      "source_start_sample": 1833728,
+      "source_end_sample": 1847040,
+      "speaker_id": "MEE014",
+      "role": "participant",
+      "source_role": "ID",
+      "reference_available": true,
+      "reference": "Whoa .",
+      "source_reference": "Whoa .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.C.words46",
+        "ES2004d.C.words47"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.25",
+      "offset_s": 82.992,
+      "duration_s": 1.248,
+      "speech_end_s": 84.24000000000001,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.6153846153846154
+      },
+      "source_annotation_id": "ES2004d.sync.25",
+      "source_start_s": 115.36,
+      "source_end_s": 116.608,
+      "source_start_sample": 1845760,
+      "source_end_sample": 1865728,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": true,
+      "reference": "It looks",
+      "source_reference": "It looks",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words53",
+        "ES2004d.A.words54"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.338",
+      "offset_s": 83.664,
+      "duration_s": 0.528,
+      "speech_end_s": 84.084,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.5681818181818182
+      },
+      "source_annotation_id": "ES2004d.sync.338",
+      "source_start_s": 116.032,
+      "source_end_s": 116.56,
+      "source_start_sample": 1856512,
+      "source_end_sample": 1864960,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "Um",
+      "reference_status": "Timing/input coverage only: unavailable/incomplete lexical reference; do not score as known transcript",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words199",
+        "ES2004d.B.words200"
+      ],
+      "annotation_event_types": [
+        "disfmarker"
+      ],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.690",
+      "offset_s": 84.16,
+      "duration_s": 1.408,
+      "speech_end_s": 85.16,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.6676136363636364
+      },
+      "source_annotation_id": "ES2004d.sync.690",
+      "source_start_s": 116.528,
+      "source_end_s": 117.936,
+      "source_start_sample": 1864448,
+      "source_end_sample": 1886976,
+      "speaker_id": "MEE014",
+      "role": "participant",
+      "source_role": "ID",
+      "reference_available": true,
+      "reference": "Going a bit crazy over here .",
+      "source_reference": "Going a bit crazy over here .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.C.words48",
+        "ES2004d.C.words49",
+        "ES2004d.C.words50",
+        "ES2004d.C.words51",
+        "ES2004d.C.words52",
+        "ES2004d.C.words53",
+        "ES2004d.C.words54"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.27",
+      "offset_s": 85.488,
+      "duration_s": 1.04,
+      "speech_end_s": 86.288,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.5961538461538461
+      },
+      "source_annotation_id": "ES2004d.sync.27",
+      "source_start_s": 117.856,
+      "source_end_s": 118.896,
+      "source_start_sample": 1885696,
+      "source_end_sample": 1902336,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "crazy .",
+      "reference_status": "Timing/input coverage only: unavailable/incomplete lexical reference; do not score as known transcript",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words55",
+        "ES2004d.A.words56",
+        "ES2004d.A.words57"
+      ],
+      "annotation_event_types": [
+        "gap"
+      ],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.340",
+      "offset_s": 86.347,
+      "duration_s": 1.111,
+      "speech_end_s": 87.458,
+      "speech_end_method": "Recovered original human interval end; new mixed-source energy mask empty. Timing-only, not an observed acoustic end.",
+      "activity": {
+        "mask_empty": true,
+        "fallback": "original_human_interval"
+      },
+      "source_annotation_id": "ES2004d.sync.340",
+      "source_start_s": 118.715,
+      "source_end_s": 119.826,
+      "source_start_sample": 1899440,
+      "source_end_sample": 1917216,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": true,
+      "reference": "Okay .",
+      "source_reference": "Okay .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words201",
+        "ES2004d.B.words202"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [
+        "agreement_confirmation_lexeme"
+      ],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.692",
+      "offset_s": 87.656,
+      "duration_s": 1.546,
+      "speech_end_s": 89.036,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.6597671410090556
+      },
+      "source_annotation_id": "ES2004d.sync.692",
+      "source_start_s": 120.024,
+      "source_end_s": 121.57,
+      "source_start_sample": 1920384,
+      "source_end_sample": 1945120,
+      "speaker_id": "MEE014",
+      "role": "participant",
+      "source_role": "ID",
+      "reference_available": true,
+      "reference": "Thank you .",
+      "source_reference": "Thank you .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.C.words55",
+        "ES2004d.C.words56",
+        "ES2004d.C.words57"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.29",
+      "offset_s": 91.811,
+      "duration_s": 2.093,
+      "speech_end_s": 93.771,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.7644529383659818
+      },
+      "source_annotation_id": "ES2004d.sync.29",
+      "source_start_s": 124.179,
+      "source_end_s": 126.272,
+      "source_start_sample": 1986864,
+      "source_end_sample": 2020352,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": true,
+      "reference": "Um not now .",
+      "source_reference": "Um not now .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words58",
+        "ES2004d.A.words59",
+        "ES2004d.A.words60",
+        "ES2004d.A.words61"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [
+        "negation_lexeme",
+        "hesitation_lexeme"
+      ],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.342",
+      "offset_s": 93.008,
+      "duration_s": 6.256,
+      "speech_end_s": 98.16799999999999,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.3037084398976982
+      },
+      "source_annotation_id": "ES2004d.sync.342",
+      "source_start_s": 125.376,
+      "source_end_s": 131.632,
+      "source_start_sample": 2006016,
+      "source_end_sample": 2106112,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "You should have one of those things and you can just take it off . Ta-da .",
+      "reference_status": "Timing/input coverage only: unavailable/incomplete lexical reference; do not score as known transcript",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words203",
+        "ES2004d.B.words204",
+        "ES2004d.B.words205",
+        "ES2004d.B.words206",
+        "ES2004d.B.words207",
+        "ES2004d.B.words208",
+        "ES2004d.B.words209",
+        "ES2004d.B.words210",
+        "ES2004d.B.words211",
+        "ES2004d.B.words212",
+        "ES2004d.B.words213",
+        "ES2004d.B.words214",
+        "ES2004d.B.words215",
+        "ES2004d.B.words216",
+        "ES2004d.B.words217",
+        "ES2004d.B.words218",
+        "ES2004d.B.words219",
+        "ES2004d.B.words220"
+      ],
+      "annotation_event_types": [
+        "vocalsound"
+      ],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.31",
+      "offset_s": 94.651,
+      "duration_s": 0.641,
+      "speech_end_s": 94.931,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.093603744149766
+      },
+      "source_annotation_id": "ES2004d.sync.31",
+      "source_start_s": 127.019,
+      "source_end_s": 127.66,
+      "source_start_sample": 2032304,
+      "source_end_sample": 2042560,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": true,
+      "reference": "Oh .",
+      "source_reference": "Oh .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words62",
+        "ES2004d.A.words63"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.33",
+      "offset_s": 97.451,
+      "duration_s": 0.563,
+      "speech_end_s": 97.711,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.3907637655417407
+      },
+      "source_annotation_id": "ES2004d.sync.33",
+      "source_start_s": 129.819,
+      "source_end_s": 130.382,
+      "source_start_sample": 2077104,
+      "source_end_sample": 2086112,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": true,
+      "reference": "Yeah .",
+      "source_reference": "Yeah .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words64",
+        "ES2004d.A.words65"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [
+        "agreement_confirmation_lexeme"
+      ],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.35",
+      "offset_s": 99.712,
+      "duration_s": 2.538,
+      "speech_end_s": 100.97200000000001,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.37825059101654845
+      },
+      "source_annotation_id": "ES2004d.sync.35",
+      "source_start_s": 132.08,
+      "source_end_s": 134.618,
+      "source_start_sample": 2113280,
+      "source_end_sample": 2153888,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "Oh , where are the hinges ?",
+      "reference_status": "Timing/input coverage only: unavailable/incomplete lexical reference; do not score as known transcript",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words66",
+        "ES2004d.A.words67",
+        "ES2004d.A.words68",
+        "ES2004d.A.words69",
+        "ES2004d.A.words70",
+        "ES2004d.A.words71",
+        "ES2004d.A.words72",
+        "ES2004d.A.words73"
+      ],
+      "annotation_event_types": [
+        "vocalsound"
+      ],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.694",
+      "offset_s": 105.408,
+      "duration_s": 13.911,
+      "speech_end_s": 119.319,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.7009560779239451
+      },
+      "source_annotation_id": "ES2004d.sync.694",
+      "source_start_s": 137.776,
+      "source_end_s": 151.687,
+      "source_start_sample": 2204416,
+      "source_end_sample": 2426992,
+      "speaker_id": "MEE014",
+      "role": "participant",
+      "source_role": "ID",
+      "reference_available": false,
+      "reference": null,
+      "source_reference": "Okay , so this is our look and feel presentation , the final our final presentation . And we'll first look at the exterior of what we've uh come up with over there . Um",
+      "reference_status": "Timing/input coverage only: unavailable/incomplete lexical reference; do not score as known transcript",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.C.words58",
+        "ES2004d.C.words59",
+        "ES2004d.C.words60",
+        "ES2004d.C.words61",
+        "ES2004d.C.words62",
+        "ES2004d.C.words63",
+        "ES2004d.C.words64",
+        "ES2004d.C.words65",
+        "ES2004d.C.words66",
+        "ES2004d.C.words67",
+        "ES2004d.C.words68",
+        "ES2004d.C.words69",
+        "ES2004d.C.words70",
+        "ES2004d.C.words71",
+        "ES2004d.C.words72",
+        "ES2004d.C.words73",
+        "ES2004d.C.words74",
+        "ES2004d.C.words75",
+        "ES2004d.C.words76",
+        "ES2004d.C.words77",
+        "ES2004d.C.words78",
+        "ES2004d.C.words79",
+        "ES2004d.C.words80",
+        "ES2004d.C.words81",
+        "ES2004d.C.words82",
+        "ES2004d.C.words83",
+        "ES2004d.C.words84",
+        "ES2004d.C.words85",
+        "ES2004d.C.words86",
+        "ES2004d.C.words87",
+        "ES2004d.C.words88",
+        "ES2004d.C.words89",
+        "ES2004d.C.words90",
+        "ES2004d.C.words91",
+        "ES2004d.C.words92",
+        "ES2004d.C.words93"
+      ],
+      "annotation_event_types": [
+        "disfmarker"
+      ],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.346",
+      "offset_s": 106.858,
+      "duration_s": 0.674,
+      "speech_end_s": 107.53200000000001,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 1.0
+      },
+      "source_annotation_id": "ES2004d.sync.346",
+      "source_start_s": 139.226,
+      "source_end_s": 139.9,
+      "source_start_sample": 2227616,
+      "source_end_sample": 2238400,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": true,
+      "reference": "Right .",
+      "source_reference": "Right .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words222",
+        "ES2004d.B.words223"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [
+        "agreement_confirmation_lexeme"
+      ],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.348",
+      "offset_s": 109.213,
+      "duration_s": 0.665,
+      "speech_end_s": 109.878,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.9699248120300752
+      },
+      "source_annotation_id": "ES2004d.sync.348",
+      "source_start_s": 141.581,
+      "source_end_s": 142.246,
+      "source_start_sample": 2265296,
+      "source_end_sample": 2275936,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "reference_available": true,
+      "reference": "Mm 'kay .",
+      "source_reference": "Mm 'kay .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words224",
+        "ES2004d.B.words225",
+        "ES2004d.B.words226"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    },
+    {
+      "id": "followup-en-natural-01-ES2004d.sync.37",
+      "offset_s": 118.454,
+      "duration_s": 1.21,
+      "speech_end_s": 119.33399999999999,
+      "speech_end_method": "Recomputed shared clean Mix-Headset20ms energy estimate inside recovered original human interval; overlap/background may bias it; not candidate-derived.",
+      "activity": {
+        "threshold_dbfs": -50.0,
+        "active_fraction": 0.5619834710743802
+      },
+      "source_annotation_id": "ES2004d.sync.37",
+      "source_start_s": 150.822,
+      "source_end_s": 152.032,
+      "source_start_sample": 2413152,
+      "source_end_sample": 2432512,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "reference_available": true,
+      "reference": "'Kay .",
+      "source_reference": "'Kay .",
+      "reference_status": "Original human-verified orthographic reference",
+      "boundary_truncated": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words74",
+        "ES2004d.A.words75"
+      ],
+      "annotation_event_types": [],
+      "annotation_tier": null,
+      "annotation_interval": null,
+      "case_tags": [],
+      "case_tag_provenance": "Deterministic reference-only orthographic/lexeme flags, overlapping and not guaranteed semantic functions or acoustic judgments.",
+      "lexical_annotation": true
+    }
+  ],
+  "annotated_nonspeech_events": [
+    {
+      "id": "ES2004d.sync.344",
+      "start": 133.904,
+      "end": 134.72,
+      "speaker_id": "FEE013",
+      "role": "participant",
+      "source_role": "PM",
+      "source_channel": 1,
+      "source_reference": "",
+      "reference_available": false,
+      "annotation_word_ids": [
+        "ES2004d.B.words221"
+      ],
+      "annotation_event_types": [
+        "vocalsound"
+      ]
+    },
+    {
+      "id": "ES2004d.sync.23",
+      "start": 111.205,
+      "end": 112.366,
+      "speaker_id": "MEO015",
+      "role": "participant",
+      "source_role": "UI",
+      "source_channel": 0,
+      "source_reference": "",
+      "reference_available": false,
+      "annotation_word_ids": [
+        "ES2004d.A.words52"
+      ],
+      "annotation_event_types": [
+        "gap"
+      ]
+    }
+  ],
+  "overlaps": [
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.682",
+        "followup-en-natural-01-ES2004d.sync.332"
+      ],
+      "start_s": 60.208,
+      "end_s": 60.288000000000004,
+      "duration_s": 0.0800000000000054
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.332",
+        "followup-en-natural-01-ES2004d.sync.13"
+      ],
+      "start_s": 60.464,
+      "end_s": 61.033,
+      "duration_s": 0.5690000000000026
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.332",
+        "followup-en-natural-01-ES2004d.sync.684"
+      ],
+      "start_s": 61.456,
+      "end_s": 61.519999999999996,
+      "duration_s": 0.06399999999999295
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.684",
+        "followup-en-natural-01-ES2004d.sync.15"
+      ],
+      "start_s": 62.288,
+      "end_s": 62.368,
+      "duration_s": 0.0800000000000054
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.15",
+        "followup-en-natural-01-ES2004d.sync.686"
+      ],
+      "start_s": 66.528,
+      "end_s": 66.64,
+      "duration_s": 0.11199999999999477
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.686",
+        "followup-en-natural-01-ES2004d.sync.17"
+      ],
+      "start_s": 68.16,
+      "end_s": 68.843,
+      "duration_s": 0.6830000000000069
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.686",
+        "followup-en-natural-01-ES2004d.sync.334"
+      ],
+      "start_s": 70.864,
+      "end_s": 73.492,
+      "duration_s": 2.628
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.686",
+        "followup-en-natural-01-ES2004d.sync.19"
+      ],
+      "start_s": 71.232,
+      "end_s": 72.432,
+      "duration_s": 1.2000000000000028
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.686",
+        "followup-en-natural-01-ES2004d.sync.21"
+      ],
+      "start_s": 73.664,
+      "end_s": 75.856,
+      "duration_s": 2.191999999999993
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.686",
+        "followup-en-natural-01-ES2004d.sync.336"
+      ],
+      "start_s": 76.624,
+      "end_s": 77.45400000000001,
+      "duration_s": 0.8300000000000125
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.334",
+        "followup-en-natural-01-ES2004d.sync.19"
+      ],
+      "start_s": 71.232,
+      "end_s": 72.432,
+      "duration_s": 1.2000000000000028
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.688",
+        "followup-en-natural-01-ES2004d.sync.25"
+      ],
+      "start_s": 82.992,
+      "end_s": 83.07199999999999,
+      "duration_s": 0.07999999999998408
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.25",
+        "followup-en-natural-01-ES2004d.sync.338"
+      ],
+      "start_s": 83.664,
+      "end_s": 84.19200000000001,
+      "duration_s": 0.5280000000000058
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.25",
+        "followup-en-natural-01-ES2004d.sync.690"
+      ],
+      "start_s": 84.16,
+      "end_s": 84.24000000000001,
+      "duration_s": 0.0800000000000125
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.338",
+        "followup-en-natural-01-ES2004d.sync.690"
+      ],
+      "start_s": 84.16,
+      "end_s": 84.19200000000001,
+      "duration_s": 0.03200000000001069
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.690",
+        "followup-en-natural-01-ES2004d.sync.27"
+      ],
+      "start_s": 85.488,
+      "end_s": 85.568,
+      "duration_s": 0.0799999999999983
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.27",
+        "followup-en-natural-01-ES2004d.sync.340"
+      ],
+      "start_s": 86.347,
+      "end_s": 86.528,
+      "duration_s": 0.1810000000000116
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.29",
+        "followup-en-natural-01-ES2004d.sync.342"
+      ],
+      "start_s": 93.008,
+      "end_s": 93.90400000000001,
+      "duration_s": 0.896000000000015
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.342",
+        "followup-en-natural-01-ES2004d.sync.31"
+      ],
+      "start_s": 94.651,
+      "end_s": 95.292,
+      "duration_s": 0.6410000000000053
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.342",
+        "followup-en-natural-01-ES2004d.sync.33"
+      ],
+      "start_s": 97.451,
+      "end_s": 98.014,
+      "duration_s": 0.5630000000000024
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.694",
+        "followup-en-natural-01-ES2004d.sync.346"
+      ],
+      "start_s": 106.858,
+      "end_s": 107.53200000000001,
+      "duration_s": 0.6740000000000066
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.694",
+        "followup-en-natural-01-ES2004d.sync.348"
+      ],
+      "start_s": 109.213,
+      "end_s": 109.878,
+      "duration_s": 0.6650000000000063
+    },
+    {
+      "ids": [
+        "followup-en-natural-01-ES2004d.sync.694",
+        "followup-en-natural-01-ES2004d.sync.37"
+      ],
+      "start_s": 118.454,
+      "end_s": 119.319,
+      "duration_s": 0.8650000000000091
+    }
+  ],
+  "gap_statistics": {
+    "definition": "Original gaps in union of speech annotation, not guaranteed acoustic silence",
+    "count": 13,
+    "brief_0_1_to_1_s": 7,
+    "intervals": [
+      {
+        "start_s": 0.0,
+        "end_s": 0.3359999999999985,
+        "duration_s": 0.3359999999999985
+      },
+      {
+        "start_s": 3.1999999999999957,
+        "end_s": 4.207999999999998,
+        "duration_s": 1.0080000000000027
+      },
+      {
+        "start_s": 7.280000000000001,
+        "end_s": 7.439999999999998,
+        "duration_s": 0.1599999999999966
+      },
+      {
+        "start_s": 7.7919999999999945,
+        "end_s": 8.543999999999997,
+        "duration_s": 0.7520000000000024
+      },
+      {
+        "start_s": 13.311999999999998,
+        "end_s": 14.704,
+        "duration_s": 1.392000000000003
+      },
+      {
+        "start_s": 50.175999999999995,
+        "end_s": 56.192,
+        "duration_s": 6.016000000000005
+      },
+      {
+        "start_s": 57.967999999999996,
+        "end_s": 58.467999999999996,
+        "duration_s": 0.5
+      },
+      {
+        "start_s": 78.666,
+        "end_s": 82.24000000000001,
+        "duration_s": 3.573999999999998
+      },
+      {
+        "start_s": 87.458,
+        "end_s": 87.656,
+        "duration_s": 0.1980000000000075
+      },
+      {
+        "start_s": 89.202,
+        "end_s": 91.811,
+        "duration_s": 2.609000000000009
+      },
+      {
+        "start_s": 99.26400000000001,
+        "end_s": 99.71200000000002,
+        "duration_s": 0.4480000000000075
+      },
+      {
+        "start_s": 102.25,
+        "end_s": 105.40800000000002,
+        "duration_s": 3.1580000000000155
+      },
+      {
+        "start_s": 119.66400000000002,
+        "end_s": 120.0,
+        "duration_s": 0.3359999999999843
+      }
+    ]
+  },
+  "boundary_statistics": {
+    "annotated_speech_turns_truncated": 0,
+    "start_inside_annotation_gap": true,
+    "end_inside_annotation_gap": true,
+    "policy": "Original lexical speech never cut; nonspeech/background may remain at crop edges."
+  },
+  "activity": {
+    "threshold_dbfs": -50.0,
+    "active_fraction": 0.16633333333333333
+  },
+  "timing_limitations": "Energy-derived end is shared, not lexical ground truth; overlap/background can bias it. Timing-only intervals remain separate. Nonempty coverage does not establish correct text.",
+  "historical_float_sha256": {
+    "clean": "ff1d57c2ab2defb271a27fd9ef279219153cd097db8be9c8674e1578b75e1ed3",
+    "noise15": "32b1e8d325d124b7cc961776ce5f454d30854679c8f6910390506343edc3446f"
+  },
+  "historical_noise": {
+    "snr_target_db": 15,
+    "snr_measured_db": 14.999999673884599,
+    "joint_gain": 1.0,
+    "peak": 0.04529079794883728,
+    "noise_kind": "environment",
+    "category": "recorded rainfall",
+    "noise_realization": 1,
+    "source_path": ".tmp/asr308/followup/data/sources/esc50/1-21189-A-10.wav",
+    "source_sha256": "5f15ab2d8f6ef9932909b1b75c8ac254cbea46c93b4b2f0f3542abdf09b9abc0",
+    "original_source_id": "21189",
+    "seed": 15787550853240031606,
+    "offset_samples_16k": 36406,
+    "offset_s": 2.275375,
+    "loop_period_samples": 78400,
+    "loop_period_s": 4.9,
+    "repetitions": 24,
+    "crossfade_s": 0.1,
+    "processing": "Common16k mono, subtract mean,100ms linear tail-to-head crossfade. Periodic indexing from frozen offset; real recorded noise only, no speech synthesis.",
+    "independent_realization": "Different original field recording per environmental realization; offsets deterministic before inference.",
+    "exported_snr_db": 14.999999678656748,
+    "exported_peak": 0.04529079794883728,
+    "clipped_samples": 0,
+    "sample_rate_hz": 16000
+  },
+  "noise_seed": 13310813761637104462,
+  "historical_reuse": "Recovered ES2004d32.368–152.368s original manual turn/reference timing; changed original audio from historicalmeanof4headsets to publicMix-Headset. HistoricalFLOAThashes are not currentaudiohashes. Shared speech ends recomputed on actual clean mixed source before inference; original-profilepink15 applied.",
+  "noise": {
+    "snr_target_db": 15,
+    "snr_measured_db": 15.000000237087443,
+    "joint_gain": 1.0,
+    "peak": 0.14135946333408356,
+    "seed": 13310813761637104462,
+    "recipe": "original #308 seeded FFT pink/fan-like at 15dB; active RMS over complete clean window",
+    "activity": {
+      "threshold_dbfs": -50.0,
+      "active_fraction": 0.4435
+    }
+  },
+  "sha256": {
+    "clean": "ee19cafe7382e7f26249b273c0f27ce080963788e35c2ca67034f234d903b6d6",
+    "noise15": "04269501e6c50c340ac261e3d62951cecfa788299f94b4048280503aaa044075"
+  }
+}

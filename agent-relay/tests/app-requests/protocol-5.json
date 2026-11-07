@@ -1,0 +1,152 @@
+[
+  {
+    "path": "/v1/classify",
+    "body": {
+      "agent_protocol": 5,
+      "input": [
+        {
+          "role": "user",
+          "content": "{\"current_message\":\"Why are captions missing?\",\"recent_messages\":[],\"active_task\":null,\"last_puri_action\":null,\"previous_modules\":[]}"
+        }
+      ],
+      "turn_id": "00000000000000000000000000000001"
+    }
+  },
+  {
+    "path": "/v1/respond",
+    "body": {
+      "agent_protocol": 5,
+      "input": [
+        {
+          "type": "configuration_update",
+          "reasoning": {
+            "effort": "high"
+          }
+        },
+        {
+          "role": "user",
+          "content": "{\"app_context\":{\"observed_at\":\"2026-11-07T12:56:53.573958+00:00\",\"modules\":[\"core\",\"output\"],\"missing\":[],\"catalogs\":{\"output\":{\"settings.subtab.overlay\":{\"overlay.target\":{\"label\":\"settings.overlay.caption_location\",\"description\":\"settings.description.overlay.target\"},\"overlay.translation.enabled\":{\"label\":\"settings.overlay.show_translation\",\"description\":\"settings.description.overlay.translation.enabled\"},\"overlay.peer_original.enabled\":{\"label\":\"settings.overlay.show_peer_original\",\"description\":\"settings.description.overlay.peer_original.enabled\"},\"overlay.background_alpha\":{\"label\":\"settings.overlay.desktop.background_alpha.title\",\"description\":\"settings.description.overlay.background_alpha\"},\"overlay.swap_caption_languages\":{\"label\":\"settings.overlay.desktop.swap_caption_languages.title\",\"description\":\"settings.description.overlay.swap_caption_languages\"},\"overlay.desktop_size\":{\"label\":\"settings.overlay.desktop.size.title\",\"description\":\"settings.description.overlay.desktop_size\"}},\"settings.subtab.general\":{\"osc.connection\":{\"label\":\"settings.osc.connection.title\",\"description\":\"settings.description.osc.connection\"},\"chatbox.source.enabled\":{\"label\":\"settings.chatbox_include_source\",\"description\":\"settings.description.chatbox.source.enabled\"},\"chatbox.activation_notice.enabled\":{\"label\":\"settings.activation_notice.title\",\"description\":\"settings.description.chatbox.activation_notice.enabled\"},\"vrc_mic_intercept.enabled\":{\"label\":\"settings.vrc_mic_intercept\",\"description\":\"settings.description.vrc_mic_intercept.enabled\"}}}},\"core\":{\"revision\":42,\"app\":{\"translation_enabled\":false,\"translation_runtime_ready\":true},\"channels\":{\"self\":{\"selected_provider\":\"local_cpu_auto\",\"effective_active\":true,\"capture\":{\"generation\":3,\"has_source\":true}},\"peer\":{\"selected_provider\":\"local_cpu_auto\",\"effective_active\":false,\"capture\":{}}},\"activity\":{\"availability\":\"subscribed\",\"self\":{\"transcript_seconds_ago\":null,\"translation_seconds_ago\":null},\"peer\":{\"transcript_seconds_ago\":null,\"translation_seconds_ago\":null}},\"recent_actions\":[],\"operations\":[],\"pending_confirmation\":null,\"support_reports\":[],\"puri_allowance\":{\"unit\":\"submitted_prompt_turns\",\"limit\":50,\"period\":\"server_utc_day\",\"remaining\":null,\"availability\":\"unavailable\",\"exhaustion\":\"not_observed\"},\"diagnostics\":{\"records\":[],\"coverage\":{\"lookup\":\"not_retained\",\"oldest_sequence\":1,\"latest_sequence\":0,\"next_after\":0,\"gap\":false,\"evicted_records\":0,\"truncated\":false}}},\"output\":{\"settings\":{\"overlay.target\":\"steamvr\",\"overlay.translation.enabled\":true,\"overlay.peer_original.enabled\":true,\"overlay.background_alpha\":0.6,\"overlay.swap_caption_languages\":false,\"overlay.desktop_size\":\"medium\",\"osc.connection\":{\"mode\":\"automatic\",\"send_port\":9000,\"receive_port\":9001},\"chatbox.source.enabled\":false,\"chatbox.activation_notice.enabled\":true,\"vrc_mic_intercept.enabled\":false},\"overlay\":{\"lifecycle\":\"off\",\"presentation_ready\":false},\"osc\":{\"local_availability\":\"off\",\"discovered_remote_present\":true,\"remote_delivery\":\"unacknowledged\"}}}}"
+        },
+        {
+          "role": "user",
+          "content": "Why are captions missing?"
+        }
+      ],
+      "turn_id": "00000000000000000000000000000001",
+      "effort": "high",
+      "route": "work",
+      "allow_tools": true
+    }
+  },
+  {
+    "path": "/v1/respond",
+    "body": {
+      "agent_protocol": 5,
+      "input": [
+        {
+          "type": "configuration_update",
+          "reasoning": {
+            "effort": "high"
+          }
+        },
+        {
+          "role": "user",
+          "content": "{\"app_context\":{\"observed_at\":\"2026-11-07T12:56:53.573958+00:00\",\"modules\":[\"core\",\"output\"],\"missing\":[],\"catalogs\":{\"output\":{\"settings.subtab.overlay\":{\"overlay.target\":{\"label\":\"settings.overlay.caption_location\",\"description\":\"settings.description.overlay.target\"},\"overlay.translation.enabled\":{\"label\":\"settings.overlay.show_translation\",\"description\":\"settings.description.overlay.translation.enabled\"},\"overlay.peer_original.enabled\":{\"label\":\"settings.overlay.show_peer_original\",\"description\":\"settings.description.overlay.peer_original.enabled\"},\"overlay.background_alpha\":{\"label\":\"settings.overlay.desktop.background_alpha.title\",\"description\":\"settings.description.overlay.background_alpha\"},\"overlay.swap_caption_languages\":{\"label\":\"settings.overlay.desktop.swap_caption_languages.title\",\"description\":\"settings.description.overlay.swap_caption_languages\"},\"overlay.desktop_size\":{\"label\":\"settings.overlay.desktop.size.title\",\"description\":\"settings.description.overlay.desktop_size\"}},\"settings.subtab.general\":{\"osc.connection\":{\"label\":\"settings.osc.connection.title\",\"description\":\"settings.description.osc.connection\"},\"chatbox.source.enabled\":{\"label\":\"settings.chatbox_include_source\",\"description\":\"settings.description.chatbox.source.enabled\"},\"chatbox.activation_notice.enabled\":{\"label\":\"settings.activation_notice.title\",\"description\":\"settings.description.chatbox.activation_notice.enabled\"},\"vrc_mic_intercept.enabled\":{\"label\":\"settings.vrc_mic_intercept\",\"description\":\"settings.description.vrc_mic_intercept.enabled\"}}}},\"core\":{\"revision\":42,\"app\":{\"translation_enabled\":false,\"translation_runtime_ready\":true},\"channels\":{\"self\":{\"selected_provider\":\"local_cpu_auto\",\"effective_active\":true,\"capture\":{\"generation\":3,\"has_source\":true}},\"peer\":{\"selected_provider\":\"local_cpu_auto\",\"effective_active\":false,\"capture\":{}}},\"activity\":{\"availability\":\"subscribed\",\"self\":{\"transcript_seconds_ago\":null,\"translation_seconds_ago\":null},\"peer\":{\"transcript_seconds_ago\":null,\"translation_seconds_ago\":null}},\"recent_actions\":[],\"operations\":[],\"pending_confirmation\":null,\"support_reports\":[],\"puri_allowance\":{\"unit\":\"submitted_prompt_turns\",\"limit\":50,\"period\":\"server_utc_day\",\"remaining\":null,\"availability\":\"unavailable\",\"exhaustion\":\"not_observed\"},\"diagnostics\":{\"records\":[],\"coverage\":{\"lookup\":\"not_retained\",\"oldest_sequence\":1,\"latest_sequence\":0,\"next_after\":0,\"gap\":false,\"evicted_records\":0,\"truncated\":false}}},\"output\":{\"settings\":{\"overlay.target\":\"steamvr\",\"overlay.translation.enabled\":true,\"overlay.peer_original.enabled\":true,\"overlay.background_alpha\":0.6,\"overlay.swap_caption_languages\":false,\"overlay.desktop_size\":\"medium\",\"osc.connection\":{\"mode\":\"automatic\",\"send_port\":9000,\"receive_port\":9001},\"chatbox.source.enabled\":false,\"chatbox.activation_notice.enabled\":true,\"vrc_mic_intercept.enabled\":false},\"overlay\":{\"lifecycle\":\"off\",\"presentation_ready\":false},\"osc\":{\"local_availability\":\"off\",\"discovered_remote_present\":true,\"remote_delivery\":\"unacknowledged\"}}}}"
+        },
+        {
+          "role": "user",
+          "content": "Why are captions missing?"
+        },
+        {
+          "id": "rs_1",
+          "type": "reasoning",
+          "encrypted_content": "synthetic",
+          "summary": []
+        },
+        {
+          "type": "function_call",
+          "id": "fc_call_1",
+          "call_id": "call_1",
+          "name": "get_app_context",
+          "arguments": "{\"topic\":\"output\"}",
+          "status": "completed"
+        },
+        {
+          "type": "function_call_output",
+          "call_id": "call_1",
+          "output": "{\"status\":\"unchanged\",\"context\":{\"observed_at\":\"2026-11-07T12:56:53.575822+00:00\",\"modules\":[\"core\",\"output\"],\"missing\":[],\"unchanged\":[\"core\",\"output\"]}}"
+        }
+      ],
+      "turn_id": "00000000000000000000000000000001",
+      "effort": "high",
+      "route": "work",
+      "allow_tools": true
+    }
+  },
+  {
+    "path": "/v1/classify",
+    "body": {
+      "agent_protocol": 5,
+      "input": [
+        {
+          "role": "user",
+          "content": "{\"current_message\":\"Thanks!\",\"recent_messages\":[{\"role\":\"user\",\"content\":\"Why are captions missing?\"},{\"role\":\"assistant\",\"content\":\"Translation is off in the current records. Turn it on in the app.\"}],\"active_task\":\"Why are captions missing?\",\"last_puri_action\":null,\"previous_modules\":[\"core\",\"output\"]}"
+        }
+      ],
+      "turn_id": "00000000000000000000000000000002"
+    }
+  },
+  {
+    "path": "/v1/respond",
+    "body": {
+      "agent_protocol": 5,
+      "input": [
+        {
+          "role": "user",
+          "content": "Why are captions missing?"
+        },
+        {
+          "role": "assistant",
+          "content": "Translation is off in the current records. Turn it on in the app."
+        },
+        {
+          "role": "user",
+          "content": "Thanks!"
+        }
+      ],
+      "turn_id": "00000000000000000000000000000002",
+      "effort": "low",
+      "route": "social",
+      "allow_tools": false
+    }
+  },
+  {
+    "path": "/v1/classify",
+    "body": {
+      "agent_protocol": 5,
+      "input": [
+        {
+          "role": "user",
+          "content": "{\"current_message\":\"Write me a poem.\",\"recent_messages\":[{\"role\":\"user\",\"content\":\"Why are captions missing?\"},{\"role\":\"assistant\",\"content\":\"Translation is off in the current records. Turn it on in the app.\"},{\"role\":\"user\",\"content\":\"Thanks!\"},{\"role\":\"assistant\",\"content\":\"You're welcome.\"}],\"active_task\":\"Why are captions missing?\",\"last_puri_action\":null,\"previous_modules\":[\"core\",\"output\"]}"
+        }
+      ],
+      "turn_id": "00000000000000000000000000000003"
+    }
+  },
+  {
+    "path": "/v1/respond",
+    "body": {
+      "agent_protocol": 5,
+      "input": [
+        {
+          "role": "user",
+          "content": "Write me a poem."
+        }
+      ],
+      "turn_id": "00000000000000000000000000000003",
+      "effort": "low",
+      "route": "out_of_scope",
+      "allow_tools": false
+    }
+  }
+]

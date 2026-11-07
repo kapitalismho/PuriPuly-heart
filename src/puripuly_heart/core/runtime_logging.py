@@ -8,7 +8,7 @@ import logging
 import queue
 import re
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from collections.abc import Awaitable, Mapping, Sequence
 from dataclasses import dataclass
 from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
@@ -83,6 +83,7 @@ _QUEUE_HANDLER_LOG_FILE_ATTR = "_puripuly_heart_log_file"
 _QUEUE_HANDLER_FILE_HANDLER_ATTR = "_puripuly_heart_file_handler"
 _QUEUE_HANDLER_LISTENER_ATTR = "_puripuly_heart_queue_listener"
 _QUEUE_HANDLER_CLOSED_ATTR = "_puripuly_heart_queue_closed"
+_QUEUE_HANDLER_CLOSE_DEADLINE_ATTR = "_puripuly_heart_queue_close_deadline"
 _QUEUE_HANDLER_CLOSING_ATTR = "_puripuly_heart_queue_closing"
 _QUEUE_HANDLER_REFCOUNT_ATTR = "_puripuly_heart_queue_refcount"
 _QUEUE_HANDLER_QUEUE_ATTR = "_puripuly_heart_queue"
@@ -94,7 +95,7 @@ _LIVE_AUDIENCE_BASIC = LIVE_AUDIENCE_BASIC
 _TERMINAL_RECORD_ATTR = "_puripuly_heart_terminal_record"
 _MAIN_FILE_QUEUE_CAPACITY = 2048
 _MAIN_FILE_PRIORITY_RESERVE = 64
-_FILE_DRAIN_TIMEOUT_S = 2.0
+_FILE_CLOSE_TIMEOUT_S = 2.0
 _TERMINAL_ENQUEUE_TIMEOUT_S = 0.25
 _FILE_BATCH_MAX_AGE_S = 1.0
 _FILE_BATCH_MAX_BYTES = 64 * 1024
@@ -176,6 +177,11 @@ LATENCY_TRACE_POINT_CONTRACTS: dict[str, LatencyTracePointContract] = {
         timing_semantics="Recorded after the first self chatbox page is successfully handed to the OSC UDP sender.",
         acceptance_expectation="This is a software send observation, not a VRChat or physical display acknowledgement.",
     ),
+    "self_chatbox_final_accepted": LatencyTracePointContract(
+        name="self_chatbox_final_accepted",
+        timing_semantics="Recorded when the chatbox owner accepts a final promotion of an already-sent identical preview.",
+        acceptance_expectation="Measure final acceptance, not the earlier preview send or a new UDP transmission; no remote or physical display acknowledgement is implied.",
+    ),
     "peer_overlay_applied": LatencyTracePointContract(
         name="peer_overlay_applied",
         timing_semantics="Recorded when the peer presenter returns an applied application receipt after logical pacing.",
@@ -218,11 +224,11 @@ class RealtimeLogHandler(logging.Handler):
 
 ObservabilityRunner = Callable[[Awaitable[None]], None]
 _OUTPUT_STAGE_TOKENS = {
-    "decision": frozenset({"accepted", "waiting"}),
+    "decision": frozenset({"waiting"}),
     "route": frozenset({"subtitle_overlay"}),
-    "reason": frozenset({"accepted_handoff", "logical_pacing_wait"}),
-    "stage": frozenset({"admission_accepted", "logical_pacing"}),
-    "outcome": frozenset({"pending", "waiting"}),
+    "reason": frozenset({"logical_pacing_wait"}),
+    "stage": frozenset({"logical_pacing"}),
+    "outcome": frozenset({"waiting"}),
     "physical_ack": frozenset({"false"}),
     "wait_reason": frozenset({"replacement_gate", "protected_rows"}),
 }
@@ -571,6 +577,8 @@ class _BatchingRotatingFileHandler(RotatingFileHandler):
                         pending = []
                         pending_bytes = 0
                         self.doRollover()
+                        if self.stream is None:
+                            self.stream = self._open()
                         current_bytes = 0
                     pending.append(text)
                     pending_bytes += encoded_size
@@ -805,7 +813,7 @@ class _SafeQueueListener(QueueListener):
                 if (
                     len(batch) >= _FILE_BATCH_MAX_RECORDS
                     or batch_bytes >= _FILE_BATCH_MAX_BYTES
-                    or prepared.levelno >= logging.WARNING
+                    or _is_priority_file_record(prepared)
                 ):
                     self._deliver_batch(batch)
                     for _ in batch:
@@ -853,6 +861,11 @@ class RuntimeLoggingSinks:
     file_queue: queue.Queue[logging.LogRecord] | None = None
     abandoned_records: int = 0
     _closed: bool = False
+
+    def support_log_snapshot(self) -> bytes:
+        with self.file_handler.lock:
+            self.file_handler.flush()
+            return self.log_file.read_bytes()
 
     def close(self, *, force: bool = False) -> None:
         if self._closed and not force:
@@ -989,6 +1002,9 @@ class SessionRuntimeLoggingService:
         self._conversation_record_order: deque[tuple[str, str, int | None, int | None, str]] = (
             deque()
         )
+        self._peer_conversation_revisions: OrderedDict[
+            tuple[str, str, int | None], tuple[int, set[tuple[int | None, str]], str]
+        ] = OrderedDict()
         self._request_context_keys: set[tuple[str, int | None]] = set()
         self._request_context_order: deque[tuple[str, int | None]] = deque()
         self._diagnostic_history = DiagnosticHistory()
@@ -1024,6 +1040,9 @@ class SessionRuntimeLoggingService:
     @property
     def log_file(self) -> Path:
         return self._sinks.log_file
+
+    def support_log_snapshot(self) -> bytes:
+        return self._sinks.support_log_snapshot()
 
     def configure_diagnostics(
         self,
@@ -1408,6 +1427,10 @@ class SessionRuntimeLoggingService:
                 stage="destination_delivery",
             )
             return
+        if decision.decision == "published":
+            if decision.route == "subtitle_overlay" and decision.reason == "logical_pacing_wait":
+                self.emit_diagnostic(_format_output_routing_decision(decision))
+            return
         if (
             decision.decision == "denied"
             and decision.route == "self_chatbox"
@@ -1423,19 +1446,13 @@ class SessionRuntimeLoggingService:
             "stale_retired",
             "stale",
             "preview_superseded",
+            "output_superseded",
             "destination_replaced",
             "cancelled_local",
             "output_runtime_closing",
         }:
             return
-        if (
-            decision.decision == "published"
-            and decision.route == "subtitle_overlay"
-            and decision.reason in {"accepted_handoff", "logical_pacing_wait"}
-        ):
-            self.emit_diagnostic(_format_output_routing_decision(decision))
-            return
-        self.emit_basic(_format_output_routing_decision(decision))
+        self.emit_basic(_format_output_routing_decision(decision), level=logging.WARNING)
 
     async def observe_output_routing(self, decision: OutputRoutingDecision) -> None:
         self.record_output_routing_decision(decision)
@@ -1544,9 +1561,31 @@ class SessionRuntimeLoggingService:
         disposition = str(values.get("disposition") or "accepted")
         record_kind = "translation" if translation_text is not None else "source"
         key = (speaker_channel, utterance_id, segment_index, target_index, record_kind)
-        if key in self._conversation_record_keys:
-            return
-        self._remember_conversation_key(key)
+        revision_value = values.get("peer_caption_revision")
+        revision = revision_value if isinstance(revision_value, int) else 0
+        if speaker_channel == "peer" and revision > 0:
+            unit_id = str(values.get("parent_utterance_id") or utterance_id)
+            unit_key = (speaker_channel, unit_id, segment_index)
+            previous = self._peer_conversation_revisions.get(unit_key)
+            record_key = (target_index, record_kind)
+            if previous is not None and (
+                revision < previous[0] or (revision == previous[0] and record_key in previous[1])
+            ):
+                return
+            if previous is None or revision > previous[0]:
+                action = "commit" if previous is None else "replace"
+                previous = (revision, set(), action)
+                self._peer_conversation_revisions[unit_key] = previous
+            previous[1].add(record_key)
+            self._peer_conversation_revisions.move_to_end(unit_key)
+            while len(self._peer_conversation_revisions) > 4096:
+                self._peer_conversation_revisions.popitem(last=False)
+            values["peer_caption_unit_id"] = unit_id
+            values["peer_caption_history_action"] = previous[2]
+        else:
+            if key in self._conversation_record_keys:
+                return
+            self._remember_conversation_key(key)
         safe_source, source_redacted = _safe_conversation_text(transcript_text)
         safe_translation, translation_redacted = _safe_conversation_text(translation_text)
         omission = "secret_redacted" if source_redacted or translation_redacted else "none"
@@ -1674,6 +1713,13 @@ class SessionRuntimeLoggingService:
                 disposition=disposition,
                 origin_wall_clock_ms=metadata.get("origin_wall_clock_ms"),
                 turn_kind=metadata.get("turn_kind"),
+                **(
+                    {"peer_caption_revision": metadata["peer_caption_revision"]}
+                    if record.speaker_channel == "peer"
+                    and isinstance(metadata.get("peer_caption_revision"), int)
+                    and metadata["peer_caption_revision"] > 0
+                    else {}
+                ),
             )
         except Exception as exc:
             self.emit_basic(
@@ -1782,14 +1828,6 @@ def _new_correlation_id(prefix: str) -> str:
     return f"{prefix}-{uuid4()}"
 
 
-def _severity_for_level(level: int) -> Severity:
-    if level >= logging.ERROR:
-        return SEVERITY_ERROR
-    if level >= logging.WARNING:
-        return SEVERITY_WARNING
-    return SEVERITY_INFO
-
-
 def _level_for_severity(severity: Severity) -> int:
     if severity == SEVERITY_ERROR:
         return logging.ERROR
@@ -1833,6 +1871,15 @@ def _format_conversation_record(
         parts = [header]
         if record.transcript_text is not None:
             parts.append(f"Original {json.dumps(record.transcript_text, ensure_ascii=False)}")
+    revision = metadata.get("peer_caption_revision")
+    if record.speaker_channel == "peer" and isinstance(revision, int) and revision > 0:
+        action = str(metadata.get("peer_caption_history_action") or "commit")
+        parts.insert(
+            1,
+            f"Caption {action} unit={json.dumps(metadata.get('peer_caption_unit_id') or record.utterance_id)} "
+            f"revision={revision} segment={metadata.get('segment_index')} "
+            f"target={metadata.get('target_index')}",
+        )
     if disposition not in {"accepted", "translated"}:
         parts.append(f"Outcome {disposition.replace('_', ' ')}")
     failure_code = metadata.get("failure_code")
@@ -1942,13 +1989,8 @@ def _redact_observability_fields_for_sink(
 
 
 def _format_output_routing_decision(decision: OutputRoutingDecision) -> str:
-    intermediate = decision.decision == "published" and decision.reason in {
-        "accepted_handoff",
-        "logical_pacing_wait",
-    }
-    status: str = decision.decision
-    if intermediate:
-        status = "waiting" if decision.reason == "logical_pacing_wait" else "accepted"
+    intermediate = decision.decision == "published" and decision.reason == "logical_pacing_wait"
+    status = "waiting" if intermediate else decision.decision
     parts = [
         "[Output] destination_stage" if intermediate else "[Output] destination_result",
         f"decision={status}",
@@ -2046,7 +2088,7 @@ def _main_file_queue_for_handler(
 def _join_pending_file_queue(
     sinks: RuntimeLoggingSinks,
     *,
-    timeout_s: float | None = None,
+    deadline: float,
 ) -> bool:
     file_queue_handler = getattr(sinks, "file_queue_handler", None)
     if file_queue_handler is None:
@@ -2058,8 +2100,6 @@ def _join_pending_file_queue(
     )
     if file_queue is None:
         return True
-    timeout = _FILE_DRAIN_TIMEOUT_S if timeout_s is None else timeout_s
-    deadline = time.monotonic() + max(0.0, timeout)
     while file_queue.unfinished_tasks and time.monotonic() < deadline:
         time.sleep(0.005)
     return file_queue.unfinished_tasks == 0
@@ -2137,9 +2177,15 @@ def _note_oversized_rejection(sinks: RuntimeLoggingSinks) -> None:
 
 def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Handler) -> None:
     failures: list[Exception] = []
-    already_closing = bool(getattr(handler, _QUEUE_HANDLER_CLOSING_ATTR, False))
-    setattr(handler, _QUEUE_HANDLER_REFCOUNT_ATTR, 0)
-    setattr(handler, _QUEUE_HANDLER_CLOSING_ATTR, True)
+    started_at = time.monotonic()
+    with handler.lock:
+        already_closing = bool(getattr(handler, _QUEUE_HANDLER_CLOSING_ATTR, False))
+        deadline = getattr(handler, _QUEUE_HANDLER_CLOSE_DEADLINE_ATTR, None)
+        if deadline is None:
+            deadline = started_at + _FILE_CLOSE_TIMEOUT_S
+            setattr(handler, _QUEUE_HANDLER_CLOSE_DEADLINE_ATTR, deadline)
+        setattr(handler, _QUEUE_HANDLER_REFCOUNT_ATTR, 0)
+        setattr(handler, _QUEUE_HANDLER_CLOSING_ATTR, True)
 
     file_queue = _main_file_queue_for_handler(handler)
     listener = getattr(handler, _QUEUE_HANDLER_LISTENER_ATTR, None)
@@ -2152,7 +2198,7 @@ def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Hand
         file_queue_listener=listener,
         file_queue=file_queue,
     )
-    drained = _join_pending_file_queue(sinks)
+    drained = _join_pending_file_queue(sinks, deadline=deadline)
     initial_delivery_failures = (
         file_handler.delivery_failures
         if isinstance(file_handler, _BatchingRotatingFileHandler)
@@ -2184,7 +2230,7 @@ def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Hand
 
     listener_stopped = True
     if isinstance(listener, _SafeQueueListener):
-        listener_stopped = listener.stop_bounded(timeout_s=_TERMINAL_ENQUEUE_TIMEOUT_S)
+        listener_stopped = listener.stop_bounded(timeout_s=max(0.0, deadline - time.monotonic()))
         failures.extend(listener.cleanup_failures)
     elif isinstance(listener, QueueListener) and drained:
         try:

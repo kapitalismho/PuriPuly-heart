@@ -12,22 +12,22 @@ from puripuly_heart.app.adapters.local_asr_application import (
     LocalASRNoticeProjector,
     LocalASRNoticeSink,
 )
-from puripuly_heart.app.services.local_asr_cpu_repair import (
+from puripuly_heart.app.services.local_asr.local_asr_cpu_repair import (
     LocalASRCpuRepairOwner,
     LocalASRCpuRepairRequest,
 )
-from puripuly_heart.app.services.local_asr_readiness import LocalASRReadinessOwner
-from puripuly_heart.app.services.local_asr_selection import (
+from puripuly_heart.app.services.local_asr.local_asr_readiness import LocalASRReadinessOwner
+from puripuly_heart.app.services.local_asr.local_asr_selection import (
     local_asr_status_for_provider,
     required_local_asr_model_ids,
 )
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
 from puripuly_heart.config.provider_values import STTProviderName
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     ProviderRuntimeChannelSnapshot,
 )
-from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 
 from .wiring_composition import (
@@ -108,7 +108,6 @@ def compose_local_asr_application(
     rebuild_self_provider: Callable[[], Awaitable[None]],
     resume_self: Callable[[], Awaitable[bool]],
     resume_peer: Callable[[], Awaitable[None]],
-    persist_manual_fallback: Callable[[str], bool],
     load_log_sink: Callable[..., None],
 ) -> LocalASRApplicationRuntime:
     def self_provider_available() -> bool:
@@ -187,7 +186,6 @@ def compose_local_asr_application(
         self_channel_provider=self_channel_provider,
         rebuild_self_provider=rebuild_self_provider,
         probe_self_provider=probe_self_provider,
-        persist_manual_fallback=persist_manual_fallback,
         validate_gpu_activation=validate_gpu_activation,
         gpu_state_provider=gpu_state_provider,
         retain_gpu_pending=retain_gpu_pending,

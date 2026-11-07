@@ -489,7 +489,6 @@ async def test_all_llm_outer_providers_forward_scene_to_inner_client() -> None:
     from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
     from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
     from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
-    from puripuly_heart.providers.llm.qwen import QwenLLMProvider
     from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
 
     @dataclass
@@ -514,7 +513,6 @@ async def test_all_llm_outer_providers_forward_scene_to_inner_client() -> None:
 
     inners: list[CapturingInner] = []
     providers = [
-        QwenLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),
         AsyncQwenLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),
         OpenRouterLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),
         DeepSeekLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),

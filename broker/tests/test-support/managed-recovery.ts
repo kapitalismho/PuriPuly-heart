@@ -1,7 +1,6 @@
 import worker from '../../src/index';
+import { buildManagedOperationId, buildManagedOperationResumeToken } from './managed-operation';
 import {
-  buildManagedOperationId,
-  buildManagedOperationResumeToken,
   createManagedOperation,
   getManagedOperation,
   hashManagedOperationResumeToken,

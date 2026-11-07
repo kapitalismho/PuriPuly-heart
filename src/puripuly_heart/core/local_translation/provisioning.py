@@ -697,6 +697,9 @@ class LocalGemmaDownloadAdapter:
         self.spec = spec
 
     async def validate_inputs(self, *, cancel_event):
+        if cancel_event is None:
+            cancel_event = threading.Event()
+
         def validate():
             if set(self.files) != {asset.filename for asset in self.spec.assets}:
                 raise GemmaProvisioningError(
@@ -718,14 +721,7 @@ class LocalGemmaDownloadAdapter:
                 if digest.hexdigest() != asset.sha256:
                     raise GemmaInstallInvalidError("Import checksum mismatch")
 
-        task = asyncio.create_task(asyncio.to_thread(validate))
-        try:
-            await asyncio.shield(task)
-        except asyncio.CancelledError:
-            if cancel_event is not None:
-                cancel_event.set()
-            await asyncio.gather(task, return_exceptions=True)
-            raise
+        await _owned_io(validate, cancel_event=cancel_event)
 
     async def download(self, request, *, cancel_event, on_progress):
         asset = next(asset for asset in self.spec.assets if asset.filename == request.remote_path)

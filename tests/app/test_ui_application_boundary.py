@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationIntentRejectedError,
@@ -143,9 +144,11 @@ class RecordingBackend:
         )
         self.events.append(("clear-verification", provider))
 
-    async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
+    async def verify_api_key(
+        self, provider: str, key: str
+    ) -> ProviderCredentialVerificationOutcome:
         self.events.append(("verify", provider, key))
-        return True, "verified"
+        return ProviderCredentialVerificationOutcome(status="verified", provider=provider)
 
     def persist_api_key_verification(self, provider: str, key: str, success: bool) -> None:
         self.events.append(("persist-verification", provider, key, success))

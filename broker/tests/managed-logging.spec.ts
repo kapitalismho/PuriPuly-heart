@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { buildManagedOperationId } from './test-support/managed-operation';
 
 import {
-  buildManagedOperationId,
   createManagedOperation,
   expireManagedOperation,
   hashManagedOperationResumeToken,

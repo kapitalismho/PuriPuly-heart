@@ -13,26 +13,29 @@ This notice file focuses on components that are bundled, shipped, installed, or 
 
 The technical metadata review performed for the AGPL transition found no obvious license blocker to licensing PuriPuly Heart's own code under AGPL-3.0-or-later. This is a repository metadata review, not legal advice.
 
-Notable shipped/runtime license families include MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, LGPL-2.1-or-later, SIL Open Font License 1.1, CC-BY-4.0, and GPL-2.0-or-later WITH Bootloader-exception for PyInstaller-built binaries.
+Notable shipped/runtime license families include MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, LGPL-2.1-or-later, SIL Open Font License 1.1, CC-BY-4.0, and the FunASR Model Open Source License Agreement v1.1.
 
 Runtime/bundled notice-sensitive components:
-- huggingface-hub 1.26.0: Apache-2.0.
-- hf-xet 1.5.2 and its Windows native extension: Apache-2.0.
+- huggingface-hub 2.3.0: Apache-2.0.
+- hf-xet 1.7.0 and its Windows native extension: Apache-2.0.
+- httpx2 2.16.0 and httpcore2 2.16.0: BSD-3-Clause. Their upstream license payloads remain in the packaged distribution metadata.
+- Flet 1.0.5 and serious_python 5.0.0: Apache-2.0. Native Windows releases retain Flutter's generated dependency notices under data\flutter_assets\NOTICES.Z; the locked Python Flet wheel retains its upstream license metadata.
+- dart-bridge 1.10.0: MIT. The unmodified upstream license is packaged under puripuly_heart\data\licenses\DART-BRIDGE-1.10.0-LICENSE.txt. Source: https://github.com/flet-dev/dart-bridge/tree/v1.10.0 .
 - soxr / libsoxr: LGPL-2.1-or-later. Windows releases include the LGPL compliance bundle described below. The source-tree license text is `src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt`; installed releases stage it under the soxr compliance bundle.
 - python-zeroconf 0.150.0 and its Windows native extension modules: LGPL-2.1-or-later. The exact PyPI source distribution is included in the installed LGPL source bundle described below.
 - certifi: MPL-2.0.
 - NumPy and SciPy binary wheels bundle OpenBLAS, LAPACK, and compiler runtime notices. NumPy carries its wheel-provided notices in the packaged distribution; SciPy's wheel-provided license bundle is included under `puripuly_heart\data\licenses\SCIPY-1.18.0-LICENSE.txt`.
-- CPython 3.14.7: the official distribution LICENSE.txt is packaged under `puripuly_heart\data\licenses\PYTHON-3.14.7-LICENSE.txt`.
+- CPython 3.14.10: the official distribution LICENSE.txt is packaged under `puripuly_heart\data\licenses\PYTHON-3.14.10-LICENSE.txt`.
 - Microsoft Visual C++ Runtime: native Windows builds include the x64 Microsoft.VC143.CRT DLLs from the selected Visual Studio toolchain's official redist directory, deployed app-locally under Microsoft's Visual Studio license and redistribution terms. Exact versions, source paths, and SHA256 hashes are recorded in the build's `vc-runtime.json`; redistribution guidance: https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files?view=msvc-170 .
 - Native Python wheels: LICENSE, COPYING, NOTICE, AUTHORS, and third-party notice payloads from the locked distributions are retained under their upstream package or `.dist-info` paths as detailed below.
 - sounddevice 0.5.5: releases retain its standard PortAudio runtime and upstream license metadata, but intentionally omit the ASIO-only DLL. `SD_ENABLE_ASIO=1` is unsupported in this distribution.
 - OpenVR runtime DLL: BSD-3-Clause.
 - llama.cpp CPU and Vulkan runtime: MIT.
+- Native Rust overlay/ASR worker dependencies and the Rust standard library retain their upstream licenses. Supplemental aggregate notices are not bundled.
 - Noto Sans CJK Medium TTC: SIL Open Font License 1.1.
 - Silero VAD ONNX model: MIT.
 - Smart Turn v3.2 CPU ONNX model: BSD-2-Clause.
 - Bundled fonts: SIL Open Font License 1.1.
-- PyInstaller bootloader/runtime packaging: GPL-2.0-or-later WITH Bootloader-exception.
 
 Broker runtime direct dependency:
 - Hono: MIT.
@@ -51,7 +54,7 @@ For package-managed dependencies, the authoritative license texts are distribute
 - LGPL-2.1-or-later: source-tree copy at src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt; installed release copy in third_party\soxr\ next to the LGPL source bundle.
 - SIL Open Font License 1.1: included below for bundled fonts.
 - CC-BY-4.0: https://creativecommons.org/licenses/by/4.0/legalcode.en
-- PyInstaller bootloader exception: https://github.com/pyinstaller/pyinstaller/blob/develop/COPYING.txt
+- FunASR Model Open Source License Agreement v1.1: pinned model-specific sources are listed below; this is not Apache-2.0.
 
 ----
 
@@ -65,6 +68,23 @@ Bundled LLVM OpenMP runtime (libomp.dll): Apache-2.0 WITH LLVM-exception.
 The complete upstream LICENSE-LLVM-OpenMP, including its additional legacy notices, is installed alongside libomp.dll in each llama.cpp backend directory.
 
 Windows releases contain the pinned llama.cpp server runtime required for managed local translation. The application installer does not contain Gemma model weights. The complete llama.cpp license is installed at third_party/llama.cpp/LICENSE.
+
+----
+
+transcribe.cpp CPU and Vulkan ASR runtime
+Source: https://github.com/handy-computer/transcribe.cpp/tree/8facde6fcd8fb9caa585a5788ab450df6e8ec7db
+Rust bindings and native source version: 0.4.1
+License: MIT
+
+The authenticated native ASR worker bundles matching transcribe.cpp and ggml
+dynamic backends. CPU channels use independent workers; GPU channels share one
+resident Model. Model weights are downloaded separately and retain the model
+licenses below, independently of the runtime's MIT license.
+
+Modifications: PuriPuly applies a build-time Fun-ASR prompt overlay that maps
+validated ISO language codes to the checkpoint's documented Chinese language
+names. The overlay is maintained in native/asr_worker/cmake and is compiled
+into transcribe.dll. It does not modify the downloaded model weights.
 
 ----
 
@@ -102,32 +122,122 @@ before release.
 
 ----
 
-Hugging Face Hub and Xet download runtime
-Sources: https://github.com/huggingface/huggingface_hub , https://github.com/huggingface/xet-core
-Pinned packages: huggingface-hub 1.26.0 ; hf-xet 1.5.2
+Gemma 4 26B A4B local translation model asset
+Upstream model source: https://huggingface.co/google/gemma-4-26B-A4B-it
+Manifest distribution sources: https://huggingface.co/unsloth/gemma-4-26B-A4B-it-qat-GGUF , https://www.modelscope.cn/models/unsloth/gemma-4-26B-A4B-it-qat-GGUF
 License: Apache-2.0
-Bundled native runtime: hf_xet\hf_xet.pyd on Windows
+Pinned Hugging Face revision: 7b92b5b28818151e8669af2e45e88d6086f490dd
+Pinned ModelScope revision: f5f82bed79bc0bc49b01e0e577bb3dc949ebc564
+Target model: gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf
+Size: 14,249,047,104 bytes
+SHA-256: a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891
 
-These packages provide the optional high-speed Hugging Face/Xet download path for the pinned GPU transcribe.cpp GGUF model. The application downloads that asset directly into app-owned staging and does not enable HF_XET_HIGH_PERFORMANCE by default.
+This optional managed model is downloaded on demand and is not included in the
+application installer. It uses the same size, integrity, provenance, and license
+requirements as the E4B assets.
 
 ----
 
-Qwen3-ASR local model assets
-Official upstream sources: https://huggingface.co/Qwen/Qwen3-ASR-0.6B , https://github.com/QwenLM/Qwen3-ASR
-Manifest mirror sources used by the app: https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25 , https://modelscope.cn/models/zengshuishui/Qwen3-ASR-onnx
+Hugging Face Hub and Xet download runtime
+Sources: https://github.com/huggingface/huggingface_hub , https://github.com/huggingface/xet-core
+Pinned packages: huggingface-hub 2.3.0 ; hf-xet 1.7.0
 License: Apache-2.0
+Bundled native runtime: hf_xet\hf_xet.pyd on Windows
 
-Provenance chain verified 2026-08-20 (all links Apache-2.0):
-Qwen3-ASR official (Qwen/Qwen3-ASR-0.6B, Apache-2.0)
-  -> sherpa-onnx ONNX conversion (Wasser1462/Qwen3-ASR-onnx, Apache-2.0)
-  -> ModelScope source (zengshuishui/Qwen3-ASR-onnx, Apache-2.0, pinned revision de9e449eb376dcb472c1ce8141fbae8d524fabbd)
-  -> HF mirror used by the app (csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25, pinned revision 68818b2313fe77bd06f6a7c5068ff3ef59d02b8a)
-  -> PuriPuly manifest (exact SHA-256 pins)
-  -> local execution
+Embedded native dependencies retain their own licenses. The original upstream
+wheel, parent license and CycloneDX inventory are preserved without modification.
+They do not provide complete embedded-native attribution. Supply the applicable
+copyright, license, NOTICE and source-access materials before redistributing
+native builds.
 
-The mirror's own README states the files are downloaded from the ModelScope source above, and the conversion uses the official sherpa-onnx export scripts (https://github.com/Wasser1462/Qwen3-ASR-onnx, https://k2-fsa.github.io/sherpa/onnx/qwen3-asr/export.html). The local Qwen3-ASR-0.6B model is a default local CPU STT model; the app manifest identifies pinned downloadable ONNX/tokenizer assets for local ASR setup.
+Native Xet transfers are enabled where compatible with the inherited transfer
+preference and application TLS/proxy policy. Explicit custom CAs, incompatible
+proxy bypass policies and mirrors retain HTTP; a failed native attempt retains
+the existing HTTP fallback. The worker sets HF_HUB_DISABLE_TELEMETRY=1 and
+HF_XET_TELEMETRY_ENABLED=0 to prevent Hub agent-harness discovery and native
+transfer telemetry. These opt-outs do not disable native Xet; the inherited
+HF_HUB_DISABLE_XET transfer preference remains independent. Downloads remain
+staged and checked against pinned size/SHA-256 before installation.
+These package updates do not fix all bundled native TLS advisories; see
+https://github.com/kapitalismho/PuriPuly-heart/issues/307 for remaining risks.
+File-integrity checks do not repair TLS validation.
 
-The pinned decoder is the April 7, 2026 correction for abnormal x64 recognition output (https://github.com/k2-fsa/sherpa-onnx/issues/3473). Its SHA-256 is 4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771; the encoder, convolution frontend, and tokenizer files are unchanged.
+----
+
+Granite Speech 5.0 470M TurboCTC Multilingual Q8_0 local CPU model asset
+Original model and author: https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc ; IBM Granite
+Pinned source checkpoint: 1dd23f46f6d4e6eae2531982ba2e33220086dd97 (October 21, 2026 multilingual release)
+GGUF conversion and Q8_0 packaging: 17slever17
+Pinned export repository: https://huggingface.co/17slever17/granite-speech-5.0-470m-turboctc-multilingual-GGUF/tree/62f64d9d5ad35989b06caf199cafe7155944a22b
+Selected export: granite-speech-5.0-470m-turboctc-multilingual-Q8_0.gguf
+Size: 505,663,136 bytes
+SHA-256: f3efdc05b85b3a764bb5bb7022e69f61cafcecc11605c881c6396a6ed07ec91b
+License: Apache-2.0
+License source: https://huggingface.co/17slever17/granite-speech-5.0-470m-turboctc-multilingual-GGUF/blob/62f64d9d5ad35989b06caf199cafe7155944a22b/LICENSE
+Attribution notice: https://huggingface.co/17slever17/granite-speech-5.0-470m-turboctc-multilingual-GGUF/blob/62f64d9d5ad35989b06caf199cafe7155944a22b/NOTICE
+Packaged texts: puripuly_heart/data/licenses/GRANITE-SPEECH-5.0-LICENSE.txt and GRANITE-SPEECH-5.0-NOTICE.txt
+
+Modifications: 17slever17 converted the multilingual checkpoint to diagnostic
+F32 GGUF and then Q8_0 using transcribe.cpp converter revision
+4d7c1ccefd39e5a9ea36cca5f8fefc6dcc14b99b with the published multilingual
+metadata patch. This is format conversion and weight quantization, not
+additional training. The original multilingual vocabulary and CTC blank token
+are preserved. This is not an official IBM release. PuriPuly downloads the
+selected export unchanged and uses its existing transcribe.cpp runtime pin
+8facde6fcd8fb9caa585a5788ab450df6e8ec7db, independently of the converter pin.
+
+----
+
+GigaAM-v3 e2e-CTC Q8_0 local CPU model asset (Russian only)
+Original model and author: https://huggingface.co/ai-sage/GigaAM-v3 ; GigaChat Team
+Pinned source checkpoint: cec030b4c4f35d928e4a9044a3bdb29ebd499fac
+Pinned export repository: https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf/tree/59717de63d50dd9dd93b3249da6ad3f2f1c4ad6b
+Selected export: gigaam-v3-e2e-ctc-Q8_0.gguf
+Size: 272,151,136 bytes
+SHA-256: 9ccce4750dc813a493d96ca15ee251712bedec15ac9a02fa3d2bd732f08ae5eb
+License: MIT
+Copyright (c) 2024 GigaChat Team
+License source: https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf/blob/59717de63d50dd9dd93b3249da6ad3f2f1c4ad6b/LICENSE
+Attribution notice: https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf/blob/59717de63d50dd9dd93b3249da6ad3f2f1c4ad6b/NOTICE
+Packaged texts: puripuly_heart/data/licenses/GIGAAM-V3-LICENSE.txt and GIGAAM-V3-NOTICE.txt
+
+Modifications: handy-computer converted the pinned ai-sage/GigaAM-v3 checkpoint
+to GGUF for transcribe.cpp, renaming and re-laying-out tensors. Q8_0 stores
+weights at reduced numeric precision; the weights were not retrained or
+fine-tuned. PuriPuly downloads the selected e2e-CTC export unchanged and uses
+the existing transcribe.cpp runtime pin recorded above.
+
+Both Q8_0 assets use weight quantization, not all-INT8 execution. Both have
+byte-identical alternate downloads through hf-mirror.net using their pinned
+repository paths and unchanged size/SHA-256 integrity contracts.
+
+----
+
+Fun-ASR-Nano-2512 and Fun-ASR-MLT-Nano-2512 Q8_0 local CPU model assets
+Model sources and authors: https://huggingface.co/FunAudioLLM/Fun-ASR-Nano-2512 , https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512 ; FunAudioLLM / Alibaba Group
+Copyright (C) [2023-2028] [Alibaba Group]. All rights reserved.
+License: FunASR Model Open Source License Agreement, Version 1.1
+Standard Nano export: https://huggingface.co/handy-computer/fun-asr-nano-2512-gguf/tree/3f66330195d91d51e9a70703bd21e570bdb19d75
+MLT export: https://huggingface.co/handy-computer/fun-asr-mlt-nano-2512-gguf/tree/08f28dadd984030331802b2f9fbd9ecac97bf834
+Standard Nano license and notice: https://huggingface.co/handy-computer/fun-asr-nano-2512-gguf/blob/3f66330195d91d51e9a70703bd21e570bdb19d75/LICENSE , https://huggingface.co/handy-computer/fun-asr-nano-2512-gguf/blob/3f66330195d91d51e9a70703bd21e570bdb19d75/NOTICE
+MLT license and notice: https://huggingface.co/handy-computer/fun-asr-mlt-nano-2512-gguf/blob/08f28dadd984030331802b2f9fbd9ecac97bf834/LICENSE , https://huggingface.co/handy-computer/fun-asr-mlt-nano-2512-gguf/blob/08f28dadd984030331802b2f9fbd9ecac97bf834/NOTICE
+
+The model agreement requires source and author attribution and retention of
+the model names. The embedded GGUF metadata's Apache-2.0 field conflicts with
+the pinned upstream model LICENSE and is not the governing model license.
+
+Modifications: handy-computer converted Fun-ASR-Nano-2512 at commit a7088d6 and
+Fun-ASR-MLT-Nano-2512 at commit cf67a93 to GGUF for transcribe.cpp. Conversion
+repackages the weights, renaming and re-laying-out tensors; Q8_0 also stores
+them at reduced numeric precision. The weights were not retrained or fine-tuned.
+PuriPuly uses standard Nano for Chinese and MLT for the remaining languages
+in its declared scope after higher-priority CPU routes, without modifying
+these selected exports.
+
+The selected GGUF weights are not embedded in the installer. Setup downloads
+the required five-model CPU catalog; the app also supports managed repair or
+reinstall. The existing hf-mirror.net source uses the same pinned paths, file
+sizes and SHA-256 integrity contracts as the primary Hugging Face source.
 
 ----
 
@@ -141,13 +251,13 @@ The local GPU Qwen ASR GGUF model is not committed directly to this repository. 
 
 ----
 
-NVIDIA Parakeet TDT model assets
-Official upstream sources: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3 , https://huggingface.co/nvidia/parakeet-tdt_ctc-0.6b-ja
-Manifest mirror sources used by the app: https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8 , https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8
+NVIDIA Parakeet Japanese CTC model assets
+Official upstream source: https://huggingface.co/nvidia/parakeet-tdt_ctc-0.6b-ja
+Manifest mirror source used by the app: https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8
 Additional HTTPS distribution mirror: https://hf-mirror.net/ . The application and Setup use the original pinned repository revisions and unchanged file size/SHA-256 contracts through this endpoint. Mirror downloads use direct HTTPS rather than the Hugging Face SDK.
 License: CC-BY-4.0
 
-The local Parakeet models are the default local CPU STT models. The app manifests identify pinned downloadable ONNX assets for local ASR setup. NVIDIA Parakeet model assets are governed by the Creative Commons Attribution 4.0 International license. The mirror or converted assets referenced by the manifests may not expose complete license metadata, so pinned mirror provenance and license metadata must be verified before release.
+The Japanese Parakeet CTC CPU path retains its pinned downloadable ONNX assets and CC BY 4.0 attribution to NVIDIA. Retired multilingual CPU bundles are no longer installed or used as fallbacks.
 
 ----
 
@@ -248,15 +358,22 @@ their original package-relative paths.
 
 ----
 
-CPython 3.14.7 runtime
-Distribution archive: https://www.python.org/ftp/python/3.14.7/python-3.14.7-embed-amd64.zip
-Distribution archive SHA-256: d297e5ff019966817ad8502465176139f2d3d840fa4ed84b13bed399a6ab1f15
-License member: LICENSE.txt
-Packaged license path: puripuly_heart\data\licenses\PYTHON-3.14.7-LICENSE.txt
+CPython 3.14.10 runtime
+Distribution archive: https://www.python.org/ftp/python/3.14.10/python-3.14.10-embed-amd64.zip
+Distribution archive SHA-256: 90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159
+Full standard library and runtime: https://api.nuget.org/v3-flatcontainer/python/3.14.10/python.3.14.10.nupkg
+NuGet package SHA-256: f54ba67c9951c3d773ea47d2bb095150c037c399f0423a968bcda22809241784
+License member: tools/LICENSE.txt
+Packaged license path: puripuly_heart\data\licenses\PYTHON-3.14.10-LICENSE.txt
 
-The official embedded distribution's runtime members are byte-identical to
-the ordinary GIL-enabled CPython 3.14.7 runtime files collected by the Windows
-build. Its complete LICENSE.txt is included at the packaged path above.
+The official NuGet distribution supplies the complete GIL-enabled CPython 3.14.10
+standard library, core DLLs, and extension modules. Every runtime binary shared
+with the official embedded distribution is checked for byte identity before
+building the native shell. Its complete LICENSE.txt is included at the packaged
+path above, including OpenSSL and the runtime's other incorporated software.
+The native embedded runtime retains its existing reduced-standard-library policy:
+tests, optional GUI tools, bundled package installers, and Lib executables are
+omitted. All selected runtime files come from this same patched distribution.
 
 ----
 
@@ -266,13 +383,11 @@ Windows packaging retains the complete metadata directories for the exact
 locked distributions below. This preserves their upstream LICENSE, COPYING,
 NOTICE, and AUTHORS payloads at the original `.dist-info` paths:
 
-- aiohttp 3.13.2, including its vendored llhttp LICENSE.
+
 - cffi 2.0.0, including LICENSE and AUTHORS.
 - charset-normalizer 3.4.4.
-- frozenlist 1.8.0.
 - msgpack 1.2.1.
-- multidict 6.7.0.
-- propcache 0.4.1, including LICENSE and NOTICE.
+
 - psutil 7.2.2.
 - PyAudioWPatch 0.2.12.8.
 - PyYAML 6.0.3.
@@ -281,7 +396,7 @@ NOTICE, and AUTHORS payloads at the original `.dist-info` paths:
   project, and the complete LICENSE supplied by the sherpa-onnx wheel is
   retained together with both distributions' metadata.
 - sounddevice 0.5.5.
-- yarl 1.22.0, including LICENSE and NOTICE.
+
 - python-zeroconf 0.150.0.
 
 ONNX Runtime 1.28.0 supplies its license payloads in the package directory

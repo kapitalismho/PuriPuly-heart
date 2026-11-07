@@ -1,23 +1,27 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 import numpy as np
 
 from puripuly_heart.config.resolved import ResolvedSTTConfig
-from puripuly_heart.core.audio.ownership import OwnedStreamInput, OwnedVadEvent
-from puripuly_heart.core.gpu_worker import (
-    GpuWorkerActivation,
-    GpuWorkerDevice,
-    GpuWorkerTranscription,
+from puripuly_heart.core.asr_worker import (
+    ASRWorkerActivation,
+    ASRWorkerDevice,
+    ASRWorkerTranscription,
 )
+from puripuly_heart.core.audio.ownership import OwnedStreamInput, OwnedVadEvent
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.stt.backend import STTProviderTurnEvent
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
+
+if TYPE_CHECKING:
+    from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 
 ProviderRuntimeChannel = Literal["self", "peer"]
 ProviderRuntimeChannelPhase = Literal[
@@ -145,7 +149,7 @@ class ProviderRuntimeChannelSnapshot:
 @dataclass(frozen=True, slots=True)
 class ProviderRuntimeGpuSnapshot:
     phase: ProviderRuntimeGpuPhase
-    devices: tuple[GpuWorkerDevice, ...]
+    devices: tuple[ASRWorkerDevice, ...]
     active_channels: frozenset[ProviderRuntimeChannel]
     pending_count: int
     worker_pid: int | None
@@ -187,6 +191,10 @@ class ProviderRuntimeDiagnostic:
     queue_wait_seconds: float | None = None
     worker_exit_code: int | None = None
     failure_diagnostics: ErrorDiagnostics | None = None
+    previous_provider_id: str | None = None
+    previous_model_id: str | None = None
+    source_language: str | None = None
+    previous_source_language: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,7 +234,7 @@ class ProviderGpuRuntimePort(Protocol):
     @property
     def startup_cleanup_snapshot(self) -> Mapping[str, object]: ...
 
-    async def discover_devices(self) -> tuple[GpuWorkerDevice, ...]: ...
+    async def discover_devices(self) -> tuple[ASRWorkerDevice, ...]: ...
 
     async def activate_channel(
         self,
@@ -238,9 +246,9 @@ class ProviderGpuRuntimePort(Protocol):
         device_id: str,
         operation_id: str | None = None,
         request_id: str | None = None,
-    ) -> GpuWorkerActivation: ...
+    ) -> ASRWorkerActivation: ...
 
-    async def retry(self) -> GpuWorkerActivation: ...
+    async def retry(self) -> ASRWorkerActivation: ...
 
     async def submit(
         self,
@@ -249,7 +257,7 @@ class ProviderGpuRuntimePort(Protocol):
         *,
         speech_end_at: float,
         language_hint: str | None = None,
-    ) -> GpuWorkerTranscription: ...
+    ) -> ASRWorkerTranscription: ...
 
     async def deactivate_channel(
         self, channel: ProviderRuntimeChannel, *, owner: object
@@ -323,6 +331,16 @@ class LocalASRProviderRuntimePort(Protocol):
         operation_id: str | None = None,
         request_id: str | None = None,
     ) -> None: ...
+
+    def recognition_probe_handle(
+        self, channel: ProviderRuntimeChannel
+    ) -> ProviderRuntimeHandle: ...
+
+    def recognition_probe_provider(
+        self,
+        channel: ProviderRuntimeChannel,
+        request: ProviderRuntimeBuildRequest | None,
+    ) -> AbstractAsyncContextManager[tuple[object | None, int]]: ...
 
     async def handle_vad_event(
         self,

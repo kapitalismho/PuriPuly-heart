@@ -12,7 +12,6 @@ import {
   resolveRequestNetworkIdentityCandidates,
   type NetworkIdentitySecrets,
   type NetworkIdentityWriteMode,
-  type RequestNetworkIdentity,
 } from './network-identity';
 import {
   BROKER_RUNTIME_CONFIG_KEYS,
@@ -202,7 +201,7 @@ export async function persistBrokerAbuseRuntimeState(
   const guardClauses: string[] = [];
   const guardArguments: Array<string | number | null> = [];
 
-  for (const [path, value] of sectionsToPersist) {
+  for (const [path] of sectionsToPersist) {
     switch (path) {
       case '$.brake': {
         guardClauses.push(
@@ -1178,6 +1177,18 @@ function validateBrokerAbuseControlsConfig(
     'POST /v1/providers/openrouter/managed-key-delivery/ack',
     'ip',
   );
+  const puriTokenIp = validatePuriTokenRateLimitConfig(
+    value.puriTokenIp ?? DEFAULT_BROKER_ABUSE_CONTROLS.puriTokenIp,
+    'ip',
+  );
+  const puriTokenRegistrationIp = validatePuriTokenRateLimitConfig(
+    value.puriTokenRegistrationIp ?? DEFAULT_BROKER_ABUSE_CONTROLS.puriTokenRegistrationIp,
+    'ip',
+  );
+  const puriTokenInstallation = validatePuriTokenRateLimitConfig(
+    value.puriTokenInstallation ?? DEFAULT_BROKER_ABUSE_CONTROLS.puriTokenInstallation,
+    'installation_id',
+  );
   const pendingDiscordOAuthSessions = validatePendingDiscordOAuthSessionsConfig(
     value.pendingDiscordOAuthSessions,
   );
@@ -1203,6 +1214,9 @@ function validateBrokerAbuseControlsConfig(
     !managedOperationResumeIp ||
     !managedOperationResumeInstallation ||
     !managedKeyDeliveryAckIp ||
+    !puriTokenIp ||
+    !puriTokenRegistrationIp ||
+    !puriTokenInstallation ||
     !pendingDiscordOAuthSessions ||
     !newActiveEntitlementsPerDay ||
     !immediateAlerts ||
@@ -1227,6 +1241,9 @@ function validateBrokerAbuseControlsConfig(
     managedOperationResumeIp,
     managedOperationResumeInstallation,
     managedKeyDeliveryAckIp,
+    puriTokenIp,
+    puriTokenRegistrationIp,
+    puriTokenInstallation,
     pendingDiscordOAuthSessions,
     newActiveEntitlementsPerDay,
     immediateAlerts,
@@ -1322,6 +1339,17 @@ function validateEndpointRateLimitConfig(
     maxRequests: value.maxRequests,
     windowMinutes: value.windowMinutes,
   };
+}
+
+function validatePuriTokenRateLimitConfig(
+  value: unknown,
+  scope: BrokerEndpointRateLimitConfig['scope'],
+): BrokerEndpointRateLimitConfig | null {
+  const config = validateEndpointRateLimitConfig(value, 'POST /v1/puri/token', scope);
+  return config && Number.isSafeInteger(config.maxRequests) &&
+    Number.isSafeInteger(config.windowMinutes) && config.windowMinutes <= 1440
+    ? config
+    : null;
 }
 
 function validateDailyIssuanceCapConfig(

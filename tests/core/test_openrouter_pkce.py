@@ -6,13 +6,13 @@ import threading
 
 import httpx
 import pytest
-from puripuly_heart.core.openrouter_pkce import (
+
+from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
+from puripuly_heart.core.openrouter.openrouter_pkce import (
     OpenRouterPKCEClient,
     OpenRouterPKCEExchangeResult,
     OpenRouterPKCESession,
 )
-
-from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
 from puripuly_heart.ui.i18n import get_locale, set_locale
 
 
@@ -109,7 +109,7 @@ def test_reopen_authorization_url_reopens_current_pkce_session(
 
     client.current_authorization_url = "https://openrouter.ai/auth?callback_url=callback"
     monkeypatch.setattr(
-        "puripuly_heart.core.openrouter_pkce.webbrowser.open",
+        "puripuly_heart.core.openrouter.openrouter_pkce.webbrowser.open",
         lambda url: opened.append(url) or True,
     )
 
@@ -161,8 +161,10 @@ async def test_run_desktop_flow_binds_listener_before_opening_browser(
     monkeypatch.setattr(client, "build_session", lambda: session)
     monkeypatch.setattr(client, "_create_callback_listener", fake_create_callback_listener)
     monkeypatch.setattr(client, "exchange_code", fake_exchange_code)
-    monkeypatch.setattr("puripuly_heart.core.openrouter_pkce.asyncio.to_thread", fake_to_thread)
-    monkeypatch.setattr("puripuly_heart.core.openrouter_pkce.webbrowser.open", fake_open)
+    monkeypatch.setattr(
+        "puripuly_heart.core.openrouter.openrouter_pkce.asyncio.to_thread", fake_to_thread
+    )
+    monkeypatch.setattr("puripuly_heart.core.openrouter.openrouter_pkce.webbrowser.open", fake_open)
 
     result = await client.run_desktop_flow()
 
@@ -260,8 +262,10 @@ async def test_run_desktop_flow_closes_listener_and_skips_exchange_on_timeout(
     monkeypatch.setattr(client, "build_session", lambda: session)
     monkeypatch.setattr(client, "_create_callback_listener", fake_create_callback_listener)
     monkeypatch.setattr(client, "exchange_code", fake_exchange_code)
-    monkeypatch.setattr("puripuly_heart.core.openrouter_pkce.asyncio.to_thread", fake_to_thread)
-    monkeypatch.setattr("puripuly_heart.core.openrouter_pkce.webbrowser.open", fake_open)
+    monkeypatch.setattr(
+        "puripuly_heart.core.openrouter.openrouter_pkce.asyncio.to_thread", fake_to_thread
+    )
+    monkeypatch.setattr("puripuly_heart.core.openrouter.openrouter_pkce.webbrowser.open", fake_open)
 
     with pytest.raises(OpenRouterAuthenticationError) as caught:
         await client.run_desktop_flow()
@@ -319,7 +323,7 @@ async def test_run_desktop_flow_cancellation_unblocks_waiting_listener(
     monkeypatch.setattr(client, "build_session", lambda: session)
     monkeypatch.setattr(client, "_create_callback_listener", fake_create_callback_listener)
     monkeypatch.setattr(client, "exchange_code", fake_exchange_code)
-    monkeypatch.setattr("puripuly_heart.core.openrouter_pkce.webbrowser.open", fake_open)
+    monkeypatch.setattr("puripuly_heart.core.openrouter.openrouter_pkce.webbrowser.open", fake_open)
 
     task = asyncio.create_task(client.run_desktop_flow())
     started = await asyncio.to_thread(wait_started.wait, 1.0)
@@ -359,7 +363,7 @@ async def test_browser_disabled_still_waits_and_exchanges_callback(
     monkeypatch.setattr(client, "_create_callback_listener", lambda _session: Listener())
     monkeypatch.setattr(client, "exchange_code", exchange_code)
     monkeypatch.setattr(
-        "puripuly_heart.core.openrouter_pkce.webbrowser.open",
+        "puripuly_heart.core.openrouter.openrouter_pkce.webbrowser.open",
         browser_must_not_open,
     )
 

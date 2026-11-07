@@ -18,14 +18,18 @@ from typing import Sequence
 import numpy as np
 
 from puripuly_heart import __version__
-from puripuly_heart.core.local_stt_assets import (
-    LOCAL_STT_MODEL_ID,
+from puripuly_heart.app.adapters.asr_worker_process import DefaultASRWorkerProcessFactory
+from puripuly_heart.core.local_asr.local_stt_assets import (
+    FUN_ASR_MLT_NANO_MODEL_ID,
+    FUN_ASR_NANO_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
-    PARAKEET_V3_MODEL_ID,
     load_local_stt_asset_manifest,
 )
-from puripuly_heart.core.local_stt_catalog import inspect_required_cpu_model_installs
+from puripuly_heart.core.local_asr.local_stt_catalog import inspect_required_cpu_model_installs
 from puripuly_heart.providers.stt.local_cpu import create_local_cpu_backend
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 REPORT_SCHEMA = "puripuly-heart/local-cpu-real-decode/v1"
 
@@ -40,13 +44,21 @@ class DecodeCase:
 
 DECODE_CASES = (
     DecodeCase(
-        model_id=PARAKEET_V3_MODEL_ID,
+        model_id=GRANITE_MODEL_ID,
         source_language="en",
-        audio_filename="parakeet-v3-en.wav",
+        audio_filename="granite-en.wav",
         source_url=(
-            "https://huggingface.co/csukuangfj/"
-            "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/"
-            "2bda32ec70b097a55adaa07d9a7173915b43cc78/test_wavs/en.wav"
+            "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/"
+            "8facde6fcd8fb9caa585a5788ab450df6e8ec7db/samples/fleurs-en.wav"
+        ),
+    ),
+    DecodeCase(
+        model_id=GIGAAM_MODEL_ID,
+        source_language="ru",
+        audio_filename="gigaam-ru.wav",
+        source_url=(
+            "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/"
+            "8facde6fcd8fb9caa585a5788ab450df6e8ec7db/samples/ru-short.wav"
         ),
     ),
     DecodeCase(
@@ -60,13 +72,21 @@ DECODE_CASES = (
         ),
     ),
     DecodeCase(
-        model_id=LOCAL_STT_MODEL_ID,
-        source_language="de",
-        audio_filename="qwen-de.wav",
+        model_id=FUN_ASR_NANO_MODEL_ID,
+        source_language="zh",
+        audio_filename="fun-asr-nano-zh.wav",
         source_url=(
-            "https://huggingface.co/csukuangfj2/"
-            "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/"
-            "68818b2313fe77bd06f6a7c5068ff3ef59d02b8a/test_wavs/de.wav"
+            "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/"
+            "8facde6fcd8fb9caa585a5788ab450df6e8ec7db/samples/fleurs-zh.wav"
+        ),
+    ),
+    DecodeCase(
+        model_id=FUN_ASR_MLT_NANO_MODEL_ID,
+        source_language="ko",
+        audio_filename="fun-asr-mlt-nano-ko.wav",
+        source_url=(
+            "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/"
+            "8facde6fcd8fb9caa585a5788ab450df6e8ec7db/samples/ko-short.wav"
         ),
     ),
 )
@@ -156,7 +176,8 @@ async def _decode_case(
         model_root=model_root,
         source_language=case.source_language,
         sample_rate_hz=16000,
-        stream_label="evidence",
+        stream_label="self",
+        process_factory=DefaultASRWorkerProcessFactory(),
     )
     session = None
     load_started = time.perf_counter()
@@ -255,7 +276,7 @@ async def run_evidence(
                 "version": __version__,
                 "executable": str(executable),
                 "executable_sha256": _sha256(executable),
-                "frozen": bool(getattr(sys, "frozen", False)),
+                "host_kind": current_runtime_layout().host_kind,
                 "python": platform.python_version(),
                 "platform": platform.platform(),
             },
@@ -280,7 +301,7 @@ async def run_evidence(
             "application": {
                 "version": __version__,
                 "executable": str(executable),
-                "frozen": bool(getattr(sys, "frozen", False)),
+                "host_kind": current_runtime_layout().host_kind,
                 "python": platform.python_version(),
                 "platform": platform.platform(),
             },

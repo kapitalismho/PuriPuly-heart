@@ -53,32 +53,12 @@ def _peer_snapshot() -> PeerApplicationSnapshot:
     )
 
 
-class PendingStartTransition:
-    def __init__(self) -> None:
-        self.begin_calls = 0
-
+class BlockedStartTransition(OverlaySessionTransitionOwner):
     async def begin_start(self, execution_factory: Any) -> str:
-        self.begin_calls += 1
-        execution = execution_factory()
-        teardown_ok = await execution.teardown()
-        if not teardown_ok:
-            return "teardown_failed"
-        runtime = execution.create_runtime()
-        execution.on_starting(runtime, execution.resolve_target())
-        return "started"
-
-    async def shutdown(self, execution_factory: Any) -> str:
-        return await OverlaySessionTransitionOwner().shutdown(execution_factory)
-
-
-class BlockedStartTransition(PendingStartTransition):
-    async def begin_start(self, execution_factory: Any) -> str:
-        execution = execution_factory()
-        await execution.teardown()
         return "teardown_failed"
 
 
-class RaisingStartTransition(PendingStartTransition):
+class RaisingStartTransition(OverlaySessionTransitionOwner):
     async def begin_start(self, execution_factory: Any) -> str:
         raise RuntimeError("start transition failed")
 
@@ -149,9 +129,20 @@ class Harness:
         return draws
 
 
-async def test_enable_from_off_first_draws_starting_spinner_without_warning() -> None:
-    harness = Harness()
-    harness.owner._transition_owner = cast(Any, PendingStartTransition())
+@pytest.fixture
+async def harness(monkeypatch):
+    async def pending_start(self, runtime):
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(OverlayApplicationOwner, "run_start", pending_start)
+    value = Harness()
+    try:
+        yield value
+    finally:
+        await value.owner.close()
+
+
+async def test_enable_from_off_first_draws_starting_spinner_without_warning(harness) -> None:
     assert harness.owner.state == "off"
 
     marked = len(harness.presentations)
@@ -182,9 +173,8 @@ async def test_enable_from_off_first_draws_starting_spinner_without_warning() ->
     assert final.icon_visible is True
 
 
-async def test_blocked_start_stays_warning_actionable() -> None:
-    harness = Harness()
-    harness.owner._transition_owner = cast(Any, BlockedStartTransition())
+async def test_blocked_start_stays_warning_actionable(harness) -> None:
+    harness.owner._transition_owner = BlockedStartTransition()
 
     marked = len(harness.presentations)
     await harness.owner.set_enabled(True)
@@ -198,9 +188,8 @@ async def test_blocked_start_stays_warning_actionable() -> None:
     assert only.spinner_visible is False
 
 
-async def test_start_exception_still_publishes_intent_truth() -> None:
-    harness = Harness()
-    harness.owner._transition_owner = cast(Any, RaisingStartTransition())
+async def test_start_exception_still_publishes_intent_truth(harness) -> None:
+    harness.owner._transition_owner = RaisingStartTransition()
 
     marked = len(harness.presentations)
     with pytest.raises(RuntimeError, match="start transition failed"):
@@ -212,9 +201,7 @@ async def test_start_exception_still_publishes_intent_truth() -> None:
     assert draws[-1].bgcolor == COLOR_WARNING
 
 
-async def test_reopen_from_failure_draws_spinner_before_any_warning() -> None:
-    harness = Harness()
-    harness.owner._transition_owner = cast(Any, PendingStartTransition())
+async def test_reopen_from_failure_draws_spinner_before_any_warning(harness) -> None:
     harness.intent_enabled = True
     harness.owner.on_start_failed("startup_timeout")
     assert harness.owner.state == "failed"
@@ -230,9 +217,7 @@ async def test_reopen_from_failure_draws_spinner_before_any_warning() -> None:
     assert draws[0].spinner_visible is True
 
 
-async def test_disable_while_starting_clears_spinner_immediately() -> None:
-    harness = Harness()
-    harness.owner._transition_owner = cast(Any, PendingStartTransition())
+async def test_disable_while_starting_clears_spinner_immediately(harness) -> None:
 
     await harness.owner.set_enabled(True)
     assert harness.owner.state == "starting"
@@ -251,8 +236,7 @@ async def test_disable_while_starting_clears_spinner_immediately() -> None:
     assert all(draw.starting is False for draw in draws)
 
 
-async def test_redundant_enable_while_connected_keeps_connected_without_warning() -> None:
-    harness = Harness()
+async def test_redundant_enable_while_connected_keeps_connected_without_warning(harness) -> None:
     harness.intent_enabled = True
     harness.owner.state = "connected"
 
@@ -269,9 +253,8 @@ async def test_redundant_enable_while_connected_keeps_connected_without_warning(
 
 @pytest.mark.parametrize("latest_enabled", [False, True])
 async def test_toggle_during_desktop_shutdown_updates_button_before_cleanup_and_honors_latest_intent(
-    monkeypatch: pytest.MonkeyPatch, latest_enabled: bool
+    monkeypatch: pytest.MonkeyPatch, latest_enabled: bool, harness
 ) -> None:
-    harness = Harness()
     owner = harness.owner
     harness.intent_enabled = True
     owner.state = "connected"
@@ -339,10 +322,10 @@ async def test_toggle_during_desktop_shutdown_updates_button_before_cleanup_and_
         await owner.close()
 
 
-async def test_retired_vr_cleanup_does_not_block_toggle_but_is_owned_until_app_close() -> None:
-    harness = Harness()
+async def test_retired_vr_cleanup_does_not_block_toggle_but_is_owned_until_app_close(
+    harness,
+) -> None:
     owner = harness.owner
-    owner._transition_owner = cast(Any, PendingStartTransition())
     retired = owner.new_runtime()
     owner.runtime = None
     entered = asyncio.Event()

@@ -18,6 +18,7 @@ from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.ui.views import settings as settings_view
+from tests.helpers.settings_view import apply_provider_intent
 
 
 class SecretStore:
@@ -67,8 +68,6 @@ def _view(
     store: SecretStore,
     directory_opener: object | None = None,
 ) -> settings_view.SettingsView:
-    monkeypatch.setattr(settings_view.SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(settings_view.SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(settings_view.SettingsView, "update", lambda self: None)
     view = settings_view.SettingsView(
         http_extension_registry=HttpExtensionRegistryService(
@@ -118,8 +117,7 @@ def _custom_http_settings(*, http_extension_id: str = "demo") -> AppSettingsVNex
 
 
 def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     _write_extension(tmp_path)
     registry = HttpExtensionRegistry(tmp_path)
@@ -127,15 +125,26 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     store = SecretStore({"http_extension.demo.api_key": "saved-secret"})
     view = _view(monkeypatch, registry, store)
     settings = _custom_settings()
-    view.load_from_settings(settings, config_path=tmp_path / "settings.json")
+    settings_events.load(view, settings, config_path=tmp_path / "settings.json")
 
     view._on_llm_selected(TranslationModel.CUSTOM_HTTP.value)
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
-    assert pending.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
-    assert pending.intent.translation.previous_llm_model == TranslationModel.QWEN_38_FLASH.value
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.CUSTOM_HTTP.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.CUSTOM_HTTP.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.previous_llm_model
+        == TranslationModel.QWEN_38_FLASH.value
+    )
     assert view._http_extension_row.visible is True
     assert view._http_extension_host.visible is True
     assert view._translation_connection_row.visible is False
@@ -148,7 +157,12 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.http_extension_id == "demo"
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.http_extension_id
+        == "demo"
+    )
     assert set(view._http_extension_secret_fields) == {"api_key"}
     assert view._http_extension_secret_fields["api_key"].value == "saved-secret"
     assert view._http_extension_secret_fields["api_key"].password is True
@@ -158,14 +172,24 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.QWEN_38_FLASH.value
-    assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
-    assert pending.intent.translation.previous_llm_model is None
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.model
+        == TranslationModel.QWEN_38_FLASH.value
+    )
+    assert (
+        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
+        == TranslationConnection.OFFICIAL_BYOK.value
+    )
+    assert (
+        apply_provider_intent(
+            settings_events.settings, pending
+        ).intent.translation.previous_llm_model
+        is None
+    )
 
 
 def test_custom_http_credentials_use_namespaced_secret_callback_and_reload_isolated_errors(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     _write_extension(tmp_path)
     registry = HttpExtensionRegistry(tmp_path)
@@ -186,7 +210,7 @@ def test_custom_http_credentials_use_namespaced_secret_callback_and_reload_isola
 
     view.on_provider_secret_change = save_secret
     view.show_snackbar = lambda message, _color: notices.append(message)
-    view.load_from_settings(settings, config_path=tmp_path / "settings.json")
+    settings_events.load(view, settings, config_path=tmp_path / "settings.json")
 
     field = view._http_extension_secret_fields["api_key"]
     assert field.value == "saved-secret"
@@ -221,15 +245,14 @@ def test_custom_http_credentials_use_namespaced_secret_callback_and_reload_isola
 
 
 def test_custom_http_reload_uses_active_engine_with_unsaved_llm_draft(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     _write_extension(tmp_path)
     registry = HttpExtensionRegistry(tmp_path)
     registry.reload()
     view = _view(monkeypatch, registry, SecretStore())
     settings = _custom_http_settings()
-    view.load_from_settings(settings, config_path=tmp_path / "settings.json")
+    settings_events.load(view, settings, config_path=tmp_path / "settings.json")
 
     draft = view._ensure_provider_settings_draft()
     view._provider_draft = replace(
@@ -253,8 +276,7 @@ def test_custom_http_reload_uses_active_engine_with_unsaved_llm_draft(
 
 
 def test_custom_http_card_surfaces_missing_selected_extension_without_fallback(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     _write_extension(tmp_path)
     registry = HttpExtensionRegistry(tmp_path)
@@ -264,7 +286,7 @@ def test_custom_http_card_surfaces_missing_selected_extension_without_fallback(
     settings = _custom_http_settings()
     changed: list[bool] = []
     view.on_providers_changed = lambda: changed.append(True)
-    view.load_from_settings(settings, config_path=tmp_path / "settings.json")
+    settings_events.load(view, settings, config_path=tmp_path / "settings.json")
 
     (tmp_path / "demo.json").unlink()
     view._on_http_extension_reload(None)
@@ -273,14 +295,18 @@ def test_custom_http_card_surfaces_missing_selected_extension_without_fallback(
         "settings.http_extension.none"
     )
     assert view._http_extension_selected_id == "demo"
-    assert view.build_provider_apply_settings().intent.translation.http_extension_id == "demo"
+    assert (
+        apply_provider_intent(
+            settings_events.settings, view.build_provider_apply_settings()
+        ).intent.translation.http_extension_id
+        == "demo"
+    )
     assert len(view._http_extension_credentials.controls) == 0
     assert changed == [True]
 
 
 def test_custom_http_form_shows_only_when_extension_declares_secrets(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     _write_extension(tmp_path)
     extension_path = tmp_path / "demo.json"
@@ -292,7 +318,7 @@ def test_custom_http_form_shows_only_when_extension_declares_secrets(
     registry.reload()
     view = _view(monkeypatch, registry, SecretStore())
     settings = _custom_http_settings()
-    view.load_from_settings(settings, config_path=tmp_path / "settings.json")
+    settings_events.load(view, settings, config_path=tmp_path / "settings.json")
 
     assert view._http_extension_credentials in view._api_keys_column.controls
     assert view._http_extension_credentials.visible is True

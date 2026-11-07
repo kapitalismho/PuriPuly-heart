@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, sep } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
@@ -18,28 +18,18 @@ const renderFingerprintBootstrapScript = new URL(
   import.meta.url,
 );
 const checkedInWranglerConfig = new URL('../wrangler.jsonc', import.meta.url);
-const deployWorkflow = new URL(
-  '../../.github/workflows/deploy-broker-direct.yml',
-  import.meta.url,
-);
 const abuseControlsWorkflow = new URL(
   '../../.github/workflows/maintenance-broker-abuse-controls.yml',
   import.meta.url,
 );
-const deploySmokeSpec = new URL(
-  './deploy-smoke/canonical-production.spec.ts',
-  import.meta.url,
-);
-const brokerReadme = new URL('../README.md', import.meta.url);
-const dailySummaryV2Finalizer = new URL(
-  '../deploy/finalize-daily-summary-v2.sql',
-  import.meta.url,
-);
-const appActiveDayFinalizer = new URL(
-  '../deploy/finalize-app-active-day.sql',
-  import.meta.url,
-);
 
+const bashExecutable = process.platform === 'win32'
+  ? join(
+      dirname(dirname(execFileSync('where.exe', ['git'], { encoding: 'utf8' }).trim().split(/\r?\n/u)[0]!)),
+      'bin',
+      'bash.exe',
+    )
+  : 'bash';
 const tempDirs: string[] = [];
 
 afterEach(() => {
@@ -200,11 +190,6 @@ describe('broker direct deploy automation', () => {
     const db = new DatabaseSync(':memory:');
 
     try {
-      expect(renderedSql).not.toContain('__BOOTSTRAP_REQUIRED__');
-      expect(renderedSql).toContain(bootstrapSalt);
-      expect(renderedSql).not.toContain('CREATE TEMP TABLE');
-      expect(renderedSql).toContain("json_extract(value, '$.current.salt') = '__BOOTSTRAP' || '_REQUIRED__'");
-
       applyBrokerMigrations(db);
       db.exec(renderedSql);
 
@@ -271,886 +256,136 @@ describe('broker direct deploy automation', () => {
       db.close();
     }
   });
-  it.skipIf(!bashAvailable)('keeps telemetry deletion and referral retirement out of both ordinary deploy phases while preserving deferred privacy migrations', () => {
-    const workflow = readFileSync(deployWorkflow, 'utf8');
-    const stageScript = extractWorkflowRunBlock(
-      workflow,
-      'Stage ordinary broker deployment migrations',
-    );
-    const tempDir = createRepoTempDir();
-    const migrationsDir = join(tempDir, 'migrations');
-    mkdirSync(migrationsDir);
-    const migrationNames = [
-      '0020_network_identity_hmac.sql',
-      '0021_network_identity_purge.sql',
-      '0022_managed_operation_issuance_context.sql',
-      '0023_backfill_operation_route_rate_limits.sql',
-      '0024_allow_unattributed_request_events.sql',
-      '0025_drop_legacy_translation_telemetry.sql',
-      '0026_managed_attempt_cleanup_ownership.sql',
-      '0027_remove_managed_referrals.sql',
-    ];
-    for (const migrationName of migrationNames) {
-      writeFileSync(join(migrationsDir, migrationName), `SELECT '${migrationName}';\n`);
-    }
 
-    const result = runBashScript(stageScript, tempDir);
-    expect(result).toEqual({ status: 0, stderr: '' });
-    expect(
-      readdirSync(join(tempDir, '.deploy-direct', 'staged-migrations-pre-backfill')).sort(),
-    ).toEqual([
-      '0020_network_identity_hmac.sql',
-      '0022_managed_operation_issuance_context.sql',
-      '0023_backfill_operation_route_rate_limits.sql',
-      '0026_managed_attempt_cleanup_ownership.sql',
-    ]);
-    expect(
-      readdirSync(join(tempDir, '.deploy-direct', 'staged-migrations-post-backfill')).sort(),
-    ).toEqual([
-      '0020_network_identity_hmac.sql',
-      '0021_network_identity_purge.sql',
-      '0022_managed_operation_issuance_context.sql',
-      '0023_backfill_operation_route_rate_limits.sql',
-      '0024_allow_unattributed_request_events.sql',
-      '0026_managed_attempt_cleanup_ownership.sql',
-    ]);
-  });
-
-  it.skipIf(!bashAvailable)('accepts repeat deploys after both deferred network identity migrations are already applied', () => {
-    const workflow = readFileSync(deployWorkflow, 'utf8');
-    const verifyScript = extractWorkflowRunBlock(
-      workflow,
-      'Verify deferred network identity migrations are consistent',
-    ).replaceAll('${{ steps.render.outputs.config_path }}', 'wrangler.production.jsonc');
-    const requiredMigrations = [
-      '0022_managed_operation_issuance_context.sql',
-      '0023_backfill_operation_route_rate_limits.sql',
-    ];
-    const deferredMigrations = [
-      '0021_network_identity_purge.sql',
-      '0024_allow_unattributed_request_events.sql',
-    ];
-    const scenarios = [
-      { migrations: requiredMigrations, status: 0 },
-      { migrations: [...requiredMigrations, ...deferredMigrations], status: 0 },
-      { migrations: [...requiredMigrations, deferredMigrations[0]], status: 1 },
-      { migrations: [...requiredMigrations, deferredMigrations[1]], status: 1 },
-      { migrations: [requiredMigrations[0]], status: 1 },
-    ];
-
-    for (const scenario of scenarios) {
-      const tempDir = createRepoTempDir();
-      const bashEnvPath = join(tempDir, 'bash-env.sh');
-      writeFileSync(
-        bashEnvPath,
-        'pnpm() { printf \'%s\' "$JOURNAL_JSON"; }\n',
-      );
-      const journalJson = JSON.stringify([
-        { results: scenario.migrations.map((name) => ({ name })) },
-      ]);
-
-      const result = runBashScript(verifyScript, tempDir, {
-        BASH_ENV: './bash-env.sh',
-        JOURNAL_JSON: journalJson,
-      });
-
-      expect(result.status, scenario.migrations.join(',')).toBe(scenario.status);
-    }
-  });
-  it.skipIf(!bashAvailable)('admits a fresh schema or completed privacy history and rejects incomplete existing databases before deployment', () => {
-    const workflow = readFileSync(deployWorkflow, 'utf8');
-    const script = extractWorkflowRunBlock(workflow, 'Require completed privacy migration before referral-free deployment')
-      .replaceAll('${{ steps.render.outputs.config_path }}', 'wrangler.production.jsonc');
-    const scenarios = [
-      { tables: [], migrations: [], status: 0, firstInstall: true },
-      { tables: ['installations', 'broker_config'], migrations: ['0021_network_identity_purge.sql', '0024_allow_unattributed_request_events.sql'], status: 0, firstInstall: false },
-      { tables: ['installations', 'broker_config'], migrations: ['0021_network_identity_purge.sql'], status: 1, firstInstall: false },
-      { tables: ['installations', 'broker_config'], migrations: [], status: 1, firstInstall: false },
-      { tables: ['broker_config'], migrations: [], status: 1, firstInstall: false },
-    ];
-    for (const scenario of scenarios) {
-      const tempDir = createRepoTempDir();
-      writeFileSync(join(tempDir, 'bash-env.sh'), `pnpm() { case \"$*\" in *sqlite_master*) printf '%s' \"$SCHEMA_JSON\" ;; *) printf '%s' \"$JOURNAL_JSON\" ;; esac; }\n`);
-      const outputPath = join(tempDir, 'github-output');
-      const result = runBashScript(script, tempDir, {
-        BASH_ENV: './bash-env.sh',
-        GITHUB_OUTPUT: outputPath,
-        SCHEMA_JSON: JSON.stringify([{ results: scenario.tables.map((name) => ({ name })) }]),
-        JOURNAL_JSON: JSON.stringify([{ results: scenario.migrations.map((name) => ({ name })) }]),
-      });
-      expect(result.status, JSON.stringify(scenario)).toBe(scenario.status);
-      if (scenario.status === 0) expect(readFileSync(outputPath, 'utf8')).toContain(`first_install=${scenario.firstInstall}`);
-    }
-    const prerequisite = workflow.indexOf('Require completed privacy migration before referral-free deployment');
-    expect(prerequisite).toBeLessThan(workflow.indexOf('Export pre-migration production D1 backup'));
-    expect(prerequisite).toBeLessThan(workflow.indexOf('pnpm exec wrangler deploy'));
-    expect(workflow).toContain("if: steps.privacy_prerequisite.outputs.first_install == 'true'");
-  });
-
-  it.skipIf(!bashAvailable)('requires the dedicated deletion inputs and a usable backup before staging and applying only migration 0025', () => {
-    const workflow = readFileSync(deployWorkflow, 'utf8');
-    const guardScript = extractWorkflowRunBlock(
-      workflow,
-      'Guard production deploy ref and confirmation',
-    );
-    for (const scenario of [
-      {
-        env: {
-          DELETE_LEGACY_TRANSLATION_TELEMETRY: undefined,
-          CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: undefined,
-        },
-        status: 0,
-      },
-      {
-        env: {
-          DELETE_LEGACY_TRANSLATION_TELEMETRY: 'false',
-          CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: undefined,
-        },
-        status: 0,
-      },
-      {
-        env: {
-          DELETE_LEGACY_TRANSLATION_TELEMETRY: 'true',
-          CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: 'deploy puripuly-heart-broker from dev',
-        },
-        status: 1,
-      },
-      {
-        env: {
-          DELETE_LEGACY_TRANSLATION_TELEMETRY: 'true',
-          CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION:
-            'delete retired translation telemetry from production D1',
-        },
-        status: 0,
-      },
+  it.skipIf(!bashAvailable)('renders configured daily-cap maintenance and changes only the cap before reading it back', () => {
+    const script = dailyCapWorkflowScript();
+    for (const [current, previous, cap] of [
+      ['7', undefined, '1'],
+      ['12', '11', '100000'],
+      ['9', ' \t ', '450'],
     ]) {
-      expect(runGuardScript(guardScript, scenario.env).status).toBe(scenario.status);
-    }
-
-    const applyScript = extractWorkflowRunBlock(
-      workflow,
-      'Apply explicitly authorized legacy telemetry deletion',
-    );
-    const scenarios: Array<{
-      deletion: string | undefined;
-      confirmation: string | undefined;
-      status: number;
-      applied: boolean;
-      usableBackup?: boolean;
-    }> = [
-      { deletion: undefined, confirmation: undefined, status: 0, applied: false },
-      { deletion: 'false', confirmation: undefined, status: 0, applied: false },
-      { deletion: 'true', confirmation: 'wrong confirmation', status: 1, applied: false },
-      {
-        deletion: 'true',
-        confirmation: 'delete retired translation telemetry from production D1',
-        status: 0,
-        applied: true,
-      },
-      {
-        deletion: 'true',
-        confirmation: 'delete retired translation telemetry from production D1',
-        status: 1,
-        applied: false,
-        usableBackup: false,
-      },
-    ];
-
-    for (const scenario of scenarios) {
-      const tempDir = createRepoTempDir();
-      const migrationsDir = join(tempDir, 'migrations');
-      mkdirSync(migrationsDir);
-      writeFileSync(
-        join(migrationsDir, '0025_drop_legacy_translation_telemetry.sql'),
-        'DROP TABLE IF EXISTS telemetry_active_days;\n',
-      );
-      const backupPath = join(tempDir, 'pre-migration-backup.sql');
-      const configPath = join(tempDir, 'legacy-deletion.jsonc');
-      const outputPath = join(tempDir, 'github-output.txt');
-      const pnpmLogPath = join(tempDir, 'pnpm.log');
-      const bashEnvPath = join(tempDir, 'bash-env.sh');
-      if (scenario.usableBackup !== false) {
-        writeFileSync(backupPath, 'production backup\n');
-      }
-      writeFileSync(configPath, '{}\n');
-      writeFileSync(outputPath, '');
-      writeFileSync(
-        bashEnvPath,
-        'pnpm() { printf \'%s\\n\' "$*" >> "$PNPM_LOG"; }\n',
-      );
-
-      const result = runBashScript(applyScript, tempDir, {
-        DELETE_LEGACY_TRANSLATION_TELEMETRY: scenario.deletion,
-        CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: scenario.confirmation,
-        LEGACY_DELETION_CONFIG_PATH: 'legacy-deletion.jsonc',
-        D1_BACKUP_PATH: 'pre-migration-backup.sql',
-        GITHUB_OUTPUT: 'github-output.txt',
-        PNPM_LOG: 'pnpm.log',
-        BASH_ENV: './bash-env.sh',
+      const scenario = createDailyCapScenario({
+        NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: current,
+        NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: previous,
+        TARGET_MAX_COUNT: cap,
       });
-      expect(result.status).toBe(scenario.status);
-
-      const stagedDir = join(
-        tempDir,
-        '.deploy-direct',
-        'staged-migrations-legacy-telemetry-deletion',
-      );
-      if (scenario.applied) {
-        expect(readdirSync(stagedDir)).toEqual([
-          '0025_drop_legacy_translation_telemetry.sql',
-        ]);
-        expect(readFileSync(pnpmLogPath, 'utf8').split('\n').filter(Boolean)).toEqual([
-          'exec wrangler types --config legacy-deletion.jsonc',
-          'exec wrangler d1 migrations apply puripuly-heart-broker --remote --config legacy-deletion.jsonc',
-        ]);
-        expect(readFileSync(outputPath, 'utf8')).toBe('applied=true\n');
+      const result = runBashScript(script, scenario.tempDir, scenario.env);
+      expect(result.status, result.stderr).toBe(0);
+      const config = readFileSync(join(scenario.tempDir, 'wrangler.production.jsonc'), 'utf8');
+      expect(config).toContain('"name": "puripuly-heart-broker"');
+      expect(config).toContain('"binding": "BROKER_DB"');
+      expect(config).toContain('"database_name": "puripuly-heart-broker"');
+      expect(config).toContain('"database_id": "daily-cap-synthetic-database"');
+      expect(config).not.toContain('REQUIRED_AT_DEPLOY_TIME');
+      expect(config).toContain(`"NETWORK_IDENTITY_HMAC_KEY_VERSION": "${current}"`);
+      if (previous?.trim()) {
+        expect(config).toContain(`"NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS": "${previous}"`);
       } else {
-        expect(existsSync(stagedDir)).toBe(false);
-        expect(existsSync(pnpmLogPath)).toBe(false);
-        if (scenario.status === 0) {
-          expect(readFileSync(outputPath, 'utf8')).toBe('applied=false\n');
-        }
+        expect(config).not.toContain('"NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS"');
       }
-    }
 
-    const backupUploadIndex = workflow.indexOf('Upload pre-migration D1 backup');
-    const workerDeployIndex = workflow.indexOf('Deploy canonical broker worker');
-    const healthCheckIndex = workflow.indexOf('Wait for deployed workers.dev healthz');
-    const smokeCheckIndex = workflow.indexOf(
-      'Run deployed broker production QQ issuance smoke test',
-    );
-    const deletionIndex = workflow.indexOf(
-      'Apply explicitly authorized legacy telemetry deletion',
-    );
-    for (const prerequisiteIndex of [
-      backupUploadIndex,
-      workerDeployIndex,
-      healthCheckIndex,
-      smokeCheckIndex,
-      deletionIndex,
-    ]) {
-      expect(prerequisiteIndex).toBeGreaterThanOrEqual(0);
-    }
-    expect(backupUploadIndex).toBeLessThan(deletionIndex);
-    expect(workerDeployIndex).toBeLessThan(deletionIndex);
-    expect(healthCheckIndex).toBeLessThan(deletionIndex);
-    expect(smokeCheckIndex).toBeLessThan(deletionIndex);
-  });
-
-  it('ships a manual direct-deploy workflow that renders config, applies remote D1 changes, syncs the transitional and child-key management secrets, deploys the canonical worker, and runs production QQ issuance smoke', () => {
-    const workflow = readFileSync(deployWorkflow, 'utf8');
-    const smokeSpec = readFileSync(deploySmokeSpec, 'utf8');
-    const readme = readFileSync(brokerReadme, 'utf8');
-    const deployJobEnvBlock = extractBetween(
-      workflow,
-      '    env:\n',
-      '    steps:\n',
-    );
-    const productionSecretNames = [
-      'CLOUDFLARE_API_TOKEN',
-      'CLOUDFLARE_ACCOUNT_ID',
-      'BROKER_D1_DATABASE_ID_PRODUCTION',
-      'OPENROUTER_MANAGED_API_KEY_PRODUCTION',
-      'OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION',
-      'OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION',
-      'OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION',
-      'QQ_AUTH_HMAC_PSK_PRODUCTION',
-      'TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION',
-      'DISCORD_CLIENT_ID_PRODUCTION',
-      'DISCORD_CLIENT_SECRET_PRODUCTION',
-      'DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION',
-      'DISCORD_USER_REF_SECRET_PRODUCTION',
-      'NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION',
-      'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION',
-      'DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION',
-    ];
-    const liveInputValidationIndex = smokeSpec.indexOf(
-      'const liveInputs = readLiveDeploySmokeInputs',
-    );
-    const healthzProbeIndex = smokeSpec.indexOf(
-      "url: new URL('/healthz'",
-    );
-    const managedUserHmacBlankCheckIndex = workflow.indexOf(
-      'OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION is required and must not be blank.',
-    );
-    const cloudflareApiTokenBlankCheckIndex = workflow.indexOf(
-      'CLOUDFLARE_API_TOKEN is required and must not be blank.',
-    );
-    const cloudflareAccountIdBlankCheckIndex = workflow.indexOf(
-      'CLOUDFLARE_ACCOUNT_ID is required and must not be blank.',
-    );
-    const brokerD1DatabaseIdBlankCheckIndex = workflow.indexOf(
-      'BROKER_D1_DATABASE_ID_PRODUCTION is required and must not be blank.',
-    );
-    const managedApiKeyBlankCheckIndex = workflow.indexOf(
-      'OPENROUTER_MANAGED_API_KEY_PRODUCTION is required and must not be blank.',
-    );
-    const managementApiKeyBlankCheckIndex = workflow.indexOf(
-      'OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION is required and must not be blank.',
-    );
-    const managedGuardrailIdBlankCheckIndex = workflow.indexOf(
-      'OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION is required and must not be blank.',
-    );
-    const discordWebhookBlankCheckIndex = workflow.indexOf(
-      'DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION is required and must not be blank.',
-    );
-    const remoteD1MigrationIndex = workflow.indexOf(
-      'wrangler d1 migrations apply',
-    );
-    const remoteD1BackupIndex = workflow.indexOf('wrangler d1 export');
-    const remoteD1BackupUploadIndex = workflow.indexOf(
-      'actions/upload-artifact@v7',
-    );
-    const openRouterGuardrailPatchIndex = workflow.indexOf(
-      'PATCH "$guardrail_url"',
-    );
-    const firstSecretSyncIndex = workflow.indexOf(
-      'wrangler secret put OPENROUTER_MANAGED_API_KEY',
-    );
-    const managedUserHmacSyncIndex = workflow.indexOf(
-      'wrangler secret put OPENROUTER_MANAGED_USER_HMAC_SECRET',
-    );
-    const discordImmediateWebhookSyncIndex = workflow.indexOf(
-      'wrangler secret put DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL',
-    );
-    const discordDailyWebhookSyncIndex = workflow.indexOf(
-      'wrangler secret put DISCORD_DAILY_REPORT_WEBHOOK_URL',
-    );
-    const qqAuthHmacPskBlankCheckIndex = workflow.indexOf(
-      'QQ_AUTH_HMAC_PSK_PRODUCTION is required and must not be blank.',
-    );
-    const qqAuthHmacPskSyncIndex = workflow.indexOf(
-      'wrangler secret put QQ_AUTH_HMAC_PSK',
-    );
-    const telemetrySubjectHmacSecretBlankCheckIndex = workflow.indexOf(
-      'TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION is required and must not be blank.',
-    );
-    const telemetrySubjectHmacSecretSyncIndex = workflow.indexOf(
-      'wrangler secret put TELEMETRY_SUBJECT_HMAC_SECRET',
-    );
-    const networkIdentityHmacBlankCheckIndex = workflow.indexOf(
-      'NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION is required and must not be blank.',
-    );
-    const networkIdentityHmacSyncIndex = workflow.indexOf(
-      'wrangler secret put NETWORK_IDENTITY_HMAC_SECRET ',
-    );
-    const networkIdentityPreviousSyncIndex = workflow.indexOf(
-      'wrangler secret put NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS',
-    );
-    const networkIdentityPreviousDeleteIndex = workflow.indexOf(
-      'wrangler secret delete NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS',
-    );
-    const stagedMigrationRenderIndex = workflow.indexOf(
-      'staged-migrations-pre-backfill',
-    );
-    const networkIdentityBackfillAwaitIndex = workflow.indexOf(
-      'Await network identity backfill until keyed_only',
-    );
-    const networkIdentityPurgeApplyIndex = workflow.indexOf(
-      'wrangler d1 migrations apply',
-      networkIdentityBackfillAwaitIndex + 1,
-    );
-    const networkIdentityPurgeVerifyIndex = workflow.indexOf(
-      'Verify legacy network identity columns are gone',
-    );
-    const migrationJournalGateIndex = workflow.indexOf(
-      'Verify deferred network identity migrations are consistent',
-    );
-
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toContain('\npush:');
-    expect(workflow).toContain('confirm_production_deploy');
-    expect(workflow).toContain('environment: production');
-    expect(deployJobEnvBlock).toContain("NODE_VERSION: '22'");
-    expect(deployJobEnvBlock).toContain('BROKER_CANONICAL_WORKER_NAME: puripuly-heart-broker');
-    expect(deployJobEnvBlock).toContain(
-      'BROKER_CANONICAL_WORKERS_DEV_URL: ${{ vars.BROKER_CANONICAL_WORKERS_DEV_URL }}',
-    );
-    expect(deployJobEnvBlock).toContain(
-      'BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION: ${{ vars.BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION }}',
-    );
-    expect(deployJobEnvBlock).not.toContain('secrets.');
-    for (const productionSecretName of productionSecretNames) {
-      expect(deployJobEnvBlock).not.toContain(`${productionSecretName}:`);
-      expect(workflow).toContain(
-        `${productionSecretName}: \${{ secrets.${productionSecretName} }}`,
+      const db = new DatabaseSync(scenario.databasePath);
+      try {
+        const rows = db.prepare('SELECT key, value, updated_at FROM broker_config ORDER BY key').all();
+        expect(rows).toHaveLength(2);
+        expect(rows[0].key).toBe('abuse_controls');
+        expect(JSON.parse(String(rows[0].value))).toEqual({
+          newActiveEntitlementsPerDay: { maxCount: Number(cap), windowDays: 1 },
+          preserved: { enabled: true },
+        });
+        expect(rows[0].updated_at).not.toBe('2000-01-01 00:00:00');
+        expect(rows[1]).toEqual({
+          key: 'fingerprint_salt',
+          value: '{"preserved":"salt"}',
+          updated_at: '2000-01-01 00:00:00',
+        });
+        expect(db.prepare('SELECT value FROM maintenance_sentinel').all()).toEqual([{ value: 'untouched' }]);
+      } finally {
+        db.close();
+      }
+      const calls = readFileSync(scenario.callLogPath, 'utf8').trim().split('\n').map(
+        (line) => JSON.parse(line) as { args: string[]; results: unknown[] },
       );
-    }
-    expect(workflow).toContain('BROKER_D1_DATABASE_ID_PRODUCTION');
-    expect(workflow).toContain('OPENROUTER_MANAGED_API_KEY_PRODUCTION');
-    expect(workflow).toContain('OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION');
-    expect(workflow).toContain('OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION');
-    expect(workflow).toContain('OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION');
-    expect(workflow).toContain('QQ_AUTH_HMAC_PSK_PRODUCTION');
-    expect(workflow).toContain('QQ_AUTH_HMAC_PSK');
-    expect(workflow).toContain('TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION');
-    expect(workflow).toContain('TELEMETRY_SUBJECT_HMAC_SECRET');
-    expect(workflow).toContain('NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION');
-    expect(workflow).toContain('NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION');
-    expect(workflow).toContain('NETWORK_IDENTITY_HMAC_SECRET');
-    expect(workflow).toContain(
-      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}',
-    );
-    expect(workflow).toContain(
-      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}',
-    );
-    expect(workflow).toContain('--network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION"');
-    expect(workflow).toContain(
-      '--network-identity-hmac-key-version-previous "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION"',
-    );
-    expect(workflow).toContain(
-      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.',
-    );
-    expect(workflow).toContain(
-      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must be a positive integer when set.',
-    );
-    expect(workflow).toContain(
-      'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is set.',
-    );
-    expect(workflow).toContain(
-      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is set.',
-    );
-    expect(workflow).toContain(
-      'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must differ from NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION.',
-    );
-    expect(workflow).not.toContain('NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION:-');
-    expect(workflow).not.toContain('NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION:-');
-    expect(workflow).toContain('staged-migrations-pre-backfill');
-    expect(workflow).toContain('0020_network_identity_hmac.sql');
-    expect(workflow).toContain('0022_managed_operation_issuance_context.sql');
-    expect(workflow).toContain('0023_backfill_operation_route_rate_limits.sql');
-    expect(workflow).toContain('0024_allow_unattributed_request_events.sql');
-    expect(workflow).toContain('migrations_dir');
-    expect(workflow).toContain('network_identity_migration');
-    expect(workflow).toContain('keyed_only');
-    expect(workflow).toContain('pragma_table_info');
-    expect(workflow).toContain('attempt_ip_hash');
-    expect(workflow).toContain('Await network identity backfill until keyed_only');
-    expect(workflow).toContain('Verify deferred network identity migrations are consistent');
-    expect(workflow).toContain('SELECT name FROM d1_migrations;');
-    expect(workflow).toContain("'0023_backfill_operation_route_rate_limits.sql' not in applied");
-    expect(workflow).toContain('applied_deferred and applied_deferred != deferred');
-    expect(workflow).toContain('Apply deferred 0021 purge followed by 0024 rebuild');
-    expect(workflow).toContain('Verify legacy network identity columns are gone');
-    expect(workflow).toMatch(
-      /wrangler secret put NETWORK_IDENTITY_HMAC_SECRET --config/u,
-    );
-    expect(workflow).toMatch(
-      /wrangler secret put NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS --config/u,
-    );
-    expect(workflow).toMatch(
-      /wrangler secret delete NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS --config/u,
-    );
-    expect(workflow).toContain('DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION');
-    expect(workflow).toContain('BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION');
-    expect(workflow).toContain('BROKER_CANONICAL_WORKERS_DEV_URL');
-    expect(workflow).toContain(
-      'BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION is required',
-    );
-    expect(workflow).toContain('must differ from the managed allowlisted models.');
-    expect(workflow).toContain('ref: refs/heads/dev');
-    expect(workflow).toContain('render-production-wrangler-config.mjs');
-    expect(workflow).toContain('render-fingerprint-bootstrap-sql.mjs');
-    expect(workflow).toContain("working-directory: broker");
-    expect(workflow).toContain("deploy_dir='.deploy-direct'");
-    expect(workflow).toContain("config_path='wrangler.production.jsonc'");
-    expect(workflow).toContain('fingerprint-bootstrap.sql');
-    expect(workflow).toMatch(/wrangler types --config/u);
-    expect(workflow).toContain('BROKER_CANONICAL_WORKERS_DEV_URL is required');
-    expect(workflow).toContain('refs/heads/dev');
-    expect(workflow).toContain("broker/src/trial-policy.ts");
-    expect(workflow).toContain('MANAGED_TRIAL_ALLOWED_MODELS was not found');
-    expect(workflow).toContain('https://openrouter.ai/api/v1/guardrails/');
-    expect(workflow).toContain('PATCH "$guardrail_url"');
-    expect(workflow).toContain('allowed_models');
-    expect(workflow).toContain('allowed_providers');
-    expect(workflow).toContain('ignored_providers');
-    expect(workflow).toContain('enforce_zdr');
-    expect(workflow).toContain('must be cleared (null or [])');
-    expect(workflow).toContain('GET guardrail');
-    expect(workflow).toMatch(
-      /wrangler d1 migrations apply\s+puripuly-heart-broker\s+--remote\s+--config/u,
-    );
-    expect(workflow).toMatch(
-      /wrangler d1 export puripuly-heart-broker\s+\\\s+--remote --config/u,
-    );
-    expect(workflow).toContain('$RUNNER_TEMP/puripuly-heart-broker-pre-migration-');
-    expect(workflow).toContain('if-no-files-found: error');
-    expect(workflow).toMatch(
-      /wrangler d1 execute\s+puripuly-heart-broker\s+--remote\s+--config/u,
-    );
-    expect(workflow).toContain("json_extract(value, '$.current.salt')");
-    expect(workflow).toMatch(
-      /wrangler secret put OPENROUTER_MANAGED_API_KEY --config/u,
-    );
-    expect(workflow).toMatch(
-      /wrangler secret put OPENROUTER_MANAGEMENT_API_KEY --config/u,
-    );
-    expect(workflow).toMatch(
-      /wrangler secret put OPENROUTER_MANAGED_GUARDRAIL_ID --config/u,
-    );
-    expect(workflow).toMatch(
-      /wrangler secret put OPENROUTER_MANAGED_USER_HMAC_SECRET --config/u,
-    );
-    expect(workflow).toMatch(/wrangler secret put QQ_AUTH_HMAC_PSK --config/u);
-    expect(workflow).toMatch(
-      /wrangler secret put TELEMETRY_SUBJECT_HMAC_SECRET --config/u,
-    );
-    expect(workflow).toMatch(
-      /wrangler secret put DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL --config/u,
-    );
-    expect(workflow).toMatch(
-      /wrangler secret put DISCORD_DAILY_REPORT_WEBHOOK_URL --config/u,
-    );
-    for (const requiredDeployBlankCheckIndex of [
-      cloudflareApiTokenBlankCheckIndex,
-      cloudflareAccountIdBlankCheckIndex,
-      brokerD1DatabaseIdBlankCheckIndex,
-      managedApiKeyBlankCheckIndex,
-      managementApiKeyBlankCheckIndex,
-      managedGuardrailIdBlankCheckIndex,
-    ]) {
-      expect(requiredDeployBlankCheckIndex).toBeGreaterThanOrEqual(0);
-      expect(requiredDeployBlankCheckIndex).toBeLessThan(remoteD1MigrationIndex);
-      expect(requiredDeployBlankCheckIndex).toBeLessThan(openRouterGuardrailPatchIndex);
-      expect(requiredDeployBlankCheckIndex).toBeLessThan(firstSecretSyncIndex);
-    }
-    expect(managedUserHmacBlankCheckIndex).toBeGreaterThanOrEqual(0);
-    expect(discordWebhookBlankCheckIndex).toBeGreaterThanOrEqual(0);
-    expect(remoteD1MigrationIndex).toBeGreaterThanOrEqual(0);
-    expect(remoteD1BackupIndex).toBeGreaterThanOrEqual(0);
-    expect(remoteD1BackupUploadIndex).toBeGreaterThanOrEqual(0);
-    expect(remoteD1BackupIndex).toBeLessThan(remoteD1BackupUploadIndex);
-    expect(remoteD1BackupUploadIndex).toBeLessThan(remoteD1MigrationIndex);
-    expect(managedUserHmacBlankCheckIndex).toBeLessThan(remoteD1MigrationIndex);
-    expect(managedUserHmacSyncIndex).toBeGreaterThanOrEqual(0);
-    expect(managedUserHmacBlankCheckIndex).toBeLessThan(managedUserHmacSyncIndex);
-    expect(qqAuthHmacPskBlankCheckIndex).toBeGreaterThanOrEqual(0);
-    expect(qqAuthHmacPskBlankCheckIndex).toBeLessThan(remoteD1MigrationIndex);
-    expect(qqAuthHmacPskSyncIndex).toBeGreaterThanOrEqual(0);
-    expect(qqAuthHmacPskBlankCheckIndex).toBeLessThan(qqAuthHmacPskSyncIndex);
-    expect(telemetrySubjectHmacSecretBlankCheckIndex).toBeGreaterThanOrEqual(0);
-    expect(telemetrySubjectHmacSecretBlankCheckIndex).toBeLessThan(remoteD1MigrationIndex);
-    expect(telemetrySubjectHmacSecretSyncIndex).toBeGreaterThanOrEqual(0);
-    expect(telemetrySubjectHmacSecretBlankCheckIndex).toBeLessThan(
-      telemetrySubjectHmacSecretSyncIndex,
-    );
-    expect(discordImmediateWebhookSyncIndex).toBeGreaterThanOrEqual(0);
-    expect(discordDailyWebhookSyncIndex).toBeGreaterThanOrEqual(0);
-    expect(discordWebhookBlankCheckIndex).toBeLessThan(discordImmediateWebhookSyncIndex);
-    expect(discordWebhookBlankCheckIndex).toBeLessThan(discordDailyWebhookSyncIndex);
-    expect(networkIdentityHmacBlankCheckIndex).toBeGreaterThanOrEqual(0);
-    expect(networkIdentityHmacBlankCheckIndex).toBeLessThan(remoteD1MigrationIndex);
-    expect(networkIdentityHmacSyncIndex).toBeGreaterThanOrEqual(0);
-    expect(networkIdentityHmacBlankCheckIndex).toBeLessThan(networkIdentityHmacSyncIndex);
-    expect(networkIdentityPreviousSyncIndex).toBeGreaterThanOrEqual(0);
-    expect(networkIdentityPreviousDeleteIndex).toBeGreaterThanOrEqual(0);
-    expect(stagedMigrationRenderIndex).toBeGreaterThanOrEqual(0);
-    expect(stagedMigrationRenderIndex).toBeLessThan(remoteD1MigrationIndex);
-    expect(networkIdentityHmacSyncIndex).toBeLessThan(
-      workflow.indexOf('pnpm exec wrangler deploy'),
-    );
-    expect(networkIdentityBackfillAwaitIndex).toBeGreaterThanOrEqual(0);
-    expect(networkIdentityPurgeApplyIndex).toBeGreaterThanOrEqual(0);
-    expect(networkIdentityBackfillAwaitIndex).toBeLessThan(networkIdentityPurgeApplyIndex);
-    expect(migrationJournalGateIndex).toBeGreaterThanOrEqual(0);
-    expect(networkIdentityBackfillAwaitIndex).toBeLessThan(migrationJournalGateIndex);
-    expect(migrationJournalGateIndex).toBeLessThan(networkIdentityPurgeApplyIndex);
-    expect(networkIdentityPurgeVerifyIndex).toBeGreaterThanOrEqual(0);
-    expect(networkIdentityPurgeApplyIndex).toBeLessThan(networkIdentityPurgeVerifyIndex);
-    expect(networkIdentityPurgeVerifyIndex).toBeLessThan(
-      workflow.indexOf('deploy/finalize-daily-summary-v2.sql'),
-    );
-    expect(networkIdentityPurgeVerifyIndex).toBeLessThan(
-      workflow.indexOf('broker/tests/deploy-smoke/canonical-production.spec.ts'),
-    );
-    expect(workflow).toMatch(/wrangler deploy --config/u);
-    expect(workflow).toContain(
-      'broker/tests/deploy-smoke/canonical-production.spec.ts',
-    );
-    expect(workflow).toContain('BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL');
-    expect(workflow).toContain('curl --fail');
-    expect(workflow).toContain('timeout-minutes: 10');
-    expect(workflow).toContain('BROKER_DEPLOY_SMOKE_QQ_AUTH_HMAC_PSK');
-    expect(workflow).toContain("BROKER_DEPLOY_SMOKE_RUN: 'true'");
-    expect(workflow).toContain(
-      'BROKER_DEPLOY_SMOKE_QQ_AUTH_HMAC_PSK: ${{ secrets.QQ_AUTH_HMAC_PSK_PRODUCTION }}',
-    );
-    expect(workflow).toContain('app / public traffic');
-    expect(workflow).toContain('transitional runtime compatibility');
-    expect(workflow).toContain('managed child-key creation and cleanup');
-    expect(workflow).toContain('QQ production issuance');
-    expect(workflow).toContain('TELEMETRY_SUBJECT_HMAC_SECRET');
-    expect(workflow).toContain('assign the canonical production guardrail');
-    expect(workflow).toContain('positive Qwen/DeepSeek/Gemini routing');
-    expect(smokeSpec).not.toContain("process.env.CI === 'true'");
-    expect(smokeSpec).not.toContain('smokeBaseUrl ||');
-    expect(smokeSpec).toContain('BROKER_DEPLOY_SMOKE_RUN');
-    expect(smokeSpec).toContain(
-      "process.env.BROKER_DEPLOY_SMOKE_RUN === 'true'",
-    );
-    expect(liveInputValidationIndex).toBeGreaterThanOrEqual(0);
-    expect(healthzProbeIndex).toBeGreaterThanOrEqual(0);
-    expect(liveInputValidationIndex).toBeLessThan(healthzProbeIndex);
-    expect(smokeSpec).toContain('/api/v1/key');
-    expect(smokeSpec).toContain('/api/v1/chat/completions');
-    expect(smokeSpec).toContain('BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL');
-    expect(smokeSpec).toContain('BROKER_DEPLOY_SMOKE_QQ_AUTH_HMAC_PSK');
-    expect(smokeSpec).toContain('/v1/auth/qq/assert');
-    expect(smokeSpec).toContain('deploy-smoke-qq-');
-    expect(smokeSpec).toContain('ph-qq-subject-v1_');
-    expect(smokeSpec).toContain("expect(qqAssertion.body.status).toBe('issued')");
-    expect(smokeSpec).not.toContain("expect(qqAssertion.body.status).toBe('verified')");
-    expect(smokeSpec).toContain('assertQqIssuedResponse');
-    expect(smokeSpec).toContain('qqIssuedKey.openrouterApiKey');
-    expect(smokeSpec).toContain('reads issued child-key metadata');
-    expect(smokeSpec).toContain('recognizes model-routing failures as guardrail enforcement');
-    expect(smokeSpec).toContain('assertSuccessfulChatCompletionResponse');
-    expect(smokeSpec).toContain('assertManagedOpenRouterUserId');
-    expect(smokeSpec).toContain('issue.body.openrouter_user_id');
-    expect(smokeSpec).toContain('MANAGED_OPENROUTER_USER_ID_PATTERN');
-    expect(smokeSpec).toContain('MANAGED_OPENROUTER_USER_ID_PATTERN.test(value)');
-    expect(smokeSpec).not.toContain(
-      'expect(value).toMatch(MANAGED_OPENROUTER_USER_ID_PATTERN)',
-    );
-    expect(smokeSpec).toContain('ph-or-user-v');
-    expect(smokeSpec).toContain('MANAGED_TRIAL_ALLOWED_MODELS');
-    expect(smokeSpec).toContain('google/gemma-4-31b-it');
-    expect(smokeSpec).toContain('deepseek/deepseek-v4.1-flash');
-    expect(smokeSpec).toContain('deepseek/deepseek-v4-flash-0731');
-    expect(smokeSpec).toContain('deepseek/deepseek-v4-flash');
-    expect(smokeSpec).toContain('MANAGED_TRIAL_ALLOWED_MODELS');
-    expect(smokeSpec).toContain('must differ from the managed allowlisted models');
-    expect(readme).toContain('per-installation OpenRouter child key');
-    expect(readme).toContain('not the shared worker secret');
-    expect(readme).toContain('BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION');
-    expect(readme).toContain('OPENROUTER_MANAGED_API_KEY_PRODUCTION` remains transitional');
-    expect(readme).toContain('OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION');
-    expect(readme).toContain('OPENROUTER_MANAGED_USER_HMAC_SECRET');
-    expect(readme).toContain('QQ_AUTH_HMAC_PSK_PRODUCTION');
-    expect(readme).toContain('QQ_AUTH_HMAC_PSK');
-    expect(readme).toContain('TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION');
-    expect(readme).toContain('TELEMETRY_SUBJECT_HMAC_SECRET');
-    expect(readme).toContain('POST /v1/auth/qq/assert');
-    expect(readme).toContain('POST /v1/telemetry/app-active-day');
-    expect(readme).toContain('production issuance-capable when runtime issuance configuration is present');
-    expect(readme).toContain('issuance-disabled verification-only behavior');
-    expect(readme).toContain('bounded retryable/internal error envelope');
-    expect(readme).toContain('qq_managed_entitlements');
-    expect(readme).toContain('broker_issue_success_events');
-    expect(readme).toContain('issue_source');
-    expect(readme).toContain('subject_ref');
-    expect(readme).not.toContain('test-only `POST /v1/auth/qq/assert`');
-    expect(readme).not.toContain('test-only QQ Bot assertion evidence');
-    expect(readme).toContain('0008_add_qq_auth_assertions.sql');
-    expect(readme).toContain('qq_auth_assertions');
-    expect(readme).toContain('qqAuthAssertIp');
-    expect(readme).toContain('DISCORD_CLIENT_ID_PRODUCTION');
-    expect(readme).toContain('DISCORD_CLIENT_SECRET_PRODUCTION');
-    expect(readme).toContain('DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION');
-    expect(readme).toContain('DISCORD_USER_REF_SECRET_PRODUCTION');
-    expect(readme).toContain('DISCORD_CLIENT_ID');
-    expect(readme).toContain('DISCORD_CLIENT_SECRET');
-    expect(readme).toContain('DISCORD_REDIRECT_URI_ALLOWLIST');
-    expect(readme).toContain('DISCORD_USER_REF_SECRET');
-    expect(readme).toContain('DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION');
-    expect(readme).toContain('DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL');
-    expect(readme).toContain('DISCORD_DAILY_REPORT_WEBHOOK_URL');
-    expect(readme).toContain('puripuly_daily_summary.v2');
-    expect(workflow).toContain('deploy/finalize-daily-summary-v2.sql');
-    expect(workflow).toContain(
-      "json_type(value, '$.dailyReport.includeZeroActivity') AS legacy_type",
-    );
-    expect(workflow.indexOf('pnpm exec wrangler deploy')).toBeLessThan(
-      workflow.indexOf('deploy/finalize-daily-summary-v2.sql'),
-    );
-    expect(workflow.indexOf('deploy/finalize-daily-summary-v2.sql')).toBeLessThan(
-      workflow.indexOf('broker/tests/deploy-smoke/canonical-production.spec.ts'),
-    );
-    expect(readFileSync(dailySummaryV2Finalizer, 'utf8')).toContain(
-      "json_remove(value, '$.dailyReport.includeZeroActivity')",
-    );
-    expect(workflow).toContain('deploy/finalize-app-active-day.sql');
-    expect(workflow).toContain(
-      "json_type(value, '$.telemetryTranslationSuccessDayIp') AS legacy_type",
-    );
-    expect(workflow.indexOf('pnpm exec wrangler deploy')).toBeLessThan(
-      workflow.indexOf('deploy/finalize-app-active-day.sql'),
-    );
-    expect(workflow.indexOf('deploy/finalize-app-active-day.sql')).toBeLessThan(
-      workflow.indexOf('broker/tests/deploy-smoke/canonical-production.spec.ts'),
-    );
-    expect(readFileSync(appActiveDayFinalizer, 'utf8')).toContain(
-      "json_remove(value, '$.telemetryTranslationSuccessDayIp')",
-    );
-    expect(readme).toContain('three-month expiry');
-    expect(readme).not.toContain('six-month expiry');
-    expect(readme).toContain('optional `openrouter_user_id`');
-    expect(readme).toContain('google/gemma-4-31b-it');
-    expect(readme).toContain('deepseek/deepseek-v4.1-flash');
-    expect(readme).toContain('deepseek/deepseek-v4-flash-0731');
-    expect(readme).toContain('deepseek/deepseek-v4-flash');
-  });
-
-  it.skipIf(!bashAvailable)('guards network identity key versions and the previous pair before migrations', () => {
-    const workflow = readFileSync(deployWorkflow, 'utf8');
-    const guardScript = extractWorkflowRunBlock(
-      workflow,
-      'Guard production deploy ref and confirmation',
-    );
-    const scenarios: Array<{
-      name: string;
-      env: Record<string, string | undefined>;
-      expectStatus: number;
-      expectStderrContains?: string;
-    }> = [
-      {
-        name: 'first deploy v1 without previous',
-        env: {
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '1',
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: undefined,
-          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: undefined,
-        },
-        expectStatus: 0,
-      },
-      {
-        name: 'rotation v2 with previous v1',
-        env: {
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '2',
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: '1',
-          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: 'guard-scenario-previous-secret',
-        },
-        expectStatus: 0,
-      },
-      {
-        name: 'missing current version is rejected without an implicit default',
-        env: {
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: undefined,
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: undefined,
-          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: undefined,
-        },
-        expectStatus: 1,
-        expectStderrContains:
-          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.',
-      },
-      {
-        name: 'zero current version is rejected',
-        env: { NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '0' },
-        expectStatus: 1,
-        expectStderrContains:
-          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.',
-      },
-      {
-        name: 'non-numeric current version is rejected',
-        env: { NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: 'v1' },
-        expectStatus: 1,
-        expectStderrContains:
-          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.',
-      },
-      {
-        name: 'zero-padded current version is rejected',
-        env: { NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '01' },
-        expectStatus: 1,
-        expectStderrContains:
-          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.',
-      },
-      {
-        name: 'previous version without previous secret is rejected',
-        env: {
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '2',
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: '1',
-          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: undefined,
-        },
-        expectStatus: 1,
-        expectStderrContains:
-          'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is set.',
-      },
-      {
-        name: 'whitespace-only previous secret does not satisfy the pair',
-        env: {
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '2',
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: '1',
-          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: '   ',
-        },
-        expectStatus: 1,
-        expectStderrContains:
-          'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is set.',
-      },
-      {
-        name: 'previous secret without previous version is rejected',
-        env: {
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '2',
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: undefined,
-          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: 'guard-scenario-previous-secret',
-        },
-        expectStatus: 1,
-        expectStderrContains:
-          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is set.',
-      },
-      {
-        name: 'non-numeric previous version is rejected',
-        env: {
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '2',
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: 'v1',
-          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: 'guard-scenario-previous-secret',
-        },
-        expectStatus: 1,
-        expectStderrContains:
-          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must be a positive integer when set.',
-      },
-      {
-        name: 'previous version equal to current is rejected',
-        env: {
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '2',
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: '2',
-          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: 'guard-scenario-previous-secret',
-        },
-        expectStatus: 1,
-        expectStderrContains:
-          'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must differ from NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION.',
-      },
-    ];
-
-    for (const scenario of scenarios) {
-      const result = runGuardScript(guardScript, scenario.env);
-      expect(result.status, scenario.name).toBe(scenario.expectStatus);
-      if (scenario.expectStderrContains !== undefined) {
-        expect(result.stderr, scenario.name).toContain(scenario.expectStderrContains);
-      }
-      expect(result.stderr, scenario.name).not.toContain('guard-scenario-current-secret');
-      expect(result.stderr, scenario.name).not.toContain('guard-scenario-previous-secret');
+      expect(calls).toHaveLength(3);
+      expect(calls[0].args).toContain('--command');
+      expect(calls[0].results).toEqual([
+        { max_count: 333, window_days: 1, updated_at: '2000-01-01 00:00:00' },
+      ]);
+      expect(calls[1].args).toContain('--file');
+      expect(calls[2].args).toContain('--command');
+      expect(calls[2].results).toEqual([
+        expect.objectContaining({ max_count: Number(cap), window_days: 1 }),
+      ]);
     }
   }, 15000);
 
-  it('ships a manual production workflow that updates only the broker daily auth cap runtime config', () => {
-    const workflow = readFileSync(abuseControlsWorkflow, 'utf8');
+  it.skipIf(!bashAvailable)('rejects unauthorized or invalid daily-cap inputs before rendering or D1 access', () => {
+    const script = dailyCapWorkflowScript();
+    const rejections: Array<Record<string, string | undefined>> = [
+      { CONFIRM_UPDATE: undefined },
+      { CONFIRM_UPDATE: 'update broker daily auth cap ' },
+      ...[undefined, '', '0', '-1', '100001', '18446744073709551617', '9'.repeat(1000), '1.5', 'abc', '01'].map(
+        (TARGET_MAX_COUNT) => ({ TARGET_MAX_COUNT }),
+      ),
+      ...['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'BROKER_D1_DATABASE_ID_PRODUCTION'].flatMap(
+        (name) => [{ [name]: undefined }, { [name]: ' \t ' }],
+      ),
+    ];
+    for (const overrides of rejections) {
+      const scenario = createDailyCapScenario(overrides);
+      const result = runBashScript(script, scenario.tempDir, scenario.env);
+      expect(result.status, JSON.stringify(overrides)).toBe(1);
+      expect(existsSync(join(scenario.tempDir, 'wrangler.production.jsonc'))).toBe(false);
+      expect(existsSync(scenario.callLogPath)).toBe(false);
+    }
+  }, 15000);
 
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toContain('\npush:');
-    expect(workflow).toContain('environment: production');
-    expect(workflow).toContain('max_count');
-    expect(workflow).toContain('default: "1000"');
-    expect(workflow).toContain('confirm_update');
-    expect(workflow).toContain('update broker daily auth cap');
-    expect(workflow).toContain('CLOUDFLARE_API_TOKEN');
-    expect(workflow).toContain('CLOUDFLARE_ACCOUNT_ID');
-    expect(workflow).toContain('BROKER_D1_DATABASE_ID_PRODUCTION');
-    expect(workflow).toContain('render-production-wrangler-config.mjs');
-    expect(workflow).toContain('wrangler.production.jsonc');
-    expect(workflow).toContain('wrangler d1 execute');
-    expect(workflow).toContain('puripuly-heart-broker --remote --config');
-    expect(workflow).toContain("json_set(value, '$.newActiveEntitlementsPerDay.maxCount'");
-    expect(workflow).toContain("json_extract(value, '$.newActiveEntitlementsPerDay.maxCount')");
-    expect(workflow).toContain('Daily auth cap verification failed');
-    expect(workflow).not.toContain('wrangler deploy');
-    expect(workflow).not.toContain('wrangler d1 migrations apply');
-    expect(workflow).not.toContain('wrangler secret put');
-  });
+  it.skipIf(!bashAvailable)('rejects missing or invalid configured identity versions before daily-cap D1 access', () => {
+    const script = dailyCapWorkflowScript();
+    const rejections: Array<Record<string, string | undefined>> = [
+      ...[undefined, '', ' ', '0', 'v7', '9007199254740992'].map(
+        (NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION) => ({ NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }),
+      ),
+      ...['0', 'v6', '7'].map(
+        (NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION) => ({ NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }),
+      ),
+    ];
+    for (const overrides of rejections) {
+      const scenario = createDailyCapScenario(overrides);
+      const result = runBashScript(script, scenario.tempDir, scenario.env);
+      expect(result.status, JSON.stringify(overrides)).toBe(1);
+      expect(existsSync(join(scenario.tempDir, 'wrangler.production.jsonc'))).toBe(false);
+      expect(existsSync(scenario.callLogPath)).toBe(false);
+    }
+  }, 15000);
+
+  it.skipIf(!bashAvailable)('rejects a missing row, mismatched cap, or wrong daily window in the actual maintenance readback', () => {
+    const workflow = readFileSync(abuseControlsWorkflow, 'utf8');
+    const render = extractWorkflowRunBlock(workflow, 'Render production Wrangler config');
+    const verify = extractWorkflowRunBlock(workflow, 'Verify daily auth cap runtime config');
+    for (const sql of [
+      "DELETE FROM broker_config WHERE key = 'abuse_controls'",
+      "UPDATE broker_config SET value = json_set(value, '$.newActiveEntitlementsPerDay.maxCount', 444) WHERE key = 'abuse_controls'",
+      "UPDATE broker_config SET value = json_set(value, '$.newActiveEntitlementsPerDay.windowDays', 2) WHERE key = 'abuse_controls'",
+    ]) {
+      const scenario = createDailyCapScenario({ TARGET_MAX_COUNT: '333' });
+      const db = new DatabaseSync(scenario.databasePath);
+      try {
+        db.exec(sql);
+      } finally {
+        db.close();
+      }
+      expect(runBashScript(render, scenario.tempDir, scenario.env).status).toBe(0);
+      const result = runBashScript(verify, scenario.tempDir, scenario.env);
+      expect(result.status, sql).toBe(1);
+      expect(readFileSync(scenario.callLogPath, 'utf8').trim().split('\n')).toHaveLength(1);
+    }
+  }, 15000);
 });
 
 const bashAvailable = (() => {
   try {
-    return spawnSync('bash', ['--version']).status === 0;
+    return spawnSync(bashExecutable, ['--version']).status === 0;
   } catch {
     return false;
   }
@@ -1160,12 +395,12 @@ function extractWorkflowRunBlock(workflow: string, stepName: string): string {
   const stepIndex = workflow.indexOf(`- name: ${stepName}`);
   expect(stepIndex).toBeGreaterThanOrEqual(0);
 
-  const runMarker = '\n        run: |\n';
-  const runIndex = workflow.indexOf(runMarker, stepIndex);
-  expect(runIndex).toBeGreaterThanOrEqual(0);
+  const runMatch = workflow.slice(stepIndex).match(/\n        run: (\||>-)\n/u);
+  expect(runMatch).not.toBeNull();
+  const runIndex = stepIndex + runMatch!.index! + runMatch![0].length;
 
   const body: string[] = [];
-  for (const line of workflow.slice(runIndex + runMarker.length).split('\n')) {
+  for (const line of workflow.slice(runIndex).split('\n')) {
     if (line !== '' && !line.startsWith('          ')) {
       break;
     }
@@ -1174,65 +409,93 @@ function extractWorkflowRunBlock(workflow: string, stepName: string): string {
   while (body.length > 0 && body[body.length - 1] === '') {
     body.pop();
   }
-  return `${body.join('\n')}\n`;
+  return `${body.join(runMatch![1] === '>-' ? ' ' : '\n')}\n`;
 }
-function guardScenarioEnv(overrides: Record<string, string | undefined>): Record<string, string> {
-  const env: Record<string, string> = {
-    GITHUB_REF: 'refs/heads/dev',
-    CONFIRM_PRODUCTION_DEPLOY: 'deploy puripuly-heart-broker from dev',
-    DELETE_LEGACY_TRANSLATION_TELEMETRY: 'false',
-    BROKER_CANONICAL_WORKERS_DEV_URL: 'https://puripuly-heart-broker.example.workers.dev',
-    BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION: 'guard-scenario-disallowed-model',
-    CLOUDFLARE_API_TOKEN: 'guard-scenario-api-token',
-    CLOUDFLARE_ACCOUNT_ID: 'guard-scenario-account-id',
-    BROKER_D1_DATABASE_ID_PRODUCTION: 'guard-scenario-database-id',
-    OPENROUTER_MANAGED_API_KEY_PRODUCTION: 'guard-scenario-managed-key',
-    OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION: 'guard-scenario-management-key',
-    OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION: 'guard-scenario-guardrail-id',
-    OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION: 'guard-scenario-user-hmac-secret',
-    QQ_AUTH_HMAC_PSK_PRODUCTION: 'guard-scenario-qq-psk',
-    TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION: 'guard-scenario-telemetry-secret',
-    DISCORD_CLIENT_ID_PRODUCTION: 'guard-scenario-discord-client-id',
-    DISCORD_CLIENT_SECRET_PRODUCTION: 'guard-scenario-discord-client-secret',
-    DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION:
-      'http://127.0.0.1:62187/discord/callback, http://127.0.0.1:62188/discord/callback, http://127.0.0.1:62189/discord/callback',
-    DISCORD_USER_REF_SECRET_PRODUCTION: 'guard-scenario-discord-user-ref-secret',
-    NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION: 'guard-scenario-current-secret',
-    NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '1',
-    DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION: 'https://discord.example/webhook',
-  };
-  for (const [key, value] of Object.entries(overrides)) {
-    if (value === undefined) {
-      delete env[key];
-    } else {
-      env[key] = value;
-    }
-  }
-  return env;
+
+function dailyCapWorkflowScript(): string {
+  const workflow = readFileSync(abuseControlsWorkflow, 'utf8');
+  let previousIndex = -1;
+  return [
+    'Guard production runtime-config update inputs',
+    'Render production Wrangler config',
+    'Inspect current daily auth cap',
+    'Update daily auth cap runtime config',
+    'Verify daily auth cap runtime config',
+  ].map((name) => {
+    const index = workflow.indexOf(`- name: ${name}`);
+    expect(index).toBeGreaterThan(previousIndex);
+    previousIndex = index;
+    return extractWorkflowRunBlock(workflow, name);
+  }).join('\n');
 }
-function runGuardScript(
-  guardScript: string,
-  envOverrides: Record<string, string | undefined>,
-): { status: number; stderr: string } {
+
+function createDailyCapScenario(overrides: Record<string, string | undefined>) {
   const tempDir = createRepoTempDir();
-  const scriptPath = join(tempDir, 'guard-scenario.sh');
-  const assignments = Object.entries(guardScenarioEnv(envOverrides)).map(
-    ([key, value]) => `${key}='${value.replace(/'/g, `'"'"'`)}'`,
+  mkdirSync(join(tempDir, 'scripts'));
+  writeFileSync(
+    join(tempDir, 'scripts', 'render-production-wrangler-config.mjs'),
+    readFileSync(renderWranglerConfigScript),
   );
-  writeFileSync(scriptPath, `${assignments.join('\n')}\n${guardScript}`, 'utf8');
-  const bashPath = relative(process.cwd(), scriptPath).split(sep).join('/');
+  writeFileSync(join(tempDir, 'wrangler.jsonc'), readFileSync(checkedInWranglerConfig));
+  const databasePath = join(tempDir, 'synthetic-d1.sqlite');
+  const callLogPath = join(tempDir, 'd1-calls.jsonl');
+  const db = new DatabaseSync(databasePath);
   try {
-    execFileSync('bash', [bashPath], {
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-    return { status: 0, stderr: '' };
-  } catch (error) {
-    const execError = error as { status?: number; stderr?: string | Buffer };
-    if (execError.status === undefined) {
-      throw error;
-    }
-    return { status: execError.status, stderr: String(execError.stderr ?? '') };
+    db.exec(`
+      CREATE TABLE broker_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
+      INSERT INTO broker_config VALUES
+        ('abuse_controls', '{"newActiveEntitlementsPerDay":{"maxCount":333,"windowDays":1},"preserved":{"enabled":true}}', '2000-01-01 00:00:00'),
+        ('fingerprint_salt', '{"preserved":"salt"}', '2000-01-01 00:00:00');
+      CREATE TABLE maintenance_sentinel (value TEXT NOT NULL);
+      INSERT INTO maintenance_sentinel VALUES ('untouched');
+    `);
+  } finally {
+    db.close();
   }
+  writeFileSync(join(tempDir, 'bash-env.sh'), 'pnpm() { node ./synthetic-d1.mjs "$@"; }\n');
+  writeFileSync(join(tempDir, 'synthetic-d1.mjs'), `
+import assert from 'node:assert/strict';
+import { appendFileSync, readFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
+const args = process.argv.slice(2);
+assert.deepEqual(args.slice(0, 5), ['exec', 'wrangler', 'd1', 'execute', 'puripuly-heart-broker']);
+assert(args.includes('--remote'));
+assert(args.includes('--json'));
+assert.equal(args[args.indexOf('--config') + 1], 'wrangler.production.jsonc');
+const config = readFileSync('wrangler.production.jsonc', 'utf8');
+assert(config.includes('"database_id": "daily-cap-synthetic-database"'));
+const db = new DatabaseSync('synthetic-d1.sqlite');
+let results = [];
+try {
+  if (args.includes('--file')) {
+    assert(args.includes('--yes'));
+    db.exec(readFileSync(args[args.indexOf('--file') + 1], 'utf8'));
+  } else {
+    assert(args.includes('--command'));
+    results = db.prepare(args[args.indexOf('--command') + 1]).all();
+  }
+} finally {
+  db.close();
+}
+appendFileSync('d1-calls.jsonl', JSON.stringify({ args, results }) + '\\n');
+process.stdout.write(JSON.stringify([{ success: true, results }]));
+`);
+  return {
+    tempDir,
+    databasePath,
+    callLogPath,
+    env: {
+      BASH_ENV: './bash-env.sh',
+      CONFIRM_UPDATE: 'update broker daily auth cap',
+      TARGET_MAX_COUNT: '450',
+      CLOUDFLARE_API_TOKEN: 'daily-cap-synthetic-token',
+      CLOUDFLARE_ACCOUNT_ID: 'daily-cap-synthetic-account',
+      BROKER_D1_DATABASE_ID_PRODUCTION: 'daily-cap-synthetic-database',
+      NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '7',
+      NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: undefined,
+      ...overrides,
+    },
+  };
 }
 function runBashScript(
   script: string,
@@ -1253,15 +516,18 @@ function runBashScript(
   const bashCwd = relative(process.cwd(), cwd).split(sep).join('/');
   const quotedBashCwd = bashCwd.replace(/'/g, `'"'"'`);
   const sourceBashEnv = overrides.BASH_ENV === undefined ? '' : 'source "$BASH_ENV"\n';
+  const nodePath = process.execPath.split(sep).join('/').replace(/'/g, `'"'"'`);
+  const runtimeBindings = `node() { '${nodePath}' "$@"; }\n` +
+    (process.platform === 'win32' ? 'python3() { python "$@"; }\n' : '');
   const scriptPath = join(cwd, 'workflow-step-scenario.sh');
   writeFileSync(
     scriptPath,
-    `cd '${quotedBashCwd}'\n${assignments.join('\n')}\n${sourceBashEnv}${script}`,
+    `cd '${quotedBashCwd}'\n${runtimeBindings}${assignments.join('\n')}\n${sourceBashEnv}${script}`,
     'utf8',
   );
   const bashPath = relative(process.cwd(), scriptPath).split(sep).join('/');
   const result = spawnSync(
-    'bash',
+    bashExecutable,
     ['--noprofile', '--norc', '-e', '-o', 'pipefail', bashPath],
     {
       encoding: 'utf8',
@@ -1292,16 +558,7 @@ function createTempDir(): string {
 function runNodeScript(scriptUrl: URL, args: string[]): string {
   return execFileSync(process.execPath, [fileURLToPath(scriptUrl), ...args], {
     encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
 }
 
-function extractBetween(source: string, startMarker: string, endMarker: string): string {
-  const startIndex = source.indexOf(startMarker);
-  expect(startIndex).toBeGreaterThanOrEqual(0);
-
-  const contentStartIndex = startIndex + startMarker.length;
-  const endIndex = source.indexOf(endMarker, contentStartIndex);
-  expect(endIndex).toBeGreaterThanOrEqual(0);
-
-  return source.slice(contentStartIndex, endIndex);
-}

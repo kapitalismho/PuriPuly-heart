@@ -40,6 +40,7 @@ def test_cpu_profile_preserves_fixed_common_and_mtp_contract(tmp_path: Path) -> 
     assert "--warmup" in command
     assert "--perf" in command
     assert "--metrics" in command
+    assert "--offline" in command
     assert "--no-webui" in command
     assert _values(command, "--threads-http") == ["1"]
     assert _values(command, "--host") == ["127.0.0.1"]
@@ -91,6 +92,7 @@ def test_gpu_profile_is_vulkan_full_offload_without_mtp(tmp_path: Path) -> None:
     assert _values(command, "--device") == ["Vulkan2"]
     assert _values(command, "--n-gpu-layers") == ["99"]
     assert _values(command, "--flash-attn") == ["on"]
+    assert "--offline" in command
     assert _values(command, "--prio") == ["-1"]
     assert _values(command, "--cache-type-k") == ["f16"]
     assert _values(command, "--cache-type-v") == ["f16"]
@@ -181,7 +183,15 @@ def test_26b_fixed_vulkan_profile_uses_exact_artifact_and_no_drafter(tmp_path):
     }
     for flag, value in expected.items():
         assert _values(command, flag) == [value]
-    for flag in ("--swa-full", "--cache-prompt", "--warmup", "--perf", "--metrics", "--no-webui"):
+    for flag in (
+        "--offline",
+        "--swa-full",
+        "--cache-prompt",
+        "--warmup",
+        "--perf",
+        "--metrics",
+        "--no-webui",
+    ):
         assert command.count(flag) == 1
     assert not any(item.startswith("--spec-") for item in command)
 

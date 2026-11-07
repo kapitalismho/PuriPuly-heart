@@ -12,8 +12,8 @@ from puripuly_heart.app.ports.desktop_overlay import (
     DesktopWorkAreaPort,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
-from puripuly_heart.app.services.settings_application import SettingsApplicationOwner
+from puripuly_heart.app.services.overlay.overlay_application import OverlayApplicationOwner
+from puripuly_heart.app.services.settings.settings_application import SettingsApplicationOwner
 from puripuly_heart.config.resolved import OVERLAY_TARGET_DESKTOP, ResolvedOverlayConfig
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,

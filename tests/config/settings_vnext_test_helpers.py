@@ -19,17 +19,3 @@ def assert_raw_vnext_settings_file(path: Path) -> dict[str, Any]:
     assert set(data) == CANONICAL_SETTINGS_TOP_LEVEL_KEYS
     assert data["settings_version"] == VNEXT_SETTINGS_SCHEMA_VERSION
     return data
-
-
-def legacy_projected_settings_dict(raw_vnext: dict[str, Any]) -> dict[str, Any]:
-    return assert_raw_vnext_dict(raw_vnext)
-
-
-def assert_raw_vnext_dict(raw_vnext: dict[str, Any]) -> dict[str, Any]:
-    assert set(raw_vnext) == CANONICAL_SETTINGS_TOP_LEVEL_KEYS
-    assert raw_vnext["settings_version"] == VNEXT_SETTINGS_SCHEMA_VERSION
-    return raw_vnext
-
-
-def legacy_projected_settings_file(path: Path) -> dict[str, Any]:
-    return legacy_projected_settings_dict(assert_raw_vnext_settings_file(path))

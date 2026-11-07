@@ -60,7 +60,7 @@ async def test_peer_desktop_transcripts_are_routed_to_peer_runtime_and_never_sen
 
 
 @pytest.mark.asyncio
-async def test_peer_final_runs_owner_creates_ordered_children_for_language_runs() -> None:
+async def test_peer_translation_creates_ordered_children_for_language_runs() -> None:
     harness = compose_translation_test_harness(
         stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock(_now=10.0)
     )
@@ -118,44 +118,6 @@ async def test_peer_final_event_preserves_language_runs_at_the_current_consumer_
     assert event.type == UIEventType.TRANSCRIPT_FINAL
     assert isinstance(event.payload, Transcript)
     assert event.payload.final_language_runs == runs
-
-
-@pytest.mark.asyncio
-async def test_integrated_context_always_includes_peer_entries() -> None:
-    clock = FakeClock(_now=112.0)
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        clock=clock,
-        integrated_context_enabled=True,
-        peer_translation_enabled=True,
-    )
-    harness.replace_configuration(source_language="en")
-    harness.replace_configuration(target_language="ko")
-    harness.self_runtime.remember_context(
-        "self line",
-        timestamp=100.0,
-        source_language="en",
-        target_language="ko",
-    )
-    harness.peer_runtime.remember_context(
-        "peer line",
-        timestamp=105.0,
-        source_language="en",
-        target_language="ko",
-    )
-
-    context, mode = harness.translation_requests.context_resolver.resolve_for_request(
-        runtime=harness.self_runtime,
-        other_runtime=harness.peer_runtime,
-        source_language="en",
-        target_language="ko",
-    )
-
-    assert mode == "integrated"
-    assert "self line" in context
-    assert "peer line" in context
 
 
 def test_integrated_context_includes_opposite_direction_peer_entries() -> None:

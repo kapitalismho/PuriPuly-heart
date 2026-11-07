@@ -7,7 +7,13 @@ from collections.abc import Callable
 
 import httpx
 import pytest
-from puripuly_heart.core.managed_openrouter_release import (
+
+from puripuly_heart.app.ports.broker_client import (
+    ManagedKeyDeliveryAckRequest,
+    QqManagedAssertionRequest,
+)
+from puripuly_heart.core.diagnostics import sanitize_diagnostics
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterChallengeSuccess,
     ManagedOpenRouterDiscordStartSuccess,
     ManagedOpenRouterFingerprintSalt,
@@ -15,12 +21,6 @@ from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterReleaseError,
     ManagedOpenRouterVerifySuccess,
 )
-
-from puripuly_heart.app.ports.broker_client import (
-    ManagedKeyDeliveryAckRequest,
-    QqManagedAssertionRequest,
-)
-from puripuly_heart.core.diagnostics import sanitize_diagnostics
 
 
 class TrackingTransport(httpx.AsyncBaseTransport):
@@ -79,7 +79,7 @@ def _build_client(
     *,
     base_url: str = "https://broker.example.test",
 ) -> tuple[object, TrackingTransport]:
-    from puripuly_heart.core.managed_openrouter_broker_client import (
+    from puripuly_heart.core.openrouter.managed_openrouter_broker_client import (
         HttpManagedOpenRouterBrokerClient,
     )
 
@@ -1853,7 +1853,7 @@ async def test_retry_after_http_date_is_retained_and_bounded():
 
 @pytest.mark.asyncio
 async def test_local_ca_configuration_is_actionable_before_broker_dispatch(monkeypatch, tmp_path):
-    from puripuly_heart.core.managed_openrouter_broker_client import (
+    from puripuly_heart.core.openrouter.managed_openrouter_broker_client import (
         HttpManagedOpenRouterBrokerClient,
     )
 

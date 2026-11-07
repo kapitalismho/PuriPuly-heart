@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import sys
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -373,5 +375,96 @@ async def test_client_rejects_oversized_request_before_dispatch():
             )
         assert error.value.code == "request_too_large"
         assert control.calls == 0
+    finally:
+        await server.close()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows authenticated instance discovery")
+@pytest.mark.asyncio
+async def test_cli_subprocess_discovers_authenticates_and_keeps_valid_queries_after_rejection(
+    tmp_path, monkeypatch
+):
+    from puripuly_heart.core.control_instance import acquire, discover
+
+    profile = tmp_path / "isolated-profile"
+    for name in ("HOME", "USERPROFILE", "LOCALAPPDATA", "APPDATA", "XDG_CONFIG_HOME"):
+        directory = profile / name.lower()
+        directory.mkdir(parents=True)
+        monkeypatch.setenv(name, str(directory))
+    environment = {
+        name: value
+        for name, value in os.environ.items()
+        if not name.startswith(("PURIPULY_HEART_", "PYTHON"))
+    }
+    settings = tmp_path / "synthetic-settings.json"
+    instance_id = "00000000-0000-0000-0000-000000000295"
+    token = "synthetic-control-token-" + "a" * 32
+    control = _Control()
+    server = ControlServer(control, instance_id=instance_id, token=token)
+    port = await server.start()
+
+    async def invoke(*arguments):
+        process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-I",
+            "-B",
+            "-m",
+            "puripuly_heart.main",
+            "cli",
+            "--config",
+            str(settings),
+            *arguments,
+            cwd=tmp_path,
+            env=environment,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), 15)
+        finally:
+            if process.returncode is None:
+                process.kill()
+                await process.wait()
+        assert token not in (stdout + stderr).decode("utf-8")
+        return process.returncode, stdout.decode("utf-8"), stderr.decode("utf-8")
+
+    try:
+        with acquire(settings) as lease:
+            lease.publish(port=port, token=token, instance_id=instance_id)
+            code, stdout, stderr = await invoke("capabilities")
+            assert code == 0, stderr
+            assert stderr == ""
+            assert json.loads(stdout) == {"output_version": 1, "queries": ["app.status"]}
+
+            private = "SYNTHETIC_PRIVATE_CREDENTIAL"
+            code, stdout, stderr = await invoke(
+                "command", "auth.login", "--arguments", json.dumps({"credential": private})
+            )
+            assert code == 3
+            assert stdout == ""
+            assert json.loads(stderr)["error"]["code"] == "invalid_input"
+            assert private not in stderr
+            assert control.calls == 1
+
+            code, stdout, stderr = await invoke("app", "status")
+            assert code == 0, stderr
+            assert stderr == ""
+            assert json.loads(stdout) == {
+                "output_version": 1,
+                "instance_id": instance_id,
+                "port": port,
+                "status": "ready",
+                "name": "app.status",
+            }
+            assert control.calls == 2
+        assert discover(settings) is None
+        code, stdout, stderr = await invoke("capabilities")
+        assert code == 3
+        assert stdout == ""
+        assert json.loads(stderr)["error"]["code"] == "instance_not_found"
+        assert control.calls == 2
+        assert not settings.exists()
+        assert not list(profile.rglob("secrets*"))
+        assert not list(profile.rglob("*.log"))
     finally:
         await server.close()

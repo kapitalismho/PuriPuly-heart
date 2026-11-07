@@ -3,8 +3,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
 
+from puripuly_heart.app.services.settings.settings_application import (
+    settings_view_surface_snapshots,
+)
 from puripuly_heart.composition.application_runtime import compose_application_runtime
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings, save_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
@@ -20,8 +22,6 @@ async def test_peer_provider_options_survive_composed_apply_and_reload(
     already_selected: bool,
     peer_provider: str,
 ) -> None:
-    monkeypatch.setattr(SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(SettingsView, "_refresh_microphones", lambda self: None)
     monkeypatch.setattr(SettingsView, "_load_secrets", lambda self, *args: None)
     monkeypatch.setattr(SettingsView, "update", lambda self: None)
     view = SettingsView()
@@ -67,7 +67,9 @@ async def test_peer_provider_options_survive_composed_apply_and_reload(
         assert len(pending) == 1
         intent = pending.pop()
         assert intent is not None
-        await app.apply_provider_intent(intent)
+        outcome = await app.apply_settings_change(intent)
+        assert outcome.saved is True
+        assert outcome.transaction is not None
         view.acknowledge_provider_apply_settings(intent)
         app.refresh_settings_projection()
 

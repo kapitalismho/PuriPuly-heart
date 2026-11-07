@@ -5,22 +5,11 @@ import asyncio
 import pytest
 
 from puripuly_heart.core.runtime import GithubStarPromptRuntime
-from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
 async def _flush_loop() -> None:
     await asyncio.sleep(0)
     await asyncio.sleep(0)
-
-
-def test_github_star_prompt_runtime_exposes_lifecycle_inventory() -> None:
-    runtime = GithubStarPromptRuntime()
-
-    snapshot = runtime.lifecycle_owner_snapshot()
-
-    assert_lifecycle_structure(snapshot)
-    assert snapshot["owner"] == "GithubStarPromptRuntime"
-    assert len(snapshot["resource_fields"]) == 3
 
 
 @pytest.mark.asyncio

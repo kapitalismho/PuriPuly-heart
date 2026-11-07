@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     LocalASRProviderRuntimeSnapshot,
     ProviderRuntimeBuildRequest,

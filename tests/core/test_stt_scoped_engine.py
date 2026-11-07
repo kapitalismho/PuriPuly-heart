@@ -425,7 +425,7 @@ async def test_successor_start_waits_without_holding_ingress_lock_for_predecesso
 async def test_sealed_overlap_admits_successor_and_orders_out_of_order_terminals_before_delivery() -> (
     None
 ):
-    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("local_qwen"))
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("local_cpu_auto"))
     a_start, _a_chunk, a_end = segment_events(ledger, start_sample=100, now=1.0)
     b_start, _b_chunk, b_end = segment_events(ledger, start_sample=200, now=2.0)
     session = ControlledScopedSession()
@@ -504,7 +504,7 @@ async def test_successor_begin_failure_drains_predecessor_terminal_from_retiring
 
     ledger = PeerAudioSegmentLedger(
         activation_generation=1,
-        settings=settings("local_qwen"),
+        settings=settings("local_cpu_auto"),
     )
     a_start, _a_chunk, a_end = segment_events(ledger, start_sample=100, now=1.0)
     b_start, _b_chunk, _b_end = segment_events(ledger, start_sample=200, now=2.0)
@@ -736,7 +736,7 @@ def test_event_buffer_coalesces_provisional_and_fails_stable_overflow() -> None:
     assert buffer.depth == 1
 
     stable_buffer = STTProviderEventBuffer()
-    for sequence in range(256):
+    for sequence in range(stable_buffer.max_events):
         assert stable_buffer.put(
             STTProviderTurnUpdate(
                 identity=identity,
@@ -1175,8 +1175,9 @@ def test_normalizer_bounds_private_raw_whitespace_and_cumulative_appends() -> No
 
 
 @pytest.mark.asyncio
-async def test_local_write_timeout_keeps_one_quarantined_resource() -> None:
-    local_settings = settings("local_qwen")
+@pytest.mark.parametrize("provider_id", ["local_cpu_auto", "local_granite", "local_gigaam"])
+async def test_local_write_timeout_keeps_one_quarantined_resource(provider_id: str) -> None:
+    local_settings = settings(provider_id)
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=local_settings)
     a_start, _a_chunk, a_end = segment_events(ledger, start_sample=500, now=5.0)
     b_start, _b_chunk, b_end = segment_events(ledger, start_sample=600, now=6.0)
@@ -2226,7 +2227,7 @@ async def test_soniox_error_before_configuration_send_prioritizes_structured_fai
             event_sink=emitted.append,
             terminal_failure_sink=failures.append,
             watchdog_resolver=lambda _settings: watchdogs(
-                connect_retry_base_s=0.8, connect_retry_max_s=1.6
+                readiness_timeout_s=2, connect_retry_base_s=0.8, connect_retry_max_s=1.6
             ),
             sleep=sleep,
         )
@@ -2629,7 +2630,7 @@ async def test_idle_retirement_reopens_only_for_demand() -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "provider_id",
-    ["custom_offline", "local_cpu_auto", "local_parakeet_v3", "local_qwen_gpu"],
+    ["custom_offline", "local_cpu_auto", "local_granite", "local_gigaam", "local_qwen_gpu"],
 )
 async def test_disabled_session_lifetime_keeps_healthy_session_past_180s(
     provider_id: str,
@@ -3373,6 +3374,7 @@ async def test_shared_budget_counts_old_local_retention_against_new_scoped_engin
     )
     old_session = ControlledScopedSession()
     old_session.terminal_on_seal = ("empty", "")
+    old_events: list[STTProviderTurnEvent] = []
     old_engine = ScopedRecognitionEngine(
         channel="self",
         session_factory=lambda _settings, _epoch: asyncio.sleep(
@@ -3382,6 +3384,7 @@ async def test_shared_budget_counts_old_local_retention_against_new_scoped_engin
         watchdog_resolver=lambda _settings: watchdogs(),
         retention_profile_resolver=lambda _settings: profile,
     )
+    old_engine.bind_event_sink(old_events.append)
     new_session = ControlledScopedSession()
     new_terminals: list[STTProviderTurnTerminal] = []
     new_engine = ScopedRecognitionEngine(
@@ -3413,6 +3416,11 @@ async def test_shared_budget_counts_old_local_retention_against_new_scoped_engin
     await wait_until(lambda: budget.used_bytes == 0)
     await new_engine.close()
     await old_engine.close()
+    assert [
+        (event.identity, event.outcome)
+        for event in old_events
+        if isinstance(event, STTProviderTurnTerminal)
+    ] == [(old_session.requests[0].identity, "empty")]
 
 
 @pytest.mark.asyncio
@@ -3438,6 +3446,7 @@ async def test_streaming_scoped_engine_releases_native_copy_after_each_write() -
     )
     session = ControlledScopedSession()
     session.terminal_on_seal = ("empty", "")
+    emitted: list[STTProviderTurnEvent] = []
     engine = ScopedRecognitionEngine(
         channel="self",
         session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
@@ -3449,6 +3458,7 @@ async def test_streaming_scoped_engine_releases_native_copy_after_each_write() -
             retained_bytes_per_sample=4,
         ),
     )
+    engine.bind_event_sink(emitted.append)
 
     await engine.handle_owned_vad_event(start)
     assert budget.used_bytes == 24
@@ -3457,6 +3467,11 @@ async def test_streaming_scoped_engine_releases_native_copy_after_each_write() -
     assert budget.used_bytes == 0
     await engine.handle_owned_vad_event(end)
     await engine.close()
+    assert [
+        (event.identity, event.outcome)
+        for event in emitted
+        if isinstance(event, STTProviderTurnTerminal)
+    ] == [(session.requests[0].identity, "empty")]
 
 
 @pytest.mark.asyncio
@@ -3826,8 +3841,9 @@ async def test_queued_capture_discontinuity_retires_stream_after_successor_arriv
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failure", ["timeout", "error"])
+@pytest.mark.parametrize("with_context", [False, True])
 async def test_continuous_stream_write_failure_recovers_unsent_frames_and_new_finals(
-    failure: str,
+    failure: str, with_context: bool
 ) -> None:
     ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
     first_start, _, _ = segment_events(ledger, start_sample=0, now=0)
@@ -3859,7 +3875,19 @@ async def test_continuous_stream_write_failure_recovers_unsent_frames_and_new_fi
             await wait_until(sessions[0].write_cancelled.is_set)
         await engine.handle_stream_input(stream_input(ledger, 6, 10))
         assert len(sessions) == 1
-        await engine.handle_stream_input(stream_input(ledger, 8, 14))
+        recovery_input = (
+            stream_input(ledger, 12, 16) if with_context else stream_input(ledger, 8, 14)
+        )
+        if with_context:
+            recovery_input = replace(
+                recovery_input,
+                event=replace(
+                    recovery_input.event,
+                    pre_roll=np.full(2, 0.1, dtype=np.float32),
+                    pre_roll_capture=(span(10, 10, 12),),
+                ),
+            )
+        await engine.handle_stream_input(recovery_input)
         assert len(sessions) == 2
         recovered = sessions[1]
         assert recovered.requests == []
@@ -3867,7 +3895,7 @@ async def test_continuous_stream_write_failure_recovers_unsent_frames_and_new_fi
             (s.normalized_start_sample, s.normalized_end_sample)
             for _, ranges in recovered.audio
             for s in ranges
-        ] == [(10, 14)]
+        ] == ([(12, 16)] if with_context else [(10, 14)])
         new_stream = recovered.stream
         assert new_stream is not None and new_stream != old_stream
         assert not engine.is_current_recognition_stream(old_stream)
@@ -3894,6 +3922,7 @@ async def test_stream_recovery_connection_failure_exhausts_once_not_on_every_fra
     session = ControlledStreamSession()
     opens = 0
     failures: list[Exception] = []
+    emitted: list[STTProviderTurnEvent] = []
 
     async def factory(_settings, _epoch):
         nonlocal opens
@@ -3908,6 +3937,7 @@ async def test_stream_recovery_connection_failure_exhausts_once_not_on_every_fra
         watchdog_resolver=lambda _: watchdogs(write_timeout_s=0.01),
         terminal_failure_sink=failures.append,
     )
+    engine.bind_event_sink(emitted.append)
     try:
         await engine.handle_owned_vad_event(start)
         session.send_gate.clear()
@@ -3920,6 +3950,11 @@ async def test_stream_recovery_connection_failure_exhausts_once_not_on_every_fra
         assert failures[0].channel == engine.channel
     finally:
         await engine.close()
+    assert [
+        (event.identity, event.outcome)
+        for event in emitted
+        if isinstance(event, STTProviderInputTerminal)
+    ] == [(session.requests[0].identity, "cancelled")]
 
 
 @pytest.mark.asyncio
@@ -3936,16 +3971,22 @@ async def test_stream_recovery_connection_failure_exhausts_once_not_on_every_fra
         "cancelled",
     ],
 )
+@pytest.mark.parametrize("recovery", ["write_failure", "normal_idle"])
 async def test_inflight_stream_recovery_cannot_revive_invalidated_capture(
-    invalidation: str,
+    invalidation: str, recovery: str
 ) -> None:
     ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
-    start, _, _ = segment_events(ledger, start_sample=0, now=0)
+    start, _, end = segment_events(ledger, start_sample=0, now=100)
+    clock = ControlledMonotonicClock(value=100)
     sessions = [ControlledStreamSession(), ControlledStreamSession()]
+    emitted: list[STTProviderTurnEvent] = []
     opening = asyncio.Event()
     release = asyncio.Event()
     capture_current = True
     opens = 0
+
+    async def sleep(delay):
+        await (asyncio.sleep(0) if delay < 1 else clock.sleep(delay))
 
     async def factory(_settings, _epoch):
         nonlocal opens
@@ -3959,16 +4000,31 @@ async def test_inflight_stream_recovery_cannot_revive_invalidated_capture(
         factory,
         channel="self",
         watchdog_resolver=lambda _: watchdogs(write_timeout_s=0.01),
+        monotonic_clock=clock.now,
+        sleep=sleep,
     )
+    engine.bind_event_sink(emitted.append)
     try:
         await engine.handle_owned_vad_event(start)
-        sessions[0].send_gate.clear()
-        await engine.handle_stream_input(stream_input(ledger, 6, 10))
-        pending = asyncio.create_task(
-            engine.handle_stream_input(
-                stream_input(ledger, 10, 14, is_current=lambda: capture_current)
-            )
+        if recovery == "normal_idle":
+            await engine.handle_owned_vad_event(end)
+            await clock.advance_to(161)
+            await wait_until(lambda: ("close",) in sessions[0].calls)
+        else:
+            sessions[0].send_gate.clear()
+            await engine.handle_stream_input(stream_input(ledger, 6, 10))
+        onset = stream_input(
+            ledger, 10, 14, speech_observed=True, is_current=lambda: capture_current
         )
+        onset = replace(
+            onset,
+            event=replace(
+                onset.event,
+                pre_roll=np.full(4, 0.1, dtype=np.float32),
+                pre_roll_capture=(span(6, 6, 10),),
+            ),
+        )
+        pending = asyncio.create_task(engine.handle_stream_input(onset))
         await opening.wait()
         if invalidation == "settings":
             ledger.rebind(
@@ -3994,6 +4050,12 @@ async def test_inflight_stream_recovery_cannot_revive_invalidated_capture(
     finally:
         release.set()
         await engine.close()
+    expected_outcome = "cancelled" if recovery == "write_failure" else "submitted"
+    assert [
+        (event.identity, event.outcome)
+        for event in emitted
+        if isinstance(event, STTProviderInputTerminal)
+    ] == [(sessions[0].requests[0].identity, expected_outcome)]
 
 
 @pytest.mark.asyncio
@@ -4018,6 +4080,7 @@ async def test_continuous_stream_recovery_waits_for_physical_cleanup_and_stops_i
     session = QuarantinedStreamSession()
     opens = 0
     failures: list[Exception] = []
+    emitted: list[STTProviderTurnEvent] = []
 
     async def factory(_settings, _epoch):
         nonlocal opens
@@ -4030,6 +4093,7 @@ async def test_continuous_stream_recovery_waits_for_physical_cleanup_and_stops_i
         watchdog_resolver=lambda _: watchdogs(write_timeout_s=0.01, readiness_timeout_s=0.01),
         terminal_failure_sink=failures.append,
     )
+    engine.bind_event_sink(emitted.append)
     try:
         await engine.handle_owned_vad_event(start)
         session.send_gate.clear()
@@ -4047,6 +4111,11 @@ async def test_continuous_stream_recovery_waits_for_physical_cleanup_and_stops_i
     finally:
         session.release.set()
         await engine.close()
+    assert [
+        (event.identity, event.outcome)
+        for event in emitted
+        if isinstance(event, STTProviderInputTerminal)
+    ] == [(session.requests[0].identity, "cancelled")]
 
 
 @pytest.mark.asyncio
@@ -4056,6 +4125,7 @@ async def test_independent_scoped_context_deduplicates_seen_audio_and_retains_in
     ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
     first, _, end = segment_events(ledger, start_sample=0, now=0)
     session = ControlledStreamSession()
+    emitted: list[STTProviderTurnEvent] = []
 
     async def factory(_settings, _epoch):
         return session
@@ -4065,6 +4135,7 @@ async def test_independent_scoped_context_deduplicates_seen_audio_and_retains_in
         channel="self",
         watchdog_resolver=lambda _: watchdogs(),
     )
+    engine.bind_event_sink(emitted.append)
     try:
         await engine.handle_owned_vad_event(first)
         await engine.handle_stream_input(stream_input(ledger, 6, 10))
@@ -4087,6 +4158,14 @@ async def test_independent_scoped_context_deduplicates_seen_audio_and_retains_in
         ] == [(0, 2), (2, 6), (6, 10), (10, 14)]
     finally:
         await engine.close()
+    assert [
+        (event.identity, event.outcome)
+        for event in emitted
+        if isinstance(event, STTProviderInputTerminal)
+    ] == [
+        (session.requests[0].identity, "submitted"),
+        (session.requests[1].identity, "cancelled"),
+    ]
 
 
 @pytest.mark.asyncio
@@ -4357,9 +4436,10 @@ async def test_native_speech_extends_idle_but_silence_sleeps_until_source_speech
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("retirement", ["max_age", "receive_failure", "go_away", "event_eof"])
+@pytest.mark.parametrize("with_context", [False, True])
 @pytest.mark.parametrize("open_turn", [False, True])
 async def test_independent_retirement_resumes_unsent_audio_without_new_local_turn(
-    retirement: str, open_turn: bool
+    retirement: str, open_turn: bool, with_context: bool
 ) -> None:
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("gemini_transcribe"))
     start, _, end = segment_events(ledger, start_sample=0, now=100)
@@ -4409,7 +4489,19 @@ async def test_independent_retirement_resumes_unsent_audio_without_new_local_tur
                 )
             )
         await wait_until(lambda: ("close",) in previous.calls)
-        await engine.handle_stream_input(stream_input(ledger, 8, 14))
+        recovery_input = (
+            stream_input(ledger, 12, 16) if with_context else stream_input(ledger, 8, 14)
+        )
+        if with_context:
+            recovery_input = replace(
+                recovery_input,
+                event=replace(
+                    recovery_input.event,
+                    pre_roll=np.full(2, 0.1, dtype=np.float32),
+                    pre_roll_capture=(span(10, 10, 12),),
+                ),
+            )
+        await engine.handle_stream_input(recovery_input)
         assert len(sessions) == 2
         successor = sessions[1]
         assert successor.requests == []
@@ -4417,7 +4509,7 @@ async def test_independent_retirement_resumes_unsent_audio_without_new_local_tur
             (s.normalized_start_sample, s.normalized_end_sample)
             for _, ranges in successor.audio
             for s in ranges
-        ] == [(10, 14)]
+        ] == ([(12, 16)] if with_context else [(10, 14)])
         assert successor.stream is not None and successor.stream != old_stream
         successor.emit(STTRecognitionUnit(RecognitionUnitIdentity(old_stream, uuid4(), 1), "old"))
         successor.emit(
@@ -4528,3 +4620,427 @@ async def test_retired_stream_cannot_reopen_after_capture_boundary(boundary: str
         assert sessions[0].audio[-1][1] == (span(1, 2, 6),)
     finally:
         await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("channel", "mode", "positive_frames"),
+    [
+        ("self", "cold", 1),
+        ("self", "warm", 1),
+        ("self", "post_idle", 1),
+        ("peer", "cold", 3),
+        ("peer", "warm", 3),
+        ("peer", "post_idle", 3),
+        ("peer", "post_idle", 1),
+        ("self", "context_error", 1),
+        ("self", "context_timeout", 1),
+        ("peer", "context_error", 3),
+        ("peer", "context_timeout", 3),
+        ("peer", "context_error", 1),
+        ("peer", "context_timeout", 1),
+    ],
+)
+async def test_capture_resume_preserves_real_context_before_onset_once(
+    channel: str, mode: str, positive_frames: int
+) -> None:
+    from puripuly_heart.core.audio.format import AudioFrameF32, float32_to_pcm16le_bytes
+    from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
+    from puripuly_heart.core.vad.gating import VadGating, create_peer_vad_gating
+    from tests.helpers.audio import FakeAudioSource
+    from tests.helpers.vad import SequenceVadEngine
+
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("gemini_transcribe"))
+    clock = ControlledMonotonicClock(value=100)
+    sessions: list[ControlledStreamSession] = []
+    emitted: list[object] = []
+    failures: list[Exception] = []
+    context_failed = mode in {"context_error", "context_timeout"}
+    budget = AudioRetentionBudget(capacity_bytes=65536, capacity_sample_equivalents=16384)
+
+    async def sleep(delay):
+        await (asyncio.sleep(0) if delay < 1 else clock.sleep(delay))
+
+    async def factory(_settings, _epoch):
+        session = ControlledStreamSession()
+        if len(sessions) == 1:
+            if mode == "context_error":
+                session.failure = OSError("context delivery ambiguous")
+            elif mode == "context_timeout":
+                session.send_gate.clear()
+        sessions.append(session)
+        return session
+
+    engine = ScopedRecognitionEngine(
+        factory,
+        channel=channel,
+        event_sink=emitted.append,
+        terminal_failure_sink=failures.append,
+        watchdog_resolver=lambda _: watchdogs(write_timeout_s=0.01),
+        monotonic_clock=clock.now,
+        sleep=sleep,
+    )
+    start_sample = 10
+    samples = (np.arange((16 + positive_frames) * 512, dtype=np.int32) % 24001 - 12000).astype(
+        np.float32
+    ) / 32767
+    frames = [
+        AudioFrameF32(
+            samples=samples[index * 512 : (index + 1) * 512],
+            sample_rate_hz=16000,
+            capture=span(index, start_sample + index * 512, start_sample + (index + 1) * 512),
+        )
+        for index in range(16 + positive_frames)
+    ]
+    vad_engine = SequenceVadEngine([0.1] * 16 + [0.9] * positive_frames)
+    vad = (
+        create_peer_vad_gating(
+            vad_engine, sample_rate_hz=16000, ring_buffer_ms=500, hangover_ms=500
+        )
+        if channel == "peer"
+        else VadGating(vad_engine, sample_rate_hz=16000, ring_buffer_ms=500, hangover_ms=500)
+    )
+    submitted_before_local_start: list[bytes] = []
+    local_starts: list[SpeechStart] = []
+
+    class Sink:
+        async def handle_stream_input(self, event: CaptureStreamInput) -> None:
+            await engine.handle_stream_input(
+                OwnedStreamInput(
+                    event,
+                    ledger,
+                    ledger.settings,
+                    ledger.activation_generation,
+                    retention=AudioRetentionBinding(budget, object()),
+                )
+            )
+            if event.speech_observed and not local_starts:
+                submitted_before_local_start.append(
+                    b"".join(pcm for pcm, _ranges in sessions[-1].audio) if sessions else b""
+                )
+
+        async def handle_owned_vad_event(self, event: OwnedVadEvent) -> None:
+            if isinstance(event.event, SpeechStart):
+                local_starts.append(event.event)
+            await engine.handle_owned_vad_event(event)
+
+    try:
+        if mode != "cold":
+            first = segment_events(ledger, start_sample=0, now=100)
+            for event in first:
+                await engine.handle_owned_vad_event(event)
+            if mode not in {"cold", "warm"}:
+                await clock.advance_to(161)
+                await wait_until(lambda: ("close",) in sessions[0].calls)
+        initial_pcm = b"".join(pcm for pcm, _ranges in sessions[0].audio) if sessions else b""
+        await run_audio_vad_loop(
+            source=FakeAudioSource(frames),
+            vad=vad,
+            sink=Sink(),
+            target_sample_rate_hz=16000,
+            segment_ledger=ledger,
+            channel_label=channel,
+            monotonic_clock=clock.now,
+        )
+        assert len(sessions) == (3 if context_failed else (2 if mode == "post_idle" else 1))
+        resumed = sessions[-1]
+        resumed_offset = 16 * 512 if context_failed else 192
+        expected = (
+            initial_pcm + float32_to_pcm16le_bytes(samples)
+            if mode == "warm"
+            else float32_to_pcm16le_bytes(samples[resumed_offset:])
+        )
+        assert b"".join(pcm for pcm, _ranges in resumed.audio) == expected
+        assert resumed.mapping.sent_samples == len(expected) // 2
+        expected_start = 0 if mode == "warm" else start_sample + resumed_offset
+        assert resumed.mapping.covers((span(0, expected_start, start_sample + samples.size),))
+        assert len(local_starts) == (0 if channel == "peer" and positive_frames == 1 else 1)
+        if mode not in {"cold", "warm"}:
+            assert len(resumed.requests) == (1 if local_starts else 0)
+            assert submitted_before_local_start[0] == float32_to_pcm16le_bytes(
+                samples[resumed_offset : 16 * 512 + 512]
+            )
+        assert failures == []
+        assert budget.used_bytes == 0
+        assert budget.used_sample_equivalents == 0
+        if context_failed:
+            assert sessions[1].audio == []
+            assert ("close",) in sessions[1].calls
+        if not local_starts:
+            assert resumed.stream is not None
+            resumed.emit(
+                STTRecognitionUnit(
+                    RecognitionUnitIdentity(resumed.stream, uuid4(), 1), "native only"
+                )
+            )
+            await wait_until(
+                lambda: any(isinstance(event, STTRecognitionUnitTerminal) for event in emitted)
+            )
+            assert [
+                event.unit.text
+                for event in emitted
+                if isinstance(event, STTRecognitionUnitTerminal)
+            ] == ["native only"]
+    finally:
+        await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize("finish", ["drain", "abort", "capacity"])
+async def test_capture_dispatch_accounts_for_context_and_releases_it(
+    channel: str, finish: str
+) -> None:
+    from types import SimpleNamespace
+
+    from puripuly_heart.core.runtime import peer_channel, self_capture
+
+    ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
+    runtime = SimpleNamespace(
+        segment_ledger=ledger,
+        _current_stream_capture_epoch=None,
+        is_current_generation=lambda generation: generation == 3,
+    )
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    delivered: list[OwnedStreamInput] = []
+
+    class Sink:
+        async def handle_stream_input(self, event: OwnedStreamInput) -> None:
+            delivered.append(event)
+            entered.set()
+            await release.wait()
+
+    budget = AudioRetentionBudget(
+        capacity_bytes=128 if finish == "capacity" else 4096,
+        capacity_sample_equivalents=1024,
+    )
+    if channel == "self":
+        guard = self_capture._GenerationGuardedVadSink(
+            sink=Sink(),
+            owner=runtime,
+            capture_generation=self_capture._CaptureGeneration(3),
+            ledger=ledger,
+            retention_budget=budget,
+        )
+    else:
+        ready = asyncio.Event()
+        ready.set()
+        guard = peer_channel._GenerationGuardedVadSink(
+            sink=Sink(),
+            runtime=runtime,
+            capture_generation=peer_channel._CaptureGeneration(3),
+            provider_ingress_ready=ready,
+        )
+        guard.retention_budget = budget
+    event = CaptureStreamInput(
+        np.full(4, 0.4, dtype=np.float32),
+        (span(20, 20, 24),),
+        speech_observed=True,
+        pre_roll=np.full(20, 0.1, dtype=np.float32),
+        pre_roll_capture=(span(0, 0, 20),),
+    )
+    try:
+        await guard.handle_stream_input(event)
+        await entered.wait()
+        assert budget.used_bytes == 96
+        assert budget.used_sample_equivalents == 24
+        await guard.handle_stream_input(event)
+        assert budget.used_bytes == (96 if finish == "capacity" else 192)
+        if finish == "abort":
+            await guard.abort()
+            assert len(delivered) == 1
+        else:
+            release.set()
+            await guard.finish()
+            if finish == "capacity":
+                assert [item.event.boundary_reason for item in delivered] == [
+                    None,
+                    "source_discontinuity",
+                ]
+            else:
+                assert len(delivered) == 2
+        assert budget.used_bytes == 0
+        assert budget.used_sample_equivalents == 0
+    finally:
+        release.set()
+        await guard.abort()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize("invalidation", ["none", "capture_epoch", "settings", "activation"])
+async def test_successful_resume_context_does_not_admit_newly_stale_onset(
+    channel: str, invalidation: str
+) -> None:
+    from types import SimpleNamespace
+
+    from puripuly_heart.core.audio.format import float32_to_pcm16le_bytes
+    from puripuly_heart.core.runtime import peer_channel, self_capture
+
+    ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
+    clock = ControlledMonotonicClock(value=100)
+    sessions: list[ControlledStreamSession] = []
+    emitted: list[STTProviderTurnEvent] = []
+
+    async def factory(_settings, _epoch):
+        session = ControlledStreamSession()
+        if sessions:
+            session.send_gate.clear()
+        sessions.append(session)
+        return session
+
+    engine = ScopedRecognitionEngine(
+        factory,
+        channel=channel,
+        watchdog_resolver=lambda _: watchdogs(write_timeout_s=1.0),
+        monotonic_clock=clock.now,
+        sleep=clock.sleep,
+    )
+    engine.bind_event_sink(emitted.append)
+    runtime = SimpleNamespace(
+        segment_ledger=ledger,
+        _current_stream_capture_epoch=None,
+        is_current_generation=lambda generation: generation == 3,
+    )
+
+    class NativeCaptureBoundary:
+        async def handle_stream_input(self, event: OwnedStreamInput) -> None:
+            await engine.handle_stream_input(event)
+
+    if channel == "self":
+        guard = self_capture._GenerationGuardedVadSink(
+            sink=NativeCaptureBoundary(),
+            owner=runtime,
+            capture_generation=self_capture._CaptureGeneration(3),
+            ledger=ledger,
+            retention_budget=AudioRetentionBudget(
+                capacity_bytes=4096, capacity_sample_equivalents=1024
+            ),
+        )
+    else:
+        ready = asyncio.Event()
+        ready.set()
+        guard = peer_channel._GenerationGuardedVadSink(
+            sink=engine,
+            runtime=runtime,
+            capture_generation=peer_channel._CaptureGeneration(3),
+            provider_ingress_ready=ready,
+        )
+    context = np.full(10, 0.1, dtype=np.float32)
+    onset = np.full(4, 0.4, dtype=np.float32)
+    try:
+        for event in segment_events(ledger, start_sample=0, now=100):
+            await engine.handle_owned_vad_event(event)
+        await clock.advance_to(161)
+        await wait_until(lambda: ("close",) in sessions[0].calls)
+        await guard.handle_stream_input(
+            CaptureStreamInput(
+                onset,
+                (span(20, 20, 24),),
+                speech_observed=True,
+                pre_roll=context,
+                pre_roll_capture=(span(10, 10, 20),),
+            )
+        )
+        await wait_until(lambda: len(sessions) == 2)
+        resumed = sessions[1]
+        await asyncio.wait_for(resumed.write_entered.wait(), timeout=1.0)
+        if invalidation == "capture_epoch":
+            await guard.handle_stream_input(
+                CaptureStreamInput(
+                    np.empty(0, dtype=np.float32), (), boundary_reason="source_discontinuity"
+                )
+            )
+            await guard.handle_stream_input(
+                CaptureStreamInput(
+                    np.full(4, 0.5, dtype=np.float32),
+                    (replace(span(24, 24, 28), capture_epoch=2),),
+                )
+            )
+        elif invalidation == "settings":
+            ledger.rebind(
+                activation_generation=3,
+                settings=settings("gemini_transcribe", signature="successor"),
+            )
+        elif invalidation == "activation":
+            ledger.rebind(activation_generation=4, settings=ledger.settings)
+        resumed.send_gate.set()
+        await asyncio.wait_for(guard.finish(), timeout=1.0)
+        expected = [(float32_to_pcm16le_bytes(context), (span(10, 10, 20),))]
+        if invalidation == "none":
+            expected.append((float32_to_pcm16le_bytes(onset), (span(20, 20, 24),)))
+        assert resumed.audio == expected
+        assert guard.retention_budget.used_bytes == 0
+        assert guard.retention_budget.used_sample_equivalents == 0
+    finally:
+        for session in sessions:
+            session.send_gate.set()
+        await guard.abort()
+        await engine.close()
+    assert [
+        (event.identity, event.outcome)
+        for event in emitted
+        if isinstance(event, STTProviderInputTerminal)
+    ] == [(sessions[0].requests[0].identity, "submitted")]
+
+
+async def test_bounded_backend_close_keeps_pending_cleanup_for_explicit_settlement():
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    closed = asyncio.Event()
+
+    async def close_backend():
+        entered.set()
+        await release.wait()
+        closed.set()
+
+    async def factory(_settings, _epoch):
+        pytest.fail("backend close must not open a recognition session")
+
+    engine = ScopedRecognitionEngine(
+        factory, backend_close=close_backend, event_drain_timeout_s=0.001
+    )
+    waiting = None
+    try:
+        await asyncio.wait_for(engine.close_backend(), timeout=1)
+        assert entered.is_set() and not closed.is_set()
+        assert engine.cleanup_debt > 0
+        waiting = asyncio.create_task(engine.close_backend_and_wait())
+        await asyncio.sleep(0)
+        assert not waiting.done() and not closed.is_set()
+        release.set()
+        await asyncio.wait_for(waiting, timeout=1)
+        assert closed.is_set() and engine.cleanup_debt == 0
+        await engine.close_backend_and_wait()
+    finally:
+        release.set()
+        if waiting is not None:
+            await waiting
+        await engine.close_backend_and_wait()
+
+
+async def test_failed_backend_teardown_remains_owned_and_retryable_until_resource_release():
+    fail = True
+    resource_alive = True
+
+    async def close_backend():
+        nonlocal resource_alive
+        if fail:
+            raise RuntimeError("controlled cleanup failure")
+        resource_alive = False
+
+    async def factory(_settings, _epoch):
+        pytest.fail("backend close must not open a recognition session")
+
+    engine = ScopedRecognitionEngine(factory, backend_close=close_backend)
+    try:
+        with pytest.raises(RuntimeError):
+            await engine.close_backend_and_wait()
+        assert resource_alive and engine.cleanup_debt > 0
+        fail = False
+        await engine.close_backend_and_wait()
+        assert not resource_alive and engine.cleanup_debt == 0
+    finally:
+        fail = False
+        await engine.close_backend_and_wait()

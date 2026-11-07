@@ -9,13 +9,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.app.services.provider_settings import (
-    ProviderSettingsOwner,
-    provider_verification_context,
-)
-from puripuly_heart.app.services.provider_verification_binding import (
-    ProviderVerificationBindingOwner,
-)
 
 from puripuly_heart.app.adapters import (
     settings_vnext_canonical_persistence as adapter_module,
@@ -32,6 +25,13 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
     SettingsOwner,
     compose_settings_owner,
     materialize_canonical_translation_settings,
+)
+from puripuly_heart.app.services.provider.provider_settings import (
+    ProviderSettingsOwner,
+    provider_verification_context,
+)
+from puripuly_heart.app.services.provider.provider_verification_binding import (
+    ProviderVerificationBindingOwner,
 )
 from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
@@ -445,7 +445,9 @@ def test_old_settings_without_openai_evidence_keep_existing_translation_history(
 async def test_openai_verification_is_bound_to_luna_and_invalidated_by_key_changes(
     tmp_path: Path,
 ) -> None:
-    from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
+    from puripuly_heart.app.services.settings.settings_application import (
+        settings_view_surface_snapshots,
+    )
 
     path = tmp_path / "settings.json"
     initial_key = "private-openai-credential"
@@ -765,7 +767,7 @@ def test_deepseek_v4_managed_materialization_migrates_to_41(connection: str) -> 
     assert result.connection == connection
     assert result.connection_history["deepseek_v4_flash_41"] == connection
     assert "deepseek_v4_flash" not in result.connection_history
-    assert result.openrouter_model == "deepseek/deepseek-v4.1-flash"
+    assert result.openrouter_model == "deepseek/deepseek-v4.1-flash-1017"
     assert result.openrouter_provider_routing == "deepseek_v4_flash_41_strict"
     assert result.openrouter_selection_alias == "deepseek_v4_flash_41_managed"
     assert result.openrouter_selected_source == "managed"
@@ -799,7 +801,7 @@ def test_deepseek_41_materialization_persists_distinct_identity(connection: str)
         canonical.intent.translation,
         model="deepseek_v4_flash_41",
         connection=connection,
-        openrouter_model="deepseek/deepseek-v4-flash-0731",
+        openrouter_model="deepseek/deepseek-v4.1-flash",
         openrouter_provider_routing="deepseek_v4_flash_latency",
     )
 
@@ -808,7 +810,8 @@ def test_deepseek_41_materialization_persists_distinct_identity(connection: str)
     ).intent.translation
 
     assert result.model == "deepseek_v4_flash_41"
-    assert result.openrouter_model == "deepseek/deepseek-v4.1-flash"
+    assert result.connection == connection
+    assert result.openrouter_model == "deepseek/deepseek-v4.1-flash-1017"
     assert result.openrouter_provider_routing == "deepseek_v4_flash_41_strict"
     expected_alias = (
         "deepseek_v4_flash_41_byok"
@@ -816,6 +819,9 @@ def test_deepseek_41_materialization_persists_distinct_identity(connection: str)
         else "deepseek_v4_flash_41_managed"
     )
     assert result.openrouter_selection_alias == expected_alias
+    assert result.openrouter_selected_source == (
+        "byok" if connection == "openrouter" else "managed"
+    )
 
 
 def test_old_official_deepseek_primary_materializes_as_41_direct() -> None:
@@ -833,6 +839,7 @@ def test_old_official_deepseek_primary_materializes_as_41_direct() -> None:
     assert result.model == "deepseek_v4_flash_41"
     assert result.connection == "official_byok"
     assert result.deepseek.llm_model == "deepseek-flash"
+    assert result.openrouter_model == "deepseek/deepseek-v4.1-flash-1017"
 
 
 @pytest.mark.parametrize("connection", ["gpu", "cpu", "managed", "invalid"])
@@ -867,3 +874,164 @@ def test_26b_canonical_selection_normalizes_gpu_and_survives_reload(
     assert translation.connection == "gpu"
     assert translation.connection_history == {"managed_gemma": "cpu", "managed_gemma_26b": "gpu"}
     assert settings.intent.translation.openrouter_model == translation.openrouter_model
+
+
+def _seed_retired_cpu_install(root: Path) -> Path:
+    model_id = "qwen3-asr-0.6b-int8-sherpa"
+    directory = root / model_id
+    directory.mkdir(parents=True)
+    (directory / "installed-manifest.json").write_text(
+        json.dumps(
+            {
+                "manifest_version": 1,
+                "model_id": model_id,
+                "engine": "sherpa-onnx",
+                "install_dirname": model_id,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (directory / "decoder.int8.onnx").write_bytes(b"synthetic-retired-payload")
+    return directory
+
+
+@pytest.mark.parametrize("failure_phase", ["backup", "write", "validation"])
+def test_failed_cpu_migration_preserves_settings_and_cannot_authorize_asset_retirement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure_phase: str
+) -> None:
+    from puripuly_heart.app.ports.canonical_settings_persistence import (
+        CanonicalSettingsPersistenceError,
+    )
+    from puripuly_heart.config.settings_vnext import compat, serialization
+    from puripuly_heart.core.local_asr import retired_cpu_assets
+
+    root = tmp_path / "models"
+    monkeypatch.setattr(retired_cpu_assets, "default_local_stt_model_root", lambda: root)
+    retired = _seed_retired_cpu_install(root)
+    path = tmp_path / "settings.json"
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = AppSettingsVNext().settings_version
+    raw["intent"]["stt"]["provider"] = "local_orukeet"
+    raw["intent"]["peer_stt"]["provider"] = "local_parakeet_v3"
+    original = json.dumps(raw).encode("utf-8")
+    path.write_bytes(original)
+
+    def fail(*_args, **_kwargs):
+        raise OSError("synthetic persistence failure")
+
+    target = {
+        "backup": "create_pre_migration_backup",
+        "write": "_atomic_write_text",
+        "validation": "_validate_persisted_settings",
+    }[failure_phase]
+    owner = compose_settings_owner(path)
+    with monkeypatch.context() as failure:
+        failure.setattr(compat, target, fail)
+        with pytest.raises(CanonicalSettingsPersistenceError):
+            owner.start()
+
+    assert path.read_bytes() == original
+    assert (retired / "decoder.int8.onnx").read_bytes() == b"synthetic-retired-payload"
+    assert not (retired / ".retirement-pending.json").exists()
+    backups = list(tmp_path.glob("*.bak"))
+    assert len(backups) == (0 if failure_phase == "backup" else 1)
+    assert all(backup.read_bytes() == original for backup in backups)
+
+    retried = owner.start()
+
+    assert retried.settings.intent.stt.provider == "local_cpu_auto"
+    assert retried.settings.intent.peer_stt.provider == "local_cpu_auto"
+    assert not retired.exists()
+
+
+def test_successful_cpu_upgrade_retires_assets_and_retries_on_canonical_restart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from puripuly_heart.config.settings_vnext import serialization
+    from puripuly_heart.core.local_asr import retired_cpu_assets
+    from puripuly_heart.core.local_asr.local_stt_assets import (
+        LOCAL_QWEN_GPU_MODEL_ID,
+        PARAKEET_JAPANESE_MODEL_ID,
+    )
+
+    root = tmp_path / "models"
+    monkeypatch.setattr(retired_cpu_assets, "default_local_stt_model_root", lambda: root)
+    retired = _seed_retired_cpu_install(root)
+    protected = []
+    for name in (LOCAL_QWEN_GPU_MODEL_ID, PARAKEET_JAPANESE_MODEL_ID, "unrelated"):
+        directory = root / name
+        directory.mkdir()
+        sentinel = directory / "user-data.bin"
+        sentinel.write_bytes(name.encode("utf-8"))
+        protected.append(sentinel)
+    path = tmp_path / "settings.json"
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = AppSettingsVNext().settings_version
+    raw["intent"]["stt"]["provider"] = "local_parakeet_v3"
+    raw["intent"]["peer_stt"]["provider"] = "local_orukeet"
+    raw["intent"]["stt"]["gpu_device_id"] = "gpu-sentinel"
+    raw["intent"]["languages"]["source_language"] = "uk"
+    raw["intent"]["languages"]["peer_source_language"] = "ru"
+    original = json.dumps(raw).encode("utf-8")
+    path.write_bytes(original)
+
+    owner = compose_settings_owner(path)
+    first = owner.start()
+
+    assert first.migrated
+    assert first.backup_path.read_bytes() == original
+    assert first.settings.intent.stt.provider == "local_cpu_auto"
+    assert first.settings.intent.peer_stt.provider == "local_cpu_auto"
+    assert first.settings.intent.stt.gpu_device_id == "gpu-sentinel"
+    assert first.settings.intent.languages.source_language == "uk"
+    assert first.settings.intent.languages.peer_source_language == "ru"
+    assert not retired.exists()
+    recreated = _seed_retired_cpu_install(root)
+
+    ordinary = SettingsVNextCanonicalPersistenceAdapter().load_active(path)
+
+    assert ordinary.canonical_settings == first.settings
+    assert recreated.is_dir()
+    updated = owner.persist_telemetry_preference(False)
+    assert recreated.is_dir()
+    repeated = owner.start()
+    assert repeated.settings == updated
+    assert recreated.is_dir()
+    canonical_bytes = path.read_bytes()
+
+    restarted = compose_settings_owner(path).start()
+
+    assert not restarted.migrated
+    assert restarted.settings == updated
+    assert path.read_bytes() == canonical_bytes
+    assert not recreated.exists()
+    for sentinel in protected:
+        assert sentinel.read_bytes() == sentinel.parent.name.encode("utf-8")
+
+
+def test_reentrant_start_notification_cannot_reopen_retirement_authority(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from puripuly_heart.config.settings_vnext.facade import save_vnext_settings
+    from puripuly_heart.core.local_asr import retired_cpu_assets
+
+    root = tmp_path / "models"
+    monkeypatch.setattr(retired_cpu_assets, "default_local_stt_model_root", lambda: root)
+    _seed_retired_cpu_install(root)
+    path = tmp_path / "settings.json"
+    assert save_vnext_settings(path, AppSettingsVNext()).ok
+    owner = compose_settings_owner(path)
+
+    def reenter(snapshot: AppSettingsVNext) -> None:
+        recreated = _seed_retired_cpu_install(root)
+        assert owner.start().settings == snapshot
+        assert (recreated / "decoder.int8.onnx").read_bytes() == b"synthetic-retired-payload"
+
+    owner.observe_commits(reenter)
+
+    started = owner.start()
+
+    assert owner.require_committed() == started.settings
+    assert (root / "qwen3-asr-0.6b-int8-sherpa").is_dir()
+    compose_settings_owner(path).start()
+    assert not (root / "qwen3-asr-0.6b-int8-sherpa").exists()

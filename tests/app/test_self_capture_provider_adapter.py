@@ -4,10 +4,12 @@ from types import SimpleNamespace
 from typing import cast
 
 import pytest
-from puripuly_heart.app.adapters.self_capture_provider import SelfCaptureProviderAdapter
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 
+from puripuly_heart.app.adapters.self_capture.self_capture_provider import (
+    SelfCaptureProviderAdapter,
+)
 from puripuly_heart.config.resolved import ResolvedSTTConfig
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.self_capture import (
     SelfCaptureIngressError,
     SelfCaptureProviderMutationStatus,
@@ -67,7 +69,7 @@ class RecordingRuntime:
         self.handoff_result = SimpleNamespace(
             status="failed",
             failure_code="worker_process_exited",
-            failure_type="GpuWorkerClosedError",
+            failure_type="ASRWorkerClosedError",
             failure_stage="provider_warmup",
             failure_diagnostics=None,
         )
@@ -141,7 +143,7 @@ async def test_mutations_forward_terminal_failure_owner_and_map_results() -> Non
     assert handed_off.status is SelfCaptureProviderMutationStatus.FAILED
     assert handed_off.reason == "worker_process_exited"
     assert handed_off.failure_code == "worker_process_exited"
-    assert handed_off.failure_type == "GpuWorkerClosedError"
+    assert handed_off.failure_type == "ASRWorkerClosedError"
     assert handed_off.failure_stage == "provider_warmup"
     assert runtime.calls == [
         ("reset", "self"),

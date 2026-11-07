@@ -139,132 +139,6 @@ fn overlay_state_deserializes_active_peer_variant() {
 }
 
 #[test]
-fn overlay_state_treats_language_only_update_as_visual_change_without_reassigning_slot() {
-    let initial: OverlayPresentationSnapshot = serde_json::from_value(json!({
-        "revision": 1,
-        "calibration": OverlayPresentationCalibration::default(),
-        "blocks": [{
-            "id": "self:language",
-            "occupant_key": "self:language",
-            "appearance_seq": 1,
-            "channel": "self",
-            "block_variant": "finalized",
-            "primary_text": "こんにちは",
-            "secondary_text": "",
-            "secondary_enabled": true,
-            "primary_language": "ko"
-        }]
-    }))
-    .unwrap();
-    let updated: OverlayPresentationSnapshot = serde_json::from_value(json!({
-        "revision": 2,
-        "calibration": OverlayPresentationCalibration::default(),
-        "blocks": [{
-            "id": "self:language",
-            "occupant_key": "self:language",
-            "appearance_seq": 1,
-            "channel": "self",
-            "block_variant": "finalized",
-            "primary_text": "こんにちは",
-            "secondary_text": "",
-            "secondary_enabled": true,
-            "primary_language": "ja"
-        }]
-    }))
-    .unwrap();
-    let mut state = OverlayState::default();
-
-    assert!(state.apply_snapshot(&initial));
-    let slot = state.scene().slots()[0].as_ref().unwrap();
-    let original_slot_index = slot.slot_index;
-    let original_anchor_top_px = slot.anchor_top_px;
-    let original_slot_entry_order = slot.slot_entry_order;
-
-    assert!(state.apply_snapshot(&updated));
-
-    let slot = state.scene().slots()[0].as_ref().unwrap();
-    assert_eq!(slot.slot_index, original_slot_index);
-    assert_eq!(slot.anchor_top_px, original_anchor_top_px);
-    assert_eq!(slot.slot_entry_order, original_slot_entry_order);
-    assert_eq!(slot.occupant_key, "self:language");
-    assert_eq!(slot.appearance_seq, 1);
-    assert_eq!(slot.primary_language.as_deref(), Some("ja"));
-}
-
-#[test]
-fn overlay_state_keeps_snapshot_blocks_in_order() {
-    let mut state = OverlayState::default();
-
-    state.apply_snapshot(&OverlayPresentationSnapshot {
-        revision: 1,
-        calibration: OverlayPresentationCalibration::default(),
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        blocks: vec![
-            slot_block("self:1", "self:1", 1, "self", "hello", "안녕", true),
-            slot_block("peer:2", "peer:2", 2, "peer", "there", "원문", true),
-        ],
-        ..Default::default()
-    });
-
-    assert_eq!(state.blocks().len(), 2);
-    assert_eq!(state.blocks()[0].id, "self:1");
-    assert_eq!(state.blocks()[1].id, "peer:2");
-}
-
-#[test]
-fn overlay_state_snapshot_replaces_stale_blocks() {
-    let mut state = OverlayState::default();
-
-    state.apply_snapshot(&OverlayPresentationSnapshot {
-        revision: 1,
-        calibration: OverlayPresentationCalibration::default(),
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        blocks: vec![block("self:1", "self", "hello", "", true)],
-        ..Default::default()
-    });
-
-    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 2,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![block("peer:2", "peer", "there", "원문", false)],
-        speaker_divider: false,
-    }));
-
-    assert_eq!(state.blocks().len(), 1);
-    assert_eq!(state.blocks()[0].id, "peer:2");
-}
-
-#[test]
-fn overlay_state_tracks_latest_snapshot_calibration() {
-    let mut state = OverlayState::default();
-
-    assert_eq!(state.calibration().distance, 1.1);
-
-    state.apply_snapshot(&OverlayPresentationSnapshot {
-        revision: 3,
-        calibration: OverlayPresentationCalibration {
-            anchor: "head_locked".to_string(),
-            offset_x: 0.15,
-            offset_y: -0.2,
-            distance: 1.2,
-            text_scale: 1.1,
-            background_alpha: 0.4,
-        },
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        blocks: vec![],
-        ..Default::default()
-    });
-
-    assert_eq!(state.calibration().distance, 1.2);
-    assert_eq!(state.calibration().background_alpha, 0.4);
-}
-
-#[test]
 fn overlay_state_ignores_lower_revision_snapshots() {
     let mut state = OverlayState::default();
 
@@ -311,96 +185,18 @@ fn overlay_state_treats_equal_revision_snapshots_as_noop() {
         blocks: vec![block("peer:4", "peer", "ignore", "", true)],
         speaker_divider: false,
     }));
-}
-
-#[test]
-fn overlay_state_keeps_slot_two_anchor_when_slot_one_disappears() {
-    let mut state = OverlayState::default();
+    assert_eq!(state.snapshot().revision, 4);
+    assert_eq!(state.blocks()[0].id, "self:4");
+    assert_eq!(state.blocks()[0].primary_text, "keep");
 
     assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 1,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![
-            slot_block("self:1", "self:1", 1, "self", "one", "", true),
-            slot_block("peer:2", "peer:2", 2, "peer", "two", "", true),
-        ],
-        speaker_divider: false,
+        revision: 5,
+        blocks: vec![block("peer:5", "peer", "next", "", true)],
+        ..Default::default()
     }));
-
-    let second_top = state.scene().slots()[1].as_ref().unwrap().anchor_top_px;
-
-    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 2,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![slot_block("peer:2", "peer:2", 2, "peer", "two", "", true)],
-        speaker_divider: false,
-    }));
-
-    assert!(state.scene().slots()[0].is_none());
-    assert_eq!(
-        state.scene().slots()[1].as_ref().unwrap().anchor_top_px,
-        second_top
-    );
-}
-
-#[test]
-fn overlay_state_promotes_matching_occupant_key_without_reassigning_slot() {
-    let mut state = OverlayState::default();
-
-    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 1,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![OverlayPresentationBlock {
-            id: "self:active".into(),
-            occupant_key: "self:merge-1".into(),
-            appearance_seq: 1,
-            channel: "self".into(),
-            block_variant: OverlayPresentationBlockVariant::ActiveSelf,
-            primary_text: "hello live".into(),
-            secondary_text: String::new(),
-            secondary_enabled: true,
-            primary_language: None,
-            secondary_language: None,
-            update_id: None,
-            origin_wall_clock_ms: None,
-            session_scope: None,
-            ..Default::default()
-        }],
-        speaker_divider: false,
-    }));
-    let original_slot = state.scene().slots()[0].as_ref().unwrap().slot_index;
-    let original_anchor_top = state.scene().slots()[0].as_ref().unwrap().anchor_top_px;
-    let original_entry_order = state.scene().slots()[0].as_ref().unwrap().slot_entry_order;
-
-    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
-        revision: 2,
-        calibration: OverlayPresentationCalibration::default(),
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        blocks: vec![slot_block(
-            "self:merge-1",
-            "self:merge-1",
-            1,
-            "self",
-            "hello live",
-            "",
-            true,
-        )],
-        speaker_divider: false,
-    }));
-
-    let slot = state.scene().slots()[0].as_ref().unwrap();
-    assert_eq!(slot.slot_index, original_slot);
-    assert_eq!(slot.anchor_top_px, original_anchor_top);
-    assert_eq!(slot.slot_entry_order, original_entry_order);
-    assert_eq!(slot.occupant_key, "self:merge-1");
-    assert_eq!(slot.id, "self:merge-1");
+    assert_eq!(state.snapshot().revision, 5);
+    assert_eq!(state.blocks()[0].id, "peer:5");
+    assert_eq!(state.blocks()[0].primary_text, "next");
 }
 
 #[test]
@@ -430,8 +226,8 @@ fn overlay_state_promotes_active_peer_matching_occupant_key_without_reassigning_
         }],
         speaker_divider: false,
     }));
-    let original_slot = state.scene().slots()[0].as_ref().unwrap().slot_index;
-    let original_entry_order = state.scene().slots()[0].as_ref().unwrap().slot_entry_order;
+    let original_slot = state.scene().slots()[1].as_ref().unwrap().slot_index;
+    let original_entry_order = state.scene().slots()[1].as_ref().unwrap().slot_entry_order;
 
     assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
@@ -457,7 +253,7 @@ fn overlay_state_promotes_active_peer_matching_occupant_key_without_reassigning_
         speaker_divider: false,
     }));
 
-    let slot = state.scene().slots()[0].as_ref().unwrap();
+    let slot = state.scene().slots()[1].as_ref().unwrap();
     assert_eq!(slot.slot_index, original_slot);
     assert_eq!(slot.slot_entry_order, original_entry_order);
     assert_eq!(slot.occupant_key, "peer:turn-1");
@@ -469,7 +265,7 @@ fn overlay_state_promotes_active_peer_matching_occupant_key_without_reassigning_
 }
 
 #[test]
-fn overlay_state_fills_first_empty_slot_before_replacing_again() {
+fn overlay_state_places_new_self_below_peer_without_hiding_it() {
     let mut state = OverlayState::default();
 
     assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
@@ -512,6 +308,47 @@ fn overlay_state_fills_first_empty_slot_before_replacing_again() {
             .iter()
             .map(|slot| slot.as_ref().map(|slot| slot.id.clone()))
             .collect::<Vec<_>>(),
-        vec![Some("self:3".to_string()), Some("peer:2".to_string())]
+        vec![Some("peer:2".to_string()), Some("self:3".to_string())]
     );
+}
+
+#[test]
+fn peer_captions_enter_lower_and_promote_previous_without_resetting_identity() {
+    let mut state = OverlayState::default();
+    let first = slot_block("peer:1", "peer:1", 1, "peer", "first page", "", true);
+    let second = slot_block("peer:2", "peer:2", 2, "peer", "second", "", true);
+    let third = slot_block("peer:3", "peer:3", 3, "peer", "third", "", true);
+    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 1,
+        blocks: vec![first.clone()],
+        ..Default::default()
+    }));
+    assert!(state.scene().slots()[0].is_none());
+    let occurrence = state.scene().slots()[1].as_ref().unwrap().slot_entry_order;
+    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 2,
+        blocks: vec![first, second.clone()],
+        ..Default::default()
+    }));
+    let upper = state.scene().slots()[0].as_ref().unwrap();
+    assert_eq!(upper.id, "peer:1");
+    assert_eq!(upper.slot_entry_order, occurrence);
+    assert_eq!(state.scene().slots()[1].as_ref().unwrap().id, "peer:2");
+    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 3,
+        blocks: vec![second.clone(), third.clone()],
+        ..Default::default()
+    }));
+    assert_eq!(state.scene().slots()[0].as_ref().unwrap().id, "peer:2");
+    assert_eq!(state.scene().slots()[1].as_ref().unwrap().id, "peer:3");
+    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
+        revision: 4,
+        blocks: vec![OverlayPresentationBlock {
+            primary_text: "second page".into(),
+            ..second
+        }, third],
+        ..Default::default()
+    }));
+    assert_eq!(state.scene().slots()[0].as_ref().unwrap().primary_text, "second page");
+    assert_eq!(state.scene().slots()[1].as_ref().unwrap().id, "peer:3");
 }

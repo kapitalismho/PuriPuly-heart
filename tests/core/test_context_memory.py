@@ -10,7 +10,6 @@ import pytest
 
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime, ContextEntry
 from puripuly_heart.core.orchestrator.context import ContextResolver
-from puripuly_heart.core.translation_backend import LlmTranslationBackend
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
 from puripuly_heart.domain.models import Transcript, Translation
 from tests.helpers.translation_owners import compose_translation_test_harness
@@ -181,53 +180,6 @@ class TestContextFiltering:
         assert len(valid) == 1
         assert valid[0].text == "ok"
 
-    def test_context_cleared_on_clear_context(self):
-        """clear_context() should empty the history."""
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=FakeLLMProvider(),
-            osc=FakeOscQueue(),
-            clock=FakeClock(),
-        )
-
-        harness.self_runtime.translation_history = [
-            ContextEntry(text="test", source_language="ko", target_language="en", timestamp=1.0),
-        ]
-        harness.clear_context()
-
-        assert len(harness.self_runtime.translation_history) == 0
-
-    def test_old_entries_removed_when_full(self):
-        """When max_entries is exceeded, oldest should be removed."""
-        clock = FakeClock(initial_time=10.0)
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=FakeLLMProvider(),
-            osc=FakeOscQueue(),
-            clock=clock,
-            context_max_entries=3,
-        )
-
-        # Add 3 entries (at capacity)
-        harness.self_runtime.translation_history = [
-            ContextEntry(text="e1", source_language="ko", target_language="en", timestamp=7.0),
-            ContextEntry(text="e2", source_language="ko", target_language="en", timestamp=8.0),
-            ContextEntry(text="e3", source_language="ko", target_language="en", timestamp=9.0),
-        ]
-
-        # Add a 4th entry
-        harness.self_runtime.translation_history.append(
-            ContextEntry(text="e4", source_language="ko", target_language="en", timestamp=10.0)
-        )
-        if (
-            len(harness.self_runtime.translation_history)
-            > harness.configuration.snapshot().value.context_max_entries
-        ):
-            harness.self_runtime.translation_history.pop(0)
-
-        assert len(harness.self_runtime.translation_history) == 3
-        assert harness.self_runtime.translation_history[0].text == "e2"  # e1 removed
-
     def test_context_resolver_tracks_updated_owner_settings_after_init(self):
         harness = compose_translation_test_harness(
             stt=None,
@@ -332,76 +284,7 @@ class TestContextPassedToLLM:
         assert fake_llm.calls[0]["context"] == ""
 
 
-class TestContextFormatting:
-    """Test context formatting for LLM."""
-
-    def test_format_context_empty(self):
-        """Empty context list should return empty string."""
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=FakeLLMProvider(),
-            osc=FakeOscQueue(),
-            clock=FakeClock(),
-        )
-
-        result = harness.format_context([])
-        assert result == ""
-
-    def test_format_context_single_entry(self):
-        """Single entry should be formatted correctly."""
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=FakeLLMProvider(),
-            osc=FakeOscQueue(),
-            clock=FakeClock(initial_time=20.0),
-        )
-
-        entries = [
-            ContextEntry(text="안녕", source_language="ko", target_language="en", timestamp=8.0)
-        ]
-        result = harness.format_context(entries)
-
-        assert result == '- [self] "안녕"'
-
-    def test_format_context_multiple_entries(self):
-        """Multiple entries should all be included."""
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=FakeLLMProvider(),
-            osc=FakeOscQueue(),
-            clock=FakeClock(initial_time=20.0),
-        )
-
-        entries = [
-            ContextEntry(text="a", source_language="ko", target_language="en", timestamp=8.0),
-            ContextEntry(text="b", source_language="ko", target_language="en", timestamp=9.0),
-        ]
-        result = harness.format_context(entries)
-
-        assert '- [self] "a"' in result
-        assert '- [self] "b"' in result
-
-
 class TestContextInternalPaths:
-    def test_context_resolver_formats_entries_without_relative_age(self):
-        runtime = compose_translation_test_harness(
-            stt=None,
-            llm=FakeLLMProvider(),
-            osc=FakeOscQueue(),
-            clock=FakeClock(initial_time=112.0),
-        ).self_runtime
-        runtime.remember_context("hello there", timestamp=100.0)
-        resolver = ContextResolver(clock=FakeClock(initial_time=112.0))
-
-        entries = resolver.get_entries(
-            runtime=runtime,
-            source_language="en",
-            target_language="ko",
-        )
-        context = resolver.format_entries(entries)
-
-        assert context == '- [self] "hello there"'
-
     def test_translation_fixture_uses_integrated_context_when_peer_translation_is_off(self):
         harness = compose_translation_test_harness(
             stt=None,
@@ -453,36 +336,6 @@ class TestContextInternalPaths:
         assert mode == "integrated"
         assert context == ('- [self] "I am ready"\n- [peer] "hello from peer"')
 
-    def test_context_resolver_always_uses_integrated_context(self):
-        self_runtime = compose_translation_test_harness(
-            stt=None,
-            llm=None,
-            osc=FakeOscQueue(),
-            clock=FakeClock(initial_time=112.0),
-        ).self_runtime
-        peer_runtime = compose_translation_test_harness(
-            stt=None,
-            llm=None,
-            osc=FakeOscQueue(),
-            clock=FakeClock(initial_time=112.0),
-        ).peer_runtime
-        self_runtime.remember_context("safe local line", timestamp=100.0)
-        peer_runtime.remember_context(
-            "peer line",
-            timestamp=105.0,
-        )
-        resolver = ContextResolver(clock=FakeClock(initial_time=112.0))
-
-        context, mode = resolver.resolve_for_request(
-            runtime=self_runtime,
-            other_runtime=peer_runtime,
-            source_language="en",
-            target_language="ko",
-        )
-
-        assert mode == "integrated"
-        assert '- [peer] "peer line"' in context
-
     def test_context_resolver_uses_available_self_context_when_peer_context_is_empty(self):
         self_runtime = ChannelRuntime(channel="self")
         peer_runtime = ChannelRuntime(channel="peer")
@@ -503,90 +356,6 @@ class TestContextInternalPaths:
 
         assert mode == "integrated"
         assert context == '- [self] "safe local line"'
-
-    def test_integrated_context_uses_60_second_window_before_entry_budget(self):
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=None,
-            osc=FakeOscQueue(),
-            clock=FakeClock(initial_time=100.0),
-            integrated_context_enabled=True,
-            peer_translation_enabled=True,
-        )
-        harness.self_runtime.remember_context(
-            "61 seconds old", timestamp=39.0, source_language="en", target_language="ko"
-        )
-        harness.self_runtime.remember_context(
-            "self recent", timestamp=70.0, source_language="en", target_language="ko"
-        )
-        harness.peer_runtime.remember_context(
-            "peer recent", timestamp=71.0, source_language="en", target_language="ko"
-        )
-        harness.self_runtime.remember_context(
-            "self newest", timestamp=72.0, source_language="en", target_language="ko"
-        )
-
-        context, mode = harness.translation_requests.context_resolver.resolve_for_request(
-            runtime=harness.self_runtime,
-            other_runtime=harness.peer_runtime,
-            source_language="en",
-            target_language="ko",
-            other_source_language="en",
-            other_target_language="ko",
-        )
-
-        assert mode == "integrated"
-        assert "61 seconds old" not in context
-        assert context == (
-            '- [self] "self recent"\n' '- [peer] "peer recent"\n' '- [self] "self newest"'
-        )
-
-    def test_integrated_context_uses_latest_5_combined_entries_after_timestamp_merge(self):
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=None,
-            osc=FakeOscQueue(),
-            clock=FakeClock(initial_time=100.0),
-            integrated_context_enabled=True,
-            peer_translation_enabled=True,
-        )
-        harness.self_runtime.remember_context(
-            "self 1", timestamp=70.0, source_language="en", target_language="ko"
-        )
-        harness.peer_runtime.remember_context(
-            "peer 1", timestamp=71.0, source_language="en", target_language="ko"
-        )
-        harness.self_runtime.remember_context(
-            "self 2", timestamp=72.0, source_language="en", target_language="ko"
-        )
-        harness.peer_runtime.remember_context(
-            "peer 2", timestamp=73.0, source_language="en", target_language="ko"
-        )
-        harness.self_runtime.remember_context(
-            "self 3", timestamp=74.0, source_language="en", target_language="ko"
-        )
-        harness.peer_runtime.remember_context(
-            "peer 3", timestamp=75.0, source_language="en", target_language="ko"
-        )
-
-        context, mode = harness.translation_requests.context_resolver.resolve_for_request(
-            runtime=harness.self_runtime,
-            other_runtime=harness.peer_runtime,
-            source_language="en",
-            target_language="ko",
-            other_source_language="en",
-            other_target_language="ko",
-        )
-
-        assert mode == "integrated"
-        assert "self 1" not in context
-        assert context == (
-            '- [peer] "peer 1"\n'
-            '- [self] "self 2"\n'
-            '- [peer] "peer 2"\n'
-            '- [self] "self 3"\n'
-            '- [peer] "peer 3"'
-        )
 
     def test_context_resolver_default_integrated_context_uses_60_second_window_and_latest_5_entries(
         self,
@@ -673,58 +442,6 @@ class TestContextSerializationContract:
         assert second == '- [self] "hello"'
         assert first == second
 
-    def test_formatted_context_contains_no_timestamp_derived_syntax(self):
-        entries = [
-            ContextEntry(
-                text="hello",
-                source_language="en",
-                target_language="ko",
-                timestamp=100.0,
-                channel="self",
-            ),
-            ContextEntry(
-                text="hi",
-                source_language="en",
-                target_language="ko",
-                timestamp=101.0,
-                channel="peer",
-            ),
-        ]
-
-        context = ContextResolver(clock=FakeClock(initial_time=110.0)).format_entries(entries)
-
-        assert context == '- [self] "hello"\n- [peer] "hi"'
-        assert "ago" not in context
-        assert "seconds" not in context
-        assert "100.0" not in context
-        assert "101.0" not in context
-
-    @pytest.mark.asyncio
-    async def test_provider_request_context_contains_no_relative_time_syntax(self):
-        clock = FakeClock(initial_time=110.0)
-        fake_llm = FakeLLMProvider()
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=fake_llm,
-            osc=FakeOscQueue(),
-            clock=clock,
-            context_time_window_s=60.0,
-            context_max_entries=3,
-        )
-        harness.self_runtime.translation_history = [
-            ContextEntry(text="hello", source_language="ko", target_language="en", timestamp=100.0),
-        ]
-
-        await harness.self_owner.submit_text("world")
-        await asyncio.gather(
-            *harness.self_runtime.translation_tasks.values(), return_exceptions=True
-        )
-
-        assert len(fake_llm.calls) == 1
-        assert fake_llm.calls[0]["context"] == '- [self] "hello"'
-        assert "ago" not in fake_llm.calls[0]["context"]
-        assert "seconds" not in fake_llm.calls[0]["context"]
-
 
 class TestContextLogging:
     def test_prepare_llm_request_counts_peer_local_context_as_peer_entries(self):
@@ -747,27 +464,6 @@ class TestContextLogging:
         )
 
         assert context == '- [peer] "secret peer context"'
-
-    @pytest.mark.asyncio
-    async def test_submit_text_without_llm_enqueues_transcript_only(self):
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=None,
-            osc=FakeOscQueue(),
-            clock=FakeClock(),
-        )
-
-        admission = await harness.self_owner.submit_text("hello")
-        assert admission.status == "admitted"
-        utterance_id = admission.turn_id
-        bundle = harness.bundle_for(utterance_id)
-        assert bundle.translation is None
-
-        events = [await harness.ui_events.get(), await harness.ui_events.get()]
-        assert [event.type for event in events] == [
-            UIEventType.TRANSCRIPT_FINAL,
-            UIEventType.OSC_SENT,
-        ]
 
     @pytest.mark.asyncio
     async def test_ensure_translation_deduplicates_same_utterance(self):
@@ -940,85 +636,4 @@ class TestContextLogging:
             UIEventType.TRANSCRIPT_FINAL,
             UIEventType.TRANSLATION_DONE,
             UIEventType.OSC_SENT,
-        ]
-
-    @pytest.mark.asyncio
-    async def test_peer_translation_stays_off_chatbox_on_success(self):
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=FakeLLMProvider(response_text="OK"),
-            osc=FakeOscQueue(),
-            clock=FakeClock(initial_time=112.0),
-            integrated_context_enabled=True,
-            peer_translation_enabled=True,
-        )
-        harness.replace_configuration(source_language="en")
-        harness.replace_configuration(target_language="ko")
-        harness.output_runtime.activate_peer_generation(1)
-        transcript = Transcript(
-            utterance_id=uuid4(),
-            text="peer hello",
-            is_final=True,
-            channel="peer",
-            publication_generation=1,
-            source_order=1,
-        )
-
-        await harness.dispatch_stt_event(
-            STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
-        )
-        await harness.translation_turns.wait_for_idle()
-        await harness.output_runtime.wait_for_peer_output_idle()
-
-        events = [await harness.ui_events.get(), await harness.ui_events.get()]
-        translation_event = events[1]
-        bundle = harness.bundle_for(translation_event.utterance_id, channel="peer")
-
-        assert bundle.translation is not None
-        assert harness.osc.messages == []
-        assert [event.type for event in events] == [
-            UIEventType.TRANSCRIPT_FINAL,
-            UIEventType.TRANSLATION_DONE,
-        ]
-
-    @pytest.mark.asyncio
-    async def test_peer_translation_error_fallback_does_not_publish_chatbox(self):
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=FakeLLMProvider(response_text="OK"),
-            osc=FakeOscQueue(),
-            clock=FakeClock(initial_time=112.0),
-            fallback_transcript_only=True,
-            integrated_context_enabled=True,
-            peer_translation_enabled=True,
-        )
-        harness.llm_runtime.attach_provider_reference(
-            LlmTranslationBackend(FakeLLMProvider(response_text="OK"))
-        )
-        harness.replace_configuration(source_language="en")
-        harness.replace_configuration(target_language="ko")
-        harness.output_runtime.activate_peer_generation(1)
-        transcript = Transcript(
-            utterance_id=uuid4(),
-            text="peer hello",
-            is_final=True,
-            channel="peer",
-            publication_generation=1,
-            source_order=1,
-        )
-
-        async def failing_translate(**kwargs):  # noqa: ANN003
-            raise RuntimeError("boom")
-
-        harness.llm_runtime.provider.provider.translate = failing_translate  # type: ignore[method-assign]
-
-        await harness.ensure_translation(transcript)
-        await harness.translation_turns.wait_for_idle()
-        await harness.output_runtime.wait_for_peer_output_idle()
-        events = [await harness.ui_events.get(), await harness.ui_events.get()]
-
-        assert harness.osc.messages == []
-        assert [event.type for event in events] == [
-            UIEventType.TRANSCRIPT_FINAL,
-            UIEventType.ERROR,
         ]

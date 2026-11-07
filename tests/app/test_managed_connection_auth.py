@@ -6,17 +6,6 @@ from dataclasses import FrozenInstanceError, dataclass, fields, is_dataclass
 from typing import Any
 
 import pytest
-from puripuly_heart.app.services.managed_auth_claims import (
-    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
-    MANAGED_AUTH_CLAIM_SOURCE_QQ,
-    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
-    OPENROUTER_MANAGED_USER_ID_SECRET,
-    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
-    ManagedAuthClaimGuard,
-)
-from puripuly_heart.app.services.managed_key_delivery_ack import (
-    ManagedKeyDeliveryAckService,
-)
 
 from puripuly_heart.app.ports import (
     broker_client,
@@ -24,13 +13,24 @@ from puripuly_heart.app.ports import (
     secret_store,
     settings_repository,
 )
+from puripuly_heart.app.services.managed.managed_auth_claims import (
+    MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+    MANAGED_AUTH_CLAIM_SOURCE_QQ,
+    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+    OPENROUTER_MANAGED_USER_ID_SECRET,
+    OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
+    ManagedAuthClaimGuard,
+)
+from puripuly_heart.app.services.managed.managed_key_delivery_ack import (
+    ManagedKeyDeliveryAckService,
+)
 from puripuly_heart.core import messages
 from puripuly_heart.core.managed_credential import (
     ManagedCredentialBinding,
     credential_binding_secret,
 )
 
-SERVICE_MODULE = "puripuly_heart.app.services.managed_connection_auth"
+SERVICE_MODULE = "puripuly_heart.app.services.managed.managed_connection_auth"
 DISCORD_AUTH_PORT_MODULE = "puripuly_heart.app.ports.discord_auth"
 LOCAL_IDENTITY_PORT_MODULE = "puripuly_heart.app.ports.managed_identity"
 
@@ -1771,60 +1771,6 @@ async def test_discord_auth_wait_keeps_recovering_without_fresh_issue() -> None:
     assert managed_state.pending_managed_operation_id == DISCORD_SEEDED_OPERATION_ID
     assert store.values["openrouter_managed_operation_resume_token"] == DISCORD_SEEDED_RESUME_TOKEN
     _assert_no_raw_values(result, label="managed operation wait result")
-
-
-@pytest.mark.asyncio
-async def test_discord_ack_recovery_finishes_without_new_authorization() -> None:
-    metadata = _delivery_ack_metadata()
-    managed_state = RecordingManagedState(
-        active_managed_credential_ref=metadata.managed_credential_ref,
-        pending_delivery_ack_source="discord",
-        pending_delivery_ack_delivery_id=metadata.delivery_id,
-        pending_delivery_ack_managed_credential_ref=metadata.managed_credential_ref,
-        pending_delivery_ack_expires_at=metadata.expires_at,
-    )
-    identity = RecordingLocalIdentity(_identity_success())
-    discord = RecordingDiscordAuth(_discord_success())
-    broker = RecordingBrokerClient(
-        None,
-        ack_result=broker_client.ManagedKeyDeliveryAckResult(
-            succeeded=True,
-            status="acknowledged",
-        ),
-    )
-    store = RecordingSecretStore()
-    store.values[LOCAL_SECRET_KEY] = RAW_MANAGED_CREDENTIAL
-    store.values["openrouter_managed_delivery_ack_token"] = metadata.delivery_ack_token
-    store.values[credential_binding_secret("discord")] = ManagedCredentialBinding.create(
-        source="discord",
-        installation_id=managed_state.installation_id,
-        operation_id="delivered-op",
-        delivery_id=metadata.delivery_id,
-        managed_credential_ref=metadata.managed_credential_ref,
-        credential=RAW_MANAGED_CREDENTIAL,
-    ).encode()
-    repository = RecordingSettingsRepository(None)
-
-    result = await _service(
-        identity=identity,
-        discord=discord,
-        broker=broker,
-        store=store,
-        repository=repository,
-        delivery_ack_service=ManagedKeyDeliveryAckService(
-            broker,
-            store,
-            managed_state,
-        ),
-    ).authorize(_request())
-
-    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-    assert broker.requests == []
-    assert broker.status_requests == []
-    assert broker.resume_requests == []
-    assert managed_state.pending_delivery_ack_source is None
-    assert store.values[LOCAL_SECRET_KEY] == RAW_MANAGED_CREDENTIAL
-    _assert_no_raw_values(result, label="managed ACK recovery result")
 
 
 QQ_SEEDED_OPERATION_ID = "ph-mop-v1_0123456789abcdef0123456789abcdef"

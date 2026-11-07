@@ -1,7 +1,5 @@
 import ast
 
-from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
-from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from tests.helpers.paths import REPO_ROOT
 
 DRIVER_PATH = (
@@ -56,7 +54,3 @@ def test_evidence_contract_is_ui_neutral_and_composition_is_page_free() -> None:
     )
     assert "flet" not in imported_modules
     assert "_ApplicationLocalASRProductionEvidence" in composition_source
-    required_presentation_members = {
-        name for name in UiPresentationPort.__dict__ if not name.startswith("_")
-    }
-    assert required_presentation_members <= set(dir(FletUiPresentationAdapter))

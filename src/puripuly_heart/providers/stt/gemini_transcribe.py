@@ -9,7 +9,7 @@ import logging
 import math
 from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Callable, ClassVar, Sequence
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.audio.format import AudioCaptureSpan
@@ -330,6 +330,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
     _stream: RecognitionStreamIdentity | None = field(init=False, default=None, repr=False)
     _input_map: STTStreamInputMap = field(init=False, default_factory=STTStreamInputMap)
     _receipt_sequence: int = field(init=False, default=0)
+    _partial_unit_id: UUID | None = field(init=False, default=None)
     _queued_audio_bytes: int = field(init=False, default=0)
     _audio_since_fence: bool = field(init=False, default=False)
     _protocol_failed: bool = field(init=False, default=False)
@@ -626,6 +627,48 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 if self._go_away_active:
                     self._start_teardown()
 
+    def _publish_transcription(self, transcription: Any, *, is_final: bool) -> None:
+        stream = self._stream
+        if stream is None:
+            return
+        text = getattr(transcription, "text", "") or ""
+        if not isinstance(text, str):
+            raise TypeError("Gemini transcription text must be a string")
+        self._receipt_sequence += 1
+        unit_id = self._partial_unit_id or uuid4()
+        self._partial_unit_id = None if is_final else unit_id
+        unit = STTRecognitionUnit(
+            identity=RecognitionUnitIdentity(stream, unit_id, self._receipt_sequence),
+            text=text,
+            is_final=is_final,
+            observed_at=asyncio.get_running_loop().time(),
+            provenance=STTNativeProvenance(
+                transcription=NativeTranscriptionEvidence(
+                    finished=getattr(transcription, "finished", None),
+                    language_code=getattr(transcription, "language_code", None),
+                    speaker_label=getattr(transcription, "speaker_label", None),
+                    words=tuple(
+                        (
+                            getattr(word, "word", None),
+                            (
+                                str(word.start_offset)
+                                if getattr(word, "start_offset", None) is not None
+                                else None
+                            ),
+                            (
+                                str(word.end_offset)
+                                if getattr(word, "end_offset", None) is not None
+                                else None
+                            ),
+                        )
+                        for word in (getattr(transcription, "words", None) or ())
+                    ),
+                )
+            ),
+        )
+        if not self._event_projection.put_recognition(unit):
+            self._scoped_transport_failure("gemini_recognition_buffer_overflow")
+
     def _handle_message(self, message: Any) -> None:
         if self._protocol_failed or self._stopped:
             return
@@ -642,36 +685,14 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
             if self._event_projection.is_legacy:
                 self._put_event(STTBackendTranscriptEvent(text=text, is_final=True))
             elif self._stream is not None:
-                self._receipt_sequence += 1
-                unit = STTRecognitionUnit(
-                    identity=RecognitionUnitIdentity(self._stream, uuid4(), self._receipt_sequence),
-                    text=text,
-                    provenance=STTNativeProvenance(
-                        transcription=NativeTranscriptionEvidence(
-                            finished=getattr(final, "finished", None),
-                            language_code=getattr(final, "language_code", None),
-                            speaker_label=getattr(final, "speaker_label", None),
-                            words=tuple(
-                                (
-                                    getattr(word, "word", None),
-                                    (
-                                        str(word.start_offset)
-                                        if getattr(word, "start_offset", None) is not None
-                                        else None
-                                    ),
-                                    (
-                                        str(word.end_offset)
-                                        if getattr(word, "end_offset", None) is not None
-                                        else None
-                                    ),
-                                )
-                                for word in (getattr(final, "words", None) or ())
-                            ),
-                        )
-                    ),
+                self._publish_transcription(
+                    final,
+                    is_final=self._stream.channel != "peer"
+                    or getattr(final, "finished", None) is not False,
                 )
-                if not self._event_projection.put_recognition(unit):
-                    self._scoped_transport_failure("gemini_recognition_buffer_overflow")
+        interim = getattr(content, "interim_input_transcription", None)
+        if interim is not None and self._stream is not None and self._stream.channel == "peer":
+            self._publish_transcription(interim, is_final=False)
         go_away = getattr(message, "go_away", None)
         if go_away is not None and not self._go_away_active:
             self._go_away_active = True

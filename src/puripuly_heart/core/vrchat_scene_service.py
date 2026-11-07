@@ -14,8 +14,8 @@ from puripuly_heart.config.process_capture_resolution import (
 )
 from puripuly_heart.config.settings_vnext.schema import ProcessCaptureTargetIntent
 from puripuly_heart.core.audio.process_identity import (
-    PsutilCurrentUserProcessSnapshots,
     PsutilProcessIdentityWatcher,
+    default_current_user_process_snapshots,
 )
 from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
@@ -74,7 +74,7 @@ def _is_newer(selected: VrchatSceneLogCandidate, current: VrchatSceneLogCandidat
 @dataclass(slots=True)
 class VrchatSceneService(SceneSnapshotProvider):
     snapshots: CurrentUserProcessSnapshotPort = field(
-        default_factory=PsutilCurrentUserProcessSnapshots
+        default_factory=default_current_user_process_snapshots
     )
     watcher_factory: PsutilProcessIdentityWatcher = field(
         default_factory=PsutilProcessIdentityWatcher

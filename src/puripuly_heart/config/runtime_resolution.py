@@ -25,6 +25,7 @@ from puripuly_heart.config.llm_profiles import (
     normalize_legacy_openrouter_model,
     openrouter_alias_for_fields,
 )
+from puripuly_heart.config.provider_values import normalize_stt_provider
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_MANAGED,
     CREDENTIAL_SOURCE_NONE,
@@ -241,9 +242,11 @@ CREDENTIAL_REF_SONIOX_STT: Final = "soniox:stt"
 CREDENTIAL_REF_CUSTOM_STT: Final = "custom:stt"
 
 STT_PROVIDER_LOCAL_CPU_AUTO: Final = "local_cpu_auto"
-STT_PROVIDER_LOCAL_PARAKEET_V3: Final = "local_parakeet_v3"
+STT_PROVIDER_LOCAL_GRANITE: Final = "local_granite"
+STT_PROVIDER_LOCAL_GIGAAM: Final = "local_gigaam"
+STT_PROVIDER_LOCAL_FUN_ASR_NANO: Final = "local_fun_asr_nano"
+STT_PROVIDER_LOCAL_FUN_ASR_MLT_NANO: Final = "local_fun_asr_mlt_nano"
 STT_PROVIDER_LOCAL_PARAKEET_JAPANESE: Final = "local_parakeet_ja"
-STT_PROVIDER_LOCAL_QWEN: Final = "local_qwen"
 STT_PROVIDER_LOCAL_QWEN_GPU: Final = "local_qwen_gpu"
 STT_PROVIDER_DEEPGRAM: Final = "deepgram"
 STT_PROVIDER_GEMINI_TRANSCRIBE: Final = "gemini_transcribe"
@@ -261,9 +264,11 @@ STT_CUSTOM_PROVIDERS: Final[tuple[str, ...]] = (
 )
 STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_LOCAL_CPU_AUTO,
-    STT_PROVIDER_LOCAL_PARAKEET_V3,
+    STT_PROVIDER_LOCAL_GRANITE,
+    STT_PROVIDER_LOCAL_GIGAAM,
+    STT_PROVIDER_LOCAL_FUN_ASR_NANO,
+    STT_PROVIDER_LOCAL_FUN_ASR_MLT_NANO,
     STT_PROVIDER_LOCAL_PARAKEET_JAPANESE,
-    STT_PROVIDER_LOCAL_QWEN,
     STT_PROVIDER_LOCAL_QWEN_GPU,
     STT_PROVIDER_DEEPGRAM,
     STT_PROVIDER_ELEVENLABS_SCRIBE,
@@ -309,7 +314,7 @@ ELEVENLABS_SCRIBE_STT_MODEL: Final = "scribe_v2_realtime"
 ELEVENLABS_SCRIBE_STT_MAX_KEYTERMS: Final = 50
 ELEVENLABS_SCRIBE_STT_MAX_KEYTERM_CHARS: Final = 20
 QWEN_AUDIO_STT_MODEL: Final = "qwen-audio-3.1-asr-flash-streaming"
-SONIOX_STT_MODEL_RT_V5: Final = "stt-rt-v5"
+SONIOX_STT_MODEL_RT_V6: Final = "stt-rt-v6"
 SONIOX_STT_DEFAULT_ENDPOINT: Final = "wss://stt-rt.soniox.com/transcribe-websocket"
 SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S: Final = 10.0
 SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS: Final = 100
@@ -779,7 +784,7 @@ class STTRuntimeIntent:
     elevenlabs_scribe_auto_language: bool = False
     qwen_region: str = QWEN_REGION_BEIJING
     qwen_connection: AlibabaConnection | None = None
-    soniox_model: str = SONIOX_STT_MODEL_RT_V5
+    soniox_model: str = SONIOX_STT_MODEL_RT_V6
     soniox_endpoint: str = SONIOX_STT_DEFAULT_ENDPOINT
     soniox_keepalive_interval_s: float = SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S
     soniox_trailing_silence_ms: int = SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS
@@ -802,7 +807,7 @@ class STTRuntimeIntent:
             default=RUNTIME_CHANNEL_SELF,
         )
         provider = _normalize_allowed(
-            self.provider,
+            normalize_stt_provider(self.provider),
             allowed=STT_PROVIDERS,
             default=STT_PROVIDER_LOCAL_CPU_AUTO,
         )
@@ -1800,7 +1805,7 @@ __all__ = [
     "SONIOX_STT_DEFAULT_ENDPOINT",
     "SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S",
     "SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS",
-    "SONIOX_STT_MODEL_RT_V5",
+    "SONIOX_STT_MODEL_RT_V6",
     "STT_DEFAULT_CHANNELS",
     "STT_DEFAULT_DRAIN_TIMEOUT_S",
     "STT_DEFAULT_LOW_LATENCY_ENABLED",
@@ -1818,8 +1823,10 @@ __all__ = [
     "STT_PROVIDER_GEMINI_TRANSCRIBE",
     "STT_PROVIDER_LOCAL_CPU_AUTO",
     "STT_PROVIDER_LOCAL_PARAKEET_JAPANESE",
-    "STT_PROVIDER_LOCAL_PARAKEET_V3",
-    "STT_PROVIDER_LOCAL_QWEN",
+    "STT_PROVIDER_LOCAL_GRANITE",
+    "STT_PROVIDER_LOCAL_GIGAAM",
+    "STT_PROVIDER_LOCAL_FUN_ASR_NANO",
+    "STT_PROVIDER_LOCAL_FUN_ASR_MLT_NANO",
     "STT_PROVIDER_LOCAL_QWEN_GPU",
     "PEER_AUTO_DETECTION_STT_PROVIDERS",
     "STT_PROVIDER_QWEN_AUDIO",

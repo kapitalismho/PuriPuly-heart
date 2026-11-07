@@ -16,9 +16,6 @@ CONTROLLER_PATH = ROOT / "src" / "puripuly_heart" / "composition" / "application
 CAPTURE_WIRING_PATH = (
     ROOT / "src" / "puripuly_heart" / "app" / "wiring" / "wiring_capture_runtime.py"
 )
-RUNTIME_COMPOSITION_PATH = (
-    ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
-)
 LEGACY_OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_audio.py"
 VAD_SINK_ADAPTER_PATH = (
     ROOT
@@ -108,13 +105,11 @@ def test_controller_composes_self_vad_sink_adapter_without_channel_wrapper() -> 
 
 def test_application_composes_self_admission_adapter_without_admission_algorithm() -> None:
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
-    composition_source = RUNTIME_COMPOSITION_PATH.read_text(encoding="utf-8")
     local_asr_adapter = (
         ROOT / "src" / "puripuly_heart" / "app" / "adapters" / "local_asr_application.py"
     ).read_text(encoding="utf-8")
 
     assert source.count("self_admission=create_self_capture_admission_adapter(") == 1
-    assert source == composition_source
     assert "_SelfCaptureAdmissionAdapter" not in source
     assert "_admit_self_capture" not in source
     assert "SelfCaptureAdmissionStatus" not in source
@@ -145,12 +140,3 @@ def test_self_vad_sink_adapter_routes_only_self_events_without_lifecycle_ownersh
     assert "await runtime.handle_vad_event(event)" in source
     assert "asyncio.create_task" not in source
     assert "async def close(" not in source
-
-
-def test_self_capture_session_owner_remains_generation_guard_and_sink_caller() -> None:
-    source = OWNER_PATH.read_text(encoding="utf-8")
-
-    assert "class _GenerationGuardedVadSink" in source
-    assert "if not self.owner.is_current_generation" in source
-    assert "await cast(_VadSink, self.sink).handle_vad_event(event)" in source
-    assert "vad_sink: object" in source

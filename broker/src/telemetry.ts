@@ -2,8 +2,8 @@ import type { Context } from 'hono';
 
 import { errorResponse as publicErrorResponse } from './broker-error';
 import type { BrokerEnv } from './contract';
+import { readJsonBody } from './public-input';
 
-export const APP_ACTIVE_DAY_ENDPOINT = 'POST /v1/telemetry/app-active-day';
 export const APP_SUBJECT_REF_PREFIX = 'ph-app-subject-v1_';
 
 const ANONYMOUS_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
@@ -39,7 +39,12 @@ export async function handleAppActiveDay(c: Context<BrokerEnv>): Promise<Respons
   const now = new Date();
   const body = await readJsonBody<AppActiveDayRequestBody>(c);
   if (!body.ok) {
-    return invalidTelemetryRequest(c, body.reason);
+    return invalidTelemetryRequest(
+      c,
+      body.reason === 'invalid_json'
+        ? 'request body must be valid JSON'
+        : 'request body must be a JSON object',
+    );
   }
 
   const validation = validateAppActiveDayRequest(body.value, now);
@@ -181,24 +186,6 @@ function validateAppActiveDayRequest(
     anonymousId: request.anonymous_id,
     activeDateUtc: request.active_date_utc,
   };
-}
-
-async function readJsonBody<T>(
-  c: Context<BrokerEnv>,
-): Promise<
-  | { ok: true; value: T }
-  | { ok: false; reason: 'request body must be valid JSON' | 'request body must be a JSON object' }
-> {
-  try {
-    const value = await c.req.json();
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      return { ok: false, reason: 'request body must be a JSON object' };
-    }
-
-    return { ok: true, value: value as T };
-  } catch {
-    return { ok: false, reason: 'request body must be valid JSON' };
-  }
 }
 
 function invalidTelemetryRequest(c: Context<BrokerEnv>, reason: string): Response {

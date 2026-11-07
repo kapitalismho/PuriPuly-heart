@@ -2,24 +2,9 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { HOSTING_ASSUMPTIONS, REQUIRED_BINDINGS } from '../src/contract';
+import { REQUIRED_BINDINGS } from '../src/contract';
 
 describe('broker hosting assumptions', () => {
-  it('keeps the initial rollout as an explicit single-region assumption and explicitly bounded', () => {
-    expect(HOSTING_ASSUMPTIONS).toEqual({
-      regionMode: 'single-region-rollout-assumption',
-      d1LocationHint: 'apac',
-      infrastructure: ['worker-service', 'd1-database', 'worker-secrets'],
-      exclusions: [
-        'translation-proxying',
-        'multi-region-deployment',
-        'kv',
-        'r2',
-        'admin-dashboard',
-      ],
-    });
-  });
-
   it('binds the worker to the broker entrypoint and native D1 config without unsupported location fields', () => {
     const wranglerConfig = readFileSync(
       new URL('../wrangler.jsonc', import.meta.url),

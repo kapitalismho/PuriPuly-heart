@@ -8,8 +8,8 @@ from pathlib import Path
 
 from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice, model_asset_choices
 from puripuly_heart.core.feature_diagnostics import log_feature
-from puripuly_heart.core.local_asr_provisioning import LocalASRInstallRequest
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRInstallRequest
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     default_local_stt_model_root,
     inspect_local_stt_install_state,

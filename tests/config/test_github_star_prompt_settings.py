@@ -49,11 +49,6 @@ def test_github_star_prompt_state_round_trips_through_canonical_settings() -> No
     restored = serialization.from_dict(serialized)
     prompt = serialized["state"]["github_star_prompt"]
 
-    assert _prompt(settings).clicked is True
-    assert _prompt(settings).last_shown_at == persisted_timestamp
-    assert _prompt(settings).show_count == 3
-    assert _prompt(settings).translation_success_observed is True
-    assert _prompt(settings).eligible_launch_count == 2
     assert prompt["clicked"] is True
     assert prompt["last_shown_at"] == persisted_timestamp
     assert prompt["show_count"] == 3

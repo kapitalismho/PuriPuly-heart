@@ -5,6 +5,7 @@ from dataclasses import replace
 from uuid import uuid4
 
 import numpy as np
+import pytest
 
 from puripuly_heart.core.audio.desktop_pipeline import DesktopPeerPipeline
 from puripuly_heart.core.audio.format import (
@@ -1173,3 +1174,123 @@ async def test_stream_input_carries_vad_speech_fact_with_real_source_timing_befo
     ]
     assert delivery_order == ["stream", "start", "stream", "stream"]
     assert activity_times == [500.0, 500.0, 500.0]
+
+
+@pytest.mark.parametrize(
+    ("boundary", "expected_context_frames"),
+    [
+        ("none", 4),
+        ("mute", 1),
+        ("settings", 2),
+        ("activation", 2),
+        ("vad_settings", 2),
+        ("discontinuity", 2),
+        ("capture_epoch", 2),
+    ],
+)
+async def test_stream_onset_context_is_real_bounded_and_permission_scoped(
+    boundary: str, expected_context_frames: int
+) -> None:
+    from puripuly_heart.core.audio.ownership import CaptureStreamInput
+
+    settings = AudioSegmentSettingsSnapshot(
+        provider_id="gemini_transcribe",
+        provider_signature=("test",),
+        runtime_signature=("test",),
+        source_mode="desktop",
+        source_language="en",
+        expected_languages=("en",),
+        target_sample_rate_hz=16000,
+        vad_speech_threshold=0.4,
+        vad_hangover_ms=500,
+        vad_pre_roll_ms=500,
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings)
+    vad = create_peer_vad_gating(
+        SequenceVadEngine([0.1] * 4 + [0.9, 0.1]),
+        sample_rate_hz=16000,
+        ring_buffer_ms=500,
+        hangover_ms=500,
+    )
+    samples = np.repeat(np.arange(1, 7, dtype=np.float32) / 16, 512)
+    streams: list[CaptureStreamInput] = []
+    starts: list[object] = []
+    order: list[str] = []
+
+    class Source:
+        async def frames(self):
+            for index in range(6):
+                if index == 2:
+                    if boundary == "settings":
+                        ledger.rebind(
+                            activation_generation=1,
+                            settings=replace(settings, provider_signature=("new",)),
+                        )
+                    elif boundary == "activation":
+                        ledger.rebind(activation_generation=2, settings=settings)
+                    elif boundary == "vad_settings":
+                        vad.reconfigure_next_segment(
+                            speech_threshold=0.4, hangover_ms=500, ring_buffer_ms=500
+                        )
+                discontinuity = (
+                    AudioCaptureDiscontinuity("unknown_loss", 1.0)
+                    if boundary == "discontinuity" and index == 2
+                    else None
+                )
+                yield AudioFrameF32(
+                    samples=samples[index * 512 : (index + 1) * 512],
+                    sample_rate_hz=16000,
+                    capture=AudioCaptureSpan(
+                        capture_epoch=2 if boundary == "capture_epoch" and index >= 2 else 1,
+                        callback_sequence=index,
+                        source_sample_rate_hz=16000,
+                        source_start_sample=index * 512,
+                        source_end_sample=(index + 1) * 512,
+                        source_start_monotonic_s=index * 0.032,
+                        source_end_monotonic_s=(index + 1) * 0.032,
+                        discontinuity_before=discontinuity,
+                    ),
+                )
+
+    class Gate:
+        def process_chunk(self, chunk: np.ndarray) -> np.ndarray:
+            return np.zeros_like(chunk) if boundary == "mute" and chunk[0] == 3 / 16 else chunk
+
+    class Sink:
+        async def handle_stream_input(self, event: CaptureStreamInput) -> None:
+            streams.append(event)
+            order.append("stream")
+
+        async def handle_owned_vad_event(self, event: object) -> None:
+            starts.append(event)
+            order.append("local")
+
+    await run_audio_vad_loop(
+        source=Source(),
+        vad=vad,
+        sink=Sink(),
+        audio_gate=Gate(),
+        target_sample_rate_hz=16000,
+        segment_ledger=ledger,
+    )
+    positive = [event for event in streams if event.speech_observed]
+    assert len(positive) == 1
+    onset = positive[0]
+    assert onset.pre_roll is not None
+    np.testing.assert_array_equal(
+        onset.pre_roll, samples[(4 - expected_context_frames) * 512 : 4 * 512]
+    )
+    assert onset.pre_roll.size <= 8000
+    assert (
+        sum(span.normalized_sample_count for span in onset.pre_roll_capture) == onset.pre_roll.size
+    )
+    assert onset.pre_roll_capture[0].normalized_start_sample == (4 - expected_context_frames) * 512
+    assert onset.pre_roll_capture[-1].normalized_end_sample == 4 * 512
+    assert all(
+        span.capture_epoch == onset.capture[0].capture_epoch for span in onset.pre_roll_capture
+    )
+    assert all(event.pre_roll is None for event in streams if not event.speech_observed)
+    assert starts == []
+    assert "local" not in order
+    if boundary == "mute":
+        assert [event.boundary_reason for event in streams].count("source_discontinuity") == 1

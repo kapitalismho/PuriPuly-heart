@@ -9,12 +9,6 @@ from typing import cast
 
 import httpx
 import pytest
-from puripuly_heart.app.services.provider_credential_verification import (
-    ProviderCredentialVerificationInteractionOwner,
-    ProviderCredentialVerificationOwner,
-)
-from puripuly_heart.app.services.settings_transaction_result import SettingsTransactionResultOwner
-from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEClient, OpenRouterPKCEExchangeResult
 
 from puripuly_heart.app.adapters.provider_verifier import ProviderVerifierAdapter
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
@@ -27,6 +21,13 @@ from puripuly_heart.app.services.openrouter_pkce_flow import (
     OpenRouterPkceApplicationOwner,
     OpenRouterPkceFlowOwner,
 )
+from puripuly_heart.app.services.provider.provider_credential_verification import (
+    ProviderCredentialVerificationInteractionOwner,
+    ProviderCredentialVerificationOwner,
+)
+from puripuly_heart.app.services.settings.settings_transaction_result import (
+    SettingsTransactionResultOwner,
+)
 from puripuly_heart.config.provider_values import OpenRouterSelectionAlias
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core import network_clients
@@ -36,6 +37,10 @@ from puripuly_heart.core.error_messages import (
     openrouter_auth_failure_report,
 )
 from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
+from puripuly_heart.core.openrouter.openrouter_pkce import (
+    OpenRouterPKCEClient,
+    OpenRouterPKCEExchangeResult,
+)
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.ui.components.settings.api_key_verification_controller import (
     ApiKeyVerificationController,
@@ -373,7 +378,9 @@ async def test_missing_callback_times_out_and_closes_real_listener(
     with socket.socket() as available:
         available.bind(("127.0.0.1", 0))
         port = available.getsockname()[1]
-    monkeypatch.setattr("puripuly_heart.core.openrouter_pkce.CALLBACK_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(
+        "puripuly_heart.core.openrouter.openrouter_pkce.CALLBACK_TIMEOUT_SECONDS", 0.01
+    )
     client = OpenRouterPKCEClient(callback_origin=f"http://127.0.0.1:{port}", open_browser=False)
     with pytest.raises(OpenRouterAuthenticationError) as caught:
         await client.run_desktop_flow()
@@ -405,7 +412,7 @@ async def test_unsuccessful_browser_launch_is_reported_without_callback_wait_or_
 
     monkeypatch.setattr(client, "_create_callback_listener", lambda _session: Listener())
     monkeypatch.setattr(
-        "puripuly_heart.core.openrouter_pkce.webbrowser.open",
+        "puripuly_heart.core.openrouter.openrouter_pkce.webbrowser.open",
         unsuccessful_browser,
     )
     flow = OpenRouterPkceFlowOwner(client_factory=lambda: client)

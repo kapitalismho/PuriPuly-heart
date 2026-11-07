@@ -161,7 +161,9 @@ def modelscope_server():
             return None
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
     worker.start()
     state.url = f"http://127.0.0.1:{server.server_port}"
     try:
@@ -212,6 +214,61 @@ async def test_missing_install_downloads_pinned_files_and_promotes_atomically(
     assert updates[0].state == "downloading"
     assert updates[-1].state == "ready"
     assert updates[-1].percent == 100
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("failure", "code"),
+    [
+        ("missing", "missing_file"),
+        ("size", "file_size_mismatch"),
+        ("checksum", "checksum_failed"),
+    ],
+)
+async def test_local_import_preflight_rejects_invalid_inputs_without_replacing_install(
+    tmp_path, monkeypatch, failure, code
+) -> None:
+    contents = _pin_small_assets(monkeypatch)
+    spec = assets.e4b_gemma_spec()
+    install_dir = tmp_path / "gemma"
+    installed = await provisioning.ensure_gemma_installed(
+        downloader=FakeDownloader(contents), install_dir=install_dir, spec=spec
+    )
+    source_dir = tmp_path / "import"
+    source_dir.mkdir()
+    files = tuple(source_dir / name for name in contents)
+    for path in files:
+        path.write_bytes(contents[path.name])
+    if failure == "missing":
+        invalid_files = files[1:]
+    else:
+        invalid_files = files
+        files[0].write_bytes(
+            b"wrong-size" if failure == "size" else b"x" * len(contents[files[0].name])
+        )
+    statuses = []
+    with pytest.raises(provisioning.GemmaProvisioningError) as caught:
+        await provisioning.ensure_gemma_installed(
+            downloader=provisioning.LocalGemmaDownloadAdapter(invalid_files, spec),
+            install_dir=install_dir,
+            spec=spec,
+            source="local",
+            on_status=statuses.append,
+        )
+    assert caught.value.failure_code == code
+    assert all(status.state != "ready" for status in statuses)
+    assert assets.validate_gemma_install(install_dir, spec=spec) == installed
+    assert not tuple(tmp_path.glob("gemma.staging-*"))
+
+    for path in files:
+        path.write_bytes(contents[path.name])
+    retried = await provisioning.ensure_gemma_installed(
+        downloader=provisioning.LocalGemmaDownloadAdapter(files, spec),
+        install_dir=install_dir,
+        spec=spec,
+        source="local",
+    )
+    assert assets.validate_gemma_install(install_dir, spec=spec) == retried == installed
 
 
 @pytest.mark.asyncio

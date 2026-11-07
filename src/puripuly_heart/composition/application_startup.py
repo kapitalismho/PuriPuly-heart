@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from puripuly_heart.app.ports.application_startup import ApplicationStartupState
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
@@ -11,23 +11,20 @@ from puripuly_heart.app.services.application_runtime_logging import (
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.gpu_runtime_interaction import GpuRuntimeInteractionState
-from puripuly_heart.app.services.manual_local_asr_fallback import (
-    ManualLocalASRFallbackOwner,
-)
-from puripuly_heart.app.services.overlay_calibration_application import (
+from puripuly_heart.app.services.overlay.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
 )
 from puripuly_heart.app.wiring import create_secret_store, runtime_pipeline_inputs_from_vnext
-from puripuly_heart.app.wiring_runtime_pipeline import (
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import (
     RuntimePipelineHandle,
     RuntimePipelineLauncher,
 )
-from puripuly_heart.app.wiring_translation_runtime_configuration import (
+from puripuly_heart.app.wiring.wiring_translation_runtime_configuration import (
     replace_translation_runtime_enabled,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.diagnostics import safe_exception_fields
-from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.messages import ErrorDiagnostics
 
 
@@ -37,11 +34,9 @@ class ApplicationStartupAdapter:
     settings_loader: Callable[[], AppSettingsVNext]
     provisioning: LocalASRProvisioningPort
     gpu_state: Callable[[], GpuRuntimeInteractionState]
-    manual_fallback: ManualLocalASRFallbackOwner
     calibration: OverlayCalibrationApplicationOwner
     presentation: UiPresentationPort
     sync_presentation: Callable[[], None]
-    notify_fallback: Callable[[tuple[str, ...], bool], None]
     runtime_logging: ApplicationRuntimeLoggingOwner
     initial_llm_binding_sink: Callable[[AppSettingsVNext, object | None], None]
     pipeline_launcher: RuntimePipelineLauncher
@@ -66,55 +61,30 @@ class ApplicationStartupAdapter:
         await self.provisioning.inspect_gpu(
             explicit_intent=self.gpu_state().selected_provider_requires_model,
         )
-        fallback_plan = self.manual_fallback.plan(
-            self.manual_fallback.state(
-                loaded_settings,
-                cpu_auto_available=self.provisioning.snapshot.cpu_auto_available,
-            )
-        )
-        fallback_channels = fallback_plan.fallback_channels
-        installation_fallback = fallback_plan.installation_fallback
-        if fallback_plan.changed:
-            normalized_settings = self.manual_fallback.apply(
-                loaded_settings,
-                fallback_plan,
-            )
-            self.settings.canonical = normalized_settings
-            if not self.settings.save_current():
-                self.settings.canonical = loaded_settings
-                fallback_channels = ()
-                installation_fallback = False
-                primary = getattr(self.settings, "last_failure", None)
-                self.runtime_logging.emit_failure(
-                    ErrorDiagnostics(
-                        component="application_startup",
-                        operation="settings_fallback",
-                        code="startup_fallback_not_persisted",
-                        category="transaction",
-                        visibility="basic",
-                        content_policy="metadata_only",
-                        status_code=None,
-                        retry_after_ms=None,
-                        fields={"phase": "settings_fallback", "fallback_persisted": False},
-                        cause_id=primary.diagnostic_id if primary is not None else None,
-                    ),
-                    severity="warning",
-                    disposition="degraded",
-                    stage="settings_fallback",
-                )
-                if primary is not None:
-                    self.runtime_logging.emit_failure(primary, stage="settings_save")
-            else:
-                self.settings.canonical = normalized_settings
         settings = self.settings.canonical
         if settings is None:
             raise RuntimeError("Application settings were not retained")
+        main_input_first_launch = not settings.state.main_input_hint.first_launch_completed
+        if main_input_first_launch:
+            self.settings.canonical = replace(
+                settings,
+                state=replace(
+                    settings.state,
+                    main_input_hint=replace(
+                        settings.state.main_input_hint,
+                        first_launch_completed=True,
+                    ),
+                ),
+            )
+            if self.settings.save_current():
+                settings = self.settings.canonical
+            else:
+                self.settings.canonical = settings
         self.settings.set_overlay_enabled(False)
         self.settings.set_peer_translation_enabled(False)
         return ApplicationStartupState(
             settings=settings,
-            fallback_channels=fallback_channels,
-            installation_fallback=installation_fallback,
+            main_input_first_launch=main_input_first_launch,
         )
 
     def apply_startup_presentation(self, state: ApplicationStartupState) -> None:
@@ -122,11 +92,10 @@ class ApplicationStartupAdapter:
         self.calibration.sync_from_settings(settings)
         self.calibration.replace_draft(None)
         self.presentation.set_locale(settings.intent.ui.locale)
-        self.sync_presentation()
-        self.notify_fallback(
-            state.fallback_channels,
-            state.installation_fallback,
+        self.presentation.set_dashboard_launch_input_hint(
+            first_launch=state.main_input_first_launch
         )
+        self.sync_presentation()
         try:
             self.presentation.apply_locale()
         except Exception as exc:

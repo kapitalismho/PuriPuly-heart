@@ -1,5 +1,7 @@
 import type { Context } from 'hono';
 
+import { encodeBase64Url, sha256Base64Url } from './crypto';
+
 import {
   checkEndpointRateLimit,
   recordRequestEvent,
@@ -12,7 +14,7 @@ import {
   internalErrorResponse,
 } from './broker-error';
 import type { BrokerEnv } from './contract';
-import { stringValue } from './public-input';
+import { parseIsoDate, readJsonBody, stringValue } from './public-input';
 
 import { issueQqManagedEntitlement } from './qq-managed-issue';
 
@@ -24,8 +26,6 @@ const CREDENTIAL_HASH_PREFIX = 'sha256-base64url-v1_';
 const QQ_IDENTITY_MAX_LENGTH = 2048;
 const ASSERTED_AT_MAX_LENGTH = 64;
 const QQ_CREDENTIAL_PATTERN = /^[0-9a-f]{64}$/u;
-const STRICT_ISO_8601_TIMESTAMP =
-  /^(?<year>\d{4})-(?<month>0[1-9]|1[0-2])-(?<day>0[1-9]|[12]\d|3[01])T(?<hour>[01]\d|2[0-3]):(?<minute>[0-5]\d):(?<second>[0-5]\d)(?:\.(?<millisecond>\d{3}))?(?:(?<utc>Z)|(?<offsetSign>[+-])(?<offsetHour>[01]\d|2[0-3]):(?<offsetMinute>[0-5]\d))$/u;
 const CONTROL_OR_NEWLINE_PATTERN = /[\p{Cc}\r\n\u0085\u2028\u2029]/u;
 const textEncoder = new TextEncoder();
 
@@ -266,63 +266,7 @@ function parseStrictIsoDate(value: string): Date | null {
     return null;
   }
 
-  const match = STRICT_ISO_8601_TIMESTAMP.exec(value);
-  if (!match?.groups) {
-    return null;
-  }
-
-  const year = Number(match.groups.year);
-  const month = Number(match.groups.month);
-  const day = Number(match.groups.day);
-  const hour = Number(match.groups.hour);
-  const minute = Number(match.groups.minute);
-  const second = Number(match.groups.second);
-  const millisecond = Number(match.groups.millisecond ?? '0');
-  const offsetMinutes = match.groups.utc
-    ? 0
-    : (match.groups.offsetSign === '-' ? -1 : 1) *
-      (Number(match.groups.offsetHour) * 60 + Number(match.groups.offsetMinute));
-
-  const timestamp =
-    Date.UTC(year, month - 1, day, hour, minute, second, millisecond) -
-    offsetMinutes * 60_000;
-  const reconstructedLocalTime = new Date(timestamp + offsetMinutes * 60_000);
-
-  if (
-    reconstructedLocalTime.getUTCFullYear() !== year ||
-    reconstructedLocalTime.getUTCMonth() + 1 !== month ||
-    reconstructedLocalTime.getUTCDate() !== day ||
-    reconstructedLocalTime.getUTCHours() !== hour ||
-    reconstructedLocalTime.getUTCMinutes() !== minute ||
-    reconstructedLocalTime.getUTCSeconds() !== second ||
-    reconstructedLocalTime.getUTCMilliseconds() !== millisecond
-  ) {
-    return null;
-  }
-
-  return new Date(timestamp);
-}
-
-async function readJsonBody<T>(
-  c: Context<BrokerEnv>,
-): Promise<
-  | { ok: true; value: T }
-  | { ok: false; reason: 'invalid_json' | 'not_object' }
-> {
-  try {
-    const value = await c.req.json();
-    if (!isJsonObject(value)) {
-      return { ok: false, reason: 'not_object' };
-    }
-
-    return { ok: true, value: value as T };
-  } catch {
-    return { ok: false, reason: 'invalid_json' };
-  }
-}
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  return parseIsoDate(value);
 }
 
 function invalidRequestBodyResponse(
@@ -392,16 +336,6 @@ async function hmacSha256Bytes(secret: string, value: string): Promise<Uint8Arra
   const signature = await crypto.subtle.sign('HMAC', key, textEncoder.encode(value));
 
   return new Uint8Array(signature);
-}
-
-async function sha256Base64Url(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', textEncoder.encode(value));
-  return encodeBase64Url(new Uint8Array(digest));
-}
-
-function encodeBase64Url(bytes: Uint8Array): string {
-  const binary = Array.from(bytes, (value) => String.fromCharCode(value)).join('');
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/u, '');
 }
 
 function constantTimeEqual(left: string, right: string): boolean {

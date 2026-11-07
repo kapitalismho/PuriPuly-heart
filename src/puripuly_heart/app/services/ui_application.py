@@ -13,6 +13,7 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
+from puripuly_heart.app.ports.agent_chat import AgentChatPort
 from puripuly_heart.app.ports.application_control import ApplicationControl
 from puripuly_heart.app.ports.application_runtime_logging import (
     ApplicationRuntimeLoggingPort,
@@ -26,16 +27,20 @@ from puripuly_heart.app.ports.chatgpt_account import (
     ChatGptConnectResult,
     ChatGptSignOutResult,
 )
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretsPort
 from puripuly_heart.app.ports.settings_view import (
     AlibabaConnectionApplyResult,
     AlibabaConnectionDraftSnapshot,
     GeneralSettingsSnapshot,
     ImmediateSettingsIntent,
+    LoopbackCaptureSettingsIntent,
     OpenRouterPkceTarget,
     OverlaySettingsSnapshot,
     PromptApplyIntent,
     ProviderApplyIntent,
+    SettingsApplyOutcome,
+    TelemetrySettingsIntent,
 )
 from puripuly_heart.app.ports.ui_application import (
     TranslationEnablePreparation,
@@ -70,6 +75,9 @@ from puripuly_heart.app.services.application_shutdown import (
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
 from puripuly_heart.app.services.index_selection import IndexSelectionOwner
+from puripuly_heart.app.services.settings.settings_transaction_result import (
+    SettingsTransactionResultOwner,
+)
 from puripuly_heart.config.alibaba_connection import AlibabaEndpointMode, AlibabaRegion
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import provider_llm_for_translation
@@ -93,6 +101,7 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "apply_alibaba_connection_draft",
         "apply_settings",
         "apply_settings_intent",
+        "apply_settings_change",
         "apply_prompt_intent",
         "apply_provider_intent",
         "apply_telemetry_enabled",
@@ -146,6 +155,7 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "start_github_star_prompt",
         "start_managed_auth_task",
         "start_audio_test",
+        "diagnose_audio",
         "start_qq_managed_auth_from_dialog",
         "stop_audio_test",
         "submit_text",
@@ -162,6 +172,7 @@ _ORDERED_INTENTS = frozenset(
         "apply_settings",
         "apply_alibaba_connection_draft",
         "apply_settings_intent",
+        "apply_settings_change",
         "apply_prompt_intent",
         "edit_alibaba_connection_draft",
         "apply_provider_intent",
@@ -195,8 +206,14 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
     if inspect.iscoroutinefunction(method):
 
         async def invoke_ordered(self, *args: Any, **kwargs: Any) -> Any:
+            admission_current = kwargs.pop("admission_current", None)
+            if admission_current is not None and not admission_current():
+                return False
             self._admit_application_intent(method.__name__)
-            if method.__name__ == "start_audio_test" and kwargs.get("admission_revision") is None:
+            if (
+                method.__name__ in {"start_audio_test", "diagnose_audio"}
+                and kwargs.get("admission_revision") is None
+            ):
                 kwargs["admission_revision"] = self.audio_test_start_revision()
             control = self._control
             toggle_resource = {
@@ -216,6 +233,8 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
                 activity.has_authority = lambda: control.runtime_toggle_is_current(toggle_intent)
 
             async def apply() -> Any:
+                if admission_current is not None and not admission_current():
+                    return False
                 if activity is not None:
                     activity.has_authority = lambda: True
                 return await method(self, *args, **kwargs)
@@ -327,11 +346,15 @@ class UiApplicationBoundary:
         index_selection: IndexSelectionOwner | None = None,
         runtime_control_authority: Callable[[str, asyncio.Task | None], bool | None] | None = None,
         runtime_control_activity: Callable[[], tuple[tuple[str, bool], ...]] | None = None,
+        settings_results: SettingsTransactionResultOwner | None = None,
     ) -> None:
         self._startup = startup
+        self._startup_task: asyncio.Task[None] | None = None
+        self._startup_closed = False
         self._input_runtime = input_runtime
         self._peer_capture = peer_capture
         self._settings = settings
+        self._settings_results = settings_results or SettingsTransactionResultOwner()
         self._provider = provider
         self._audio_test = audio_test
         self._overlay = overlay
@@ -363,12 +386,25 @@ class UiApplicationBoundary:
         )
         self._application_lifecycle: ApplicationShutdownCoordinator | None = None
         self._control: ApplicationControl | None = None
+        self._agent_chat: AgentChatPort | None = None
         self._presentation_close: Callable[[], Awaitable[None]] | None = None
 
     def _boundary_application_shutdown_callbacks(
         self,
     ) -> tuple[ApplicationShutdownCallback, ...]:
         return (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="ApplicationStartupOwner",
+                callback_name="stop_ingress",
+                callback=self._freeze_startup,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="ApplicationStartupOwner",
+                callback_name="close",
+                callback=self._drain_startup,
+            ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
                 owner_name="GithubStarPromptRuntime",
@@ -400,6 +436,12 @@ class UiApplicationBoundary:
 
     def attach_control(self, control: ApplicationControl) -> None:
         self._control = control
+
+    def agent_chat(self) -> AgentChatPort | None:
+        return self._agent_chat
+
+    def attach_agent_chat(self, owner: AgentChatPort) -> None:
+        self._agent_chat = owner
 
     def osc_pending_controls(self) -> tuple[tuple[str, bool], ...]:
         pending = []
@@ -469,6 +511,22 @@ class UiApplicationBoundary:
     def overlay_calibration(self) -> object | None:
         return self._state_owner.overlay_calibration()
 
+    def _freeze_startup(self) -> None:
+        self._startup_closed = True
+        task = self._startup_task
+        if task is not None and not task.done():
+            task.cancel()
+
+    async def _drain_startup(self) -> None:
+        task = self._startup_task
+        if task is None or task.done():
+            return
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            if not task.cancelled():
+                raise
+
     async def start(self) -> None:
         attempt_id = f"startup-{uuid4().hex}"
         process_id = os.getpid()
@@ -481,7 +539,13 @@ class UiApplicationBoundary:
             )
         )
         try:
-            await self._startup.start()
+            if self._startup_closed:
+                raise asyncio.CancelledError
+            if self._agent_chat is not None:
+                await self._agent_chat.start()
+            task = asyncio.create_task(self._startup.start(), name="application-startup")
+            self._startup_task = task
+            await task
         except BaseException as exc:
             cancelled = isinstance(exc, asyncio.CancelledError)
             primary = getattr(exc, "diagnostics", None)
@@ -818,6 +882,11 @@ class UiApplicationBoundary:
             await self._audio_test.start_audio_test(observation_callback=observation_callback)
         )
 
+    async def diagnose_audio(self, *, admission_revision: int | None = None) -> dict[str, object]:
+        return await self._audio_test.diagnose_audio(
+            is_current=lambda: admission_revision == self._audio_test_start_revision
+        )
+
     def audio_test_snapshot(self) -> dict[str, object]:
         return self._audio_test.audio_test_snapshot()
 
@@ -869,6 +938,12 @@ class UiApplicationBoundary:
     def dashboard_managed_auth_prompt_kind(self) -> str:
         return str(self._managed.dashboard_managed_auth_prompt_kind())
 
+    def managed_account_snapshot(self) -> dict:
+        snapshot = self._managed.managed_account_snapshot()
+        if self._managed_auth_runtime.external_task_names:
+            snapshot["in_progress"] = True
+        return snapshot
+
     def managed_auth_last_failure_kind(self) -> str:
         accessor = getattr(self._managed, "managed_auth_last_failure_kind", None)
         if not callable(accessor):
@@ -886,6 +961,61 @@ class UiApplicationBoundary:
         result = await self._settings.apply_settings_intent(intent)
         await self._publish_osc_state()
         return result
+
+    async def apply_settings_change(self, intent: object | None) -> SettingsApplyOutcome:
+        with self._settings_results.capture() as scope:
+            try:
+                if intent is None:
+                    raw = await self._settings.retry_settings_runtime()
+                elif isinstance(intent, ProviderApplyIntent):
+                    settings = self._settings.materialize_provider_intent(intent)
+                    self.log_basic(
+                        "[Settings] provider_apply_requested "
+                        f"self={settings.intent.stt.provider} peer={settings.intent.peer_stt.provider}"
+                    )
+                    raw = await self._provider.apply_providers(settings)
+                elif isinstance(intent, PromptApplyIntent):
+                    raw = await self._settings.apply_prompt_intent(intent)
+                elif isinstance(intent, LoopbackCaptureSettingsIntent):
+                    raw = await self._peer_capture.apply_loopback_capture_option(intent.value)
+                elif isinstance(intent, TelemetrySettingsIntent):
+                    raw = await self._settings.apply_telemetry_enabled(intent.enabled)
+                elif isinstance(intent, LanguageSelectionChange):
+                    raw = await self._settings.on_dashboard_language_change(intent)
+                else:
+                    raw = await self._settings.apply_settings_intent(intent)
+            except Exception as exc:
+                emit_failure(
+                    logging.getLogger(__name__),
+                    ErrorDiagnostics(
+                        component="gui_settings_apply",
+                        operation="apply_settings_change",
+                        code="settings_apply_exception",
+                        category="transaction",
+                        visibility="basic",
+                        content_policy="metadata_only",
+                        status_code=None,
+                        retry_after_ms=None,
+                        fields=safe_exception_fields(exc),
+                    ),
+                )
+                raw = False
+            result = scope.current
+        await self._publish_osc_state()
+        if scope.reverted:
+            return SettingsApplyOutcome(
+                saved=False, applied=False, transaction=result, reverted=True
+            )
+        if result is None:
+            return SettingsApplyOutcome(
+                saved=True if raw is True or intent is None else None,
+                applied=raw is True,
+            )
+        return SettingsApplyOutcome(
+            saved=result.status.startswith("settings_commit_success_"),
+            applied=result.status == "settings_commit_success_runtime_applied",
+            transaction=result,
+        )
 
     async def apply_prompt_intent(self, intent: PromptApplyIntent) -> object:
         result = await self._settings.apply_prompt_intent(intent)
@@ -1070,7 +1200,9 @@ class UiApplicationBoundary:
     def cancel_alibaba_connection_draft(self, *, token: str) -> None:
         self._provider.cancel_alibaba_connection_draft(token=token)
 
-    async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
+    async def verify_api_key(
+        self, provider: str, key: str
+    ) -> ProviderCredentialVerificationOutcome:
         return await self._provider.verify_api_key(provider, key)
 
     def persist_api_key_verification(self, provider: str, key: str, success: bool) -> None:

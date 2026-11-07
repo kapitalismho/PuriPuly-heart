@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
-from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
+from puripuly_heart.core.openrouter.openrouter_pkce import OpenRouterPKCEExchangeResult
 
 _TaskResultT = TypeVar("_TaskResultT")
 ExternalTaskRunner = Callable[[Callable[[], Awaitable[Any]]], object]

@@ -21,6 +21,24 @@ from puripuly_heart.core.messages import TransactionResult
 
 
 @dataclass(frozen=True, slots=True)
+class SettingsApplyOutcome:
+    saved: bool | None
+    applied: bool
+    transaction: TransactionResult | None = None
+    reverted: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class LoopbackCaptureSettingsIntent:
+    value: str
+
+
+@dataclass(frozen=True, slots=True)
+class TelemetrySettingsIntent:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
 class AlibabaCapabilityEvidence:
     capability: Literal["asr", "translation"]
     model: str
@@ -466,6 +484,7 @@ __all__ = [
     "LocalLlmExtraBodyEdit",
     "LocalLlmModelEdit",
     "LocaleSettingsIntent",
+    "LoopbackCaptureSettingsIntent",
     "OpenRouterPkceTarget",
     "OscConnectionSettingsIntent",
     "OverlayCalibrationSnapshot",
@@ -490,8 +509,10 @@ __all__ = [
     "QwenSingaporeApiHostEdit",
     "SelfSttProviderEdit",
     "SelfVadSettingsIntent",
+    "SettingsApplyOutcome",
     "SttGpuDeviceEdit",
     "SystemPromptEdit",
+    "TelemetrySettingsIntent",
     "TranslationSelectionSnapshot",
     "TranslationSelectionEdit",
     "TranslationHttpExtensionEdit",

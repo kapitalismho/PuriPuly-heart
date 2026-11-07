@@ -23,19 +23,23 @@ from typing import Any
 
 from packaging.requirements import Requirement
 
-from puripuly_heart.release_evidence.gpu_worker_distribution import validate_gpu_worker_runtime
+from puripuly_heart.core.overlay.openvr_vendor import (
+    validate_openvr_runtime_dll,
+    validate_vendored_openvr_bundle,
+)
+from puripuly_heart.release_evidence.asr_worker_distribution import validate_asr_worker_runtime
 from puripuly_heart.release_evidence.native_pe import stage_vc_runtime, validate_pe_dependencies
 
 _LAYOUT_SCHEMA = "puripuly-heart/native-artifact-layout/v1"
 _MANIFEST_SCHEMA = "puripuly-heart/native-artifact-manifest/v1"
 _NATIVE_MARKER_ENVIRONMENT = {
     "implementation_name": "cpython",
-    "implementation_version": "3.14.7",
+    "implementation_version": "3.14.10",
     "os_name": "nt",
     "platform_machine": "AMD64",
     "platform_python_implementation": "CPython",
     "platform_system": "Windows",
-    "python_full_version": "3.14.7",
+    "python_full_version": "3.14.10",
     "python_version": "3.14",
     "sys_platform": "win32",
     "extra": "",
@@ -45,6 +49,9 @@ _FORBIDDEN_PTH = frozenset({"a1_coverage.pth", "distutils-precedence.pth"})
 _SOUNDDEVICE_RUNTIME_ROOT = PurePosixPath("_sounddevice_data/portaudio-binaries")
 _SOUNDDEVICE_STANDARD_DLL = _SOUNDDEVICE_RUNTIME_ROOT / "libportaudio64bit.dll"
 _SOUNDDEVICE_ASIO_DLL = _SOUNDDEVICE_RUNTIME_ROOT / "libportaudio64bit-asio.dll"
+_NOTO_CJK_FILENAME = "NotoSansCJK-Medium.ttc"
+_NOTO_CJK_SHA256 = "197d5e1e019faca33a4d55931c7d68b8056f3b97cb862049f5cb8de9efdfb8ce"
+_NOTO_CJK_BYTES = 18_354_360
 
 
 def _canonical_name(value: str) -> str:
@@ -98,9 +105,9 @@ class NativeArtifactLayout:
             "soxr_runtime_root",
             "soxr_compliance_root",
             "llama_runtime_root",
-            "local_qwen_runtime_root",
+            "local_sherpa_runtime_root",
             "overlay_executable",
-            "gpu_worker_executable",
+            "asr_worker_executable",
             "openvr_dll",
             "artifact_manifest",
         }
@@ -189,6 +196,72 @@ def verify_upstream_inputs(spec_path: Path, input_root: Path) -> dict[str, Any]:
             "sha256": digest,
         }
     return {"versions": spec["versions"], "inputs": verified}
+
+
+def _python_runtime_members(package_path: Path) -> dict[str, bytes]:
+    members: dict[str, bytes] = {}
+    excluded_stdlib = {
+        "test",
+        "idlelib",
+        "tkinter",
+        "turtledemo",
+        "ensurepip",
+        "pydoc_data",
+        "lib2to3",
+        "site-packages",
+        "rlcompleter.py",
+        "tabnanny.py",
+        "antigravity.py",
+        "this.py",
+        "__hello__.py",
+        "__phello__",
+    }
+    with zipfile.ZipFile(package_path) as archive:
+        for entry in archive.infolist():
+            if not entry.filename.startswith("tools/") or entry.is_dir():
+                continue
+            relative = _safe_relative(entry.filename.removeprefix("tools/"))
+            if relative.parts[0] == "Lib" and (
+                relative.parts[1] in excluded_stdlib
+                or relative.suffix.lower() in {".exe", ".dll", ".pyd"}
+            ):
+                continue
+            if relative.parts[0] in {"Lib", "DLLs"} or str(relative) in {
+                "python.exe",
+                "python3.dll",
+                "python314.dll",
+                "LICENSE.txt",
+            }:
+                members[str(relative)] = archive.read(entry)
+    return members
+
+
+def prepare_python_inputs(spec_path: Path, input_root: Path, cache_root: Path) -> dict[str, Any]:
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    version = spec["versions"]["python"]
+    package_name = f"python.{version}.nupkg"
+    package_path = input_root / package_name
+    members = _python_runtime_members(package_path)
+    runtime_dir = (
+        cache_root / "python-build" / f"v{version}-{spec['versions']['python_build_release']}"
+    )
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    runtime_path = runtime_dir / f"python-windows-for-dart-{version}.zip"
+    with zipfile.ZipFile(runtime_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, data in sorted(members.items()):
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(info, data)
+    manifest_name = f"manifest-{spec['versions']['python_build_release']}.json"
+    manifest = json.loads((input_root / manifest_name).read_text(encoding="utf-8"))
+    manifest["pythons"]["3.14"]["full_version"] = version
+    manifest["pythons"]["3.14"]["standalone_release_date"] = spec["versions"]["python_dist_release"]
+    manifest_path = cache_root / "python-build" / "puripuly-python-manifest.json"
+    _write_json(manifest_path, manifest)
+    return {
+        "runtime_archive": str(runtime_path),
+        "manifest": str(manifest_path),
+    }
 
 
 def filter_requirements(source: Path, destination: Path) -> list[str]:
@@ -464,14 +537,14 @@ def validate_target(
             "stdlib_archive",
             "extension_dll_root",
             "overlay_executable",
-            "gpu_worker_executable",
+            "asr_worker_executable",
             "openvr_dll",
         )
     }
     missing = sorted(str(path) for path in required_paths.values() if not path.exists())
     if missing:
         raise FileNotFoundError(f"native artifact is incomplete: {missing}")
-    gpu_worker_runtime = validate_gpu_worker_runtime(required_paths["gpu_worker_executable"].parent)
+    asr_worker_runtime = validate_asr_worker_runtime(required_paths["asr_worker_executable"].parent)
     python_archive = _validate_python_archive(target_root, layout)
     site_packages = required_paths["dependency_root"]
     dependencies = validate_dependencies(site_packages, requirements_path)
@@ -488,7 +561,7 @@ def validate_target(
     soxr_runtime = verify_installed_soxr_record(site_packages)
     portaudio_runtime = verify_sounddevice_portaudio_runtime(site_packages)
     python_digest = _sha256(required_paths["python_executable"])
-    if python_digest != "4942b86a6597e5aee0128daa00050ed79bc21f6e709a78eb19cbfeb0c2f39ac9":
+    if python_digest != "d718435b892db4ad5b547d12fec61be7baa7faf7a58d857ea58053be24c7a000":
         raise ValueError("native python.exe is not the pinned official CPython executable")
     python_copies = sorted(path for path in target_root.rglob("python.exe") if path.is_file())
     if python_copies != [required_paths["python_executable"]]:
@@ -500,7 +573,7 @@ def validate_target(
         "soxr_runtime": soxr_runtime,
         "python_archive": python_archive,
         "portaudio_runtime": portaudio_runtime,
-        "gpu_worker_runtime": gpu_worker_runtime,
+        "asr_worker_runtime": asr_worker_runtime,
         "pe_dependencies": pe_dependencies,
         "paths": {
             key: str(value.relative_to(target_root)) for key, value in required_paths.items()
@@ -1236,6 +1309,37 @@ def _validate_bundle_evidence(
         raise ValueError("loose bytecode compile evidence mismatch")
 
 
+def _validate_packaged_resources(target_root: Path, repo_root: Path) -> dict[str, Any]:
+    openvr = validate_vendored_openvr_bundle(repo_root / "third_party" / "openvr")
+    packaged_openvr = validate_openvr_runtime_dll(target_root / "openvr_api.dll")
+    font = target_root / "app" / "puripuly_heart" / "data" / "fonts" / _NOTO_CJK_FILENAME
+    if not font.is_file():
+        raise FileNotFoundError(f"native Noto CJK font not found: {font}")
+    if font.stat().st_size != _NOTO_CJK_BYTES or _sha256(font) != _NOTO_CJK_SHA256:
+        raise ValueError("native Noto CJK font does not match the pinned payload")
+    provenance = {}
+    for name in ("OFL.txt", "README.md", "SHA256SUMS.txt"):
+        source = repo_root / "third_party" / "noto-sans-cjk" / name
+        packaged = target_root / "third_party" / "noto-sans-cjk" / name
+        if not source.is_file() or not packaged.is_file():
+            raise FileNotFoundError(f"native Noto CJK provenance not found: {name}")
+        data = source.read_bytes()
+        if not data.strip() or packaged.read_bytes() != data:
+            raise ValueError(f"native Noto CJK provenance mismatch: {name}")
+        if name == "SHA256SUMS.txt" and data.decode("utf-8") not in (
+            f"{_NOTO_CJK_SHA256}  {_NOTO_CJK_FILENAME}\n",
+            f"{_NOTO_CJK_SHA256}  {_NOTO_CJK_FILENAME}\r\n",
+        ):
+            raise ValueError("Noto CJK provenance does not record the pinned font")
+        provenance[name] = _sha256(packaged)
+    return {
+        "openvr_sha256": _sha256(packaged_openvr),
+        "openvr_source_sha256": openvr.dll_sha256,
+        "noto_cjk_sha256": _NOTO_CJK_SHA256,
+        "noto_cjk_provenance": provenance,
+    }
+
+
 def validate_compliance(target_root: Path, repo_root: Path, soxr_manifest: Path) -> dict[str, Any]:
     from puripuly_heart.release_evidence.release_identity import (
         verify_packaged_license_payloads,
@@ -1243,6 +1347,7 @@ def validate_compliance(target_root: Path, repo_root: Path, soxr_manifest: Path)
     )
 
     return {
+        "resources": _validate_packaged_resources(target_root, repo_root),
         "licenses": verify_packaged_license_payloads(
             target_root,
             application_root="app",
@@ -1552,6 +1657,11 @@ def _parser() -> argparse.ArgumentParser:
     verify.add_argument("--spec", type=Path, required=True)
     verify.add_argument("--input-root", type=Path, required=True)
     verify.add_argument("--output", type=Path)
+    python_inputs = commands.add_parser("prepare-python-inputs")
+    python_inputs.add_argument("--spec", type=Path, required=True)
+    python_inputs.add_argument("--input-root", type=Path, required=True)
+    python_inputs.add_argument("--cache-root", type=Path, required=True)
+    python_inputs.add_argument("--output", type=Path, required=True)
     filter_parser = commands.add_parser("filter-requirements")
     filter_parser.add_argument("source", type=Path)
     filter_parser.add_argument("destination", type=Path)
@@ -1609,6 +1719,8 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "verify-inputs":
         _write_json(args.output, verify_upstream_inputs(args.spec, args.input_root))
+    elif args.command == "prepare-python-inputs":
+        _write_json(args.output, prepare_python_inputs(args.spec, args.input_root, args.cache_root))
     elif args.command == "filter-requirements":
         filter_requirements(args.source, args.destination)
     elif args.command == "stage-product-metadata":

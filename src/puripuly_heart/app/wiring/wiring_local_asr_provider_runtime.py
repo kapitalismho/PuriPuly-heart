@@ -5,22 +5,25 @@ import inspect
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import cast
 
-from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory
+from puripuly_heart.app.adapters.asr_worker_process import DefaultASRWorkerProcessFactory
+from puripuly_heart.app.services.local_asr.local_asr_selection import LOCAL_CPU_PROVIDERS
 from puripuly_heart.config.provider_values import (
     STTProviderName,
     custom_stt_selection_for_provider,
     is_custom_stt_provider,
 )
+from puripuly_heart.core.asr_worker import ASRWorkerProcessFactoryPort
 from puripuly_heart.core.audio.listen_delivery import (
     LISTEN_RETAINED_SEGMENT_SLOTS,
     ListenDeliveryController,
 )
 from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot
 from puripuly_heart.core.clock import Clock
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
     LocalASRProviderRuntimePort,
     ProviderGpuRuntimePort,
@@ -28,7 +31,9 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     ProviderRuntimeProviderFactoryPort,
     ProviderRuntimeTerminalFailureSink,
 )
-from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRProvisioningPort
+from puripuly_heart.core.local_asr.local_gpu_assets import local_gpu_model_path
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.gpu_asr import SharedGpuASRRuntime
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
@@ -57,7 +62,10 @@ from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
 from puripuly_heart.providers.stt.soniox import SONIOX_MAX_SESSION_AGE_S
 
-from .wiring_stt_factory import create_stt_backend_from_resolved_config
+from .wiring_stt_factory import (
+    create_stt_backend_from_resolved_config,
+    prepare_local_stt_backend_dependencies,
+)
 
 FinalTranscriptSuppressedSink = Callable[[FinalTranscriptSuppressedNotification], object]
 FaultProfileProvider = Callable[[], object]
@@ -74,9 +82,11 @@ _ACTUAL_DEGRADATION_REASONS = frozenset(
 _LOCAL_PROVIDER_IDS = frozenset(
     {
         STTProviderName.LOCAL_CPU_AUTO.value,
-        STTProviderName.LOCAL_PARAKEET_V3.value,
+        STTProviderName.LOCAL_GRANITE.value,
+        STTProviderName.LOCAL_GIGAAM.value,
         STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
-        STTProviderName.LOCAL_QWEN.value,
+        STTProviderName.LOCAL_FUN_ASR_NANO.value,
+        STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value,
         STTProviderName.LOCAL_QWEN_GPU.value,
     }
 )
@@ -117,11 +127,13 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
     secrets: SecretStore
     clock: Clock
     reset_deadline_s: float
-    gpu_model_path: Path
+    gpu_model_path: Path | None
     on_final_transcript_suppressed: FinalTranscriptSuppressedSink | None = None
     runtime_logging: SessionRuntimeLoggingService | None = None
     fault_profile_provider: FaultProfileProvider | None = None
     event_ingress_observer: Callable[..., object] | None = None
+    asr_process_factory: ASRWorkerProcessFactoryPort | None = None
+    cpu_model_root: Path | None = None
 
     async def create(
         self,
@@ -142,12 +154,19 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
                 mode=provider_mode,
                 extra=config.provider_options.get("extra"),
             )
+        if config.provider in LOCAL_CPU_PROVIDERS:
+            await run_owned_thread_call(partial(prepare_local_stt_backend_dependencies, config))
+        gpu_model_path = self.gpu_model_path
+        if provider_name == STTProviderName.LOCAL_QWEN_GPU and gpu_model_path is None:
+            gpu_model_path = await run_owned_thread_call(local_gpu_model_path)
         backend = create_stt_backend_from_resolved_config(
             config,
             secrets=self.secrets,
             gpu_runtime=cast(SharedGpuASRRuntime, gpu_runtime),
-            gpu_model_path=self.gpu_model_path,
+            gpu_model_path=gpu_model_path,
             gpu_device_id=request.gpu_device_id,
+            asr_process_factory=self.asr_process_factory,
+            cpu_model_root=self.cpu_model_root,
             basic_log_sink=(
                 None
                 if self.runtime_logging is None
@@ -186,6 +205,28 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
                     f"{provider_name.value} does not implement scoped recognition"
                 )
 
+        async def open_probe_session(
+            _settings: AudioSegmentSettingsSnapshot,
+            provider_epoch_id: str,
+        ) -> tuple[STTScopedTurnSession, str]:
+            open_session = getattr(backend, "open_probe_session", backend.open_session)
+            opened = await open_session(
+                projection=STTSessionProjection("scoped", provider_epoch_id)
+            )
+            session, exercised_provider = (
+                opened if isinstance(opened, tuple) else (opened, config.provider)
+            )
+            if isinstance(session, STTScopedTurnSession) and isinstance(
+                getattr(session, "inner", session), STTScopedTurnSession
+            ):
+                return session, exercised_provider
+            try:
+                await session.close()
+            finally:
+                raise PermanentSTTScopedSessionError(
+                    "recognition probe requires scoped recognition"
+                )
+
         async def close_backend() -> None:
             close = getattr(backend, "close", None)
             if callable(close):
@@ -219,6 +260,19 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
         return ScopedRecognitionEngine(
             channel=config.channel,
             session_factory=open_scoped_session,
+            probe_session_factory=open_probe_session,
+            probe_settings=AudioSegmentSettingsSnapshot(
+                provider_id=config.provider,
+                provider_signature=request.provider_signature,
+                runtime_signature=request.runtime_signature,
+                source_mode=config.source_mode,
+                source_language=config.source_language,
+                expected_languages=(),
+                target_sample_rate_hz=config.sample_rate_hz,
+                vad_speech_threshold=config.vad_speech_threshold,
+                vad_hangover_ms=config.vad_hangover_ms,
+                vad_pre_roll_ms=config.vad_pre_roll_ms,
+            ),
             watchdog_resolver=lambda _settings: _recognition_watchdogs(config),
             monotonic_clock=self.clock.now,
             accepted_settings_scope=(
@@ -317,9 +371,11 @@ def _recognition_retention_profile(
         provider_id
         in {
             STTProviderName.LOCAL_CPU_AUTO.value,
-            STTProviderName.LOCAL_PARAKEET_V3.value,
+            STTProviderName.LOCAL_GRANITE.value,
+            STTProviderName.LOCAL_GIGAAM.value,
             STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
-            STTProviderName.LOCAL_QWEN.value,
+            STTProviderName.LOCAL_FUN_ASR_NANO.value,
+            STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value,
             STTProviderName.LOCAL_QWEN_GPU.value,
         }
         or custom_offline
@@ -333,9 +389,11 @@ def _recognition_retention_profile(
             if provider_id
             in {
                 STTProviderName.LOCAL_CPU_AUTO.value,
-                STTProviderName.LOCAL_PARAKEET_V3.value,
+                STTProviderName.LOCAL_GRANITE.value,
+                STTProviderName.LOCAL_GIGAAM.value,
                 STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
-                STTProviderName.LOCAL_QWEN.value,
+                STTProviderName.LOCAL_FUN_ASR_NANO.value,
+                STTProviderName.LOCAL_FUN_ASR_MLT_NANO.value,
                 STTProviderName.LOCAL_QWEN_GPU.value,
             }
             else 2
@@ -366,7 +424,7 @@ class LocalASRProviderRuntimeFactory:
         return LocalASRProviderRuntimeOwner(
             provider_factory=self.provider_factory,
             gpu_runtime_factory=lambda diagnostic_sink: SharedGpuASRRuntime(
-                process_factory=DefaultGpuWorkerProcessFactory(),
+                process_factory=DefaultASRWorkerProcessFactory(),
                 clock=self.clock,
                 diagnostic_sink=diagnostic_sink,
             ),

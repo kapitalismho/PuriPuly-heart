@@ -6,13 +6,11 @@ import json
 import os
 import socket
 import sys
-import threading
 from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 
 import httpx
 import pytest
-from websockets.asyncio.server import serve
 from websockets.exceptions import SecurityError
 
 from puripuly_heart.core import external_network, network_clients, updater
@@ -27,7 +25,11 @@ from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (
 from puripuly_heart.core.network_diagnostics import safe_transport_fields
 from puripuly_heart.core.network_requests import ExternalRequestsSession
 from tests.core.test_external_network import certificates as certificates
-from tests.core.test_external_network import http_server, recording_proxy
+from tests.core.test_external_network import (
+    http_server,
+    loopback_websocket_server,
+    recording_proxy,
+)
 from tests.core.test_external_network import (
     isolated_network_environment as isolated_network_environment,
 )
@@ -71,7 +73,7 @@ async def test_bare_proxy_address_relays_httpx_requests_and_websocket(certificat
                     return client.get(url, timeout=5).text
 
             assert await asyncio.to_thread(request) == "ok"
-        async with serve(echo, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
+        async with loopback_websocket_server(echo, ssl=contexts["valid"]) as server:
             async with network_clients.external_websocket_connect(
                 f"wss://localhost:{server.sockets[0].getsockname()[1]}"
             ) as ws:
@@ -103,12 +105,13 @@ async def test_unsupported_explicit_proxy_scheme_is_not_rewritten(monkeypatch):
 @pytest.mark.parametrize(
     "transition", ["direct_to_tls", "tls_to_direct", "tls_to_http", "http_to_tls"]
 )
-async def test_websocket_redirect_reselects_snapshot_and_proxy_tls(
+async def test_websocket_redirect_reselects_route_and_proxy_tls(
     certificates, monkeypatch, transition
 ):
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     received = []
+    source_received = []
 
     async def target(ws):
         received.append(ws.request.headers)
@@ -118,11 +121,12 @@ async def test_websocket_redirect_reselects_snapshot_and_proxy_tls(
         recording_proxy(contexts["valid"]) as (tls_proxy, tls_recorded),
         recording_proxy() as (http_proxy, http_recorded),
     ):
-        async with serve(target, "127.0.0.1", 0, ssl=contexts["valid"]) as target_server:
+        async with loopback_websocket_server(target, ssl=contexts["valid"]) as target_server:
             target_port = target_server.sockets[0].getsockname()[1]
             target_url = f"wss://localhost:{target_port}/destination"
 
             def redirect(connection, request):
+                source_received.append(request.headers)
                 response = connection.respond(302, "redirect")
                 response.headers["Location"] = target_url
                 return response
@@ -131,10 +135,8 @@ async def test_websocket_redirect_reselects_snapshot_and_proxy_tls(
                 pytest.fail("Redirect source must not finish a websocket handshake")
 
             upgraded = transition in ("tls_to_http", "http_to_tls")
-            async with serve(
+            async with loopback_websocket_server(
                 unexpected,
-                "127.0.0.1",
-                0,
                 ssl=None if upgraded else contexts["valid"],
                 process_request=redirect,
             ) as source_server:
@@ -155,16 +157,58 @@ async def test_websocket_redirect_reselects_snapshot_and_proxy_tls(
                     f"{'ws' if upgraded else 'wss'}://localhost:{source_port}/source",
                     additional_headers={"Authorization": "private-key", "Cookie": "private-cookie"},
                 )
-                monkeypatch.setenv("HTTPS_PROXY", "http://localhost:1")
-                monkeypatch.setenv("WS_PROXY", "http://localhost:1")
-                monkeypatch.setenv("WSS_PROXY", "http://localhost:1")
-                monkeypatch.setenv("NO_PROXY", "*")
                 async with connector as ws:
                     assert await ws.recv() == "redirect-verified"
         assert len(tls_recorded) == 1
         assert len(http_recorded) == (1 if upgraded else 0)
+        assert len(source_received) == len(received) == 1
+        assert source_received[0]["Authorization"] == "private-key"
+        assert source_received[0]["Cookie"] == "private-cookie"
         assert "Authorization" not in received[0]
         assert "Cookie" not in received[0]
+
+
+async def test_websocket_refreshes_proxy_at_open_and_preserves_established_connection(
+    certificates, monkeypatch
+):
+    root, _, contexts = certificates
+    monkeypatch.setenv("SSL_CERT_FILE", str(root))
+    handshakes = []
+    messages = []
+
+    async def echo(ws):
+        handshakes.append(ws.request.headers)
+        async for message in ws:
+            messages.append(message)
+            await ws.send(message)
+
+    async with (
+        recording_proxy() as (first, first_requests),
+        recording_proxy() as (second, second_requests),
+        loopback_websocket_server(echo, ssl=contexts["valid"]) as server,
+    ):
+        port = server.sockets[0].getsockname()[1]
+        monkeypatch.setenv("HTTPS_PROXY", first)
+        connector = network_clients.external_websocket_connect(
+            f"wss://localhost:{port}",
+            additional_headers={"Authorization": "private-key", "Cookie": "private-cookie"},
+        )
+        monkeypatch.setenv("HTTPS_PROXY", second)
+        async with connector as ws:
+            await ws.send("opened-on-current-proxy")
+            assert await ws.recv() == "opened-on-current-proxy"
+            assert first_requests == []
+            assert second_requests == [("CONNECT", f"localhost:{port}")]
+            assert len(handshakes) == 1
+            monkeypatch.setenv("HTTPS_PROXY", first)
+            await ws.send("established-connection-continues")
+            assert await ws.recv() == "established-connection-continues"
+        assert first_requests == []
+        assert second_requests == [("CONNECT", f"localhost:{port}")]
+        assert len(handshakes) == 1
+        assert handshakes[0]["Authorization"] == "private-key"
+        assert handshakes[0]["Cookie"] == "private-cookie"
+        assert messages == ["opened-on-current-proxy", "established-connection-continues"]
 
 
 async def test_websocket_redirect_retains_tls_downgrade_rejection(certificates, monkeypatch):
@@ -190,8 +234,8 @@ async def test_websocket_redirect_retains_tls_downgrade_rejection(certificates, 
         async def unused(ws):
             pass
 
-        async with serve(
-            unused, "127.0.0.1", 0, ssl=contexts["valid"], process_request=redirect
+        async with loopback_websocket_server(
+            unused, ssl=contexts["valid"], process_request=redirect
         ) as source:
             with pytest.raises(SecurityError, match="non-secure"):
                 await network_clients.external_websocket_connect(
@@ -278,25 +322,16 @@ def huggingface_file_server(context=None):
         def log_message(self, *args):
             pass
 
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    if context is not None:
-        server.socket = context.wrap_socket(server.socket, server_side=True)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"{'https' if context else 'http'}://localhost:{server.server_port}", payload, requests
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join()
+    with http_server(context, handler=Handler) as port:
+        yield f"{'https' if context else 'http'}://localhost:{port}", payload, requests
 
 
 @pytest.mark.parametrize(
     "policy_case",
     [
-        "direct_fallback",
-        "direct_ip_fallback",
-        "system_fallback",
+        "direct",
+        "direct_ip",
+        "system",
         "registry_bypass",
         "mixed",
         "bare_env",
@@ -313,7 +348,7 @@ async def test_actual_huggingface_worker_retains_policy_and_downloads_redirect_h
     async with recording_proxy() as (proxy, recorded):
         original_system = {}
         bypass = ""
-        if policy_case in ("system_fallback", "registry_bypass", "mixed", "failed_proxy"):
+        if policy_case in ("system", "registry_bypass", "mixed", "failed_proxy"):
             original_system = {"http": proxy, "https": proxy}
         if policy_case == "failed_proxy":
             original_system = {"http": "http://localhost:1", "https": "http://localhost:1"}
@@ -335,14 +370,14 @@ async def test_actual_huggingface_worker_retains_policy_and_downloads_redirect_h
         with huggingface_file_server(
             contexts["valid"] if policy_case == "explicit_ca" else None
         ) as (endpoint, payload, requests):
-            if policy_case == "direct_ip_fallback":
+            if policy_case == "direct_ip":
                 endpoint = endpoint.replace("localhost", "127.0.0.1")
             script = """
 import json, os, pathlib, sys
 from puripuly_heart.core import external_network
 from puripuly_heart.core.local_asr import local_stt_huggingface_xet_adapter as adapter
 import huggingface_hub
-external_network._windows_proxy_settings = lambda: ({'http': 'http://localhost:1', 'https': 'http://localhost:1'} if sys.argv[5] == 'proxy' else {}, '')
+external_network._windows_proxy_settings = lambda: ({'http': 'http://localhost:1', 'https': 'http://localhost:1'} if sys.argv[4] == 'proxy' else {}, '')
 original = huggingface_hub.hf_hub_download
 request_path, event_path = map(pathlib.Path, sys.argv[1:3])
 payload = json.loads(request_path.read_text())
@@ -351,7 +386,7 @@ def download(**kwargs):
     try:
         target = original(endpoint=sys.argv[3], force_download=True, **kwargs)
     except Exception as exc:
-        if sys.argv[5] == 'direct':
+        if sys.argv[4] == 'direct':
             seen = set()
             pending = [exc]
             sources = []
@@ -364,14 +399,10 @@ def download(**kwargs):
                 pending.extend(cause for cause in (error.__cause__, error.__context__) if cause is not None)
             assert 'system' in sources
         raise
-    if sys.argv[4] == 'fallback' and os.environ.get('HF_HUB_DISABLE_XET', '').upper() not in {'1', 'TRUE'}:
-        pathlib.Path(target).unlink()
-        raise RuntimeError('controlled native failure')
     return target
 huggingface_hub.hf_hub_download = download
 raise SystemExit(adapter.run_huggingface_xet_worker(request_path=request_path, event_path=event_path))
 """
-            fallback = policy_case in ("direct_fallback", "direct_ip_fallback", "system_fallback")
             adapter = HuggingFaceXetDownloadAdapter(
                 worker_command_factory=lambda request, request_path, event_path: [
                     sys.executable,
@@ -380,7 +411,6 @@ raise SystemExit(adapter.run_huggingface_xet_worker(request_path=request_path, e
                     str(request_path),
                     str(event_path),
                     endpoint,
-                    "fallback" if fallback else "success",
                     "direct" if policy_case == "failed_proxy" else "proxy",
                 ]
             )
@@ -401,15 +431,13 @@ raise SystemExit(adapter.run_huggingface_xet_worker(request_path=request_path, e
                 assert (
                     hashlib.sha256(result.read_bytes()).digest() == hashlib.sha256(payload).digest()
                 )
-                assert len([method for method, _, _ in requests if method == "HEAD"]) == (
-                    2 if fallback else 1
-                )
-                assert len(
-                    [path for method, path, _ in requests if method == "GET" and path == "/file"]
-                ) == (2 if fallback else 1)
+                assert len([method for method, _, _ in requests if method == "HEAD"]) == 1
+                assert [
+                    path for method, path, _ in requests if method == "GET" and path == "/file"
+                ] == ["/file"]
                 assert all(trace_id for _, _, trace_id in requests)
             assert dict(os.environ) == captured_environment
-        if policy_case in ("system_fallback", "mixed", "bare_env"):
+        if policy_case in ("system", "mixed", "bare_env"):
             assert recorded
         else:
             assert recorded == []

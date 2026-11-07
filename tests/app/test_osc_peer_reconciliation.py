@@ -98,7 +98,6 @@ class PeerHarness:
             translation_runtime_configuration_provider=lambda: None,
             overlay_provider=lambda: overlay,
             ingress_frozen=lambda: False,
-            persist_manual_fallback=lambda: True,
             ensure_local_ready=self.ready,
             clear_cpu_pending=lambda: None,
             clear_gpu_pending=lambda: None,

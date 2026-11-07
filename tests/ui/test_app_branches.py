@@ -20,10 +20,12 @@ import puripuly_heart.ui.app as app_module
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
+from puripuly_heart.app.adapters.ui_runtime import UiProviderRuntimeAdapter
 from puripuly_heart.app.ports.chatgpt_account import (
     ChatGptAccountSnapshot,
     ChatGptConnectResult,
 )
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_view import (
     OpenRouterPkceTarget,
     OverlaySettingsSnapshot,
@@ -145,19 +147,21 @@ def _vnext(
 
 
 def _byok_pkce_target(settings: AppSettingsVNext) -> OpenRouterPkceTarget | None:
-    """Mirror the provider adapter's projection-to-PKCE-target wrapping."""
     owner = SettingsOwner(
         path=Path("settings.json"),
         persistence=SettingsVNextCanonicalPersistenceAdapter(),
         canonical=settings,
     )
-    target_settings = owner.build_managed_openrouter_byok_target(settings)
-    if target_settings is None:
-        return None
-    alias = target_settings.intent.translation.openrouter_selection_alias
-    if alias is None:
-        return None
-    return OpenRouterPkceTarget(OpenRouterSelectionAlias(alias))
+    provider = UiProviderRuntimeAdapter(
+        settings=owner,
+        provider_application=None,
+        gpu=None,
+        managed=None,
+        credential_verification=None,
+        provider_settings=None,
+        build_byok_target_settings=owner.build_managed_openrouter_byok_target,
+    )
+    return provider.build_managed_openrouter_byok_target()
 
 
 def _application_boundary_with_stop(backend: object) -> UiApplicationBoundary:
@@ -310,10 +314,6 @@ def _dialog_text_values(dialog) -> list[str]:
         for node in _iter_control_tree(dialog)
         if isinstance(node, ft.Text) and node.value
     ]
-
-
-def _dialog_containers(dialog) -> list[ft.Container]:
-    return [node for node in _iter_control_tree(dialog) if isinstance(node, ft.Container)]
 
 
 class FakeTelemetryApplication:
@@ -670,23 +670,6 @@ async def test_close_after_launch_tasks_cancels_app_active_day_retry() -> None:
     assert owner._retry_task_handle is None
 
 
-def test_translator_app_telemetry_binding_delegates_to_owner() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    calls: list[object] = []
-
-    class _Owner:
-        def apply_telemetry_enabled(self, enabled: bool) -> None:
-            calls.append(("apply", enabled))
-
-        def schedule_app_active_day_report(self) -> None:
-            calls.append(("schedule",))
-
-    app._telemetry_reporting = _Owner()
-    app._on_telemetry_enabled_change(True)
-    app._schedule_app_active_day_report()
-    assert calls == [("apply", True), ("schedule",)]
-
-
 @pytest.mark.asyncio
 async def test_close_after_launch_cancels_existing_telemetry_retry_only() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
@@ -797,6 +780,9 @@ class ConstructionDummyDashboardView(ft.Container):
 
 
 class ConstructionDummySettingsView(ft.Container):
+    def bind_verification_completion(self, callback):
+        return frozenset()
+
     def __init__(self, *, http_extension_registry=None) -> None:
         super().__init__()
         self.on_settings_changed = None
@@ -838,6 +824,7 @@ class ConstructionDummySettingsView(ft.Container):
         self.on_apply_loopback_capture_option = general.apply_loopback_capture_option
         self.on_loopback_capture_summary = general.loopback_capture_summary
         self.on_prompt_apply_settings = prompt.prompt_apply_settings
+        self.on_pending_prompt_changed = prompt.pending_prompt_changed
         self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
         self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
         self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
@@ -868,6 +855,8 @@ class ConstructionDummySettingsView(ft.Container):
 
 
 class ConstructionDummyLogsView(ft.Container):
+    conversation_records = ()
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -961,6 +950,7 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     )
     assert app.view_settings.on_verify_api_key == app._on_verify_api_key
     assert app.view_settings.on_prompt_apply_settings == app._on_prompt_apply_settings
+    assert app.view_settings.on_pending_prompt_changed == app._on_pending_prompt_changed
     assert app.view_settings.on_start_audio_test == app._on_start_audio_test
     assert app.view_settings.on_desktop_overlay_lock_change == (app._on_desktop_overlay_lock_change)
     assert app.view_settings.on_desktop_overlay_size_change == (app._on_desktop_overlay_size_change)
@@ -970,22 +960,12 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.view_settings.on_desktop_overlay_position_reset == (
         app._on_desktop_overlay_position_reset
     )
-    assert app.view_settings.on_view_logs == app._open_logs_tab
-    assert not hasattr(app.view_settings, "on_overlay_toggle")
-    assert not hasattr(app.view_settings, "on_peer_translation_toggle")
+    assert app.view_settings.on_view_logs == app._open_agent_tab
     assert app.view_settings.runtime_log_basic == app.application.log_basic
     assert isinstance(app.application, UiApplicationBoundary)
     assert app.application is app._ui_application
     assert isinstance(backend.app, FletUiPresentationAdapter)
     assert backend.app is app._presentation_adapter
-
-
-def test_application_property_preserves_factory_port_without_controller_compatibility() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    application = object()
-    app._ui_application = application
-
-    assert app.application is application
 
 
 def test_translator_app_consumes_production_application_factory_without_controller_reach_through(
@@ -1411,9 +1391,12 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_qq_auth_translation_gated",
         "on_discord_callback_page",
         "on_founder_letter",
-        "on_local_qwen_hallucination_modal",
         "on_github_star_snackbar",
         "on_foundation_primitives",
+        "on_agent_report_cycle",
+        "on_agent_change_cycle",
+        "on_agent_key_cycle",
+        "on_agent_account_cycle",
         "on_http_extension_form",
         "on_brake_notice",
         "on_revoked_notice",
@@ -1425,36 +1408,13 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_gpu_state_cycle",
         "on_stt_loading_button_cycle",
     }
-    display_turn = seen["callbacks"]["on_display_turn_cycle"]
-    assert getattr(display_turn, "__self__", None) is app
-    assert (
-        getattr(display_turn, "__func__", None) is TranslatorApp._cycle_debug_preview_display_turn
-    )
-    discord_callback = seen["callbacks"]["on_discord_auth"]
-    assert getattr(discord_callback, "__self__", None) is app
-    assert getattr(discord_callback, "__func__", None) is TranslatorApp._preview_discord_auth
-    qq_callback = seen["callbacks"]["on_qq_auth"]
-    assert getattr(qq_callback, "__self__", None) is app
-    assert getattr(qq_callback, "__func__", None) is TranslatorApp._preview_qq_auth
-    callback_page = seen["callbacks"]["on_discord_callback_page"]
-    assert getattr(callback_page, "__self__", None) is app
-    assert getattr(callback_page, "__func__", None) is TranslatorApp._preview_discord_callback_page
-    github_star = seen["callbacks"]["on_github_star_snackbar"]
-    assert getattr(github_star, "__self__", None) is app
-    assert getattr(github_star, "__func__", None) is TranslatorApp._preview_github_star_snackbar
-    local_qwen_modal = seen["callbacks"]["on_local_qwen_hallucination_modal"]
-    assert getattr(local_qwen_modal, "__self__", None) is app
-    assert (
-        getattr(local_qwen_modal, "__func__", None)
-        is TranslatorApp._preview_local_qwen_hallucination_modal
-    )
     preview_calls: list[bool] = []
     monkeypatch.setattr(
         app,
         "show_discord_managed_auth_dialog",
         lambda *, preview=False: preview_calls.append(preview),
     )
-    discord_callback()
+    seen["callbacks"]["on_discord_auth"]()
     assert preview_calls == [True]
     root = page.added[0]
     assert isinstance(root.content, ft.Stack)
@@ -1493,6 +1453,30 @@ def test_debug_preview_display_turn_cycles_source_and_translation_examples() -> 
     ]
 
 
+def test_debug_preview_agent_cards_open_agent_tab_and_hand_back_the_live_owner() -> None:
+    from tests.ui.test_agent_chat_view import Owner, snapshot
+
+    app = TranslatorApp.__new__(TranslatorApp)
+    live = Owner(snapshot())
+    owners: list[object] = []
+    opened: list[bool] = []
+    app._agent_navigation_owner = live
+    app.view_agent = SimpleNamespace(use_owner=owners.append)
+    app._open_agent_tab = lambda: opened.append(True)
+
+    app._cycle_debug_agent_card("report")
+    preview = owners[-1]
+    app._cycle_debug_agent_card("account")
+
+    assert opened == [True, True]
+    assert owners[-1] is preview
+    assert preview.snapshot.report_offers == ()
+    assert preview.snapshot.setup_actions[0].kind == "account_setup"
+    preview.reject_report("unused")
+    assert owners[-1] is live
+    assert live.calls == []
+
+
 def test_debug_preview_http_extension_form_writes_demo_extension_and_selects_it(
     tmp_path: Path,
 ) -> None:
@@ -1509,7 +1493,7 @@ def test_debug_preview_http_extension_form_writes_demo_extension_and_selects_it(
         _on_llm_selected=lambda value: llm_values.append(value),
         _on_http_extension_selected=lambda value: extension_values.append(value),
     )
-    app._current_tab = 1
+    app._current_tab = app._tab_index("settings")
 
     app._preview_http_extension_form()
 
@@ -1524,50 +1508,6 @@ def test_debug_preview_http_extension_form_writes_demo_extension_and_selects_it(
     app._preview_http_extension_form()
     assert llm_values == [TranslationModel.CUSTOM_HTTP.value] * 2
     assert extension_values == ["debug_demo", "debug_demo"]
-
-
-def test_debug_preview_local_qwen_modal_opens_production_dialog_without_state_or_side_effects(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    controller = SimpleNamespace(
-        _local_qwen_hallucination_detection_count=1,
-        _local_qwen_hallucination_modal_shown=False,
-    )
-    captured: dict[str, object] = {}
-
-    class FakeLocalQwenHallucinationDialog:
-        def __init__(self, page, *, on_open_guide):
-            captured["page"] = page
-            captured["on_open_guide"] = on_open_guide
-
-        def open(self) -> None:
-            captured["opened"] = True
-
-    monkeypatch.setattr(
-        app_module,
-        "LocalQwenHallucinationDialog",
-        FakeLocalQwenHallucinationDialog,
-    )
-    monkeypatch.setattr(
-        app_module.webbrowser,
-        "open",
-        lambda *_args, **_kwargs: pytest.fail("debug modal preview must not open external URLs"),
-    )
-
-    app._preview_local_qwen_hallucination_modal()
-
-    assert captured["page"] is app.page
-    assert captured["opened"] is True
-    assert getattr(captured["on_open_guide"], "__self__", None) is app
-    assert (
-        getattr(captured["on_open_guide"], "__func__", None) is TranslatorApp._open_local_qwen_guide
-    )
-    assert app._local_qwen_hallucination_dialog.__class__ is FakeLocalQwenHallucinationDialog
-    assert controller._local_qwen_hallucination_detection_count == 1
-    assert controller._local_qwen_hallucination_modal_shown is False
-    assert app.page.tasks == []
 
 
 def test_debug_preview_panel_wires_audio_fault_actions(monkeypatch) -> None:
@@ -1641,70 +1581,6 @@ def test_debug_audio_fault_actions_do_not_call_persistence_or_providers(monkeypa
     app._preview_stt_fault_cycle()
     app._preview_audio_fault_clear()
 
-    assert forbidden_calls == []
-
-
-def test_local_qwen_guidance_modal_open_guide_opens_github_api_key_guide_safely(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _patch_app_construction(monkeypatch)
-
-    class FakeBottomNavBar(ft.Container):
-        def __init__(self, on_change):
-            super().__init__()
-            self._on_change = on_change
-            self._selected = 0
-            self.visual_updates = 0
-
-        def _update_visuals(self) -> None:
-            self.visual_updates += 1
-
-    monkeypatch.setattr(app_module, "BottomNavBar", FakeBottomNavBar)
-    forbidden_calls: list[str] = []
-    opened_urls: list[str] = []
-    monkeypatch.setattr(
-        ConstructionDummyController,
-        "_save_settings",
-        lambda self: forbidden_calls.append("save_settings"),
-    )
-    monkeypatch.setattr(
-        ConstructionDummyController,
-        "persist_settings",
-        lambda self: forbidden_calls.append("persist_settings"),
-    )
-    monkeypatch.setattr(
-        app_module.webbrowser,
-        "open",
-        lambda url, *args, **kwargs: opened_urls.append(url),
-    )
-    monkeypatch.setattr(app_module, "get_locale", lambda: "ko")
-
-    page = DummyPage()
-    app = TranslatorApp(
-        page,
-        config_path=Path("settings.json"),
-        application_factory=_construction_application_factory,
-    )
-    monkeypatch.setattr(app.content_area, "update", lambda: None)
-    backend = _construction_backends[-1]
-    backend.apply_settings = lambda *args, **kwargs: forbidden_calls.append("apply_settings")
-    backend.apply_providers = lambda *args, **kwargs: forbidden_calls.append("apply_providers")
-    app.view_settings.has_provider_changes = True
-
-    app.show_local_qwen_hallucination_dialog()
-
-    dialog = app._local_qwen_hallucination_dialog
-    opened_dialog = page.opened[-1]
-    assert opened_dialog is dialog._dialog
-
-    dialog._dialog_result.primary_button.on_click(None)
-
-    assert page.closed == [opened_dialog]
-    assert opened_urls == [app_module.founder_readme_url_for_locale("ko")]
-    assert app.content_area.content is not app.view_settings
-    assert app.bottom_nav._selected == 0
-    assert app.bottom_nav.visual_updates == 0
-    assert page.tasks == []
     assert forbidden_calls == []
 
 
@@ -1824,20 +1700,20 @@ def test_translator_app_4x3_window_keeps_shell_navigation_usable(
     monkeypatch.setattr(app.content_area, "update", lambda: None)
 
     assert app.content_area.padding == app_module.APP_CONTENT_PADDING
-    assert app.layout.controls == [app.title_bar, app.content_area, app.bottom_nav]
+    assert app.layout.controls == [
+        app.title_bar,
+        app.content_area,
+        app.bottom_nav,
+    ]
     assert app.content_area.content is app.view_dashboard
 
     app._on_nav_change(1)
-    assert app.content_area.content is app.view_settings
-    assert app.content_area.padding == 0
+    assert app.content_area.content is app.view_agent
+    assert app.content_area.padding == app_module.APP_CONTENT_PADDING
 
     app._on_nav_change(2)
-    assert app.content_area.content is app.view_logs
-    assert app.content_area.padding == app_module.APP_LOGS_CONTENT_PADDING
-    assert app.content_area.padding.left == 0
-    assert app.content_area.padding.right == 0
-    assert app.content_area.padding.top == app_module.APP_CONTENT_PADDING
-    assert app.content_area.padding.bottom == app_module.APP_CONTENT_PADDING
+    assert app.content_area.content is app.view_settings
+    assert app.content_area.padding == 0
 
     app._on_nav_change(3)
     assert app.content_area.content is app.view_about
@@ -1846,7 +1722,6 @@ def test_translator_app_4x3_window_keeps_shell_navigation_usable(
     app._on_nav_change(0)
     assert app.content_area.content is app.view_dashboard
     assert app.content_area.padding == app_module.APP_CONTENT_PADDING
-    assert len(page.tasks) == 1
 
 
 def test_app_tab_key_reverses_message_input_languages_only_on_dashboard() -> None:
@@ -2358,11 +2233,11 @@ def test_debug_preview_qq_auth_states_are_pure_ui_without_tasks_or_persistence(
 def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     settings = _vnext(
-        model="openrouter_qwen35_flash",
-        connection="managed",
+        model=TranslationModel.GEMMA4_26B_31B.value,
+        connection=TranslationConnection.MANAGED.value,
         openrouter_source="managed",
-        openrouter_alias=OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED.value,
-        openrouter_model=OpenRouterLLMModel.QWEN_35_FLASH_02_23.value,
+        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value,
+        openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
     )
     app._ui_application = SimpleNamespace(
         build_managed_openrouter_byok_target=lambda: _byok_pkce_target(settings),
@@ -2380,7 +2255,7 @@ def test_discord_managed_auth_byok_launches_openrouter_pkce_with_byok_target() -
     assert len(pkce_calls) == 1
     target, launch_source = pkce_calls[0]
     assert launch_source == "discord_auth"
-    assert target.selection_alias is OpenRouterSelectionAlias.QWEN35_FLASH_BYOK
+    assert target.selection_alias is OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
     assert (
         settings.intent.translation.openrouter_selected_source
         == OpenRouterCredentialSource.MANAGED.value
@@ -3083,7 +2958,7 @@ def test_peer_translation_disable_does_not_open_eula() -> None:
 def test_gpu_provider_selection_alone_does_not_start_install() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    app._current_tab = 1
+    app._current_tab = 2
     app.view_dashboard = object()
     app.view_logs = SimpleNamespace(scroll_to_bottom=lambda: asyncio.sleep(0))
     app.view_about = object()
@@ -3098,39 +2973,10 @@ def test_gpu_provider_selection_alone_does_not_start_install() -> None:
     )
     app._ui_application = compose_test_ui_application_boundary(controller)
 
-    app._on_nav_change(1)
+    app._on_nav_change(2)
 
     assert app.page.tasks == []
     assert app.view_settings.has_provider_changes is True
-
-
-@pytest.mark.asyncio
-async def test_navigation_to_logs_scrolls_after_rendering() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app._current_tab = 0
-    scrolled = {"count": 0}
-
-    async def fake_scroll_to_bottom() -> None:
-        scrolled["count"] += 1
-
-    app.view_dashboard = object()
-    app.view_settings = SimpleNamespace(
-        has_provider_changes=False,
-        refresh_prompt_if_empty=lambda: None,
-    )
-    app.view_logs = SimpleNamespace(scroll_to_bottom=fake_scroll_to_bottom)
-    app.view_about = object()
-    app.content_area = DummyContent()
-    app._close_open_dialog_for_navigation = lambda: None
-    app._run_page_task = lambda task_factory: app.page.run_task(task_factory)
-
-    app._on_nav_change(1)
-    app._on_nav_change(2)
-    await app.page.tasks[0]()
-
-    assert app.content_area.content is app.view_logs
-    assert scrolled["count"] == 1
 
 
 @pytest.mark.asyncio
@@ -3528,7 +3374,7 @@ def test_on_nav_change_closes_open_dialog_before_switching_tabs() -> None:
     controller = SimpleNamespace(apply_providers=lambda _settings=None: asyncio.sleep(0))
     app._ui_application = compose_test_ui_application_boundary(controller)
 
-    app._on_nav_change(1)
+    app._on_nav_change(2)
 
     assert events[:3] == [
         ("close", dialog),
@@ -3814,7 +3660,11 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
 
     async def fake_verify(provider: str, key: str):
         _ = key
-        return provider in {"deepgram", "deepseek"}, "ok"
+        return ProviderCredentialVerificationOutcome(
+            status="verified" if provider in {"deepgram", "deepseek"} else "failed",
+            provider=provider,
+            error_text="ok",
+        )
 
     settings = SimpleNamespace(
         api_key_verified=SimpleNamespace(
@@ -3846,10 +3696,18 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
     openrouter_result = await app._on_verify_api_key("openrouter", "k")
     deepseek_result = await app._on_verify_api_key("deepseek", "k")
 
-    assert deepgram_result == (True, "ok")
-    assert google_result == (False, "ok")
-    assert openrouter_result == (False, "ok")
-    assert deepseek_result == (True, "ok")
+    assert deepgram_result == ProviderCredentialVerificationOutcome(
+        status="verified", provider="deepgram", error_text="ok"
+    )
+    assert google_result == ProviderCredentialVerificationOutcome(
+        status="failed", provider="google", error_text="ok"
+    )
+    assert openrouter_result == ProviderCredentialVerificationOutcome(
+        status="failed", provider="openrouter", error_text="ok"
+    )
+    assert deepseek_result == ProviderCredentialVerificationOutcome(
+        status="verified", provider="deepseek", error_text="ok"
+    )
     assert settings.api_key_verified.deepgram is True
     assert settings.api_key_verified.google is False
     assert settings.api_key_verified.openrouter is False
@@ -3878,7 +3736,9 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
 
     async def fake_verify(provider: str, key: str):
         assert (provider, key) == ("google", "old-key")
-        return True, "ok"
+        return ProviderCredentialVerificationOutcome(
+            status="verified", provider=provider, error_text="ok"
+        )
 
     settings = SimpleNamespace(
         api_key_verified=SimpleNamespace(
@@ -3898,7 +3758,9 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
 
     result = await app._on_verify_api_key("google", "old-key")
 
-    assert result == (True, "ok")
+    assert result == ProviderCredentialVerificationOutcome(
+        status="verified", provider="google", error_text="ok"
+    )
     assert settings.api_key_verified.google is False
     assert saves == []
     assert app.view_dashboard.stt_calls == []
@@ -3966,45 +3828,6 @@ def test_show_founder_letter_dialog_opens_with_locale_readme_action(
     assert opened_urls == [
         "https://github.com/kapitalismho/PuriPuly-heart/blob/dev/docs/readme/README.ko.md#자신의-api-키-사용하기"
     ]
-
-
-def test_show_founder_letter_dialog_does_not_prepare_byok_alias_when_opened(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    captured: dict[str, object] = {}
-    pkce_calls: list[tuple[AppSettingsVNext, str]] = []
-
-    class FakeFounderLetterDialog:
-        def __init__(
-            self, _page, *, on_readme=None, on_chatgpt=None, on_connect=None, on_contact=None
-        ):
-            captured["page"] = _page
-            captured["on_readme"] = on_readme
-            captured["on_connect"] = on_connect
-            captured["on_contact"] = on_contact
-
-        def open(self) -> None:
-            captured["opened"] = True
-
-    monkeypatch.setattr(app_module, "FounderLetterDialog", FakeFounderLetterDialog)
-    monkeypatch.setattr(
-        app,
-        "_on_request_openrouter_pkce",
-        lambda target_settings, *, launch_source="settings": pkce_calls.append(
-            (target_settings, launch_source)
-        ),
-    )
-
-    app.show_founder_letter_dialog()
-
-    assert captured["opened"] is True
-    assert captured["page"] is app.page
-    assert callable(captured["on_readme"])
-    assert captured["on_connect"] is None
-    assert captured["on_contact"] is None
-    assert pkce_calls == []
 
 
 @pytest.mark.asyncio

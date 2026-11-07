@@ -22,7 +22,7 @@ const POSITIVE_ROUTING_PROBE_MODELS = MANAGED_ALLOWLIST_MODELS.filter(
   (model) => model !== ISSUE_MODEL,
 );
 const EMPTY_CONTENT_ALLOWED_POSITIVE_ROUTING_MODELS = new Set([
-  'deepseek/deepseek-v4.1-flash',
+  'deepseek/deepseek-v4.1-flash-1017',
   'deepseek/deepseek-v4-flash-0731',
   'deepseek/deepseek-v4-flash',
 ]);
@@ -57,6 +57,25 @@ describe('broker deploy smoke helpers', () => {
       limit: ISSUE_BUDGET_USD,
       expiresAt: '2026-07-08T06:00:00.000Z',
     });
+  });
+
+  it('requires the flat challenge fingerprint salt contract and rejects missing or placeholder fields', () => {
+    expect(() => assertChallengeFingerprintSalt({
+      fingerprint_salt: { version: 7, salt: 'synthetic-ready-salt' },
+    })).not.toThrow();
+    for (const payload of [
+      {},
+      { fingerprint_salt: {} },
+      { fingerprint_salt: { current: { version: 7, salt: 'synthetic-ready-salt' } } },
+      { fingerprint_salt: { version: 7, salt: BOOTSTRAP_PLACEHOLDER } },
+      { fingerprint_salt: { version: 0, salt: 'synthetic-ready-salt' } },
+      { fingerprint_salt: { version: 1.5, salt: 'synthetic-ready-salt' } },
+      { fingerprint_salt: { version: '7', salt: 'synthetic-ready-salt' } },
+      { fingerprint_salt: { version: 7, salt: '' } },
+      { fingerprint_salt: { version: 7, salt: ' \t ' } },
+    ]) {
+      expect(() => assertChallengeFingerprintSalt(payload), JSON.stringify(payload)).toThrow(/fingerprint_salt/u);
+    }
   });
 
   it('recognizes model-routing failures as guardrail enforcement for a disallowed model probe', () => {
@@ -100,7 +119,7 @@ describe('broker deploy smoke helpers', () => {
     ).not.toThrow();
   });
 
-  it('accepts empty assistant content for the DeepSeek positive routing probe', () => {
+  it.each([...EMPTY_CONTENT_ALLOWED_POSITIVE_ROUTING_MODELS])('accepts empty assistant content for the %s positive routing probe', (model) => {
     expect(() =>
       assertSuccessfulChatCompletionResponse(
         {
@@ -117,7 +136,7 @@ describe('broker deploy smoke helpers', () => {
             ],
           },
         },
-        'deepseek/deepseek-v4-flash-0731',
+        model,
       ),
     ).not.toThrow();
   });
@@ -139,14 +158,7 @@ describe('broker deploy smoke helpers', () => {
     ).toThrow(/must differ from the managed allowlisted models/i);
     expect(() =>
       normalizeDisallowedModel(
-        'google/gemma-4-31b-it',
-        MANAGED_ALLOWLIST_MODELS,
-        true,
-      ),
-    ).toThrow(/must differ from the managed allowlisted models/i);
-    expect(() =>
-      normalizeDisallowedModel(
-        'deepseek/deepseek-v4.1-flash',
+        'deepseek/deepseek-v4.1-flash-1017',
         MANAGED_ALLOWLIST_MODELS,
         true,
       ),
@@ -170,7 +182,7 @@ describe('broker deploy smoke helpers', () => {
   it('keeps the positive routing probes pinned to the managed secondary models', () => {
     expect(POSITIVE_ROUTING_PROBE_MODELS).toEqual([
       'google/gemma-4-31b-it',
-      'deepseek/deepseek-v4.1-flash',
+      'deepseek/deepseek-v4.1-flash-1017',
       'deepseek/deepseek-v4-flash-0731',
       'deepseek/deepseek-v4-flash',
     ]);
@@ -437,9 +449,7 @@ describeDeploySmoke('broker direct deploy smoke', () => {
     expect(typeof challenge.body.challenge).toBe('string');
     expect(typeof challenge.body.challenge_expires_at).toBe('string');
     expect(challenge.body.managed_state?.lifecycle).toBe('none');
-    expect(challenge.body.fingerprint_salt?.current?.salt).not.toBe(
-      BOOTSTRAP_PLACEHOLDER,
-    );
+    assertChallengeFingerprintSalt(challenge.body);
 
     const verifySignedAt = timestampFromHeaders(challenge.headers);
     const verifyRequest = await signCanonicalVerifyRequest(keyPair.privateKey, {
@@ -823,13 +833,6 @@ function normalizeDisallowedModel(
   return normalized;
 }
 
-function requireDisallowedModel(model: string | undefined): string {
-  if (!model) {
-    throw new Error('BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL is required for deploy smoke');
-  }
-
-  return model;
-}
 
 function normalizeSmokeBaseUrl(baseUrl: string | undefined): URL {
   if (!baseUrl) {
@@ -882,6 +885,24 @@ async function computeHmacSha256Hex(secret: string, value: string): Promise<stri
   return Array.from(new Uint8Array(signature), (byte) =>
     byte.toString(16).padStart(2, '0'),
   ).join('');
+}
+
+function assertChallengeFingerprintSalt(payload: unknown): void {
+  const fingerprint = readObjectField(payload, 'fingerprint_salt', 'challenge response');
+  if (
+    typeof fingerprint.version !== 'number' ||
+    !Number.isSafeInteger(fingerprint.version) ||
+    fingerprint.version < 1
+  ) {
+    throw new Error('challenge fingerprint_salt must include a positive integer version');
+  }
+  if (
+    typeof fingerprint.salt !== 'string' ||
+    fingerprint.salt.trim().length === 0 ||
+    fingerprint.salt.trim() === BOOTSTRAP_PLACEHOLDER
+  ) {
+    throw new Error('challenge fingerprint_salt must include a nonempty bootstrapped salt');
+  }
 }
 
 function readOpenRouterCurrentKeyMetadata(payload: unknown): {

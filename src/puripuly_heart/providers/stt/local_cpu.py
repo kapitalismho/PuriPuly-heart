@@ -8,16 +8,18 @@ from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 
-from puripuly_heart.core.language import get_local_qwen_language_hint
-from puripuly_heart.core.local_stt_assets import (
-    LOCAL_STT_MODEL_ID,
+from puripuly_heart.core.asr_worker import ASRWorkerProcessFactoryPort
+from puripuly_heart.core.local_asr.local_stt_assets import (
+    FUN_ASR_MLT_NANO_MODEL_ID,
+    FUN_ASR_NANO_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
-    PARAKEET_V3_MODEL_ID,
     LocalSTTAssetManifest,
     default_local_stt_model_root,
     load_local_stt_asset_manifest,
 )
-from puripuly_heart.core.local_stt_catalog import (
+from puripuly_heart.core.local_asr.local_stt_catalog import (
     LocalCPUAutoUnavailableError,
     inspect_required_cpu_model_installs,
     resolve_cpu_auto_model,
@@ -30,16 +32,31 @@ from puripuly_heart.core.stt.backend import (
     STTBackendSession,
     STTSessionProjection,
 )
-from puripuly_heart.providers.stt.local_parakeet_sherpa import (
-    LocalParakeetJapaneseSherpaSTTBackend,
-    LocalParakeetV3SherpaSTTBackend,
-)
-from puripuly_heart.providers.stt.local_qwen_sherpa import (
+from puripuly_heart.providers.stt.local_session import (
     LOCAL_ASR_PENDING_TTL_S,
-    LocalQwenSherpaSTTBackend,
+    LocalOfflineSTTBackend,
 )
 
 LocalCPUBackendFactory = Callable[..., STTBackend]
+
+
+def local_cpu_backend_type(model_id: str) -> type[STTBackend]:
+    if model_id in {
+        GRANITE_MODEL_ID,
+        GIGAAM_MODEL_ID,
+        FUN_ASR_NANO_MODEL_ID,
+        FUN_ASR_MLT_NANO_MODEL_ID,
+    }:
+        from puripuly_heart.providers.stt.local_cpp import LocalCppSTTBackend
+
+        return LocalCppSTTBackend
+    if model_id == PARAKEET_JAPANESE_MODEL_ID:
+        from puripuly_heart.providers.stt.local_parakeet_sherpa import (
+            LocalParakeetJapaneseSherpaSTTBackend,
+        )
+
+        return LocalParakeetJapaneseSherpaSTTBackend
+    raise ValueError(f"Unsupported local CPU model: {model_id}")
 
 
 def create_local_cpu_backend(
@@ -49,18 +66,13 @@ def create_local_cpu_backend(
     source_language: str,
     sample_rate_hz: int,
     stream_label: str | None,
-    hotwords: tuple[str, ...] = (),
+    process_factory: ASRWorkerProcessFactoryPort | None = None,
     pending_ttl_s: float = LOCAL_ASR_PENDING_TTL_S,
     decode_clock: Callable[[], float] = time.perf_counter,
     queue_clock: Callable[[], float] = time.monotonic,
     attempt_log_sink: Callable[[str, int], None] | None = None,
 ) -> STTBackend:
-    if model_id not in {
-        LOCAL_STT_MODEL_ID,
-        PARAKEET_V3_MODEL_ID,
-        PARAKEET_JAPANESE_MODEL_ID,
-    }:
-        raise ValueError(f"Unsupported local CPU model: {model_id}")
+    backend_type = local_cpu_backend_type(model_id)
     manifest = load_local_stt_asset_manifest(model_id)
     resolved_root = model_root or default_local_stt_model_root()
     common = {
@@ -70,19 +82,26 @@ def create_local_cpu_backend(
         "pending_ttl_s": pending_ttl_s,
         "decode_clock": decode_clock,
         "queue_clock": queue_clock,
+        "attempt_log_sink": attempt_log_sink,
     }
-    if model_id == LOCAL_STT_MODEL_ID:
-        return LocalQwenSherpaSTTBackend(
+    if model_id != PARAKEET_JAPANESE_MODEL_ID:
+        return backend_type(
             **common,
-            language_hint=get_local_qwen_language_hint(source_language),
-            hotwords=hotwords,
-            attempt_log_sink=attempt_log_sink,
+            model_id=model_id,
+            provider_id={
+                GRANITE_MODEL_ID: "local_granite",
+                GIGAAM_MODEL_ID: "local_gigaam",
+                FUN_ASR_NANO_MODEL_ID: "local_fun_asr_nano",
+                FUN_ASR_MLT_NANO_MODEL_ID: "local_fun_asr_mlt_nano",
+            }[model_id],
+            language_hint=(
+                None
+                if model_id in {GRANITE_MODEL_ID, GIGAAM_MODEL_ID}
+                else source_language.split("-")[0].lower()
+            ),
+            process_factory=process_factory,
         )
-    if model_id == PARAKEET_V3_MODEL_ID:
-        return LocalParakeetV3SherpaSTTBackend(**common)
-    if model_id == PARAKEET_JAPANESE_MODEL_ID:
-        return LocalParakeetJapaneseSherpaSTTBackend(**common)
-    raise AssertionError(model_id)
+    return backend_type(**common)
 
 
 @dataclass(slots=True)
@@ -91,7 +110,7 @@ class LocalCPUAutoSTTBackend(STTBackend):
     sample_rate_hz: int = 16000
     stream_label: str | None = None
     model_root: Path | None = None
-    hotwords: tuple[str, ...] = ()
+    process_factory: ASRWorkerProcessFactoryPort | None = field(default=None, repr=False)
     pending_ttl_s: float = LOCAL_ASR_PENDING_TTL_S
     decode_clock: Callable[[], float] = field(default_factory=lambda: time.perf_counter)
     queue_clock: Callable[[], float] = field(default_factory=lambda: time.monotonic)
@@ -135,6 +154,13 @@ class LocalCPUAutoSTTBackend(STTBackend):
                 await session.close()
                 raise RuntimeError("CPU Auto backend is closed")
             return session
+
+    async def open_probe_session(self, *, projection: STTSessionProjection) -> STTBackendSession:
+        async with self._load_lock:
+            delegate = await self._ensure_delegate_locked()
+            if not isinstance(delegate, LocalOfflineSTTBackend):
+                raise TypeError("CPU recognition probe requires the configured offline backend")
+            return await delegate.open_probe_session(projection=projection)
 
     async def reconfigure_session_options(self, options: LocalASRSessionOptions) -> None:
         async with self._load_lock:
@@ -193,13 +219,16 @@ class LocalCPUAutoSTTBackend(STTBackend):
         if not snapshot.cpu_auto_available:
             raise LocalCPUAutoUnavailableError(snapshot)
         model_id = resolve_cpu_auto_model(self.source_language)
+        await run_owned_thread_call(partial(local_cpu_backend_type, model_id))
+        if self._closed:
+            raise RuntimeError("CPU Auto backend is closed")
         delegate = self.backend_factory(
             model_id,
             model_root=self.model_root,
             source_language=self.source_language,
             sample_rate_hz=self.sample_rate_hz,
             stream_label=self.stream_label,
-            hotwords=self.hotwords,
+            process_factory=self.process_factory,
             pending_ttl_s=self.pending_ttl_s,
             decode_clock=self.decode_clock,
             queue_clock=self.queue_clock,

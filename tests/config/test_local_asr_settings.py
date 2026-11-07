@@ -17,18 +17,25 @@ from puripuly_heart.config.settings_vnext.schema import (
 
 LOCAL_PROVIDER_VALUES = (
     STTProviderName.LOCAL_CPU_AUTO,
-    STTProviderName.LOCAL_PARAKEET_V3,
+    STTProviderName.LOCAL_GRANITE,
+    STTProviderName.LOCAL_GIGAAM,
+    STTProviderName.LOCAL_FUN_ASR_NANO,
+    STTProviderName.LOCAL_FUN_ASR_MLT_NANO,
     STTProviderName.LOCAL_PARAKEET_JAPANESE,
-    STTProviderName.LOCAL_QWEN,
     STTProviderName.LOCAL_QWEN_GPU,
 )
 
 
 @pytest.mark.parametrize("provider", LOCAL_PROVIDER_VALUES)
-def test_local_provider_identities_roundtrip_through_canonical_serialization(
+def test_local_provider_identities_roundtrip_through_serialization_and_restart(
     provider: STTProviderName,
+    tmp_path: Path,
 ) -> None:
-    current = AppSettingsVNext()
+    current = with_telemetry_enabled(
+        AppSettingsVNext(),
+        True,
+        identifier_factory=lambda: "local-provider-roundtrip-id",
+    )
     settings = replace(
         current,
         intent=replace(
@@ -51,6 +58,17 @@ def test_local_provider_identities_roundtrip_through_canonical_serialization(
     assert restored.intent.stt.provider == provider.value
     assert restored.intent.peer_stt.provider == provider.value
     assert restored.intent.stt.gpu_device_id == "vulkan-device-2"
+
+    path = tmp_path / "settings.json"
+    assert compat.save_vnext_settings(path, restored).ok
+    original = path.read_bytes()
+    restarted = compat.load_vnext_settings(path)
+
+    assert restarted.ok
+    assert not restarted.migrated
+    assert restarted.backup_path is None
+    assert restarted.settings == restored
+    assert path.read_bytes() == original
 
 
 @pytest.mark.parametrize(
@@ -107,40 +125,59 @@ def test_target_schema_29_local_qwen_migration_is_backed_up_and_idempotent(
     assert len(list(tmp_path.glob("*.bak"))) == 1
 
 
-def test_current_manual_qwen_selection_and_shared_gpu_device_remain_stable(
+@pytest.mark.parametrize("version", [53, VNEXT_SETTINGS_SCHEMA_VERSION])
+@pytest.mark.parametrize(
+    ("self_provider", "peer_provider"),
+    [
+        ("local_orukeet", "local_parakeet_v3"),
+        ("local_parakeet_v3", "local_orukeet"),
+        ("local_qwen", "local_qwen"),
+    ],
+)
+def test_retired_choices_migrate_recoverably_and_remain_canonical_on_restart(
     tmp_path: Path,
+    version: int,
+    self_provider: str,
+    peer_provider: str,
 ) -> None:
     path = tmp_path / "settings.json"
     default = with_telemetry_enabled(
         AppSettingsVNext(),
         True,
-        identifier_factory=lambda: "manual-qwen-test-id",
+        identifier_factory=lambda: "cpu-migration-test-id",
     )
-    manual_qwen = replace(
-        default,
-        intent=replace(
-            default.intent,
-            stt=replace(
-                default.intent.stt,
-                provider=STTProviderName.LOCAL_QWEN.value,
-                gpu_device_id="vulkan-device-1",
-            ),
-            peer_stt=replace(
-                default.intent.peer_stt,
-                provider=STTProviderName.LOCAL_QWEN.value,
-            ),
-        ),
-    )
+    raw = serialization.to_dict(default)
+    raw["settings_version"] = version
+    raw["intent"]["stt"]["provider"] = self_provider
+    raw["intent"]["peer_stt"]["provider"] = peer_provider
+    raw["intent"]["stt"]["gpu_device_id"] = "vulkan-device-1"
+    raw["intent"]["languages"]["source_language"] = "fr"
+    raw["intent"]["languages"]["peer_source_language"] = "ko"
+    raw["intent"]["stt"]["custom_terms"] = {"fr": ["PuriPuly"]}
+    original = json.dumps(raw, ensure_ascii=False, indent=2).encode("utf-8")
+    path.write_bytes(original)
 
-    raw = serialization.to_dict(manual_qwen)
-    raw["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION
-    path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
     loaded = compat.load_vnext_settings(path)
 
     assert loaded.ok
-    assert loaded.migrated is False
-    assert loaded.backup_path is None
+    assert loaded.migrated
+    assert loaded.backup_path is not None
+    assert loaded.backup_path.read_bytes() == original
     assert loaded.settings is not None
-    assert loaded.settings.intent.stt.provider == STTProviderName.LOCAL_QWEN.value
-    assert loaded.settings.intent.peer_stt.provider == STTProviderName.LOCAL_QWEN.value
+    assert loaded.settings.intent.stt.provider == "local_cpu_auto"
+    assert loaded.settings.intent.peer_stt.provider == "local_cpu_auto"
     assert loaded.settings.intent.stt.gpu_device_id == "vulkan-device-1"
+    assert loaded.settings.intent.languages.source_language == "fr"
+    assert loaded.settings.intent.languages.peer_source_language == "ko"
+    assert loaded.settings.intent.stt.custom_terms == {"fr": ["PuriPuly"]}
+    persisted = path.read_bytes()
+    assert json.loads(persisted)["intent"]["stt"]["provider"] == "local_cpu_auto"
+    assert json.loads(persisted)["intent"]["peer_stt"]["provider"] == "local_cpu_auto"
+
+    restarted = compat.load_vnext_settings(path)
+
+    assert restarted.ok
+    assert not restarted.migrated
+    assert restarted.backup_path is None
+    assert restarted.settings == loaded.settings
+    assert path.read_bytes() == persisted

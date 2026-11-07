@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
+from puripuly_heart.app.services.overlay.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.peer_application import (
     PeerApplicationOwner,
     PeerApplicationState,
 )
-from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import LocalASRProviderRuntimePort
 
 
 @dataclass(frozen=True, slots=True)

@@ -9,15 +9,14 @@ from pathlib import Path
 import pytest
 
 from puripuly_heart.release_evidence.native_distribution import (
+    bundle_runtime,
     compile_runtime,
     stage_product_metadata,
 )
 from tests.helpers.paths import REPO_ROOT
 
 
-@pytest.fixture(scope="session")
-def compiled_archive_runtime(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
-    tmp_path = tmp_path_factory.mktemp("native-compiled-runtime")
+def _build_compiled_archive_runtime(tmp_path: Path, *, compact_flet: bool) -> tuple[Path, Path]:
     root = REPO_ROOT
     layout = root / "native/windows_host/artifact-layout.json"
     app = tmp_path / "app"
@@ -86,19 +85,44 @@ def compiled_archive_runtime(tmp_path_factory: pytest.TempPathFactory) -> tuple[
     (dependencies / "masked").mkdir()
     (dependencies / "masked.py").write_text("VALUE = 17\n", encoding="utf-8")
     (dependencies / "masked/child.py").write_text("VALUE = 99\n", encoding="utf-8")
-    flet_spec = importlib.util.find_spec("flet")
-    assert flet_spec is not None and flet_spec.origin is not None
-    flet_root = Path(flet_spec.origin).parent
-    shutil.copytree(
-        flet_root, dependencies / "flet", ignore=shutil.ignore_patterns("__pycache__", "*.pyc")
-    )
-    for metadata in flet_root.parent.glob("flet-*.dist-info"):
-        shutil.copytree(metadata, dependencies / metadata.name)
+    if compact_flet:
+        flet_root = dependencies / "flet"
+        (flet_root / "controls/material").mkdir(parents=True)
+        for relative in ("__init__.py", "controls/__init__.py", "controls/material/__init__.py"):
+            (flet_root / relative).write_text("", encoding="utf-8")
+        (flet_root / "controls/material/icons.json").write_text("{}", encoding="utf-8")
+    else:
+        flet_spec = importlib.util.find_spec("flet")
+        assert flet_spec is not None and flet_spec.origin is not None
+        flet_root = Path(flet_spec.origin).parent
+        shutil.copytree(
+            flet_root,
+            dependencies / "flet",
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
+        for metadata in flet_root.parent.glob("flet-*.dist-info"):
+            shutil.copytree(metadata, dependencies / metadata.name)
     stage_product_metadata(dependencies, root / "pyproject.toml")
     evidence = compile_runtime(tmp_path, layout)
     bytecode = tmp_path / "bytecode.json"
     bytecode.write_text(json.dumps(evidence), encoding="utf-8")
     return tmp_path, layout
+
+
+@pytest.fixture(scope="session")
+def compiled_archive_runtime(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    return _build_compiled_archive_runtime(
+        tmp_path_factory.mktemp("native-compiled-runtime"), compact_flet=False
+    )
+
+
+@pytest.fixture(scope="session")
+def compiled_compact_archive_runtime(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> tuple[Path, Path]:
+    return _build_compiled_archive_runtime(
+        tmp_path_factory.mktemp("native-compiled-compact-runtime"), compact_flet=True
+    )
 
 
 @pytest.fixture
@@ -109,3 +133,107 @@ def staged_archive_runtime(
     shutil.copytree(source, tmp_path, dirs_exist_ok=True)
     bytecode = tmp_path / "bytecode.json"
     return layout, bytecode, json.loads(bytecode.read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def staged_compact_archive_runtime(
+    tmp_path: Path, compiled_compact_archive_runtime: tuple[Path, Path]
+) -> tuple[Path, Path, dict[str, object]]:
+    source, layout = compiled_compact_archive_runtime
+    shutil.copytree(source, tmp_path, dirs_exist_ok=True)
+    bytecode = tmp_path / "bytecode.json"
+    return layout, bytecode, json.loads(bytecode.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="session")
+def bundled_compact_archive_runtime(
+    tmp_path_factory: pytest.TempPathFactory,
+    compiled_compact_archive_runtime: tuple[Path, Path],
+) -> tuple[Path, Path]:
+    source, layout = compiled_compact_archive_runtime
+    target = tmp_path_factory.mktemp("native-bundled-compact-runtime")
+    shutil.copytree(source, target, dirs_exist_ok=True)
+    bytecode = target / "bytecode.json"
+    bytecode.write_text(json.dumps(bundle_runtime(target, layout, bytecode)), encoding="utf-8")
+    return target, layout
+
+
+@pytest.fixture
+def staged_compact_bundled_runtime(
+    tmp_path: Path, bundled_compact_archive_runtime: tuple[Path, Path]
+) -> tuple[Path, Path, dict[str, object]]:
+    source, layout = bundled_compact_archive_runtime
+    shutil.copytree(source, tmp_path, dirs_exist_ok=True)
+    bytecode = tmp_path / "bytecode.json"
+    return layout, bytecode, json.loads(bytecode.read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def relay_context_manifest() -> dict:
+    marker = "TRUSTED_CONTEXT_ONLY_NOT_FOR_TERRA"
+    return {
+        "format": "puri-agent-relay-context-1",
+        "agent_protocol": 5,
+        "relay_build": "a" * 64,
+        "bundle_hashes": {"index.js": "a" * 64, "guide.md": "b" * 64},
+        "contexts": {
+            "classify": {
+                "model": "synthetic-model",
+                "input_prefix": [
+                    {
+                        "role": "developer",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": marker,
+                                "prompt_cache_breakpoint": {"mode": "explicit"},
+                            }
+                        ],
+                    }
+                ],
+                "questions": [
+                    {
+                        "type": "choice",
+                        "name": "route",
+                        "instructions": "Classify current_message by the Route section.",
+                        "choices": [{"value": "work"}, {"value": "unclear"}],
+                    }
+                ],
+                "prompt_cache_options": {"mode": "explicit", "ttl": "30m"},
+            },
+            "work": {
+                "model": "synthetic-model",
+                "input_prefix": [
+                    {
+                        "role": "developer",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": marker,
+                                "prompt_cache_breakpoint": {"mode": "explicit"},
+                            }
+                        ],
+                    }
+                ],
+                "tools": [{"type": "function", "name": "synthetic_context_tool"}],
+                "reasoning": {"effort": "high"},
+                "prompt_cache_options": {"mode": "implicit", "ttl": "30m"},
+                "store": False,
+                "stream": True,
+                "parallel_tool_calls": False,
+                "max_output_tokens": 25000,
+                "include": ["reasoning.encrypted_content"],
+            },
+            **{
+                route: {
+                    "model": "synthetic-model",
+                    "input_prefix": [],
+                    "instructions": f"{marker} {route}",
+                    "tools": [],
+                    "reasoning": {"effort": "low"},
+                }
+                for route in ("social", "out_of_scope")
+            },
+        },
+        "export_provenance": {"mode": "controlled_test_fixture", "external_model_calls": 0},
+    }

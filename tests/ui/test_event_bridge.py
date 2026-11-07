@@ -12,12 +12,11 @@ import pytest
 
 pytest.importorskip("flet")
 
-from puripuly_heart.core.managed_openrouter_release import (
+from puripuly_heart.core import messages
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterReleaseDiagnostics,
     ManagedOpenRouterUserFacingError,
 )
-
-from puripuly_heart.core import messages
 from puripuly_heart.core.runtime_logging import (
     RealtimeLogHandler,
     RuntimeLoggingSinks,
@@ -39,14 +38,10 @@ from tests.helpers.ui_application import compose_test_ui_application_boundary
 
 class DummyDashboard:
     def __init__(self) -> None:
-        self.statuses: list[str] = []
         self.display_calls: list[tuple[str, str | None, bool]] = []
         self.display_debug_prefixes: list[str | None] = []
         self.translation_calls: list[tuple[str, str | None]] = []
         self.notice_calls: list[str | None] = []
-
-    def set_status(self, status: str) -> None:
-        self.statuses.append(status)
 
     def set_display_text(
         self,
@@ -219,6 +214,7 @@ def make_bridge(app: object, **kwargs: object) -> UIEventBridge:
         on_overlay_state_changed=kwargs.pop(
             "on_overlay_state_changed", getattr(app, "on_overlay_state_changed", None)
         ),
+        on_error_presented=kwargs.pop("on_error_presented", None),
     )
 
 
@@ -371,13 +367,9 @@ def test_event_projection_builds_dtos_without_runtime_subscription() -> None:
 
 class RecordingDashboardDestination:
     def __init__(self) -> None:
-        self.statuses: list[str] = []
         self.transcripts: list[dict[str, object]] = []
         self.translations: list[dict[str, object]] = []
         self.errors: list[str] = []
-
-    def publish_status(self, status: str) -> None:
-        self.statuses.append(status)
 
     def publish_transcript(self, text: str, **metadata: object) -> None:
         self.transcripts.append({"text": text, **metadata})
@@ -457,23 +449,10 @@ def assert_dashboard_translation_applied_marker(
 
 
 @pytest.mark.asyncio
-async def test_event_bridge_maps_session_and_transcript_events() -> None:
+async def test_event_bridge_delivers_partial_and_final_transcripts() -> None:
     app = DummyApp()
     bridge = make_bridge(app, event_queue=asyncio.Queue())
     utterance_id = uuid4()
-
-    await bridge._handle_event(
-        UIEvent(type=UIEventType.SESSION_STATE_CHANGED, payload=STTSessionState.CONNECTING)
-    )
-    await bridge._handle_event(
-        UIEvent(type=UIEventType.SESSION_STATE_CHANGED, payload=STTSessionState.STREAMING)
-    )
-    await bridge._handle_event(
-        UIEvent(type=UIEventType.SESSION_STATE_CHANGED, payload=STTSessionState.DRAINING)
-    )
-    await bridge._handle_event(
-        UIEvent(type=UIEventType.SESSION_STATE_CHANGED, payload=STTSessionState.DISCONNECTED)
-    )
 
     partial = Transcript(utterance_id=utterance_id, text="partial", is_final=False)
     final = Transcript(utterance_id=utterance_id, text="final", is_final=True)
@@ -487,8 +466,7 @@ async def test_event_bridge_maps_session_and_transcript_events() -> None:
         UIEvent(type=UIEventType.TRANSCRIPT_PARTIAL, payload="not-transcript")
     )
 
-    assert app.view_dashboard.statuses == ["connecting", "connected", "stopping", "disconnected"]
-    assert app.view_dashboard.display_calls[:2] == [
+    assert app.view_dashboard.display_calls == [
         ("partial", "ko", False),
         ("final", "ko", False),
     ]
@@ -584,9 +562,6 @@ async def test_event_bridge_accepts_separable_dashboard_and_history_destinations
     utterance_id = uuid4()
 
     await bridge._handle_event(
-        UIEvent(type=UIEventType.SESSION_STATE_CHANGED, payload=STTSessionState.STREAMING)
-    )
-    await bridge._handle_event(
         UIEvent(
             type=UIEventType.TRANSCRIPT_FINAL,
             payload=Transcript(utterance_id=utterance_id, text="source text", is_final=True),
@@ -607,7 +582,6 @@ async def test_event_bridge_accepts_separable_dashboard_and_history_destinations
         )
     )
 
-    assert dashboard.statuses == ["connected"]
     assert dashboard.transcripts[-1]["text"] == "source text"
     assert dashboard.translations[-1]["text"] == "translated text"
     assert history.entries == [
@@ -771,6 +745,48 @@ async def test_event_bridge_preserves_typed_error_payload_identity_for_error_des
         assert error_destination.events[index] is events[index]
     assert dashboard.errors == []
     assert app.view_dashboard.display_calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("shown", [True, False])
+async def test_displayed_error_report_offers_its_diagnostic_id_to_the_app(shown) -> None:
+    app = DummyApp()
+    dashboard = RecordingDashboardDestination()
+    presented: list[tuple[str, str]] = []
+    bridge = make_bridge(
+        app,
+        dashboard_destination=dashboard,
+        error_destination=RecordingErrorDestination(show_dashboard_error=shown),
+        on_error_presented=lambda text, diagnostic_id: presented.append((text, diagnostic_id)),
+    )
+    report = messages.UserErrorReport(
+        message=messages.UserMessageRef(
+            key="stt.failure", params={"provider": "soniox"}, severity=messages.SEVERITY_ERROR
+        ),
+        diagnostics=messages.ErrorDiagnostics(
+            component="provider.stt",
+            operation="open_session",
+            code="stt.timeout",
+            category=messages.DIAGNOSTIC_CATEGORY_TIMEOUT,
+            visibility=messages.DIAGNOSTIC_VISIBILITY_BASIC,
+            content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
+            status_code=None,
+            retry_after_ms=None,
+            fields={"provider": "soniox"},
+        ),
+    )
+
+    await bridge._handle_event(
+        UIEvent(type=UIEventType.ERROR, payload=report, runtime_log_handled=True)
+    )
+    await bridge._handle_event(
+        UIEvent(type=UIEventType.ERROR, payload="raw failure", runtime_log_handled=True)
+    )
+
+    if shown:
+        assert presented == [(dashboard.errors[0], report.diagnostics.diagnostic_id)]
+    else:
+        assert presented == [] and dashboard.errors == []
 
 
 @pytest.mark.asyncio

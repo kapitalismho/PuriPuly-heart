@@ -72,9 +72,11 @@ from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 _LOCAL_ASR_PROVIDERS = frozenset(
     {
         "local_cpu_auto",
-        "local_parakeet_v3",
+        "local_granite",
+        "local_gigaam",
+        "local_fun_asr_nano",
+        "local_fun_asr_mlt_nano",
         "local_parakeet_ja",
-        "local_qwen",
         "local_qwen_gpu",
     }
 )
@@ -111,13 +113,6 @@ class _PeerCaptureProviderHandoffFailed(RuntimeError):
     def __init__(self, diagnostics: ErrorDiagnostics | None) -> None:
         super().__init__("owned Peer STT handoff failed")
         self.failure_diagnostics = diagnostics
-
-
-@dataclass(frozen=True, slots=True)
-class PeerRuntimeDiagnostic:
-    reason: PeerRuntimeFailureReason
-    capture_kind: str
-    process_unavailable_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -384,8 +379,10 @@ class _GenerationGuardedVadSink:
                 raise RuntimeError("peer stream audio requires owned retention")
             if not binding.budget.try_reserve(
                 binding.dispatcher_owner,
-                int(event.event.chunk.nbytes),
-                sample_equivalents=int(event.event.chunk.size),
+                int(event.event.chunk.nbytes) + int(getattr(event.event.pre_roll, "nbytes", 0)),
+                sample_equivalents=(
+                    int(event.event.chunk.size) + int(getattr(event.event.pre_roll, "size", 0))
+                ),
             ):
                 self._stream_drop_pending = True
                 await self._submit(
@@ -627,13 +624,14 @@ class _GenerationGuardedVadSink:
     def _describe_event(event: object) -> _QueuedVadEvent:
         if isinstance(event, OwnedStreamInput):
             samples = int(event.event.chunk.size)
+            context_samples = int(getattr(event.event.pre_roll, "size", 0))
             return _QueuedVadEvent(
                 event=event,
-                pcm_samples=samples,
+                pcm_samples=samples + context_samples,
                 segment_id=None,
                 segment_order=None,
                 content_pcm_samples=samples,
-                context_pcm_samples=0,
+                context_pcm_samples=context_samples,
                 opens_segment=False,
                 closes_segment=False,
                 sealed_at_dispatch_s=None,
@@ -746,6 +744,7 @@ class PeerCaptureSessionOwner:
         self._current_stream_capture_epoch: int | None = None
         self._signature: tuple[object, ...] | None = None
         self._provider_signature: tuple[object, ...] | None = None
+        self._provider_runtime_signature: tuple[object, ...] | None = None
         self._provider_attachment_token: object | None = None
         self._provider_ingress_ready: asyncio.Event | None = None
         self._provider_setup_task: asyncio.Task[object] | None = None
@@ -1180,7 +1179,14 @@ class PeerCaptureSessionOwner:
                     release_mode: Literal["dormant", "abort"] = (
                         "dormant"
                         if stop_mode == "retain"
-                        and config.provider_id == "local_qwen"
+                        and config.provider_id
+                        in {
+                            "local_cpu_auto",
+                            "local_granite",
+                            "local_gigaam",
+                            "local_fun_asr_nano",
+                            "local_fun_asr_mlt_nano",
+                        }
                         and self._provider_signature == config.provider_signature
                         else "abort"
                     )
@@ -1259,7 +1265,10 @@ class PeerCaptureSessionOwner:
                 self._retire_provider_attachment()
                 self._provider_signature = None
             reusable = (
-                self._provider.is_ready(config) and self._provider_attachment_token is not None
+                self._provider.is_ready(config)
+                and self._provider_attachment_token is not None
+                and self._provider_signature == config.provider_signature
+                and self._provider_runtime_signature == config.runtime_signature
             )
             attachment_token = self._provider_attachment_token
             failure_diagnostics: Exception | ErrorDiagnostics | None = None
@@ -1314,7 +1323,9 @@ class PeerCaptureSessionOwner:
                 self._provider_signature = config.provider_signature
                 self._signature = config.runtime_signature
                 if not reusable:
-                    self._commit_provider_attachment(attachment_token)
+                    self._commit_provider_attachment(
+                        attachment_token, runtime_signature=config.runtime_signature
+                    )
                 self._provider_status = PeerCaptureProviderStatus.READY
                 self._state = PeerCaptureSessionState.STOPPED
                 self._emit_event(PeerCaptureDiagnosticEvent.PROVIDER_CHANGED)
@@ -1469,6 +1480,7 @@ class PeerCaptureSessionOwner:
                 self._provider_signature = config.provider_signature
                 self._commit_provider_attachment(
                     attachment_token,
+                    runtime_signature=config.runtime_signature,
                     recovery_handler=on_terminal_failure,
                 )
                 self._provider_status = PeerCaptureProviderStatus.READY
@@ -1590,17 +1602,17 @@ class PeerCaptureSessionOwner:
                         emit_failure(logger, native, stage=native.operation)
                     async with self._lock:
                         if self._generation == generation and self._desired_active:
-                            self._emit_failure(
-                                PeerCaptureDiagnostic(
-                                    event=PeerCaptureDiagnosticEvent.FAILURE,
-                                    generation=generation,
-                                    state=self._state,
-                                    provider_id=config.provider_id,
-                                    reason=PeerCaptureFailureReason.PROVIDER_FAILED,
-                                    capture_kind=config.capture_target.kind,
-                                    failure_diagnostics=native,
-                                )
+                            diagnostic = PeerCaptureDiagnostic(
+                                event=PeerCaptureDiagnosticEvent.FAILURE,
+                                generation=generation,
+                                state=self._state,
+                                provider_id=config.provider_id,
+                                reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                                capture_kind=config.capture_target.kind,
+                                failure_diagnostics=native,
                             )
+                            self._last_failure = diagnostic
+                            self._emit_failure(diagnostic)
                     raise _PeerCaptureProviderHandoffFailed(native)
                 raise _PeerCaptureProviderHandoffFailed(result.failure_diagnostics)
             pending_failure = self._pending_provider_failures.pop(attachment_token, None)
@@ -1609,7 +1621,9 @@ class PeerCaptureSessionOwner:
                     self._config = config
                     self._provider_signature = config.provider_signature
                     self._signature = config.runtime_signature
-                    self._commit_provider_attachment(attachment_token)
+                    self._commit_provider_attachment(
+                        attachment_token, runtime_signature=config.runtime_signature
+                    )
                     self._last_failure = None
                     self._rebind_segment_ledger(generation, config)
             if pending_failure is not None:
@@ -1743,7 +1757,10 @@ class PeerCaptureSessionOwner:
                 return
             self._notify_state_changed()
             reusable = (
-                self._provider.is_ready(config) and self._provider_attachment_token is not None
+                self._provider.is_ready(config)
+                and self._provider_attachment_token is not None
+                and self._provider_signature == config.provider_signature
+                and self._provider_runtime_signature == config.runtime_signature
             )
             attachment_token = self._provider_attachment_token
             if not reusable:
@@ -1800,7 +1817,9 @@ class PeerCaptureSessionOwner:
                 else None
             )
             if not reusable:
-                self._commit_provider_attachment(attachment_token)
+                self._commit_provider_attachment(
+                    attachment_token, runtime_signature=config.runtime_signature
+                )
             if pending_failure is not None:
                 await self._fault_current_generation_locked(
                     generation,
@@ -1829,6 +1848,7 @@ class PeerCaptureSessionOwner:
                     self._provider_signature = config.provider_signature
                     self._provider_status = PeerCaptureProviderStatus.READY
                     self._state = PeerCaptureSessionState.RUNNING
+                    self._last_failure = None
                     provider_ingress_ready.set()
             if should_release:
                 await self._provider.release(mode="abort")
@@ -2267,9 +2287,11 @@ class PeerCaptureSessionOwner:
         self,
         attachment_token: object | None,
         *,
+        runtime_signature: tuple[object, ...] | None = None,
         recovery_handler: PeerCaptureTerminalFailureHandler | None = None,
     ) -> None:
         self._provider_attachment_token = attachment_token
+        self._provider_runtime_signature = runtime_signature
         if recovery_handler is None:
             for pending in self._pending_provider_recoveries.values():
                 self._pending_provider_failures.pop(pending[1], None)
@@ -2595,7 +2617,6 @@ class PeerCaptureSessionOwner:
         return PeerRuntimeFailureReason.PROCESS_SOURCE_FAILED
 
     def _emit_failure(self, diagnostic: PeerCaptureDiagnostic) -> None:
-        self._last_failure = diagnostic
         try:
             self._notify_state_changed()
         except Exception as exc:

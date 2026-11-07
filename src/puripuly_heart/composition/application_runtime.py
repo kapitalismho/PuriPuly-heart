@@ -48,6 +48,7 @@ from puripuly_heart.app.ports.ui_models import (
 )
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
+from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.app.services.application_after_launch import (
     ApplicationAfterLaunchOwner,
 )
@@ -60,6 +61,10 @@ from puripuly_heart.app.services.audio_diagnostics_application import (
 )
 from puripuly_heart.app.services.canonical_settings_persistence import (
     compose_settings_owner,
+)
+from puripuly_heart.app.services.capture.self_capture_application import (
+    SelfCaptureApplicationOwner,
+    SelfCaptureApplicationSettings,
 )
 from puripuly_heart.app.services.chatgpt_account import ChatGptAccountOwner
 from puripuly_heart.app.services.clipboard_auto_translation import (
@@ -93,54 +98,46 @@ from puripuly_heart.app.services.index_selection import (
     translation_selection,
 )
 from puripuly_heart.app.services.llm_connection_readiness import LlmConnectionReadinessOwner
-from puripuly_heart.app.services.local_asr_diagnostics import LocalASRDiagnosticsOwner
-from puripuly_heart.app.services.local_asr_gpu_provisioning import (
+from puripuly_heart.app.services.local_asr.local_asr_diagnostics import LocalASRDiagnosticsOwner
+from puripuly_heart.app.services.local_asr.local_asr_gpu_provisioning import (
     LocalASRGpuProvisioningDiagnostic,
 )
-from puripuly_heart.app.services.local_asr_selection import (
+from puripuly_heart.app.services.local_asr.local_asr_selection import (
     LOCAL_CPU_PROVIDERS,
-    resolve_local_asr_selection,
 )
 from puripuly_heart.app.services.managed_gemma_translation import (
     ManagedGemmaTranslationOwner,
     ManagedGemmaTranslationSnapshot,
 )
-from puripuly_heart.app.services.manual_local_asr_fallback import (
-    ManualLocalASRFallbackOwner,
-)
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.model_assets import ModelAssetsApplication
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
-from puripuly_heart.app.services.overlay_application import (
+from puripuly_heart.app.services.overlay.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
-from puripuly_heart.app.services.overlay_calibration_application import (
+from puripuly_heart.app.services.overlay.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
 )
-from puripuly_heart.app.services.provider_credential_verification import (
+from puripuly_heart.app.services.provider.provider_credential_verification import (
     ProviderCredentialVerificationInteractionOwner,
 )
-from puripuly_heart.app.services.provider_runtime_apply import ProviderRuntimeApplyPlan
-from puripuly_heart.app.services.provider_settings import (
+from puripuly_heart.app.services.provider.provider_runtime_apply import ProviderRuntimeApplyPlan
+from puripuly_heart.app.services.provider.provider_settings import (
     ProviderApplicationOwner,
     ProviderSettingsOwner,
     provider_verification_context,
 )
-from puripuly_heart.app.services.provider_verification_binding import (
+from puripuly_heart.app.services.provider.provider_verification_binding import (
     ProviderVerificationBindingOwner,
 )
-from puripuly_heart.app.services.self_capture_application import (
-    SelfCaptureApplicationOwner,
-    SelfCaptureApplicationSettings,
-)
-from puripuly_heart.app.services.settings_application import (
+from puripuly_heart.app.services.settings.settings_application import (
     SettingsApplicationOwner,
     osc_control_presentation_state,
 )
-from puripuly_heart.app.services.settings_projection import SettingsProjectionOwner
-from puripuly_heart.app.services.settings_runtime_effects import (
+from puripuly_heart.app.services.settings.settings_projection import SettingsProjectionOwner
+from puripuly_heart.app.services.settings.settings_runtime_effects import (
     SettingsRuntimeEffectsAdapter,
     SettingsRuntimeEffectsState,
 )
@@ -164,32 +161,17 @@ from puripuly_heart.app.wiring import (
     resolve_overlay_config_from_vnext,
     runtime_pipeline_inputs_from_vnext,
 )
-from puripuly_heart.app.wiring.wiring_index_selection import (
-    IndexManagedAllowanceObserver,
-    check_index_availability,
-    gemma_fallback_settings,
-    unknown_managed_allowance,
-)
-from puripuly_heart.app.wiring.wiring_managed_gemma import (
-    create_managed_gemma_runtime,
-    managed_gemma_selection,
-    managed_gemma_translation_desired,
-    sync_managed_gemma_demand,
-)
-from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
-    build_llm_provider_signature,
-    provider_llm_for_translation,
-)
-from puripuly_heart.app.wiring_application_runtime_logging import (
+from puripuly_heart.app.wiring.wiring_agent_chat import compose_agent_transport
+from puripuly_heart.app.wiring.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
 )
-from puripuly_heart.app.wiring_audio_test import (
+from puripuly_heart.app.wiring.wiring_audio_test import (
     AudioTestCaptureControl,
     AudioTestRuntime,
     compose_audio_test_runtime,
 )
-from puripuly_heart.app.wiring_capture_runtime import CaptureOwnerFactory
-from puripuly_heart.app.wiring_composition import (
+from puripuly_heart.app.wiring.wiring_capture_runtime import CaptureOwnerFactory
+from puripuly_heart.app.wiring.wiring_composition import (
     create_desktop_overlay_policy,
     create_gpu_provider_recovery_application_owner,
     create_gpu_runtime_interaction_owner,
@@ -199,36 +181,51 @@ from puripuly_heart.app.wiring_composition import (
     create_vrchat_osc_presence_probe_owner,
     create_windows_desktop_work_area,
 )
-from puripuly_heart.app.wiring_local_asr_application import (
+from puripuly_heart.app.wiring.wiring_index_selection import (
+    IndexManagedAllowanceObserver,
+    check_index_availability,
+    gemma_fallback_settings,
+    unknown_managed_allowance,
+)
+from puripuly_heart.app.wiring.wiring_local_asr_application import (
     LocalASRApplicationRuntime,
     compose_local_asr_application,
 )
-from puripuly_heart.app.wiring_managed_account import (
+from puripuly_heart.app.wiring.wiring_managed_account import (
     ManagedAccountComponents,
     ManagedOpenRouterReleaseRuntime,
     ManagedTranslationRuntimeAccess,
     compose_managed_account,
 )
-from puripuly_heart.app.wiring_peer_application import (
+from puripuly_heart.app.wiring.wiring_managed_gemma import (
+    create_managed_gemma_runtime,
+    managed_gemma_selection,
+    managed_gemma_translation_desired,
+    sync_managed_gemma_demand,
+)
+from puripuly_heart.app.wiring.wiring_peer_application import (
     PeerApplicationRuntime,
     compose_peer_application,
 )
-from puripuly_heart.app.wiring_provider_runtime import (
+from puripuly_heart.app.wiring.wiring_provider_runtime import (
     ProviderRuntimeComponents,
     ProviderRuntimeSignatures,
     compose_provider_runtime,
 )
-from puripuly_heart.app.wiring_runtime_composition import RuntimeCompositionComponents
-from puripuly_heart.app.wiring_runtime_pipeline import (
+from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
+    build_llm_provider_signature,
+    provider_llm_for_translation,
+)
+from puripuly_heart.app.wiring.wiring_runtime_composition import RuntimeCompositionComponents
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import (
     RuntimePipelineComponents,
     RuntimePipelineHandle,
     RuntimePipelineLauncher,
 )
-from puripuly_heart.app.wiring_translation_runtime_configuration import (
+from puripuly_heart.app.wiring.wiring_translation_runtime_configuration import (
     replace_translation_runtime_enabled,
 )
-from puripuly_heart.app.wiring_vrc_mic_sync import compose_vrc_mic_sync
-from puripuly_heart.composition.application_settings import load_application_settings
+from puripuly_heart.app.wiring.wiring_vrc_mic_sync import compose_vrc_mic_sync
 from puripuly_heart.composition.application_startup import (
     ApplicationStartupAdapter,
     compose_application_startup,
@@ -254,15 +251,14 @@ from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
 )
-from puripuly_heart.core.local_asr_provider_runtime import (
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
 )
-from puripuly_heart.core.local_asr_provisioning import (
+from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRProvisioningDiagnostic,
     LocalASRProvisioningPort,
     LocalASRProvisioningSnapshot,
 )
-from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
 from puripuly_heart.core.local_translation.assets import GEMMA_26B_MODEL_ID
 from puripuly_heart.core.observability import DiagnosticEvent
 from puripuly_heart.core.orchestrator.configuration import (
@@ -491,7 +487,6 @@ def compose_application_runtime(
     control_events = ControlEvents()
     signatures = ProviderRuntimeSignatures(http_extensions=http_extensions)
     effects_state = SettingsRuntimeEffectsState()
-    manual_fallback = ManualLocalASRFallbackOwner()
     event_bridge: UIEventBridgePort | None = None
     bridge_task = None
     overlay: OverlayApplicationOwner | None = None
@@ -829,9 +824,6 @@ def compose_application_runtime(
                 ),
                 overlay_provider=require_overlay,
                 ingress_frozen=lambda: ingress.frozen,
-                persist_manual_fallback=lambda: (
-                    require_settings_application().persist_manual_fallback(channel="peer")
-                ),
                 ensure_local_ready=lambda generation: require_local_asr().ensure_peer_ready(
                     activation_generation=generation,
                 ),
@@ -851,6 +843,9 @@ def compose_application_runtime(
                 log_diagnostic=log_diagnostic,
                 translation_demand_sink=sync_local_translation_demand,
                 stop_audio_test=lambda: require_audio_test().stop(),
+                transaction_result_sink=lambda result: require_settings_application().results.set(
+                    result
+                ),
             )
         return peer
 
@@ -1048,11 +1043,6 @@ def compose_application_runtime(
                 ),
                 resume_self=resume_self_after_cpu_repair,
                 resume_peer=resume_peer_after_cpu_repair,
-                persist_manual_fallback=lambda channel: (
-                    require_settings_application().persist_manual_fallback(
-                        channel=cast(Literal["self", "peer"], channel)
-                    )
-                ),
                 load_log_sink=require_local_asr_diagnostics().log_load_result,
             )
         return local_asr
@@ -1081,20 +1071,18 @@ def compose_application_runtime(
         nonlocal last_self_capture_lifecycle
         provider_status = getattr(snapshot.provider_status, "value", snapshot.provider_status)
         capture_state = getattr(snapshot.state, "value", snapshot.state)
-        if (
-            snapshot.failure_reason is not None
-            or provider_status == "failed"
-            or capture_state == "faulted"
-        ):
+        if snapshot.failure_reason is not None or capture_state == "faulted":
+            lifecycle = "failed"
+        elif provider_status == "releasing" or capture_state == "stopping":
+            lifecycle = "stopping"
+        elif capture_state in {"admission_pending", "starting"}:
+            lifecycle = "preparing"
+        elif provider_status == "failed":
             lifecycle = "failed"
         elif provider_status == "pending":
             lifecycle = "pending"
-        elif capture_state in {"admission_pending", "starting"}:
-            lifecycle = "preparing"
         elif provider_status == "ready" and snapshot.desired_active and snapshot.effective_active:
             lifecycle = "committed"
-        elif provider_status == "releasing" or capture_state == "stopping":
-            lifecycle = "stopping"
         else:
             lifecycle = "idle"
         if lifecycle != last_self_capture_lifecycle:
@@ -1114,6 +1102,17 @@ def compose_application_runtime(
             elif lifecycle == "idle" and last_self_capture_lifecycle == "committed":
                 log_basic("[STT] Recognition stopped")
             last_self_capture_lifecycle = lifecycle
+        if lifecycle == "failed":
+            status = "failed"
+        elif lifecycle == "stopping":
+            status = "stopping"
+        elif not snapshot.desired_active:
+            status = "disconnected"
+        elif lifecycle == "committed":
+            status = "connected"
+        else:
+            status = "connecting"
+        presentation.set_dashboard_capture_status(status)
         require_local_asr().adapters.notice.sync()
         publish_osc_state_from_runtime()
         control_events.publish(
@@ -1143,9 +1142,6 @@ def compose_application_runtime(
                 runtime_available=lambda: pipeline.self_translation_channel is not None,
                 capture_owner=lambda: require_runtime_components().self_capture_owner(),
                 capture_owner_if_created=lambda: pipeline.self_capture,
-                persist_manual_fallback=lambda: (
-                    require_settings_application().persist_manual_fallback(channel="self")
-                ),
                 reset_local_pending=lambda: require_local_asr().cpu_repair.reset_self(),
                 clear_gpu_pending=lambda: require_gpu().clear_pending("self"),
                 overlay_state_provider=lambda: require_overlay().snapshot.state,
@@ -1238,7 +1234,9 @@ def compose_application_runtime(
                     next_settings,
                     reload_settings_view=False,
                 ),
-                apply_mutation=lambda mutate: application.control().apply_mutation(mutate),
+                apply_mutation=lambda mutate, is_current: application.control().apply_mutation(
+                    mutate, is_current
+                ),
                 application_provider=lambda: application,
                 sender_provider=lambda: pipeline.sender,
                 osc_state_provider=osc_state,
@@ -1246,6 +1244,10 @@ def compose_application_runtime(
                 ui_state_sink=presentation.project_osc_control_state,
                 language_state_provider=language_state,
                 translation_model_normalizer=settings.materialize_translation,
+                connection_changed=lambda: (
+                    vrchat_presence.connection_changed() if vrchat_presence is not None else None
+                ),
+                local_listener_probe=getattr(vrchat_osc_presence, "observe", None),
             )
         return vrc_mic_sync
 
@@ -1363,31 +1365,6 @@ def compose_application_runtime(
                 presentation.set_settings_overlay_calibration(require_calibration().current)
         refresh_overlay_presentation()
 
-    def log_manual_fallbacks(
-        previous,
-        normalized,
-        channels: tuple[str, ...],
-    ) -> None:
-        previous_canonical = settings.project(previous, authoritative=True)
-        normalized_canonical = settings.project(normalized, authoritative=True)
-        for channel in channels:
-            if channel == "self":
-                requested = previous_canonical.intent.stt.provider
-                actual = normalized_canonical.intent.stt.provider
-                source_language = normalized_canonical.intent.languages.source_language
-            else:
-                requested = previous_canonical.intent.peer_stt.provider
-                actual = normalized_canonical.intent.peer_stt.provider
-                languages = normalized_canonical.intent.languages
-                source_language = languages.peer_source_language or languages.source_language
-            decision = resolve_local_asr_selection(actual, source_language)
-            log_basic(
-                "[LocalASR][Selection] "
-                f"channel={channel} requested={requested} actual={actual} "
-                f"model={decision.model_id or 'unknown'} "
-                "reason=preferred_model_unavailable"
-            )
-
     def active_local_asr_change(
         base: AppSettingsVNext,
         next_value: AppSettingsVNext,
@@ -1429,6 +1406,7 @@ def compose_application_runtime(
                     settings=settings,
                     presentation=presentation,
                     runtime_logging=runtime_logging,
+                    asr_diagnostics=require_local_asr_diagnostics(),
                     pipeline=pipeline,
                     runtime_signatures=signatures,
                     audio_test=require_audio_test(),
@@ -1452,20 +1430,7 @@ def compose_application_runtime(
                     ),
                     rebuild_managed_gemma=lambda: provider_runtime.llm_rebuild.rebuild(),
                 ),
-                manual_fallback=manual_fallback,
-                cpu_auto_available=lambda: require_provisioning().snapshot.cpu_auto_available,
-                inspect_cpu=require_provisioning().inspect_cpu,
-                fallback_sink=lambda channels, installation_fallback: (
-                    show_short_message(
-                        "local_stt.installation_fallback_qwen"
-                        if installation_fallback
-                        else "local_stt.language_fallback_qwen"
-                    )
-                    if channels
-                    else None
-                ),
                 sync_ui=sync_ui_from_settings,
-                fallback_log_sink=log_manual_fallbacks,
                 mutation_service_provider=lambda: None,
                 consume_superseded_settings=signatures.consume_superseded,
                 active_local_asr_change=active_local_asr_change,
@@ -1645,12 +1610,16 @@ def compose_application_runtime(
             diagnostics_sink=telemetry_diagnostic,
         )
 
-    def vrchat_probe_port() -> int:
-        value = current_settings()
-        if value is None:
-            return 9000
-        port = getattr(value.intent.osc, "port", 9000)
-        return port if isinstance(port, int) and 0 < port <= 65535 else 9000
+    def vrchat_probe_port() -> int | None:
+        if vrc_mic_sync is None:
+            return None
+        connection = vrc_mic_sync.output_snapshot()
+        if connection["effective_mode"] == "off" or connection["local_availability"] == "starting":
+            return None
+        if vrc_mic_sync.effective_send_host not in {"127.0.0.1", "localhost"}:
+            return None
+        port = connection["effective_send_port"]
+        return port if isinstance(port, int) else None
 
     def require_vrchat_presence() -> VrchatOscPresenceProbeOwner:
         nonlocal vrchat_presence
@@ -1684,7 +1653,7 @@ def compose_application_runtime(
                 secrets=secrets,
                 clock=clock,
                 reset_deadline_s=STT_RESET_DEADLINE_S,
-                gpu_model_path=local_gpu_model_path(),
+                gpu_model_path=None,
                 on_final_transcript_suppressed=(
                     require_audio_diagnostics().on_final_transcript_suppressed
                 ),
@@ -1739,8 +1708,8 @@ def compose_application_runtime(
             refresh_self=lambda: (
                 require_runtime_components().provider_runtime.effects.refresh_self_stt(canonical)
             ),
-            refresh_peer=lambda: (
-                require_runtime_components().provider_runtime.effects.refresh_peer(canonical)
+            refresh_peer=lambda: require_runtime_components().provider_runtime.effects.refresh_peer(
+                canonical
             ),
             should_refresh_self=bool(plan is not None and plan.should_refresh_self_stt),
             should_refresh_peer=bool(plan is not None and plan.should_refresh_peer),
@@ -2128,7 +2097,7 @@ def compose_application_runtime(
     def install_pipeline(components: RuntimePipelineComponents) -> None:
         replace_translation_runtime_enabled(components.translation_runtime_configuration, False)
         pipeline.install(components)
-        components.translation_requests.settled_failure_sink = index_selection.request_failed
+        on_self_capture_state(components.self_capture.snapshot)
         index_selection.start()
         llm_connection_readiness.sync()
 
@@ -2219,16 +2188,12 @@ def compose_application_runtime(
 
     startup_adapter = ApplicationStartupAdapter(
         settings=settings,
-        settings_loader=lambda: load_application_settings(
-            settings=settings,
-        ),
+        settings_loader=lambda: settings.start().settings,
         provisioning=require_provisioning(),
         gpu_state=gpu_state,
-        manual_fallback=manual_fallback,
         calibration=require_calibration(),
         presentation=presentation,
         sync_presentation=sync_ui_from_settings,
-        notify_fallback=require_settings_application().notify_fallback,
         runtime_logging=runtime_logging,
         initial_llm_binding_sink=record_initial_llm_binding,
         pipeline_launcher=pipeline_launcher,
@@ -2289,7 +2254,7 @@ def compose_application_runtime(
     )
 
     def model_assets_active_ids() -> frozenset[str]:
-        from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
+        from puripuly_heart.core.local_asr.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
 
         active: set[str] = set()
         runtime = pipeline.local_asr_runtime
@@ -2422,6 +2387,7 @@ def compose_application_runtime(
             secret_store_factory=create_settings_secret_store,
         ),
         index_selection=index_selection,
+        settings_results=settings_owner.results,
         osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
         runtime_control_authority=runtime_control_authority,
         runtime_control_activity=runtime_control_activity,
@@ -2458,12 +2424,40 @@ def compose_application_runtime(
         locale_choices=presentation.available_locales(),
         localize=presentation.localize,
         gemma_selection=managed_gemma_selection,
+        recognition_probe_request=lambda canonical, channel: (
+            build_self_stt_provider_request_from_vnext(canonical)
+            if channel == "self"
+            else build_peer_stt_provider_request(
+                build_peer_capture_session_config_from_vnext(canonical),
+                gpu_device_id=canonical.intent.stt.gpu_device_id,
+            )
+        ),
         selection_committed=index_selection.selection_changed,
+        osc_discovery_retry=lambda: require_vrc_mic_sync().retry_automatic_discovery(),
     )
     application.attach_control(control)
+    agent_chat = AgentChatOwner(
+        control,
+        compose_agent_transport(settings=settings, config_path=config_path),
+        localize=presentation.localize,
+        support_log_snapshot=runtime_logging.support_log_snapshot,
+    )
+    application.attach_agent_chat(agent_chat)
     settings.observe_commits(control._publish_committed)
     application.register_application_shutdown_callbacks(
         (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="AgentChatOwner",
+                callback_name="freeze_ingress",
+                callback=agent_chat.freeze_ingress,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="AgentChatOwner",
+                callback_name="close",
+                callback=agent_chat.close,
+            ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
                 owner_name="ApplicationControlOwner",
@@ -2517,9 +2511,7 @@ def compose_application_runtime(
         local_asr_evidence_sink(
             _LocalASRProductionCompositionAccess(
                 config_path=config_path,
-                settings_loader=lambda: load_application_settings(
-                    settings=settings,
-                ),
+                settings_loader=lambda: settings.start().settings,
                 runtime_initializer=initialize_local_asr_evidence,
                 components_provider=lambda: pipeline.current,
                 gpu_retry=retry_gpu_activation,

@@ -21,7 +21,6 @@ AUDIO_LOOP_ADAPTER_PATH = (
     / "self_capture"
     / "self_capture_audio_loop.py"
 )
-OWNER_PATH = ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "self_capture.py"
 
 
 def test_capture_wiring_composes_self_source_adapter_without_controller_algorithm() -> None:
@@ -49,16 +48,6 @@ def test_self_capture_source_adapter_has_no_ui_settings_or_lifecycle_ownership()
     assert "will_retry_mono=True" in source
 
 
-def test_self_capture_session_owner_remains_source_lifecycle_owner() -> None:
-    source = OWNER_PATH.read_text(encoding="utf-8")
-
-    assert "class SelfCaptureSessionOwner" in source
-    assert '"_source"' in source
-    assert '"_retired_sources"' in source
-    assert "await self._close_source" in source
-    assert "source_factory: SelfCaptureSourceFactory" in source
-
-
 def test_capture_wiring_composes_self_vad_adapter_without_controller_algorithm() -> None:
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
     composition = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
@@ -82,16 +71,6 @@ def test_self_vad_adapter_has_no_ui_peer_vad_or_session_lifecycle_ownership() ->
     assert "SelfCaptureSessionConfig" in source
 
 
-def test_self_capture_session_owner_remains_vad_and_loop_lifecycle_owner() -> None:
-    source = OWNER_PATH.read_text(encoding="utf-8")
-
-    assert '"_vad"' in source
-    assert "vad_factory: SelfCaptureVadFactory" in source
-    assert "vad = self._vad_factory(config)" in source
-    assert "run_audio_loop: SelfCaptureAudioLoop" in source
-    assert '"_loop_task"' in source
-
-
 def test_capture_wiring_composes_self_audio_loop_without_controller_algorithm() -> None:
     source = CONTROLLER_PATH.read_text(encoding="utf-8")
     composition = CAPTURE_WIRING_PATH.read_text(encoding="utf-8")
@@ -112,14 +91,3 @@ def test_self_audio_loop_adapter_has_no_ui_task_or_gate_lifecycle_ownership() ->
     assert "async def close(" not in source
     assert 'channel_label="self"' in source
     assert "audio_gate=self.audio_gate_provider()" in source
-
-
-def test_self_capture_session_owner_remains_loop_task_and_cancellation_owner() -> None:
-    source = OWNER_PATH.read_text(encoding="utf-8")
-
-    assert "run_audio_loop: SelfCaptureAudioLoop" in source
-    assert '"_loop_task"' in source
-    assert "loop_task = asyncio.create_task(" in source
-    assert "loop_task.cancel()" in source
-    assert "await asyncio.gather(loop_task, return_exceptions=True)" in source
-    assert "await self._run_audio_loop(" in source

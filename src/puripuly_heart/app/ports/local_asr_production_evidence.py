@@ -13,7 +13,7 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineStartCallbacks,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
 )

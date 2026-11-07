@@ -12,6 +12,7 @@ from puripuly_heart.ui.components.warm_document_dialog import (
     split_body_paragraphs,
 )
 from puripuly_heart.ui.i18n import t
+from puripuly_heart.ui.motion import close_modal
 
 
 class DiscordManagedAuthDialog:
@@ -164,7 +165,7 @@ class DiscordManagedAuthDialog:
     def close(self) -> None:
         if self._dialog is None or not self._is_open:
             return
-        self._page.pop_dialog()
+        close_modal(self._page, self._dialog)
         self._is_open = False
         self._is_waiting = False
 

@@ -4,13 +4,13 @@ import asyncio
 from dataclasses import dataclass, field
 
 import pytest
-from puripuly_heart.app.services.overlay_session_transition import (
+
+from puripuly_heart.app.services.overlay.overlay_session_transition import (
     OverlaySessionShutdownExecution,
     OverlaySessionStartExecution,
     OverlaySessionTransitionDiagnostic,
     OverlaySessionTransitionOwner,
 )
-
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 
 
@@ -245,18 +245,6 @@ async def test_cancelled_transition_releases_admission_lock_and_reports_metadata
     assert await owner.shutdown(shutdown.execution) == "already_off"
     assert diagnostics[0].outcome == "cancelled"
     assert diagnostics[1].outcome == "already_off"
-
-
-def test_owner_declares_cross_generation_transition_policy() -> None:
-    assert OverlaySessionTransitionOwner().lifecycle_owner_snapshot() == {
-        "owner": "OverlaySessionTransitionOwner",
-        "resource_fields": ("_lock",),
-        "operation_policy": ("serialize cross-generation overlay start and shutdown transitions"),
-        "cancellation_policy": "propagate cancellation without admitting another transition",
-        "shutdown_policy": (
-            "delegate generation teardown to OverlayRuntimeHandle before publishing completion"
-        ),
-    }
 
 
 @pytest.mark.asyncio

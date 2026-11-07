@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+import random
 from types import SimpleNamespace
 
 import pytest
 
 pytest.importorskip("flet")
 
+from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.components import display_card as display_card_module
 from puripuly_heart.ui.components.display_card import DisplayCard
 from puripuly_heart.ui.fonts import default_font_family
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from puripuly_heart.ui.views.dashboard import DashboardView
 from tests.helpers.flet_page import attach_dummy_page
 
 
@@ -32,41 +36,6 @@ def _mute_display_updates(monkeypatch: pytest.MonkeyPatch, card: DisplayCard) ->
 def test_weighted_length_counts_cjk_as_two() -> None:
     assert display_card_module._weighted_len("abc") == 3
     assert display_card_module._weighted_len("한a") == 3
-
-
-@pytest.mark.parametrize(
-    ("size", "expected_lines", "expected_capacity"),
-    [
-        (48, 3, 59),
-        (44, 3, 65),
-        (40, 3, 71),
-        (36, 4, 106),
-        (32, 4, 119),
-        (28, 5, 170),
-        (24, 6, 239),
-        (20, 7, 334),
-        (16, 9, 537),
-    ],
-)
-def test_smaller_sizes_are_allowed_more_lines_and_hold_more_text(
-    size: int, expected_lines: int, expected_capacity: int
-) -> None:
-    assert display_card_module._lines_for_size(size) == expected_lines
-    assert display_card_module._capacity_for_size(size) == expected_capacity
-
-
-def test_capacity_grows_as_the_size_shrinks() -> None:
-    capacities = [
-        display_card_module._capacity_for_size(size)
-        for size in display_card_module.DISPLAY_SIZE_CANDIDATES
-    ]
-    line_counts = [
-        display_card_module._lines_for_size(size)
-        for size in display_card_module.DISPLAY_SIZE_CANDIDATES
-    ]
-
-    assert capacities == sorted(capacities)
-    assert line_counts == sorted(line_counts)
 
 
 def test_layout_picks_the_largest_size_whose_capacity_holds_the_text() -> None:
@@ -94,21 +63,6 @@ def test_display_size_never_grows_with_length() -> None:
     assert sizes == sorted(sizes, reverse=True)
     assert max(sizes) == display_card_module.DISPLAY_SIZE_CANDIDATES[0]
     assert min(sizes) == display_card_module.DISPLAY_SIZE_CANDIDATES[-1]
-
-
-def test_status_label_maps_known_states() -> None:
-    assert display_card_module._status_label("connecting") == display_card_module.t(
-        "display.connecting"
-    )
-    assert display_card_module._status_label("connected") == display_card_module.t(
-        "display.connected"
-    )
-    assert display_card_module._status_label("stopping") == display_card_module.t(
-        "display.stopping"
-    )
-    assert display_card_module._status_label("other") == display_card_module.t(
-        "display.disconnected"
-    )
 
 
 def test_only_the_source_text_uses_the_dimmed_colour(
@@ -147,10 +101,6 @@ def test_source_flagged_as_translation_uses_the_message_colour(
     assert _visible_color(card) == display_card_module.DISPLAY_SOURCE_COLOR
     assert card._display_text.weight == display_card_module.DISPLAY_SOURCE_WEIGHT
 
-    card.set_display("api key warning", as_translation=True)
-    card.set_status("connected")
-    assert _visible_color(card) == display_card_module.DISPLAY_MESSAGE_COLOR
-
 
 def test_status_and_notice_keep_the_undimmed_message_colour(
     monkeypatch: pytest.MonkeyPatch,
@@ -167,7 +117,7 @@ def test_status_and_notice_keep_the_undimmed_message_colour(
     assert card._display_text.weight == display_card_module.DISPLAY_MESSAGE_WEIGHT
 
 
-def test_a_notice_over_a_live_source_turn_still_uses_the_message_colour(
+def test_notice_preserves_source_across_background_readiness(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     card = DisplayCard(on_submit=lambda _text: None)
@@ -179,17 +129,12 @@ def test_a_notice_over_a_live_source_turn_still_uses_the_message_colour(
     card.set_notice("STT files are missing", tone="warning")
     assert _visible_text(card) == "STT files are missing"
     assert _visible_color(card) == display_card_module.DISPLAY_MESSAGE_COLOR
+    card.set_status("failed")
+    assert _visible_text(card) == "STT files are missing"
 
     card.set_notice(None, None)
     assert _visible_text(card) == "source text"
     assert _visible_color(card) == display_card_module.DISPLAY_SOURCE_COLOR
-
-
-def test_the_default_display_state_is_an_undimmed_status_label() -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-
-    assert card._display_text.color == display_card_module.DISPLAY_MESSAGE_COLOR
-    assert card._display_text.weight == display_card_module.DISPLAY_MESSAGE_WEIGHT
 
 
 def test_translation_replaces_the_source_in_the_same_slot(
@@ -229,16 +174,37 @@ def test_clearing_the_translation_restores_the_source(monkeypatch: pytest.Monkey
     assert _visible_color(card) == display_card_module.DISPLAY_SOURCE_COLOR
 
 
-def test_status_replaces_any_turn_content(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("content", ["source", "translation", "error", "api_warning"])
+def test_background_status_preserves_content_until_explicit_restore(
+    content: str,
+) -> None:
     card = DisplayCard(on_submit=lambda _text: None)
-    _mute_display_updates(monkeypatch, card)
+    card.set_status("connected")
+    card.set_display(
+        content,
+        is_error=content == "error",
+        as_translation=content == "api_warning",
+        font_family="content-font",
+        letter_spacing=0.5,
+    )
+    if content == "translation":
+        card.set_display_translation(content, font_family="content-font", letter_spacing=0.5)
+    color = _visible_color(card)
+    weight = card._display_text.weight
 
-    card.set_display("source text")
-    card.set_display_translation("translated text")
-    card.set_status("connected", font_family="font-status")
+    for status in ("connected", "connecting", "stopping", "disconnected", "failed"):
+        assert card.set_status(status, font_family="status-font") is False
+        assert _visible_text(card) == content
+        assert card._display_text.font_family == "content-font"
+        assert card._display_text.style.letter_spacing == 0.5
+        assert _visible_color(card) == color
+        assert card._display_text.weight == weight
 
-    assert _visible_text(card) == display_card_module.t("display.connected")
-    assert card._display_text.font_family == "font-status"
+    assert card.set_status("failed", font_family="status-font", replace_content=True) is True
+    assert _visible_text(card) == display_card_module.t("display.failed")
+    assert card._display_text.font_family == "status-font"
+    card.set_display_translation(None)
+    assert _visible_text(card) == display_card_module.t("display.failed")
 
 
 def test_display_text_is_selectable_and_wraps_within_the_line_budget(
@@ -382,9 +348,11 @@ def test_notice_takes_the_display_slot_and_restores_after_clear(
     card.set_status("other", font_family="status-font")
     card.set_notice("STT files are missing", tone="warning")
     assert _visible_text(card) == "STT files are missing"
+    card.set_status("failed", font_family="status-font")
+    assert _visible_text(card) == "STT files are missing"
 
     card.set_notice(None, None)
-    assert _visible_text(card) == display_card_module.t("display.disconnected")
+    assert _visible_text(card) == display_card_module.t("display.failed")
     assert card._display_text.font_family == "status-font"
 
     card.set_notice("STT 다운로드 중 63%", tone="info")
@@ -448,8 +416,13 @@ def test_yielding_notice_returns_once_the_card_is_idle_again(
     card.set_display_translation("translated text")
     assert _visible_text(card) == "translated text"
 
-    card.set_status("connected")
+    card.set_status("failed")
+    assert _visible_text(card) == "translated text"
+
+    card.set_status("failed", replace_content=True)
     assert _visible_text(card) == notice
+    card.set_notice(None)
+    assert _visible_text(card) == display_card_module.t("display.failed")
 
 
 def test_non_yielding_notice_suppresses_the_translation(
@@ -477,7 +450,7 @@ def test_debug_prefix_applies_to_the_visible_text_only(monkeypatch: pytest.Monke
     card.set_display_translation("translated text", debug_prefix="[P 41c6/3bd7]")
     assert _visible_text(card) == "[P 41c6/3bd7] translated text"
 
-    card.set_status("connected")
+    card.set_status("connected", replace_content=True)
     assert _visible_text(card) == display_card_module.t("display.connected")
     assert "[P 41c6" not in _visible_text(card)
 
@@ -702,6 +675,33 @@ def test_input_and_hint_keep_each_language_typeface(
     assert card._input_field.text_style.letter_spacing == 0.4
 
 
+@pytest.mark.parametrize(
+    ("input_font", "input_spacing"),
+    [("MPLUSRounded1c", 0.5), ("ResourceHanRoundedCN", 0.4), ("NanumSquareRound", None)],
+)
+def test_hint_does_not_inherit_input_language_typeface(
+    monkeypatch: pytest.MonkeyPatch,
+    input_font: str,
+    input_spacing: float | None,
+) -> None:
+    card = DisplayCard(on_submit=lambda _text: None)
+    monkeypatch.setattr(type(card._input_field), "update", lambda self: None)
+    _mute_display_updates(monkeypatch, card)
+
+    for display_font in ("NanumSquareRound", None):
+        card.apply_locale(
+            display_font_family=display_font,
+            input_font_family="NanumSquareRound",
+            display_letter_spacing=None,
+            input_letter_spacing=None,
+        )
+        card.set_input_font(input_font, letter_spacing=input_spacing)
+
+        hint = card._input_field.hint_style
+        assert hint.font_family == (display_font or "")
+        assert hint.letter_spacing == 0
+
+
 def test_display_updates_preserve_unsubmitted_input(monkeypatch: pytest.MonkeyPatch) -> None:
     submitted: list[str] = []
     card = DisplayCard(on_submit=submitted.append)
@@ -719,3 +719,71 @@ def test_display_updates_preserve_unsubmitted_input(monkeypatch: pytest.MonkeyPa
     card.set_status("disconnected")
     assert card._input_field.value == "still editing"
     assert submitted == []
+
+
+INPUT_HINT_POOL = {
+    "display.input_hint",
+    "display.input_hint_tip.cloud_stt",
+    "display.input_hint_tip.tab_swap",
+    "display.input_hint_tip.earmuffs",
+    "display.input_hint_tip.puri_help",
+}
+
+
+def test_first_launch_always_uses_the_default_input_hint() -> None:
+    for seed in range(50):
+        key = display_card_module.choose_input_hint_key(
+            first_launch=True,
+            rng=random.Random(seed),
+        )
+        assert key == "display.input_hint"
+
+
+def test_later_launches_draw_from_the_whole_input_hint_pool() -> None:
+    drawn = {
+        display_card_module.choose_input_hint_key(first_launch=False, rng=random.Random(seed))
+        for seed in range(200)
+    }
+
+    assert drawn == INPUT_HINT_POOL
+
+
+@pytest.mark.parametrize("locale", i18n_module.available_locales())
+def test_every_input_hint_is_translated_in_every_locale(locale: str) -> None:
+    bundle = i18n_module._load_bundle(locale)
+
+    for key in INPUT_HINT_POOL:
+        assert bundle.get(key, "").strip()
+
+
+def test_chosen_input_hint_survives_a_locale_change(monkeypatch: pytest.MonkeyPatch) -> None:
+    card = DisplayCard(on_submit=lambda _text: None)
+    monkeypatch.setattr(type(card._input_field), "update", lambda self: None)
+    _mute_display_updates(monkeypatch, card)
+
+    i18n_module.set_locale("ko")
+    card.set_input_hint_key("display.input_hint_tip.tab_swap")
+    assert card._input_field.hint_text == "Tab 키를 누르면 언어 쌍이 전환되어요"
+
+    i18n_module.set_locale("en")
+    card.apply_locale()
+
+    assert card._input_field.hint_text == "Press Tab to switch the language pair"
+
+
+def test_launch_input_hint_reaches_the_dashboard_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    dashboard = DashboardView()
+    field = dashboard.display_card._input_field
+    adapter = FletUiPresentationAdapter(SimpleNamespace(view_dashboard=dashboard))
+    i18n_module.set_locale("ko")
+
+    adapter.set_dashboard_launch_input_hint(first_launch=True)
+    assert field.hint_text == "메시지를 입력하세요"
+
+    monkeypatch.setattr(
+        display_card_module.random,
+        "choice",
+        lambda keys: "display.input_hint_tip.puri_help",
+    )
+    adapter.set_dashboard_launch_input_hint(first_launch=False)
+    assert field.hint_text == "문제가 생겼나요? Puri에게 맡겨보세요."

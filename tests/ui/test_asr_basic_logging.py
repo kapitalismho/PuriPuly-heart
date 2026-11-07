@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import logging
 import math
+from dataclasses import replace
 
-from puripuly_heart.app.services.local_asr_diagnostics import (
+import pytest
+
+from puripuly_heart.app.services.local_asr.local_asr_diagnostics import (
     LocalASRDiagnosticsGpuEffect,
     LocalASRDiagnosticsOwner,
 )
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeDiagnostic
+from puripuly_heart.core.local_asr.local_stt_assets import GIGAAM_MODEL_ID, GRANITE_MODEL_ID
 
 
 def _owner_with_logs() -> tuple[
@@ -29,125 +33,185 @@ def _owner_with_logs() -> tuple[
     return owner, basic, detailed, effects
 
 
-def test_local_asr_load_result_separates_sparse_file_evidence_from_basic_summary() -> None:
+@pytest.mark.parametrize("model_id", (GRANITE_MODEL_ID, GIGAAM_MODEL_ID))
+def test_native_load_logs_only_failures_and_preserves_failure_details(model_id: str) -> None:
     owner, basic, detailed, _effects = _owner_with_logs()
 
     owner.log_load_result(
         channel="self",
-        model_id="parakeet-v3",
+        model_id=model_id,
         backend="CPU",
         outcome="ready",
         load_seconds=2.4184,
     )
     owner.log_load_result(
         channel="peer",
-        model_id="qwen",
+        model_id=model_id,
         backend="CPU",
         outcome="failed",
         load_seconds=0.7314,
-        failure_type="LocalQwenSherpaLoadError",
+        failure_type="RuntimeError",
     )
 
-    assert len(basic) == 2
-    assert basic[0][1] == logging.INFO
-    assert "Self recognition model ready" in basic[0][0]
-    assert "parakeet-v3" not in basic[0][0]
-    assert "model=" not in basic[0][0]
-    assert "backend=" not in basic[0][0]
-    assert basic[1][1] == logging.ERROR
-    assert "Peer recognition model failed" in basic[1][0]
-    assert "LocalQwenSherpaLoadError" not in basic[1][0]
-    assert "cause=" in basic[1][0]
+    assert len(basic) == 1
+    assert basic[0][1] == logging.ERROR
+    assert "RuntimeError" not in basic[0][0]
 
-    assert len(detailed) == 2
-    assert detailed[0].startswith("[LocalASR][Load] ")
-    assert "channel=self" in detailed[0]
-    assert "model=parakeet-v3" in detailed[0]
-    assert "backend=CPU" in detailed[0]
-    assert "outcome=ready" in detailed[0]
-    assert "load_seconds=2.418" in detailed[0]
-    assert "failure_type=" not in detailed[0]
-    assert "channel=peer" in detailed[1]
-    assert "model=qwen" in detailed[1]
-    assert "failure_type=LocalQwenSherpaLoadError" in detailed[1]
+    assert len(detailed) == 1
+    assert "channel=peer" in detailed[0]
+    assert f"model={model_id}" in detailed[0]
+    assert "outcome=failed" in detailed[0]
+    assert "failure_type=RuntimeError" in detailed[0]
 
 
-def test_local_asr_load_result_omits_missing_or_invalid_timings() -> None:
+def test_python_provider_transition_does_not_claim_native_model_readiness() -> None:
     owner, basic, detailed, _effects = _owner_with_logs()
 
-    for load_seconds, warmup_seconds in (
-        (None, None),
-        (math.nan, math.inf),
-        (-1.0, -2.0),
-    ):
-        owner.log_load_result(
-            channel="self",
-            model_id="qwen",
-            backend="Vulkan",
-            outcome="ready",
-            load_seconds=load_seconds,
-            warmup_seconds=warmup_seconds,
+    for outcome in ("applied", "superseded", "closed"):
+        owner.transition_diagnostic(
+            {
+                "channel": "peer",
+                "actual_provider": "local_granite",
+                "model_id": GRANITE_MODEL_ID,
+                "load_ms": 0,
+                "outcome": outcome,
+            }
         )
 
-    assert len(basic) == 3
-    assert all(level == logging.INFO for _message, level in basic)
-    assert len(detailed) == 3
-    assert all("load_seconds=" not in message for message in detailed)
-    assert all("warmup_seconds=" not in message for message in detailed)
+    assert basic == detailed == []
+
+    owner.transition_diagnostic(
+        {
+            "channel": "self",
+            "actual_provider": "local_fun_asr_mlt_nano",
+            "model_id": "fun-asr-mlt-nano-2512-q8-0-transcribe-cpu",
+            "load_ms": 0,
+            "outcome": "failed",
+            "failure_type": "RuntimeError",
+        }
+    )
+
+    assert len(basic) == 1
+    assert basic[0][1] == logging.ERROR
+    assert "provider update failed" in basic[0][0]
+    assert "model ready" not in basic[0][0]
+    assert detailed == []
 
 
-def test_cpu_transition_logs_only_actual_terminal_results() -> None:
+def test_provider_transition_preserves_channel_and_old_new_identity() -> None:
     owner, basic, detailed, _effects = _owner_with_logs()
 
-    owner.transition_diagnostic(
-        {
-            "channel": "peer",
-            "actual_provider": "local_parakeet_v3",
-            "model_id": "parakeet-v3",
-            "load_ms": 1250,
-            "outcome": "applied",
-        }
-    )
-    owner.transition_diagnostic(
-        {
-            "channel": "self",
-            "actual_provider": "local_qwen",
-            "model_id": "qwen",
-            "load_ms": 300,
-            "outcome": "failed",
-            "failure_type": "LocalQwenSherpaLoadError",
-        }
-    )
-    owner.transition_diagnostic(
-        {
-            "channel": "self",
-            "actual_provider": "local_qwen",
-            "model_id": "qwen",
-            "load_ms": 100,
-            "outcome": "superseded",
-        }
-    )
-    owner.transition_diagnostic(
-        {
-            "channel": "self",
-            "actual_provider": "local_qwen_gpu",
-            "model_id": "qwen-gpu",
-            "load_ms": 100,
-            "outcome": "applied",
-        }
+    owner.provider_runtime_diagnostic(
+        ProviderRuntimeDiagnostic(
+            event="provider_replace",
+            channel="peer",
+            previous_provider_id="local_cpu_auto",
+            provider_id="local_cpu_auto",
+            previous_model_id=GRANITE_MODEL_ID,
+            model_id="fun-asr-mlt-nano-2512-q8-0-transcribe-cpu",
+            previous_source_language="en",
+            source_language="ko",
+            outcome="applied",
+        )
     )
 
+    assert len(basic) == 1
+    message, level = basic[0]
+    fields = dict(token.split("=", 1) for token in message.split()[2:])
+    assert level == logging.INFO
+    assert fields["channel"] == "peer"
+    assert fields["previous_provider"] == fields["provider"] == "local_cpu_auto"
+    assert fields["previous_model"] == GRANITE_MODEL_ID
+    assert fields["model"] == "fun-asr-mlt-nano-2512-q8-0-transcribe-cpu"
+    assert fields["outcome"] == "applied"
+    assert fields["stage"] == "provider"
+    assert fields["previous_language"] == "en"
+    assert fields["language"] == "ko"
+    assert detailed == []
+
+
+def test_language_selection_logs_once_without_utterance_load_or_unchanged_refresh() -> None:
+    owner, basic, _detailed, _effects = _owner_with_logs()
+    changed = ProviderRuntimeDiagnostic(
+        event="provider_replace",
+        channel="self",
+        previous_provider_id="local_cpu_auto",
+        provider_id="local_cpu_auto",
+        previous_model_id=GRANITE_MODEL_ID,
+        model_id=GRANITE_MODEL_ID,
+        previous_source_language="en",
+        source_language="es",
+        outcome="applied",
+    )
+    owner.provider_runtime_diagnostic(changed)
+    owner.provider_runtime_diagnostic(replace(changed, previous_source_language="es"))
+    owner.provider_runtime_diagnostic(
+        replace(
+            changed,
+            previous_provider_id=None,
+            previous_model_id=None,
+            previous_source_language=None,
+        )
+    )
+    owner.provider_runtime_diagnostic(
+        ProviderRuntimeDiagnostic(
+            event="activation_ready",
+            channel="self",
+            model_id=GRANITE_MODEL_ID,
+            outcome="ready",
+        )
+    )
+    assert len(basic) == 1
+    fields = dict(token.split("=", 1) for token in basic[0][0].split()[2:])
+    assert fields["previous_language"] == "en"
+    assert fields["language"] == "es"
+    assert fields["previous_model"] == fields["model"] == GRANITE_MODEL_ID
+    owner.selection_applied(
+        channel="self",
+        provider_id="local_cpu_auto",
+        model_id=GRANITE_MODEL_ID,
+        source_language="en",
+    )
+    owner.selection_applied(
+        channel="self",
+        provider_id="local_cpu_auto",
+        model_id=GRANITE_MODEL_ID,
+        source_language="en",
+    )
     assert len(basic) == 2
-    assert [level for _message, level in basic] == [logging.INFO, logging.ERROR]
-    assert len(detailed) == 2
-    assert "channel=peer" in detailed[0]
-    assert "outcome=ready" in detailed[0]
-    assert "load_seconds=1.250" in detailed[0]
-    assert "channel=self" in detailed[1]
-    assert "outcome=failed" in detailed[1]
-    assert "load_seconds=0.300" in detailed[1]
-    assert all("superseded" not in message for message in detailed)
-    assert all("qwen-gpu" not in message for message in detailed)
+    reapplied = dict(token.split("=", 1) for token in basic[1][0].split()[2:])
+    assert reapplied["previous_language"] == "es"
+    assert reapplied["language"] == "en"
+    assert reapplied["stage"] == "selection"
+
+
+def test_provider_transition_keeps_known_cloud_identity_without_unregistered_values() -> None:
+    owner, basic, detailed, _effects = _owner_with_logs()
+
+    owner.provider_runtime_diagnostic(
+        ProviderRuntimeDiagnostic(
+            event="provider_handoff",
+            channel="self",
+            previous_provider_id="custom_offline",
+            provider_id="deepgram",
+            previous_model_id="private-model-id",
+            model_id="nova-3",
+            outcome="failed",
+            failure_code="private-cause",
+        )
+    )
+
+    message, level = basic[0]
+    fields = dict(token.split("=", 1) for token in message.split()[2:])
+    assert level == logging.WARNING
+    assert fields["previous_provider"] == "custom_offline"
+    assert fields["provider"] == "deepgram"
+    assert fields["previous_model"] == "unknown"
+    assert fields["model"] == "nova-3"
+    assert fields["cause"] == "unclassified"
+    assert "private-model-id" not in message
+    assert "private-cause" not in message
+    assert detailed == []
 
 
 def test_gpu_ready_and_worker_failure_keep_basic_facts_without_internal_fields() -> None:
@@ -173,20 +237,12 @@ def test_gpu_ready_and_worker_failure_keep_basic_facts_without_internal_fields()
         )
     )
 
-    assert len(detailed) == 1
-    assert "model=qwen-gpu" in detailed[0]
-    assert "backend=Vulkan" in detailed[0]
-    assert "device=vulkan-index-0" in detailed[0]
-    assert "load_seconds=4.120" in detailed[0]
-    assert len(basic) == 2
-    assert basic[0][1] == logging.INFO
-    assert "Self recognition model ready" in basic[0][0]
-    assert "qwen-gpu" not in basic[0][0]
-    assert basic[1][1] == logging.ERROR
-    assert "Local ASR worker failed" in basic[1][0]
-    assert "cause=heartbeat timeout" in basic[1][0]
-    assert "exit code=1" in basic[1][0]
-    assert "failure_code=" not in basic[1][0]
+    assert detailed == []
+    assert len(basic) == 1
+    assert basic[0][1] == logging.ERROR
+    assert "cause=heartbeat timeout" in basic[0][0]
+    assert "exit code=1" in basic[0][0]
+    assert "failure_code=" not in basic[0][0]
     assert effects == [
         LocalASRDiagnosticsGpuEffect(state="ready", origin="activation"),
         LocalASRDiagnosticsGpuEffect(

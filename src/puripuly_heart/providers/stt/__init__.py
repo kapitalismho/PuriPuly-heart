@@ -1,6 +1,6 @@
 __all__ = [
     "deepgram",
-    "local_qwen_sherpa",
+    "local_cpp",
     "qwen_audio",
     "soniox",
 ]

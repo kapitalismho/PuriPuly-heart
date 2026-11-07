@@ -147,9 +147,8 @@ class ZeroconfOscQueryService(OscQueryServicePort):
             return None
         for candidate in sorted(candidates, key=lambda service: service.service_id.casefold()):
             resolved = await self._resolve_host_info(candidate)
-            if resolved is not None:
+            if resolved is not None and self._services.get(candidate.service_id) is candidate:
                 return resolved
-            self._forget_service(candidate.service_id)
         return None
 
     async def advertise_receiver(self, advertisement: OscQueryAdvertisement) -> None:

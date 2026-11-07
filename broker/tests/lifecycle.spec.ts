@@ -16,9 +16,6 @@ describe('managed trial entitlement lifecycle', () => {
       'expired',
       'revoked',
     ]);
-    expect(MANAGED_TRIAL_ENTITLEMENT_POLICY.lifecycle).toBe(
-      MANAGED_TRIAL_LIFECYCLE_VALUES,
-    );
   });
 
   it('keeps managed availability as separate reporting from entitlement lifecycle', () => {

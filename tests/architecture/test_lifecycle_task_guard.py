@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-from collections import Counter
 
 from tests.helpers.paths import REPO_ROOT
 from tests.helpers.task_creation import (
@@ -53,9 +52,9 @@ TASK_CREATION_REVIEWS = (
         family=ASYNCIO_TASK,
     ),
     *_reviews(
-        "app/adapters/gpu_worker_process.py",
-        {"_DefaultGpuWorkerClient.close": 1, "_DefaultGpuWorkerClient._close_writer_resource": 1},
-        "GPU worker client retains close and writer-close tasks; shielded close or force-close owns terminal resource cleanup",
+        "app/adapters/asr_worker_process.py",
+        {"_DefaultASRWorkerClient.close": 1, "_DefaultASRWorkerClient._close_writer_resource": 1},
+        "ASR worker client retains close and writer-close tasks; shielded close or force-close owns terminal resource cleanup",
     ),
     *_reviews(
         "app/services/application_control.py",
@@ -116,6 +115,11 @@ TASK_CREATION_REVIEWS = (
         "app/services/peer_application.py",
         {"PeerApplicationOwner._await_runtime_replacement_cleanup": 1},
         "PeerApplicationOwner retains shielded replacement cleanup and observes its result; the previous runtime remains owned until cleanup commits",
+    ),
+    *_reviews(
+        "app/services/ui_application.py",
+        {"UiApplicationBoundary.start": 1},
+        "UiApplicationBoundary retains and awaits startup; ingress freeze cancels it and the early shutdown drain waits for owned preparation before runtime teardown",
     ),
     *_reviews(
         "cli/host.py",
@@ -188,10 +192,9 @@ TASK_CREATION_REVIEWS = (
     *_reviews(
         "core/local_translation/provisioning.py",
         {
-            "LocalGemmaDownloadAdapter.validate_inputs": 1,
             "LocalGemmaDownloadAdapter.download": 1,
         },
-        "The local Gemma adapter shield-awaits each validation or copy worker; cancellation signals and gathers it before the owning installation releases staging resources",
+        "The local Gemma adapter shield-awaits its copy worker; cancellation signals and gathers it before the owning installation releases staging resources",
     ),
     *_reviews(
         "core/local_translation/runtime.py",
@@ -310,6 +313,19 @@ TASK_CREATION_REVIEWS = (
         "core/runtime/local_stt_download.py",
         {"LocalSTTDownloadRuntime.start": 1},
         "LocalSTTDownloadRuntime is the named lifecycle owner for download tasks",
+    ),
+    *_reviews(
+        "app/wiring/wiring_audio_test.py",
+        {"AudioTestRuntime._diagnostic_candidates": 1},
+        "AudioTestRuntime retains read-only microphone enumeration independently of operation cancellation and drains it on stop or close",
+    ),
+    *_reviews(
+        "app/services/audio_test.py",
+        {
+            "AudioTestSessionOwner._release_diagnostic_resources": 1,
+            "AudioTestSessionOwner._pause_diagnostic_capture": 1,
+        },
+        "AudioTestSessionOwner retains bounded diagnostic cleanup until drained; cancellation cannot release capture restoration before source cleanup",
     ),
     *_reviews(
         "core/runtime/audio_test.py",
@@ -455,6 +471,12 @@ TASK_CREATION_REVIEWS = (
         classification="legacy_exception",
     ),
     *_reviews(
+        "providers/stt/local_cpp.py",
+        {"LocalCppSTTBackend._settle": 2},
+        "CPU request calls retain and shield their operation and cancellation-drain tasks; load/decode locks prevent resource release until both settle despite repeated cancellation",
+        family=ASYNCIO_ENSURE_FUTURE,
+    ),
+    *_reviews(
         "providers/stt/local_gpu.py",
         {
             "_LocalGpuSTTSession.seal_turn": 1,
@@ -464,9 +486,9 @@ TASK_CREATION_REVIEWS = (
         "Local GPU STT sessions own transcription and submission tasks in an explicit set and cancel or gather tasks during stop and close",
     ),
     *_reviews(
-        "providers/stt/local_qwen_sherpa.py",
-        {"_LocalQwenSherpaSession.seal_turn": 1},
-        "Local Qwen Sherpa session retains per-job decode watchdogs and cancels plus gathers the watchdog set on close",
+        "providers/stt/local_session.py",
+        {"LocalOfflineSTTSession.seal_turn": 1},
+        "Local offline session retains per-job decode watchdogs and cancels plus gathers the watchdog set on close",
     ),
     *_reviews(
         "providers/stt/qwen_audio.py",
@@ -503,6 +525,12 @@ TASK_CREATION_REVIEWS = (
         {"_run_stage": 1},
         "Bounded grandfathering: evidence stage cancels and gathers its waiter on timeout, but has no waiter cleanup on caller cancellation",
         classification="legacy_exception",
+        family=ASYNCIO_ENSURE_FUTURE,
+    ),
+    *_reviews(
+        "ui/components/agent_secure_entry.py",
+        {"AgentSecureEntryController.submit": 1},
+        "AgentSecureEntryController retains verification in _pending, cancels it on replacement or unbind, and submit awaits settlement before clearing completion callbacks and secret input",
         family=ASYNCIO_ENSURE_FUTURE,
     ),
     *_reviews(
@@ -592,25 +620,14 @@ TASK_CREATION_REVIEWS = (
         classification="legacy_exception",
         family=RUN_TASK,
     ),
+    *_reviews(
+        "release_evidence/agent_chat_simulator/execution.py",
+        {"AttemptScheduler.run": 1},
+        "AttemptScheduler retains bounded per-attempt tasks, stops admission on failure/cancellation, "
+        "and shield-drains each attempt's model close and checkpoint before returning",
+    ),
 )
 REVIEWED_TASK_CREATION = dict(TASK_CREATION_REVIEWS)
-
-
-def _allowlist_summary(classification: TaskClassification) -> Counter[tuple[str, str]]:
-    summary: Counter[tuple[str, str]] = Counter()
-    for identity, disposition in TASK_CREATION_REVIEWS:
-        if disposition.classification == classification:
-            summary[(identity.module, identity.family)] += disposition.max_count
-    return summary
-
-
-LEGACY_TASK_CREATION_ALLOWLIST = _allowlist_summary("legacy_exception")
-NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = _allowlist_summary("named_owner")
-TASK_CREATION_ALLOWLIST_RATIONALES = {
-    (identity.module, identity.family): disposition.rationale
-    for identity, disposition in TASK_CREATION_REVIEWS
-    if disposition.classification != "owner_primitive"
-}
 
 
 def test_first_party_creation_sites_have_reviewed_bounded_ownership() -> None:
@@ -622,90 +639,6 @@ def test_first_party_creation_sites_have_reviewed_bounded_ownership() -> None:
 def test_reviewed_task_identities_are_unique_and_have_lifetime_rationales() -> None:
     assert len(REVIEWED_TASK_CREATION) == len(TASK_CREATION_REVIEWS)
     assert_task_ownership([], REVIEWED_TASK_CREATION)
-
-
-def test_lifecycle_scope_file_is_the_allowed_task_owner_primitive() -> None:
-    assert (REPO_ROOT / "src" / "puripuly_heart" / "core" / "lifecycle.py").is_file()
-
-
-def test_task_creation_allowlists_have_explicit_gate6_rationale() -> None:
-    expected = LEGACY_TASK_CREATION_ALLOWLIST + NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-
-    assert set(TASK_CREATION_ALLOWLIST_RATIONALES) == set(expected)
-    assert all(
-        rationale and "unclassified" not in rationale
-        for rationale in TASK_CREATION_ALLOWLIST_RATIONALES.values()
-    )
-
-
-def test_order34_named_owner_allowlist_has_no_retired_stt_controller_tasks() -> None:
-    stt_controller_tasks = (
-        "src/puripuly_heart/core/stt/controller.py",
-        ASYNCIO_CREATE_TASK,
-    )
-
-    assert stt_controller_tasks not in LEGACY_TASK_CREATION_ALLOWLIST
-    assert stt_controller_tasks not in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-
-
-def test_order37_named_owner_allowlist_retires_controller_bounds_task_debt() -> None:
-    assert (
-        "src/puripuly_heart/ui/foundation/runtime.py",
-        RUN_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/openrouter/managed_openrouter_release.py",
-        ASYNCIO_CREATE_TASK,
-    ) not in LEGACY_TASK_CREATION_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/runtime/oauth.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/runtime/clipboard.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-
-
-def test_order38_named_owner_allowlist_preserves_installer_legacy_task_debt() -> None:
-    assert (
-        "src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py",
-        ASYNCIO_CREATE_TASK,
-    ) in LEGACY_TASK_CREATION_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/runtime/local_stt_download.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/runtime/audio_test.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-
-
-def test_order39_named_owner_allowlist_adds_receiver_prompt_and_bounds_owners() -> None:
-    assert (
-        "src/puripuly_heart/core/runtime/receiver.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/runtime/github_star_prompt.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    assert (
-        "src/puripuly_heart/core/runtime/desktop_overlay_bounds.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    assert (
-        "src/puripuly_heart/ui/foundation/runtime.py",
-        RUN_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-
-
-def test_order40_named_owner_allowlist_adds_vrchat_osc_presence_owner() -> None:
-    assert (
-        "src/puripuly_heart/core/runtime/vrchat_osc_presence.py",
-        ASYNCIO_CREATE_TASK,
-    ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
 
 
 def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:

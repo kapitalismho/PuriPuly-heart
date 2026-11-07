@@ -195,7 +195,6 @@ def build_gui_process_retry_action(
         config_factory=lambda: config,
         peer_intent_sink=lambda _enabled: None,
         overlay_intent_sink=lambda _enabled: None,
-        persist_manual_fallback=lambda: True,
         ensure_local_ready=lambda _generation: asyncio.sleep(0, result=True),
         clear_cpu_pending=lambda: None,
         clear_gpu_pending=lambda: None,

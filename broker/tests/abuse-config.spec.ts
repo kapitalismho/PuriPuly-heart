@@ -12,6 +12,7 @@ import {
   readAbuseControls,
   readAbuseRuntimeState,
   replaceAbuseControlsValue,
+  replaceAbuseRuntimeStateValue,
   updateAbuseControls,
   updateAbuseRuntimeState,
 } from './test-support/abuse-controls';
@@ -157,98 +158,36 @@ describe('broker abuse-controls runtime config validation', () => {
     expect(blockedResponse.status).toBe(429);
   });
 
-  it('seeds the approved warning and automatic-brake defaults', () => {
+  it('keeps raw stored evidence distinct from production fallback and legacy-state normalization', async () => {
     const env = createTestBrokerEnv();
+    const incompleteControls = { trialChallenge: { maxRequests: 1 } };
+    replaceAbuseControlsValue(env, incompleteControls);
+    expect(readAbuseControls(env)).toEqual(incompleteControls);
+    await expect(getBrokerAbuseControlsConfig(env.BROKER_DB)).resolves.toEqual(
+      TEST_DEFAULT_ABUSE_CONTROLS,
+    );
 
-    expect(readAbuseControls(env).immediateAlerts).toEqual({
-      warning: 10,
-      brake: 70,
-    });
-  });
-
-  it('seeds Discord OAuth endpoint, pending-session, and daily cap defaults', () => {
-    const env = createTestBrokerEnv();
-    const controls = readAbuseControls(env) as ReturnType<typeof readAbuseControls> &
-      Record<string, unknown>;
-
-    expect(controls.discordAuthStartIp).toEqual({
-      endpoint: 'POST /v1/auth/discord/start',
-      scope: 'ip',
-      maxRequests: 20,
-      windowMinutes: 15,
-    });
-    expect(controls.discordAuthStartInstallation).toEqual({
-      endpoint: 'POST /v1/auth/discord/start',
-      scope: 'installation_id',
-      maxRequests: 5,
-      windowMinutes: 15,
-    });
-    expect(controls.discordOpenrouterIssueIp).toEqual({
-      endpoint: 'POST /v1/providers/openrouter/discord/issue',
-      scope: 'ip',
-      maxRequests: 10,
-      windowMinutes: 15,
-    });
-    expect(controls.discordOpenrouterIssueInstallation).toEqual({
-      endpoint: 'POST /v1/providers/openrouter/discord/issue',
-      scope: 'installation_id',
-      maxRequests: 3,
-      windowMinutes: 15,
-    });
-    expect(controls.pendingDiscordOAuthSessions).toEqual({
-      maxPerInstallation: 2,
-      maxPerIp: 20,
-      windowMinutes: 15,
-    });
-    expect(controls.newActiveEntitlementsPerDay.maxCount).toBe(500);
-  });
-
-  it('persists the QQ auth assertion IP endpoint default in abuse controls', () => {
-    const env = createTestBrokerEnv();
-    const row = env.__db
-      .prepare('SELECT value FROM broker_config WHERE key = ?')
-      .get('abuse_controls') as { value: string };
-    const controls = JSON.parse(row.value) as Record<string, unknown>;
-
-    expect(controls.qqAuthAssertIp).toEqual({
-      endpoint: 'POST /v1/auth/qq/assert',
-      scope: 'ip',
-      maxRequests: 20,
-      windowMinutes: 15,
-    });
-  });
-  it('seeds managed-operation and delivery-ACK endpoint rate-limit defaults', () => {
-    const env = createTestBrokerEnv();
-    const controls = readAbuseControls(env);
-    expect(controls.managedOperationStatusIp).toEqual({
-      endpoint: 'POST /v1/providers/openrouter/managed-operation/status',
-      scope: 'ip',
-      maxRequests: 30,
-      windowMinutes: 15,
-    });
-    expect(controls.managedOperationStatusInstallation).toEqual({
-      endpoint: 'POST /v1/providers/openrouter/managed-operation/status',
-      scope: 'installation_id',
-      maxRequests: 30,
-      windowMinutes: 15,
-    });
-    expect(controls.managedOperationResumeIp).toEqual({
-      endpoint: 'POST /v1/providers/openrouter/managed-operation/resume',
-      scope: 'ip',
-      maxRequests: 20,
-      windowMinutes: 15,
-    });
-    expect(controls.managedOperationResumeInstallation).toEqual({
-      endpoint: 'POST /v1/providers/openrouter/managed-operation/resume',
-      scope: 'installation_id',
-      maxRequests: 10,
-      windowMinutes: 15,
-    });
-    expect(controls.managedKeyDeliveryAckIp).toEqual({
-      endpoint: 'POST /v1/providers/openrouter/managed-key-delivery/ack',
-      scope: 'ip',
-      maxRequests: 30,
-      windowMinutes: 15,
+    const legacyRuntimeState = {
+      brake: {
+        active: true,
+        reason: 'manual',
+        changedAt: '2026-04-08T06:05:00.000Z',
+        changedBy: 'operator',
+      },
+      alertLatches: { warn1: true, warn2: false, warn3: false, critical: false },
+      dailyReport: { lastDeliveredAt: null, lastDeliveredDateUtc: null },
+    };
+    replaceAbuseRuntimeStateValue(env, legacyRuntimeState);
+    expect(readAbuseRuntimeState(env)).toEqual(legacyRuntimeState);
+    await expect(getBrokerAbuseRuntimeState(env.BROKER_DB)).resolves.toEqual({
+      brake: {
+        active: true,
+        reason: 'manual',
+        changedAt: '2026-04-08T06:05:00.000Z',
+        changedBy: 'operator',
+      },
+      alertLatches: { warning: true, warningObservedAt: null },
+      dailyReport: { lastDeliveredAt: null, lastDeliveredDateUtc: null },
     });
   });
 
@@ -324,10 +263,14 @@ describe('broker abuse-controls runtime config validation', () => {
     );
   });
 
-  it('seeds exact abuse runtime state defaults and persists runtime-state helper updates', () => {
+  it('seeds compatible stored runtime state and normalizes it through the production reader', async () => {
     const env = createTestBrokerEnv();
 
-    expect(readAbuseRuntimeState(env)).toEqual(TEST_DEFAULT_ABUSE_RUNTIME_STATE);
+    const stored = readAbuseRuntimeState(env);
+    expect(stored).toMatchObject(TEST_DEFAULT_ABUSE_RUNTIME_STATE);
+    await expect(getBrokerAbuseRuntimeState(env.BROKER_DB)).resolves.toEqual(
+      TEST_DEFAULT_ABUSE_RUNTIME_STATE,
+    );
 
     updateAbuseRuntimeState(env, (state) => {
       state.brake.active = true;
@@ -340,6 +283,7 @@ describe('broker abuse-controls runtime config validation', () => {
     });
 
     expect(readAbuseRuntimeState(env)).toEqual({
+      ...stored,
       brake: {
         active: true,
         reason: 'manual',
@@ -347,6 +291,7 @@ describe('broker abuse-controls runtime config validation', () => {
         changedBy: 'operator',
       },
       alertLatches: {
+        ...stored.alertLatches,
         warning: true,
         warningObservedAt: null,
       },

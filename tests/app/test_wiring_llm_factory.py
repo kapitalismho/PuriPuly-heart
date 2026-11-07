@@ -6,25 +6,14 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from puripuly_heart.app.wiring_managed_auth_factory import (
+
+from puripuly_heart.app.services.managed.managed_operation import new_managed_operation_id
+from puripuly_heart.app.wiring import create_llm_provider_from_resolved_config, wiring_llm_factory
+from puripuly_heart.app.wiring.wiring_llm_factory import llm_factory_extras_from_vnext
+from puripuly_heart.app.wiring.wiring_managed_auth_factory import (
     ManagedIdentityStateAdapter,
     build_openrouter_release_runtime_config,
 )
-from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterReleaseBehavior,
-    ManagedOpenRouterReleaseResult,
-    ManagedOpenRouterReleaseService,
-    UnavailableManagedOpenRouterReleaseClient,
-)
-from puripuly_heart.core.openrouter_credentials import (
-    OPENROUTER_MANAGED_API_KEY_SECRET,
-    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
-)
-
-from puripuly_heart.app import wiring_llm_factory
-from puripuly_heart.app.services.managed.managed_operation import new_managed_operation_id
-from puripuly_heart.app.wiring import create_llm_provider_from_resolved_config
-from puripuly_heart.app.wiring.wiring_llm_factory import llm_factory_extras_from_vnext
 from puripuly_heart.config.provider_values import OpenRouterCredentialSource
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_MANAGED,
@@ -45,6 +34,16 @@ from puripuly_heart.core.managed_credential import (
     ManagedCredentialBinding,
     credential_binding_secret,
     managed_key_secret,
+)
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
+    ManagedOpenRouterReleaseBehavior,
+    ManagedOpenRouterReleaseResult,
+    ManagedOpenRouterReleaseService,
+    UnavailableManagedOpenRouterReleaseClient,
+)
+from puripuly_heart.core.openrouter.openrouter_credentials import (
+    OPENROUTER_MANAGED_API_KEY_SECRET,
+    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
 )
 from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
@@ -345,7 +344,9 @@ async def test_standard_lazy_managed_provider_records_discord_claim_after_releas
 def test_combined_gemma_composes_pooled_attempts_and_single_model_emergency(
     connection: str,
 ) -> None:
-    from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
+    from puripuly_heart.core.openrouter.managed_openrouter_release import (
+        ManagedOpenRouterLLMProvider,
+    )
 
     secrets = InMemorySecretStore()
     if connection == "managed":
@@ -473,12 +474,15 @@ async def test_managed_factory_leaves_gpu_admission_to_shared_runtime_even_with_
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("prepared", [False, True])
 @pytest.mark.parametrize("source", ["discord", "qq"])
 @pytest.mark.parametrize(
     "authority", ["missing_view", "unacknowledged", "pending", "acknowledged", "legacy"]
 )
-async def test_real_managed_factory_obeys_canonical_credential_proof(source, authority):
-    from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
+async def test_real_managed_factory_obeys_canonical_credential_proof(source, authority, prepared):
+    from puripuly_heart.core.openrouter.managed_openrouter_release import (
+        ManagedOpenRouterLLMProvider,
+    )
 
     settings = _managed_china_settings() if source == "qq" else _managed_settings()
     operation = new_managed_operation_id()
@@ -512,11 +516,25 @@ async def test_real_managed_factory_obeys_canonical_credential_proof(source, aut
                 credential="synthetic-key",
             ).encode(),
         )
+    extras = None if authority == "missing_view" else llm_factory_extras_from_vnext(settings)
+    if prepared:
+        from functools import partial
+
+        from puripuly_heart.core.owned_thread import run_owned_thread_call
+
+        extras = await run_owned_thread_call(
+            partial(
+                wiring_llm_factory.prepare_llm_factory_extras,
+                wiring_llm_factory.runtime_resolution_input_from_vnext(settings),
+                secrets=secrets,
+                extras=extras,
+            )
+        )
     provider = create_llm_provider_from_resolved_config(
         _managed_china_resolved_config() if source == "qq" else _standard_managed_resolved_config(),
         secrets=secrets,
         managed_release_service=object(),
-        extras=None if authority == "missing_view" else llm_factory_extras_from_vnext(settings),
+        extras=extras,
     )
     try:
         assert isinstance(provider, SemaphoreLLMProvider)
@@ -525,5 +543,36 @@ async def test_real_managed_factory_obeys_canonical_credential_proof(source, aut
             assert provider.inner.api_key == "synthetic-key"
         else:
             assert isinstance(provider.inner, ManagedOpenRouterLLMProvider)
+    finally:
+        await provider.close()
+
+
+@pytest.mark.asyncio
+async def test_prepared_primary_does_not_retain_credentials_for_lazy_fallback() -> None:
+    from functools import partial
+
+    from puripuly_heart.core.owned_thread import run_owned_thread_call
+
+    settings = _managed_settings()
+    runtime_input = wiring_llm_factory.runtime_resolution_input_from_vnext(settings)
+    secrets = InMemorySecretStore()
+    extras = await run_owned_thread_call(
+        partial(
+            wiring_llm_factory.prepare_llm_factory_extras,
+            runtime_input,
+            secrets=secrets,
+            extras=llm_factory_extras_from_vnext(settings),
+        )
+    )
+    provider = create_llm_provider_from_resolved_config(
+        resolve_llm_config(runtime_input),
+        secrets=secrets,
+        managed_release_service=object(),
+        extras=extras,
+    )
+    try:
+        secrets.set(OPENROUTER_MANAGED_QQ_API_KEY_SECRET, "new-opposite-claim")
+        with pytest.raises(ValueError, match="local claim conflict"):
+            await provider.inner.attempts[1].provider._ensure_delegate()
     finally:
         await provider.close()

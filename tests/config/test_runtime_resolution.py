@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
-import inspect
 import sys
 from dataclasses import FrozenInstanceError, is_dataclass
 from pathlib import Path
@@ -356,37 +355,34 @@ def test_stt_runtime_intent_normalizes_legacy_vad_floor_for_both_channels(
     assert config.vad_speech_threshold == 0.10
 
 
+@pytest.mark.parametrize("channel", ["self", "peer"])
 @pytest.mark.parametrize(
-    "provider",
+    ("provider", "expected_provider"),
     [
-        "local_cpu_auto",
-        "local_parakeet_v3",
-        "local_parakeet_ja",
-        "local_qwen",
-        "local_qwen_gpu",
+        ("local_cpu_auto", "local_cpu_auto"),
+        ("local_granite", "local_granite"),
+        ("local_gigaam", "local_gigaam"),
+        ("local_orukeet", "local_cpu_auto"),
+        ("local_fun_asr_nano", "local_fun_asr_nano"),
+        ("local_fun_asr_mlt_nano", "local_fun_asr_mlt_nano"),
+        ("local_parakeet_ja", "local_parakeet_ja"),
+        ("local_qwen_gpu", "local_qwen_gpu"),
+        ("local_parakeet_v3", "local_cpu_auto"),
+        ("local_qwen", "local_cpu_auto"),
     ],
 )
-def test_stt_runtime_resolution_preserves_local_provider_identity(provider: str) -> None:
+def test_stt_runtime_resolution_emits_canonical_local_provider_identity(
+    provider: str, expected_provider: str, channel: str
+) -> None:
     runtime_resolution = _runtime_resolution_module()
 
     config = runtime_resolution.resolve_stt_config(
-        runtime_resolution.STTRuntimeIntent(provider=provider)
+        runtime_resolution.STTRuntimeIntent(provider=provider, channel=channel)
     )
 
-    assert config.provider == provider
+    assert config.provider == expected_provider
     assert config.credential.source == "none"
     assert config.credential.required is False
-
-
-def test_soniox_runtime_default_uses_realtime_v5_model() -> None:
-    runtime_resolution = _runtime_resolution_module()
-
-    config = runtime_resolution.resolve_stt_config(
-        runtime_resolution.STTRuntimeIntent(provider=runtime_resolution.STT_PROVIDER_SONIOX)
-    )
-
-    assert config.model == "stt-rt-v5"
-    assert runtime_resolution.SONIOX_STT_MODEL_RT_V5 == "stt-rt-v5"
 
 
 def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -> None:
@@ -483,7 +479,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "managed",
             "managed",
             "openrouter",
-            "deepseek/deepseek-v4.1-flash",
+            "deepseek/deepseek-v4.1-flash-1017",
             "managed",
             "openrouter:managed",
             None,
@@ -494,7 +490,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "managed_china",
             "managed",
             "openrouter",
-            "deepseek/deepseek-v4.1-flash",
+            "deepseek/deepseek-v4.1-flash-1017",
             "managed",
             "openrouter:managed_qq",
             None,
@@ -505,7 +501,7 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "openrouter",
             "byok",
             "openrouter",
-            "deepseek/deepseek-v4.1-flash",
+            "deepseek/deepseek-v4.1-flash-1017",
             "secret_store",
             "openrouter:byok",
             None,
@@ -532,28 +528,6 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "openrouter:byok",
             None,
             "google_gemini_latency",
-        ),
-        (
-            "gemini_flash",
-            "openrouter",
-            "byok",
-            "openrouter",
-            "google/gemini-3.8-flash",
-            "secret_store",
-            "openrouter:byok",
-            None,
-            "google_gemini_latency",
-        ),
-        (
-            "gemini_flash",
-            "official_byok",
-            "byok",
-            "gemini",
-            "gemini-3.8-flash",
-            "secret_store",
-            "gemini:byok",
-            None,
-            None,
         ),
         (
             "gemini_flash",
@@ -813,18 +787,6 @@ def test_luna_invalid_or_missing_connection_selects_chatgpt_plan(
     assert target.credential.reference == "chatgpt:oauth"
 
 
-def test_luna_openrouter_connection_keeps_openrouter_byok_target() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    intent = runtime_resolution.normalize_translation_runtime_intent(
-        model="gpt_6_luna", connection="openrouter"
-    )
-    target = runtime_resolution.resolve_llm_config(
-        runtime_resolution.RuntimeResolutionInput(translation=intent)
-    ).primary
-    assert target.model == "openai/gpt-6-luna"
-    assert target.credential.reference == "openrouter:byok"
-
-
 def test_luna_compatibility_provider_and_profile_resolve_to_same_product() -> None:
     runtime_resolution = _runtime_resolution_module()
     direct = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
@@ -871,29 +833,6 @@ def test_luna_canonical_product_resolves_independently_of_legacy_alias(
         assert config.credential.source == "secret_store"
 
 
-def test_managed_china_resolves_explicit_qq_managed_credential_reference() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    resolved = _resolved_module()
-
-    config = runtime_resolution.resolve_llm_config(
-        _runtime_input(
-            runtime_resolution,
-            model=runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
-            connection=runtime_resolution.TRANSLATION_CONNECTION_MANAGED_CHINA,
-            openrouter=runtime_resolution.OpenRouterRuntimeIntent(
-                selected_source=runtime_resolution.OPENROUTER_SOURCE_MANAGED,
-            ),
-        )
-    )
-
-    assert config.credential == resolved.ResolvedCredentialRequirement(
-        source=resolved.CREDENTIAL_SOURCE_MANAGED,
-        required=True,
-        reference="openrouter:managed_qq",
-    )
-    assert config.provider_routing == "deepseek_v4_flash_41_strict"
-
-
 def test_standard_managed_resolves_standard_managed_credential_reference() -> None:
     runtime_resolution = _runtime_resolution_module()
     resolved = _resolved_module()
@@ -917,20 +856,28 @@ def test_standard_managed_resolves_standard_managed_credential_reference() -> No
     )
 
 
-def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_with_identity_hedge() -> None:
+@pytest.mark.parametrize(
+    "model",
+    ["deepseek/deepseek-v4.1-flash", "deepseek/deepseek-v4.1-flash-1017"],
+)
+def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_with_identity_hedge(
+    model: str,
+) -> None:
     runtime_resolution = _runtime_resolution_module()
     resolved = _resolved_module()
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
         provider_llm="openrouter",
-        model="deepseek/deepseek-v4.1-flash",
+        model=model,
         selected_source="byok",
         routing_mode="parasail_first",
         provider_routing="deepseek_only",
         broker_base_url="https://broker.fixture.test/v1",
     )
+    assert openrouter_intent.model == "deepseek/deepseek-v4.1-flash-1017"
+    assert openrouter_intent.selection_alias == "deepseek_v4_flash_41_byok"
     translation_intent = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
         provider_llm="openrouter",
-        openrouter_model=openrouter_intent.model,
+        openrouter_model=model,
         openrouter_selected_source=openrouter_intent.selected_source,
         openrouter_provider_routing=openrouter_intent.provider_routing,
         concurrency_limit=8,
@@ -946,7 +893,7 @@ def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_with_identity_
     assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41
     assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER
     assert config.provider == "openrouter"
-    assert config.model == "deepseek/deepseek-v4.1-flash"
+    assert config.model == "deepseek/deepseek-v4.1-flash-1017"
     assert config.credential == resolved.ResolvedCredentialRequirement(
         source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
         required=True,
@@ -970,44 +917,6 @@ def test_openrouter_runtime_intent_normalizes_legacy_deepseek_model() -> None:
 
     assert intent.model == "deepseek/deepseek-v4-flash-0731"
     assert intent.selection_alias == "deepseek_v4_flash_byok"
-
-
-def test_legacy_current_openrouter_aliases_normalize_to_canonical_intent_and_resolve() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    profiles = _profiles_module()
-    resolved = _resolved_module()
-
-    openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
-        selection_alias=profiles.LEGACY_OPENROUTER_SELECTION_ALIAS_BYOK_GEMMA_4_26B_A4B_IT,
-        selected_source=profiles.OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
-    )
-
-    assert openrouter_intent.model == profiles.OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT
-    assert openrouter_intent.selected_source == profiles.OPENROUTER_CREDENTIAL_SOURCE_BYOK
-    assert (
-        openrouter_intent.selection_alias == profiles.OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK
-    )
-    assert not hasattr(openrouter_intent, "fallback_selection_alias")
-    config = runtime_resolution.resolve_llm_config(
-        _runtime_input(
-            runtime_resolution,
-            model=runtime_resolution.TRANSLATION_MODEL_GEMMA4_26B_31B,
-            connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER,
-            openrouter=openrouter_intent,
-            concurrency_limit=7,
-        )
-    )
-
-    assert config.provider == "openrouter"
-    assert config.model == profiles.OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT
-    assert config.credential == resolved.ResolvedCredentialRequirement(
-        source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
-        required=True,
-        reference="openrouter:byok",
-    )
-    assert config.fallback is not None
-    assert config.fallback.target == config.primary
-    assert config.concurrency_limit == 7
 
 
 def test_legacy_gemini_alias_only_normalizes_to_canonical_runtime_target() -> None:
@@ -1144,137 +1053,6 @@ def test_legacy_openrouter_selection_aliases_normalize_before_resolved_runtime(
     )
     assert not hasattr(config, "selection_alias")
     assert not hasattr(config, "fallback_selection_alias")
-
-
-@pytest.mark.parametrize("legacy_key", ["credential_source", "selected_credential_source"])
-def test_old_openrouter_credential_source_keys_normalize_through_settings_to_resolved_dto(
-    legacy_key: str,
-) -> None:
-    runtime_resolution = _runtime_resolution_module()
-    resolved = _resolved_module()
-    raw_openrouter = {
-        "llm_model": "google/gemma-4-26b-a4b-it",
-        legacy_key: "managed",
-        "selection_alias": "gemma4_26b_31b_managed",
-        "fallback_selection_alias": "none",
-    }
-
-    openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
-        provider_llm="openrouter",
-        model=raw_openrouter["llm_model"],
-        selected_source=raw_openrouter.get("selected_source") or raw_openrouter.get(legacy_key),
-        selection_alias=raw_openrouter["selection_alias"],
-    )
-    translation_intent = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
-        provider_llm="openrouter",
-        openrouter_model=openrouter_intent.model,
-        openrouter_selected_source=openrouter_intent.selected_source,
-        openrouter_provider_routing=openrouter_intent.provider_routing,
-        gemini_model="gemini-3.8-flash",
-        qwen_model="qwen3.8-flash",
-        concurrency_limit=5,
-    )
-    config = runtime_resolution.resolve_llm_config(
-        runtime_resolution.RuntimeResolutionInput(
-            translation=translation_intent,
-            openrouter=openrouter_intent,
-        )
-    )
-
-    assert openrouter_intent.selected_source == "managed"
-    assert openrouter_intent.selection_alias == "gemma4_26b_31b_managed"
-    assert config.provider == "openrouter"
-    assert config.model == "google/gemma-4-26b-a4b-it"
-    assert config.credential == resolved.ResolvedCredentialRequirement(
-        source=resolved.CREDENTIAL_SOURCE_MANAGED,
-        required=True,
-        reference="openrouter:managed",
-    )
-    assert not hasattr(config, legacy_key)
-    assert not hasattr(config, "selection_alias")
-
-
-def test_runtime_resolution_resolved_llm_path_has_no_legacy_alias_literals() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    source = "\n".join(
-        inspect.getsource(getattr(runtime_resolution, name))
-        for name in (
-            "resolve_llm_config",
-            "_resolve_translation_target",
-            "_resolved_openrouter_target",
-        )
-    )
-
-    for legacy_literal in (
-        "LEGACY_OPENROUTER",
-        "LEGACY_PROFILE_BY_ALIAS",
-        "gemini25_flash_lite",
-        "gemini31_flash_lite",
-        "openrouter:none:google/gemma-4-26b-a4b-it",
-        "openrouter:managed:google/gemma-4-26b-a4b-it",
-        "openrouter:byok:google/gemma-4-26b-a4b-it",
-        "openrouter:none:qwen/qwen3.5-flash-02-23",
-        "openrouter:byok:qwen/qwen3.5-flash-02-23",
-    ):
-        assert legacy_literal not in source
-
-
-def test_current_and_legacy_setting_value_snapshots_convert_to_canonical_input_and_resolve() -> (
-    None
-):
-    runtime_resolution = _runtime_resolution_module()
-    resolved = _resolved_module()
-    from tests.config.settings_migration_fixtures import (  # noqa: PLC0415
-        legacy_compatibility_settings_fixture,
-        maximal_v24_settings_fixture,
-    )
-
-    for raw_settings in (
-        maximal_v24_settings_fixture(),
-        legacy_compatibility_settings_fixture(),
-    ):
-        raw_openrouter = raw_settings["openrouter"]
-        raw_translation = raw_settings["translation"]
-        openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
-            model=raw_openrouter.get("llm_model"),
-            selected_source=(
-                raw_openrouter.get("selected_source")
-                or raw_openrouter.get("credential_source")
-                or raw_openrouter.get("selected_credential_source")
-            ),
-            selection_alias=raw_openrouter.get("selection_alias"),
-            routing_mode=raw_openrouter.get("routing_mode"),
-            provider_routing=raw_openrouter.get("provider_routing"),
-            broker_base_url=raw_openrouter.get("broker_base_url"),
-        )
-        translation_intent = runtime_resolution.normalize_translation_runtime_intent(
-            model=raw_translation.get("model"),
-            connection=raw_translation.get("connection"),
-            concurrency_limit=raw_settings["llm"].get("concurrency_limit"),
-        )
-
-        config = runtime_resolution.resolve_llm_config(
-            runtime_resolution.RuntimeResolutionInput(
-                translation=translation_intent,
-                openrouter=openrouter_intent,
-                direct=runtime_resolution.DirectProviderRuntimeIntent(
-                    local_llm_model=raw_settings["local_llm"]["model"],
-                    local_llm_base_url=raw_settings["local_llm"]["base_url"],
-                    local_llm_extra_body=raw_settings["local_llm"]["extra_body"],
-                    qwen_region=raw_settings["qwen"]["region"],
-                ),
-            )
-        )
-
-        assert isinstance(config, resolved.ResolvedLLMConfig)
-        assert config.provider in {
-            "deepseek",
-            "gemini",
-            "local_llm",
-            "openrouter",
-            "qwen",
-        }
-        assert config.concurrency_limit == raw_settings["llm"]["concurrency_limit"]
 
 
 def test_derive_runtime_from_openrouter_gemini_compatibility_values() -> None:

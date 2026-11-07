@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from puripuly_heart.app.adapters.peer_capture_vad import PeerCaptureVadAdapter
-
+from puripuly_heart.app.adapters.peer_capture.peer_capture_vad import PeerCaptureVadAdapter
 from puripuly_heart.core.peer_capture import (
     PeerCaptureLanguageFacts,
     PeerCaptureSessionConfig,

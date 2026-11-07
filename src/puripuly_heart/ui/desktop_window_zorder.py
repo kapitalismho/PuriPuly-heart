@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import ctypes
 import os
+import threading
 from collections.abc import Awaitable, Callable
 from ctypes import wintypes
 from dataclasses import dataclass
@@ -76,6 +78,8 @@ class WindowZOrderPort(Protocol):
 
     async def reassert_topmost_after_click_through(self) -> WindowZOrderResult: ...
 
+    def stop_topmost_watch(self) -> None: ...
+
     async def confirm_window_visible(
         self,
         expected_title: str,
@@ -87,6 +91,10 @@ class WindowZOrderPort(Protocol):
         on_first_visible: Callable[[], None] | None = None,
     ) -> WindowVisibilityConfirmation: ...
 
+    def close(self) -> None: ...
+
+
+class WindowZOrderWatch(Protocol):
     def close(self) -> None: ...
 
 
@@ -109,6 +117,10 @@ class Win32WindowApi(Protocol):
 
     def set_topmost_no_activate(self, hwnd: int) -> tuple[bool, int | None]: ...
 
+    def topmost_peers_ahead(self, hwnd: int) -> tuple[int, ...]: ...
+
+    def watch_z_order(self, callback: Callable[[int, int], None]) -> WindowZOrderWatch: ...
+
 
 class NoopWindowZOrderPort:
     def bind_process(self, pid: int) -> None:
@@ -116,6 +128,9 @@ class NoopWindowZOrderPort:
 
     async def reassert_topmost_after_click_through(self) -> WindowZOrderResult:
         return WindowZOrderResult(applied=False, reason="unsupported_platform")
+
+    def stop_topmost_watch(self) -> None:
+        return None
 
     async def confirm_window_bounds(
         self,
@@ -183,6 +198,9 @@ class WindowsWindowZOrderPort:
         self._pid: int | None = None
         self._binding_generation = 0
         self._closed = False
+        self._watch: WindowZOrderWatch | None = None
+        self._watch_generation = 0
+        self._watch_callback: asyncio.Handle | None = None
 
     async def confirm_window_bounds(
         self,
@@ -437,6 +455,7 @@ class WindowsWindowZOrderPort:
     def bind_process(self, pid: int) -> None:
         if self._closed:
             return
+        self.stop_topmost_watch()
         self._pid = int(pid) if int(pid) > 0 else None
         self._binding_generation += 1
 
@@ -514,6 +533,7 @@ class WindowsWindowZOrderPort:
             if not self._window_belongs_to_process(hwnd, pid):
                 return WindowZOrderResult(applied=False, reason="window_changed")
             if self._api.extended_style(hwnd) & _WS_EX_TOPMOST:
+                self._start_topmost_watch(hwnd, pid, generation, loop)
                 return WindowZOrderResult(
                     applied=True,
                     reason="applied" if click_through_confirmed else "applied_unconfirmed",
@@ -529,10 +549,69 @@ class WindowsWindowZOrderPort:
                 )
             await self._sleep(min(self._poll_interval_s, remaining))
 
+    def _start_topmost_watch(
+        self, hwnd: int, pid: int, generation: int, loop: asyncio.AbstractEventLoop
+    ) -> None:
+        self.stop_topmost_watch()
+        watch_generation = self._watch_generation
+        pending_lock = threading.Lock()
+        pending = False
+        foreign_event = False
+        last_order = self._api.topmost_peers_ahead(hwnd)
+
+        def check_order() -> None:
+            nonlocal last_order, pending, foreign_event
+            if watch_generation != self._watch_generation:
+                return
+            with pending_lock:
+                pending = False
+                should_reassert = foreign_event
+                foreign_event = False
+                self._watch_callback = None
+            if not self._binding_is_current(pid, generation):
+                return
+            if not self._window_belongs_to_process(hwnd, pid):
+                return
+            if not self._api.is_window_visible(hwnd):
+                return
+            peers = self._api.topmost_peers_ahead(hwnd)
+            if peers == last_order:
+                return
+            last_order = peers
+            if peers and should_reassert:
+                self._api.set_topmost_no_activate(hwnd)
+
+        def queue_check(_event: int = 0, event_hwnd: int = 0) -> None:
+            nonlocal pending, foreign_event
+            with pending_lock:
+                if watch_generation != self._watch_generation:
+                    return
+                foreign_event = foreign_event or event_hwnd != hwnd
+                if pending:
+                    return
+                pending = True
+                with contextlib.suppress(RuntimeError):
+                    self._watch_callback = loop.call_soon_threadsafe(check_order)
+
+        self._watch = self._api.watch_z_order(queue_check)
+        queue_check()
+
+    def stop_topmost_watch(self) -> None:
+        self._watch_generation += 1
+        watch = self._watch
+        if watch is not None:
+            watch.close()
+            self._watch = None
+        callback = self._watch_callback
+        self._watch_callback = None
+        if callback is not None:
+            callback.cancel()
+
     def close(self) -> None:
         self._closed = True
         self._pid = None
         self._binding_generation += 1
+        self.stop_topmost_watch()
 
     def _binding_is_current(self, pid: int, generation: int) -> bool:
         return not self._closed and self._pid == pid and self._binding_generation == generation
@@ -616,6 +695,8 @@ class _CtypesWin32WindowApi:
         self._user32.GetWindowTextW.restype = ctypes.c_int
         self._user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
         self._user32.GetWindowRect.restype = wintypes.BOOL
+        self._user32.IsIconic.argtypes = [wintypes.HWND]
+        self._user32.IsIconic.restype = wintypes.BOOL
 
     def all_top_level_windows_for_process(self, pid: int) -> WindowEnumerationResult:
         windows: list[int] = []
@@ -690,6 +771,29 @@ class _CtypesWin32WindowApi:
     def extended_style(self, hwnd: int) -> int:
         return int(self._user32.GetWindowLongPtrW(hwnd, _GWL_EXSTYLE))
 
+    def topmost_peers_ahead(self, hwnd: int) -> tuple[int, ...]:
+        bounds = self.window_bounds(hwnd)
+        if bounds is None:
+            return ()
+        peers: list[int] = []
+        seen: set[int] = {hwnd}
+        peer = self._user32.GetWindow(hwnd, 3)
+        while peer and peer not in seen:
+            seen.add(peer)
+            if (
+                self.is_window_visible(peer)
+                and not self._user32.IsIconic(peer)
+                and self.extended_style(peer) & _WS_EX_TOPMOST
+            ):
+                peer_bounds = self.window_bounds(peer)
+                if peer_bounds is not None and _bounds_overlap(bounds, peer_bounds):
+                    peers.append(int(peer))
+            peer = self._user32.GetWindow(peer, 3)
+        return tuple(peers)
+
+    def watch_z_order(self, callback: Callable[[int, int], None]) -> WindowZOrderWatch:
+        return _WinEventWatch(callback)
+
     def set_topmost_no_activate(self, hwnd: int) -> tuple[bool, int | None]:
         ctypes.set_last_error(0)
         applied = bool(
@@ -704,6 +808,116 @@ class _CtypesWin32WindowApi:
             )
         )
         return applied, None if applied else ctypes.get_last_error()
+
+
+def _bounds_overlap(first: tuple[int, int, int, int], second: tuple[int, int, int, int]) -> bool:
+    x, y, width, height = first
+    other_x, other_y, other_width, other_height = second
+    return (
+        x < other_x + other_width
+        and other_x < x + width
+        and y < other_y + other_height
+        and other_y < y + height
+    )
+
+
+class _WinEventWatch:
+    def __init__(self, callback: Callable[[int, int], None]) -> None:
+        self._callback = callback
+        self._ready = threading.Event()
+        self._error: BaseException | None = None
+        self._thread_id = 0
+        self._user32 = ctypes.WinDLL("user32", use_last_error=True)
+        self._user32.PostThreadMessageW.argtypes = [
+            wintypes.DWORD,
+            wintypes.UINT,
+            wintypes.WPARAM,
+            wintypes.LPARAM,
+        ]
+        self._user32.PostThreadMessageW.restype = wintypes.BOOL
+        self._thread = threading.Thread(target=self._run, name="desktop-overlay-zorder")
+        self._thread.start()
+        self._ready.wait()
+        if self._error is not None:
+            self._thread.join()
+            raise self._error
+
+    def _run(self) -> None:
+        hooks: list[int] = []
+        user32 = self._user32
+        try:
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel32.GetCurrentThreadId.restype = wintypes.DWORD
+            self._thread_id = int(kernel32.GetCurrentThreadId())
+            proc_type = ctypes.WINFUNCTYPE(
+                None,
+                wintypes.HANDLE,
+                wintypes.DWORD,
+                wintypes.HWND,
+                wintypes.LONG,
+                wintypes.LONG,
+                wintypes.DWORD,
+                wintypes.DWORD,
+            )
+            user32.SetWinEventHook.argtypes = [
+                wintypes.DWORD,
+                wintypes.DWORD,
+                wintypes.HMODULE,
+                proc_type,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                wintypes.DWORD,
+            ]
+            user32.SetWinEventHook.restype = wintypes.HANDLE
+            user32.UnhookWinEvent.argtypes = [wintypes.HANDLE]
+            user32.UnhookWinEvent.restype = wintypes.BOOL
+            user32.GetMessageW.argtypes = [
+                ctypes.POINTER(wintypes.MSG),
+                wintypes.HWND,
+                wintypes.UINT,
+                wintypes.UINT,
+            ]
+            user32.GetMessageW.restype = wintypes.BOOL
+            user32.PeekMessageW.argtypes = [
+                ctypes.POINTER(wintypes.MSG),
+                wintypes.HWND,
+                wintypes.UINT,
+                wintypes.UINT,
+                wintypes.UINT,
+            ]
+            user32.PeekMessageW.restype = wintypes.BOOL
+            proc = proc_type(
+                lambda _hook, event, hwnd, *_args: self._callback(event, int(hwnd or 0))
+            )
+            message = wintypes.MSG()
+            user32.PeekMessageW(ctypes.byref(message), None, 0, 0, 0)
+            for event in (0x0003, 0x8002, 0x8004):
+                hook = user32.SetWinEventHook(event, event, None, proc, 0, 0, 0)
+                if not hook:
+                    raise ctypes.WinError(ctypes.get_last_error())
+                hooks.append(hook)
+            self._ready.set()
+            while True:
+                result = user32.GetMessageW(ctypes.byref(message), None, 0, 0)
+                if result == 0:
+                    break
+                if result == -1:
+                    raise ctypes.WinError(ctypes.get_last_error())
+        except BaseException as exc:
+            self._error = exc
+        finally:
+            for hook in hooks:
+                if not user32.UnhookWinEvent(hook):
+                    self._error = self._error or ctypes.WinError(ctypes.get_last_error())
+            self._ready.set()
+
+    def close(self) -> None:
+        if self._thread.is_alive():
+            if not self._user32.PostThreadMessageW(self._thread_id, 0x0012, 0, 0):
+                raise ctypes.WinError(ctypes.get_last_error())
+        self._thread.join()
+        if self._error is not None:
+            raise self._error
 
 
 def create_window_z_order_port() -> WindowZOrderPort:

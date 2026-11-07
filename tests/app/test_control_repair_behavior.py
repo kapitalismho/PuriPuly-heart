@@ -94,6 +94,99 @@ def offline(tmp_path, monkeypatch):
     return path
 
 
+@pytest.mark.parametrize(
+    ("demand", "ready", "status"),
+    [(True, False, "degraded"), (True, True, "applied"), (False, False, "applied")],
+)
+async def test_audio_target_control_receipt_matches_effective_listen_application(
+    tmp_path, monkeypatch, demand, ready, status
+):
+    from tests.app.test_peer_capture_target_application import capture_application
+
+    harness = capture_application(tmp_path, monkeypatch, demand=demand, ready=ready)
+    try:
+        accepted = await harness.control.submit(
+            "audio.target.set", {"value": "device:Synthetic A"}, request_id="target-state"
+        )
+        receipt = await harness.control.wait(accepted["operation_id"], timeout=5)
+        assert receipt["terminal"] is True
+        assert receipt["status"] == status
+        assert receipt["transaction"]["status"] == (
+            "settings_commit_success_runtime_applied"
+            if status == "applied"
+            else "settings_commit_success_runtime_degraded"
+        )
+        assert (
+            harness.settings.require_committed().intent.desktop_audio.capture_target.device_name
+            == "Synthetic A"
+        )
+        assert harness.settings.peer_translation_enabled() is demand
+        assert harness.runtime.snapshot.desired_active is demand
+        assert harness.runtime.snapshot.effective_active is (demand and ready)
+        assert harness.peer.owner.snapshot().effective_enabled is (demand and ready)
+    finally:
+        await harness.peer.owner.close()
+        await harness.control.drain_operations()
+
+
+@pytest.mark.parametrize("unavailable", [False, True])
+async def test_audio_target_control_preserves_invalid_and_unavailable_rejection(
+    tmp_path, monkeypatch, unavailable
+):
+    from puripuly_heart.app.ports.ui_models import OptionItem
+    from tests.app.test_peer_capture_target_application import capture_application
+
+    harness = capture_application(tmp_path, monkeypatch)
+    if unavailable:
+        monkeypatch.setattr(
+            harness.app,
+            "list_loopback_capture_options",
+            lambda: [OptionItem(value="device:Unknown", label="Unknown", disabled=True)],
+        )
+    try:
+        accepted = await harness.control.submit(
+            "audio.target.set", {"value": "device:Unknown"}, request_id="target-rejected"
+        )
+        receipt = await harness.control.wait(accepted["operation_id"], timeout=5)
+        assert receipt["status"] == ("action_required" if unavailable else "rejected")
+        assert receipt["error"]["code"] == (
+            "capture_target_unavailable" if unavailable else "invalid_arguments"
+        )
+        assert harness.sources == []
+        assert harness.provider.requests == []
+    finally:
+        await harness.peer.owner.close()
+        await harness.control.drain_operations()
+
+
+async def test_audio_target_control_preserves_failed_runtime_exception(tmp_path, monkeypatch):
+    from tests.app.test_peer_capture_target_application import capture_application
+
+    harness = capture_application(tmp_path, monkeypatch)
+    harness.app._runtime_logging = None
+
+    async def fail_refresh():
+        raise RuntimeError("controlled capture runtime failure")
+
+    effects = harness.peer.target.runtime_effects
+    harness.peer.target.runtime_effects = replace(effects, refresh_peer=fail_refresh)
+    try:
+        accepted = await harness.control.submit(
+            "audio.target.set", {"value": "device:Synthetic A"}, request_id="target-failed"
+        )
+        receipt = await harness.control.wait(accepted["operation_id"], timeout=5)
+        assert receipt["status"] == "failed"
+        assert receipt["error"]["code"] == "application_operation_failed"
+        assert (
+            harness.settings.require_committed().intent.desktop_audio.capture_target.device_name
+            == "Synthetic A"
+        )
+        assert harness.settings.peer_translation_enabled() is True
+    finally:
+        await harness.peer.owner.close()
+        await harness.control.drain_operations()
+
+
 @pytest.mark.asyncio
 async def test_committed_gui_event_is_unsolicited_and_staged_failure_is_invisible(
     offline, monkeypatch
@@ -306,9 +399,10 @@ async def test_noninterruptible_persistence_drains_before_host_closes(offline, m
             raise TimeoutError("save gate not released")
         return original(self, path, settings)
 
-    monkeypatch.setattr(type(host.control.settings.persistence), "persist", slow_save)
     try:
         await host.start()
+        assert not entered.is_set()
+        monkeypatch.setattr(type(host.control.settings.persistence), "persist", slow_save)
         control = host.control
         initial = await control.query("settings.current", {})
         stream = control.subscribe(topics=["settings"])
@@ -638,7 +732,7 @@ async def test_install_cancel_still_targets_started_owner_work(offline):
 
 @pytest.mark.asyncio
 async def test_manual_output_wait_allows_safe_mutations_but_orders_provider_transition(
-    offline, monkeypatch
+    offline, monkeypatch, memory_osc_transports
 ):
     app = compose_headless_application(offline)
     entered = asyncio.Event()
@@ -647,6 +741,7 @@ async def test_manual_output_wait_allows_safe_mutations_but_orders_provider_tran
 
     from uuid import uuid4
 
+    from puripuly_heart.app.ports.osc_control import SECONDARY_LANGUAGE_ID_BY_CODE
     from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
 
     async def slow_output(_text):
@@ -662,6 +757,7 @@ async def test_manual_output_wait_allows_safe_mutations_but_orders_provider_tran
         await app.start()
         control = app.control()
         control.bind_instance("isolated-manual-wait")
+        osc_runtime = await memory_osc_transports.enable_manual(app)
         monkeypatch.setattr(app, "submit_text", slow_output)
         monkeypatch.setattr(app, "set_translation_enabled", translation)
         manual = await control.submit("text.submit", {"text": "safe text"}, request_id="manual")
@@ -693,10 +789,11 @@ async def test_manual_output_wait_allows_safe_mutations_but_orders_provider_tran
         )
         assert (await control.wait(conflicting["operation_id"], timeout=0.01))["terminal"] is False
         assert (await control.wait(stale["operation_id"], timeout=0.01))["terminal"] is False
-        osc_runtime = app._runtime_shutdown.vrc_mic_sync()
-        assert osc_runtime is not None
         osc_change = asyncio.create_task(
-            osc_runtime.router._application.set_secondary_target_language("zh-CN")
+            osc_runtime.router.dispatch_packet(
+                "/avatar/parameters/PuriPuly_SelfDstLang2",
+                SECONDARY_LANGUAGE_ID_BY_CODE["zh-CN"],
+            )
         )
         await asyncio.sleep(0)
         assert not osc_change.done()
@@ -712,7 +809,9 @@ async def test_manual_output_wait_allows_safe_mutations_but_orders_provider_tran
         }
         assert (await control.wait(conflicting["operation_id"], timeout=5))["status"] == "applied"
         assert translated == [False]
-        await asyncio.wait_for(osc_change, 5)
+        osc_result = await asyncio.wait_for(osc_change, 5)
+        assert osc_result.applied is True
+        assert osc_result.error is None
         assert (await control.query("settings.current", {}))["settings"]["intent"]["languages"][
             "secondary_target_language"
         ] == "zh-CN"
@@ -738,8 +837,8 @@ async def test_long_output_wait_orders_cli_overlay_audio_and_gui_settings_captur
         await release.wait()
         return TextSubmissionAdmission("admitted", uuid4(), ())
 
-    async def no_audio_effects(_settings):
-        pass
+    async def no_audio_effects(_settings) -> bool:
+        return True
 
     try:
         await app.start()
@@ -938,7 +1037,7 @@ async def test_control_overlay_receipts_preserve_owner_outcomes_and_captured_tra
 
 @pytest.mark.asyncio
 async def test_gpu_discovery_receipt_follows_owner_snapshot(offline):
-    from puripuly_heart.core.gpu_worker import GpuWorkerDevice
+    from puripuly_heart.core.asr_worker import ASRWorkerDevice
     from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
         LocalASRProviderRuntimeSnapshot,
         ProviderRuntimeGpuSnapshot,
@@ -950,7 +1049,7 @@ async def test_gpu_discovery_receipt_follows_owner_snapshot(offline):
         control = app.control()
         control.bind_instance("offline-gpu")
         owner = control.gpu()
-        device = GpuWorkerDevice("gpu:0", 0, "isolated", "fake GPU", "discrete", 1024, 512)
+        device = ASRWorkerDevice("gpu:0", 0, "isolated", "fake GPU", "discrete", 1024, 512)
         phase = "unsupported"
 
         async def discover_gpu(*, force):
@@ -1125,12 +1224,11 @@ async def test_logout_restores_active_translation_after_failed_persistence_and_h
 async def test_managed_logout_preserves_other_account_metadata_and_compensates_failed_save(
     offline, monkeypatch
 ):
-    from puripuly_heart.core.openrouter_credentials import (
+    from puripuly_heart.app.wiring.wiring_managed_auth_factory import ManagedAuthRuntimeAdapter
+    from puripuly_heart.core.openrouter.openrouter_credentials import (
         OPENROUTER_MANAGED_API_KEY_SECRET,
         OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     )
-
-    from puripuly_heart.app.wiring.wiring_managed_auth_factory import ManagedAuthRuntimeAdapter
 
     app = compose_headless_application(offline)
     owner = app._settings.settings
@@ -1200,12 +1298,12 @@ async def test_qq_network_recovery_login_remains_action_required_without_reasser
     import ssl
 
     import httpx
-    from puripuly_heart.app.services.managed_auth import (
+
+    from puripuly_heart.app.services.managed.managed_auth import (
         ManagedAuthExecutionResult,
         ManagedAuthOwner,
         ManagedAuthState,
     )
-
     from puripuly_heart.core import messages
     from tests.app.test_qq_managed_auth import (
         RAW_QQ_CREDENTIAL,

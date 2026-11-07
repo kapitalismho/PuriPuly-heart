@@ -153,10 +153,6 @@ def test_settings_api_surface_preserves_accepted_initial_row_visibility() -> Non
 def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings_view_module.SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(
-        settings_view_module.SettingsView, "_refresh_microphones", lambda self: None
-    )
     monkeypatch.setattr(settings_view_module.SettingsView, "update", lambda self: None)
     view = settings_view_module.SettingsView()
 
@@ -192,7 +188,10 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
         apply_loopback_capture_option=make("apply_loopback_capture_option"),
         loopback_capture_summary=make("loopback_capture_summary"),
     )
-    prompt = SettingsPromptIntents(prompt_apply_settings=make("prompt_apply_settings"))
+    prompt = SettingsPromptIntents(
+        prompt_apply_settings=make("prompt_apply_settings"),
+        pending_prompt_changed=make("pending_prompt_changed"),
+    )
     overlay = SettingsOverlayIntents(
         desktop_overlay_lock_change=make("desktop_overlay_lock_change"),
         desktop_overlay_size_change=make("desktop_overlay_size_change"),
@@ -234,6 +233,7 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     assert view.on_apply_loopback_capture_option is general.apply_loopback_capture_option
     assert view.on_loopback_capture_summary is general.loopback_capture_summary
     assert view.on_prompt_apply_settings is prompt.prompt_apply_settings
+    assert view.on_pending_prompt_changed is prompt.pending_prompt_changed
     assert view.on_desktop_overlay_lock_change is overlay.desktop_overlay_lock_change
     assert view.on_desktop_overlay_size_change is overlay.desktop_overlay_size_change
     assert view.on_desktop_overlay_recovery_action is overlay.desktop_overlay_recovery_action
@@ -248,10 +248,6 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
 def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings_view_module.SettingsView, "_populate_host_apis", lambda self: None)
-    monkeypatch.setattr(
-        settings_view_module.SettingsView, "_refresh_microphones", lambda self: None
-    )
     monkeypatch.setattr(settings_view_module.SettingsView, "update", lambda self: None)
     view = settings_view_module.SettingsView()
     existing_basic = view.runtime_log_basic

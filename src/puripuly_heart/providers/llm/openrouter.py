@@ -19,8 +19,10 @@ from puripuly_heart.core import network_clients
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
-from puripuly_heart.core.openrouter_credentials import normalize_managed_openrouter_user_identifier
-from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
+from puripuly_heart.core.openrouter.openrouter_credentials import (
+    normalize_managed_openrouter_user_identifier,
+)
+from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
 from puripuly_heart.core.openrouter_routing import (
     OpenRouterProviderRouting,
     OpenRouterRoutingMode,
@@ -193,7 +195,7 @@ def _build_provider_preferences(
         }
     if model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41:
         return {
-            "only": ["deepseek", "wafer"],
+            "only": ["inference-net", "deepseek"],
             "allow_fallbacks": False,
         }
     if model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH:
@@ -241,7 +243,7 @@ def _build_provider_preferences(
         }
     if provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT:
         return {
-            "only": ["deepseek", "wafer"],
+            "only": ["inference-net", "deepseek"],
             "allow_fallbacks": False,
         }
     if provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY:

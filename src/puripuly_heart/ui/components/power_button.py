@@ -4,6 +4,7 @@ import flet as ft
 
 from puripuly_heart.ui.components.loading_spinner import create_button_spinner
 from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
+from puripuly_heart.ui.motion import press
 from puripuly_heart.ui.theme import (
     COLOR_PRIMARY,
     COLOR_SECONDARY,
@@ -13,6 +14,7 @@ from puripuly_heart.ui.theme import (
 )
 
 _HOVER_SCALE = 1.02
+_HOVER_ANIMATION = ft.Animation(200, ft.AnimationCurve.EASE_OUT)
 
 
 class PowerButton(ft.Container):
@@ -33,6 +35,7 @@ class PowerButton(ft.Container):
         self._is_on = False
         self._needs_key = False
         self._is_starting = False
+        self._hovered = False
         self._color_on = color_on if color_on is not None else COLOR_PRIMARY
 
         self._icon_control = ft.Icon(icon=icon, size=icon_size, color=COLOR_SECONDARY)
@@ -73,8 +76,9 @@ class PowerButton(ft.Container):
             # alignment=ft.alignment.center,  <-- REMOVED: This was crushing the stack
             on_click=lambda _: self._on_click(),
             on_hover=self._on_hover,
+            on_tap_down=self._on_tap_down,
             animate=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
-            animate_scale=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
+            animate_scale=_HOVER_ANIMATION,
             scale=1.0,
         )
 
@@ -118,8 +122,22 @@ class PowerButton(ft.Container):
 
     def _on_hover(self, event: ft.ControlEvent) -> None:
         """Lift the button while the pointer is over it."""
-        self.scale = _HOVER_SCALE if (is_hover_active(event) and not self._is_starting) else 1.0
+        self._hovered = is_hover_active(event)
+        self.scale = self._rest_scale()
         update_control_if_mounted(self)
+
+    def _on_tap_down(self, _event: object) -> None:
+        if self.disabled or self._is_starting:
+            return
+        press(self, rest=self._rest_scale, animation=_HOVER_ANIMATION)
+
+    def _rest_scale(self) -> float:
+        return _HOVER_SCALE if (self._hovered and not self._is_starting) else 1.0
+
+    def set_icon(self, icon: str) -> None:
+        self._icon = icon
+        self._icon_control.icon = icon
+        update_control_if_mounted(self._icon_control)
 
     def set_label(self, label: str) -> None:
         self._label = label

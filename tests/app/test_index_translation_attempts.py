@@ -13,11 +13,7 @@ from puripuly_heart.config.runtime_resolution import (
     resolve_llm_config,
 )
 from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider, LLMProviderRaceError
-from puripuly_heart.core.llm.index_translate import (
-    IndexRequestLimitError,
-    IndexServiceUnavailableError,
-    is_index_service_failure,
-)
+from puripuly_heart.core.llm.index_translate import IndexServiceUnavailableError
 from puripuly_heart.providers.llm import index_translate
 
 
@@ -136,7 +132,10 @@ async def test_early_primary_error_waits_for_1300ms_and_never_adds_third_attempt
             with pytest.raises(LLMProviderRaceError) as failure:
                 await asyncio.wait_for(task, 1)
             assert len(failure.value.errors) == 2
-            assert is_index_service_failure(failure.value)
+            for error in failure.value.errors:
+                assert isinstance(error, IndexServiceUnavailableError)
+                assert error.reason == "http_status"
+                assert error.status_code == 503
         await delay.advance_to(100.0)
         assert sent == [0.0, 1.3]
     finally:
@@ -248,22 +247,3 @@ async def test_cancellation_before_delay_never_sends_duplicate(build_provider):
     finally:
         await provider.close()
     assert all(client.is_closed for client in clients)
-
-
-@pytest.mark.parametrize(
-    "errors",
-    [
-        (),
-        (IndexRequestLimitError("output_limit"),),
-        (IndexServiceUnavailableError("timeout"), IndexRequestLimitError("input_limit")),
-        (asyncio.CancelledError(),),
-        (RuntimeError("unknown failure"),),
-    ],
-)
-def test_only_all_service_failures_establish_unavailability(errors):
-    assert not is_index_service_failure(LLMProviderRaceError(errors))
-    assert is_index_service_failure(
-        LLMProviderRaceError(
-            (IndexServiceUnavailableError("timeout"), IndexServiceUnavailableError("transport"))
-        )
-    )

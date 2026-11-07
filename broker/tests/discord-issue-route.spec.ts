@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { buildManagedOperationId, buildManagedOperationResumeToken } from './test-support/managed-operation';
 
 import app from '../src/index';
 import {
@@ -23,8 +24,6 @@ import {
   updateAbuseRuntimeState,
 } from './test-support/abuse-controls';
 import {
-  buildManagedOperationId,
-  buildManagedOperationResumeToken,
   getManagedOperation,
   listManagedOperationAttempts,
 } from '../src/managed-operation';

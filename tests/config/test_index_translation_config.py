@@ -40,7 +40,7 @@ def test_index_is_a_distinct_public_api_selection():
     assert intent.connection == "public_api"
     compatible = derive_translation_runtime_intent_from_compatibility(
         provider_llm="index_translate",
-        openrouter_model="deepseek/deepseek-v4.1-flash",
+        openrouter_model="deepseek/deepseek-v4.1-flash-1017",
         openrouter_selected_source="managed",
     )
     assert compatible == intent

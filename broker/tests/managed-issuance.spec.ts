@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import type { ManagedCleanupOutcomeForAudit } from '../src/managed-issuance';
 import {
@@ -6,14 +6,6 @@ import {
   getManagedIssuanceSourcePolicy,
 } from '../src/managed-issuance';
 
-type AssertFalse<T extends false> = T;
-type HasSuccessfulCleanupOutcome = Extract<
-  ManagedCleanupOutcomeForAudit,
-  { ok: true }
-> extends never
-  ? false
-  : true;
-type RejectSuccessfulCleanupOutcome = AssertFalse<HasSuccessfulCleanupOutcome>;
 
 describe('Managed issuance source policy', () => {
   it('keeps QQ on the base Managed trial policy', () => {
@@ -34,6 +26,10 @@ describe('Managed issuance source policy', () => {
 });
 
 describe('Managed cleanup-required audit payloads', () => {
+  it('excludes successful cleanup from cleanup-required audit input', () => {
+    expectTypeOf<Extract<ManagedCleanupOutcomeForAudit, { ok: true }>>().toEqualTypeOf<never>();
+  });
+
   it('uses source-aware QQ metadata and redacts sensitive cleanup diagnostics', () => {
     const rawCredential = 'abcdef'.repeat(10) + 'abcd';
     const rawChildKey = 'sk-or-v1-sensitive-child-key-value';

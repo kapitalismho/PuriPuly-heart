@@ -10,13 +10,13 @@ from puripuly_heart.config.process_capture_resolution import (
     ProcessCaptureResolver,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.audio.process_identity import PsutilCurrentUserProcessSnapshots
+from puripuly_heart.core.audio.process_identity import default_current_user_process_snapshots
 
 
 class WindowsProcessCaptureInventoryAdapter:
     def candidates(self) -> tuple[ProcessCaptureCandidate, ...]:
         return ProcessCaptureResolver(
-            snapshots=PsutilCurrentUserProcessSnapshots()
+            snapshots=default_current_user_process_snapshots()
         ).enumerate_candidates()
 
 
@@ -45,14 +45,15 @@ class WindowsLoopbackDeviceInventoryAdapter:
 
 @dataclass(frozen=True, slots=True)
 class PeerCaptureTargetRuntimeEffectsAdapter:
-    refresh_peer: Callable[[], Awaitable[None]]
+    refresh_peer: Callable[[], Awaitable[bool]]
     sync_effective_flags: Callable[[object], None]
     refresh_presentation: Callable[[], None]
 
-    async def apply_capture_target(self, settings: AppSettingsVNext) -> None:
-        await self.refresh_peer()
+    async def apply_capture_target(self, settings: AppSettingsVNext) -> bool:
+        applied = await self.refresh_peer()
         self.sync_effective_flags(settings)
         self.refresh_presentation()
+        return applied
 
 
 __all__ = [

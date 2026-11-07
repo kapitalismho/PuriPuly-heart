@@ -528,11 +528,16 @@ export async function findManagedChildKeyByName(input: {
   managementApiKey: string;
   keyName: string;
   offset?: number;
+  pageBudget?: { remainingProviderPages: number };
   fetchImpl?: FetchImpl;
 }): Promise<ManagedChildKeyLookupResult> {
   let offset = input.offset ?? 0;
   try {
     for (let page = 0; page < 20; page += 1) {
+      if (input.pageBudget) {
+        if (input.pageBudget.remainingProviderPages === 0) break;
+        input.pageBudget.remainingProviderPages -= 1;
+      }
       const response = await requestOpenRouter({
         operation: 'read_key',
         path: `/keys?limit=100&offset=${offset}&include_disabled=true&include_expired=true`,

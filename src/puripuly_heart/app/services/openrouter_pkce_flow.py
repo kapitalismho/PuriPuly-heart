@@ -10,18 +10,20 @@ from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
 from puripuly_heart.app.ports.secret_store import SecretStorePort
 from puripuly_heart.app.ports.settings_view import OpenRouterPkceTarget
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.app.services.provider_runtime_apply import (
+from puripuly_heart.app.services.provider.provider_runtime_apply import (
     ProviderRuntimeApplyAdapter,
     ProviderRuntimeOwner,
     _runtime_apply_result_as_degraded_transaction,
 )
-from puripuly_heart.app.services.provider_settings import ProviderSettingsOwner
+from puripuly_heart.app.services.provider.provider_settings import ProviderSettingsOwner
 from puripuly_heart.app.services.secret_settings_transaction import (
     SecretSetRequest,
     SecretSettingsTransaction,
 )
-from puripuly_heart.app.services.settings_application import materialize_provider_apply_intent
-from puripuly_heart.app.services.settings_transaction_result import (
+from puripuly_heart.app.services.settings.settings_application import (
+    materialize_provider_apply_intent,
+)
+from puripuly_heart.app.services.settings.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
 from puripuly_heart.config.llm_profiles import profile_for_alias
@@ -44,8 +46,8 @@ from puripuly_heart.core.openrouter.authentication import (
     OpenRouterAuthenticationError,
     OpenRouterAuthStage,
 )
-from puripuly_heart.core.openrouter_credentials import OPENROUTER_BYOK_API_KEY_SECRET
-from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
+from puripuly_heart.core.openrouter.openrouter_credentials import OPENROUTER_BYOK_API_KEY_SECRET
+from puripuly_heart.core.openrouter.openrouter_pkce import OpenRouterPKCEExchangeResult
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 
 

@@ -10,17 +10,9 @@ CUSTOM_STT_PROVIDER: Final = "custom"
 _CUSTOM_STT_SECRET_GENERATION = 0
 CUSTOM_STT_MODE_OFFLINE: Final = "offline"
 CUSTOM_STT_MODE_REALTIME: Final = "realtime"
-CUSTOM_STT_MODES: Final[tuple[str, ...]] = (
-    CUSTOM_STT_MODE_OFFLINE,
-    CUSTOM_STT_MODE_REALTIME,
-)
 
 CUSTOM_STT_COMPAT_OPENAI_TRANSCRIPTION: Final = "openai_transcription"
 CUSTOM_STT_COMPAT_OPENAI_REALTIME: Final = "openai_realtime"
-CUSTOM_STT_COMPATIBILITIES: Final[tuple[str, ...]] = (
-    CUSTOM_STT_COMPAT_OPENAI_TRANSCRIPTION,
-    CUSTOM_STT_COMPAT_OPENAI_REALTIME,
-)
 
 CUSTOM_STT_CAPABILITY_LANGUAGE_HINT: Final = "language_hint"
 
@@ -40,10 +32,6 @@ CUSTOM_STT_VALIDATION_STATUSES: Final[tuple[str, ...]] = (
     CUSTOM_STT_VALIDATION_READY,
 )
 
-_DEFAULT_COMPATIBILITY_BY_MODE: Final[Mapping[str, str]] = {
-    CUSTOM_STT_MODE_OFFLINE: CUSTOM_STT_COMPAT_OPENAI_TRANSCRIPTION,
-    CUSTOM_STT_MODE_REALTIME: CUSTOM_STT_COMPAT_OPENAI_REALTIME,
-}
 _SUPPORTED_COMPATIBILITIES_BY_MODE: Final[Mapping[str, frozenset[str]]] = {
     CUSTOM_STT_MODE_OFFLINE: frozenset({CUSTOM_STT_COMPAT_OPENAI_TRANSCRIPTION}),
     CUSTOM_STT_MODE_REALTIME: frozenset({CUSTOM_STT_COMPAT_OPENAI_REALTIME}),
@@ -102,13 +90,6 @@ def custom_stt_secret_generation() -> int:
     return _CUSTOM_STT_SECRET_GENERATION
 
 
-def default_compatibility_for_mode(mode: str) -> str:
-    try:
-        return _DEFAULT_COMPATIBILITY_BY_MODE[mode]
-    except KeyError as exc:
-        raise CustomSTTConfigurationError(f"unsupported Custom STT mode: {mode}") from exc
-
-
 def supported_compatibilities_for_mode(mode: str) -> frozenset[str]:
     try:
         return _SUPPORTED_COMPATIBILITIES_BY_MODE[mode]
@@ -135,59 +116,6 @@ def validate_mode_compatibility(mode: str, compatibility: str) -> None:
         raise CustomSTTConfigurationError(
             f"Custom STT compatibility {compatibility} is not supported in {mode} mode"
         )
-
-
-def normalize_custom_stt_mode(value: object, *, default: str = CUSTOM_STT_MODE_OFFLINE) -> str:
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"streaming", "realtime", "real-time"}:
-            return CUSTOM_STT_MODE_REALTIME
-        if normalized in CUSTOM_STT_MODES:
-            return normalized
-    return default
-
-
-def normalize_custom_stt_compatibility(
-    value: object,
-    *,
-    mode: str,
-    default: str | None = None,
-) -> str:
-    allowed = supported_compatibilities_for_mode(mode)
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in allowed:
-            return normalized
-        if normalized:
-            raise CustomSTTConfigurationError(
-                f"Custom STT compatibility {normalized} is not supported in {mode} mode"
-            )
-    return default if default is not None else default_compatibility_for_mode(mode)
-
-
-def normalize_custom_stt_endpoint(value: object) -> str:
-    if not isinstance(value, str):
-        return ""
-    raw = value.strip()
-    if not raw:
-        return ""
-    try:
-        parsed = urlsplit(raw)
-        _ = parsed.port
-    except ValueError:
-        return ""
-    if parsed.username or parsed.password or parsed.query or parsed.fragment:
-        if not parsed.scheme or not parsed.hostname:
-            return ""
-        netloc = f"{parsed.hostname}:{parsed.port}" if parsed.port else parsed.hostname
-        return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
-    return raw
-
-
-def normalize_custom_stt_model(value: object) -> str:
-    if not isinstance(value, str):
-        return ""
-    return value.strip()
 
 
 def normalize_custom_stt_extra(

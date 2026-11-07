@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 
 import type { BrokerEnv } from './contract';
+import { readJsonBody } from './public-input';
 import { executeDiscordResumeIssuance } from './discord-managed-issue';
 import {
   authenticateManagedOperationRequest,
@@ -22,19 +23,6 @@ import {
 import { instrumentPublicPostRoute } from './abuse-controls';
 import type { ManagedKeyDeliveryRecord } from './persistence';
 import { executeQqResumeIssuance } from './qq-managed-issue';
-
-async function readJsonBody(c: Context<BrokerEnv>): Promise<{ ok: true; value: Record<string, unknown> } | { ok: false }> {
-  let parsed: unknown;
-  try {
-    parsed = await c.req.json();
-  } catch {
-    return { ok: false };
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    return { ok: false };
-  }
-  return { ok: true, value: parsed as Record<string, unknown> };
-}
 
 async function getLatestOperationDelivery(
   db: D1Database,

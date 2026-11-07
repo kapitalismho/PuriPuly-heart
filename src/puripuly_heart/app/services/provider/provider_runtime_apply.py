@@ -112,6 +112,8 @@ class LlmProviderRebuildContext:
     replace_provider: LlmProviderReplace
     requires_secret: bool
     resource_label: str = "LLM provider"
+    selection: tuple[str, str, str] | None = None
+    previous_selection: tuple[str, str, str] | None = None
 
 
 @dataclass(slots=True)
@@ -155,6 +157,26 @@ class LlmProviderRebuildOwner:
         else:
             self.signature_sink(context.settings)
         self.availability_sink(provider is None and context.requires_secret)
+        if provider is not None and (
+            context.selection is None or context.selection != context.previous_selection
+        ):
+            provider_id, model_id, connection_id = context.selection or (
+                "unknown",
+                "unknown",
+                "unknown",
+            )
+            previous_provider, previous_model, previous_connection = context.previous_selection or (
+                "none",
+                "none",
+                "none",
+            )
+            self.success_sink(
+                "[Translation] provider_transition channel=self,peer "
+                f"previous_provider={previous_provider} provider={provider_id} "
+                f"previous_model={previous_model} model={model_id} "
+                f"previous_connection={previous_connection} connection={connection_id} "
+                "outcome=applied"
+            )
         try:
             await self.usage_refresh()
         except Exception:
@@ -166,7 +188,6 @@ class LlmProviderRebuildOwner:
         if provider is None:
             self.failure_sink(f"{context.resource_label} not available")
             return False
-        self.success_sink(f"[Settings] {context.resource_label} rebuilt successfully")
         return True
 
 

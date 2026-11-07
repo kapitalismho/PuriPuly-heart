@@ -9,9 +9,9 @@
     "verify:config": "wrangler types --config wrangler.jsonc"
   },
   "dependencies": {
-    "hono": "^4.12.12"
+    "hono": "^4.13.14"
   },
   "devDependencies": {
-    "wrangler": "^4.80.0"
+    "wrangler": "^4.153.0"
   }
 }

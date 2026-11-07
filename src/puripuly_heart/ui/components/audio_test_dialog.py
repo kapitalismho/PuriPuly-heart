@@ -23,6 +23,7 @@ from puripuly_heart.ui.components.modal_kit import (
 )
 from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.i18n import t
+from puripuly_heart.ui.motion import close_modal, show_modal
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_NEUTRAL_DARK,
@@ -302,7 +303,7 @@ class AudioTestDialog:
         self._close_notified = False
         self._dialog = self._build_dialog()
         self._is_open = True
-        self._page.show_dialog(self._dialog)
+        show_modal(self._page, self._dialog)
         self._render_task = self._run_task(self._render_loop)
 
     def close(self, *, notify: bool = False) -> None:
@@ -317,7 +318,7 @@ class AudioTestDialog:
         else:
             self._close_notified = True
         if was_open:
-            self._page.pop_dialog()
+            close_modal(self._page, dialog)
 
     def add_samples(self, channel: str, samples: Sequence[object]) -> None:
         panel = self._panels.get(channel)

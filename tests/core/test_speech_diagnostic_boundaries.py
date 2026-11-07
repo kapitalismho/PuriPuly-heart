@@ -6,8 +6,8 @@ from dataclasses import replace
 
 import pytest
 
+from puripuly_heart.core.asr_worker import ASRWorkerRequestError
 from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
-from puripuly_heart.core.gpu_worker import GpuWorkerRequestError
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.self_capture import SelfCaptureSessionState
 from tests.core.runtime.test_local_asr_provider_runtime import (
@@ -29,7 +29,7 @@ def native_records(caplog):
 
 @pytest.mark.asyncio
 async def test_failed_build_warmup_retains_first_cause_and_cleanup_debt(caplog) -> None:
-    primary = GpuWorkerRequestError("heartbeat_timeout", {"raw_payload": "PRIVATE_NATIVE_BODY"})
+    primary = ASRWorkerRequestError("heartbeat_timeout", {"raw_payload": "PRIVATE_NATIVE_BODY"})
 
     class Candidate(FakeProvider):
         async def warmup(self):
@@ -81,7 +81,7 @@ async def test_failed_build_warmup_retains_first_cause_and_cleanup_debt(caplog) 
 async def test_attached_warmup_failure_preserves_actual_phase_and_retryability(caplog) -> None:
     class Candidate(FakeProvider):
         async def warmup(self):
-            raise GpuWorkerRequestError("heartbeat_timeout", {})
+            raise ASRWorkerRequestError("heartbeat_timeout", {})
 
     class Factory(FakeProviderFactory):
         async def create(self, request, *, gpu_runtime, on_terminal_failure=None):
@@ -101,7 +101,7 @@ async def test_attached_warmup_failure_preserves_actual_phase_and_retryability(c
             ProviderRuntimeBuildRequest(config=_resolved_config("self")), start=True
         )
         generation = owner.snapshot.channel_for("self").generation
-        with pytest.raises(GpuWorkerRequestError):
+        with pytest.raises(ASRWorkerRequestError):
             await owner.warmup_channel("self")
         assert owner.snapshot.channel_for("self").phase == "running"
         assert owner.snapshot.channel_for("self").generation == generation

@@ -214,7 +214,6 @@ class Harness:
                 "overlay_enabled",
                 enabled,
             ),
-            persist_manual_fallback=lambda: True,
             ensure_local_ready=self.ensure_ready,
             clear_cpu_pending=lambda: self.events.append("clear_cpu"),
             clear_gpu_pending=lambda: self.events.append("clear_gpu"),
@@ -247,7 +246,7 @@ def test_peer_runtime_state_omits_intermediate_provider_wait() -> None:
         provider_status=PeerCaptureProviderStatus.PENDING,
         target_status=PeerCaptureTargetStatus.RESOLVED,
         generation=7,
-        provider_id="local_qwen",
+        provider_id="local_fun_asr_mlt_nano",
         failure_reason=None,
         admission_reason="provider_wait",
         target_reason=None,
@@ -288,7 +287,7 @@ def test_nonprocess_runtime_failure_refreshes_effective_flags_and_presentation()
             event=PeerCaptureDiagnosticEvent.FAILURE,
             generation=1,
             state=PeerCaptureSessionState.FAULTED,
-            provider_id="local_qwen",
+            provider_id="local_fun_asr_mlt_nano",
             capture_kind="default_output_device",
             reason=PeerCaptureFailureReason.SESSION_FAILED,
         )
@@ -703,6 +702,20 @@ async def test_peer_activation_waits_for_provisioning_before_recording_convergen
         )
         is True
     )
+
+
+@pytest.mark.parametrize("demand", [False, True])
+async def test_capture_target_refresh_without_runtime_only_applies_when_listen_is_off(
+    demand: bool,
+) -> None:
+    harness = Harness(runtime_available=False)
+    harness.settings.ui.peer_translation_enabled = demand
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+
+    assert await owner.refresh_capture_target() is not demand
+    assert owner.snapshot().effective_enabled is False
+    assert harness.settings.ui.peer_translation_enabled is demand
 
 
 @pytest.mark.asyncio

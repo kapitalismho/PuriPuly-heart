@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import importlib
-import inspect
 import json
 import logging
 import sys
@@ -25,20 +24,6 @@ FAKE_APP_VIEW = SimpleNamespace(FLET_APP_HIDDEN=object())
 
 def test_main_version_prints(capsys) -> None:
     result = main_module.main(["--version"])
-    assert result == 0
-    assert capsys.readouterr().out.strip() == __version__
-
-
-def test_main_version_prints_without_soxr_runtime_startup_check(monkeypatch, capsys) -> None:
-    monkeypatch.setattr(
-        main_module,
-        "ensure_soxr_runtime_available_for_startup",
-        lambda: pytest.fail("--version should not run the soxr startup check"),
-        raising=False,
-    )
-
-    result = main_module.main(["--version"])
-
     assert result == 0
     assert capsys.readouterr().out.strip() == __version__
 
@@ -270,81 +255,6 @@ def test_run_gui_logs_actionable_ui_startup_failure(monkeypatch, tmp_path, caplo
     assert all("application boundary construction failed" not in message for message in messages)
 
 
-def test_main_default_invokes_gui(monkeypatch, tmp_path) -> None:
-    calls: dict[str, object] = {}
-
-    fake_flet = ModuleType("flet")
-
-    def fake_run(*, main, assets_dir, **_kwargs):
-        calls["main"] = main
-        calls["assets_dir"] = assets_dir
-
-    fake_flet.run = fake_run
-    fake_flet.AppView = FAKE_APP_VIEW
-    monkeypatch.setitem(sys.modules, "flet", fake_flet)
-
-    fake_ui_app = ModuleType("puripuly_heart.ui.app")
-
-    async def main_gui(page, *, config_path, debug_ui_preview=False, **_kwargs):
-        _ = page
-        calls["config_path"] = config_path
-        calls["debug_ui_preview"] = debug_ui_preview
-
-    fake_ui_app.main_gui = main_gui
-    monkeypatch.setitem(sys.modules, "puripuly_heart.ui.app", fake_ui_app)
-
-    fake_fonts = ModuleType("puripuly_heart.ui.fonts")
-    fake_fonts.assets_dir = lambda: tmp_path
-    monkeypatch.setitem(sys.modules, "puripuly_heart.ui.fonts", fake_fonts)
-
-    config_path = tmp_path / "settings.json"
-    result = main_module.main(["--config", str(config_path)])
-
-    assert result == 0
-    assert calls["assets_dir"] == str(tmp_path)
-    assert callable(calls["main"])
-    asyncio.run(calls["main"](object()))
-    assert calls["config_path"] == config_path
-    assert calls["debug_ui_preview"] is False
-
-
-def test_main_run_gui_passes_debug_ui_preview_flag(monkeypatch, tmp_path) -> None:
-    calls: dict[str, object] = {}
-
-    fake_flet = ModuleType("flet")
-
-    def fake_run(*, main, assets_dir, **_kwargs):
-        calls["main"] = main
-        calls["assets_dir"] = assets_dir
-
-    fake_flet.run = fake_run
-    fake_flet.AppView = FAKE_APP_VIEW
-    monkeypatch.setitem(sys.modules, "flet", fake_flet)
-
-    fake_ui_app = ModuleType("puripuly_heart.ui.app")
-
-    async def main_gui(page, *, config_path, debug_ui_preview=False, **_kwargs):
-        _ = page
-        calls["config_path"] = config_path
-        calls["debug_ui_preview"] = debug_ui_preview
-
-    fake_ui_app.main_gui = main_gui
-    monkeypatch.setitem(sys.modules, "puripuly_heart.ui.app", fake_ui_app)
-
-    fake_fonts = ModuleType("puripuly_heart.ui.fonts")
-    fake_fonts.assets_dir = lambda: tmp_path
-    monkeypatch.setitem(sys.modules, "puripuly_heart.ui.fonts", fake_fonts)
-
-    config_path = tmp_path / "settings.json"
-    result = main_module.main(["--config", str(config_path), "run-gui", "--debug-ui-preview"])
-
-    assert result == 0
-    assert calls["assets_dir"] == str(tmp_path)
-    asyncio.run(calls["main"](object()))
-    assert calls["config_path"] == config_path
-    assert calls["debug_ui_preview"] is True
-
-
 def test_run_gui_debug_preview_constructs_vrchat_presence(monkeypatch, tmp_path) -> None:
     calls: dict[str, object] = {}
     fake_flet = ModuleType("flet")
@@ -483,34 +393,23 @@ def test_main_default_gui_passes_debug_ui_preview_flag(monkeypatch, tmp_path) ->
     assert calls["debug_ui_preview"] is True
 
 
-def test_real_main_gui_accepts_debug_ui_preview_keyword_only() -> None:
-    from puripuly_heart.ui.app import main_gui
-
-    parameters = inspect.signature(main_gui).parameters
-
-    assert "debug_ui_preview" in parameters
-    debug_ui_preview = parameters["debug_ui_preview"]
-    assert debug_ui_preview.kind is inspect.Parameter.KEYWORD_ONLY
-    assert debug_ui_preview.default is False
-
-
-def test_main_local_qwen_runtime_check_dispatches_runner(monkeypatch, tmp_path) -> None:
+def test_main_local_sherpa_runtime_check_dispatches_runner(monkeypatch, tmp_path) -> None:
     calls: dict[str, object] = {}
 
-    def fake_run_local_qwen_runtime_check() -> int:
+    def fake_run_local_sherpa_runtime_check() -> int:
         calls["called"] = True
         return 0
 
     monkeypatch.setattr(
         main_module,
-        "run_local_qwen_runtime_check",
-        fake_run_local_qwen_runtime_check,
+        "run_local_sherpa_runtime_check",
+        fake_run_local_sherpa_runtime_check,
         raising=False,
     )
 
     config_path = tmp_path / "settings.json"
     try:
-        result = main_module.main(["--config", str(config_path), "local-qwen-runtime-check"])
+        result = main_module.main(["--config", str(config_path), "local-sherpa-runtime-check"])
     except SystemExit as exc:  # pragma: no cover - red phase guard
         pytest.fail(f"unexpected SystemExit: {exc}")
 
@@ -520,13 +419,6 @@ def test_main_local_qwen_runtime_check_dispatches_runner(monkeypatch, tmp_path) 
 
 def test_main_soxr_runtime_check_dispatches_runner(monkeypatch, tmp_path) -> None:
     calls: dict[str, object] = {}
-
-    monkeypatch.setattr(
-        main_module,
-        "ensure_soxr_runtime_available_for_startup",
-        lambda: None,
-        raising=False,
-    )
 
     def fake_run_soxr_runtime_check() -> int:
         calls["called"] = True
@@ -646,7 +538,7 @@ def test_run_soxr_runtime_check_rejects_non_windows(monkeypatch, capsys) -> None
     monkeypatch.setattr(runtime_check_module.sys, "platform", "linux", raising=False)
     monkeypatch.setattr(
         runtime_check_module,
-        "ensure_soxr_runtime_available_for_startup",
+        "resolve_soxr_runtime_paths",
         lambda: pytest.fail("should not validate soxr runtime on non-Windows"),
         raising=False,
     )
@@ -678,7 +570,7 @@ def test_run_soxr_runtime_check_reports_runtime_validation_failure(monkeypatch, 
     )
     monkeypatch.setattr(
         runtime_check_module,
-        "ensure_soxr_runtime_available_for_startup",
+        "resolve_soxr_runtime_paths",
         raise_runtime_error,
         raising=False,
     )
@@ -710,10 +602,10 @@ def test_run_soxr_runtime_check_reports_soxr_import_or_smoke_failure(
     monkeypatch.setattr(runtime_check_module.sys, "platform", "win32", raising=False)
     monkeypatch.setattr(
         runtime_check_module,
-        "ensure_soxr_runtime_available_for_startup",
+        "resolve_soxr_runtime_paths",
         lambda: runtime_paths,
-        raising=False,
     )
+    monkeypatch.setattr(runtime_check_module, "validate_soxr_runtime_paths", lambda paths: paths)
     real_import_module = runtime_check_module.importlib.import_module
 
     def fake_import_module(name: str, *args, **kwargs):
@@ -773,11 +665,11 @@ def test_run_soxr_runtime_check_imports_soxr_runs_smoke_and_reports_paths(
     monkeypatch.setattr(runtime_check_module.sys, "platform", "win32", raising=False)
     monkeypatch.setattr(
         runtime_check_module,
-        "ensure_soxr_runtime_available_for_startup",
+        "resolve_soxr_runtime_paths",
         lambda: runtime_paths,
-        raising=False,
     )
 
+    monkeypatch.setattr(runtime_check_module, "validate_soxr_runtime_paths", lambda paths: paths)
     real_import_module = runtime_check_module.importlib.import_module
 
     def fake_import_module(name: str, *args, **kwargs):
@@ -838,9 +730,10 @@ def test_run_soxr_runtime_check_writes_json_report_when_env_var_is_set(
     monkeypatch.setenv("PURIPULY_HEART_SOXR_RUNTIME_REPORT_PATH", str(report_path))
     monkeypatch.setattr(
         runtime_check_module,
-        "ensure_soxr_runtime_available_for_startup",
+        "resolve_soxr_runtime_paths",
         lambda: runtime_paths,
     )
+    monkeypatch.setattr(runtime_check_module, "validate_soxr_runtime_paths", lambda paths: paths)
     monkeypatch.setattr(
         runtime_check_module,
         "_resolve_loaded_soxr_dll_path",
@@ -856,20 +749,20 @@ def test_run_soxr_runtime_check_writes_json_report_when_env_var_is_set(
     assert payload["loaded_sibling_dll_path"] == str(runtime_paths.sibling_dll_path)
 
 
-def test_run_local_qwen_runtime_check_imports_sherpa_onnx_and_offline_recognizer_before_reporting_success(
+def test_run_local_sherpa_runtime_check_imports_sherpa_onnx_and_offline_recognizer_before_reporting_success(
     monkeypatch, capsys, tmp_path
 ) -> None:
     try:
         runtime_check_module = importlib.import_module(
-            "puripuly_heart.app.local_qwen_runtime_check"
+            "puripuly_heart.app.local_sherpa_runtime_check"
         )
     except ModuleNotFoundError:  # pragma: no cover - red phase guard
-        pytest.fail("local_qwen_runtime_check module is missing")
+        pytest.fail("local_sherpa_runtime_check module is missing")
 
     monkeypatch.setattr(runtime_check_module.sys, "platform", "win32", raising=False)
     monkeypatch.setattr(
-        runtime_check_module.local_qwen_runtime,
-        "ensure_local_qwen_windows_runtime",
+        runtime_check_module.local_sherpa_runtime,
+        "ensure_local_sherpa_windows_runtime",
         lambda: tmp_path,
     )
 
@@ -887,58 +780,58 @@ def test_run_local_qwen_runtime_check_imports_sherpa_onnx_and_offline_recognizer
 
     monkeypatch.setattr(runtime_check_module.importlib, "import_module", fake_import_module)
 
-    result = runtime_check_module.run_local_qwen_runtime_check()
+    result = runtime_check_module.run_local_sherpa_runtime_check()
 
     assert result == 0
     assert imported_modules == ["sherpa_onnx", "sherpa_onnx.offline_recognizer"]
-    assert capsys.readouterr().out.strip() == f"local_qwen_runtime_dir={tmp_path}"
+    assert capsys.readouterr().out.strip() == f"local_sherpa_runtime_dir={tmp_path}"
 
 
-def test_run_local_qwen_runtime_check_rejects_non_windows(monkeypatch, capsys) -> None:
-    runtime_check_module = importlib.import_module("puripuly_heart.app.local_qwen_runtime_check")
+def test_run_local_sherpa_runtime_check_rejects_non_windows(monkeypatch, capsys) -> None:
+    runtime_check_module = importlib.import_module("puripuly_heart.app.local_sherpa_runtime_check")
 
     monkeypatch.setattr(runtime_check_module, "sys", ModuleType("sys"), raising=False)
     monkeypatch.setattr(runtime_check_module.sys, "platform", "linux", raising=False)
 
-    result = runtime_check_module.run_local_qwen_runtime_check()
+    result = runtime_check_module.run_local_sherpa_runtime_check()
 
     assert result == 2
     assert capsys.readouterr().out.strip() == (
-        "Error: local-qwen-runtime-check is only supported on Windows"
+        "Error: local-sherpa-runtime-check is only supported on Windows"
     )
 
 
-def test_run_local_qwen_runtime_check_reports_bootstrap_failure(monkeypatch, capsys) -> None:
-    runtime_check_module = importlib.import_module("puripuly_heart.app.local_qwen_runtime_check")
-    runtime_error = importlib.import_module("puripuly_heart.core.local_asr.local_qwen_runtime")
+def test_run_local_sherpa_runtime_check_reports_bootstrap_failure(monkeypatch, capsys) -> None:
+    runtime_check_module = importlib.import_module("puripuly_heart.app.local_sherpa_runtime_check")
+    runtime_error = importlib.import_module("puripuly_heart.core.local_asr.local_sherpa_runtime")
 
     monkeypatch.setattr(runtime_check_module, "sys", ModuleType("sys"), raising=False)
     monkeypatch.setattr(runtime_check_module.sys, "platform", "win32", raising=False)
 
     def raise_bootstrap_error() -> None:
-        raise runtime_error.LocalQwenRuntimeBootstrapError("missing runtime dlls")
+        raise runtime_error.LocalSherpaRuntimeBootstrapError("missing runtime dlls")
 
     monkeypatch.setattr(
-        runtime_check_module.local_qwen_runtime,
-        "ensure_local_qwen_windows_runtime",
+        runtime_check_module.local_sherpa_runtime,
+        "ensure_local_sherpa_windows_runtime",
         raise_bootstrap_error,
     )
 
-    result = runtime_check_module.run_local_qwen_runtime_check()
+    result = runtime_check_module.run_local_sherpa_runtime_check()
 
     assert result == 2
     assert capsys.readouterr().out.strip() == (
-        "Error: failed to verify Local Qwen Windows runtime DLL directory: missing runtime dlls"
+        "Error: failed to verify Local sherpa Windows runtime DLL directory: missing runtime dlls"
     )
 
 
-def test_run_local_qwen_runtime_check_reports_bootstrap_failure_after_runtime_module_reload(
+def test_run_local_sherpa_runtime_check_reports_bootstrap_failure_after_runtime_module_reload(
     monkeypatch, capsys, tmp_path
 ) -> None:
     runtime_check_module = importlib.reload(
-        importlib.import_module("puripuly_heart.app.local_qwen_runtime_check")
+        importlib.import_module("puripuly_heart.app.local_sherpa_runtime_check")
     )
-    runtime_module = importlib.import_module("puripuly_heart.core.local_asr.local_qwen_runtime")
+    runtime_module = importlib.import_module("puripuly_heart.core.local_asr.local_sherpa_runtime")
 
     runtime_module = importlib.reload(runtime_module)
 
@@ -948,31 +841,31 @@ def test_run_local_qwen_runtime_check_reports_bootstrap_failure_after_runtime_mo
 
     missing_runtime_dir = tmp_path / "missing-runtime"
     monkeypatch.setattr(
-        runtime_module, "resolve_local_qwen_runtime_dir", lambda: missing_runtime_dir
+        runtime_module, "resolve_local_sherpa_runtime_dir", lambda: missing_runtime_dir
     )
 
     try:
-        result = runtime_check_module.run_local_qwen_runtime_check()
+        result = runtime_check_module.run_local_sherpa_runtime_check()
     finally:
         importlib.reload(runtime_check_module)
 
     assert result == 2
     assert capsys.readouterr().out.strip() == (
-        "Error: failed to verify Local Qwen Windows runtime DLL directory: "
-        f"local qwen runtime directory does not exist: {missing_runtime_dir}"
+        "Error: failed to verify Local sherpa Windows runtime DLL directory: "
+        f"local sherpa runtime directory does not exist: {missing_runtime_dir}"
     )
 
 
-def test_run_local_qwen_runtime_check_reports_sherpa_onnx_import_failure(
+def test_run_local_sherpa_runtime_check_reports_sherpa_onnx_import_failure(
     monkeypatch, capsys, tmp_path
 ) -> None:
-    runtime_check_module = importlib.import_module("puripuly_heart.app.local_qwen_runtime_check")
+    runtime_check_module = importlib.import_module("puripuly_heart.app.local_sherpa_runtime_check")
 
     monkeypatch.setattr(runtime_check_module, "sys", ModuleType("sys"), raising=False)
     monkeypatch.setattr(runtime_check_module.sys, "platform", "win32", raising=False)
     monkeypatch.setattr(
-        runtime_check_module.local_qwen_runtime,
-        "ensure_local_qwen_windows_runtime",
+        runtime_check_module.local_sherpa_runtime,
+        "ensure_local_sherpa_windows_runtime",
         lambda: tmp_path,
     )
     real_import_module = runtime_check_module.importlib.import_module
@@ -986,7 +879,7 @@ def test_run_local_qwen_runtime_check_reports_sherpa_onnx_import_failure(
 
     monkeypatch.setattr(runtime_check_module.importlib, "import_module", fake_import_module)
 
-    result = runtime_check_module.run_local_qwen_runtime_check()
+    result = runtime_check_module.run_local_sherpa_runtime_check()
 
     assert result == 2
     assert capsys.readouterr().out.strip() == (

@@ -1,0 +1,26 @@
+{
+  "threads": 2,
+  "batch_size": 1,
+  "models": {
+    "granite": {
+      "adapter": "app",
+      "model_id": "granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu"
+    },
+    "gigaam": {
+      "adapter": "app",
+      "model_id": "gigaam-v3-e2e-ctc-q8-0-transcribe-cpu"
+    },
+    "sherpa-ja": {
+      "adapter": "app",
+      "model_id": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa"
+    },
+    "fun-asr-nano": {
+      "adapter": "app",
+      "model_id": "fun-asr-nano-2512-q8-0-transcribe-cpu"
+    },
+    "fun-asr-mlt": {
+      "adapter": "app",
+      "model_id": "fun-asr-mlt-nano-2512-q8-0-transcribe-cpu"
+    }
+  }
+}

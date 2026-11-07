@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -8,6 +8,7 @@ from typing import Protocol
 import flet as ft
 
 from puripuly_heart.app.ports.chatgpt_account import ChatGptAccountSnapshot
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretsPort
 from puripuly_heart.app.ports.settings_view import (
     GeneralSettingsSnapshot,
@@ -42,7 +43,7 @@ class SettingsChatGptIntents:
 class SettingsProviderIntents:
     providers_changed: Callable[[], None]
     request_openrouter_pkce: Callable[[OpenRouterPkceTarget], None]
-    verify_api_key: Callable[[str, str], object]
+    verify_api_key: Callable[[str, str], Awaitable[ProviderCredentialVerificationOutcome]]
     provider_secret_change: Callable[[str, str], object]
     secret_cleared: Callable[[str], None]
     local_llm_secret_changed: Callable[[], None]
@@ -69,6 +70,7 @@ class SettingsGeneralIntents:
 @dataclass(frozen=True, slots=True)
 class SettingsPromptIntents:
     prompt_apply_settings: Callable[[PromptApplyIntent], None]
+    pending_prompt_changed: Callable[[PromptApplyIntent], None] | None = None
 
 
 @dataclass(frozen=True, slots=True)

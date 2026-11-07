@@ -57,7 +57,7 @@
         "src/puripuly_heart/core/local_asr/local_stt_assets.py::LOCAL_STT_INSTALLED_MANIFEST_FILENAME"
       ],
       "fixture_or_guard_refs": [
-        "tests/config/test_settings_vnext_schema.py::test_vnext_schema_represents_current_intent_and_state_leaves",
+        "tests/config/test_settings_vnext_migration_serialization.py::test_current_vnext_dict_reads_and_serializes_idempotently",
         "tests/config/test_local_stt_assets.py",
         "tests/core/test_local_stt_runtime_installer.py"
       ],
@@ -105,8 +105,6 @@
       "fixture_or_guard_refs": [
         "tests/config/test_public_compatibility_surfaces.py::test_provider_runtime_public_config_snapshot_matches_resolved_contracts",
         "tests/config/test_runtime_resolution.py::test_legacy_openrouter_selection_aliases_normalize_before_resolved_runtime",
-        "tests/config/test_runtime_resolution.py::test_old_openrouter_credential_source_keys_normalize_through_settings_to_resolved_dto",
-        "tests/config/test_runtime_resolution.py::test_runtime_resolution_resolved_llm_path_has_no_legacy_alias_literals",
         "tests/app/test_wiring_providers.py",
         "tests/config/test_config_and_secrets.py::test_luna_supports_chatgpt_plan_first_then_byok_connections"
       ],
@@ -173,10 +171,10 @@
       "classification": "public_compatibility_preserve",
       "source_of_truth_refs": [
         "installer.iss",
-        "scripts/ci/build-release-artifacts.ps1"
+        "scripts/ci/build-native-release-artifacts.ps1"
       ],
       "fixture_or_guard_refs": [
-        "tests/config/test_public_compatibility_surfaces.py::test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract"
+        "tests/release_evidence/test_local_asr_installer.py::test_compiled_identity_and_current_schema_telemetry_reader"
       ],
       "detail_owner_work_ref": "freeze-overlay-native-and-installer-fixtures"
     },
@@ -784,7 +782,7 @@
         {"name": "gemini", "kind": "submodule"},
         {"name": "local_openai", "kind": "submodule"},
         {"name": "openrouter", "kind": "submodule"},
-        {"name": "qwen", "kind": "submodule"}
+        {"name": "qwen_async", "kind": "submodule"}
       ]
     },
     {
@@ -820,14 +818,6 @@
       "exports": [{"name": "OpenRouterLLMProvider", "kind": "attribute"}]
     },
     {
-      "module": "puripuly_heart.providers.llm.qwen",
-      "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/providers/llm/qwen.py", "tests/integration/test_qwen_llm_integration.py"],
-      "runtime_all_matches_exports": false,
-      "facade_contract": null,
-      "exports": [{"name": "QwenLLMProvider", "kind": "attribute"}]
-    },
-    {
       "module": "puripuly_heart.providers.llm.qwen_async",
       "source_rule": "existing public test or packaging import",
       "source_of_truth_refs": ["src/puripuly_heart/providers/llm/qwen_async.py", "tests/integration/test_qwen_llm_integration.py"],
@@ -847,7 +837,7 @@
       },
       "exports": [
         {"name": "deepgram", "kind": "submodule"},
-        {"name": "local_qwen_sherpa", "kind": "submodule"},
+        {"name": "local_cpp", "kind": "submodule"},
         {"name": "qwen_audio", "kind": "submodule"},
         {"name": "soniox", "kind": "submodule"}
       ]
@@ -861,14 +851,13 @@
       "exports": [{"name": "DeepgramRealtimeSTTBackend", "kind": "attribute"}]
     },
     {
-      "module": "puripuly_heart.providers.stt.local_qwen_sherpa",
+      "module": "puripuly_heart.providers.stt.local_cpp",
       "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/providers/stt/local_qwen_sherpa.py", "tests/integration/test_local_qwen_stt_integration.py"],
+      "source_of_truth_refs": ["src/puripuly_heart/providers/stt/local_cpp.py", "tests/providers/test_local_cpp_backend.py"],
       "runtime_all_matches_exports": false,
       "facade_contract": null,
       "exports": [
-        {"name": "LocalQwenSherpaInferenceError", "kind": "attribute"},
-        {"name": "LocalQwenSherpaSTTBackend", "kind": "attribute"}
+        {"name": "LocalCppSTTBackend", "kind": "attribute"}
       ]
     },
     {
@@ -955,7 +944,7 @@
       "classification": "internal_adapter_implementation_contract",
       "modules": [
         "puripuly_heart.app.adapters.provider_verifier",
-        "puripuly_heart.app.adapters.gpu_worker_process",
+        "puripuly_heart.app.adapters.asr_worker_process",
         "puripuly_heart.app.adapters.local_asr_application",
         "puripuly_heart.app.adapters.peer_application_state",
         "puripuly_heart.app.adapters.peer_capture.peer_capture_inventory"
@@ -1107,7 +1096,7 @@
       "examples": [
         "puripuly_heart.app.services.secret_settings_transaction",
         "puripuly_heart.app.services.settings.settings_mutation",
-        "puripuly_heart.app.services.managed_connection_auth"
+        "puripuly_heart.app.services.managed.managed_connection_auth"
       ],
       "rationale": "Application services are internal use-case boundaries. Their public names are stable execution inputs for later gates, but this inventory does not classify them as external public import compatibility."
     },
@@ -1129,7 +1118,7 @@
       "classification": "internal_core_contract_modules",
       "modules": [
         "puripuly_heart.core.error_messages",
-        "puripuly_heart.core.gpu_worker",
+        "puripuly_heart.core.asr_worker",
         "puripuly_heart.core.lifecycle",
         "puripuly_heart.core.local_asr.local_asr_provider_runtime",
         "puripuly_heart.core.local_asr.local_asr_provisioning",
@@ -1354,7 +1343,7 @@
       "modules": [
         "puripuly_heart.core.discord"
       ],
-      "rationale": "Domain-aligned grouping package that re-exports the moved Discord OAuth modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+      "rationale": "Domain-aligned grouping package that re-exports the canonical Discord OAuth modules; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "puripuly_heart.core.openrouter domain grouping package",
@@ -1362,7 +1351,7 @@
       "modules": [
         "puripuly_heart.core.openrouter"
       ],
-      "rationale": "Domain-aligned grouping package that re-exports the moved OpenRouter credential, PKCE, handoff, and managed release modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+      "rationale": "Domain-aligned grouping package that re-exports the canonical OpenRouter credential, PKCE, handoff, and managed release modules; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "puripuly_heart.core.chatgpt Sign in with ChatGPT package",
@@ -1378,7 +1367,7 @@
       "modules": [
         "puripuly_heart.core.local_asr"
       ],
-      "rationale": "Domain-aligned grouping package that re-exports the moved local ASR/STT contract, asset, catalog, download, and installer modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+      "rationale": "Domain-aligned grouping package that re-exports the canonical local ASR/STT contract, asset, catalog, download, and installer modules; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "puripuly_heart.app.wiring.root composition facade module",
@@ -1394,7 +1383,7 @@
       "modules": [
         "puripuly_heart.app.adapters.peer_capture"
       ],
-      "rationale": "Domain-aligned grouping package that re-exports the moved peer capture adapter modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+      "rationale": "Domain-aligned grouping package that re-exports the canonical peer capture adapter modules; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "puripuly_heart.app.adapters.self_capture domain grouping package",
@@ -1402,7 +1391,7 @@
       "modules": [
         "puripuly_heart.app.adapters.self_capture"
       ],
-      "rationale": "Domain-aligned grouping package that re-exports the moved self capture adapter modules and registers pre-move import-path compatibility aliases; it is internal structure, not an external public compatibility facade."
+      "rationale": "Domain-aligned grouping package that re-exports the canonical self capture adapter modules; it is internal structure, not an external public compatibility facade."
     },
     {
       "surface": "broker source modules",

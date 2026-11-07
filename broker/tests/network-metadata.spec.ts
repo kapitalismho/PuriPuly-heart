@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { describe, expect, it } from 'vitest';
 
-import { extractRequestNetworkMetadata, resolveRequestNetworkIdentitySecrets } from '../src/abuse-controls';
+import { extractRequestNetworkMetadata } from '../src/abuse-controls';
 import {
   deriveStableNetworkIdentityDigest,
   normalizeNetworkIdentityIp,

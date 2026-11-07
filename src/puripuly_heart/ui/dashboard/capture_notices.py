@@ -9,9 +9,15 @@ from puripuly_heart.ui.gpu_notice import GpuDashboardNotice, GpuNoticeAction
 from puripuly_heart.ui.i18n import t
 
 LOCAL_ASR_MODEL_LABEL_KEYS = {
-    "parakeet-tdt-0.6b-v3-int8-sherpa": "local_stt.model.parakeet-tdt-0.6b-v3-int8-sherpa",
+    "granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu": (
+        "local_stt.model.granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu"
+    ),
+    "gigaam-v3-e2e-ctc-q8-0-transcribe-cpu": "local_stt.model.gigaam-v3-e2e-ctc-q8-0-transcribe-cpu",
+    "fun-asr-nano-2512-q8-0-transcribe-cpu": "local_stt.model.fun-asr-nano-2512-q8-0-transcribe-cpu",
+    "fun-asr-mlt-nano-2512-q8-0-transcribe-cpu": (
+        "local_stt.model.fun-asr-mlt-nano-2512-q8-0-transcribe-cpu"
+    ),
     "parakeet-tdt-ctc-0.6b-ja-int8-sherpa": "local_stt.model.parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
-    "qwen3-asr-0.6b-int8-sherpa": "local_stt.model.qwen3-asr-0.6b-int8-sherpa",
 }
 
 LOCAL_ASR_TARGETED_NOTICE_KEYS = {

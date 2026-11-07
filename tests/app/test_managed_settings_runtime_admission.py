@@ -8,10 +8,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.app.services.provider_verification_binding import (
-    ProviderVerificationBindingOwner,
-)
-from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
 
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
@@ -46,6 +42,9 @@ from puripuly_heart.app.services.provider.provider_settings import (
     ProviderSettingsOwner,
     provider_verification_context,
 )
+from puripuly_heart.app.services.provider.provider_verification_binding import (
+    ProviderVerificationBindingOwner,
+)
 from puripuly_heart.app.services.settings.settings_application import (
     settings_view_surface_snapshots,
 )
@@ -75,6 +74,7 @@ from puripuly_heart.config.provider_values import OpenRouterSelectionAlias, STTP
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.clock import SystemClock
+from puripuly_heart.core.openrouter.openrouter_pkce import OpenRouterPKCEExchangeResult
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigurationOwner,
@@ -304,7 +304,6 @@ async def composed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         ),
         peer_intent_sink=owner.set_peer_translation_enabled,
         overlay_intent_sink=owner.set_overlay_enabled,
-        persist_manual_fallback=lambda: True,
         ensure_local_ready=_nothing,
         clear_cpu_pending=lambda: None,
         clear_gpu_pending=lambda: None,
@@ -329,7 +328,6 @@ async def composed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         runtime_available=lambda: True,
         capture_owner=lambda: self_capture,
         capture_owner_if_created=lambda: self_capture,
-        persist_manual_fallback=lambda: True,
         reset_local_pending=lambda: None,
         clear_gpu_pending=lambda: None,
         overlay_state_provider=lambda: "off",

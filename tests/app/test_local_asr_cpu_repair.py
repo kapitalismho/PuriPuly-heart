@@ -5,15 +5,16 @@ from collections.abc import Callable
 from dataclasses import replace
 
 import pytest
-from puripuly_heart.app.services.local_asr_cpu_repair import (
+
+from puripuly_heart.app.services.local_asr.local_asr_cpu_repair import (
     LocalASRCpuRepairEffect,
     LocalASRCpuRepairEffectType,
     LocalASRCpuRepairOwner,
     LocalASRCpuRepairRequest,
     LocalASRCpuRepairRuntimeState,
 )
-from puripuly_heart.app.wiring_composition import create_local_asr_cpu_repair_owner
-from puripuly_heart.core.local_asr_provisioning import (
+from puripuly_heart.app.wiring.wiring_composition import create_local_asr_cpu_repair_owner
+from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRInstallRequest,
     LocalASRInstallResult,
     LocalASRInstallResultHandler,
@@ -21,30 +22,38 @@ from puripuly_heart.core.local_asr_provisioning import (
     LocalASRProvisioningActivity,
     LocalASRProvisioningSnapshot,
 )
-from puripuly_heart.core.local_stt_assets import (
-    LOCAL_STT_MODEL_ID,
+from puripuly_heart.core.local_asr.local_stt_assets import (
+    FUN_ASR_MLT_NANO_MODEL_ID,
+    FUN_ASR_NANO_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
     PARAKEET_JAPANESE_MODEL_ID,
-    PARAKEET_V3_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )
 
-LOCAL_QWEN_PROVIDER = "local_qwen"
+LOCAL_MLT_PROVIDER = "local_fun_asr_mlt_nano"
 LOCAL_AUTO_PROVIDER = "local_cpu_auto"
 
 
 def _snapshot(
     *,
-    qwen: str = "ready",
-    parakeet_v3: str = "ready",
+    mlt: str = "ready",
+    granite: str = "ready",
+    gigaam: str = "ready",
     parakeet_ja: str = "ready",
     active: bool = False,
 ) -> LocalASRProvisioningSnapshot:
     return LocalASRProvisioningSnapshot(
         models=(
             LocalASRModelProvisioningState(
-                model_id=PARAKEET_V3_MODEL_ID,
+                model_id=GRANITE_MODEL_ID,
                 backend="cpu",
-                integrity=parakeet_v3,
+                integrity=granite,
+            ),
+            LocalASRModelProvisioningState(
+                model_id=GIGAAM_MODEL_ID,
+                backend="cpu",
+                integrity=gigaam,
             ),
             LocalASRModelProvisioningState(
                 model_id=PARAKEET_JAPANESE_MODEL_ID,
@@ -52,9 +61,14 @@ def _snapshot(
                 integrity=parakeet_ja,
             ),
             LocalASRModelProvisioningState(
-                model_id=LOCAL_STT_MODEL_ID,
+                model_id=FUN_ASR_MLT_NANO_MODEL_ID,
                 backend="cpu",
-                integrity=qwen,
+                integrity=mlt,
+            ),
+            LocalASRModelProvisioningState(
+                model_id=FUN_ASR_NANO_MODEL_ID,
+                backend="cpu",
+                integrity="ready",
             ),
         ),
         required_cpu_model_ids=REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
@@ -63,7 +77,7 @@ def _snapshot(
             (
                 LocalASRProvisioningActivity(
                     backend="cpu",
-                    model_id=LOCAL_STT_MODEL_ID,
+                    model_id=FUN_ASR_MLT_NANO_MODEL_ID,
                     origin="manual",
                     progress_percent=0,
                     generation=1,
@@ -134,8 +148,8 @@ def _state(
     *,
     settings_available: bool = True,
     locale: str | None = "ko",
-    self_provider: str | None = LOCAL_QWEN_PROVIDER,
-    peer_provider: str | None = LOCAL_QWEN_PROVIDER,
+    self_provider: str | None = LOCAL_MLT_PROVIDER,
+    peer_provider: str | None = LOCAL_MLT_PROVIDER,
     self_provider_local: bool = True,
     peer_requested: bool = False,
     self_generation: int = 7,
@@ -158,8 +172,8 @@ def _state(
 def _model_ids(provider: str) -> tuple[str, ...]:
     if provider == LOCAL_AUTO_PROVIDER:
         return REQUIRED_CPU_LOCAL_STT_MODEL_IDS
-    if provider == LOCAL_QWEN_PROVIDER:
-        return (LOCAL_STT_MODEL_ID,)
+    if provider == LOCAL_MLT_PROVIDER:
+        return (FUN_ASR_MLT_NANO_MODEL_ID,)
     return ()
 
 
@@ -172,14 +186,14 @@ def _result(
 ) -> LocalASRInstallResult:
     request = LocalASRInstallRequest(
         backend="cpu",
-        model_ids=(LOCAL_STT_MODEL_ID,),
+        model_ids=(FUN_ASR_MLT_NANO_MODEL_ID,),
         locale="ko",
         origin=origin,
     )
     return LocalASRInstallResult(
         request=request,
-        installed_model_ids=(() if failed or cancelled else (LOCAL_STT_MODEL_ID,)),
-        failed_model_ids=((LOCAL_STT_MODEL_ID,) if failed else ()),
+        installed_model_ids=(() if failed or cancelled else (FUN_ASR_MLT_NANO_MODEL_ID,)),
+        failed_model_ids=((FUN_ASR_MLT_NANO_MODEL_ID,) if failed else ()),
         cancelled=cancelled,
         snapshot=provisioning.snapshot,
     )
@@ -230,7 +244,7 @@ def _owner(
 
 
 def test_self_repair_admission_preserves_effect_order_exact_request_and_single_flight() -> None:
-    provisioning = RecordingProvisioning(_snapshot(qwen="missing"))
+    provisioning = RecordingProvisioning(_snapshot(mlt="missing"))
     state_box = [_state()]
     effects: list[LocalASRCpuRepairEffect] = []
     owner = _owner(provisioning, state_box, effects=effects)
@@ -255,7 +269,7 @@ def test_self_repair_admission_preserves_effect_order_exact_request_and_single_f
     assert provisioning.requests == [
         LocalASRInstallRequest(
             backend="cpu",
-            model_ids=(LOCAL_STT_MODEL_ID,),
+            model_ids=(FUN_ASR_MLT_NANO_MODEL_ID,),
             locale="ko",
             origin="manual",
         )
@@ -274,7 +288,7 @@ def test_self_repair_admission_preserves_effect_order_exact_request_and_single_f
 
 
 def test_repair_admission_rejects_stale_self_and_peer_generations() -> None:
-    provisioning = RecordingProvisioning(_snapshot(qwen="missing"))
+    provisioning = RecordingProvisioning(_snapshot(mlt="missing"))
     state_box = [_state(peer_requested=True)]
     effects: list[LocalASRCpuRepairEffect] = []
     owner = _owner(provisioning, state_box, effects=effects)
@@ -304,7 +318,7 @@ def test_repair_admission_rejects_stale_self_and_peer_generations() -> None:
 
 
 def test_repair_without_generation_preserves_legacy_admission_and_missing_settings_skip() -> None:
-    provisioning = RecordingProvisioning(_snapshot(qwen="missing"))
+    provisioning = RecordingProvisioning(_snapshot(mlt="missing"))
     state_box = [_state(self_desired=False)]
     effects: list[LocalASRCpuRepairEffect] = []
     owner = _owner(provisioning, state_box, effects=effects)
@@ -320,7 +334,7 @@ def test_repair_without_generation_preserves_legacy_admission_and_missing_settin
     assert owner.snapshot.self_activation_generation == 7
     assert len(provisioning.requests) == 1
 
-    unavailable = RecordingProvisioning(_snapshot(qwen="missing"))
+    unavailable = RecordingProvisioning(_snapshot(mlt="missing"))
     unavailable_effects: list[LocalASRCpuRepairEffect] = []
     unavailable_owner = _owner(
         unavailable,
@@ -341,8 +355,8 @@ def test_repair_without_generation_preserves_legacy_admission_and_missing_settin
 
 
 def test_repair_re_resolves_provisioning_after_model_selection_effects() -> None:
-    inspected = RecordingProvisioning(_snapshot(qwen="missing"))
-    installed = RecordingProvisioning(_snapshot(qwen="missing"))
+    inspected = RecordingProvisioning(_snapshot(mlt="missing"))
+    installed = RecordingProvisioning(_snapshot(mlt="missing"))
     provider_box = [inspected]
     state_box = [_state()]
     effects: list[LocalASRCpuRepairEffect] = []
@@ -381,7 +395,7 @@ def test_repair_re_resolves_provisioning_after_model_selection_effects() -> None
     assert installed.requests == [
         LocalASRInstallRequest(
             backend="cpu",
-            model_ids=(LOCAL_STT_MODEL_ID,),
+            model_ids=(FUN_ASR_MLT_NANO_MODEL_ID,),
             locale="ko",
             origin="manual",
         )
@@ -408,8 +422,37 @@ def test_repair_uses_required_models_when_snapshot_has_no_unavailable_identity()
     assert provisioning.requests[0].model_ids == REQUIRED_CPU_LOCAL_STT_MODEL_IDS
 
 
+@pytest.mark.parametrize(
+    ("integrities", "model_id"),
+    (
+        ({"granite": "missing"}, GRANITE_MODEL_ID),
+        ({"gigaam": "invalid"}, GIGAAM_MODEL_ID),
+    ),
+)
+def test_auto_repair_targets_only_the_unavailable_new_model(
+    integrities: dict[str, str], model_id: str
+) -> None:
+    provisioning = RecordingProvisioning(_snapshot(**integrities))
+    state_box = [
+        _state(
+            self_provider=LOCAL_AUTO_PROVIDER,
+            self_provider_local=True,
+        )
+    ]
+    owner = _owner(provisioning, state_box)
+
+    owner.request_repair(
+        LocalASRCpuRepairRequest(
+            status="missing",
+            channel="self",
+        )
+    )
+
+    assert provisioning.requests[0].model_ids == (model_id,)
+
+
 def test_repair_with_explicit_models_skips_provider_model_resolution() -> None:
-    provisioning = RecordingProvisioning(_snapshot(qwen="missing"))
+    provisioning = RecordingProvisioning(_snapshot(mlt="missing"))
     state_box = [
         _state(
             self_provider=LOCAL_AUTO_PROVIDER,
@@ -430,15 +473,15 @@ def test_repair_with_explicit_models_skips_provider_model_resolution() -> None:
         LocalASRCpuRepairRequest(
             status="invalid",
             channel="self",
-            model_ids=(PARAKEET_V3_MODEL_ID,),
+            model_ids=(GRANITE_MODEL_ID,),
         )
     )
 
-    assert provisioning.requests[0].model_ids == (PARAKEET_V3_MODEL_ID,)
+    assert provisioning.requests[0].model_ids == (GRANITE_MODEL_ID,)
 
 
 def test_repair_with_empty_models_uses_unavailable_subset_before_required_fallback() -> None:
-    provisioning = RecordingProvisioning(_snapshot(qwen="missing"))
+    provisioning = RecordingProvisioning(_snapshot(mlt="missing"))
     state_box = [
         _state(
             self_provider=LOCAL_AUTO_PROVIDER,
@@ -455,12 +498,12 @@ def test_repair_with_empty_models_uses_unavailable_subset_before_required_fallba
         )
     )
 
-    assert provisioning.requests[0].model_ids == (LOCAL_STT_MODEL_ID,)
+    assert provisioning.requests[0].model_ids == (FUN_ASR_MLT_NANO_MODEL_ID,)
 
 
 def test_start_install_runtime_error_is_a_false_single_flight_admission() -> None:
     provisioning = RecordingProvisioning(
-        _snapshot(qwen="missing"),
+        _snapshot(mlt="missing"),
         start_error=RuntimeError("raced"),
     )
     state_box = [_state()]
@@ -534,14 +577,14 @@ async def test_successful_manual_result_resumes_self_then_peer() -> None:
 
 @pytest.mark.asyncio
 async def test_successful_result_waits_for_ready_provider_status() -> None:
-    provisioning = RecordingProvisioning(_snapshot(qwen="missing"))
+    provisioning = RecordingProvisioning(_snapshot(mlt="missing"))
     state_box = [_state()]
     calls: list[str] = []
     owner = _owner(
         provisioning,
         state_box,
         calls=calls,
-        status_by_provider={LOCAL_QWEN_PROVIDER: "missing"},
+        status_by_provider={LOCAL_MLT_PROVIDER: "missing"},
     )
     owner.retain_pending("self", activation_generation=7)
 
@@ -667,18 +710,3 @@ async def test_non_manual_success_clears_switched_intent_without_resume() -> Non
     assert calls == []
     assert owner.snapshot.self_pending is False
     assert owner.snapshot.peer_pending is False
-
-
-def test_owner_lifecycle_inventory_declares_state_without_resources() -> None:
-    provisioning = RecordingProvisioning(_snapshot())
-    owner = _owner(provisioning, [_state()])
-
-    inventory = owner.lifecycle_owner_snapshot()
-
-    assert inventory["owner"] == "LocalASRCpuRepairOwner"
-    assert inventory["state_fields"] == (
-        "_self_pending",
-        "_self_activation_generation",
-        "_peer_pending",
-    )
-    assert inventory["shutdown_policy"] == "no task or external resource is retained"

@@ -129,6 +129,7 @@ class FletUiPresentationAdapter:
                 None,
             ),
             on_overlay_state_changed=getattr(self._app, "on_overlay_state_changed", None),
+            on_error_presented=getattr(self._app, "on_error_presented", None),
         )
 
     def set_dashboard_translation_enabled(self, enabled: bool) -> None:
@@ -142,6 +143,12 @@ class FletUiPresentationAdapter:
         setter = getattr(dashboard, "set_stt_enabled", None)
         if callable(setter):
             setter(enabled)
+
+    def set_dashboard_capture_status(self, status: str) -> None:
+        dashboard = getattr(self._app, "view_dashboard", None)
+        setter = getattr(dashboard, "set_status", None)
+        if callable(setter):
+            setter(status)
 
     def set_dashboard_translation_needs_key(self, needs_key: bool) -> None:
         dashboard = getattr(self._app, "view_dashboard", None)
@@ -166,6 +173,12 @@ class FletUiPresentationAdapter:
             setter(needs_key)
         elif dashboard is not None:
             dashboard.peer_needs_key = needs_key
+
+    def set_dashboard_launch_input_hint(self, *, first_launch: bool) -> None:
+        dashboard = getattr(self._app, "view_dashboard", None)
+        apply_hint = getattr(dashboard, "apply_launch_input_hint", None)
+        if callable(apply_hint):
+            apply_hint(first_launch=first_launch)
 
     def dashboard_translation_enabled(self) -> bool:
         dashboard = getattr(self._app, "view_dashboard", None)
@@ -485,13 +498,6 @@ class FletUiPresentationAdapter:
 
     def show_founder_letter_dialog(self) -> bool:
         callback = getattr(self._app, "show_founder_letter_dialog", None)
-        if callable(callback):
-            callback()
-            return True
-        return False
-
-    def show_local_qwen_hallucination_dialog(self) -> bool:
-        callback = getattr(self._app, "show_local_qwen_hallucination_dialog", None)
         if callable(callback):
             callback()
             return True

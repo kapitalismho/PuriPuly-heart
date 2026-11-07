@@ -3,16 +3,15 @@ from __future__ import annotations
 from dataclasses import asdict
 from types import SimpleNamespace
 
-from puripuly_heart.core.openrouter_handoff import (
+from puripuly_heart.app.wiring import ManagedIdentityStateAdapter
+from puripuly_heart.config.settings_vnext.schema import ManagedConnectionState
+from puripuly_heart.core.openrouter.openrouter_handoff import (
     MANAGED_EFFECTIVE_EXHAUSTION_USD,
     is_effectively_exhausted,
     mark_founder_letter_shown,
     should_auto_show_founder_letter,
     store_managed_entitlement_snapshot,
 )
-
-from puripuly_heart.app.wiring import ManagedIdentityStateAdapter
-from puripuly_heart.config.settings_vnext.schema import ManagedConnectionState
 from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata
 
 

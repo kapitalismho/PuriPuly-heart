@@ -10,7 +10,6 @@ import { sha256Base64Url } from './test-support/hash';
 import {
   createTestBrokerEnv,
   type TestBrokerEnv,
-  seedRequestEvent,
 } from './test-support/sqlite-d1';
 
 const QQ_AUTH_ASSERT_URL = 'http://broker.test/v1/auth/qq/assert';

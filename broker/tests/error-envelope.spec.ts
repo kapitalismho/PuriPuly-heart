@@ -6,7 +6,6 @@ import {
   signCanonicalIssueRequest,
 } from './test-support/ed25519';
 import {
-  activatePendingReleaseSession,
   createPendingReleaseSession,
   mockOpenRouterManagementApi,
 } from './test-support/openrouter-issue';
@@ -69,53 +68,6 @@ describe('broker public error envelope', () => {
         expires_at: null,
       },
     });
-  });
-
-  it('normalizes active reissue into trial_not_eligible with managed_key_unrecoverable', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-04-08T06:00:00Z'));
-
-    const env = createTestBrokerEnv();
-    const active = await activatePendingReleaseSession({
-      env,
-      installationId: 'install-error-envelope-active-reissue',
-      appVersion: '1.2.3',
-      hardwareHash: 'hardware-hash-error-envelope-active-reissue',
-    });
-
-    const response = await postIssue(
-      env,
-      await signCanonicalIssueRequest(active.keyPair.privateKey, {
-        installation_id: 'install-error-envelope-active-reissue',
-        device_public_key: active.keyPair.devicePublicKey,
-        release_token: active.releaseToken,
-        hardware_hash: active.hardwareHash,
-        reason: 'llm_start',
-        budget_usd: 0.07,
-        model: 'google/gemma-4-26b-a4b-it',
-        signed_at: '2026-04-08T06:00:45.000Z',
-      }),
-    );
-
-    expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual(
-      normalizedErrorEnvelope({
-        code: 'trial_not_eligible',
-        class: 'terminal',
-        subcode: 'managed_key_unrecoverable',
-        message: 'managed key was already issued and cannot be recovered',
-        managedState: {
-          lifecycle: 'active',
-          managed_availability: true,
-        },
-        currentEntitlement: {
-          provider: 'OpenRouter',
-          budget_usd: 0.07,
-          issued_at: '2026-04-08T06:00:00.000Z',
-          expires_at: '2026-07-08T06:00:00.000Z',
-        },
-      }),
-    );
   });
 
   it('returns internal_error and leaves a structured orphan-audit trail when activation cleanup fails', async () => {

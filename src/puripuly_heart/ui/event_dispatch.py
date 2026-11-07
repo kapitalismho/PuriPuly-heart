@@ -8,8 +8,6 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import Protocol
 
-from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterUserFacingError
-
 from puripuly_heart.core.diagnostic_validation import (
     DIAGNOSTIC_REDACTION_MARKER,
     DIAGNOSTIC_SINK_DASHBOARD,
@@ -22,12 +20,16 @@ from puripuly_heart.core.diagnostic_validation import (
 from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.error_messages import sanitize_legacy_raw_user_visible_error_text
 from puripuly_heart.core.messages import ErrorDiagnostics, UserErrorReport, UserMessageRef
+from puripuly_heart.core.openrouter.managed_openrouter_release import (
+    ManagedOpenRouterUserFacingError,
+)
 from puripuly_heart.domain.events import SelfTurnPresentation, STTSessionState, UIEvent
 from puripuly_heart.domain.models import OSCMessage, Translation
 from puripuly_heart.ui.event_mapping import map_ui_event
 from puripuly_heart.ui.event_projection import (
     EventProjectionContext,
     EventProjectionService,
+    HistoryProjection,
     TranslationAppliedDiagnostic,
 )
 from puripuly_heart.ui.i18n import localize_user_message_ref, t
@@ -40,8 +42,6 @@ _RAW_STRING_ERROR_DEPRECATION_DIAGNOSTIC = (
 
 
 class DashboardEventDestination(Protocol):
-    def publish_status(self, status: str) -> None: ...
-
     def publish_transcript(
         self,
         text: str,
@@ -75,6 +75,8 @@ class HistoryEventDestination(Protocol):
 
     def publish_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None: ...
 
+    def publish_peer_caption(self, history: HistoryProjection) -> None: ...
+
 
 class ErrorEventDestination(Protocol):
     def publish_error(
@@ -96,11 +98,6 @@ class RuntimeLoggingPort(Protocol):
 class AppDashboardEventDestination:
     def __init__(self, dashboard: object | None) -> None:
         self._dashboard = dashboard
-
-    def publish_status(self, status: str) -> None:
-        dashboard = self._dashboard
-        if dashboard is not None:
-            dashboard.set_status(status)
 
     def publish_transcript(
         self,
@@ -173,6 +170,20 @@ class AppHistoryEventDestination:
     def publish_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
         if self._conversation_view is not None:
             self._conversation_view.update_self_turn(snapshot, source=source)
+
+    def publish_peer_caption(self, history: HistoryProjection) -> None:
+        if self._conversation_view is not None:
+            self._conversation_view.append_conversation_record(
+                source=history.source,
+                channel="peer",
+                utterance_id=str(history.utterance_id),
+                source_text=None if history.translated else history.text,
+                translated_text=history.text if history.translated else None,
+                source_language=None if history.translated else history.language_code,
+                target_language=history.language_code if history.translated else None,
+                target_index=0 if history.translated else None,
+                peer_caption_revision=history.peer_caption_revision,
+            )
 
 
 class AppErrorEventDestination:
@@ -302,20 +313,21 @@ class UIEventBridge:
         clear_managed_auth_pending: object | None = None,
         on_github_star_translation_success: object | None = None,
         on_overlay_state_changed: object | None = None,
+        on_error_presented: object | None = None,
     ):
         self.event_queue = event_queue
         self.runtime_logging = runtime_logging
         self._get_language_codes_callback = get_language_codes
         self._is_translation_enabled_callback = is_translation_enabled
-        self._get_stt_state_callback = get_stt_state
         self._github_star_translation_success_callback = on_github_star_translation_success
         self._overlay_state_changed_callback = on_overlay_state_changed
+        self._error_presented_callback = on_error_presented
         self.dashboard_destination = dashboard_destination
         self.history_destination = history_destination
         self.error_destination = error_destination or AppErrorEventDestination(
             runtime_logging=runtime_logging,
             clear_managed_auth_pending=clear_managed_auth_pending,
-            get_stt_state=self._get_stt_state_callback,
+            get_stt_state=get_stt_state,
         )
         self.projection_service = EventProjectionService()
         self._running = False
@@ -335,14 +347,10 @@ class UIEventBridge:
 
     def _projection_context(self) -> EventProjectionContext:
         source_lang, target_lang = self._get_language_codes()
-        stt_state = (
-            self._get_stt_state_callback() if callable(self._get_stt_state_callback) else None
-        )
         return EventProjectionContext(
             source_language=source_lang,
             target_language=target_lang,
             translation_enabled=self._translation_enabled(),
-            stt_state=stt_state,
         )
 
     def _emit_dashboard_translation_applied_diagnostic(
@@ -444,9 +452,6 @@ class UIEventBridge:
         mapped = map_ui_event(event)
         if mapped is None:
             return
-        if mapped.kind == "status" and mapped.status is not None:
-            self.dashboard_destination.publish_status(mapped.status)
-            return
 
         if mapped.kind == "self_turn":
             projection = self.projection_service.project(mapped, self._projection_context())
@@ -482,12 +487,15 @@ class UIEventBridge:
                     self._record_output_failure(event, "dashboard", exc)
             for history in projection.history:
                 try:
-                    self.history_destination.append_entry(
-                        history.source,
-                        history.text,
-                        translated=history.translated,
-                        language_code=history.language_code,
-                    )
+                    if history.peer_caption_revision > 0:
+                        self.history_destination.publish_peer_caption(history)
+                    else:
+                        self.history_destination.append_entry(
+                            history.source,
+                            history.text,
+                            translated=history.translated,
+                            language_code=history.language_code,
+                        )
                 except Exception as exc:
                     self._record_output_failure(event, "conversation_feed", exc)
             return
@@ -514,12 +522,15 @@ class UIEventBridge:
                 )
             for history in projection.history:
                 try:
-                    self.history_destination.append_entry(
-                        history.source,
-                        history.text,
-                        translated=history.translated,
-                        language_code=history.language_code,
-                    )
+                    if history.peer_caption_revision > 0:
+                        self.history_destination.publish_peer_caption(history)
+                    else:
+                        self.history_destination.append_entry(
+                            history.source,
+                            history.text,
+                            translated=history.translated,
+                            language_code=history.language_code,
+                        )
                 except Exception as exc:
                     self._record_output_failure(event, "conversation_feed", exc)
             if isinstance(mapped.payload, Translation):
@@ -554,3 +565,12 @@ class UIEventBridge:
             authority = event.delivery_authority
             if authority is None or authority.claim_presentation():
                 self.dashboard_destination.publish_error(text)
+                self._notify_error_presented(text, payload)
+
+    def _notify_error_presented(self, text: str, payload: object | None) -> None:
+        if not isinstance(payload, UserErrorReport) or not callable(self._error_presented_callback):
+            return
+        try:
+            self._error_presented_callback(text, payload.diagnostics.diagnostic_id)
+        except Exception:
+            logger.error("A user interface operation failed.")

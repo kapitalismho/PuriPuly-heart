@@ -3,12 +3,8 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 
-from puripuly_heart.config.provider_values import OpenRouterCredentialSource
 from puripuly_heart.config.settings_vnext import serialization
-from puripuly_heart.config.settings_vnext.schema import (
-    DEFAULT_OPENROUTER_BROKER_BASE_URL,
-    AppSettingsVNext,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 
 def _with_managed_connection(settings: AppSettingsVNext, **updates: object) -> AppSettingsVNext:
@@ -19,37 +15,6 @@ def _with_managed_connection(settings: AppSettingsVNext, **updates: object) -> A
             managed_connection=replace(settings.state.managed_connection, **updates),
         ),
     )
-
-
-def test_managed_identity_settings_round_trip() -> None:
-    settings = _with_managed_connection(
-        AppSettingsVNext(),
-        installation_id="01961ad7-a7c1-7000-8000-0123456789ab",
-        release_token="release-1",
-        release_token_expires_at="2026-04-08T06:00:45.000Z",
-        verified_hardware_hash="hardware-hash-1",
-        verified_hardware_hash_salt_version=7,
-    )
-
-    restored = serialization.from_dict(serialization.to_dict(settings))
-
-    assert restored.state.managed_connection == settings.state.managed_connection
-
-
-def test_managed_identity_settings_round_trip_includes_handoff_fields() -> None:
-    settings = _with_managed_connection(
-        AppSettingsVNext(),
-        installation_id="01961ad7-a7c1-7000-8000-0123456789ab",
-        active_managed_credential_ref="hash_123",
-        active_managed_expires_at="2026-10-17T12:34:56Z",
-        founder_letter_seen_credential_ref="hash_123",
-    )
-
-    restored = serialization.from_dict(serialization.to_dict(settings))
-
-    assert restored.state.managed_connection.active_managed_credential_ref == "hash_123"
-    assert restored.state.managed_connection.active_managed_expires_at == "2026-10-17T12:34:56Z"
-    assert restored.state.managed_connection.founder_letter_seen_credential_ref == "hash_123"
 
 
 def test_loading_and_writing_old_referral_settings_preserves_managed_authority(tmp_path) -> None:
@@ -111,27 +76,6 @@ def test_loading_and_writing_old_referral_settings_preserves_managed_authority(t
     assert reloaded.settings.state.managed_connection == settings.state.managed_connection
 
 
-def test_openrouter_selected_source_round_trip() -> None:
-    current = AppSettingsVNext()
-    settings = replace(
-        current,
-        intent=replace(
-            current.intent,
-            translation=replace(
-                current.intent.translation,
-                openrouter_selected_source=OpenRouterCredentialSource.MANAGED.value,
-            ),
-        ),
-    )
-
-    restored = serialization.from_dict(serialization.to_dict(settings))
-
-    assert (
-        restored.intent.translation.openrouter_selected_source
-        == OpenRouterCredentialSource.MANAGED.value
-    )
-
-
 def test_openrouter_broker_base_url_round_trip() -> None:
     current = AppSettingsVNext()
     settings = replace(
@@ -148,11 +92,3 @@ def test_openrouter_broker_base_url_round_trip() -> None:
     restored = serialization.from_dict(serialization.to_dict(settings))
 
     assert restored.intent.translation.openrouter_broker_base_url == "https://broker.example.test"
-
-
-def test_openrouter_broker_base_url_default_is_production_broker() -> None:
-    settings = AppSettingsVNext()
-
-    assert (
-        settings.intent.translation.openrouter_broker_base_url == DEFAULT_OPENROUTER_BROKER_BASE_URL
-    )

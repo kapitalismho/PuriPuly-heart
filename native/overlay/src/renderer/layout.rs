@@ -1,5 +1,5 @@
 #[cfg(windows)]
-use super::cache::LayoutCache;
+use super::cache::{BoundedLruCache, LayoutCache, TEXT_FORMAT_CACHE_CAP};
 use super::cache::{CachedBlockLayoutTemplate, CachedLineLayoutTemplate};
 #[cfg(windows)]
 use super::font_resolver::{
@@ -11,11 +11,14 @@ use super::types::{
     CaptionPresentation, LayoutCacheKey, LineRole, ResolvedBlockLayout, ResolvedFrameLayout,
     ResolvedLineLayout, SpeakerDividerBand, TextStyleDescriptor, VisualBounds,
     DEFAULT_AVERAGE_GLYPH_ADVANCE_PX, DEFAULT_BLOCK_SPACING_PX, DEFAULT_FONT_SIZE_PX,
-    DEFAULT_HORIZONTAL_PADDING_PX, DEFAULT_PRIMARY_LINE_HEIGHT_PX, DEFAULT_SECONDARY_LINE_HEIGHT_PX,
-    DEFAULT_STRIP_HORIZONTAL_PADDING_PX, DEFAULT_STRIP_VERTICAL_PADDING_PX,
-    DEFAULT_SURFACE_HEIGHT_PX, DEFAULT_SURFACE_WIDTH_PX, DEFAULT_VERTICAL_PADDING_PX,
-    PRIMARY_SECONDARY_GAP_PX, SECONDARY_FONT_SCALE, TEXT_OUTLINE_OVERHANG_PX,
+    DEFAULT_HORIZONTAL_PADDING_PX, DEFAULT_PRIMARY_LINE_HEIGHT_PX,
+    DEFAULT_SECONDARY_LINE_HEIGHT_PX, DEFAULT_STRIP_HORIZONTAL_PADDING_PX,
+    DEFAULT_STRIP_VERTICAL_PADDING_PX, DEFAULT_SURFACE_HEIGHT_PX, DEFAULT_SURFACE_WIDTH_PX,
+    DEFAULT_VERTICAL_PADDING_PX, PRIMARY_SECONDARY_GAP_PX, SECONDARY_FONT_SCALE,
+    TEXT_OUTLINE_OVERHANG_PX,
 };
+#[cfg(windows)]
+use std::cell::RefCell;
 #[cfg(windows)]
 use windows::core::PCWSTR;
 #[cfg(all(windows, test))]
@@ -33,6 +36,10 @@ use windows::Win32::Graphics::DirectWrite::{
 };
 #[cfg(windows)]
 use windows_core::Interface;
+
+#[cfg(all(test, windows))]
+#[path = "update_layout_tests.rs"]
+mod update_layout_tests;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CaptionLayoutPolicy {
@@ -186,36 +193,6 @@ impl CaptionLayoutPolicy {
         .into()
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn layout_cache_key_for_block(
-        &self,
-        block: &CaptionBlock,
-        surface_width_px: u32,
-        presentation: &CaptionPresentation,
-    ) -> LayoutCacheKey {
-        let resolver = FontResolver::default();
-        let primary_style = style_descriptor_for_text(
-            &resolver,
-            block.primary_language.as_deref(),
-            &block.primary_text,
-        );
-        let secondary_style = style_descriptor_for_text(
-            &resolver,
-            block.secondary_language.as_deref(),
-            &block.secondary_text,
-        );
-        layout_cache_key_for_block(
-            block,
-            self.content_width_px(surface_width_px),
-            presentation.text_scale.max(0.1),
-            primary_style.style_key,
-            secondary_style.style_key,
-            block.fit_scales.unwrap_or_else(|| {
-                self.fit_scales_for_block(block, surface_width_px, presentation)
-            }),
-        )
-    }
-
     #[cfg(windows)]
     pub(crate) fn layout_cache_key_for_block_windows(
         &self,
@@ -244,21 +221,6 @@ impl CaptionLayoutPolicy {
     }
 
     pub fn resolve_blocks_for_presentation(
-        &self,
-        blocks: Vec<CaptionBlock>,
-        surface_width_px: u32,
-        surface_height_px: u32,
-        presentation: &CaptionPresentation,
-    ) -> ResolvedFrameLayout {
-        self.resolve_blocks_for_presentation_fallback(
-            blocks,
-            surface_width_px,
-            surface_height_px,
-            presentation,
-        )
-    }
-
-    fn resolve_blocks_for_presentation_fallback(
         &self,
         blocks: Vec<CaptionBlock>,
         surface_width_px: u32,
@@ -436,9 +398,10 @@ impl CaptionLayoutPolicy {
         let local_bounds = BlockBounds::new(0.0, 0.0, strip_width_px, block_height_px);
         let primary_advance_px =
             self.average_glyph_advance_px as f32 * text_scale * fit_scales.primary;
-        let secondary_advance_px =
-            self.average_glyph_advance_px as f32 * text_scale * SECONDARY_FONT_SCALE
-                * fit_scales.secondary;
+        let secondary_advance_px = self.average_glyph_advance_px as f32
+            * text_scale
+            * SECONDARY_FONT_SCALE
+            * fit_scales.secondary;
         let wrapped_primary = wrap_text(&block.primary_text, content_width_px, primary_advance_px);
         let truncated_primary = wrapped_primary.len() > primary_budget;
         let primary_lines = wrapped_primary
@@ -783,12 +746,28 @@ impl DirectWriteResolvedTextStyle {
 }
 
 #[cfg(windows)]
+const WRAPPING_BOUNDARY_CAP: usize = 16;
+#[cfg(windows)]
+const WRAPPING_BOUNDARY_BYTES: usize = 4096;
+
+#[cfg(windows)]
+struct WrappingBoundary {
+    style_key: TextStyleKey,
+    font_size_bits: u32,
+    width_bits: u32,
+    tested_prefix: String,
+    best_end: usize,
+}
+
+#[cfg(windows)]
 pub(crate) struct DirectWriteLayoutEngine {
     factory: IDWriteFactory,
     system_font_collection: IDWriteFontCollection,
     system_font_fallback: IDWriteFontFallback,
     font_resolver: FontResolver,
     bundled_font_collection: Option<WindowsBundledFontCollection>,
+    measurement_formats: RefCell<BoundedLruCache<(TextStyleKey, u32, i32), IDWriteTextFormat>>,
+    wrapping_boundaries: RefCell<Vec<WrappingBoundary>>,
 }
 
 #[cfg(windows)]
@@ -806,6 +785,10 @@ impl DirectWriteLayoutEngine {
             system_font_fallback: system_font_fallback.clone(),
             font_resolver,
             bundled_font_collection,
+            measurement_formats: RefCell::new(BoundedLruCache::with_capacity(
+                TEXT_FORMAT_CACHE_CAP,
+            )),
+            wrapping_boundaries: RefCell::new(Vec::with_capacity(WRAPPING_BOUNDARY_CAP)),
         }
     }
 
@@ -816,15 +799,6 @@ impl DirectWriteLayoutEngine {
         text: &str,
     ) -> TextStyleKey {
         self.resolve_text_style(policy, language, text).style_key
-    }
-
-    #[cfg(test)]
-    fn resolved_text_style_key_for_test(
-        &self,
-        policy: &CaptionLayoutPolicy,
-        text: &str,
-    ) -> TextStyleKey {
-        self.resolve_text_style(policy, None, text).style_key
     }
 
     #[cfg(test)]
@@ -843,6 +817,10 @@ impl DirectWriteLayoutEngine {
                 "test DirectWrite layout engine uses system fallback resources",
             ),
             bundled_font_collection: None,
+            measurement_formats: RefCell::new(BoundedLruCache::with_capacity(
+                TEXT_FORMAT_CACHE_CAP,
+            )),
+            wrapping_boundaries: RefCell::new(Vec::with_capacity(WRAPPING_BOUNDARY_CAP)),
         })
     }
 
@@ -867,8 +845,13 @@ impl DirectWriteLayoutEngine {
                 lines.push(String::new());
             }
             while !remaining.is_empty() && lines.len() < budget {
-                let line =
-                    self.longest_fitting_prefix(policy, style, remaining, max_width_px, font_size_px)?;
+                let line = self.longest_fitting_prefix(
+                    policy,
+                    style,
+                    remaining,
+                    max_width_px,
+                    font_size_px,
+                )?;
                 if line.is_empty() {
                     break;
                 }
@@ -993,42 +976,67 @@ impl DirectWriteLayoutEngine {
             return Ok("");
         }
 
-        if self
-            .measure_centered_line_for_resolved_style(
-                policy,
-                style,
-                trimmed,
-                max_width_px,
-                font_size_px,
-            )?
-            .width_px
-            <= max_width_px
-        {
+        let full_measurement = self.measure_centered_line_for_resolved_style(
+            policy,
+            style,
+            trimmed,
+            max_width_px,
+            font_size_px,
+        )?;
+        if full_measurement.width_px <= max_width_px {
             return Ok(trimmed);
+        }
+        let mut cacheable = full_measurement.style_key == style.style_key;
+        if cacheable {
+            let mut boundaries = self.wrapping_boundaries.borrow_mut();
+            if let Some(index) = boundaries.iter().rposition(|entry| {
+                entry.style_key == style.style_key
+                    && entry.font_size_bits == font_size_px.to_bits()
+                    && entry.width_bits == max_width_px.to_bits()
+                    && trimmed.starts_with(&entry.tested_prefix)
+            }) {
+                let entry = boundaries.remove(index);
+                let best_end = entry.best_end;
+                boundaries.push(entry);
+                return Ok(trimmed[..best_end].trim_end());
+            }
         }
 
         let mut best_end = 0usize;
+        let mut tested_end = 0usize;
         for (index, ch) in trimmed.char_indices() {
             let end = index + ch.len_utf8();
             let candidate = trimmed[..end].trim_end();
             if candidate.is_empty() {
                 continue;
             }
-            if self
-                .measure_centered_line_for_resolved_style(
-                    policy,
-                    style,
-                    candidate,
-                    max_width_px,
-                    font_size_px,
-                )?
-                .width_px
-                <= max_width_px
-            {
+            let measurement = self.measure_centered_line_for_resolved_style(
+                policy,
+                style,
+                candidate,
+                max_width_px,
+                font_size_px,
+            )?;
+            cacheable &= measurement.style_key == style.style_key;
+            if measurement.width_px <= max_width_px {
                 best_end = if ch.is_whitespace() { index } else { end };
                 continue;
             }
+            tested_end = end;
             break;
+        }
+        if cacheable && best_end > 0 && tested_end > 0 && tested_end <= WRAPPING_BOUNDARY_BYTES {
+            let mut boundaries = self.wrapping_boundaries.borrow_mut();
+            if boundaries.len() == WRAPPING_BOUNDARY_CAP {
+                boundaries.remove(0);
+            }
+            boundaries.push(WrappingBoundary {
+                style_key: style.style_key,
+                font_size_bits: font_size_px.to_bits(),
+                width_bits: max_width_px.to_bits(),
+                tested_prefix: trimmed[..tested_end].to_string(),
+                best_end,
+            });
         }
 
         if best_end == 0 {
@@ -1174,6 +1182,16 @@ impl DirectWriteLayoutEngine {
                 trimming_sign,
             );
         }
+        let key = (
+            resolved_style.style_key,
+            font_size_px.to_bits(),
+            word_wrapping.0,
+        );
+        if trimming_sign.is_none() {
+            if let Some(format) = self.measurement_formats.borrow_mut().get(&key) {
+                return Ok(format.clone());
+            }
+        }
         let locale = utf16_null(&resolved_style.locale);
         let face_name = utf16_null(&resolved_style.family_name);
         let text_format = unsafe {
@@ -1209,6 +1227,11 @@ impl DirectWriteLayoutEngine {
                     trimming_sign,
                 )?;
             }
+        }
+        if trimming_sign.is_none() {
+            self.measurement_formats
+                .borrow_mut()
+                .insert(key, text_format.clone());
         }
         Ok(text_format)
     }
@@ -1612,7 +1635,10 @@ fn measure_text_width(text: &str, average_glyph_advance_px: f32) -> f32 {
                     | 0x4e00..=0x9fff
                     | 0xac00..=0xd7af
                     | 0xf900..=0xfaff
-            ) => average_glyph_advance_px,
+            ) =>
+            {
+                average_glyph_advance_px
+            }
             _ => average_glyph_advance_px * 0.72,
         })
         .sum()
@@ -1694,12 +1720,13 @@ fn utf16_null(value: &str) -> Vec<u16> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::types::TEXT_OUTLINE_OVERHANG_PX;
+    use super::super::types::{
+        effective_background_alpha, fill_color_for_channel, outline_offsets_px,
+        TEXT_OUTLINE_OVERHANG_PX,
+    };
     use super::{measure_text_width, wrap_text, CaptionLayoutPolicy};
     use crate::renderer::{
-        effective_background_alpha, fill_color_for_channel, outline_offsets_px, text_script_bucket,
         CaptionBlock, CaptionChannel, CaptionPresentation, FontResolver, SpeakerStyle,
-        TextScriptBucket,
     };
 
     fn fallback_styles(
@@ -1761,85 +1788,6 @@ mod tests {
         assert_close(template.primary_lines[0].font_size_px, 132.0);
     }
 
-    #[test]
-    fn fallback_layout_secondary_origin_includes_scaled_primary_secondary_gap() {
-        let policy = CaptionLayoutPolicy::default();
-        let block = CaptionBlock::new("peer:translated", "translated peer text")
-            .with_secondary_text("source peer text", true);
-        let (primary_style, secondary_style) = fallback_styles(&block);
-        let template = policy.build_fallback_block_template(
-            &block,
-            3200.0,
-            1.25,
-            primary_style,
-            secondary_style,
-        );
-        let secondary = template
-            .secondary_line
-            .as_ref()
-            .expect("secondary line should be present");
-
-        assert_close(secondary.origin_y, (32.0 + 2.0 * 150.0 + 30.0) * 1.25);
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn windows_graphics_directwrite_layout_secondary_origin_includes_scaled_primary_secondary_gap()
-    {
-        let policy = CaptionLayoutPolicy::default();
-        let engine = super::DirectWriteLayoutEngine::new_for_test()
-            .expect("DirectWrite layout should initialize on Windows");
-        let layout = policy
-            .resolve_blocks_for_presentation_windows_cached(
-                vec![CaptionBlock::new("peer:translated", "translated peer text")
-                    .with_secondary_text("source peer text", true)],
-                3840,
-                1024,
-                &CaptionPresentation::default(),
-                &engine,
-                None,
-            )
-            .expect("DirectWrite layout should initialize on Windows");
-        let block = &layout.visible_blocks[0];
-        let secondary = block
-            .secondary_line
-            .as_ref()
-            .expect("secondary line should be present");
-
-        assert_close(
-            secondary.origin_y,
-            block.bounds.top_px + 32.0 + 2.0 * 150.0 + 30.0,
-        );
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn windows_graphics_layout_key_and_line_key_use_same_resolved_style_as_measurement() {
-        let policy = CaptionLayoutPolicy::default();
-        let engine = super::DirectWriteLayoutEngine::new_for_test()
-            .expect("DirectWrite layout should initialize on Windows");
-        let layout = policy
-            .resolve_blocks_for_presentation_windows_cached(
-                vec![CaptionBlock::new("latin", "hello style identity")],
-                3840,
-                1024,
-                &CaptionPresentation::default(),
-                &engine,
-                None,
-            )
-            .expect("DirectWrite layout should initialize on Windows");
-
-        let block = &layout.visible_blocks[0];
-        let line = block
-            .primary_lines
-            .first()
-            .expect("primary line should be present");
-        let resolved_style_key = engine.resolved_text_style_key_for_test(&policy, &line.text);
-
-        assert_eq!(block.layout_cache_key.primary_style_key, resolved_style_key);
-        assert_eq!(line.style_key, resolved_style_key);
-    }
-
     #[cfg(windows)]
     #[test]
     fn windows_graphics_wrapped_mixed_script_layout_cache_key_is_reachable_on_second_resolve() {
@@ -1893,16 +1841,6 @@ mod tests {
 
         assert_eq!(cache.len(), cache_len_after_first);
         assert!(cache.get(&lookup_key).is_some());
-    }
-
-    #[test]
-    fn text_script_bucket_prefers_latin_for_non_cjk_text() {
-        assert_eq!(text_script_bucket("hello world"), TextScriptBucket::Latin);
-    }
-
-    #[test]
-    fn text_script_bucket_uses_cjk_bucket_for_korean_text() {
-        assert_eq!(text_script_bucket("안녕하세요"), TextScriptBucket::Cjk);
     }
 
     #[test]

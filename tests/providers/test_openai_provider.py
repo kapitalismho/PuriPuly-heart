@@ -385,21 +385,122 @@ async def test_httpx_openai_client_propagates_request_cancellation_without_retry
 
 
 @pytest.mark.asyncio
-async def test_openai_key_verification_probes_selected_luna_model(
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "error": {
+                "code": "sk-private-secret-value",
+                "type": "private account",
+                "param": "private",
+            }
+        },
+        {"error": {"code": ["invalid_value"], "type": {}, "param": True}},
+        {"error": "private upstream response"},
+        ["private upstream response"],
+    ],
+)
+async def test_openai_verification_drops_untrusted_error_details(
+    monkeypatch: pytest.MonkeyPatch, payload: object
+) -> None:
+    from puripuly_heart.core import network_clients
+    from puripuly_heart.core.diagnostics import sanitize_diagnostics
+    from puripuly_heart.core.error_messages import provider_failure_report
+
+    transport = httpx.MockTransport(lambda _request: httpx.Response(400, json=payload))
+    monkeypatch.setattr(
+        network_clients,
+        "external_async_client",
+        lambda **kwargs: httpx.AsyncClient(transport=transport, **kwargs),
+    )
+
+    with pytest.raises(OpenAIResponseError) as failure:
+        await OpenAILLMProvider.verify_api_key("synthetic-key")
+
+    diagnostics = sanitize_diagnostics(failure.value.failure_diagnostics)
+    assert diagnostics.status_code == 400
+    assert diagnostics.fields["openai_error_code"] == "unknown"
+    assert diagnostics.fields["openai_error_type"] == "unknown"
+    assert diagnostics.fields["openai_error_param"] == "unknown"
+    assert (
+        provider_failure_report(
+            failure.value, provider="openai", operation="key_verification"
+        ).message.key
+        == "error.openai.request_rejected"
+    )
+    assert "private" not in repr(diagnostics) + repr(failure.value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(400, text="private non-JSON error"),
+        httpx.Response(400, json={"error": None}),
+    ],
+)
+async def test_openai_verification_keeps_http_failure_when_error_body_is_unusable(
+    monkeypatch: pytest.MonkeyPatch, response: httpx.Response
+) -> None:
+    from puripuly_heart.core import network_clients
+
+    monkeypatch.setattr(
+        network_clients,
+        "external_async_client",
+        lambda **kwargs: httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _request: response), **kwargs
+        ),
+    )
+    with pytest.raises(OpenAIResponseError) as failure:
+        await OpenAILLMProvider.verify_api_key("synthetic-key")
+    assert failure.value.status_code == 400
+    assert failure.value.failure_diagnostics.category == "invalid_response"
+    assert "private" not in repr(failure.value.failure_diagnostics)
+
+
+@pytest.mark.asyncio
+async def test_openai_verification_succeeds_when_upstream_rejects_tiny_output_budgets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_http = FakeAsyncClient()
-    monkeypatch.setattr(httpx, "AsyncClient", lambda **_kwargs: fake_http)
+    import json
+    from http.server import BaseHTTPRequestHandler
 
-    assert await OpenAILLMProvider.verify_api_key("verify-secret", model=OPENAI_MODEL_GPT_6_LUNA)
-    assert fake_http.last_request is not None
-    assert fake_http.last_request["url"] == "https://api.openai.com/v1/chat/completions"
-    assert fake_http.last_request["headers"]["Authorization"] == "Bearer verify-secret"
-    assert fake_http.last_request["json"] == {
-        "model": "gpt-6-luna",
-        "messages": [{"role": "user", "content": "Reply with OK."}],
-        "reasoning_effort": "none",
-        "temperature": 0.6,
-        "max_completion_tokens": 1,
-    }
-    assert fake_http.closed is True
+    from puripuly_heart.core import network_clients
+    from puripuly_heart.providers.llm import openai as openai_module
+    from tests.core.test_external_network import http_server
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            budget = body.get("max_completion_tokens")
+            accepted = budget is None or (type(budget) is int and budget >= 16)
+            payload = (
+                {"choices": [{"message": {"content": "OK"}, "finish_reason": "stop"}]}
+                if accepted
+                else {
+                    "error": {
+                        "message": "The model cannot use this tiny max_tokens budget.",
+                        "type": "invalid_request_error",
+                        "code": None,
+                        "param": None,
+                    }
+                }
+            )
+            encoded = json.dumps(payload).encode()
+            self.send_response(200 if accepted else 400)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def log_message(self, *_args):
+            pass
+
+    monkeypatch.setattr(
+        network_clients,
+        "external_async_client",
+        lambda **kwargs: httpx.AsyncClient(trust_env=False, **kwargs),
+    )
+    with http_server(handler=Handler, ipv6=False) as port:
+        monkeypatch.setattr(openai_module, "_OPENAI_BASE_URL", f"http://127.0.0.1:{port}/v1")
+        assert await OpenAILLMProvider.verify_api_key("synthetic-key")

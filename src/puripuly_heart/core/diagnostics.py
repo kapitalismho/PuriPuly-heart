@@ -16,14 +16,18 @@ from threading import RLock
 from uuid import uuid4
 
 from puripuly_heart.config.provider_values import STTProviderName
-from puripuly_heart.core.diagnostic_codes import is_supported_diagnostic_code
+from puripuly_heart.core.diagnostic_codes import (
+    AUDIO_DIAGNOSE_FAILURE_CODES,
+    is_supported_diagnostic_code,
+)
 from puripuly_heart.core.diagnostic_validation import (
+    OPENAI_FAILURE_ENUM_FIELDS,
     QWEN_FAILURE_ENUM_FIELDS,
     QWEN_FAILURE_NUMERIC_FIELDS,
     stt_startup_failure_code,
 )
 from puripuly_heart.core.lifecycle import LIFECYCLE_SHUTDOWN_PHASE_ORDER
-from puripuly_heart.core.local_stt_assets import (
+from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )
@@ -71,6 +75,11 @@ _NUMERIC_FIELDS = (
             "exit_code",
             "attempts",
             "count",
+            "frame_count",
+            "vad_sample_count",
+            "level_ppm",
+            "speech_probability_ppm",
+            "elapsed_ms",
             "generation",
             "runtime_generation",
             "activation_generation",
@@ -110,6 +119,9 @@ _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset(
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"logging_oversized_rejected"})
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"dropped"})
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"pending_temporary_directories"})
+_UNIT_INTERVAL_FIELDS = frozenset(
+    {"speech_probability_min", "speech_probability_max", "speech_threshold"}
+)
 _BOOLEAN_FIELDS = frozenset(
     {
         "settings_commit_succeeded",
@@ -132,6 +144,11 @@ _BOOLEAN_FIELDS = frozenset(
         "rollback_succeeded",
         "managed_secret_present",
         "token_present",
+        "opened",
+        "frames_received",
+        "silence_observed",
+        "speech_detected",
+        "candidate_current_route",
     }
 )
 _BOOLEAN_FIELDS = _BOOLEAN_FIELDS | frozenset(
@@ -149,13 +166,22 @@ _ID_FIELDS = frozenset(
         "worker_session_id",
         "attempt_id",
         "temporary_cleanup_diagnostic_id",
+        "route_id",
     }
 )
 _ENUM_FIELDS = {
     **TRANSPORT_ENUM_FIELDS,
+    **OPENAI_FAILURE_ENUM_FIELDS,
     **QWEN_FAILURE_ENUM_FIELDS,
     **{key: frozenset(values) for key, values in QQ_ENUM_FIELDS.items()},
     "channel": frozenset({"self", "peer"}),
+    "audio_failure_code": AUDIO_DIAGNOSE_FAILURE_CODES | {"none"},
+    "audio_restore_self": frozenset(
+        {"not_needed", "restored", "skipped", "failed", "cleanup_pending"}
+    ),
+    "audio_restore_peer": frozenset(
+        {"not_needed", "restored", "skipped", "failed", "cleanup_pending"}
+    ),
     "model_id": frozenset((*REQUIRED_CPU_LOCAL_STT_MODEL_IDS, LOCAL_QWEN_GPU_MODEL_ID)),
     "destination": frozenset(
         {
@@ -382,6 +408,7 @@ _COMPONENTS = frozenset(
     {
         "unclassified",
         "application_control",
+        "audio_diagnosis",
         "application_runtime_logging",
         "provider.stt",
         "provider.llm",
@@ -404,7 +431,7 @@ _COMPONENTS = frozenset(
         "application_notification",
         "output_runtime",
         "osc_control",
-        "gpu_worker",
+        "asr_worker",
         "overlay_process",
         "overlay_bridge",
         "provider_verifier",
@@ -430,6 +457,8 @@ _BOUNDARIES = (
             "dispatch",
             "diagnostic",
             "python_log",
+            "audio_diagnosis",
+            "audio.diagnose",
             "readiness",
             "begin",
             "send",
@@ -764,6 +793,7 @@ _NULLABLE_FIELDS = (
     | _BOOLEAN_FIELDS
     | _ID_FIELDS
     | _ENUM_FIELDS.keys()
+    | _UNIT_INTERVAL_FIELDS
     | {"provider_code", "ws_close_code", "api_code", "managed_operation_id"}
 )
 _operation_context: ContextVar[tuple[str, str, str, list[bool], object] | None] = ContextVar(
@@ -884,12 +914,16 @@ def sanitize_diagnostic_fields(
             accepted = type(value) is int and 0 <= value <= (
                 999999 if key == "provider_code" else 4999
             )
+        elif key in {"level_ppm", "speech_probability_ppm"}:
+            accepted = type(value) is int and 0 <= value <= 1_000_000
         elif key in _NUMERIC_FIELDS:
             accepted = type(value) is int and (
                 -(2**31) <= value < 2**32
                 if key in {"errno", "os_errno", "winerror", "exit_code"}
                 else 0 <= value < 2**64
             )
+        elif key in _UNIT_INTERVAL_FIELDS:
+            accepted = type(value) in {int, float} and 0 <= value <= 1
         elif key in _BOOLEAN_FIELDS or key == "cause_chain_truncated":
             accepted = value is None or type(value) is bool
         elif key in _ID_FIELDS:
@@ -1234,7 +1268,24 @@ class DiagnosticHistory:
                 "lookup": (
                     "foreign_instance"
                     if foreign
-                    else "invalid_cursor" if invalid else "found" if matched else "not_retained"
+                    else (
+                        "invalid_cursor"
+                        if invalid
+                        else (
+                            "found"
+                            if matched
+                            else (
+                                "no_new_records"
+                                if self.instance_id is not None
+                                and "after" in arguments
+                                and after == self.sequence
+                                and not any(
+                                    key in arguments for key in ("operation_id", "diagnostic_id")
+                                )
+                                else "not_retained"
+                            )
+                        )
+                    )
                 ),
                 "records": selected,
                 "oldest_sequence": oldest,

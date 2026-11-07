@@ -26,9 +26,12 @@ PRIMARY_ACTION_KEYS = [
     "qq_auth_translation_gated",
     "discord_callback_page",
     "founder_letter",
-    "local_qwen_hallucination_modal",
     "github_star_snackbar",
     "foundation_primitives",
+    "agent_report_cycle",
+    "agent_change_cycle",
+    "agent_key_cycle",
+    "agent_account_cycle",
     "http_extension_form",
 ]
 EXTENDED_ACTION_KEYS = [
@@ -92,6 +95,7 @@ def test_debug_preview_panel_starts_with_curated_actions_and_collapsed_diagnosti
 
 def test_debug_preview_panel_expands_diagnostics_with_bounded_scroll_height() -> None:
     panel = DebugPreviewPanel(**_callbacks([]))
+    collapsed = panel._popover.content.height
 
     panel._toggle_extended_actions(None)
 
@@ -101,7 +105,7 @@ def test_debug_preview_panel_expands_diagnostics_with_bounded_scroll_height() ->
 
     panel._toggle_extended_actions(None)
     assert panel._extended_actions_container.visible is False
-    assert panel._popover.content.height < DEBUG_PREVIEW_POPOVER_MAX_HEIGHT
+    assert panel._popover.content.height == collapsed
 
 
 def test_debug_preview_panel_omits_optional_http_and_extended_actions() -> None:
@@ -180,30 +184,6 @@ def test_debug_preview_panel_apply_locale_refreshes_labels(
         assert _button_label(panel._extended_action_buttons[action_key]) == (
             f"label:debug_preview.{action_key}"
         )
-
-
-def test_debug_preview_panel_uses_flet_086_text_button_content_api(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    created: list[object] = []
-
-    class ContentOnlyButton:
-        def __init__(self, *, content, tooltip=None, on_click=None, style=None) -> None:
-            self.content = content
-            self.tooltip = tooltip
-            self.on_click = on_click
-            self.style = style
-            created.append(self)
-
-    monkeypatch.setattr(panel_module.ft, "TextButton", ContentOnlyButton)
-    DebugPreviewPanel(**_callbacks([]))
-
-    assert [button.content for button in created] == [
-        panel_module.t("debug_preview.button"),
-        *(panel_module.t(f"debug_preview.{key}") for key in PRIMARY_ACTION_KEYS),
-        *(panel_module.t(f"debug_preview.{key}") for key in EXTENDED_ACTION_KEYS),
-        panel_module.t("debug_preview.more_diagnostics"),
-    ]
 
 
 def test_debug_preview_i18n_keys_exist_in_all_locale_bundles() -> None:

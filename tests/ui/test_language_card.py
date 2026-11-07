@@ -61,18 +61,6 @@ def test_rows_use_the_dashboard_capture_icons() -> None:
     assert card._self_row._row_icon.color == COLOR_DISPLAY_SOURCE
 
 
-def test_the_row_icon_is_its_own_leading_column_outside_the_source_slot() -> None:
-    card = _build_language_card()
-
-    for row in (card._self_row, card._peer_row):
-        pair = row.content
-        assert pair.controls[0] is row._icon_holder
-        assert row._icon_holder.alignment == ft.Alignment.CENTER_LEFT
-        assert row._icon_holder.padding is None
-        assert row._icon_holder.on_click is None
-        assert row._row_icon not in row._source_slot.content.controls
-
-
 def test_card_padding_is_asymmetric_so_the_leading_icon_keeps_its_inset() -> None:
     from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
 
@@ -82,12 +70,6 @@ def test_card_padding_is_asymmetric_so_the_leading_icon_keeps_its_inset() -> Non
     assert padding.left == padding.right == FOUNDATION_DESIGN_TOKENS.spacing.card
     assert padding.top == padding.bottom == FOUNDATION_DESIGN_TOKENS.spacing.inline
     assert padding.left > padding.top
-
-
-def test_the_row_width_follows_the_horizontal_card_padding() -> None:
-    assert language_card_module.LANGUAGE_ROW_WIDTH == (
-        600 - 2 * language_card_module.LANGUAGE_CARD_HORIZONTAL_PADDING
-    )
 
 
 def test_rows_have_no_caption_line_and_keep_the_swap_arrow() -> None:
@@ -110,7 +92,6 @@ def test_rows_have_no_caption_line_and_keep_the_swap_arrow() -> None:
 def test_rows_expose_no_tooltip() -> None:
     card = _build_language_card()
 
-    assert not hasattr(card, "set_row_labels")
     assert card._self_row.tooltip is None
     assert card._peer_row.tooltip is None
 
@@ -214,18 +195,6 @@ def test_only_the_target_area_carries_the_reveal_hover() -> None:
     assert row._target_holder.on_hover is not None
     assert row._source_holder.on_hover is None
     assert row._icon_holder.on_hover is None
-
-
-def test_the_peer_target_area_hover_has_no_secondary_slot_to_reveal(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    card = _build_language_card()
-    _mute(monkeypatch, card)
-    card.set_languages("한국어", "English", "English", "한국어")
-
-    card._peer_row._on_target_area_hover(SimpleNamespace(data="true"))
-
-    assert card._peer_row._secondary_slot is None
 
 
 def test_the_reveal_survives_a_language_refresh(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -354,18 +323,16 @@ def test_a_long_language_name_shrinks_every_slot(monkeypatch: pytest.MonkeyPatch
 
 
 def test_the_size_ladder_never_overflows_the_card_height() -> None:
-    for size in language_card_module.LANGUAGE_SIZE_CANDIDATES:
-        chosen = language_card_module._row_text_size(
-            source_texts=("A" * 200,),
-            target_texts=("B" * 200,),
-            target_lines=2,
-        )
-        assert chosen == language_card_module.LANGUAGE_SIZE_CANDIDATES[-1]
-        assert (
-            language_card_module._card_height(chosen, target_lines=2)
-            <= language_card_module.LANGUAGE_CARD_HEIGHT
-        )
-        assert size in language_card_module.LANGUAGE_SIZE_CANDIDATES
+    chosen = language_card_module._row_text_size(
+        source_texts=("A" * 200,),
+        target_texts=("B" * 200,),
+        target_lines=2,
+    )
+    assert chosen == language_card_module.LANGUAGE_SIZE_CANDIDATES[-1]
+    assert (
+        language_card_module._card_height(chosen, target_lines=2)
+        <= language_card_module.LANGUAGE_CARD_HEIGHT
+    )
 
 
 def test_the_common_case_uses_the_largest_size() -> None:

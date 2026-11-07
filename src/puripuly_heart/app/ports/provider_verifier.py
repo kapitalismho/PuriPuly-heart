@@ -10,8 +10,15 @@ from puripuly_heart.core.messages import (
     ErrorDiagnostics,
     UserMessageRef,
 )
-from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
+from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
 
+ProviderCredentialVerificationStatus = Literal[
+    "verified",
+    "failed",
+    "empty",
+    "unknown",
+    "error",
+]
 ProviderVerificationStatus = Literal["verified", "failed", "skipped"]
 PROVIDER_VERIFICATION_STATUS_VERIFIED: Final[ProviderVerificationStatus] = "verified"
 PROVIDER_VERIFICATION_STATUS_FAILED: Final[ProviderVerificationStatus] = "failed"
@@ -55,6 +62,16 @@ class ProviderVerificationResult:
         object.__setattr__(self, "evidence", _freeze_fields(self.evidence))
 
 
+@dataclass(frozen=True, slots=True)
+class ProviderCredentialVerificationOutcome:
+    status: ProviderCredentialVerificationStatus
+    provider: str
+    error_text: str | None = None
+    diagnostics: ErrorDiagnostics | None = None
+    verification_scope: str = "key_probe"
+    recognition_readiness: str = "unobserved"
+
+
 class ProviderVerifierPort(Protocol):
     async def verify_api_key(
         self,
@@ -93,6 +110,8 @@ class ProviderVerifierPort(Protocol):
 
 
 __all__ = [
+    "ProviderCredentialVerificationOutcome",
+    "ProviderCredentialVerificationStatus",
     "PROVIDER_VERIFICATION_STATUSES",
     "PROVIDER_VERIFICATION_STATUS_FAILED",
     "PROVIDER_VERIFICATION_STATUS_SKIPPED",

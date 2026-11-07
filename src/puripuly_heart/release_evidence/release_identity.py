@@ -20,7 +20,12 @@ _SHA64 = re.compile(r"[0-9a-f]{64}")
 
 PACKAGED_LICENSE_PATHS = (
     "puripuly_heart/data/licenses/SCIPY-1.18.0-LICENSE.txt",
-    "puripuly_heart/data/licenses/PYTHON-3.14.7-LICENSE.txt",
+    "puripuly_heart/data/licenses/PYTHON-3.14.10-LICENSE.txt",
+    "puripuly_heart/data/licenses/DART-BRIDGE-1.10.0-LICENSE.txt",
+    "puripuly_heart/data/licenses/GRANITE-SPEECH-5.0-LICENSE.txt",
+    "puripuly_heart/data/licenses/GRANITE-SPEECH-5.0-NOTICE.txt",
+    "puripuly_heart/data/licenses/GIGAAM-V3-LICENSE.txt",
+    "puripuly_heart/data/licenses/GIGAAM-V3-NOTICE.txt",
     "scipy/_lib/_uarray/LICENSE",
     "scipy/fft/_duccfft/LICENSE.md",
     "scipy/integrate/LICENSE_DOP",
@@ -28,23 +33,15 @@ PACKAGED_LICENSE_PATHS = (
     "zeroconf-0.150.0.dist-info/licenses/COPYING",
     "onnxruntime/LICENSE",
     "onnxruntime/ThirdPartyNotices.txt",
-    "aiohttp-3.13.2.dist-info/licenses/LICENSE.txt",
-    "aiohttp-3.13.2.dist-info/licenses/vendor/llhttp/LICENSE",
     "sherpa_onnx-1.13.8.dist-info/licenses/LICENSE",
     "sounddevice-0.5.5.dist-info/licenses/LICENSE",
     "charset_normalizer-3.4.4.dist-info/licenses/LICENSE",
     "cffi-2.0.0.dist-info/licenses/AUTHORS",
     "cffi-2.0.0.dist-info/licenses/LICENSE",
     "pyaudiowpatch-0.2.12.8.dist-info/licenses/LICENSE.txt",
-    "frozenlist-1.8.0.dist-info/licenses/LICENSE",
     "msgpack-1.2.1.dist-info/licenses/COPYING",
-    "multidict-6.7.0.dist-info/licenses/LICENSE",
-    "propcache-0.4.1.dist-info/licenses/LICENSE",
-    "propcache-0.4.1.dist-info/licenses/NOTICE",
     "psutil-7.2.2.dist-info/LICENSE",
     "pyyaml-6.0.3.dist-info/licenses/LICENSE",
-    "yarl-1.22.0.dist-info/licenses/LICENSE",
-    "yarl-1.22.0.dist-info/licenses/NOTICE",
 )
 SOXR_LICENSE_SOURCE_PARTS = ("src", "puripuly_heart", "data", "licenses", "COPYING.LGPL-2.1.txt")
 SOXR_MANIFEST_PARTS = ("build", "soxr-release-inputs", "manifest.json")
@@ -555,7 +552,7 @@ def _build_parser() -> argparse.ArgumentParser:
     build_parser.add_argument("--run-id", default="")
     build_parser.add_argument("--run-attempt", default="")
     build_parser.add_argument("--main-exe", type=Path, required=True)
-    build_parser.add_argument("--gpu-worker-exe", type=Path, required=True)
+    build_parser.add_argument("--asr-worker-exe", type=Path, required=True)
     build_parser.add_argument("--overlay-exe", type=Path, required=True)
     build_parser.add_argument("--installer", type=Path, required=True)
     build_parser.add_argument("--soxr-bundle", type=Path, default=None)
@@ -600,7 +597,7 @@ def _run_verify_build(arguments: argparse.Namespace) -> dict[str, object]:
         arguments.main_exe, expected_version=expected_version
     )
     gpu_metadata = verify_pe_product_metadata(
-        arguments.gpu_worker_exe, expected_version=expected_version
+        arguments.asr_worker_exe, expected_version=expected_version
     )
     overlay_metadata = verify_pe_product_metadata(
         arguments.overlay_exe, expected_version=expected_version
@@ -610,7 +607,7 @@ def _run_verify_build(arguments: argparse.Namespace) -> dict[str, object]:
     )
     candidates: list[tuple[str, Path, dict[str, str]]] = [
         ("main-executable", Path(arguments.main_exe), main_metadata),
-        ("gpu-worker-executable", Path(arguments.gpu_worker_exe), gpu_metadata),
+        ("asr-worker-executable", Path(arguments.asr_worker_exe), gpu_metadata),
         ("overlay-executable", Path(arguments.overlay_exe), overlay_metadata),
         ("installer", Path(arguments.installer), installer_metadata),
     ]

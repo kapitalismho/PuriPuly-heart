@@ -1,23 +1,25 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
 import numpy as np
-import puripuly_heart.app.wiring_local_asr_provider_runtime as runtime_wiring
 import pytest
-from puripuly_heart.app.adapters.self_capture_provider import SelfCaptureProviderAdapter
-from puripuly_heart.app.wiring_local_asr_provider_runtime import (
+
+import puripuly_heart.app.wiring.wiring_local_asr_provider_runtime as runtime_wiring
+from puripuly_heart.app.adapters.self_capture.self_capture_provider import (
+    SelfCaptureProviderAdapter,
+)
+from puripuly_heart.app.ports.asr_worker import ASRWorkerRequestError
+from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
     SharedSTTProviderFactory,
     _recognition_retention_profile,
 )
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
-
-from puripuly_heart.app.ports.gpu_worker import GpuWorkerRequestError
 from puripuly_heart.app.wiring.wiring_stt_factory import build_peer_stt_provider_request
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.resolved import (
@@ -27,6 +29,8 @@ from puripuly_heart.config.resolved import (
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot, PeerAudioSegmentLedger
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.peer_capture import (
     PeerCaptureLanguageFacts,
     PeerCaptureSessionConfig,
@@ -36,7 +40,11 @@ from puripuly_heart.core.runtime.gpu_asr import SharedGpuASRRuntime
 from puripuly_heart.core.runtime.local_asr_provider_runtime import LocalASRProviderRuntimeOwner
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
-from puripuly_heart.core.stt.backend import PermanentSTTScopedSessionError, STTSessionProjection
+from puripuly_heart.core.stt.backend import (
+    PermanentSTTScopedSessionError,
+    STTProviderTurnTerminal,
+    STTSessionProjection,
+)
 from puripuly_heart.core.stt.custom import (
     CustomSTTConfigurationError,
     normalize_custom_stt_extra,
@@ -50,8 +58,8 @@ from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.providers.stt.custom import _OfflineOpenAITranscriptionSession
 from tests.core.runtime.test_gpu_asr import (
     DEVICE,
-    FakeGpuWorkerClient,
-    FakeGpuWorkerFactory,
+    FakeASRWorkerClient,
+    FakeASRWorkerFactory,
 )
 from tests.core.runtime.test_local_asr_provider_runtime import (
     FakeProvisioningPort,
@@ -209,12 +217,6 @@ async def test_managed_provider_factory_uses_scoped_projection_for_both_channels
     assert callable(basic_log_sink)
     basic_log_sink("measured CPU attempt", 20)
     assert runtime_logging.basic[-1] == ("measured CPU attempt", 20)
-    assert calls[0][1] == {
-        "secrets": factory.secrets,
-        "gpu_runtime": gpu_runtime,
-        "gpu_model_path": Path("gpu.gguf"),
-        "gpu_device_id": "vk:2",
-    }
     assert isinstance(peer_provider, ScopedRecognitionEngine)
     assert peer_provider.scoped_settings_scope == (
         "deepgram",
@@ -498,14 +500,16 @@ def test_listen_retention_profile_covers_six_seconds_and_largest_prefix(
         ("self", 7 * 16000),
     ],
 )
+@pytest.mark.parametrize("provider_id", ["local_qwen_gpu", "local_granite", "local_gigaam"])
 async def test_production_retention_profiles_accept_listen_boundary_and_long_self_like(
     channel: str,
     content_samples: int,
+    provider_id: str,
 ) -> None:
-    settings = _retention_settings("local_qwen_gpu")
+    settings = _retention_settings(provider_id)
     config = SimpleNamespace(
         channel=channel,
-        provider="local_qwen_gpu",
+        provider=provider_id,
         provider_options={},
         sample_rate_hz=16000,
     )
@@ -542,7 +546,9 @@ async def test_production_retention_profiles_accept_listen_boundary_and_long_sel
 @pytest.mark.parametrize("provider_id", ["custom", "custom_offline"])
 async def test_production_profile_accounts_real_offline_custom_buffer_for_both_selectors(
     provider_id: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level("WARNING", logger="puripuly_heart.core.stt.scoped_engine")
     settings = _retention_settings(provider_id)
     config = SimpleNamespace(
         channel="peer",
@@ -551,6 +557,7 @@ async def test_production_profile_accounts_real_offline_custom_buffer_for_both_s
         sample_rate_hz=16000,
     )
     sessions: list[_OfflineOpenAITranscriptionSession] = []
+    emitted: list[object] = []
 
     async def open_session(_settings, epoch_id):
         session = _OfflineOpenAITranscriptionSession(
@@ -569,6 +576,7 @@ async def test_production_profile_accounts_real_offline_custom_buffer_for_both_s
     engine = ScopedRecognitionEngine(
         channel="peer",
         session_factory=open_session,
+        event_sink=emitted.append,
         retention_profile_resolver=lambda snapshot: _recognition_retention_profile(
             config,
             snapshot,
@@ -578,12 +586,36 @@ async def test_production_profile_accounts_real_offline_custom_buffer_for_both_s
 
     await engine.handle_owned_vad_event(start)
     session = sessions[0]
+    identity = session._event_projection.active_identity
+    assert identity is not None
+    assert identity.segment == start.segment.identity
+    assert identity.provider_epoch_id == session.projection.provider_epoch_id
 
     assert len(session._scoped_buffer) == 3200
     assert engine.retention_snapshot.retained_samples == 1600
     assert engine.retention_snapshot.retained_bytes == len(session._scoped_buffer)
     await engine.abort()
     await engine.close()
+
+    assert len(emitted) == 1
+    terminal = emitted[0]
+    assert isinstance(terminal, STTProviderTurnTerminal)
+    assert terminal.identity == identity
+    assert terminal.outcome == "cancelled"
+    assert terminal.failure_reason == "cancelled"
+    assert terminal.text_authority == "none"
+    assert terminal.epoch_disposition == "retire"
+    assert engine.retention_snapshot.retained_samples == 0
+    assert engine.retention_snapshot.retained_bytes == 0
+    assert engine.cleanup_debt == 0
+    assert not engine.is_live
+    assert session._stopped
+    assert session._client is None
+    assert not any(
+        value[0].fields.get("recognition_cause") == "provider_event_drain_timeout"
+        for record in caplog.records
+        if (value := getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE, None)) is not None
+    )
 
 
 def test_custom_realtime_profile_releases_after_completed_write() -> None:
@@ -614,9 +646,9 @@ def _gpu_build_request(channel: str, *, warmup: bool) -> ProviderRuntimeBuildReq
 
 def _production_gpu_owner(
     tmp_path: Path,
-    client: FakeGpuWorkerClient,
-) -> tuple[LocalASRProviderRuntimeOwner, FakeGpuWorkerFactory, asyncio.Queue, asyncio.Queue]:
-    worker_factory = FakeGpuWorkerFactory([FakeGpuWorkerClient(), client])
+    client: FakeASRWorkerClient,
+) -> tuple[LocalASRProviderRuntimeOwner, FakeASRWorkerFactory, asyncio.Queue, asyncio.Queue]:
+    worker_factory = FakeASRWorkerFactory([FakeASRWorkerClient(), client])
     self_events = asyncio.Queue()
     peer_events = asyncio.Queue()
     owner = LocalASRProviderRuntimeOwner(
@@ -659,7 +691,7 @@ async def test_production_self_ingress_prepares_gpu_before_first_speech(
     tmp_path: Path,
     peer_active: bool,
 ) -> None:
-    client = FakeGpuWorkerClient()
+    client = FakeASRWorkerClient()
     owner, workers, self_events, peer_events = _production_gpu_owner(tmp_path, client)
     adapter = SelfCaptureProviderAdapter(owner, None)
     config = SelfCaptureSessionConfig(
@@ -727,7 +759,7 @@ async def test_production_self_ingress_prepares_gpu_before_first_speech(
 async def test_production_peer_without_warmup_stays_lazy_until_requested(
     tmp_path: Path,
 ) -> None:
-    client = FakeGpuWorkerClient()
+    client = FakeASRWorkerClient()
     owner, workers, _self_events, _peer_events = _production_gpu_owner(tmp_path, client)
     try:
         await owner.start()
@@ -751,7 +783,7 @@ async def test_production_peer_without_warmup_stays_lazy_until_requested(
 async def test_production_failed_gpu_preparation_discards_backend_resources(
     tmp_path: Path,
 ) -> None:
-    client = FakeGpuWorkerClient(activation_error=GpuWorkerRequestError("model_missing"))
+    client = FakeASRWorkerClient(activation_error=ASRWorkerRequestError("model_missing"))
     owner, workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
     try:
         await owner.start()
@@ -778,7 +810,7 @@ async def test_production_failed_gpu_preparation_discards_backend_resources(
 async def test_production_cancelled_gpu_preparation_discards_backend_resources(
     tmp_path: Path,
 ) -> None:
-    client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
+    client = FakeASRWorkerClient(activation_gate=asyncio.Event())
     owner, workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
     await owner.start()
     building = asyncio.create_task(
@@ -806,7 +838,7 @@ async def test_production_cancelled_gpu_preparation_discards_backend_resources(
 async def test_scoped_gpu_warmup_cannot_revive_closing_or_closed_engine(
     tmp_path: Path,
 ) -> None:
-    client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
+    client = FakeASRWorkerClient(activation_gate=asyncio.Event())
     owner, _workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
     await owner.start()
     result = await owner.replace_provider(
@@ -849,7 +881,7 @@ async def test_scoped_gpu_warmup_cannot_revive_closing_or_closed_engine(
 async def test_production_same_channel_replacement_survives_retired_backend_close(
     tmp_path: Path,
 ) -> None:
-    client = FakeGpuWorkerClient()
+    client = FakeASRWorkerClient()
     owner, workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
     try:
         await owner.start()
@@ -890,7 +922,7 @@ async def test_production_same_channel_replacement_survives_retired_backend_clos
 async def test_production_cancelled_same_channel_candidate_preserves_live_preparation(
     tmp_path: Path,
 ) -> None:
-    client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
+    client = FakeASRWorkerClient(activation_gate=asyncio.Event())
     owner, workers, self_events, _peer_events = _production_gpu_owner(tmp_path, client)
     await owner.start()
     request = _gpu_build_request("self", warmup=False)
@@ -930,3 +962,127 @@ async def test_production_cancelled_same_channel_candidate_preserves_live_prepar
         )
         await owner.close()
     assert client.close_calls == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["ready", "cancel", "failure"])
+@pytest.mark.parametrize("provider_id", ["local_granite", "local_gigaam"])
+async def test_cpu_backend_preparation_drains_without_constructing_cancelled_provider(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, outcome: str, provider_id: str
+) -> None:
+    from puripuly_heart.core.storage.secrets import InMemorySecretStore
+
+    loop = asyncio.get_running_loop()
+    loop_thread = threading.get_ident()
+    entered = asyncio.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    construction_threads = []
+    original_prepare = runtime_wiring.prepare_local_stt_backend_dependencies
+    original_create = runtime_wiring.create_stt_backend_from_resolved_config
+
+    def prepare(config: ResolvedSTTConfig) -> None:
+        loop.call_soon_threadsafe(entered.set)
+        try:
+            assert release.wait(3)
+            if outcome == "failure":
+                raise OSError("selected backend unavailable")
+            original_prepare(config)
+        finally:
+            finished.set()
+
+    def create(config: ResolvedSTTConfig, **kwargs: object) -> object:
+        construction_threads.append(threading.get_ident())
+        return original_create(config, **kwargs)
+
+    monkeypatch.setattr(runtime_wiring, "prepare_local_stt_backend_dependencies", prepare)
+    monkeypatch.setattr(runtime_wiring, "create_stt_backend_from_resolved_config", create)
+    factory = SharedSTTProviderFactory(
+        secrets=InMemorySecretStore(),
+        clock=FakeClock(),
+        reset_deadline_s=300,
+        gpu_model_path=None,
+    )
+    request = replace(
+        _gpu_build_request("self", warmup=False), config=_resolved_config("self", provider_id)
+    )
+    task = asyncio.create_task(factory.create(request, gpu_runtime=object()))
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        progressed = asyncio.Event()
+        loop.call_soon(progressed.set)
+        await asyncio.wait_for(progressed.wait(), 1)
+        assert not task.done()
+        if outcome == "cancel":
+            for _ in range(2):
+                task.cancel()
+                await asyncio.sleep(0)
+            assert not task.done()
+            assert not finished.is_set()
+        release.set()
+        if outcome == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(task, 1)
+        elif outcome == "failure":
+            with pytest.raises(OSError, match="selected backend unavailable"):
+                await asyncio.wait_for(task, 1)
+        else:
+            provider = await asyncio.wait_for(task, 1)
+            assert provider.accepted_settings_scope[0] == provider_id
+            assert construction_threads == [loop_thread]
+            await provider.close_backend()
+        assert finished.is_set()
+        if outcome != "ready":
+            assert construction_threads == []
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_gpu_backend_resolves_default_path_without_blocking_or_starting_capture(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    release = threading.Event()
+    model_path = tmp_path / "synthetic-selected.gguf"
+
+    class Runtime:
+        activation_calls = 0
+        deactivation_calls = 0
+
+        async def activate_channel(self, *_args, **_kwargs):
+            self.activation_calls += 1
+
+        async def deactivate_channel(self, *_args, **_kwargs):
+            self.deactivation_calls += 1
+
+    runtime = Runtime()
+
+    def resolve() -> Path:
+        loop.call_soon_threadsafe(entered.set)
+        assert release.wait(3)
+        return model_path
+
+    monkeypatch.setattr(runtime_wiring, "local_gpu_model_path", resolve)
+    factory = SharedSTTProviderFactory(
+        secrets=object(), clock=FakeClock(), reset_deadline_s=300, gpu_model_path=None
+    )
+    task = asyncio.create_task(
+        factory.create(_gpu_build_request("self", warmup=False), gpu_runtime=runtime)
+    )
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        assert not task.done()
+        release.set()
+        provider = await asyncio.wait_for(task, 1)
+        assert runtime.activation_calls == 0
+        assert provider.accepted_settings_scope[0] == "local_qwen_gpu"
+        assert provider.backend_prepare.__self__.model_path == model_path
+        await provider.close_backend()
+        assert runtime.activation_calls == 0
+        assert runtime.deactivation_calls == 1
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)

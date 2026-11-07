@@ -30,7 +30,7 @@ def _create_vrchat_osc_probe_task(
 @dataclass(slots=True)
 class VrchatOscPresenceProbeOwner:
     presence_provider: Callable[[], VrchatOscPresencePort | None]
-    port_provider: Callable[[], int]
+    port_provider: Callable[[], int | None]
     publish_notice: Callable[[bool], None]
     task_factory: VrchatOscProbeTaskFactory = _create_vrchat_osc_probe_task
     diagnostics_sink: VrchatOscProbeDiagnosticsSink | None = None
@@ -39,6 +39,9 @@ class VrchatOscPresenceProbeOwner:
     _task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _generation: int = field(init=False, default=0, repr=False)
     _accepting_ingress: bool = field(init=False, default=True, repr=False)
+    _connection_changed: asyncio.Event = field(
+        init=False, default_factory=asyncio.Event, repr=False
+    )
 
     @property
     def owner_name(self) -> str:
@@ -68,10 +71,11 @@ class VrchatOscPresenceProbeOwner:
                 "_generation",
                 "_notice_active",
                 "_accepting_ingress",
+                "_connection_changed",
             ),
             "stop_ingress": "reject new probes and invalidate the active generation",
             "shutdown_policy": "cancel and await presence probe task",
-            "late_callback_rule": "generation check drops stale probe results",
+            "late_callback_rule": "generation and connection changes drop stale probe results",
         }
 
     def publish(self, active: bool) -> None:
@@ -83,6 +87,12 @@ class VrchatOscPresenceProbeOwner:
             self.publish_notice(active)
         except Exception:
             return
+
+    def connection_changed(self) -> None:
+        if not self._accepting_ingress:
+            return
+        self._connection_changed.set()
+        self.publish(False)
 
     def schedule(self, *, force: bool = False) -> None:
         _ = force
@@ -108,12 +118,14 @@ class VrchatOscPresenceProbeOwner:
 
     async def run(self, generation: int) -> None:
         while generation == self._generation:
+            self._connection_changed.clear()
             try:
                 presence = self.presence_provider()
+                port = self.port_provider()
                 should_prompt = (
                     None
-                    if presence is None
-                    else await presence.should_prompt_enable_osc(port=self.port_provider())
+                    if presence is None or port is None
+                    else await presence.should_prompt_enable_osc(port=port)
                 )
             except asyncio.CancelledError:
                 raise
@@ -126,11 +138,14 @@ class VrchatOscPresenceProbeOwner:
                 should_prompt = None
             if generation != self._generation:
                 return
+            if self._connection_changed.is_set():
+                continue
             self.publish(bool(should_prompt))
             try:
-                await asyncio.sleep(max(0.0, float(self.interval_seconds)))
-            except asyncio.CancelledError:
-                raise
+                async with asyncio.timeout(max(0.0, float(self.interval_seconds))):
+                    await self._connection_changed.wait()
+            except TimeoutError:
+                pass
 
     def stop_ingress(self) -> None:
         self._accepting_ingress = False

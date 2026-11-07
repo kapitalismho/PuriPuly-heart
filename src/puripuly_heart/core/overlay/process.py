@@ -71,6 +71,7 @@ from .process_runners import (
 from .process_runners import (
     normalize_handoff_experiment as normalize_handoff_experiment,
 )
+from .protocol import RuntimeStopReason
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +180,10 @@ class OverlayProcessManager:
     _shutdown_request_sent: bool = field(init=False, default=False)
     _shutdown_acknowledged: bool = field(init=False, default=False)
     _shutdown_complete_acknowledged: bool = field(init=False, default=False)
+    runtime_stop_reason: RuntimeStopReason | None = field(init=False, default=None)
+    runtime_stop_completed: bool = field(init=False, default=False)
+    _runtime_stop_terminal_received: bool = field(init=False, default=False, repr=False)
+    _runtime_stop_deadline: float | None = field(init=False, default=None, repr=False)
     restart_refill_ready: bool = field(init=False, default=False)
     _qualified_health_started_at: float | None = field(init=False, default=None, repr=False)
     _last_qualified_health_challenge_id: int | None = field(
@@ -286,12 +291,6 @@ class OverlayProcessManager:
         return False
 
     @classmethod
-    def _is_bounds_vector(cls, value: object) -> bool:
-        if not isinstance(value, (list, tuple)) or len(value) != 4:
-            return False
-        return all(cls._is_finite_non_bool_number(item) for item in value)
-
-    @classmethod
     def _is_positive_canonical_bounds(cls, value: object) -> bool:
         if not isinstance(value, (list, tuple)) or len(value) != 4:
             return False
@@ -380,7 +379,11 @@ class OverlayProcessManager:
         return {
             "graceful_request": self._shutdown_graceful_request,
             "acknowledged": self._shutdown_acknowledged,
-            "terminal_status_received": self._shutdown_complete_acknowledged,
+            "terminal_status_received": self._shutdown_terminal_received(),
+            "stop_origin": "openvr" if self.runtime_stop_reason is not None else "parent",
+            "stop_reason": (
+                self.runtime_stop_reason.value if self.runtime_stop_reason is not None else None
+            ),
             "terminate_requested": self._shutdown_terminate_requested,
             "kill_requested": self._shutdown_kill_requested,
             "forced": self._shutdown_forced,
@@ -406,6 +409,16 @@ class OverlayProcessManager:
             "stdout_events": [dict(event) for event in self._shutdown_evidence],
             "stderr_diagnostics": stderr_evidence,
         }
+
+    def _shutdown_ack_received(self) -> bool:
+        if self.runtime_stop_reason is not None:
+            return self._runtime_stop_terminal_received
+        return self._shutdown_acknowledged
+
+    def _shutdown_terminal_received(self) -> bool:
+        if self.runtime_stop_reason is not None:
+            return self._runtime_stop_terminal_received
+        return self._shutdown_complete_acknowledged
 
     async def start(self) -> None:
         if self.state in {"starting", "connected"}:
@@ -433,6 +446,10 @@ class OverlayProcessManager:
         self._shutdown_request_sent = False
         self._shutdown_acknowledged = False
         self._shutdown_complete_acknowledged = False
+        self.runtime_stop_reason = None
+        self.runtime_stop_completed = False
+        self._runtime_stop_terminal_received = False
+        self._runtime_stop_deadline = None
         self._shutdown_graceful_request = "not_attempted"
         self._shutdown_terminate_requested = False
         self._shutdown_kill_requested = False
@@ -660,7 +677,7 @@ class OverlayProcessManager:
         process = self._process
         if process is not None:
             graceful_shutdown_complete = False
-            if self.graceful_shutdown_request is not None:
+            if self.graceful_shutdown_request is not None or self.runtime_stop_reason is not None:
                 graceful_shutdown_complete = await self._request_graceful_shutdown_before_terminate(
                     process,
                     request_already_sent=self._shutdown_request_sent,
@@ -722,12 +739,12 @@ class OverlayProcessManager:
             elif self._last_exit_code != 0:
                 self._set_shutdown_failure("runtime_exit_nonzero")
             elif (
-                self.graceful_shutdown_request is not None and not self._shutdown_graceful_completed
-            ):
+                self.graceful_shutdown_request is not None or self.runtime_stop_reason is not None
+            ) and not self._shutdown_graceful_completed:
                 self.native_evidence_state = "incomplete"
                 self._set_shutdown_failure(
                     "shutdown_terminal_unavailable"
-                    if self._shutdown_acknowledged
+                    if self._shutdown_acknowledged or self.runtime_stop_reason is not None
                     else "shutdown_not_acknowledged"
                 )
             self._note_outer_exit_for_cleanup(process)
@@ -750,6 +767,8 @@ class OverlayProcessManager:
             self.state = "off"
             self._current_phase = "off"
             self._shutdown_cleanup_succeeded = True
+            if self.runtime_stop_reason is not None:
+                self.runtime_stop_completed = self._shutdown_graceful_completed
         else:
             self.state = "failed"
             self._current_phase = "failed"
@@ -879,6 +898,8 @@ class OverlayProcessManager:
                     exit_code = exit_task.result()
                     self._last_exit_code = exit_code
                     self._record_process("process_exited", phase="startup", exit_code=exit_code)
+                    if await self._settle_runtime_stop_exit(self._process, event_task, exit_code):
+                        return
                     await self._fail(
                         self._map_exit_code_to_failure_reason(exit_code),
                         terminate_process=False,
@@ -886,7 +907,11 @@ class OverlayProcessManager:
                     return
 
                 if timeout_task in done:
-                    await self._fail("startup_timeout")
+                    await self._fail(
+                        "shutdown_terminal_unavailable"
+                        if self.runtime_stop_reason is not None
+                        else "startup_timeout"
+                    )
                     return
         finally:
             for task in (event_task, bridge_task, exit_task, timeout_task):
@@ -933,7 +958,15 @@ class OverlayProcessManager:
                 done, _pending = await asyncio.wait(
                     pending_tasks,
                     return_when=asyncio.FIRST_COMPLETED,
+                    timeout=(
+                        max(0.0, self._runtime_stop_deadline - asyncio.get_running_loop().time())
+                        if self._runtime_stop_deadline is not None
+                        else None
+                    ),
                 )
+                if not done:
+                    await self._fail("shutdown_terminal_unavailable")
+                    return
 
                 if event_task in done:
                     if (
@@ -966,6 +999,8 @@ class OverlayProcessManager:
                     self._last_exit_code = exit_code
                     self._record_process("process_exited", phase="connected", exit_code=exit_code)
                     await self._reconcile_terminal_process_events(process, event_task)
+                    if await self._settle_runtime_stop_exit(process, event_task, exit_code):
+                        return
                     if self.state == "connected" and exit_code is not None:
                         if self._shutdown_requested and exit_code == 0:
                             try:
@@ -1026,6 +1061,62 @@ class OverlayProcessManager:
             return self.task_factory(coroutine, task_name=task_name)
         return asyncio.create_task(coroutine, name=f"OverlayProcessManager:{task_name}")
 
+    async def _settle_runtime_stop_exit(
+        self,
+        process: OverlayManagedProcess,
+        event_task: asyncio.Task[Any],
+        exit_code: int | None,
+    ) -> bool:
+        if self.selected_target != "steamvr":
+            return False
+        readers_settled = False
+        reader_failure: Exception | None = None
+        try:
+            await process.finish_readers()
+            readers_settled = True
+            self._shutdown_reader_cleanup = "complete"
+        except Exception as exc:
+            reader_failure = exc
+        await self._reconcile_terminal_process_events(process, event_task)
+        if self.runtime_stop_reason is None:
+            return False
+        if reader_failure is not None:
+            self._shutdown_reader_cleanup = "failed"
+            self._set_shutdown_failure(
+                "shutdown_cleanup_failed",
+                fields={"cleanup_stage": "reader_cleanup", **safe_exception_fields(reader_failure)},
+            )
+        self.restart_scheduled = False
+        self._shutdown_exit_confirmed = type(exit_code) is int
+        if exit_code != 0:
+            self._set_shutdown_failure("runtime_exit_nonzero")
+        elif not self._runtime_stop_terminal_received:
+            self._set_shutdown_failure("shutdown_terminal_unavailable")
+        if readers_settled:
+            self._detach_process_lifecycle_sink(process)
+            if self._process is process:
+                self._process = None
+            try:
+                self._cleanup_manifest()
+            except Exception as exc:
+                self._set_shutdown_failure(
+                    "shutdown_cleanup_failed",
+                    fields={"cleanup_stage": "cleanup", **safe_exception_fields(exc)},
+                )
+        self.runtime_stop_completed = (
+            readers_settled
+            and self._shutdown_exit_confirmed
+            and exit_code == 0
+            and self._runtime_stop_terminal_received
+            and self.failure_reason is None
+            and self._shutdown_terminal_cause is None
+        )
+        self._shutdown_cleanup_succeeded = self.runtime_stop_completed
+        self._shutdown_graceful_completed = self.runtime_stop_completed
+        self.state = "off" if self.runtime_stop_completed else "failed"
+        self._current_phase = self.state
+        return True
+
     @staticmethod
     def _create_cleanup_task(
         coroutine: Coroutine[Any, Any, Any],
@@ -1041,6 +1132,11 @@ class OverlayProcessManager:
         allow_ready: bool,
         trusted_process_event: bool = True,
     ) -> str:
+        trusted_runtime_event = (
+            isinstance(event, _OverlayProcessEvent)
+            and event.trusted_process_event
+            and self._process is not None
+        )
         if isinstance(event, _OverlayProcessEvent):
             trusted_process_event = event.trusted_process_event
             event = event.payload
@@ -1114,7 +1210,38 @@ class OverlayProcessManager:
                     accepted=False,
                 )
             return "ignored"
+        if event_type == "runtime_stop_requested" or (
+            event_type == "shutdown_complete" and event.get("stop_origin") == "openvr"
+        ):
+            if (
+                not trusted_runtime_event
+                or self.selected_target != "steamvr"
+                or self.state not in {"starting", "connected", "stopping"}
+                or event.get("overlay_instance_id") != self.overlay_instance_id
+                or type(event.get("runtime_generation")) is not int
+                or event.get("runtime_generation") != 1
+                or event.get("stop_origin") != "openvr"
+            ):
+                return "ignored"
+            try:
+                reason = RuntimeStopReason(event.get("stop_reason"))
+            except ValueError, TypeError:
+                return "ignored"
+            if event_type == "runtime_stop_requested":
+                if self.runtime_stop_reason is None:
+                    self.runtime_stop_reason = reason
+                    self._runtime_stop_deadline = (
+                        asyncio.get_running_loop().time() + self.graceful_shutdown_timeout_s
+                    )
+                    self.restart_scheduled = False
+                    self._record_process("runtime_stop_admitted", stop_reason=reason.value)
+            elif self.runtime_stop_reason == reason and event.get("cleanup_succeeded") is True:
+                self._runtime_stop_terminal_received = True
+                self._shutdown_complete_acknowledged = True
+            return "ignored"
         if event_type in {"shutdown_ack", "shutdown_complete"}:
+            if self.runtime_stop_reason is not None:
+                return "ignored"
             if not trusted_process_event:
                 self._record_process(
                     "renderer_message_ignored",
@@ -1145,6 +1272,8 @@ class OverlayProcessManager:
             self._handle_desktop_first_visible(event, trusted_process_event)
             return "ignored"
         if allow_ready and trusted_process_event and event_type == "overlay_ready":
+            if self.runtime_stop_reason is not None:
+                return "ignored"
             event_instance_id = event.get("overlay_instance_id")
             if event_instance_id != self.overlay_instance_id:
                 self._record_process(
@@ -1631,7 +1760,7 @@ class OverlayProcessManager:
         request_already_sent: bool = False,
     ) -> bool:
         request = self.graceful_shutdown_request
-        if request is None:
+        if request is None and self.runtime_stop_reason is None:
             self._shutdown_graceful_request = "unavailable"
             self._record_process("graceful_shutdown_unavailable")
             return False
@@ -1653,7 +1782,9 @@ class OverlayProcessManager:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout_s
         request_failed = False
-        if request_already_sent:
+        if self.runtime_stop_reason is not None:
+            self._shutdown_graceful_request = "runtime_requested"
+        elif request_already_sent:
             self._shutdown_graceful_request = "already_sent"
         else:
             try:
@@ -1677,7 +1808,7 @@ class OverlayProcessManager:
             request_failed=request_failed,
         )
         ack_task: asyncio.Task[Any] | None = None
-        if not self._shutdown_acknowledged:
+        if not self._shutdown_ack_received():
             ack_task = self._create_cleanup_task(
                 self._next_shutdown_lifecycle_event(process),
                 task_name="graceful-shutdown-ack",
@@ -1690,7 +1821,7 @@ class OverlayProcessManager:
                 task_name="graceful-shutdown-process-wait",
             )
             self._active_process_exit_task = exit_task
-        acknowledged = self._shutdown_acknowledged
+        acknowledged = self._shutdown_ack_received()
         failed_native_startup = (
             self.selected_target == "steamvr"
             and self.failure_reason is not None
@@ -1715,7 +1846,7 @@ class OverlayProcessManager:
                         ack_task = None
                     else:
                         await self._drain_process_events(process)
-                    acknowledged = self._shutdown_acknowledged
+                    acknowledged = self._shutdown_ack_received()
                     if not acknowledged:
                         break
                     self._last_exit_code = self._process_exit_code(process, exit_task)
@@ -1724,7 +1855,7 @@ class OverlayProcessManager:
                         exit_code=self._last_exit_code,
                     )
                     self._shutdown_graceful_completed = (
-                        self._shutdown_complete_acknowledged
+                        self._shutdown_terminal_received()
                         and self._last_exit_code == 0
                         and self._shutdown_terminal_cause is None
                     )
@@ -1754,7 +1885,7 @@ class OverlayProcessManager:
                         break
                     for event in events:
                         await self._record_shutdown_lifecycle_event(event)
-                    acknowledged = self._shutdown_acknowledged
+                    acknowledged = self._shutdown_ack_received()
                     ack_task = None
                     if not acknowledged:
                         ack_task = self._create_cleanup_task(
@@ -1847,7 +1978,9 @@ class OverlayProcessManager:
         )
         failure_reason = self.failure_reason or failure_reason
         connected_session = self._last_transition in {"overlay_ready", "bridge_ready"}
-        self.restart_scheduled = connected_session and not self._shutdown_requested
+        self.restart_scheduled = (
+            connected_session and not self._shutdown_requested and self.runtime_stop_reason is None
+        )
         self._current_phase = "failed"
         stdout_count = (
             len(self.diagnostics.child_stdout_lines) if self.diagnostics is not None else 0
@@ -2099,6 +2232,9 @@ class OverlayProcessManager:
                     "exit_code",
                     "runtime_generation",
                     "overlay_instance_id",
+                    "stop_origin",
+                    "stop_reason",
+                    "cleanup_succeeded",
                 )
                 if key in event
                 and (isinstance(event[key], (str, int, float, bool)) or event[key] is None)
@@ -2108,7 +2244,13 @@ class OverlayProcessManager:
                     safe_event[key] = safe_failure_reason(safe_event[key])
             self._shutdown_evidence.append(safe_event)
             event_type = str(event.get("type", ""))
-            if event_type in {"overlay_trace", "shutdown_ack", "shutdown_complete", "owner_status"}:
+            if event_type in {
+                "overlay_trace",
+                "shutdown_ack",
+                "shutdown_complete",
+                "runtime_stop_requested",
+                "owner_status",
+            }:
                 await self._handle_lifecycle_event(source_event, allow_ready=False)
                 return
             if event_type in {"startup_error", "runtime_error"}:

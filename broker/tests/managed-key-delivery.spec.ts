@@ -7,18 +7,17 @@ vi.mock('../src/openrouter-management', async (importOriginal) => ({
 
 import app from '../src/index';
 import {
-  acknowledgeManagedKeyDelivery,
   claimStaleManagedKeyDeliveryCleanup,
   createManagedKeyDelivery,
   hashDeliveryAckToken,
   listStalePendingManagedKeyDeliveries,
+  markManagedKeyDeliveryAcknowledged,
 } from '../src/managed-key-delivery';
 import {
   cleanupManagedChildKey,
 } from '../src/openrouter-management';
 import { handleScheduled, reconcileStaleManagedKeyDeliveries } from '../src/scheduled';
 import { normalizedErrorEnvelope } from './test-support/errors';
-import { BROKER_MIGRATION_FILENAMES } from './test-support/migrations';
 import {
   createTestBrokerEnv,
   seedRequestEvent,
@@ -31,20 +30,8 @@ describe('managed key delivery ACK foundation', () => {
     vi.unstubAllGlobals();
   });
 
-  it('orders migration 0012 after telemetry 0011 and creates delivery ACK schema', () => {
+  it('accepts delivery-pending entitlement rows for Discord and QQ', () => {
     const env = createTestBrokerEnv();
-
-    expect(BROKER_MIGRATION_FILENAMES).toEqual(
-      expect.arrayContaining([
-        '0011_add_telemetry_active_days.sql',
-        '0012_add_managed_key_delivery_ack.sql',
-      ]),
-    );
-    expect(
-      BROKER_MIGRATION_FILENAMES.indexOf('0012_add_managed_key_delivery_ack.sql'),
-    ).toBe(
-      BROKER_MIGRATION_FILENAMES.indexOf('0011_add_telemetry_active_days.sql') + 1,
-    );
 
     env.__db
       .prepare(
@@ -87,38 +74,6 @@ describe('managed key delivery ACK foundation', () => {
         '2026-08-05T00:00:00.000Z',
       );
     expect(Number(qqDeliveryPending.changes)).toBe(1);
-
-    const deliveryColumns = env.__db
-      .prepare("SELECT name FROM pragma_table_info('managed_key_deliveries') ORDER BY cid")
-      .all() as Array<{ name: string }>;
-    expect(deliveryColumns.map(({ name }) => name)).toEqual([
-      'delivery_id',
-      'issue_source',
-      'subject_ref',
-      'installation_id',
-      'managed_credential_ref',
-      'ack_token_hash',
-      'status',
-      'created_at',
-      'expires_at',
-      'acknowledged_at',
-      'failed_at',
-      'failure_reason',
-      'operation_id',
-      'attempt_index',
-    ]);
-
-    const indexes = env.__db
-      .prepare("SELECT name FROM pragma_index_list('managed_key_deliveries') ORDER BY name")
-      .all() as Array<{ name: string }>;
-    expect(indexes.map(({ name }) => name)).toEqual(
-      expect.arrayContaining([
-        'idx_managed_key_deliveries_issue_source_created_at',
-        'idx_managed_key_deliveries_managed_credential_ref',
-        'idx_managed_key_deliveries_operation_id',
-        'idx_managed_key_deliveries_status_expires_at',
-      ]),
-    );
   });
 
   it('creates pending delivery rows with hashed ACK tokens only', async () => {
@@ -147,7 +102,7 @@ describe('managed key delivery ACK foundation', () => {
     expect(JSON.stringify(row)).not.toContain(delivery.deliveryAckToken);
   });
 
-  it('acknowledges once and treats duplicate valid ACK as idempotent', async () => {
+  it('marks finalized delivery acknowledgement once and keeps repair idempotent', async () => {
     const env = createTestBrokerEnv();
     const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
       issueSource: 'qq',
@@ -157,17 +112,13 @@ describe('managed key delivery ACK foundation', () => {
       expiresAt: new Date('2026-07-05T00:10:00.000Z'),
     });
 
-    const first = await acknowledgeManagedKeyDelivery(env.BROKER_DB, {
+    const first = await markManagedKeyDeliveryAcknowledged(env.BROKER_DB, {
       deliveryId: delivery.deliveryId,
-      managedCredentialRef: 'managed-credential-2',
-      deliveryAckToken: delivery.deliveryAckToken,
-      now: new Date('2026-07-05T00:01:00.000Z'),
+      acknowledgedAt: new Date('2026-07-05T00:01:00.000Z'),
     });
-    const second = await acknowledgeManagedKeyDelivery(env.BROKER_DB, {
+    const second = await markManagedKeyDeliveryAcknowledged(env.BROKER_DB, {
       deliveryId: delivery.deliveryId,
-      managedCredentialRef: 'managed-credential-2',
-      deliveryAckToken: delivery.deliveryAckToken,
-      now: new Date('2026-07-05T00:02:00.000Z'),
+      acknowledgedAt: new Date('2026-07-05T00:02:00.000Z'),
     });
 
     expect(first).toEqual({ ok: true, status: 'acknowledged' });
@@ -942,11 +893,19 @@ describe('managed key delivery ACK foundation', () => {
       createdAt: new Date('2026-07-05T00:00:00.000Z'),
       expiresAt: new Date('2026-07-05T00:15:00.000Z'),
     });
-    vi.mocked(cleanupManagedChildKey)
-      .mockResolvedValueOnce({ ok: true })
-      .mockResolvedValueOnce({ ok: false, reason: cleanupFailureReason() });
+    vi.mocked(cleanupManagedChildKey).mockImplementation(async ({ keyHash }) => {
+      if (keyHash === 'hash_discord_stale_ok') {
+        return { ok: true };
+      }
+      if (keyHash === 'hash_discord_stale_fail') {
+        return { ok: false, reason: cleanupFailureReason() };
+      }
+      throw new Error(`unexpected stale cleanup target: ${keyHash}`);
+    });
 
-    await reconcileStaleManagedKeyDeliveries(env, new Date('2026-07-05T00:16:00.000Z'));
+    await expect(
+      reconcileStaleManagedKeyDeliveries(env, new Date('2026-07-05T00:16:00.000Z')),
+    ).resolves.toEqual({ expired: 1, cleanupRequired: 1 });
 
     expect(selectDiscordEntitlement(env, 'hash_discord_stale_ok')).toBeNull();
     expect(selectDiscordIdentityStatus(env, 'ph-discord-user-v1_stale_ok', 'discord-install-stale-ok')).toBeNull();

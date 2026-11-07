@@ -8,23 +8,24 @@ from puripuly_heart.app.adapters.peer_application_state import (
     PeerApplicationSettings,
     PeerApplicationStateAdapter,
 )
-from puripuly_heart.app.adapters.peer_capture_inventory import (
+from puripuly_heart.app.adapters.peer_capture.peer_capture_inventory import (
     PeerCaptureTargetRuntimeEffectsAdapter,
     WindowsLoopbackDeviceInventoryAdapter,
     WindowsProcessCaptureInventoryAdapter,
 )
 from puripuly_heart.app.ports.settings_view import GeneralSettingsSnapshot
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
-from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
+from puripuly_heart.app.services.capture.peer_capture_target_application import (
+    PeerCaptureTargetApplicationOwner,
+)
+from puripuly_heart.app.services.overlay.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.peer_application import (
     PeerApplicationOwner,
     PeerApplicationState,
 )
-from puripuly_heart.app.services.peer_capture_target_application import (
-    PeerCaptureTargetApplicationOwner,
-)
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import LocalASRProviderRuntimePort
+from puripuly_heart.core.messages import TransactionResult
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
 )
@@ -57,7 +58,6 @@ def compose_peer_application(
     ],
     overlay_provider: Callable[[], OverlayApplicationOwner],
     ingress_frozen: Callable[[], bool],
-    persist_manual_fallback: Callable[[], bool],
     ensure_local_ready: Callable[[int], Awaitable[bool]],
     clear_cpu_pending: Callable[[], None],
     clear_gpu_pending: Callable[[], None],
@@ -73,6 +73,7 @@ def compose_peer_application(
     stop_audio_test: Callable[[], Awaitable[None]],
     translation_demand_sink: Callable[[], Awaitable[None]] | None = None,
     mutation_settled: Callable[[], None] | None = None,
+    transaction_result_sink: Callable[[TransactionResult], None] | None = None,
 ) -> PeerApplicationRuntime:
     state = PeerApplicationStateAdapter(
         settings_provider=settings_provider,
@@ -102,7 +103,6 @@ def compose_peer_application(
         config_factory=lambda: build_peer_capture_session_config_from_vnext(require_canonical()),
         peer_intent_sink=peer_intent_sink,
         overlay_intent_sink=overlay_intent_sink,
-        persist_manual_fallback=persist_manual_fallback,
         ensure_local_ready=ensure_local_ready,
         clear_cpu_pending=clear_cpu_pending,
         clear_gpu_pending=clear_gpu_pending,
@@ -129,13 +129,14 @@ def compose_peer_application(
         processes=WindowsProcessCaptureInventoryAdapter(),
         devices=WindowsLoopbackDeviceInventoryAdapter(),
         runtime_effects=PeerCaptureTargetRuntimeEffectsAdapter(
-            refresh_peer=owner.refresh_runtime,
+            refresh_peer=owner.refresh_capture_target,
             sync_effective_flags=lambda _settings: owner.sync_effective_flags(state.state()),
             refresh_presentation=presentation_changed,
         ),
         settings_presentation_sink=settings_presentation_sink,
         warning_reset=lambda: setattr(owner, "process_warning_reason", None),
         stop_audio_test=stop_audio_test,
+        transaction_result_sink=transaction_result_sink,
     )
     return PeerApplicationRuntime(
         state=state,

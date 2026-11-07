@@ -6,6 +6,9 @@
 - Automatic: OSCQuery discovery and dynamic receive port
 - Manual: send `9000`, receive `9001` by default
 - Off: stop control traffic and preserve manual ports
+- The OSC-enable warning follows the effective destination. It clears when OSC is Off or automatic discovery is starting; results from an earlier connection state cannot restore it.
+- Automatic discovery rechecks known candidates after temporary OSCQuery information failures; actual service removal still clears them. The existing fallback remains in effect while no usable target is discovered.
+- For missing Chatbox output, the assistant can inspect safe app evidence and perform bounded discovery recovery without changing saved destinations, restarting working recognition/translation or sending test messages. Its result confirms internal target application or reports unavailability, not game display. No technical inspection or test-sentence report is required from the user.
 
 ## Progressive Self chatbox translations
 
@@ -85,9 +88,9 @@
 | ID | Provider |
 | ---: | --- |
 | 0 | Auto Select (CPU Inference) |
-| 1 | Parakeet TDT 0.6B v3 |
+| 1 | Legacy CPU ASR input → Auto Select (CPU Inference) |
 | 2 | Parakeet TDT-CTC 0.6B (ja) |
-| 3 | Qwen3 ASR 0.6B |
+| 3 | Legacy CPU Qwen input → Auto Select (CPU Inference) |
 | 4 | Qwen3 ASR 1.7B |
 | 5 | Deepgram |
 | 7 | Soniox |
@@ -97,9 +100,14 @@
 | 11 | ElevenLabs Scribe |
 | 12 | Qwen Audio 3.1 ASR Flash Streaming |
 | 13 | Free cloud ASR auto-selection (ElevenLabs Scribe → Gemini → Deepgram) |
+| 14 | Fun-ASR-Nano-2512 (Chinese) |
+| 15 | Fun-ASR-MLT-Nano-2512 (31 languages) |
+| 16 | Granite Speech 5.0 Multilingual (7 languages) |
+| 17 | GigaAM-v3 e2e-CTC (Russian only) |
 
 - Used by: `PuriPuly_SelfASR`, `PuriPuly_PeerASR`
 - ID `6` is retired and rejected as an unknown ASR value. Qwen Audio uses ID `12`.
+- Legacy IDs `1` and `3` are accepted as input but publish canonical Auto ID `0` on both channels. All other numeric meanings are unchanged. Retired CPU providers are not advertised or restored as fallbacks.
 
 ### Translation model IDs
 
@@ -114,7 +122,7 @@
 | 10 | Gemma 4 E4B CPU |
 | 11 | Gemma 4 E4B GPU |
 | 13 | DeepSeek V4.1 Flash |
-| 14 | GPT 6 Luna |
+| 14 | GPT-6 Luna |
 | 15 | Gemma 4 26B A4B GPU |
 | 16 | Index-Translate 35B |
 

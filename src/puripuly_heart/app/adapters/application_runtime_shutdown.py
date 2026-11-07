@@ -18,11 +18,11 @@ from puripuly_heart.app.services.clipboard_auto_translation import (
 )
 from puripuly_heart.app.services.github_star_prompt import GithubStarPromptOwner
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
-from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
+from puripuly_heart.app.services.overlay.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
-from puripuly_heart.app.wiring_audio_test import AudioTestRuntime
-from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
-from puripuly_heart.app.wiring_runtime_pipeline import (
+from puripuly_heart.app.wiring.wiring_audio_test import AudioTestRuntime
+from puripuly_heart.app.wiring.wiring_managed_account import ManagedAccountComponents
+from puripuly_heart.app.wiring.wiring_runtime_pipeline import (
     RuntimePipelineHandle,
     RuntimePipelineLauncher,
 )
@@ -194,7 +194,8 @@ class ApplicationRuntimeShutdownAdapter:
             await owner.cancel()
 
     async def stop_self_capture_ingress(self) -> None:
-        await self.stop_self_capture()
+        if self.pipeline.self_capture is not None:
+            await self.stop_self_capture()
 
     async def close_vrc_mic_receiver_runtime(self) -> None:
         owner = self.vrc_mic_sync()

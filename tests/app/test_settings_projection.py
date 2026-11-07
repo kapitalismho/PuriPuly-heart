@@ -5,9 +5,10 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
-from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
-from puripuly_heart.app.services.settings_projection import SettingsProjectionOwner
-
+from puripuly_heart.app.services.settings.settings_application import (
+    settings_view_surface_snapshots,
+)
+from puripuly_heart.app.services.settings.settings_projection import SettingsProjectionOwner
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
 

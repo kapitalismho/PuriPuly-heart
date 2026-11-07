@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from puripuly_heart.app import wiring_secrets_factory
-from puripuly_heart.app.wiring import create_secret_store
+from puripuly_heart.app.wiring import create_secret_store, wiring_secrets_factory
 from puripuly_heart.config.provider_values import SecretsBackend
 from puripuly_heart.config.settings_vnext.schema import SecretsIntent
 from puripuly_heart.core.storage.secrets import (

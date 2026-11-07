@@ -4,12 +4,12 @@ import asyncio
 from dataclasses import dataclass, field
 
 import pytest
-from puripuly_heart.app.services.provider_secret_change import (
+
+from puripuly_heart.app.services.provider.provider_secret_change import (
     ProviderSecretChangeExecution,
     ProviderSecretChangeOwner,
     ProviderSecretChangeRequest,
 )
-
 from puripuly_heart.app.services.secret_settings_transaction import (
     SecretClearRequest,
     SecretSetRequest,
@@ -173,19 +173,3 @@ async def test_owner_releases_serialization_after_transaction_failure() -> None:
     succeeded = TransactionStub()
     succeeded.release.set()
     assert await owner.change(lambda: _execution(succeeded, value="next-secret", results=results))
-
-
-def test_owner_declares_transaction_lifecycle_policy() -> None:
-    owner = ProviderSecretChangeOwner()
-
-    assert owner.lifecycle_owner_snapshot() == {
-        "owner": "ProviderSecretChangeOwner",
-        "resource_fields": ("_lock", "per-call LifecycleScope"),
-        "operation_policy": (
-            "serialize provider-secret transactions and deliver results in admission order"
-        ),
-        "cancellation_policy": (
-            "finish the admitted atomic transaction, deliver its result, then replay cancellation"
-        ),
-        "shutdown_policy": "no background task or external resource is retained",
-    }

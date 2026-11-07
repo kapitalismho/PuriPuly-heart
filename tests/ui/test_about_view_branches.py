@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import shutil
-import sys
 import types
 from pathlib import Path
 
@@ -91,34 +90,6 @@ def test_about_view_link_actions_handle_missing_page_gracefully(
     assert "https://github.com/misyaguziya/VRCT" in opened
     assert "https://github.com/naeruru/mimiuchi" in opened
     assert "https://github.com/febilly/Yakutan" in opened
-
-
-def test_about_view_special_thanks_names_render_in_requested_order(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(about_module, "_get_profile_image_path", lambda: "")
-    monkeypatch.setattr(about_module, "_load_third_party_notices", lambda: "licenses")
-
-    view = AboutView()
-
-    expected_names = [
-        "SUI_32C",
-        "Nagikokoro",
-        "motoka96",
-        "_Ykol魚",
-        "kascr_",
-        "Just Monika V",
-        "FLUVIA",
-        "Han โชเล่ย์",
-        "EA_PE",
-        "Ephedrine",
-        "~ eri ~",
-        "梅雨Shiro",
-    ]
-    rendered_names = [
-        value for value in _collect_text_values(view.controls[2]) if value in expected_names
-    ]
-    assert rendered_names == expected_names
 
 
 def test_about_view_special_thanks_names_render_from_i18n(
@@ -214,11 +185,9 @@ def test_about_helper_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
     assert about_module._get_profile_image_path() == ""
 
 
-@pytest.mark.parametrize("host_kind", ("native", "pyinstaller"))
 def test_about_resources_resolve_real_files_outside_module_archive(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    host_kind: str,
 ) -> None:
     resource_root = tmp_path / "relocated app 한글"
     data_root = resource_root / "puripuly_heart" / "data"
@@ -231,12 +200,7 @@ def test_about_resources_resolve_real_files_outside_module_archive(
         "__file__",
         str(resource_root / "python.zip" / "puripuly_heart" / "ui" / "views" / "about.pyc"),
     )
-    if host_kind == "native":
-        monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(resource_root))
-    else:
-        monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
-        monkeypatch.setattr(sys, "frozen", True, raising=False)
-        monkeypatch.setattr(sys, "_MEIPASS", str(resource_root), raising=False)
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(resource_root))
 
     assert about_module._load_third_party_notices() == (
         SOURCE_ROOT / "data" / "THIRD_PARTY_NOTICES.txt"

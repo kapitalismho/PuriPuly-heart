@@ -16,7 +16,7 @@ FORBIDDEN_IMPORT_PREFIXES = (
     "flet",
     "puripuly_heart.app.adapters",
     "puripuly_heart.config.settings",
-    "puripuly_heart.core.managed_openrouter_broker_client",
+    "puripuly_heart.core.openrouter.managed_openrouter_broker_client",
     "puripuly_heart.core.osc",
     "puripuly_heart.core.runtime_logging",
     "puripuly_heart.providers",

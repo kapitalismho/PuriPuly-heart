@@ -9,14 +9,14 @@ import numpy as np
 import pytest
 
 import puripuly_heart.core.runtime.gpu_asr as gpu_asr_module
-from puripuly_heart.app.ports.gpu_worker import (
-    GpuWorkerActivation,
-    GpuWorkerClosedError,
-    GpuWorkerDevice,
-    GpuWorkerEvent,
-    GpuWorkerMode,
-    GpuWorkerRequestError,
-    GpuWorkerTranscription,
+from puripuly_heart.app.ports.asr_worker import (
+    ASRWorkerActivation,
+    ASRWorkerClosedError,
+    ASRWorkerDevice,
+    ASRWorkerEvent,
+    ASRWorkerMode,
+    ASRWorkerRequestError,
+    ASRWorkerTranscription,
 )
 from puripuly_heart.core.audio.ownership import (
     AudioSegmentIdentity,
@@ -42,7 +42,7 @@ from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 
 _GPU_OWNERS = {"self": object(), "peer": object()}
 
-DEVICE = GpuWorkerDevice(
+DEVICE = ASRWorkerDevice(
     device_id="vulkan:0",
     registry_index=0,
     name="Test GPU",
@@ -51,18 +51,18 @@ DEVICE = GpuWorkerDevice(
     memory_total_bytes=8_000_000_000,
     memory_free_bytes=4_000_000_000,
 )
-ACTIVATION = GpuWorkerActivation(
+ACTIVATION = ASRWorkerActivation(
     device=DEVICE,
     model_load_seconds=1.25,
     warmup_seconds=0.5,
 )
 
 
-class FakeGpuWorkerClient:
+class FakeASRWorkerClient:
     def __init__(
         self,
         *,
-        activation_error: GpuWorkerRequestError | None = None,
+        activation_error: ASRWorkerRequestError | None = None,
         activation_gate: asyncio.Event | None = None,
         discovery_gate: asyncio.Event | None = None,
         transcribe_gate: asyncio.Event | None = None,
@@ -83,7 +83,7 @@ class FakeGpuWorkerClient:
         self.started = asyncio.Event()
         self.transcribe_returning = asyncio.Event()
         self.activation_started = asyncio.Event()
-        self._events: asyncio.Queue[GpuWorkerEvent | None] = asyncio.Queue()
+        self._events: asyncio.Queue[ASRWorkerEvent | None] = asyncio.Queue()
         self._closed = False
         self._cancelled_request_ids: set[str] = set()
 
@@ -95,12 +95,12 @@ class FakeGpuWorkerClient:
     def is_closed(self) -> bool:
         return self._closed
 
-    async def discover(self) -> tuple[GpuWorkerDevice, ...]:
+    async def discover(self) -> tuple[ASRWorkerDevice, ...]:
         if self.discovery_gate is not None:
             await self.discovery_gate.wait()
         return (DEVICE,)
 
-    async def activate(self, *, model_path: Path, device_id: str) -> GpuWorkerActivation:
+    async def activate(self, *, model_path: Path, device_id: str) -> ASRWorkerActivation:
         self.activate_calls.append((model_path, device_id))
         self.activation_started.set()
         if self.activation_gate is not None:
@@ -117,7 +117,7 @@ class FakeGpuWorkerClient:
         audio_path: Path,
         language_hint: str | None = None,
         on_request_sent: Callable[[], None] | None = None,
-    ) -> GpuWorkerTranscription:
+    ) -> ASRWorkerTranscription:
         assert audio_path.is_file()
         if self.send_error is not None:
             raise self.send_error
@@ -128,7 +128,7 @@ class FakeGpuWorkerClient:
         if self.transcribe_gate is not None:
             await self.transcribe_gate.wait()
         if request_id in self._cancelled_request_ids:
-            raise GpuWorkerRequestError(
+            raise ASRWorkerRequestError(
                 "cancelled",
                 {
                     "audio_seconds": 0.1,
@@ -138,11 +138,11 @@ class FakeGpuWorkerClient:
                 attempt_started=True,
             )
         if self._closed:
-            raise GpuWorkerClosedError("closed")
+            raise ASRWorkerClosedError("closed")
         if self.transcribe_error is not None:
             raise self.transcribe_error
         self.transcribe_returning.set()
-        return GpuWorkerTranscription(
+        return ASRWorkerTranscription(
             text=f"{channel}-{len(self.transcribe_calls)}",
             detected_language="en",
             audio_seconds=0.1,
@@ -156,10 +156,10 @@ class FakeGpuWorkerClient:
         if self.transcribe_gate is not None:
             self.transcribe_gate.set()
 
-    async def next_event(self) -> GpuWorkerEvent:
+    async def next_event(self) -> ASRWorkerEvent:
         event = await self._events.get()
         if event is None:
-            raise GpuWorkerClosedError("closed")
+            raise ASRWorkerClosedError("closed")
         return event
 
     async def close(self) -> None:
@@ -176,18 +176,18 @@ class FakeGpuWorkerClient:
         await self.close()
 
 
-class FakeGpuWorkerFactory:
-    def __init__(self, clients: list[FakeGpuWorkerClient]) -> None:
+class FakeASRWorkerFactory:
+    def __init__(self, clients: list[FakeASRWorkerClient]) -> None:
         self.clients = clients
-        self.modes: list[GpuWorkerMode] = []
+        self.modes: list[ASRWorkerMode] = []
 
     async def start(
         self,
         *,
-        mode: GpuWorkerMode,
+        mode: ASRWorkerMode,
         operation_id: str | None = None,
         request_id: str | None = None,
-    ) -> FakeGpuWorkerClient:
+    ) -> FakeASRWorkerClient:
         self.modes.append(mode)
         return self.clients.pop(0)
 
@@ -200,7 +200,7 @@ class FakeGpuWorkerFactory:
 
 async def _activate(
     runtime: SharedGpuASRRuntime, channel: GpuASRChannel = "self"
-) -> GpuWorkerActivation:
+) -> ASRWorkerActivation:
     return await runtime.activate_channel(
         channel,
         owner=_GPU_OWNERS[channel],
@@ -211,8 +211,8 @@ async def _activate(
 
 
 async def test_one_worker_and_model_are_shared_until_last_channel_deactivates() -> None:
-    client = FakeGpuWorkerClient()
-    factory = FakeGpuWorkerFactory([client])
+    client = FakeASRWorkerClient()
+    factory = FakeASRWorkerFactory([client])
     runtime = SharedGpuASRRuntime(process_factory=factory)
 
     first = await _activate(runtime, "self")
@@ -246,9 +246,9 @@ async def test_device_change_after_full_quiesce_accepts_both_channel_orders(
     stop_order: tuple[GpuASRChannel, GpuASRChannel],
     restore_order: tuple[GpuASRChannel, GpuASRChannel],
 ) -> None:
-    old_client = FakeGpuWorkerClient()
-    new_client = FakeGpuWorkerClient()
-    runtime = SharedGpuASRRuntime(process_factory=FakeGpuWorkerFactory([old_client, new_client]))
+    old_client = FakeASRWorkerClient()
+    new_client = FakeASRWorkerClient()
+    runtime = SharedGpuASRRuntime(process_factory=FakeASRWorkerFactory([old_client, new_client]))
     await _activate(runtime, "self")
     await _activate(runtime, "peer")
 
@@ -272,8 +272,8 @@ async def test_device_change_after_full_quiesce_accepts_both_channel_orders(
 
 async def test_concurrent_channels_share_one_owned_activation_task() -> None:
     gate = asyncio.Event()
-    client = FakeGpuWorkerClient(activation_gate=gate)
-    factory = FakeGpuWorkerFactory([client])
+    client = FakeASRWorkerClient(activation_gate=gate)
+    factory = FakeASRWorkerFactory([client])
     runtime = SharedGpuASRRuntime(process_factory=factory)
 
     self_activation = asyncio.create_task(_activate(runtime, "self"))
@@ -293,8 +293,8 @@ async def test_concurrent_channels_share_one_owned_activation_task() -> None:
 
 async def test_close_cancels_and_awaits_in_progress_activation() -> None:
     gate = asyncio.Event()
-    client = FakeGpuWorkerClient(activation_gate=gate)
-    runtime = SharedGpuASRRuntime(process_factory=FakeGpuWorkerFactory([client]))
+    client = FakeASRWorkerClient(activation_gate=gate)
+    runtime = SharedGpuASRRuntime(process_factory=FakeASRWorkerFactory([client]))
 
     activation = asyncio.create_task(_activate(runtime))
     await client.activation_started.wait()
@@ -306,23 +306,21 @@ async def test_close_cancels_and_awaits_in_progress_activation() -> None:
     assert client.close_calls == 1
 
 
-async def test_last_channel_disable_aborts_loading_without_releasing_readiness_and_can_retry() -> (
-    None
-):
+async def test_last_disable_drains_loading_without_readiness_before_retry() -> None:
     gate = asyncio.Event()
 
-    class LoadingClient(FakeGpuWorkerClient):
+    class LoadingClient(FakeASRWorkerClient):
         async def close(self) -> None:
             await gate.wait()
             await super().close()
 
         async def force_close(self) -> None:
             self.force_close_calls += 1
-            await FakeGpuWorkerClient.close(self)
+            await FakeASRWorkerClient.close(self)
 
     client = LoadingClient(activation_gate=gate)
-    replacement = FakeGpuWorkerClient()
-    factory = FakeGpuWorkerFactory([client, replacement])
+    replacement = FakeASRWorkerClient()
+    factory = FakeASRWorkerFactory([client, replacement])
     diagnostics = []
     runtime = SharedGpuASRRuntime(
         process_factory=factory,
@@ -332,14 +330,19 @@ async def test_last_channel_disable_aborts_loading_without_releasing_readiness_a
     activation = asyncio.create_task(_activate(runtime))
     await asyncio.wait_for(client.activation_started.wait(), timeout=1)
     try:
-        await asyncio.wait_for(
-            runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"]), timeout=1
+        stopping = asyncio.create_task(
+            runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"])
         )
+        await asyncio.sleep(0.02)
+        assert not stopping.done()
+        assert not client.is_closed
+        assert client.force_close_calls == 0
+        gate.set()
+        await stopping
         with pytest.raises(asyncio.CancelledError):
             await activation
-        assert not gate.is_set()
         assert client.is_closed
-        assert client.force_close_calls == 1
+        assert client.force_close_calls == 0
         assert runtime.worker_pid is None
         assert runtime.active_channels == frozenset()
         assert runtime.state == GpuASRRuntimeState.STOPPED
@@ -359,8 +362,8 @@ async def test_revoked_pending_owner_cannot_receive_shared_activation_readiness(
     remaining_channel: GpuASRChannel,
 ) -> None:
     gate = asyncio.Event()
-    client = FakeGpuWorkerClient(activation_gate=gate)
-    factory = FakeGpuWorkerFactory([client])
+    client = FakeASRWorkerClient(activation_gate=gate)
+    factory = FakeASRWorkerFactory([client])
     runtime = SharedGpuASRRuntime(process_factory=factory)
     remaining_owner = object()
     activation = asyncio.create_task(_activate(runtime))
@@ -398,17 +401,17 @@ async def test_revoked_pending_owner_cannot_receive_shared_activation_readiness(
 
 async def test_activation_progress_is_observed_before_activation_completes() -> None:
     gate = asyncio.Event()
-    client = FakeGpuWorkerClient(activation_gate=gate)
+    client = FakeASRWorkerClient(activation_gate=gate)
     diagnostics = []
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]),
+        process_factory=FakeASRWorkerFactory([client]),
         diagnostic_sink=diagnostics.append,
     )
 
     activation = asyncio.create_task(_activate(runtime))
     await client.activation_started.wait()
     await client._events.put(
-        GpuWorkerEvent(
+        ASRWorkerEvent(
             name="activation_progress",
             request_id=None,
             fields={"phase": "loading", "progress": 0.25},
@@ -431,9 +434,9 @@ async def test_activation_progress_is_observed_before_activation_completes() -> 
 
 async def test_global_speech_end_fifo_has_finite_per_channel_public_admission() -> None:
     gate = asyncio.Event()
-    client = FakeGpuWorkerClient(transcribe_gate=gate)
+    client = FakeASRWorkerClient(transcribe_gate=gate)
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]),
+        process_factory=FakeASRWorkerFactory([client]),
         clock=FakeClock(_now=100.0),
     )
     await _activate(runtime)
@@ -472,9 +475,9 @@ async def test_global_speech_end_fifo_has_finite_per_channel_public_admission() 
 
 
 async def test_shared_queue_preserves_per_utterance_language_hints() -> None:
-    client = FakeGpuWorkerClient()
+    client = FakeASRWorkerClient()
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]),
+        process_factory=FakeASRWorkerFactory([client]),
         clock=FakeClock(_now=2.0),
     )
     await _activate(runtime)
@@ -495,11 +498,11 @@ async def test_shared_queue_preserves_per_utterance_language_hints() -> None:
 
 async def test_pending_work_expires_exactly_at_twelve_seconds_before_start() -> None:
     gate = asyncio.Event()
-    client = FakeGpuWorkerClient(transcribe_gate=gate)
+    client = FakeASRWorkerClient(transcribe_gate=gate)
     clock = FakeClock(_now=100.0)
     diagnostics = []
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]),
+        process_factory=FakeASRWorkerFactory([client]),
         clock=clock,
         diagnostic_sink=diagnostics.append,
     )
@@ -529,9 +532,9 @@ async def test_pending_work_expires_exactly_at_twelve_seconds_before_start() -> 
 
 async def test_active_decode_survives_ttl() -> None:
     gate = asyncio.Event()
-    client = FakeGpuWorkerClient(transcribe_gate=gate)
+    client = FakeASRWorkerClient(transcribe_gate=gate)
     clock = FakeClock(_now=10.0)
-    runtime = SharedGpuASRRuntime(process_factory=FakeGpuWorkerFactory([client]), clock=clock)
+    runtime = SharedGpuASRRuntime(process_factory=FakeASRWorkerFactory([client]), clock=clock)
     await _activate(runtime)
     work = asyncio.create_task(
         runtime.submit("self", np.zeros(1600, dtype=np.float32), speech_end_at=10.0)
@@ -546,9 +549,9 @@ async def test_active_decode_survives_ttl() -> None:
 
 async def test_last_disable_cancels_active_work_and_awaits_worker_close() -> None:
     gate = asyncio.Event()
-    client = FakeGpuWorkerClient(transcribe_gate=gate)
+    client = FakeASRWorkerClient(transcribe_gate=gate)
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]),
+        process_factory=FakeASRWorkerFactory([client]),
         clock=FakeClock(_now=10.0),
     )
     await _activate(runtime)
@@ -568,72 +571,46 @@ async def test_last_disable_cancels_active_work_and_awaits_worker_close() -> Non
 
 
 @pytest.mark.parametrize("shutdown", ["last_disable", "application_close"])
-@pytest.mark.parametrize("cancel_hangs", [False, True])
-async def test_terminal_shutdown_forces_noncooperative_worker_without_stopping_hang(
-    shutdown: str,
-    cancel_hangs: bool,
-) -> None:
-    class NonCooperativeClient(FakeGpuWorkerClient):
-        def __init__(self) -> None:
-            super().__init__(transcribe_gate=asyncio.Event())
-            self.close_gate = asyncio.Event()
-            self.force_close_calls = 0
+async def test_terminal_shutdown_drains_noninterruptible_worker(shutdown: str) -> None:
+    drained = asyncio.Event()
 
+    class NonInterruptibleClient(FakeASRWorkerClient):
         async def cancel(self, target_request_id: str) -> None:
             self.cancel_calls.append(target_request_id)
-            if cancel_hangs:
-                await asyncio.Event().wait()
 
         async def close(self) -> None:
-            self.close_calls += 1
-            await self.close_gate.wait()
+            await drained.wait()
+            await super().close()
 
-        async def force_close(self) -> None:
-            self.force_close_calls += 1
-            self._closed = True
-            assert self.transcribe_gate is not None
-            self.transcribe_gate.set()
-            self.close_gate.set()
-            await self._events.put(None)
-
-    client = NonCooperativeClient()
-    diagnostics = []
+    client = NonInterruptibleClient(transcribe_gate=asyncio.Event())
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]),
-        clock=FakeClock(_now=10.0),
-        diagnostic_sink=diagnostics.append,
-        channel_cancel_seconds=0.01,
-        force_close_seconds=0.01,
+        process_factory=FakeASRWorkerFactory([client]), clock=FakeClock(_now=10.0)
     )
     await _activate(runtime)
     work = asyncio.create_task(
         runtime.submit("self", np.zeros(1600, dtype=np.float32), speech_end_at=10.0)
     )
     await client.started.wait()
-
-    if shutdown == "last_disable":
-        await asyncio.wait_for(
-            runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"]),
-            timeout=0.2,
-        )
-        expected_state = GpuASRRuntimeState.STOPPED
-    else:
-        await asyncio.wait_for(runtime.close(), timeout=0.2)
-        expected_state = GpuASRRuntimeState.CLOSED
-
+    stopping = asyncio.create_task(
+        runtime.close()
+        if shutdown == "application_close"
+        else runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"])
+    )
+    await asyncio.sleep(0.02)
+    assert not stopping.done()
+    assert not client.is_closed
+    assert client.force_close_calls == 0
+    drained.set()
+    await stopping
     with pytest.raises(GpuASRWorkDiscarded):
         await work
-    assert client.force_close_calls == 1
-    assert runtime.state == expected_state
-    assert runtime.active_channels == frozenset()
+    assert client.is_closed
+    assert runtime.state == (
+        GpuASRRuntimeState.CLOSED if shutdown == "application_close" else GpuASRRuntimeState.STOPPED
+    )
     assert runtime.worker_pid is None
-    assert runtime._dispatcher_task is None
-    assert runtime._event_task is None
     assert runtime._temporary_directory is None
-    stopped = [item for item in diagnostics if item.kind == "worker_stopped"]
-    assert stopped[-1].fields["forced"] is True
-    if shutdown == "last_disable":
-        await runtime.close()
+    await runtime.close()
 
 
 @pytest.mark.parametrize(
@@ -645,10 +622,10 @@ async def test_channel_disable_discards_only_its_work_and_retains_shared_worker(
     surviving_channel: GpuASRChannel,
 ) -> None:
     gate = asyncio.Event()
-    client = FakeGpuWorkerClient(transcribe_gate=gate)
+    client = FakeASRWorkerClient(transcribe_gate=gate)
     diagnostics = []
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]),
+        process_factory=FakeASRWorkerFactory([client]),
         clock=FakeClock(_now=100.0),
         diagnostic_sink=diagnostics.append,
     )
@@ -691,9 +668,9 @@ async def test_channel_disable_discards_only_its_work_and_retains_shared_worker(
 
 
 async def test_channel_disable_rejects_unresolved_worker_result() -> None:
-    client = FakeGpuWorkerClient(transcribe_gate=asyncio.Event())
+    client = FakeASRWorkerClient(transcribe_gate=asyncio.Event())
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]),
+        process_factory=FakeASRWorkerFactory([client]),
         clock=FakeClock(_now=100.0),
     )
     await _activate(runtime, "self")
@@ -716,40 +693,15 @@ async def test_channel_disable_rejects_unresolved_worker_result() -> None:
     await runtime.close()
 
 
-@pytest.mark.parametrize("cancel_hangs", [False, True])
-async def test_noncooperative_partial_channel_cancel_forces_bounded_worker_failure(
-    cancel_hangs: bool,
-) -> None:
-    class NonCooperativeClient(FakeGpuWorkerClient):
-        def __init__(self) -> None:
-            super().__init__(transcribe_gate=asyncio.Event())
-            self.close_gate = asyncio.Event()
-            self.force_close_calls = 0
-
+async def test_partial_channel_cancel_drains_without_destroying_peer_resource() -> None:
+    class NonInterruptibleClient(FakeASRWorkerClient):
         async def cancel(self, target_request_id: str) -> None:
             self.cancel_calls.append(target_request_id)
-            if cancel_hangs:
-                await asyncio.Event().wait()
 
-        async def close(self) -> None:
-            self.close_calls += 1
-            await self.close_gate.wait()
-
-        async def force_close(self) -> None:
-            self.force_close_calls += 1
-            self._closed = True
-            assert self.transcribe_gate is not None
-            self.transcribe_gate.set()
-            self.close_gate.set()
-            await self._events.put(None)
-
-    client = NonCooperativeClient()
-    runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]),
-        clock=FakeClock(_now=100.0),
-        channel_cancel_seconds=0.01,
-        force_close_seconds=0.01,
-    )
+    gate = asyncio.Event()
+    client = NonInterruptibleClient(transcribe_gate=gate)
+    factory = FakeASRWorkerFactory([client])
+    runtime = SharedGpuASRRuntime(process_factory=factory, clock=FakeClock(_now=100.0))
     await _activate(runtime, "self")
     await _activate(runtime, "peer")
     active = asyncio.create_task(
@@ -760,33 +712,30 @@ async def test_noncooperative_partial_channel_cancel_forces_bounded_worker_failu
         runtime.submit("peer", np.zeros(1600, dtype=np.float32), speech_end_at=99.1)
     )
     await asyncio.sleep(0)
-
-    await asyncio.wait_for(
-        runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"]),
-        timeout=0.2,
-    )
-
+    stopping = asyncio.create_task(runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"]))
+    await asyncio.sleep(0.02)
     with pytest.raises(GpuASRWorkDiscarded):
         await active
-    with pytest.raises(GpuASRWorkDiscarded, match="channel_cancel_timeout"):
-        await pending
-    assert client.force_close_calls == 1
-    assert runtime.state == GpuASRRuntimeState.FAILED
-    assert runtime.last_failure_code == "channel_cancel_timeout"
+    assert not stopping.done()
+    assert not pending.done()
+    assert not client.is_closed
+    gate.set()
+    await stopping
+    assert (await pending).text == "peer-2"
+    assert (
+        await runtime.submit("peer", np.zeros(1600, dtype=np.float32), speech_end_at=100.0)
+    ).text == "peer-3"
+    assert client.force_close_calls == client.close_calls == 0
     assert runtime.active_channels == frozenset({"peer"})
-    assert runtime.pending_count == 0
-    assert runtime.worker_pid is None
-    assert runtime._dispatcher_task is None
-    assert runtime._event_task is None
-    assert runtime._temporary_directory is None
-    assert runtime._scope.active_task_names == ()
+    assert runtime.state == GpuASRRuntimeState.READY
+    assert factory.modes == ["persistent"]
     await runtime.close()
 
 
 async def test_ttl_is_rechecked_after_wav_staging_before_worker_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = FakeGpuWorkerClient()
+    client = FakeASRWorkerClient()
     clock = FakeClock(_now=100.0)
     diagnostics = []
     staged_paths: list[Path] = []
@@ -799,7 +748,7 @@ async def test_ttl_is_rechecked_after_wav_staging_before_worker_request(
 
     monkeypatch.setattr(gpu_asr_module, "_write_pcm16_wav", stage_and_advance)
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]),
+        process_factory=FakeASRWorkerFactory([client]),
         clock=clock,
         diagnostic_sink=diagnostics.append,
     )
@@ -826,8 +775,8 @@ async def test_ttl_is_rechecked_after_wav_staging_before_worker_request(
     "failure",
     [
         OSError("staging failed"),
-        GpuWorkerClosedError("send failed"),
-        GpuWorkerRequestError(
+        ASRWorkerClosedError("send failed"),
+        ASRWorkerRequestError(
             "audio_invalid",
             {"channel": "self", "backend": "Vulkan"},
             attempt_started=False,
@@ -838,9 +787,9 @@ async def test_prestart_failures_emit_no_attempt_or_rtf(
     failure: BaseException,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = FakeGpuWorkerClient(
-        send_error=failure if isinstance(failure, GpuWorkerClosedError) else None,
-        transcribe_error=(failure if isinstance(failure, GpuWorkerRequestError) else None),
+    client = FakeASRWorkerClient(
+        send_error=failure if isinstance(failure, ASRWorkerClosedError) else None,
+        transcribe_error=(failure if isinstance(failure, ASRWorkerRequestError) else None),
     )
     if isinstance(failure, OSError):
         monkeypatch.setattr(
@@ -850,7 +799,7 @@ async def test_prestart_failures_emit_no_attempt_or_rtf(
         )
     diagnostics = []
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]),
+        process_factory=FakeASRWorkerFactory([client]),
         clock=FakeClock(_now=10.0),
         diagnostic_sink=diagnostics.append,
     )
@@ -871,7 +820,7 @@ async def test_prestart_failures_emit_no_attempt_or_rtf(
 
 
 async def test_started_native_failure_retains_worker_decode_only_timing() -> None:
-    native_failure = GpuWorkerRequestError(
+    native_failure = ASRWorkerRequestError(
         "decode_failure",
         {
             "audio_seconds": 0.1,
@@ -881,10 +830,10 @@ async def test_started_native_failure_retains_worker_decode_only_timing() -> Non
         attempt_started=True,
     )
     diagnostics = []
-    recovered = FakeGpuWorkerClient()
+    recovered = FakeASRWorkerClient()
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory(
-            [FakeGpuWorkerClient(transcribe_error=native_failure), recovered]
+        process_factory=FakeASRWorkerFactory(
+            [FakeASRWorkerClient(transcribe_error=native_failure), recovered]
         ),
         clock=FakeClock(_now=10.0),
         diagnostic_sink=diagnostics.append,
@@ -914,7 +863,7 @@ async def test_started_native_failure_retains_worker_decode_only_timing() -> Non
 
 
 async def test_decode_failure_restarts_once_without_replaying_failed_utterance() -> None:
-    native_failure = GpuWorkerRequestError(
+    native_failure = ASRWorkerRequestError(
         "decode_failure",
         {
             "audio_seconds": 7.5,
@@ -924,9 +873,9 @@ async def test_decode_failure_restarts_once_without_replaying_failed_utterance()
         attempt_started=True,
     )
     activation_gate = asyncio.Event()
-    failed = FakeGpuWorkerClient(transcribe_error=native_failure)
-    recovered = FakeGpuWorkerClient(activation_gate=activation_gate)
-    factory = FakeGpuWorkerFactory([failed, recovered])
+    failed = FakeASRWorkerClient(transcribe_error=native_failure)
+    recovered = FakeASRWorkerClient(activation_gate=activation_gate)
+    factory = FakeASRWorkerFactory([failed, recovered])
     diagnostics = []
     runtime = SharedGpuASRRuntime(
         process_factory=factory,
@@ -971,10 +920,10 @@ async def test_decode_failure_restarts_once_without_replaying_failed_utterance()
 
 
 async def test_second_decode_failure_before_success_requires_manual_retry() -> None:
-    failure = GpuWorkerRequestError("decode_failure", attempt_started=True)
-    first = FakeGpuWorkerClient(transcribe_error=failure)
-    second = FakeGpuWorkerClient(transcribe_error=failure)
-    factory = FakeGpuWorkerFactory([first, second])
+    failure = ASRWorkerRequestError("decode_failure", attempt_started=True)
+    first = FakeASRWorkerClient(transcribe_error=failure)
+    second = FakeASRWorkerClient(transcribe_error=failure)
+    factory = FakeASRWorkerFactory([first, second])
     runtime = SharedGpuASRRuntime(
         process_factory=factory,
         clock=FakeClock(_now=10.0),
@@ -991,7 +940,7 @@ async def test_second_decode_failure_before_success_requires_manual_retry() -> N
     while runtime.state != GpuASRRuntimeState.READY:
         await asyncio.sleep(0)
 
-    with pytest.raises(GpuWorkerRequestError, match="decode_failure"):
+    with pytest.raises(ASRWorkerRequestError, match="decode_failure"):
         await runtime.submit(
             "self",
             np.ones(1600, dtype=np.float32),
@@ -1006,9 +955,9 @@ async def test_second_decode_failure_before_success_requires_manual_retry() -> N
 
 
 async def test_started_out_of_memory_failure_does_not_auto_restart() -> None:
-    failure = GpuWorkerRequestError("out_of_memory", attempt_started=True)
-    factory = FakeGpuWorkerFactory(
-        [FakeGpuWorkerClient(transcribe_error=failure), FakeGpuWorkerClient()]
+    failure = ASRWorkerRequestError("out_of_memory", attempt_started=True)
+    factory = FakeASRWorkerFactory(
+        [FakeASRWorkerClient(transcribe_error=failure), FakeASRWorkerClient()]
     )
     runtime = SharedGpuASRRuntime(
         process_factory=factory,
@@ -1016,7 +965,7 @@ async def test_started_out_of_memory_failure_does_not_auto_restart() -> None:
     )
     await _activate(runtime)
 
-    with pytest.raises(GpuWorkerRequestError, match="out_of_memory"):
+    with pytest.raises(ASRWorkerRequestError, match="out_of_memory"):
         await runtime.submit(
             "self",
             np.zeros(1600, dtype=np.float32),
@@ -1029,16 +978,16 @@ async def test_started_out_of_memory_failure_does_not_auto_restart() -> None:
 
 
 async def test_recovery_activation_failure_discards_new_pending_work() -> None:
-    decode_failure = GpuWorkerRequestError("decode_failure", attempt_started=True)
+    decode_failure = ASRWorkerRequestError("decode_failure", attempt_started=True)
     activation_gate = asyncio.Event()
-    failed = FakeGpuWorkerClient(transcribe_error=decode_failure)
-    replacement = FakeGpuWorkerClient(
+    failed = FakeASRWorkerClient(transcribe_error=decode_failure)
+    replacement = FakeASRWorkerClient(
         activation_gate=activation_gate,
-        activation_error=GpuWorkerRequestError("out_of_memory"),
+        activation_error=ASRWorkerRequestError("out_of_memory"),
     )
     diagnostics = []
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([failed, replacement]),
+        process_factory=FakeASRWorkerFactory([failed, replacement]),
         clock=FakeClock(_now=10.0),
         diagnostic_sink=diagnostics.append,
     )
@@ -1072,12 +1021,12 @@ async def test_recovery_activation_failure_discards_new_pending_work() -> None:
 
 
 async def test_close_cancels_and_awaits_decode_recovery_activation() -> None:
-    decode_failure = GpuWorkerRequestError("decode_failure", attempt_started=True)
+    decode_failure = ASRWorkerRequestError("decode_failure", attempt_started=True)
     activation_gate = asyncio.Event()
-    failed = FakeGpuWorkerClient(transcribe_error=decode_failure)
-    replacement = FakeGpuWorkerClient(activation_gate=activation_gate)
+    failed = FakeASRWorkerClient(transcribe_error=decode_failure)
+    replacement = FakeASRWorkerClient(activation_gate=activation_gate)
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([failed, replacement]),
+        process_factory=FakeASRWorkerFactory([failed, replacement]),
         clock=FakeClock(_now=10.0),
     )
     await _activate(runtime)
@@ -1098,9 +1047,9 @@ async def test_close_cancels_and_awaits_decode_recovery_activation() -> None:
 
 
 async def test_gpu_failure_requires_manual_retry_and_never_starts_fallback() -> None:
-    failed = FakeGpuWorkerClient(activation_error=GpuWorkerRequestError("out_of_memory"))
-    recovered = FakeGpuWorkerClient()
-    factory = FakeGpuWorkerFactory([failed, recovered])
+    failed = FakeASRWorkerClient(activation_error=ASRWorkerRequestError("out_of_memory"))
+    recovered = FakeASRWorkerClient()
+    factory = FakeASRWorkerFactory([failed, recovered])
     runtime = SharedGpuASRRuntime(process_factory=factory)
 
     with pytest.raises(GpuASRManualRetryRequired, match="out_of_memory"):
@@ -1122,8 +1071,8 @@ async def test_gpu_failure_requires_manual_retry_and_never_starts_fallback() -> 
 
 async def test_discovery_reports_pending_without_loading_a_model() -> None:
     gate = asyncio.Event()
-    client = FakeGpuWorkerClient(discovery_gate=gate)
-    factory = FakeGpuWorkerFactory([client])
+    client = FakeASRWorkerClient(discovery_gate=gate)
+    factory = FakeASRWorkerFactory([client])
     runtime = SharedGpuASRRuntime(
         process_factory=factory,
         discovery_pending_seconds=0.01,
@@ -1174,8 +1123,8 @@ async def test_real_shared_gpu_runtime_serves_two_scoped_concrete_adapters(
     tmp_path: Path,
 ) -> None:
     gate = asyncio.Event()
-    client = FakeGpuWorkerClient(transcribe_gate=gate)
-    runtime = SharedGpuASRRuntime(process_factory=FakeGpuWorkerFactory([client]))
+    client = FakeASRWorkerClient(transcribe_gate=gate)
+    runtime = SharedGpuASRRuntime(process_factory=FakeASRWorkerFactory([client]))
     self_backend = LocalGpuSTTBackend(
         runtime=runtime,
         channel="self",
@@ -1256,7 +1205,7 @@ async def test_scoped_gpu_transcript_precedes_owned_file_cleanup(
     import threading
     import wave
 
-    class InspectingClient(FakeGpuWorkerClient):
+    class InspectingClient(FakeASRWorkerClient):
         wav_samples: bytes | None = None
 
         async def transcribe(self, *, audio_path: Path, **kwargs):
@@ -1267,7 +1216,7 @@ async def test_scoped_gpu_transcript_precedes_owned_file_cleanup(
     client = InspectingClient()
     diagnostics = []
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]), diagnostic_sink=diagnostics.append
+        process_factory=FakeASRWorkerFactory([client]), diagnostic_sink=diagnostics.append
     )
     backend = LocalGpuSTTBackend(
         runtime=runtime,
@@ -1350,9 +1299,9 @@ async def test_gpu_cleanup_debt_blocks_next_dispatch_without_blocking_first_resu
 ) -> None:
     import threading
 
-    client = FakeGpuWorkerClient()
+    client = FakeASRWorkerClient()
     runtime = SharedGpuASRRuntime(
-        process_factory=FakeGpuWorkerFactory([client]), clock=FakeClock(_now=100.0)
+        process_factory=FakeASRWorkerFactory([client]), clock=FakeClock(_now=100.0)
     )
     await _activate(runtime, "self")
     await _activate(runtime, "peer")
@@ -1403,8 +1352,8 @@ async def test_published_gpu_result_releases_runtime_pcm_while_unlink_is_held(
     import weakref
 
     worker_gate = asyncio.Event()
-    client = FakeGpuWorkerClient(transcribe_gate=worker_gate)
-    runtime = SharedGpuASRRuntime(process_factory=FakeGpuWorkerFactory([client]))
+    client = FakeASRWorkerClient(transcribe_gate=worker_gate)
+    runtime = SharedGpuASRRuntime(process_factory=FakeASRWorkerFactory([client]))
     await _activate(runtime)
     unlink_entered = threading.Event()
     unlink_release = threading.Event()
@@ -1455,8 +1404,8 @@ async def test_cancelled_close_waiter_does_not_abandon_gpu_shutdown(
 ) -> None:
     import threading
 
-    client = FakeGpuWorkerClient()
-    runtime = SharedGpuASRRuntime(process_factory=FakeGpuWorkerFactory([client]))
+    client = FakeASRWorkerClient()
+    runtime = SharedGpuASRRuntime(process_factory=FakeASRWorkerFactory([client]))
     await _activate(runtime)
     entered = threading.Event()
     release = threading.Event()
@@ -1502,9 +1451,9 @@ async def test_cancelled_last_channel_waiter_retains_cleanup_before_reactivation
 ) -> None:
     import threading
 
-    old_client = FakeGpuWorkerClient()
-    replacement = FakeGpuWorkerClient()
-    factory = FakeGpuWorkerFactory([old_client, replacement])
+    old_client = FakeASRWorkerClient()
+    replacement = FakeASRWorkerClient()
+    factory = FakeASRWorkerFactory([old_client, replacement])
     runtime = SharedGpuASRRuntime(process_factory=factory)
     await _activate(runtime)
     entered = threading.Event()
@@ -1548,8 +1497,8 @@ async def test_cancelled_last_channel_waiter_retains_cleanup_before_reactivation
 
 
 async def test_membership_owner_is_idempotent_and_only_last_owner_cancels_work() -> None:
-    client = FakeGpuWorkerClient(transcribe_gate=asyncio.Event())
-    factory = FakeGpuWorkerFactory([client])
+    client = FakeASRWorkerClient(transcribe_gate=asyncio.Event())
+    factory = FakeASRWorkerFactory([client])
     runtime = SharedGpuASRRuntime(process_factory=factory, clock=FakeClock())
     owners = (object(), object())
     work = None
@@ -1610,9 +1559,9 @@ async def test_activation_primary_survives_temporary_cleanup_debt(
             self.cleanup_complete = True
 
     monkeypatch.setattr(gpu_asr_module.tempfile, "TemporaryDirectory", OwnedDirectory)
-    primary = GpuWorkerRequestError("out_of_memory")
-    failed_client = FakeGpuWorkerClient(activation_error=primary)
-    factory = FakeGpuWorkerFactory([failed_client, FakeGpuWorkerClient()])
+    primary = ASRWorkerRequestError("out_of_memory")
+    failed_client = FakeASRWorkerClient(activation_error=primary)
+    factory = FakeASRWorkerFactory([failed_client, FakeASRWorkerClient()])
     diagnostics = []
     runtime = SharedGpuASRRuntime(process_factory=factory, diagnostic_sink=diagnostics.append)
     from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE

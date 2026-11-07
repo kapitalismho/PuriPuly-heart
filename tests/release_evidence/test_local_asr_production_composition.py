@@ -12,11 +12,11 @@ from uuid import uuid4
 
 import numpy as np
 import pytest
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 
 import puripuly_heart.composition.local_asr_production_evidence as composition
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
@@ -202,6 +202,26 @@ def test_require_gpu_session_rejects_worker_before_channel_open() -> None:
             channel="self",
             expected_device_id="vulkan-index-0",
             stage="production Self inference",
+        )
+
+
+def test_require_gpu_session_rejects_nonresident_model_with_active_worker() -> None:
+    owner = _owner_snapshot(
+        worker_pid=4242,
+        active_channels=frozenset({"self", "peer"}),
+        configured_device_id="vulkan-index-0",
+        model_resident=False,
+        self_model="qwen3-asr-1.7b",
+        peer_model="qwen3-asr-1.7b",
+    )
+
+    with pytest.raises(RuntimeError, match="GPU model was not resident"):
+        evidence._require_gpu_session(
+            owner,
+            channel="peer",
+            expected_device_id="vulkan-index-0",
+            expected_pid=4242,
+            stage="production Peer inference",
         )
 
 

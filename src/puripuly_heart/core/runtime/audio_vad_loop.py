@@ -51,6 +51,40 @@ def _capture_prefix(
     return tuple(selected)
 
 
+def _stream_onset_context(
+    onset: tuple[np.ndarray, tuple[AudioCaptureSpan, ...]] | None,
+    capture: tuple[AudioCaptureSpan, ...],
+    source_floor: int,
+) -> tuple[np.ndarray | None, tuple[AudioCaptureSpan, ...]]:
+    if onset is None or not capture:
+        return None, ()
+    samples, ranges = onset
+    cursor = capture[0].normalized_start_sample
+    if cursor is None:
+        return None, ()
+    selected: list[AudioCaptureSpan] = []
+    count = 0
+    for span in reversed(ranges):
+        start, end = span.normalized_start_sample, span.normalized_end_sample
+        if (
+            span.capture_epoch != capture[0].capture_epoch
+            or start is None
+            or end != cursor
+            or end <= source_floor
+        ):
+            break
+        left = max(start, source_floor)
+        selected.append(span if left == start else span.slice_normalized(left, end))
+        count += end - left
+        cursor = left
+        if left != start or span.discontinuity_before is not None:
+            break
+    if not count or count > samples.size:
+        return None, ()
+    selected.reverse()
+    return samples[-count:], tuple(selected)
+
+
 def _terminal_reason(source: object) -> str | None:
     current = source
     for _ in range(4):
@@ -151,6 +185,8 @@ async def run_audio_vad_loop(
     synthetic_sequence = 0
     delivery_controller: ListenDeliveryController | None = None
     gate_stream_blocked = False
+    stream_context_scope: tuple[object, ...] | None = None
+    stream_context_floor = 0
     peer_diagnostics = channel_label.lower() == "peer"
     window_samples = 0
     window_square_sum = 0.0
@@ -306,6 +342,7 @@ async def run_audio_vad_loop(
 
     async def _process_buffered_chunks() -> None:
         nonlocal gate_stream_blocked
+        nonlocal stream_context_scope, stream_context_floor
         nonlocal buffer
         nonlocal window_samples, window_square_sum, window_max_probability
         nonlocal window_threshold_min, window_threshold_max, window_threshold_hits
@@ -320,6 +357,21 @@ async def run_audio_vad_loop(
                 gated = audio_gate.process_chunk(chunk)
                 permitted = gated is chunk
                 chunk = gated
+            if chunk_capture:
+                stream_ledger = segment_ledger or getattr(sink, "ledger", None)
+                context_scope = (
+                    chunk_capture[0].capture_epoch,
+                    getattr(vad, "diagnostic_generation", None),
+                    getattr(stream_ledger, "activation_generation", None),
+                    getattr(stream_ledger, "settings", None),
+                )
+                if context_scope != stream_context_scope:
+                    stream_context_scope = context_scope
+                    stream_context_floor = chunk_capture[0].normalized_start_sample or 0
+                if not permitted:
+                    stream_context_floor = (
+                        chunk_capture[-1].normalized_end_sample or stream_context_floor
+                    )
             if peer_diagnostics:
                 generation = getattr(vad, "diagnostic_generation", None)
                 if generation != window_generation:
@@ -404,11 +456,18 @@ async def run_audio_vad_loop(
                     elif chunk_capture:
                         gate_stream_blocked = False
                         real_samples = sum(span.normalized_sample_count for span in chunk_capture)
+                        pre_roll, pre_roll_capture = _stream_onset_context(
+                            getattr(vad, "onset_pre_roll", None),
+                            chunk_capture,
+                            stream_context_floor,
+                        )
                         await handle_stream_input(
                             CaptureStreamInput(
                                 chunk=chunk[:real_samples],
                                 capture=chunk_capture,
                                 speech_observed=speech_observed,
+                                pre_roll=pre_roll,
+                                pre_roll_capture=pre_roll_capture,
                             )
                         )
                 for event in events:
@@ -430,6 +489,9 @@ async def run_audio_vad_loop(
     ) -> None:
         nonlocal buffer, capture_buffer
         nonlocal gate_stream_blocked
+        nonlocal stream_context_scope, stream_context_floor
+        stream_context_scope = None
+        stream_context_floor = 0
         gate_stream_blocked = False
         handle_stream_input = getattr(sink, "handle_stream_input", None)
         if callable(handle_stream_input):

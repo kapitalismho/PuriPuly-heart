@@ -5,12 +5,6 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 
 import pytest
-from puripuly_heart.core.local_asr_provider_runtime import (
-    ProviderRuntimeBuildRequest,
-    ProviderRuntimeChannel,
-    ProviderRuntimeGpuRecoveryRequest,
-    ProviderRuntimeTerminalFailureSink,
-)
 
 from puripuly_heart.app.services.gpu_provider_recovery import (
     GpuProviderRecoveryChannelPlan,
@@ -22,6 +16,12 @@ from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_NONE,
     ResolvedCredentialRequirement,
     ResolvedSTTConfig,
+)
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
+    ProviderRuntimeBuildRequest,
+    ProviderRuntimeChannel,
+    ProviderRuntimeGpuRecoveryRequest,
+    ProviderRuntimeTerminalFailureSink,
 )
 
 
@@ -380,15 +380,3 @@ async def test_prepare_failure_aborts_prior_channel_and_propagates() -> None:
 
     assert events == ["prepare:self", "prepare:peer", "abort:self"]
     assert runtime.requests == []
-
-
-def test_owner_declares_recovery_lifecycle_policy() -> None:
-    assert GpuProviderRecoveryOwner().lifecycle_owner_snapshot() == {
-        "owner": "GpuProviderRecoveryOwner",
-        "resource_fields": ("_lock",),
-        "operation_policy": (
-            "serialize preparation, runtime recovery, consumer adoption and cleanup"
-        ),
-        "cancellation_policy": "propagate cancellation after prepared callback cleanup",
-        "shutdown_policy": "no background task or external resource is retained",
-    }

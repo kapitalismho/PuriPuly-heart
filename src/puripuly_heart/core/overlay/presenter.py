@@ -10,6 +10,11 @@ from uuid import UUID
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.clock import Clock, SystemClock
 
+from .peer_caption_layout import (
+    PEER_PAGE_INTERVAL_SECONDS,
+    peer_page_reading_budget,
+    peer_translation_pages,
+)
 from .presenter_acceptance import PresenterAcceptanceLedger
 from .presenter_projection import NativeRetryIntentProjection
 from .protocol import (
@@ -23,6 +28,7 @@ from .sink import (
     OverlayEventUnion,
     OverlaySink,
     PeerActiveUpdate,
+    PeerPacingWaitObserver,
     PeerTranscriptFinal,
     SelfActiveClear,
     SelfActiveUpdate,
@@ -48,7 +54,6 @@ VISIBLE_TTL_SECONDS = 8.0
 SELF_TRANSLATION_MIN_VISIBLE_SECONDS = 4.0
 SleepFn = Callable[[float], Awaitable[None]]
 PEER_REPLACEMENT_INTERVAL_SECONDS = 1.0
-PeerPacingWaitObserver = Callable[[str], None]
 
 
 class OverlayPresentationTransport(Protocol):
@@ -102,13 +107,19 @@ class OverlayPresenter(OverlaySink):
     _active_speaker_order: tuple[int, int, int] = field(init=False, default=(0, 0, 0))
 
     def __post_init__(self) -> None:
-        self._presentation_state = OverlayPresentationState()
+        self._presentation_state = OverlayPresentationState(
+            peer_text_scale=self.calibration.text_scale
+        )
         self._retry_projection.reset(enabled=self.native_retry_enabled)
         self._presentation_state.generate_snapshot(
             revision=0,
             calibration=_calibration_from_overlay(self.calibration),
             rendered_entries=[],
         )
+
+    @property
+    def peer_caption_text_scale(self) -> float:
+        return self.calibration.text_scale
 
     @property
     def _entries(self) -> dict[tuple[str, UUID], _LogicalTurnEntry]:
@@ -237,12 +248,14 @@ class OverlayPresenter(OverlaySink):
         event: OverlayEventUnion,
         *,
         on_wait: PeerPacingWaitObserver | None = None,
+        admission_started_at: float | None = None,
     ) -> OverlayApplicationReceipt:
         if event.channel != "peer" or not isinstance(
-            event, (PeerTranscriptFinal, TranslationFinal)
+            event, (PeerTranscriptFinal, TranslationStreamUpdate, TranslationFinal)
         ):
             return await self.emit(event)
         wait_reported = False
+        queued_at = self.clock.now() if admission_started_at is None else admission_started_at
         while True:
             wake: asyncio.Event | None = None
             delay: float | None = None
@@ -263,7 +276,7 @@ class OverlayPresenter(OverlaySink):
                     )
                     self._acceptance.remember_receipt(event, receipt)
                     return receipt
-                delay = self._peer_replacement_delay(normalized)
+                delay = self._peer_replacement_delay(normalized, queued_at=queued_at)
                 if delay is None:
                     wait_reason = "protected_rows"
                     wake = self._peer_admission_changed
@@ -309,9 +322,19 @@ class OverlayPresenter(OverlaySink):
                             task.cancel()
                     await asyncio.gather(*owned_tasks, return_exceptions=True)
 
-    def _peer_replacement_delay(self, event: OverlayEventUnion) -> float | None:
+    def _peer_replacement_delay(
+        self, event: OverlayEventUnion, *, queued_at: float | None = None
+    ) -> float | None:
         key = self._entry_key(event.channel, event.utterance_id)
-        selected_ids = {block.id for block in self.snapshot().blocks}
+        if (
+            isinstance(event, TranslationFinal)
+            and event.peer_caption_revision > 0
+            and not event.text.strip()
+            and not event.source_text.strip()
+        ):
+            return 0.0
+        blocks = self.snapshot().blocks
+        selected_ids = {block.id for block in blocks}
         if f"{key[0]}:{key[1]}" in selected_ids:
             return 0.0
         if len(selected_ids) < self.visible_window_target_blocks:
@@ -323,12 +346,26 @@ class OverlayPresenter(OverlaySink):
         }
         if len(protected) >= self.visible_window_target_blocks:
             return None
-        if self._last_new_occupant_at is None:
-            return 0.0
-        return max(
-            0.0,
-            self._last_new_occupant_at + PEER_REPLACEMENT_INTERVAL_SECONDS - self.clock.now(),
+        if not self.translation_enabled:
+            if self._last_new_occupant_at is None:
+                return 0.0
+            return max(
+                0.0,
+                self._last_new_occupant_at + PEER_REPLACEMENT_INTERVAL_SECONDS - self.clock.now(),
+            )
+        upper = next(
+            (
+                self._entries.get((block.channel, UUID(block.id.split(":", 1)[1])))
+                for block in blocks
+                if (block.channel, UUID(block.id.split(":", 1)[1])) not in protected
+            ),
+            None,
         )
+        if upper is None or upper.channel != "peer" or upper.peer_protected_until is None:
+            return 0.0
+        now = self.clock.now()
+        deadline = (now if queued_at is None else queued_at) + PEER_REPLACEMENT_INTERVAL_SECONDS
+        return max(0.0, min(upper.peer_protected_until, deadline) - now)
 
     def _signal_peer_admission_change(self) -> None:
         previous = self._peer_admission_changed
@@ -357,6 +394,20 @@ class OverlayPresenter(OverlaySink):
             if calibration == self.calibration:
                 return
             self.calibration = calibration.copy()
+            if self._presentation_state.peer_text_scale != calibration.text_scale:
+                self._presentation_state.peer_text_scale = calibration.text_scale
+                for entry in self._entries.values():
+                    if entry.channel == "peer":
+                        entry.peer_pages = peer_translation_pages(
+                            (
+                                entry.original_text
+                                if entry.peer_source_only
+                                else entry.translation_text
+                            ),
+                            text_scale=calibration.text_scale,
+                        )
+                        entry.peer_page_index = 0
+                        entry.peer_page_due_at = None
             await self._publish_if_changed()
 
     async def update_display_preferences(
@@ -517,7 +568,17 @@ class OverlayPresenter(OverlaySink):
             terminal_update_reason=self._terminal_update_reason,
             translation_enabled=self.translation_enabled,
         )
-        return self._finish_peer_reduction_result(result, event)
+        changed = self._finish_peer_reduction_result(result, event)
+        if changed and (
+            event.text.strip()
+            or (isinstance(event, TranslationFinal) and event.peer_caption_revision > 0)
+        ):
+            for unit_id in event.peer_superseded_unit_ids:
+                if unit_id != event.utterance_id:
+                    self._acceptance.remember_scene_terminal(
+                        ("peer", unit_id), "absorbed_by_repair"
+                    )
+        return changed
 
     def _apply_peer_utterance_closed(self, event: UtteranceClosed, *, now: float) -> bool:
         result = self._presentation_state.apply_peer_utterance_closed(
@@ -661,6 +722,7 @@ class OverlayPresenter(OverlaySink):
         force_protocol_publish: bool = False,
     ) -> None:
         now = self.clock.now()
+        self._advance_peer_pages(now=now)
         self._expire_closed_entries(now=now)
         self._presentation_state.promote_staged_self(
             now=now,
@@ -772,19 +834,89 @@ class OverlayPresenter(OverlaySink):
             block.id: self._presentation_state.visible_block_content_signature(block)
             for block in previous_blocks
         }
+        previous_upper = previous_blocks[0].id if len(previous_blocks) > 1 else None
+        upper = rendered_entries[0][1].id if len(rendered_entries) > 1 else None
         for key, block in rendered_entries:
-            if previous_signatures.get(
-                block.id
-            ) == self._presentation_state.visible_block_content_signature(block):
-                continue
             entry = self._entries.get(key)
             if entry is None:
                 continue
-            entry.ever_visible = True
-            if entry.visible_since is None:
-                entry.visible_since = now
-            entry.last_meaningful_visible_at = now
-            self._schedule_expiration(key, entry)
+            previous_deadline = self._entry_expiration_deadline(entry)
+            previous_page_due = entry.peer_page_due_at
+            changed = previous_signatures.get(
+                block.id
+            ) != self._presentation_state.visible_block_content_signature(block)
+            new_occurrence = block.id not in previous_signatures
+            if changed:
+                entry.ever_visible = True
+                if entry.visible_since is None or new_occurrence:
+                    entry.visible_since = now
+                entry.last_meaningful_visible_at = now
+            if entry.channel == "peer":
+                if new_occurrence:
+                    entry.peer_promoted_at = None
+                    entry.peer_page_due_at = None
+                if block.id == upper and self.translation_enabled:
+                    if block.id != previous_upper or entry.peer_promoted_at is None:
+                        entry.peer_promoted_at = now
+                    entry.peer_protected_until = max(
+                        (
+                            now
+                            if entry.last_meaningful_visible_at is None
+                            else entry.last_meaningful_visible_at
+                        )
+                        + peer_page_reading_budget(block.primary_text),
+                        entry.peer_promoted_at + 2.0,
+                    )
+                else:
+                    entry.peer_promoted_at = None
+                    entry.peer_protected_until = None
+                if (
+                    entry.peer_page_index + 1 < len(entry.peer_pages)
+                    and entry.peer_page_due_at is None
+                    and self.translation_enabled
+                ):
+                    entry.peer_page_due_at = now + PEER_PAGE_INTERVAL_SECONDS
+                if (
+                    changed
+                    or previous_deadline != self._entry_expiration_deadline(entry)
+                    or previous_page_due != entry.peer_page_due_at
+                    or self._expiration_tasks.get(key) is self._current_task()
+                    or key not in self._expiration_tasks
+                ):
+                    self._schedule_expiration(key, entry)
+            elif changed:
+                self._schedule_expiration(key, entry)
+
+    def _advance_peer_pages(self, *, now: float) -> None:
+        visible_ids = {block.id for block in self.snapshot().blocks}
+        for entry in self._entries.values():
+            if (
+                entry.channel != "peer"
+                or entry.block_id not in visible_ids
+                or not self.translation_enabled
+                or entry.peer_page_due_at is None
+                or entry.peer_page_due_at > now
+            ):
+                continue
+            if entry.peer_page_index + 1 < len(entry.peer_pages):
+                previous_page = entry.peer_pages[entry.peer_page_index]
+                entry.peer_page_index += 1
+                entry.peer_page_due_at = (
+                    now + PEER_PAGE_INTERVAL_SECONDS
+                    if entry.peer_page_index + 1 < len(entry.peer_pages)
+                    else None
+                )
+                if entry.peer_pages[entry.peer_page_index] != previous_page:
+                    entry.last_meaningful_visible_at = now
+                if (
+                    entry.peer_promoted_at is not None
+                    and entry.last_meaningful_visible_at is not None
+                ):
+                    entry.peer_protected_until = max(
+                        entry.last_meaningful_visible_at
+                        + peer_page_reading_budget(entry.peer_pages[entry.peer_page_index]),
+                        entry.peer_promoted_at + 2.0,
+                    )
 
     def _prune_displaced_finalized_entries(
         self,
@@ -870,14 +1002,14 @@ class OverlayPresenter(OverlaySink):
             if entry is None:
                 continue
             if entry.speaker_style is None:
-                entry.speaker_style, entry.speaker_gray_reason = self._first_readable_speaker_style(
+                entry.speaker_style, entry.speaker_gray_reason = self._speaker_style_for_assignment(
                     entry,
                     colored_old_scope=colored_old_scope,
                 )
             styled.append((key, replace(block, speaker_style=entry.speaker_style)))
         return styled
 
-    def _first_readable_speaker_style(
+    def _speaker_style_for_assignment(
         self,
         entry: _LogicalTurnEntry,
         *,
@@ -894,7 +1026,12 @@ class OverlayPresenter(OverlaySink):
         if attribution.key is None:
             return "gray", "malformed"
         scope = (attribution.source, attribution.speaker_scope_id)
-        if scope != self._active_speaker_scope or colored_old_scope:
+        if (
+            scope == entry.speaker_handoff_scope
+            or scope != self._active_speaker_scope
+            or colored_old_scope
+        ):
+            entry.speaker_handoff_scope = scope
             return "gray", "scope_handoff"
         index = assignment.palette_index
         if index is not None and 0 <= index < len(SPEAKER_IDENTITY_STYLES):
@@ -917,6 +1054,8 @@ class OverlayPresenter(OverlaySink):
                 or entry is None
                 or entry.speaker_gray_reason != "palette_overflow"
                 or entry.speaker_assignment is None
+                or not entry.speaker_assignment.palette_overflow
+                or entry.speaker_assignment.attribution.state != "identified"
                 or entry.speaker_assignment.attribution.key is None
             ):
                 return False
@@ -941,8 +1080,11 @@ class OverlayPresenter(OverlaySink):
         key: tuple[str, UUID],
         entry: _LogicalTurnEntry,
     ) -> None:
-        self._cancel_expiration_task(key)
-        if self._entry_expiration_deadline(entry) is None:
+        if self._expiration_tasks.get(key) is self._current_task():
+            self._expiration_tasks.pop(key, None)
+        else:
+            self._cancel_expiration_task(key)
+        if self._entry_next_wake(entry) is None:
             return
         entry.expiration_revision += 1
         self._expiration_tasks[key] = self._create_task(
@@ -955,27 +1097,20 @@ class OverlayPresenter(OverlaySink):
     ) -> None:
         try:
             while True:
-                entry = self._entries.get(key)
-                if entry is None or entry.expiration_revision != expiration_revision:
-                    return
-
-                deadline = self._entry_expiration_deadline(entry)
-                if deadline is None:
-                    return
-                remaining = deadline - self.clock.now()
-                if remaining > 0:
-                    await self.sleep(remaining)
-                    continue
-
-                self._remove_entry(
-                    key,
-                    reason="expired",
-                    now=self.clock.now(),
-                    current_task=self._current_task(),
-                    tombstone_seq=entry.last_updated_seq if entry.closed_seq is None else None,
-                )
-                await self._publish_if_changed()
-                return
+                async with self._ownership_transition_lock:
+                    entry = self._entries.get(key)
+                    if entry is None or entry.expiration_revision != expiration_revision:
+                        return
+                    deadline = self._entry_next_wake(entry)
+                    if deadline is None:
+                        return
+                    remaining = deadline - self.clock.now()
+                    if remaining <= 0:
+                        self._advance_peer_pages(now=self.clock.now())
+                        self._expire_closed_entries(now=self.clock.now())
+                        await self._publish_if_changed()
+                        return
+                await self.sleep(remaining)
         except asyncio.CancelledError:
             raise
         finally:
@@ -984,6 +1119,7 @@ class OverlayPresenter(OverlaySink):
                 self._expiration_tasks.pop(key, None)
 
     def _expire_closed_entries(self, *, now: float) -> None:
+        self._advance_peer_pages(now=now)
         current_task = self._current_task()
         self._presentation_state.expire_entries(
             now=now,
@@ -996,6 +1132,18 @@ class OverlayPresenter(OverlaySink):
 
     def _entry_expiration_deadline(self, entry: _LogicalTurnEntry) -> float | None:
         return self._entry_expiration_components(entry)[0]
+
+    def _entry_next_wake(self, entry: _LogicalTurnEntry) -> float | None:
+        deadline = self._entry_expiration_deadline(entry)
+        page_due = (
+            entry.peer_page_due_at
+            if self.translation_enabled
+            and any(block.id == entry.block_id for block in self.snapshot().blocks)
+            else None
+        )
+        if page_due is None:
+            return deadline
+        return page_due if deadline is None else min(deadline, page_due)
 
     def _entry_expiration_components(
         self,
@@ -1045,7 +1193,7 @@ class OverlayPresenter(OverlaySink):
         seq = record.tombstone_seq if record.tombstone_seq is not None else entry.closed_seq
         if record.reason == "expired" and entry.ever_visible:
             self._acceptance.remember_scene_terminal(key, record.reason)
-        if record.reason == "evicted_by_newer_turn":
+        if record.reason in {"evicted_by_newer_turn", "absorbed_by_repair", "peer_caption_retired"}:
             self._acceptance.remember_scene_terminal(key, record.reason)
         if seq is not None:
             self._acceptance.remember_tombstone(key, seq)

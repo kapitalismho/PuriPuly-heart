@@ -1,0 +1,25 @@
+{
+  "provenance": "paired-pilot coding agent, reference-text-only linguistic labels from pinned original human manifest annotations, frozen before viewing either arm; no new human/audio adjudication. Sentence/turn ambiguity is not forced into continue/separate.",
+  "unit": "Unique original native final lexical token, weight 1; punctuation/control excluded. Speaker reference requires an unambiguous token midpoint in exactly one reference_available interval and no different-speaker overlap anywhere in token time span. Native token time mapped through actual sent capture ranges, not guessed cut offsets.",
+  "boundary_rule": "Original adjacent final boundary is continue only when both nearest scorable lexical tokens belong to the same declared coherent unit; separate when different unambiguous reference speakers, or two different declared completed units. Otherwise uncertain, excluded from primary join precision/recall. Within-final coalescing reported separately.",
+  "coherent": {
+    "en": [
+      {"id": "en-ready", "annotations": ["ES2004d.sync.322"], "status": "complete", "note": "Opening readiness statement; trailing filler is retained."},
+      {"id": "en-prototype", "annotations": ["ES2004d.sync.330"], "status": "complete"},
+      {"id": "en-you", "annotations": ["ES2004d.sync.332"], "status": "complete"},
+      {"id": "en-get", "annotations": ["ES2004d.sync.336"], "status": "complete", "note": "Two related sentences treated as one coherent reply, not automatic sentence=turn."},
+      {"id": "en-crazy", "annotations": ["ES2004d.sync.690"], "status": "complete"},
+      {"id": "en-thanks", "annotations": ["ES2004d.sync.692"], "status": "complete"}
+    ],
+    "ja": [
+      {"id": "ja-near", "annotations": ["japanese-themed-dialogue01-speaker_2-a58"], "status": "open", "note": "Initial question plus unfinished topic; only within-unit final splits can be labelled continue."},
+      {"id": "ja-city", "annotations": ["japanese-themed-dialogue01-speaker_2-a60", "japanese-themed-dialogue01-speaker_2-a61"], "status": "complete", "note": "Contrast 自分は遠いけど -> 他の家族; interjected acknowledgement is a separate speaker."},
+      {"id": "ja-home", "annotations": ["japanese-themed-dialogue01-speaker_2-a62", "japanese-themed-dialogue01-speaker_2-a63"], "status": "open", "note": "Syntactic continuation across annotation gap; later overlapped dialogue not forced into this unit."},
+      {"id": "ja-children", "annotations": ["japanese-themed-dialogue01-speaker_1-a31", "japanese-themed-dialogue01-speaker_1-a32", "japanese-themed-dialogue01-speaker_1-a33", "japanese-themed-dialogue01-speaker_1-a34"], "status": "open", "note": "Self-correcting question; interruptions remain independent reference speakers."},
+      {"id": "ja-park", "annotations": ["japanese-themed-dialogue01-speaker_1-a36", "japanese-themed-dialogue01-speaker_1-a37"], "status": "complete", "note": "Theme-park example and elaboration form one coherent thought."},
+      {"id": "ja-eating", "annotations": ["japanese-themed-dialogue01-speaker_1-a78", "japanese-themed-dialogue01-speaker_1-a79"], "status": "open", "note": "ところが -> あって is an explicit continuation; subsequent topic changes are uncertain."},
+      {"id": "ja-drive", "annotations": ["japanese-themed-dialogue01-speaker_1-a80", "japanese-themed-dialogue01-speaker_1-a81"], "status": "open", "note": "Incomplete at recording end; do not count a missing sentence ending as product loss."}
+    ]
+  },
+  "uncertainty": "Text-only small pilot labels, not ground-truth full utterance segmentation or MT quality ratings. English long timing-only intervals and Japanese tagged/unavailable lexical intervals remain unscorable; no reference text is recovered from Soniox output. Natural source audio is never filtered."
+}

@@ -4,6 +4,7 @@ import {
   deliverManagedCleanupIncident,
 } from './abuse-monitoring';
 import type { BrokerBindings } from './contract';
+import { createManagedCleanupBudget, SCHEDULED_MANAGED_DELIVERY_LIMIT, type ManagedCleanupBudget } from './managed-cleanup';
 import { sendDailyReport, type DailyReportPayload } from './discord-alerts';
 import {
   acknowledgeManagedKeyDeliveryCleanupClaim,
@@ -18,9 +19,11 @@ import type {
   ManagedKeyDeliveryRecord,
 } from './persistence';
 
-import { getManagedOperation, hasOtherLiveOperation, listManagedOperationAttempts, reconcileUnknownAttempt, sweepStaleManagedOperations } from './managed-operation';
+import { hasOtherLiveOperation, markOperationActiveOnAck, sweepStaleManagedOperations } from './managed-operation';
 import { runNetworkIdentityBackfill } from './network-identity-migration';
 import { resolveNetworkIdentitySecrets } from './network-identity';
+import { deleteExpiredChallengePreflightInstallations } from './preflight-retention';
+import { deleteExpiredPuriProofNonces } from './puri-token';
 
 import {
   applyAppActiveDayRetention,
@@ -74,11 +77,12 @@ export async function handleScheduled(
 ): Promise<void> {
   const now = new Date(controller.scheduledTime);
   const failures: unknown[] = [];
+  const cleanupBudget = createManagedCleanupBudget();
 
   await runScheduledPhase(failures, () =>
-    reconcileStaleManagedKeyDeliveries(env, now),
+    reconcileStaleManagedKeyDeliveries(env, now, cleanupBudget),
   );
-  await runScheduledPhase(failures, () => sweepStaleManagedOperations(env, now));
+  await runScheduledPhase(failures, () => sweepStaleManagedOperations(env, now, undefined, cleanupBudget));
   await runScheduledPhase(failures, () =>
     runNetworkIdentityBackfill(
       env.BROKER_DB,
@@ -119,6 +123,10 @@ async function applyScheduledRetention(db: D1Database, now: Date): Promise<void>
   await runScheduledPhase(failures, () =>
     applyAppActiveDayRetention(db, now),
   );
+  await runScheduledPhase(failures, () =>
+    deleteExpiredChallengePreflightInstallations(db, { now }),
+  );
+  await runScheduledPhase(failures, () => deleteExpiredPuriProofNonces(db, now));
   throwFirstScheduledFailure(failures);
 }
 
@@ -147,15 +155,24 @@ export async function reconcileStaleManagedKeyDeliveries(
     | 'DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL'
   >,
   now: Date,
+  budget: ManagedCleanupBudget = createManagedCleanupBudget(),
 ): Promise<{ expired: number; cleanupRequired: number }> {
   let expired = 0;
   let cleanupRequired = 0;
   const staleDeliveries = await listStalePendingManagedKeyDeliveries(env.BROKER_DB, {
     now,
-    limit: 50,
+    limit: Math.min(SCHEDULED_MANAGED_DELIVERY_LIMIT, budget.remainingCandidates),
   });
   const nowIso = now.toISOString();
   for (const delivery of staleDeliveries) {
+    if (budget.remainingCandidates === 0 || budget.remainingProviderPages === 0) break;
+    budget.remainingCandidates -= 1;
+    if (delivery.status === 'acknowledged') {
+      if (!(await markOperationActiveOnAck(env.BROKER_DB, delivery.delivery_id, now))) {
+        throw new Error('failed to reconcile acknowledged managed operation');
+      }
+      continue;
+    }
     if (await isManagedKeyDeliveryFinalized(env.BROKER_DB, delivery)) {
       const repaired =
         delivery.status === 'pending'
@@ -173,22 +190,10 @@ export async function reconcileStaleManagedKeyDeliveries(
       if (!repaired) {
         throw new Error('failed to reconcile finalized managed key delivery');
       }
+      await markOperationActiveOnAck(env.BROKER_DB, delivery.delivery_id, now);
       continue;
     }
-    if (delivery.operation_id && delivery.attempt_index) {
-      const operation = await getManagedOperation(env.BROKER_DB, delivery.operation_id);
-      if (operation) {
-        await reconcileUnknownAttempt(
-          env.BROKER_DB, env.OPENROUTER_MANAGEMENT_API_KEY,
-          { ...operation, current_attempt_index: delivery.attempt_index }, now,
-        );
-        const attempts = await listManagedOperationAttempts(env.BROKER_DB, delivery.operation_id);
-        if (attempts.some((attempt) => attempt.attempt_index === delivery.attempt_index && attempt.outcome === 'cleaned')) {
-          expired += 1;
-        }
-      }
-      continue;
-    }
+    if (delivery.operation_id && delivery.attempt_index) continue;
     const claimed = await claimStaleManagedKeyDeliveryCleanup(env.BROKER_DB, {
       delivery,
       claimedAt: nowIso,
@@ -604,13 +609,6 @@ export async function runDailyReport(
   return { ok: true, payload, sent: true };
 }
 
-export async function buildDailySummaryPacket(
-  db: BrokerBindings['BROKER_DB'],
-  now: Date,
-): Promise<DailyReportPayload> {
-  const window = resolveDailyReportWindow(now);
-  return buildDailySummaryPacketForWindow(db, window);
-}
 
 async function buildDailySummaryPacketForDate(
   db: BrokerBindings['BROKER_DB'],

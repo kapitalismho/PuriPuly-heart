@@ -3,13 +3,14 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from puripuly_heart.app.services.managed_usage import (
+
+from puripuly_heart.app.services.managed.managed_usage import (
     ManagedUsageMetadataResult,
     ManagedUsageOwner,
     ManagedUsageState,
     ManagedUsageViewState,
 )
-from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
+from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
 
 
 def _state(

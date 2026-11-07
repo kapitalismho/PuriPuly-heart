@@ -1,12 +1,9 @@
-import { BROKER_RETENTION_POLICY } from './persistence';
-
-const CHALLENGE_PREFLIGHT_RETENTION_MS =
-  BROKER_RETENTION_POLICY.challengePreflight.inactiveDays * 24 * 60 * 60 * 1000;
+const CHALLENGE_PREFLIGHT_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 export async function deleteExpiredChallengePreflightInstallations(
   db: D1Database,
   input: {
-    installationId: string;
+    installationId?: string;
     now: Date;
     devicePublicKey?: string;
   },
@@ -18,9 +15,10 @@ export async function deleteExpiredChallengePreflightInstallations(
   await db
     .prepare(
       `DELETE FROM installations
-         WHERE (installation_id = ? OR (? IS NOT NULL AND device_public_key = ?))
+         WHERE (? IS NULL OR installation_id = ? OR (? IS NOT NULL AND device_public_key = ?))
            AND hardware_hash IS NULL
            AND hardware_hash_salt_version IS NULL
+           AND puri_bound_at IS NULL
            AND challenge IS NOT NULL
            AND challenge_expires_at IS NOT NULL
            AND challenge_salt_version IS NOT NULL
@@ -32,7 +30,8 @@ export async function deleteExpiredChallengePreflightInstallations(
            AND max(julianday(last_seen_at), julianday(challenge_expires_at)) < julianday(?)`,
     )
     .bind(
-      input.installationId,
+      input.installationId ?? null,
+      input.installationId ?? null,
       input.devicePublicKey ?? null,
       input.devicePublicKey ?? null,
       cutoffIso,

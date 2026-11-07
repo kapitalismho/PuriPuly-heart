@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import time
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -16,13 +17,20 @@ from puripuly_heart.core.chatgpt.oauth import (
     CHATGPT_JWKS_URL,
     CHATGPT_PLAN_SCOPE,
     CHATGPT_TOKEN_URL,
+    ChatGptIdentity,
+    ChatGptTokenSet,
 )
 from puripuly_heart.core.chatgpt.session import (
     CHATGPT_CLIENT_ID_SECRET,
+    CHATGPT_HOST_ID_SECRET,
     CHATGPT_REFRESH_TOKEN_SECRET,
     ChatGptSession,
 )
-from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.core.storage.secrets import (
+    EncryptedFileSecretStore,
+    InMemorySecretStore,
+    SecretStore,
+)
 
 _KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
@@ -124,7 +132,7 @@ class _Listener:
         self.closed = True
 
 
-def _owner(store: InMemorySecretStore, flow: _Flow) -> ChatGptAccountOwner:
+def _owner(store: SecretStore, flow: _Flow) -> ChatGptAccountOwner:
     session = ChatGptSession(
         secret_store=lambda: store,
         http_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(flow.handler)),
@@ -217,3 +225,63 @@ async def test_reauthorization_rejects_callback_for_a_different_client() -> None
     assert (result.succeeded, result.failure_code) == (False, "client_mismatch")
     assert store.get(CHATGPT_CLIENT_ID_SECRET) == "oaiapp_saved"
     await owner.close()
+
+
+async def test_logout_allows_subsequent_authorized_sign_in_and_refresh(tmp_path: Path) -> None:
+    path = tmp_path / "secrets.json"
+    store = EncryptedFileSecretStore(path, passphrase="synthetic")
+    refreshes = []
+
+    class ReturningFlow(_Flow):
+        def handler(self, request: httpx.Request) -> httpx.Response:
+            form = parse_qs(request.content.decode())
+            if form.get("grant_type") == ["refresh_token"]:
+                refreshes.append(form["refresh_token"][0])
+                return httpx.Response(
+                    200,
+                    json={
+                        "access_token": "rotated-access",
+                        "refresh_token": "rotated-refresh",
+                        "expires_in": 3600,
+                        "scope": CHATGPT_PLAN_SCOPE,
+                    },
+                )
+            return super().handler(request)
+
+    flow = ReturningFlow(issued_client_id=None)
+    owner = _owner(store, flow)
+    host = owner.session.host_id()
+    store.set("unrelated", "keep")
+    owner.session.store_sign_in(
+        client_id="oaiapp_saved",
+        tokens=ChatGptTokenSet(
+            access_token="old-access",
+            refresh_token="old-refresh",
+            expires_at=0,
+            scopes=(CHATGPT_PLAN_SCOPE,),
+        ),
+        identity=ChatGptIdentity(subject="old-user", email="old@example.invalid"),
+    )
+    try:
+        logout = await owner.sign_out()
+        assert logout.local_credentials_removed is True
+        assert logout.remote_revoked is False
+        assert logout.diagnostics.code == "chatgpt_remote_revocation_unconfirmed"
+        fresh = EncryptedFileSecretStore(path, passphrase="synthetic")
+        assert fresh.get(CHATGPT_REFRESH_TOKEN_SECRET) is None
+        assert owner.snapshot().signed_in is False
+        signed_in = await owner.connect()
+        assert signed_in.succeeded is True
+        assert signed_in.first_sign_in is False
+        assert flow.authorization_params["client_id"] == "oaiapp_saved"
+        assert await owner.session.access_token() == "access"
+        owner.session.invalidate_access_token("access")
+        assert await owner.session.access_token() == "rotated-access"
+        assert refreshes == ["refresh"]
+        assert owner.snapshot().signed_in is True
+        assert fresh.get(CHATGPT_REFRESH_TOKEN_SECRET) == "rotated-refresh"
+        assert fresh.get(CHATGPT_CLIENT_ID_SECRET) == "oaiapp_saved"
+        assert fresh.get(CHATGPT_HOST_ID_SECRET) == host
+        assert fresh.get("unrelated") == "keep"
+    finally:
+        await owner.close()

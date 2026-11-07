@@ -10,27 +10,35 @@ from urllib.parse import parse_qs, urlsplit
 
 import numpy as np
 import pytest
-from puripuly_heart.app.services.self_capture_application import (
+from websockets.asyncio.client import connect
+from websockets.asyncio.server import serve
+from websockets.exceptions import ConnectionClosed
+
+from puripuly_heart.app.services.capture.self_capture_application import (
     SelfCaptureApplicationOwner,
     SelfCaptureApplicationSettings,
 )
-from puripuly_heart.app.wiring_stt_factory import (
+from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import SharedSTTProviderFactory
+from puripuly_heart.app.wiring.wiring_stt_factory import (
+    build_peer_capture_session_config,
     build_self_capture_session_config,
     build_self_capture_vad_signature,
     build_self_stt_provider_request,
     build_self_stt_provider_signature,
     build_self_stt_runtime_signature,
 )
-from websockets.asyncio.client import connect
-from websockets.asyncio.server import serve
-from websockets.exceptions import ConnectionClosed
-
-from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import SharedSTTProviderFactory
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.audio.format import float32_to_pcm16le_bytes
 from puripuly_heart.core.clock import SystemClock
+from puripuly_heart.core.local_asr.local_stt_assets import (
+    FUN_ASR_MLT_NANO_MODEL_ID,
+    FUN_ASR_NANO_MODEL_ID,
+    GIGAAM_MODEL_ID,
+    GRANITE_MODEL_ID,
+    PARAKEET_JAPANESE_MODEL_ID,
+)
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmission,
@@ -205,7 +213,6 @@ def _application_owner(
         runtime_available=lambda: True,
         capture_owner=lambda: session,
         capture_owner_if_created=lambda: session,
-        persist_manual_fallback=lambda: True,
         reset_local_pending=lambda: None,
         clear_gpu_pending=lambda: None,
         overlay_state_provider=lambda: "off",
@@ -274,14 +281,23 @@ def test_cloud_source_language_is_owned_by_self_provider_identity(
 
 
 @pytest.mark.parametrize(
-    "provider",
-    (STTProviderName.LOCAL_QWEN, STTProviderName.LOCAL_QWEN_GPU),
+    ("provider", "first_language", "second_language"),
+    (
+        (STTProviderName.LOCAL_GRANITE, "en", "en-US"),
+        (STTProviderName.LOCAL_GRANITE, "en", "ja"),
+        (STTProviderName.LOCAL_GIGAAM, "ru", "ru-RU"),
+        (STTProviderName.LOCAL_FUN_ASR_NANO, "zh-CN", "zh-TW"),
+        (STTProviderName.LOCAL_FUN_ASR_MLT_NANO, "ko", "ko-KR"),
+        (STTProviderName.LOCAL_QWEN_GPU, "ko", "ja"),
+    ),
 )
 def test_local_source_language_is_owned_by_session_options(
     provider: STTProviderName,
+    first_language: str,
+    second_language: str,
 ) -> None:
-    korean = _settings(provider, "ko")
-    japanese = _settings(provider, "ja")
+    korean = _settings(provider, first_language)
+    japanese = _settings(provider, second_language)
     korean_config = build_self_capture_session_config(korean)
     japanese_config = build_self_capture_session_config(japanese)
 
@@ -289,19 +305,63 @@ def test_local_source_language_is_owned_by_session_options(
     assert korean_config.session_options is not None
     assert japanese_config.session_options is not None
     assert korean_config.session_options != japanese_config.session_options
-    assert japanese_config.session_options.source_language == "ja"
+    assert japanese_config.session_options.source_language == second_language
 
 
 def test_local_cpu_auto_model_identity_changes_with_source_language() -> None:
     english = _settings(STTProviderName.LOCAL_CPU_AUTO, "en")
     japanese = _settings(STTProviderName.LOCAL_CPU_AUTO, "ja")
-    korean = _settings(STTProviderName.LOCAL_QWEN, "ko")
-    japanese_qwen = _settings(STTProviderName.LOCAL_QWEN, "ja")
 
     assert build_self_stt_provider_signature(english) != build_self_stt_provider_signature(japanese)
-    assert build_self_stt_provider_signature(korean) == build_self_stt_provider_signature(
-        japanese_qwen
+
+
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize(
+    ("provider", "language", "model_id", "language_hint"),
+    [
+        (STTProviderName.LOCAL_GRANITE, "en", GRANITE_MODEL_ID, None),
+        (STTProviderName.LOCAL_GRANITE, "ja", GRANITE_MODEL_ID, None),
+        (STTProviderName.LOCAL_GIGAAM, "ru", GIGAAM_MODEL_ID, None),
+        (STTProviderName.LOCAL_CPU_AUTO, "en", GRANITE_MODEL_ID, None),
+        (STTProviderName.LOCAL_CPU_AUTO, "ru", GIGAAM_MODEL_ID, None),
+        (STTProviderName.LOCAL_CPU_AUTO, "ja", PARAKEET_JAPANESE_MODEL_ID, "ja"),
+        (STTProviderName.LOCAL_FUN_ASR_NANO, "zh-CN", FUN_ASR_NANO_MODEL_ID, "zh"),
+        (STTProviderName.LOCAL_FUN_ASR_MLT_NANO, "ko", FUN_ASR_MLT_NANO_MODEL_ID, "ko"),
+    ],
+)
+def test_channel_local_model_configuration_preserves_language_and_native_conditioning(
+    channel: str,
+    provider: STTProviderName,
+    language: str,
+    model_id: str,
+    language_hint: str | None,
+) -> None:
+    settings = _settings(provider, language)
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            peer_stt=replace(settings.intent.peer_stt, provider=provider.value),
+            languages=replace(
+                settings.intent.languages,
+                peer_source_mode="manual",
+                peer_source_language=language,
+            ),
+        ),
     )
+
+    capture = (
+        build_self_capture_session_config(settings)
+        if channel == "self"
+        else build_peer_capture_session_config(settings)
+    )
+
+    assert capture.provider_id == provider.value
+    assert capture.model_id == model_id
+    assert capture.session_options is not None
+    assert capture.session_options.source_language == language
+    assert capture.session_options.source_mode == "manual"
+    assert capture.session_options.language_hint == language_hint
 
 
 @pytest.mark.parametrize(
@@ -334,10 +394,12 @@ def test_qwen_audio_capture_provider_identity_matches_runtime_provider() -> None
 
 
 def test_custom_vocabulary_does_not_change_unsupported_provider_signature() -> None:
-    initial = _with_custom_terms(_settings(STTProviderName.LOCAL_QWEN, "ko"), {"ko": ["Puripuly"]})
+    initial = _with_custom_terms(
+        _settings(STTProviderName.LOCAL_FUN_ASR_MLT_NANO, "ko"), {"ko": ["Puripuly"]}
+    )
     updated = _with_custom_terms(initial, {"ko": ["Puripuly", "VRChat"]})
 
-    assert build_self_stt_runtime_signature(updated) != build_self_stt_runtime_signature(initial)
+    assert build_self_stt_runtime_signature(updated) == build_self_stt_runtime_signature(initial)
     assert build_self_stt_provider_signature(updated) == build_self_stt_provider_signature(initial)
 
 
@@ -551,9 +613,22 @@ async def test_running_cloud_source_language_change_handoffs_new_backend() -> No
 
 
 @pytest.mark.asyncio
-async def test_running_local_source_language_change_handoffs_scoped_backend() -> None:
-    korean = _settings(STTProviderName.LOCAL_QWEN, "ko")
-    japanese = _settings(STTProviderName.LOCAL_QWEN, "ja")
+@pytest.mark.parametrize(
+    ("provider_name", "first_language", "second_language", "language_hint"),
+    [
+        (STTProviderName.LOCAL_QWEN_GPU, "ko", "ja", "ja"),
+        (STTProviderName.LOCAL_GRANITE, "en", "ja", None),
+        (STTProviderName.LOCAL_GIGAAM, "ru", "ru-RU", None),
+    ],
+)
+async def test_running_local_source_language_change_handoffs_scoped_backend(
+    provider_name: STTProviderName,
+    first_language: str,
+    second_language: str,
+    language_hint: str | None,
+) -> None:
+    korean = _settings(provider_name, first_language)
+    japanese = _settings(provider_name, second_language)
     settings_holder = {"settings": korean}
     provider = _RecordingProvider()
     owner = _build_owner(provider, settings_holder)
@@ -568,16 +643,22 @@ async def test_running_local_source_language_change_handoffs_scoped_backend() ->
     assert len(provider.handoff_calls) == 1
     request, started = provider.handoff_calls[0]
     assert started is True
-    assert request.config.source_language == "ja"
+    assert request.config.source_language == second_language
     assert request.session_options is not None
-    assert request.session_options.language_hint == "ja"
+    assert request.session_options.language_hint == language_hint
     await owner.close()
 
 
 @pytest.mark.asyncio
-async def test_running_local_cpu_auto_language_change_handoffs_when_model_changes() -> None:
+@pytest.mark.parametrize(
+    ("language", "model_id"),
+    [("ja", PARAKEET_JAPANESE_MODEL_ID), ("ru", GIGAAM_MODEL_ID)],
+)
+async def test_running_local_cpu_auto_language_change_handoffs_when_model_changes(
+    language: str, model_id: str
+) -> None:
     english = _settings(STTProviderName.LOCAL_CPU_AUTO, "en")
-    japanese = _settings(STTProviderName.LOCAL_CPU_AUTO, "ja")
+    japanese = _settings(STTProviderName.LOCAL_CPU_AUTO, language)
     settings_holder = {"settings": english}
     provider = _RecordingProvider()
     owner = _build_owner(provider, settings_holder)
@@ -592,7 +673,8 @@ async def test_running_local_cpu_auto_language_change_handoffs_when_model_change
     assert len(provider.handoff_calls) == 1
     request, started = provider.handoff_calls[0]
     assert started is True
-    assert request.config.source_language == "ja"
+    assert request.config.source_language == language
+    assert request.model_id == model_id
     await owner.close()
 
 
@@ -638,7 +720,7 @@ async def test_replace_provider_hot_cloud_language_change_uses_application_path(
 
 @pytest.mark.parametrize(
     "provider_name",
-    [STTProviderName.DEEPGRAM, STTProviderName.LOCAL_QWEN],
+    [STTProviderName.DEEPGRAM, STTProviderName.LOCAL_CPU_AUTO],
 )
 @pytest.mark.asyncio
 async def test_failed_scoped_language_handoff_does_not_look_applied(

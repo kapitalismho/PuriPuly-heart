@@ -50,6 +50,68 @@ class FakePsutil:
         )
 
 
+def test_windows_snapshots_project_process_records() -> None:
+    from puripuly_heart.core.audio.windows_process_table import WindowsProcessRecord
+
+    records = (
+        WindowsProcessRecord(
+            pid=10,
+            parent_pid=0,
+            image_name="one.exe",
+            executable_path=r"C:\Apps\one.exe",
+            is_current_user=True,
+            create_time=1.25,
+        ),
+        WindowsProcessRecord(
+            pid=20,
+            parent_pid=10,
+            image_name="two.exe",
+            executable_path=r"C:\Apps\two.exe",
+            is_current_user=False,
+            create_time=None,
+        ),
+        WindowsProcessRecord(
+            pid=30,
+            parent_pid=10,
+            image_name="Secure System",
+            executable_path=None,
+            is_current_user=False,
+            create_time=3.5,
+        ),
+    )
+
+    snapshots = tuple(
+        process_identity.WindowsCurrentUserProcessSnapshots(scan=lambda: records).snapshots()
+    )
+
+    assert [(item.pid, item.parent_pid) for item in snapshots] == [
+        (10, None),
+        (20, 10),
+        (30, 10),
+    ]
+    assert [item.is_current_user for item in snapshots] == [True, False, False]
+    assert [item.executable_path for item in snapshots] == [
+        r"C:\Apps\one.exe",
+        r"C:\Apps\two.exe",
+        None,
+    ]
+    assert [item.instance_id for item in snapshots] == ["10:1.25", None, None]
+
+
+def test_default_snapshots_follow_platform(monkeypatch) -> None:
+    monkeypatch.setattr(process_identity.sys, "platform", "win32")
+    assert isinstance(
+        process_identity.default_current_user_process_snapshots(),
+        process_identity.WindowsCurrentUserProcessSnapshots,
+    )
+
+    monkeypatch.setattr(process_identity.sys, "platform", "linux")
+    assert isinstance(
+        process_identity.default_current_user_process_snapshots(),
+        process_identity.PsutilCurrentUserProcessSnapshots,
+    )
+
+
 def test_snapshot_scan_uses_one_bulk_parent_lookup(monkeypatch) -> None:
     psutil = FakePsutil()
     monkeypatch.setattr(process_identity, "_import_psutil", lambda: psutil)

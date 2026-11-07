@@ -10,10 +10,16 @@ Download `{{INSTALLER_EXE}}` from the Assets section below, then run it.
 
 
 ## Change logs
-- Luna on the ChatGPT connection preconnects one standby socket while translation is off and reuses it when translation is enabled.
-
-- Soniox speech recognition and API-key verification now authenticate when opening the WebSocket connection. Update before **January 15, 2027**, when Soniox will reject older builds that authenticate only in the first configuration message. Existing API keys continue to work; no key reissuance or settings change is required.
-- Soniox's concurrent-connection limit now uses the existing bounded recovery policy.
+- CPU speech recognition replaces Orukeet with multilingual Granite Speech 5.0 TurboCTC Q8_0 and adds GigaAM-v3 e2e-CTC Q8_0 for Russian. Chinese Fun-ASR-Nano, Japanese Parakeet CTC, and Fun-ASR-MLT-Nano remain available.
+- CPU Auto routes six Western languages to Granite, Russian to GigaAM, Chinese to standard Nano, Japanese to CTC, and the remaining supported languages to MLT. The combined contract covers 36 language codes; Ukrainian is explicitly unsupported without a hidden fallback.
+- Talk and Listen use independent transcribe.cpp CPU Model/Session instances with two inference threads each. GPU ASR keeps one shared resident Model, separate channel Sessions and serialized inference, including safe model replacement.
+- Old Orukeet, Parakeet v3 and Qwen CPU selections migrate to CPU Auto. Recognized retired assets are cleaned only after recoverable settings migration; blocked deletion retries without removing unknown contents or current Japanese/GPU assets.
+- All five CPU models support pinned, integrity-checked Hugging Face downloads and alternate HF-mirror paths. Granite no-speech-marker-only output is treated as an empty transcript.
+- The window stays responsive during startup, including the first Windows process scan. Closing the window during startup also drains pending preparation safely.
+- Gemini speech recognition preserves eligible pre-roll when resuming a stream after an idle period.
+- From the second launch, the message input shows a randomly selected prompt or usage tip. Changing the interface language keeps the selected tip.
+- Local translation models now share one Local section in the model picker. The GPT-6 luna description also clarifies that it can use a ChatGPT plan.
+- ASR logs identify applied provider and model selections, final latency remains visible when an already-sent preview becomes final, and routine Output success messages no longer flood the logs.
 
 ---
 **If PuriPuly has made your world a bit wider,

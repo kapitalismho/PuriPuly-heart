@@ -10,8 +10,6 @@ import pytest
 
 pytest.importorskip("flet")
 
-from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
-
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
@@ -22,6 +20,7 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 from puripuly_heart.app.services.github_star_prompt_settings import (
     compose_github_star_prompt_owner,
 )
+from puripuly_heart.app.services.managed.managed_usage import ManagedUsageOwner
 from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.settings_vnext.serialization import to_dict as canonical_to_dict
@@ -147,13 +146,6 @@ def _with_star_success(settings: AppSettingsVNext) -> AppSettingsVNext:
             ),
         ),
     )
-
-
-def test_official_byok_fixture_uses_supported_model_provider_combo() -> None:
-    settings = _settings_for_connection("official_byok")
-
-    assert settings.intent.translation.model == "deepseek_v4_flash_41"
-    assert settings.intent.translation.connection == "official_byok"
 
 
 def test_github_star_prompt_is_eligible_for_managed_remaining_percent_at_threshold() -> None:

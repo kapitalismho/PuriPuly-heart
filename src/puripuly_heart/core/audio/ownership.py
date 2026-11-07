@@ -67,6 +67,8 @@ class AudioSegmentSnapshot:
     opened_at_monotonic_s: float
     sealed_at_monotonic_s: float | None
     seal_reason: str | None
+    delivery_pause_s: float | None = None
+    smart_turn_incomplete: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,6 +194,8 @@ class CaptureStreamInput:
     capture: tuple[AudioCaptureSpan, ...]
     boundary_reason: str | None = None
     speech_observed: bool = False
+    pre_roll: np.ndarray | None = None
+    pre_roll_capture: tuple[AudioCaptureSpan, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,6 +220,8 @@ class _MutableSegment:
     synthetic_context_sample_count: int = 0
     sealed_at_monotonic_s: float | None = None
     seal_reason: str | None = None
+    delivery_pause_s: float | None = None
+    smart_turn_incomplete: bool = False
     terminal: AudioSegmentTerminalReceipt | None = None
 
 
@@ -282,7 +288,14 @@ class PeerAudioSegmentLedger:
         self._ready_terminal_receipts.clear()
         return receipts
 
-    def observe_vad_event(self, event: object, *, now_monotonic_s: float) -> OwnedVadEvent:
+    def observe_vad_event(
+        self,
+        event: object,
+        *,
+        now_monotonic_s: float,
+        delivery_pause_s: float | None = None,
+        smart_turn_incomplete: bool = False,
+    ) -> OwnedVadEvent:
         from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 
         if isinstance(event, SpeechStart):
@@ -321,6 +334,8 @@ class PeerAudioSegmentLedger:
             segment = self._require_writable_segment(event.utterance_id)
             segment.sealed_at_monotonic_s = now_monotonic_s
             segment.seal_reason = event.reason
+            segment.delivery_pause_s = delivery_pause_s
+            segment.smart_turn_incomplete = smart_turn_incomplete
             if self._open_segment_id == event.utterance_id:
                 self._open_segment_id = None
             return OwnedVadEvent(event=event, segment=self._snapshot(segment))
@@ -681,6 +696,8 @@ class PeerAudioSegmentLedger:
             opened_at_monotonic_s=segment.opened_at_monotonic_s,
             sealed_at_monotonic_s=segment.sealed_at_monotonic_s,
             seal_reason=segment.seal_reason,
+            delivery_pause_s=segment.delivery_pause_s,
+            smart_turn_incomplete=segment.smart_turn_incomplete,
         )
 
 

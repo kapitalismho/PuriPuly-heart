@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 
 from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.messages import ErrorDiagnostics
-from puripuly_heart.core.openrouter_handoff import is_effectively_exhausted
-from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
+from puripuly_heart.core.openrouter.openrouter_handoff import is_effectively_exhausted
+from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
 
 from .managed_status_refresh import ManagedStatusRefreshOwner
 

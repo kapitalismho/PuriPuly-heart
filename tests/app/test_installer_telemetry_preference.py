@@ -100,6 +100,7 @@ def test_installer_preference_uses_supported_legacy_telemetry_migration(
             }
         ),
     ],
+    ids=["invalid-json", "unsupported-version"],
 )
 def test_invalid_existing_settings_stop_preference_persistence_without_replacement(
     tmp_path: Path, content: str

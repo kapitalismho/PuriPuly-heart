@@ -110,7 +110,6 @@ async def test_deepgram_actual_result_shape_reuses_acknowledged_epoch_and_detect
 
     monkeypatch.setattr(_DeepgramSDKSession, "_write_payload", write)
     session = _deepgram_session()
-    assert session._audio_q.maxsize == 258
     request_a = _request("deepgram")
     await session.begin_turn(request_a)
     gate.clear()
@@ -137,9 +136,20 @@ async def test_deepgram_actual_result_shape_reuses_acknowledged_epoch_and_detect
     session._build_transcript_event(_deepgram_result("text"))
     session._build_transcript_event(_deepgram_result("", from_finalize=True))
     await asyncio.sleep(0)
-    assert (await _next(session)).text == "same "
-    assert (await _next(session)).text == "text"
+    stable_a, stable_b, preview = [await _next(session) for _ in range(3)]
+    assert all(isinstance(event, STTProviderTurnUpdate) for event in (stable_a, stable_b, preview))
+    assert [(event.stability, event.assembly, event.text) for event in (stable_a, stable_b)] == [
+        ("stable", "append", "same "),
+        ("stable", "append", "text"),
+    ]
+    assert (preview.stability, preview.assembly, preview.text) == (
+        "provisional",
+        "replace",
+        "same  text",
+    )
+    assert preview.identity == request_a.identity
     terminal_a = await _next(session)
+    assert isinstance(terminal_a, STTProviderTurnTerminal)
     assert (terminal_a.outcome, terminal_a.text, terminal_a.epoch_disposition) == (
         "final",
         "same text",
@@ -163,8 +173,11 @@ async def test_deepgram_actual_result_shape_reuses_acknowledged_epoch_and_detect
     )
     session._build_transcript_event(_deepgram_result("same text", from_finalize=True))
     await asyncio.sleep(0)
-    assert (await _next(session)).text == "same text"
+    stable = await _next(session)
+    assert isinstance(stable, STTProviderTurnUpdate)
+    assert (stable.stability, stable.assembly, stable.text) == ("stable", "append", "same text")
     terminal_b = await _next(session)
+    assert isinstance(terminal_b, STTProviderTurnTerminal)
     assert (terminal_b.text, terminal_b.epoch_disposition) == ("same text", "reuse")
     assert terminal_a.identity != terminal_b.identity
     assert all(item[0] is session for item in writes)
@@ -202,6 +215,7 @@ async def test_deepgram_empty_error_abort_and_two_drain_path(monkeypatch) -> Non
     empty._build_transcript_event(_deepgram_result("", from_finalize=True))
     await asyncio.sleep(0)
     terminal = await _next(empty)
+    assert isinstance(terminal, STTProviderTurnTerminal)
     assert (terminal.outcome, terminal.text_authority, terminal.epoch_disposition) == (
         "empty",
         "authoritative",
@@ -214,9 +228,18 @@ async def test_deepgram_empty_error_abort_and_two_drain_path(monkeypatch) -> Non
     await errored.begin_turn(error_request)
     errored._build_transcript_event(_deepgram_result("kept"))
     await asyncio.sleep(0)
-    await _next(errored)
+    stable, preview = await _next(errored), await _next(errored)
+    assert isinstance(stable, STTProviderTurnUpdate)
+    assert (stable.stability, stable.assembly, stable.text) == ("stable", "append", "kept")
+    assert isinstance(preview, STTProviderTurnUpdate)
+    assert (preview.stability, preview.assembly, preview.text) == (
+        "provisional",
+        "replace",
+        "kept",
+    )
     errored._scoped_transport_end(False, "deepgram_transport_error")
     degraded = await _next(errored)
+    assert isinstance(degraded, STTProviderTurnTerminal)
     ended = await _next(errored)
     assert (degraded.outcome, degraded.text) == ("degraded", "kept")
     assert isinstance(ended, STTProviderEpochEnded)
@@ -269,6 +292,7 @@ async def test_gemini_native_results_are_stream_scoped_receipt_units() -> None:
         live.push(_gemini_message(final="before seal"))
         early = await _next(session)
         assert isinstance(early, STTRecognitionUnit)
+        assert (early.text, early.is_final) == ("before seal", True)
         await session.seal_turn(
             first.identity,
             sealed_content_ranges=_span(),
@@ -300,14 +324,18 @@ async def test_gemini_native_results_are_stream_scoped_receipt_units() -> None:
         )
         assert session.recognition_source_covers(next_span)
         live.push(_gemini_message(ack=True, interim="not final"))
+        partial = await _next(session)
+        assert isinstance(partial, STTRecognitionUnit)
+        assert (partial.text, partial.is_final) == ("not final", False)
         live.push(_gemini_message(final="same"))
         live.push(_gemini_message(final="same"))
         units = [await _next(session), await _next(session)]
-        assert all(isinstance(unit, STTRecognitionUnit) for unit in units)
+        assert all(isinstance(unit, STTRecognitionUnit) and unit.is_final for unit in units)
         assert [unit.text for unit in units] == ["same", "same"]
-        assert [unit.identity.receipt_sequence for unit in [early, *units]] == [1, 2, 3]
+        assert [unit.identity.receipt_sequence for unit in [early, partial, *units]] == [1, 2, 3, 4]
         assert len({unit.identity.unit_id for unit in [early, *units]}) == 3
-        assert all(unit.identity.stream == early.identity.stream for unit in units)
+        assert partial.identity.unit_id == units[0].identity.unit_id
+        assert all(unit.identity.stream == early.identity.stream for unit in [partial, *units])
         assert [next(iter(item)) for item in live.sent] == ["audio", "audio_stream_end", "audio"]
         await session.seal_turn(
             second.identity,
@@ -375,7 +403,6 @@ async def test_gemini_empty_result_transport_error_and_abort_have_distinct_recei
 @pytest.mark.asyncio
 async def test_soniox_documented_unkeyed_tokens_reuse_epoch_and_detect_idle_ambiguity() -> None:
     session, ws = _soniox_session()
-    assert session._audio_q.maxsize == 258
     request_a = _request("soniox")
     await session.begin_turn(request_a)
     ws.send_gate.clear()
@@ -511,7 +538,6 @@ async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_am
     assert "transcript_id" not in CommittedTranscriptPayload.model_fields
     assert "commit_id" not in CommittedTranscriptPayload.model_fields
     session, connection = _scribe_session()
-    assert session._connection_events.maxsize == 258
     request_a = _request("elevenlabs_scribe")
     await session.begin_turn(request_a)
     session._on_committed(CommittedTranscriptPayload(text="before-commit"))

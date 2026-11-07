@@ -38,7 +38,6 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
     RuntimeDiagnostic,
     SttEventLoopFailureDiagnostic,
     SttTurnFailureDiagnostic,
-    TranslationFailureDiagnostic,
     TranslationLatencyDiagnosticsOwner,
 )
 from puripuly_heart.core.orchestrator.translation_output_projection import (
@@ -124,7 +123,6 @@ class SelfTranslationChannelPort(Protocol):
 @dataclass(slots=True)
 class _AcousticContinuation:
     utterance_id: UUID
-    started_at: float
     recognition_scope: tuple[object, ...] | None
     chunk_count: int = 0
     ended_at: float | None = None
@@ -319,10 +317,7 @@ class SelfTranslationChannelOwner:
                 )
                 buffer = self.merge_buffer
                 if buffer is not None:
-                    await self._evaluate_speculative_next_action(
-                        buffer,
-                        reason="speech_end",
-                    )
+                    await self._evaluate_speculative_next_action(buffer)
         if owned is None:
             await self.local_asr_runtime.handle_vad_event("self", vad_event)
         else:
@@ -370,7 +365,7 @@ class SelfTranslationChannelOwner:
         self._settle_acoustic_continuation(receipt.identity)
         buffer = self.merge_buffer
         if buffer is not None:
-            await self._evaluate_speculative_next_action(buffer, reason="source_segment_retired")
+            await self._evaluate_speculative_next_action(buffer)
 
     def release_input_segment(self, event: STTProviderInputTerminal) -> None:
         segment_id = event.identity.segment.segment_id
@@ -689,10 +684,7 @@ class SelfTranslationChannelOwner:
             self._clear_resume_state(buffer)
         publication_id = self._scoped_publication_ids.get(identity)
         if publication_id is None:
-            await self._evaluate_speculative_next_action(
-                buffer,
-                reason="recognition_terminal",
-            )
+            await self._evaluate_speculative_next_action(buffer)
             return
         if acoustic_id in self.runtime.speech_ended_ids:
             self.runtime.speech_ended_ids.add(publication_id)
@@ -700,10 +692,7 @@ class SelfTranslationChannelOwner:
             if end_time is not None:
                 self.runtime.utterance_start_times[publication_id] = end_time
             self._maybe_start_finalize_wait(publication_id)
-            await self._evaluate_speculative_next_action(
-                buffer,
-                reason="recognition_terminal",
-            )
+            await self._evaluate_speculative_next_action(buffer)
 
     @staticmethod
     def _recognition_scope(identity: STTProviderTurnIdentity) -> tuple[object, ...]:
@@ -721,7 +710,7 @@ class SelfTranslationChannelOwner:
         self._clear_resume_state(buffer)
         buffer.awaiting_vad_end = False
         buffer.awaiting_vad_utterance_id = None
-        await self._commit_merge(buffer, reason="recognition_configuration_barrier")
+        await self._commit_merge(buffer)
 
     def _inherit_scoped_publication_end(
         self,
@@ -1254,9 +1243,6 @@ class SelfTranslationChannelOwner:
             )
         )
 
-    def _emit_metric(self, message: str, *args: object) -> None:
-        return
-
     def _record_latency_stage(
         self,
         *,
@@ -1302,22 +1288,6 @@ class SelfTranslationChannelOwner:
     def _finalize_latency_timeline(self, utterance_id: UUID) -> None:
         self.diagnostics.publish_latency(
             LatencyTimelineDiagnostic(channel="self", utterance_id=utterance_id)
-        )
-
-    def _log_translation_failure(
-        self,
-        *,
-        stage: str,
-        exc: Exception,
-        diagnostic_only: bool = False,
-    ) -> UserErrorReport:
-        return self.diagnostics.record_translation_failure(
-            TranslationFailureDiagnostic(
-                stage=stage,
-                channel="self",
-                exception=exc,
-                diagnostic_only=diagnostic_only,
-            )
         )
 
     @staticmethod
@@ -1381,12 +1351,6 @@ class SelfTranslationChannelOwner:
             if existing == text:
                 return
             buffer.parts[idx] = text
-            self._emit_metric(
-                "[Metric] final_update id=%s index=%s text_len=%s",
-                str(buffer.merge_id)[:8],
-                idx,
-                len(text),
-            )
             return
         buffer.parts.append(text)
         buffer.utterance_ids.append(utterance_id)
@@ -1411,18 +1375,13 @@ class SelfTranslationChannelOwner:
         buffer.resume_pending = True
         buffer.resume_confirmed = observation.chunk_count >= 3
         buffer.resume_utterance_id = observation.utterance_id
-        buffer.resume_chunk_count = observation.chunk_count
-        buffer.resume_started_at = observation.started_at
         if observation.timeout_task is not None:
-            buffer.resume_end_utterance_id = observation.utterance_id
             buffer.resume_end_timeout_task = observation.timeout_task
 
     def _clear_resume_state(self, buffer: _MergeBuffer) -> None:
         buffer.resume_pending = False
         buffer.resume_confirmed = False
         buffer.resume_utterance_id = None
-        buffer.resume_chunk_count = 0
-        buffer.resume_started_at = None
         self._cancel_resume_end_timeout(buffer)
 
     def _maybe_update_buffer_end_time(self, utterance_id: UUID) -> None:
@@ -1482,19 +1441,11 @@ class SelfTranslationChannelOwner:
             return
         if not buffer.awaiting_vad_end:
             return
-        self._emit_metric(
-            "[Metric] awaiting_vad_timeout id=%s timeout_s=%s",
-            str(merge_id)[:8],
-            timeout_s,
-        )
         buffer.awaiting_vad_end = False
         buffer.awaiting_vad_utterance_id = None
         buffer.awaiting_vad_timeout_task = None
         self._restart_post_end_grace(buffer)
-        await self._evaluate_speculative_next_action(
-            buffer,
-            reason="awaiting_vad_timeout",
-        )
+        await self._evaluate_speculative_next_action(buffer)
 
     def _cancel_resume_end_timeout(self, buffer: _MergeBuffer) -> None:
         task = buffer.resume_end_timeout_task
@@ -1506,7 +1457,6 @@ class SelfTranslationChannelOwner:
             if not task.done():
                 task.cancel()
         buffer.resume_end_timeout_task = None
-        buffer.resume_end_utterance_id = None
 
     def _start_resume_end_timeout(
         self,
@@ -1536,20 +1486,10 @@ class SelfTranslationChannelOwner:
         buffer = self.merge_buffer
         if observation is None or observation.timeout_task is not asyncio.current_task():
             return
-        utterance_id = observation.utterance_id
         self._settle_acoustic_continuation(key)
-        self._emit_metric(
-            "[Metric] resume_end_timeout id=%s vad_id=%s timeout_s=%s",
-            str(buffer.merge_id)[:8] if buffer is not None else "none",
-            str(utterance_id)[:8],
-            timeout_s,
-        )
         if buffer is not None:
             self._cancel_finalize_wait(buffer)
-            await self._evaluate_speculative_next_action(
-                buffer,
-                reason="resume_end_timeout",
-            )
+            await self._evaluate_speculative_next_action(buffer)
 
     def _restart_post_end_grace(self, buffer: _MergeBuffer) -> None:
         wait_ms = self.config_snapshot().value.low_latency_finalize_wait_ms
@@ -1564,11 +1504,6 @@ class SelfTranslationChannelOwner:
                 buffer.finalize_wait_started_at,
                 wait_ms,
             )
-        )
-        self._emit_metric(
-            "[Metric] post_end_grace_start id=%s wait_ms=%s",
-            str(buffer.merge_id)[:8],
-            wait_ms,
         )
 
     async def _finalize_wait_timeout(
@@ -1588,15 +1523,7 @@ class SelfTranslationChannelOwner:
             return
         buffer.finalize_wait_task = None
         buffer.finalize_wait_started_at = None
-        self._emit_metric(
-            "[Metric] post_end_grace_timeout id=%s wait_ms=%s",
-            str(merge_id)[:8],
-            wait_ms,
-        )
-        await self._evaluate_speculative_next_action(
-            buffer,
-            reason="post_end_grace",
-        )
+        await self._evaluate_speculative_next_action(buffer)
 
     def _mark_resume_pending(
         self,
@@ -1610,17 +1537,9 @@ class SelfTranslationChannelOwner:
             return
         self._acoustic_continuations[key] = _AcousticContinuation(
             utterance_id=event.utterance_id,
-            started_at=self.clock.now(),
             recognition_scope=recognition_scope,
         )
         self._refresh_resume_state()
-        buffer = self.merge_buffer
-        if buffer is not None:
-            self._emit_metric(
-                "[Metric] resume_pending id=%s vad_id=%s",
-                str(buffer.merge_id)[:8],
-                str(event.utterance_id)[:8],
-            )
 
     def _maybe_confirm_resume(
         self,
@@ -1636,12 +1555,6 @@ class SelfTranslationChannelOwner:
         buffer = self.merge_buffer
         if observation.chunk_count < 3 or buffer is None:
             return None
-        self._emit_metric(
-            "[Metric] resume_confirmed id=%s confirm_ms=%s chunk_count=%s",
-            str(buffer.merge_id)[:8],
-            int((self.clock.now() - observation.started_at) * 1000),
-            observation.chunk_count,
-        )
         return buffer
 
     async def _maybe_clear_resume_on_end(
@@ -1660,20 +1573,9 @@ class SelfTranslationChannelOwner:
         if observation.chunk_count >= 3:
             self._start_resume_end_timeout(key)
             return
-        false_ms = int((self.clock.now() - observation.started_at) * 1000)
-        chunk_count = observation.chunk_count
         self._settle_acoustic_continuation(key)
         if buffer is not None:
-            self._emit_metric(
-                "[Metric] resume_false_start id=%s false_ms=%s chunk_count=%s",
-                str(buffer.merge_id)[:8],
-                false_ms,
-                chunk_count,
-            )
-            await self._evaluate_speculative_next_action(
-                buffer,
-                reason="resume_false_start",
-            )
+            await self._evaluate_speculative_next_action(buffer)
 
     async def _handle_low_latency_final(
         self,
@@ -1686,10 +1588,6 @@ class SelfTranslationChannelOwner:
         if not text:
             return
         if transcript.utterance_id in self.runtime.low_latency_committed_utterance_ids:
-            self._emit_metric(
-                "[Metric] final_duplicate_ignored vad_id=%s",
-                str(transcript.utterance_id)[:8],
-            )
             return
 
         self._record_latency_stage(
@@ -1702,7 +1600,7 @@ class SelfTranslationChannelOwner:
         self._settle_acoustic_continuation(source_identity or transcript.utterance_id)
         buffer = self.merge_buffer
         if buffer is None:
-            buffer = _MergeBuffer(merge_id=uuid4(), start_time=now, last_final_at=now)
+            buffer = _MergeBuffer(merge_id=uuid4(), start_time=now)
             self.merge_buffer = buffer
             self._refresh_resume_state()
         if recognition_scope is not None:
@@ -1718,7 +1616,6 @@ class SelfTranslationChannelOwner:
         self._upsert_merge_part(buffer, transcript.utterance_id, text)
         if transcript.recognition_origins:
             buffer.recognition_origins[transcript.utterance_id] = transcript.recognition_origins
-        buffer.last_final_at = now
 
         end_time = self.runtime.utterance_start_times.get(transcript.utterance_id)
         speech_already_ended = transcript.utterance_id in self.runtime.speech_ended_ids
@@ -1728,11 +1625,6 @@ class SelfTranslationChannelOwner:
             buffer.awaiting_vad_utterance_id = transcript.utterance_id
             self._cancel_finalize_wait(buffer)
             self._start_awaiting_vad_timeout(buffer)
-            self._emit_metric(
-                "[Metric] final_phase id=%s phase=pre_end vad_id=%s",
-                str(buffer.merge_id)[:8],
-                str(transcript.utterance_id)[:8],
-            )
         else:
             self._maybe_update_buffer_end_time(transcript.utterance_id)
             if (
@@ -1742,24 +1634,15 @@ class SelfTranslationChannelOwner:
                 buffer.awaiting_vad_end = False
                 buffer.awaiting_vad_utterance_id = None
             self._restart_post_end_grace(buffer)
-            self._emit_metric(
-                "[Metric] final_phase id=%s phase=post_end vad_id=%s",
-                str(buffer.merge_id)[:8],
-                str(transcript.utterance_id)[:8],
-            )
 
         await self._maybe_restart_spec(buffer)
-        await self._evaluate_speculative_next_action(
-            buffer,
-            reason="final_reconciled",
-        )
+        await self._evaluate_speculative_next_action(buffer)
 
-    async def _commit_merge(self, buffer: _MergeBuffer, *, reason: str) -> None:
+    async def _commit_merge(self, buffer: _MergeBuffer) -> None:
         if self.merge_buffer is not buffer:
             return
         blocker = self._continuation_blocker(buffer)
         if blocker is not None:
-            self._emit_continuation_blocker(buffer, blocker=blocker, reason=reason)
             return
         await self._maybe_restart_spec(buffer)
         if buffer.last_end_time is not None:
@@ -1790,16 +1673,6 @@ class SelfTranslationChannelOwner:
         if buffer.finalize_wait_task is not None:
             return "post_end_grace"
         return None
-
-    def _emit_continuation_blocker(
-        self, buffer: _MergeBuffer, *, blocker: str, reason: str
-    ) -> None:
-        self._emit_metric(
-            "[Metric] commit_blocked id=%s blocker=%s reason=%s",
-            str(buffer.merge_id)[:8],
-            blocker,
-            reason,
-        )
 
     async def _maybe_restart_spec(self, buffer: _MergeBuffer) -> None:
         text = self._merge_text(buffer.parts, preserve_text=bool(buffer.recognition_origins))
@@ -1856,16 +1729,15 @@ class SelfTranslationChannelOwner:
             preparation_failure=None,
         )
 
-    async def _evaluate_speculative_next_action(self, buffer: _MergeBuffer, *, reason: str) -> None:
+    async def _evaluate_speculative_next_action(self, buffer: _MergeBuffer) -> None:
         if self.merge_buffer is not buffer:
             return
         blocker = self._continuation_blocker(buffer)
         if blocker == "post_end_grace" or blocker is None:
             self.translation_turns.prestart_draft_secondary(buffer.merge_id)
         if blocker is not None:
-            self._emit_continuation_blocker(buffer, blocker=blocker, reason=reason)
             return
-        await self._commit_merge(buffer, reason=reason)
+        await self._commit_merge(buffer)
 
     async def _sync_overlay_active_self(self, buffer: _MergeBuffer) -> None:
         await self.translation_turns.republish_draft(buffer.merge_id)

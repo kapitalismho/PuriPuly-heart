@@ -5,6 +5,7 @@ import io
 import json
 import logging
 import os
+import queue
 import re
 import threading
 import time
@@ -12,14 +13,16 @@ from collections.abc import Awaitable
 from concurrent.futures import ThreadPoolExecutor
 from logging.handlers import QueueHandler, RotatingFileHandler
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from puripuly_heart.app.services.local_asr_diagnostics import LocalASRDiagnosticsOwner
-from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 
+from puripuly_heart.app.services.application_runtime_logging import ApplicationRuntimeLoggingOwner
+from puripuly_heart.app.services.local_asr.local_asr_diagnostics import LocalASRDiagnosticsOwner
 from puripuly_heart.app.wiring.wiring_capture_runtime import CaptureDiagnosticsAdapter
 from puripuly_heart.core import runtime_logging as runtime_logging_module
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     CONTENT_POLICY_RAW_USER_TEXT_ALLOWED,
@@ -128,24 +131,23 @@ class _RaisingObservabilityRunner:
         raise RuntimeError("observability runner failure")
 
 
-class _DelayingForwardingHandler(logging.Handler):
+class _BlockingForwardingHandler(logging.Handler):
     def __init__(
         self,
         target: logging.Handler,
         *,
-        delayed_message: str,
-        delay_s: float = 0.2,
+        blocked_message: str,
     ) -> None:
         super().__init__()
         self._target = target
-        self._delayed_message = delayed_message
-        self._delay_s = delay_s
-        self.started = False
+        self._blocked_message = blocked_message
+        self.started = threading.Event()
+        self.release = threading.Event()
 
     def emit(self, record: logging.LogRecord) -> None:
-        if record.getMessage() == self._delayed_message:
-            self.started = True
-            time.sleep(self._delay_s)
+        if record.getMessage() == self._blocked_message:
+            self.started.set()
+            assert self.release.wait(timeout=5.0)
         self._target.handle(record)
 
 
@@ -240,6 +242,7 @@ def test_persisted_records_identify_date_and_process_without_changing_live_outpu
     record.msecs = 123.0
     try:
         root_logger.handle(record)
+        root_logger.warning("[Lifecycle] boundary phase=readiness")
     finally:
         if reused_sinks is not None:
             reused_sinks.close()
@@ -266,6 +269,7 @@ def test_configure_main_logging_routes_file_writes_through_queue(tmp_path) -> No
         assert sinks.file_handler not in root_logger.handlers
 
         root_logger.info("[Lifecycle] boundary phase=enqueue")
+        root_logger.warning("[Lifecycle] boundary phase=readiness")
         _wait_for_log_text(sinks.log_file, "phase=enqueue")
     finally:
         sinks.close()
@@ -521,6 +525,188 @@ def test_configure_main_logging_names_single_backup_with_log_extension(tmp_path)
         sinks.close()
 
 
+def test_support_log_snapshot_flushes_exact_current_bytes_without_backup(tmp_path) -> None:
+    root = logging.getLogger(f"test.runtime_logging.snapshot.{uuid4()}")
+    root.propagate = False
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    try:
+        (tmp_path / "puripuly_heart.backup.log").write_bytes(b"backup-only\n")
+        sinks.file_handler.stream = sinks.file_handler._open()
+        sinks.file_handler.stream.write("current 한글\n")
+        snapshot = sinks.support_log_snapshot()
+        assert snapshot == sinks.log_file.read_bytes()
+        assert snapshot.decode("utf-8").splitlines() == ["current 한글"]
+        assert b"backup-only" not in snapshot
+    finally:
+        sinks.close()
+
+
+@pytest.mark.parametrize("failure", [FileNotFoundError, PermissionError])
+def test_support_log_snapshot_propagates_current_file_failure(
+    tmp_path, monkeypatch, failure
+) -> None:
+    root = logging.getLogger(f"test.runtime_logging.snapshot.failure.{uuid4()}")
+    root.propagate = False
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    try:
+        (tmp_path / "puripuly_heart.backup.log").write_bytes(b"not-a-fallback\n")
+        if failure is PermissionError:
+
+            def unreadable(_path):
+                raise PermissionError("synthetic unreadable current log")
+
+            monkeypatch.setattr(Path, "read_bytes", unreadable)
+        with pytest.raises(failure):
+            sinks.support_log_snapshot()
+        assert sinks.file_handler.stream is None
+        assert not sinks.log_file.exists()
+    finally:
+        sinks.close()
+
+
+def test_support_log_snapshot_excludes_concurrent_batch_rotation(tmp_path, monkeypatch) -> None:
+    root = logging.getLogger(f"test.runtime_logging.snapshot.rotation.{uuid4()}")
+    root.propagate = False
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    handler = sinks.file_handler
+    handler.filters.clear()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    handler.maxBytes = 12
+    handler.emit_batch([root.makeRecord(root.name, logging.INFO, "", 0, "old-current", (), None)])
+    reading = threading.Event()
+    release = threading.Event()
+    writing = threading.Event()
+    read_bytes = Path.read_bytes
+
+    def blocked_read(path):
+        if path == sinks.log_file:
+            reading.set()
+            assert release.wait(5.0)
+        return read_bytes(path)
+
+    def rotate():
+        writing.set()
+        handler.emit_batch(
+            [root.makeRecord(root.name, logging.INFO, "", 0, "new-current", (), None)]
+        )
+
+    monkeypatch.setattr(Path, "read_bytes", blocked_read)
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            snapshot = pool.submit(sinks.support_log_snapshot)
+            try:
+                assert reading.wait(2.0)
+                rotation = pool.submit(rotate)
+                assert writing.wait(2.0)
+                with pytest.raises(TimeoutError):
+                    rotation.result(timeout=0.05)
+            finally:
+                release.set()
+            assert snapshot.result(timeout=2.0) == f"old-current{os.linesep}".encode()
+            rotation.result(timeout=2.0)
+        assert sinks.support_log_snapshot() == f"new-current{os.linesep}".encode()
+        assert read_bytes(tmp_path / "puripuly_heart.backup.log") == (
+            f"old-current{os.linesep}".encode()
+        )
+    finally:
+        release.set()
+        sinks.close()
+
+
+def test_support_log_snapshot_real_service_smoke_preserves_masked_conversation(tmp_path) -> None:
+    root = logging.getLogger(f"test.runtime_logging.snapshot.smoke.{uuid4()}")
+    root.propagate = False
+    root.addHandler(logging.StreamHandler(io.StringIO()))
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    session = SessionRuntimeLoggingService(
+        root_logger=root,
+        session_logger=logging.getLogger(f"test.runtime_logging.snapshot.session.{uuid4()}"),
+        sinks=sinks,
+    )
+    service = RuntimeLoggingService(session_service=session)
+    owner = ApplicationRuntimeLoggingOwner(
+        presentation=SimpleNamespace(attach_runtime_log_sink=lambda _service: None),
+        service_factory=lambda: service,
+        fallback_logger=root,
+    )
+    try:
+        (tmp_path / "puripuly_heart.backup.log").write_bytes(b"backup-only-sentinel\n")
+        for utterance, source, translation in (
+            ("speech", "synthetic spoken sentence", None),
+            ("translation", None, "synthetic translated sentence"),
+            ("masked-speech", "api_key=synthetic-secret-speech", None),
+            ("masked-translation", None, "token=synthetic-secret-translation"),
+        ):
+            service.record_conversation_observation(
+                utterance_id=utterance,
+                speaker_channel="self",
+                transcript_text=source,
+                translation_text=translation,
+                source_language="en",
+                target_language="ko",
+            )
+        _wait_for_log_text(sinks.log_file, "synthetic translated sentence")
+        _wait_for_log_text(sinks.log_file, "Content redacted")
+        snapshot = owner.support_log_snapshot()
+        assert snapshot == sinks.log_file.read_bytes()
+        assert b"synthetic spoken sentence" in snapshot
+        assert b"synthetic translated sentence" in snapshot
+        assert snapshot.count(b"Content redacted") == 2
+        assert b"synthetic-secret" not in snapshot
+        assert b"backup-only-sentinel" not in snapshot
+        sinks.file_handler.maxBytes = len(snapshot)
+        service.record_conversation_observation(
+            utterance_id="post-rotation",
+            speaker_channel="self",
+            transcript_text="post-rotation spoken sentence",
+            translation_text=None,
+            source_language="en",
+            target_language="ko",
+        )
+        _wait_for_log_text(sinks.log_file, "post-rotation spoken sentence")
+        rotated_snapshot = owner.support_log_snapshot()
+        assert rotated_snapshot == sinks.log_file.read_bytes()
+        assert b"post-rotation spoken sentence" in rotated_snapshot
+        assert b"synthetic spoken sentence" not in rotated_snapshot
+        assert b"synthetic translated sentence" not in rotated_snapshot
+        assert (tmp_path / "puripuly_heart.backup.log").read_bytes() == snapshot
+        assert not service.is_closed
+        assert sinks.file_queue_listener._thread.is_alive()
+    finally:
+        service.close()
+        sinks.close()
+
+
+def test_support_log_snapshot_does_not_wait_for_queued_records(tmp_path) -> None:
+    root = logging.getLogger(f"test.runtime_logging.snapshot.queued.{uuid4()}")
+    root.propagate = False
+    root.addHandler(logging.StreamHandler(io.StringIO()))
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    session = SessionRuntimeLoggingService(root_logger=root, sinks=sinks)
+    blocking = _BlockingForwardingHandler(
+        sinks.file_handler,
+        blocked_message="queued-only-sentinel",
+    )
+    try:
+        session.emit_basic("already-written-sentinel")
+        _wait_for_log_text(sinks.log_file, "already-written-sentinel")
+        sinks.file_queue_listener.handlers = (blocking,)
+        session.emit_basic("queued-only-sentinel")
+        assert blocking.started.wait(2.0)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            snapshot = pool.submit(session.support_log_snapshot).result(timeout=2.0)
+        assert b"already-written-sentinel" in snapshot
+        assert b"queued-only-sentinel" not in snapshot
+        assert sinks.file_queue_listener._thread.is_alive()
+        blocking.release.set()
+        _wait_for_log_text(sinks.log_file, "queued-only-sentinel")
+        assert b"queued-only-sentinel" in session.support_log_snapshot()
+    finally:
+        blocking.release.set()
+        session.close()
+        sinks.close()
+
+
 def test_configure_main_logging_reuses_existing_queue_handler(tmp_path) -> None:
     root_logger = logging.getLogger(f"test.runtime_logging.queue.reuse.{uuid4()}")
     root_logger.handlers.clear()
@@ -556,6 +742,7 @@ def test_configure_main_logging_keeps_shared_queue_alive_until_last_close(tmp_pa
         assert second.file_queue_handler in root_logger.handlers
 
         root_logger.info("[Lifecycle] boundary phase=send")
+        root_logger.warning("[Lifecycle] boundary phase=readiness")
         _wait_for_log_text(second.log_file, "phase=send")
 
         second.close()
@@ -620,6 +807,7 @@ def test_default_session_logging_services_share_queue_until_last_close(
 
         first.close()
         second.emit_basic("[Lifecycle] boundary phase=readiness")
+        root_logger.warning("[Lifecycle] boundary phase=cleanup")
         _wait_for_log_text(second.log_file, "[Lifecycle] boundary phase=readiness")
 
         second.close()
@@ -641,6 +829,7 @@ def test_configure_main_logging_removes_stale_queue_when_log_dir_changes(tmp_pat
 
     first = configure_main_logging(root_logger=root_logger, log_dir=first_dir)
     root_logger.info("[Lifecycle] boundary phase=begin")
+    root_logger.warning("[Lifecycle] boundary phase=readiness")
     _wait_for_log_text(first.log_file, "phase=begin")
 
     second = configure_main_logging(root_logger=root_logger, log_dir=second_dir)
@@ -650,6 +839,7 @@ def test_configure_main_logging_removes_stale_queue_when_log_dir_changes(tmp_pat
         assert second.file_queue_handler in root_logger.handlers
 
         root_logger.info("[Lifecycle] boundary phase=seal")
+        root_logger.warning("[Lifecycle] boundary phase=readiness")
         _wait_for_log_text(second.log_file, "phase=seal")
         assert "phase=seal" not in first.log_file.read_text(encoding="utf-8")
     finally:
@@ -665,15 +855,15 @@ def test_bounded_file_queue_drops_under_pressure_without_blocking_producers(tmp_
     sinks.stream_handler.setLevel(logging.CRITICAL)
     assert sinks.file_queue_listener is not None
     assert sinks.file_queue_handler is not None
-    delaying_handler = _DelayingForwardingHandler(
+    blocking_handler = _BlockingForwardingHandler(
         sinks.file_handler,
-        delayed_message="[Lifecycle] boundary phase=source_read",
+        blocked_message="[Lifecycle] boundary phase=source_read",
     )
-    sinks.file_queue_listener.handlers = (delaying_handler,)
+    sinks.file_queue_listener.handlers = (blocking_handler,)
 
     try:
         root_logger.info("[Lifecycle] boundary phase=source_read")
-        _wait_until(lambda: delaying_handler.started)
+        assert blocking_handler.started.wait(timeout=2.0)
         started = time.monotonic()
         for index in range(3000):
             root_logger.info("[Lifecycle] boundary attempts=%s", index)
@@ -682,6 +872,7 @@ def test_bounded_file_queue_drops_under_pressure_without_blocking_producers(tmp_
         assert elapsed < 1.0
         assert sinks.file_queue_handler.dropped_records > 0
     finally:
+        blocking_handler.release.set()
         sinks.close()
 
 
@@ -692,16 +883,15 @@ def test_file_queue_reserves_capacity_and_evicts_info_before_error(tmp_path) -> 
     sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
     assert sinks.file_queue_listener is not None
     assert sinks.file_queue_handler is not None
-    delaying_handler = _DelayingForwardingHandler(
+    blocking_handler = _BlockingForwardingHandler(
         sinks.file_handler,
-        delayed_message="[Lifecycle] boundary phase=provider_warmup",
-        delay_s=1.0,
+        blocked_message="[Lifecycle] boundary phase=provider_warmup",
     )
-    sinks.file_queue_listener.handlers = (delaying_handler,)
+    sinks.file_queue_listener.handlers = (blocking_handler,)
 
     try:
         root_logger.info("[Lifecycle] boundary phase=provider_warmup")
-        _wait_until(lambda: delaying_handler.started)
+        assert blocking_handler.started.wait(timeout=2.0)
         for index in range(3000):
             root_logger.info("[Lifecycle] boundary attempts=%s", index)
         root_logger.error("[Provider] provider.network")
@@ -717,8 +907,10 @@ def test_file_queue_reserves_capacity_and_evicts_info_before_error(tmp_path) -> 
         ]
         assert retained_indexes == sorted(retained_indexes)
         assert sinks.file_queue_handler.dropped_records > 0
+        blocking_handler.release.set()
         _wait_for_log_text(sinks.log_file, "provider.network")
     finally:
+        blocking_handler.release.set()
         sinks.close()
 
 
@@ -726,7 +918,7 @@ def test_timed_out_close_leaves_listener_owned_cleanup_and_prevents_second_write
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(runtime_logging_module, "_FILE_DRAIN_TIMEOUT_S", 0.05)
+    monkeypatch.setattr(runtime_logging_module, "_FILE_CLOSE_TIMEOUT_S", 0.05)
     monkeypatch.setattr(runtime_logging_module, "_TERMINAL_ENQUEUE_TIMEOUT_S", 0.05)
     root_logger = logging.getLogger(f"test.runtime_logging.queue.blocked_close.{uuid4()}")
     root_logger.handlers.clear()
@@ -775,12 +967,11 @@ def test_terminal_file_record_survives_queue_pressure_and_later_reports_loss(tmp
     sinks.stream_handler.setLevel(logging.CRITICAL)
     assert sinks.file_queue_listener is not None
     assert sinks.file_queue_handler is not None
-    delaying_handler = _DelayingForwardingHandler(
+    blocking_handler = _BlockingForwardingHandler(
         sinks.file_handler,
-        delayed_message="[Lifecycle] boundary phase=source_open",
-        delay_s=0.5,
+        blocked_message="[Lifecycle] boundary phase=source_open",
     )
-    sinks.file_queue_listener.handlers = (delaying_handler,)
+    sinks.file_queue_listener.handlers = (blocking_handler,)
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=root_logger,
         sinks=sinks,
@@ -788,12 +979,13 @@ def test_terminal_file_record_survives_queue_pressure_and_later_reports_loss(tmp
 
     try:
         root_logger.info("[Lifecycle] boundary phase=source_open")
-        _wait_until(lambda: delaying_handler.started)
+        assert blocking_handler.started.wait(timeout=2.0)
         assert sinks.file_queue is not None
         for _ in range(3000):
             root_logger.info("[Lifecycle] boundary phase=event_loop")
 
         runtime_logging.emit_persisted("[Lifecycle] boundary phase=abort")
+        blocking_handler.release.set()
         _wait_for_log_text(sinks.log_file, "[Lifecycle] boundary phase=abort")
         runtime_logging.emit_persisted("[Lifecycle] boundary phase=seal")
         _wait_for_log_text(sinks.log_file, "[Lifecycle] boundary phase=seal")
@@ -806,6 +998,7 @@ def test_terminal_file_record_survives_queue_pressure_and_later_reports_loss(tmp
         assert re.search(r"logging_delivery_dropped=[1-9]\d*", terminal_two)
         assert "logging_delivery_failures=0" in terminal_two
     finally:
+        blocking_handler.release.set()
         runtime_logging.close()
         sinks.close()
 
@@ -876,18 +1069,19 @@ def test_emit_persisted_preserves_queued_record_order_before_direct_write(tmp_pa
     root_logger.propagate = False
     sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
     runtime_logging = SessionRuntimeLoggingService(root_logger=root_logger, sinks=sinks)
-    delaying_handler = _DelayingForwardingHandler(
+    blocking_handler = _BlockingForwardingHandler(
         sinks.file_handler,
-        delayed_message="basic before persisted",
+        blocked_message="basic before persisted",
     )
     assert sinks.file_queue_listener is not None
-    sinks.file_queue_listener.handlers = (delaying_handler,)
+    sinks.file_queue_listener.handlers = (blocking_handler,)
 
     try:
         runtime_logging.emit_basic("basic before persisted")
-        _wait_until(lambda: delaying_handler.started)
+        assert blocking_handler.started.wait(timeout=2.0)
 
         runtime_logging.emit_persisted("[Lifecycle] boundary phase=enqueue")
+        blocking_handler.release.set()
 
         _wait_for_log_text(sinks.log_file, "basic before persisted")
         _wait_for_log_text(sinks.log_file, "phase=enqueue")
@@ -900,6 +1094,7 @@ def test_emit_persisted_preserves_queued_record_order_before_direct_write(tmp_pa
         )
         assert basic_index < persisted_index
     finally:
+        blocking_handler.release.set()
         runtime_logging.close()
         sinks.close()
 
@@ -1119,6 +1314,7 @@ def test_configure_main_logging_reconfigures_after_close(tmp_path) -> None:
         assert second.file_queue_handler is not first.file_queue_handler
         assert second.file_queue_handler in root_logger.handlers
         root_logger.info("[Lifecycle] boundary phase=receive")
+        root_logger.warning("[Lifecycle] boundary phase=readiness")
         _wait_for_log_text(second.log_file, "phase=receive")
     finally:
         second.close()
@@ -1565,6 +1761,7 @@ async def test_soniox_failure_metadata_survives_file_sink_without_external_conte
                             break
             finally:
                 await session.close()
+        provider_logger.warning("[Lifecycle] boundary phase=readiness")
     finally:
         sinks.close()
         provider_logger.removeHandler(sinks.stream_handler)
@@ -1588,8 +1785,8 @@ async def test_soniox_failure_metadata_survives_file_sink_without_external_conte
     ("stage", "code", "exception_class"),
     [
         ("readiness", "provider_readiness_unavailable", "ProviderReadinessError"),
-        ("provider_build", "worker_process_exited", "GpuWorkerClosedError"),
-        ("provider_warmup", "heartbeat_timeout", "GpuWorkerRequestError"),
+        ("provider_build", "worker_process_exited", "ASRWorkerClosedError"),
+        ("provider_warmup", "heartbeat_timeout", "ASRWorkerRequestError"),
         ("provider_warmup", "model_missing", "GpuASRManualRetryRequired"),
         ("ingress", "gpu_not_ready", "SelfCaptureIngressError"),
         ("ingress", "self_channel_inactive", "SelfCaptureIngressError"),
@@ -1689,3 +1886,294 @@ def test_stt_startup_failure_identity_survives_persisted_redaction_without_exter
     finally:
         runtime_logging.close()
         file_handler.close()
+
+
+@pytest.mark.parametrize("finalizer_error", [False, True])
+def test_terminal_file_cleanup_uses_close_budget_and_preserves_finalizer_failure(
+    tmp_path, monkeypatch, finalizer_error
+) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.finalizer_budget.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    original_close = runtime_logging_module._close_file_handler
+    finalizer_threads = []
+
+    def delayed_close(handler):
+        finalizer_threads.append(threading.get_ident())
+        time.sleep(0.4)
+        original_close(handler)
+        if finalizer_error:
+            raise OSError("synthetic file finalizer failure")
+
+    monkeypatch.setattr(runtime_logging_module, "_close_file_handler", delayed_close)
+    root_logger.warning("[Lifecycle] boundary phase=cleanup")
+    try:
+        if finalizer_error:
+            with pytest.raises(OSError, match="synthetic file finalizer failure"):
+                sinks.close(force=True)
+        else:
+            sinks.close(force=True)
+        assert sinks.file_queue_handler not in root_logger.handlers
+        assert sinks.file_queue_listener.cleanup_complete
+        assert finalizer_threads and all(
+            thread != threading.get_ident() for thread in finalizer_threads
+        )
+        released = tmp_path / "released.log"
+        sinks.log_file.replace(released)
+        assert "phase=cleanup" in released.read_text(encoding="utf-8")
+    finally:
+        sinks.close(force=True)
+
+
+def test_file_close_shares_absolute_budget_and_retry_cannot_extend_listener_ownership(
+    tmp_path, monkeypatch
+) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.shared_close_budget.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    listener = sinks.file_queue_listener
+    writer_entered = threading.Event()
+    release_writer = threading.Event()
+    finalizer_entered = threading.Event()
+    release_finalizer = threading.Event()
+    finalizer_finished = threading.Event()
+    close_finished = threading.Event()
+    budget_started = threading.Event()
+    failures = []
+    finalizer_threads = []
+    closer_id = None
+
+    class Clock:
+        value = 0.0
+        sleep = staticmethod(time.sleep)
+
+        def monotonic(self):
+            value = self.value
+            if threading.get_ident() == closer_id:
+                budget_started.set()
+            return value
+
+    clock = Clock()
+    original_write = sinks.file_handler._write_pending
+    original_close = runtime_logging_module._close_file_handler
+
+    def write(pending):
+        writer_entered.set()
+        assert release_writer.wait(5)
+        original_write(pending)
+
+    def finalize(handler):
+        finalizer_threads.append(threading.get_ident())
+        finalizer_entered.set()
+        try:
+            assert release_finalizer.wait(5)
+            original_close(handler)
+        finally:
+            finalizer_finished.set()
+
+    def close():
+        nonlocal closer_id
+        closer_id = threading.get_ident()
+        try:
+            sinks.close(force=True)
+        except BaseException as exc:
+            failures.append(exc)
+        finally:
+            close_finished.set()
+
+    monkeypatch.setattr(runtime_logging_module, "time", clock)
+    monkeypatch.setattr(sinks.file_handler, "_write_pending", write)
+    monkeypatch.setattr(runtime_logging_module, "_close_file_handler", finalize)
+    closer = threading.Thread(target=close)
+    try:
+        root_logger.warning("[Lifecycle] boundary phase=cleanup")
+        assert writer_entered.wait(2)
+        closer.start()
+        assert budget_started.wait(2)
+        clock.value = 1.5
+        release_writer.set()
+        assert finalizer_entered.wait(2)
+        clock.value = 2.5
+        assert close_finished.wait(1.5)
+        assert len(failures) == 1
+        assert isinstance(failures[0], TimeoutError)
+        assert not finalizer_finished.is_set()
+        assert sinks.file_handler.stream is not None
+        assert sinks.file_queue_handler in root_logger.handlers
+        assert finalizer_threads == [listener._thread.ident]
+
+        for retry in (
+            lambda: sinks.close(force=True),
+            lambda: configure_main_logging(root_logger=root_logger, log_dir=tmp_path),
+        ):
+            started = time.monotonic()
+            with pytest.raises(TimeoutError, match="cleanup remains listener-owned"):
+                retry()
+            assert time.monotonic() - started < 1
+        assert not finalizer_finished.is_set()
+        assert len(finalizer_threads) == 1
+
+        release_finalizer.set()
+        assert finalizer_finished.wait(2)
+        _wait_until(lambda: listener.cleanup_complete)
+        sinks.close(force=True)
+        assert sinks.file_queue_handler not in root_logger.handlers
+        released = tmp_path / "released.log"
+        sinks.log_file.replace(released)
+        assert "phase=cleanup" in released.read_text(encoding="utf-8")
+    finally:
+        release_writer.set()
+        release_finalizer.set()
+        if closer.ident is not None:
+            closer.join(3)
+        _wait_until(lambda: listener.cleanup_complete)
+        sinks.close(force=True)
+
+
+@pytest.mark.parametrize("kind", ["terminal-info", "warning", "ordinary-info"])
+def test_file_delivery_flushes_priority_records_before_ordinary_batch_expiry(
+    tmp_path, monkeypatch, kind
+) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.terminal_flush.{uuid4()}")
+    root_logger.propagate = False
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    session = SessionRuntimeLoggingService(root_logger=root_logger, sinks=sinks)
+    writer_entered = threading.Event()
+    release_writer = threading.Event()
+    release_batch_expiry = threading.Event()
+    delivery_decided = threading.Event()
+    record_visible = threading.Event()
+    original_emit_batch = sinks.file_handler.emit_batch
+    original_get = sinks.file_queue.get
+
+    def emit_batch(records):
+        if not writer_entered.is_set():
+            writer_entered.set()
+            assert release_writer.wait(5)
+        original_emit_batch(records)
+        if any("phase=seal" in record.getMessage() for record in records):
+            record_visible.set()
+            delivery_decided.set()
+
+    def wait_for_batch_expiry(block=True, timeout=None):
+        if timeout is not None:
+            delivery_decided.set()
+            assert release_batch_expiry.wait(5)
+            raise queue.Empty
+        return original_get(block=block)
+
+    monkeypatch.setattr(sinks.file_handler, "emit_batch", emit_batch)
+    monkeypatch.setattr(sinks.file_queue, "get", wait_for_batch_expiry)
+    try:
+        session.emit_basic("[Lifecycle] boundary phase=source_open", level=logging.WARNING)
+        assert writer_entered.wait(5)
+        if kind == "terminal-info":
+            session.emit_persisted("[Lifecycle] boundary phase=seal", level=logging.INFO)
+        else:
+            level = logging.WARNING if kind == "warning" else logging.INFO
+            session.emit_basic("[Lifecycle] boundary phase=seal", level=level)
+        release_writer.set()
+
+        assert delivery_decided.wait(5)
+        if kind == "ordinary-info":
+            assert not record_visible.is_set()
+            release_batch_expiry.set()
+            assert record_visible.wait(5)
+        else:
+            assert record_visible.is_set(), "priority record waited for ordinary batch expiry"
+        content = sinks.log_file.read_text(encoding="utf-8")
+        assert "phase=source_open" in content
+        terminal_line = next(line for line in content.splitlines() if "phase=seal" in line)
+        assert ("[WARNING]" if kind == "warning" else "[INFO]") in terminal_line
+    finally:
+        release_writer.set()
+        release_batch_expiry.set()
+        session.close_terminal_owner()
+
+
+@pytest.mark.asyncio
+async def test_peer_conversation_revisions_share_monotonic_parent_identity() -> None:
+    session, stream = _make_runtime_logging_capture()
+    runtime = RuntimeLoggingService(session_service=session)
+    runner = _ObservabilityRunner()
+    sink = _StructuredObservabilitySink()
+    session.configure_structured_observability(
+        conversation_record_sink=sink, observability_runner=runner
+    )
+    try:
+        for revision, translated in ((1, False), (1, True), (3, False), (2, True), (3, True)):
+            runtime.record_conversation_observation(
+                utterance_id="child" if translated else "parent",
+                speaker_channel="peer",
+                transcript_text=None if translated else f"source revision {revision}",
+                translation_text=f"translation revision {revision}" if translated else None,
+                source_language="en",
+                target_language="ko" if translated else None,
+                metadata={
+                    "parent_utterance_id": "parent",
+                    "segment_index": 0,
+                    "target_index": 0 if translated else None,
+                    "peer_caption_revision": revision,
+                },
+            )
+        await runner.drain()
+        assert [
+            record.metadata["peer_caption_revision"] for record in sink.conversation_records
+        ] == [1, 1, 3, 3]
+        assert {
+            record.metadata["peer_caption_unit_id"] for record in sink.conversation_records
+        } == {"parent"}
+        assert [
+            record.metadata["peer_caption_history_action"] for record in sink.conversation_records
+        ] == ["commit", "commit", "replace", "replace"]
+        assert "translation revision 2" not in stream.getvalue()
+        assert 'Caption replace unit="parent" revision=3' in stream.getvalue()
+    finally:
+        runtime.close()
+
+
+def test_peer_revision_retention_is_bounded_and_legacy_logging_is_unchanged() -> None:
+    session, stream = _make_runtime_logging_capture()
+    try:
+        for revision in range(1, 100):
+            session.record_conversation_observation(
+                utterance_id="same-unit",
+                speaker_channel="peer",
+                transcript_text=f"source {revision}",
+                translation_text=None,
+                source_language="en",
+                target_language=None,
+                metadata={"peer_caption_revision": revision},
+            )
+        assert len(session._peer_conversation_revisions) == 1
+        for index in range(4100):
+            session.record_conversation_observation(
+                utterance_id=f"unit-{index}",
+                speaker_channel="peer",
+                transcript_text="genuine repetition",
+                translation_text=None,
+                source_language="en",
+                target_language=None,
+                metadata={"peer_caption_revision": 1},
+            )
+        assert len(session._peer_conversation_revisions) == 4096
+        for channel in ("self", "peer"):
+            for revision in (0, 0):
+                session.record_conversation_observation(
+                    utterance_id="legacy-unit",
+                    speaker_channel=channel,
+                    transcript_text=f"legacy {channel}",
+                    translation_text=None,
+                    source_language="en",
+                    target_language=None,
+                    metadata={"peer_caption_revision": revision},
+                )
+        for channel in ("self", "peer"):
+            lines = [line for line in stream.getvalue().splitlines() if f"legacy {channel}" in line]
+            assert len(lines) == 1
+            assert "Caption" not in lines[0]
+        assert len(session._conversation_record_keys) == 2
+    finally:
+        session.close()
