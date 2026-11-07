@@ -7,12 +7,18 @@ import inspect
 from collections.abc import Awaitable
 from typing import Callable
 
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.core.error_messages import openrouter_auth_failure_report
+from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
 
 SaveHandler = Callable[[str, str], object]
-VerifyHandler = Callable[[str, str], object]
+VerifyHandler = Callable[
+    [str, str],
+    ProviderCredentialVerificationOutcome | Awaitable[ProviderCredentialVerificationOutcome],
+]
 StatusHandler = Callable[[str], None]
 MessageHandler = Callable[[str, str], None]
+CompletionHandler = Callable[[str, bool, str | None], None]
 
 
 class ApiKeyVerificationController:
@@ -32,6 +38,7 @@ class ApiKeyVerificationController:
         on_save: SaveHandler | None = None,
         on_status: StatusHandler | None = None,
         on_message: MessageHandler | None = None,
+        on_complete: CompletionHandler | None = None,
         show_status: bool = True,
     ) -> None:
         self._secret_key = secret_key
@@ -40,6 +47,7 @@ class ApiKeyVerificationController:
         self._on_save = on_save
         self._on_status = on_status
         self._on_message = on_message
+        self._on_complete = on_complete
         self._show_status = show_status
 
         self._value_dirty = False
@@ -82,6 +90,9 @@ class ApiKeyVerificationController:
     def replace_value(self) -> None:
         """Reset dirty tracking after the field value is replaced programmatically."""
         self._value_dirty = False
+
+    def bind_completion(self, callback: CompletionHandler | None) -> None:
+        self._on_complete = callback
 
     def handle_blur(self, key: str) -> None:
         """Coordinate save and verification for the blurred value."""
@@ -136,12 +147,18 @@ class ApiKeyVerificationController:
                 return
 
             if needs_save and self._on_save:
-                save_result = self._on_save(self._secret_key, key)
-                if inspect.isawaitable(save_result):
-                    save_result = await save_result
+                try:
+                    save_result = self._on_save(self._secret_key, key)
+                    if inspect.isawaitable(save_result):
+                        save_result = await save_result
+                except Exception as exc:
+                    if self.current_value() == key:
+                        self._save_failed(exc)
+                    continue
+                if self.current_value() != key:
+                    continue
                 if save_result is False:
-                    self._set_status("error")
-                    self._last_verified_hash = ""
+                    self._save_failed()
                     continue
             if not key:
                 self._set_status("idle")
@@ -155,7 +172,7 @@ class ApiKeyVerificationController:
             result = self._on_verify(self._provider, key)
             if inspect.isawaitable(result):
                 result = await result
-            success, msg = result
+            success = result.status == "verified"
         except Exception as exc:
             if self.current_value() != key:
                 return
@@ -169,6 +186,7 @@ class ApiKeyVerificationController:
                     else self.translate_error(str(exc))
                 ),
             )
+            self._emit_completion(False, exc)
             return
 
         if self.current_value() != key:
@@ -183,14 +201,37 @@ class ApiKeyVerificationController:
             self._last_verified_hash = ""
             self._emit_message(
                 "snackbar.verification_failed",
-                message=self.translate_error(msg),
+                message=self.translate_error(result.error_text or ""),
             )
+        self._emit_completion(
+            success, code=result.diagnostics.code if result.diagnostics is not None else None
+        )
 
     def current_value(self) -> str:
         return self._value_getter()
 
     def set_value_getter(self, getter: Callable[[], str]) -> None:
         self._value_getter = getter
+
+    def _save_failed(self, error: Exception | None = None) -> None:
+        self._value_dirty = True
+        self._set_status("error")
+        self._last_verified_hash = ""
+        self._emit_completion(False, error)
+
+    def _emit_completion(
+        self, success: bool, error: Exception | None = None, *, code: str | None = None
+    ) -> None:
+        if success:
+            code = None
+        elif code is None:
+            code = (
+                f"openrouter.auth.{error.reason}"
+                if isinstance(error, OpenRouterAuthenticationError)
+                else "verification_failed"
+            )
+        if self._on_complete:
+            self._on_complete(self._provider, success, code)
 
     def _set_status(self, status: str) -> None:
         self._current_status = status

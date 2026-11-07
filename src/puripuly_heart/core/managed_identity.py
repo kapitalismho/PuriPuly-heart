@@ -4,6 +4,7 @@ import base64
 import hashlib
 import math
 import os
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -23,6 +24,8 @@ MANAGED_DEVICE_PUBLIC_KEY_SECRET = "managed_device_public_key"
 MANAGED_IDENTITY_BINDING_SECRET = "managed_identity_binding"
 DISCORD_OPENROUTER_ISSUE_METHOD = "POST"
 DISCORD_OPENROUTER_ISSUE_PATH = "/v1/providers/openrouter/discord/issue"
+
+_identity_lock = threading.Lock()
 
 
 def encode_base64url(value: bytes) -> str:
@@ -44,6 +47,30 @@ class ManagedIdentityBundle:
     installation_id: str
     device_public_key: str
     _private_key: Ed25519PrivateKey = field(repr=False, compare=False)
+
+    def sign_puri_token_request(
+        self, *, app_version: str, signed_at: str, nonce: str
+    ) -> dict[str, str]:
+        payload = _canonical_payload(
+            "puripuly-heart:puri-token:v1",
+            "POST",
+            "/v1/puri/token",
+            "puripuly-agent-relay",
+            self.installation_id,
+            self.device_public_key,
+            app_version,
+            signed_at,
+            nonce,
+        )
+        return {
+            "installation_id": self.installation_id,
+            "device_public_key": self.device_public_key,
+            "app_version": app_version,
+            "signed_at": signed_at,
+            "nonce": nonce,
+            "signature_alg": "ed25519",
+            "signature": _sign_payload(self._private_key, payload),
+        }
 
     def sign_verify_request(
         self,
@@ -256,26 +283,28 @@ def ensure_managed_identity_bundle(
     *,
     broker_installation_id: str | None = None,
     broker_device_public_key: str | None = None,
+    require_empty_installation_id: bool = False,
 ) -> ManagedIdentityBundle:
-    existing = _load_existing_bundle(state, secret_store)
-    if existing is not None and _bundle_matches_broker(
-        existing,
-        broker_installation_id=broker_installation_id,
-        broker_device_public_key=broker_device_public_key,
-    ):
-        return existing
-    if any(
-        secret_store.get(key) is not None
-        for key in (
-            MANAGED_DEVICE_PRIVATE_KEY_SECRET,
-            MANAGED_DEVICE_PUBLIC_KEY_SECRET,
-            MANAGED_IDENTITY_BINDING_SECRET,
-            OPENROUTER_MANAGED_API_KEY_SECRET,
-            "openrouter_managed_qq_api_key",
-        )
-    ):
-        raise ValueError("managed identity binding requires recovery")
-    return _replace_managed_identity_bundle(state, secret_store)
+    with _identity_lock:
+        existing = _load_existing_bundle(state, secret_store)
+        if existing is not None and _bundle_matches_broker(
+            existing,
+            broker_installation_id=broker_installation_id,
+            broker_device_public_key=broker_device_public_key,
+        ):
+            return existing
+        if (require_empty_installation_id and state.installation_id.strip()) or any(
+            secret_store.get(key) is not None
+            for key in (
+                MANAGED_DEVICE_PRIVATE_KEY_SECRET,
+                MANAGED_DEVICE_PUBLIC_KEY_SECRET,
+                MANAGED_IDENTITY_BINDING_SECRET,
+                OPENROUTER_MANAGED_API_KEY_SECRET,
+                "openrouter_managed_qq_api_key",
+            )
+        ):
+            raise ValueError("managed identity binding requires recovery")
+        return _replace_managed_identity_bundle(state, secret_store)
 
 
 def load_existing_managed_identity_bundle(
@@ -284,14 +313,16 @@ def load_existing_managed_identity_bundle(
 ) -> ManagedIdentityBundle | None:
     """Load a valid persisted managed identity bundle without creating or repairing it."""
 
-    return _load_existing_bundle(state, secret_store)
+    with _identity_lock:
+        return _load_existing_bundle(state, secret_store)
 
 
 def regenerate_managed_identity_bundle(
     state: ManagedIdentityStatePort,
     secret_store: SecretStore,
 ) -> ManagedIdentityBundle:
-    return _replace_managed_identity_bundle(state, secret_store)
+    with _identity_lock:
+        return _replace_managed_identity_bundle(state, secret_store)
 
 
 def _bundle_matches_broker(

@@ -24,6 +24,14 @@ This guide covers service boundaries, recovery invariants, and development/deplo
 
 Public error envelopes distinguish retryable, terminal, and security failures from entitlement lifecycle data. Read the returned state and retry guidance rather than treating every non-active state as a new-issuance opportunity. Route and payload contracts live in [routing](src/app.ts), [errors](src/broker-error.ts), and the owning handlers.
 
+## Puri Installation Tokens
+
+- `POST /v1/puri/token` verifies possession of the application's installation key and issues a bearer token for the relay. It is separate from trial onboarding and provider credential release; no managed entitlement is required.
+- Broker owns installation-key binding, proof replay protection, and issuance limits. Blocking issuance does not revoke existing tokens; they remain reusable until expiry.
+- The relay receives a derived subject, not the raw installation ID. The app caches tokens only in memory; renewal does not reset installation-scoped usage.
+- `PURI_TOKEN_SECRET` is shared by Broker and Relay, giving both signing authority. `PURI_IDENTITY_HMAC_SECRET` remains Broker-only. Coordinate token-secret rotation; changing the identity secret changes accounting subjects.
+- Broker receives no chat, app context, tool results, or support bundles. Model requests, usage accounting, and click-only support storage belong to [Agent Relay](../agent-relay/README.md).
+
 ## Privacy and Operations
 
 - Persist derived identity references, not raw QQ identities, assertion credentials, API keys, or recovery/ACK tokens. Logs and alerts must exclude secrets, raw request payloads, conversation content, and audio.
@@ -110,6 +118,7 @@ For focused offline deployment/maintenance coverage, run `pnpm exec vitest run b
 | --- | --- |
 | Routes, environment bindings, public errors | [Routing](src/app.ts), [contract](src/contract.ts), [errors](src/broker-error.ts) |
 | Device, Discord, and QQ authentication/issuance | [Trial handshake](src/trial-handshake.ts), [Discord issuance](src/discord-managed-issue.ts), [QQ assertions](src/qq-auth.ts), [QQ issuance](src/qq-managed-issue.ts) |
+| Puri installation proof and tokens | [Token handler](src/puri-token.ts), [secret provisioning](scripts/manage-puri-secrets.mjs) |
 | Durable issuance, recovery, delivery ACK | [Issuance](src/managed-issuance.ts), [operation owner](src/managed-operation.ts), [resume](src/managed-operation-resume.ts), [delivery](src/managed-key-delivery.ts) |
 | Provider resources and cleanup | [OpenRouter management](src/openrouter-management.ts), [cleanup](src/managed-cleanup.ts) |
 | Trial policy and persistence | [Policy](src/trial-policy.ts), [persistence](src/persistence.ts), [migrations](migrations/) |

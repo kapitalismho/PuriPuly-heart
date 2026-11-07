@@ -205,6 +205,28 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
                     f"{provider_name.value} does not implement scoped recognition"
                 )
 
+        async def open_probe_session(
+            _settings: AudioSegmentSettingsSnapshot,
+            provider_epoch_id: str,
+        ) -> tuple[STTScopedTurnSession, str]:
+            open_session = getattr(backend, "open_probe_session", backend.open_session)
+            opened = await open_session(
+                projection=STTSessionProjection("scoped", provider_epoch_id)
+            )
+            session, exercised_provider = (
+                opened if isinstance(opened, tuple) else (opened, config.provider)
+            )
+            if isinstance(session, STTScopedTurnSession) and isinstance(
+                getattr(session, "inner", session), STTScopedTurnSession
+            ):
+                return session, exercised_provider
+            try:
+                await session.close()
+            finally:
+                raise PermanentSTTScopedSessionError(
+                    "recognition probe requires scoped recognition"
+                )
+
         async def close_backend() -> None:
             close = getattr(backend, "close", None)
             if callable(close):
@@ -238,6 +260,19 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
         return ScopedRecognitionEngine(
             channel=config.channel,
             session_factory=open_scoped_session,
+            probe_session_factory=open_probe_session,
+            probe_settings=AudioSegmentSettingsSnapshot(
+                provider_id=config.provider,
+                provider_signature=request.provider_signature,
+                runtime_signature=request.runtime_signature,
+                source_mode=config.source_mode,
+                source_language=config.source_language,
+                expected_languages=(),
+                target_sample_rate_hz=config.sample_rate_hz,
+                vad_speech_threshold=config.vad_speech_threshold,
+                vad_hangover_ms=config.vad_hangover_ms,
+                vad_pre_roll_ms=config.vad_pre_roll_ms,
+            ),
             watchdog_resolver=lambda _settings: _recognition_watchdogs(config),
             monotonic_clock=self.clock.now,
             accepted_settings_scope=(

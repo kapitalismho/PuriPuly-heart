@@ -32,7 +32,10 @@ from puripuly_heart.core.stt.backend import (
     STTBackendSession,
     STTSessionProjection,
 )
-from puripuly_heart.providers.stt.local_session import LOCAL_ASR_PENDING_TTL_S
+from puripuly_heart.providers.stt.local_session import (
+    LOCAL_ASR_PENDING_TTL_S,
+    LocalOfflineSTTBackend,
+)
 
 LocalCPUBackendFactory = Callable[..., STTBackend]
 
@@ -151,6 +154,13 @@ class LocalCPUAutoSTTBackend(STTBackend):
                 await session.close()
                 raise RuntimeError("CPU Auto backend is closed")
             return session
+
+    async def open_probe_session(self, *, projection: STTSessionProjection) -> STTBackendSession:
+        async with self._load_lock:
+            delegate = await self._ensure_delegate_locked()
+            if not isinstance(delegate, LocalOfflineSTTBackend):
+                raise TypeError("CPU recognition probe requires the configured offline backend")
+            return await delegate.open_probe_session(projection=projection)
 
     async def reconfigure_session_options(self, options: LocalASRSessionOptions) -> None:
         async with self._load_lock:

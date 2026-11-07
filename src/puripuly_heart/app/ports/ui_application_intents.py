@@ -10,6 +10,7 @@ from puripuly_heart.app.ports.chatgpt_account import (
     ChatGptConnectResult,
     ChatGptSignOutResult,
 )
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_view import (
     AlibabaConnectionApplyResult,
     AlibabaConnectionDraftSnapshot,
@@ -187,7 +188,9 @@ class UiProviderRuntimePort(Protocol):
     ) -> AlibabaConnectionApplyResult: ...
     def cancel_alibaba_connection_draft(self, *, token: str) -> None: ...
 
-    async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]: ...
+    async def verify_api_key(
+        self, provider: str, key: str
+    ) -> ProviderCredentialVerificationOutcome: ...
 
     def persist_api_key_verification(
         self,
@@ -214,6 +217,8 @@ class UiAudioTestRuntimePort(Protocol):
         *,
         observation_callback: Callable[[str, tuple[object, ...]], object] | None = None,
     ) -> bool: ...
+
+    async def diagnose_audio(self, *, is_current: Callable[[], bool]) -> dict[str, object]: ...
 
     def audio_test_snapshot(self) -> dict[str, object]: ...
 
@@ -252,6 +257,8 @@ class UiManagedRuntimePort(Protocol):
     def dashboard_managed_auth_action(self) -> str: ...
 
     def dashboard_managed_auth_prompt_kind(self) -> str: ...
+
+    def managed_account_snapshot(self) -> dict: ...
 
     def managed_auth_last_failure_kind(self) -> str: ...
 

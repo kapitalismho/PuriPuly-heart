@@ -74,6 +74,9 @@ class ApplicationRuntimeLoggingOwner:
     def diagnostic_health(self) -> dict:
         return self._metadata_service().diagnostic_health()
 
+    def support_log_snapshot(self) -> bytes:
+        return self._metadata_service().support_log_snapshot()
+
     def emit_failure(
         self,
         diagnostics: ErrorDiagnostics,

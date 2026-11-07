@@ -18,6 +18,7 @@ Python and native must agree on the manifest, protocol, and advertised execution
 
 - Snapshots replace the scene; equal or older revisions are rejected. Python prunes expired content before sending. Native does not independently expire captions or use semantic retirement metadata to remove blocks.
 - Python rejects stale publications and fixes speaker style at first readable publication. Native receives presentation styles, not speaker identities; source and translation share that style. Self and non-diarized Peer captions keep their distinct styles without consuming diarized speaker slots.
+- Qwen Audio Peer captions carry explicit non-diarized attribution from their first preview, preserving the same gold style through preview refreshes and final settlement.
 - Native exclusively owns bounded presentation retries. Eligible scene changes protect the latest accepted scene rather than replaying intermediate snapshots. Fresh rendering and GPU readiness precede submission; a cached texture or scheduled retry is not evidence of a completed presentation opportunity.
 - Retry metadata cannot extend caption lifetime, revive removed content, or reset stalled-work responsibility. Runtime replacement seeds only currently valid content. Desktop presentation does not schedule native retries.
 - Spatial history preserves placement for drawable identities and reclaims only eligible absent entries. It does not own caption lifetime and is not an unbounded record of every displayed caption.
@@ -30,7 +31,9 @@ Python and native must agree on the manifest, protocol, and advertised execution
 - Python owns one bounded startup budget, including preparation, spawn, initialization, and readiness. Delayed authentication receives the latest pruned scene, not a snapshot retained from before initialization.
 - Scene acceptance requires a valid health-challenge response covering the current scene. A live process or successful resource creation is not sufficient; presentation progress and physical visibility remain separate observations.
 - OFF, failure recovery, and shutdown retain process ownership through bounded cleanup. Timeout does not prove cleanup is complete. Empty output follows the successful-empty-frame/hide contract rather than reviving a prior scene.
-- OpenVR quit events for another process cannot terminate this overlay. Owned-process and global runtime quit signals remain fatal.
+- Explicit OpenVR runtime or driver shutdown requests stop CAPTIONS normally only after a matching native completion, successful child exit, and resource cleanup. Python clears the ephemeral enabled intent without changing the saved VR target, calibration, or desktop bounds. It does not restart the overlay or switch to Desktop; restarting SteamVR requires enabling CAPTIONS again. Capture and translation remain independent.
+- Own-process quit faults, connection loss, rendering failures, and unexpected exits remain failures; quit events for another process are ignored. Already-polled faults and cleanup failures remain visible even alongside an explicit runtime shutdown request. Once that request is admitted, failure recovery cannot restart into the quitting runtime.
+- Initial enable while SteamVR is absent retains the existing Desktop fallback. This is distinct from an already-running VR overlay receiving an explicit shutdown request.
 
 ## Rendering Boundaries
 

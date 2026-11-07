@@ -7,6 +7,8 @@
 - Manual: send `9000`, receive `9001` by default
 - Off: stop control traffic and preserve manual ports
 - The OSC-enable warning follows the effective destination. It clears when OSC is Off or automatic discovery is starting; results from an earlier connection state cannot restore it.
+- Automatic discovery rechecks known candidates after temporary OSCQuery information failures; actual service removal still clears them. The existing fallback remains in effect while no usable target is discovered.
+- For missing Chatbox output, the assistant can inspect safe app evidence and perform bounded discovery recovery without changing saved destinations, restarting working recognition/translation or sending test messages. Its result confirms internal target application or reports unavailability, not game display. No technical inspection or test-sentence report is required from the user.
 
 ## Progressive Self chatbox translations
 

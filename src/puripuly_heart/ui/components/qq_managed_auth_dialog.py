@@ -16,6 +16,7 @@ from puripuly_heart.ui.components.warm_document_dialog import (
 )
 from puripuly_heart.ui.flet_runtime import FILL_PARENT_WIDTH
 from puripuly_heart.ui.i18n import t
+from puripuly_heart.ui.motion import close_modal
 from puripuly_heart.ui.theme import (
     COLOR_ON_BACKGROUND,
     COLOR_WARNING,
@@ -165,7 +166,7 @@ class QqManagedAuthDialog:
     def close(self) -> None:
         if self._dialog is None or not self._is_open:
             return
-        self._page.pop_dialog()
+        close_modal(self._page, self._dialog)
         self._is_open = False
         self._is_waiting = False
 

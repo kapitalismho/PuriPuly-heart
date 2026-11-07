@@ -14,6 +14,7 @@ import pytest
 pytest.importorskip("flet")
 
 from puripuly_heart.app.ports.chatgpt_account import ChatGptAccountSnapshot
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_view import (
     CustomSttEndpointEdit,
     OverlayTranslationSettingsIntent,
@@ -1167,6 +1168,7 @@ def test_set_managed_key_state_updates_card_controls_and_api_section_repaint(
         update=lambda: updates.append("managed_key_card"),
     )
     view._api_keys_column = SimpleNamespace(
+        controls=view._api_keys_column.controls,
         page=mounted_page,
         update=lambda: updates.append("api_keys_column"),
     )
@@ -1288,6 +1290,7 @@ def test_translation_connection_selected_repaints_managed_key_card_immediately(
         update=lambda: updates.append("managed_key_card"),
     )
     view._api_keys_column = SimpleNamespace(
+        controls=view._api_keys_column.controls,
         page=mounted_page,
         update=lambda: updates.append("api_keys_column"),
     )
@@ -3422,10 +3425,12 @@ async def test_openrouter_pkce_button_disables_after_manual_key_verification(
     settings_events.load(view, settings, config_path=Path("settings.json"))
     view._openrouter_key.value = "sk-or-v1-manual"
 
-    async def fake_verify(provider: str, key: str) -> tuple[bool, str]:
+    async def fake_verify(provider: str, key: str) -> ProviderCredentialVerificationOutcome:
         assert provider == "openrouter"
         assert key == "sk-or-v1-manual"
-        return True, "ok"
+        return ProviderCredentialVerificationOutcome(
+            status="verified", provider=provider, error_text="ok"
+        )
 
     view.on_verify_api_key = fake_verify
 
@@ -3453,10 +3458,12 @@ async def test_openrouter_pkce_button_reenables_after_manual_key_verification_fa
     assert view._openrouter_pkce_button.disabled is True
     view._openrouter_key.value = "invalid-openrouter-key"
 
-    async def fake_verify(provider: str, key: str) -> tuple[bool, str]:
+    async def fake_verify(provider: str, key: str) -> ProviderCredentialVerificationOutcome:
         assert provider == "openrouter"
         assert key == "invalid-openrouter-key"
-        return False, "401 unauthorized"
+        return ProviderCredentialVerificationOutcome(
+            status="failed", provider=provider, error_text="401 unauthorized"
+        )
 
     view.on_verify_api_key = fake_verify
 
@@ -5380,14 +5387,22 @@ async def test_verify_key_reports_unavailable_or_provider_result(
 ) -> None:
     view, _ = _make_settings_view(monkeypatch, settings_events)
     unavailable = await view._verify_key("google", "abc")
-    assert unavailable == (False, "Verification not available")
+    assert unavailable == ProviderCredentialVerificationOutcome(
+        status="unknown", provider="google", error_text="Verification not available"
+    )
 
-    async def fake_verify(provider: str, key: str) -> tuple[bool, str]:
-        return provider == "google", key
+    async def fake_verify(provider: str, key: str) -> ProviderCredentialVerificationOutcome:
+        return ProviderCredentialVerificationOutcome(
+            status="verified" if provider == "google" else "failed",
+            provider=provider,
+            error_text=key,
+        )
 
     view.on_verify_api_key = fake_verify
     available = await view._verify_key("google", "abc")
-    assert available == (True, "abc")
+    assert available == ProviderCredentialVerificationOutcome(
+        status="verified", provider="google", error_text="abc"
+    )
 
 
 def test_prompt_change_only_updates_draft_until_commit(
@@ -6472,7 +6487,7 @@ def _make_provider_apply_app(
 
     backend.view = view
     app = TranslatorApp.__new__(TranslatorApp)
-    app._current_tab = 1
+    app._current_tab = 2
     app.view_settings = view
     app.view_dashboard = object()
     app.view_logs = object()
@@ -7020,9 +7035,11 @@ def test_qwen_api_host_change_reverifies_region_key_after_apply(
     view.on_providers_changed = lambda: None
     verified: list[tuple[str, str]] = []
 
-    async def verify(provider: str, key: str) -> tuple[bool, str]:
+    async def verify(provider: str, key: str) -> ProviderCredentialVerificationOutcome:
         verified.append((provider, key))
-        return True, "ok"
+        return ProviderCredentialVerificationOutcome(
+            status="verified", provider=provider, error_text="ok"
+        )
 
     view.on_verify_api_key = verify
     view._alibaba_key_singapore._set_status("success")

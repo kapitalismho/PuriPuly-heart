@@ -31,6 +31,7 @@ from puripuly_heart.core.local_translation.runtime_profile import (
     build_gemma_server_command,
     default_gemma_runtime_paths,
 )
+from puripuly_heart.core.translation_backend import require_translation_preparation_allowed
 
 GEMMA_PROMPT_TEMPLATE_VERSION = "translation-prefix-v1"
 GEMMA_SLOT_COUNT = 3
@@ -511,6 +512,7 @@ class ManagedGemmaRuntimeOwner:
                 or self._unsettled
             )
             if runtime_changed:
+                require_translation_preparation_allowed()
                 self._transitioning = True
                 if not self._unsettled:
                     self._generation += 1
@@ -581,6 +583,7 @@ class ManagedGemmaRuntimeOwner:
                     abort_on_cancel=not self._busy_slots,
                 )
             except Exception as exc:
+                require_translation_preparation_allowed()
                 self._transitioning = True
                 try:
                     await self._drain_locked()

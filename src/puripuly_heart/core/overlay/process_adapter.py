@@ -25,6 +25,7 @@ _REVERSE_LIFECYCLE_CONTROL_TYPES = frozenset(
         "startup_error",
         "runtime_error",
         "shutdown_complete",
+        "runtime_stop_requested",
         "owner_status",
         "desktop_first_visible",
     }
@@ -374,6 +375,7 @@ class _AsyncioOverlayProcess:
                 "runtime_error",
                 "owner_status",
                 "shutdown_complete",
+                "runtime_stop_requested",
                 "shutdown_ack",
             }:
                 wire_instance = payload.get("overlay_instance_id")

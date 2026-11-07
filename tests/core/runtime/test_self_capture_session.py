@@ -17,6 +17,7 @@ from puripuly_heart.core.audio.ownership import (
     AudioSegmentTerminalReceipt,
     CaptureStreamInput,
 )
+from puripuly_heart.core.audio.source import AudioSourceOpenFailure
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmission,
@@ -2215,3 +2216,33 @@ async def test_qwen_source_gap_forwards_only_exact_new_cancellations_while_captu
         assert len(sink.retired_sources) == (1 if disposition == "recoverable" else 0)
     finally:
         await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_partial_source_open_failure_keeps_cleanup_owner_and_blocks_reactivation():
+    source = RecordingSource([OSError("retained native close failure")])
+    calls = []
+    failure = AudioSourceOpenFailure(source, OSError("source open cleanup failed"))
+    owner, _, provider, _, _, _ = build_owner()
+
+    def create_source(_config):
+        calls.append(_config)
+        if len(calls) == 1:
+            raise failure
+        return RecordingSource()
+
+    owner._source_factory = create_source
+    snapshot = await owner.apply_intent(config(), enabled=True)
+    assert snapshot.state is SelfCaptureSessionState.FAULTED
+    assert snapshot.failure_reason is SelfCaptureFailureReason.SOURCE_OPEN_FAILED
+    assert snapshot.cleanup_debt == 1
+    assert owner.cleanup_source is source
+    assert owner.last_cleanup_exception is failure
+    assert provider.release_calls == [("abort", None)]
+    with pytest.raises(OSError, match="retained native close failure"):
+        await owner.apply_intent(config(), enabled=True)
+    assert len(calls) == 1 and owner.snapshot.cleanup_debt == 1
+    await owner.apply_intent(config(), enabled=True)
+    assert len(calls) == 2 and owner.snapshot.cleanup_debt == 0
+    assert owner.snapshot.state is SelfCaptureSessionState.RUNNING
+    await owner.close()

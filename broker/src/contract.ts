@@ -73,6 +73,10 @@ export const REQUIRED_BINDINGS = {
   ],
 } as const;
 
+export const OPTIONAL_BINDINGS = {
+  secrets: ['PURI_TOKEN_SECRET', 'PURI_IDENTITY_HMAC_SECRET'],
+} as const;
+
 export interface BrokerBindings {
   BROKER_DB: D1Database;
   OPENROUTER_MANAGEMENT_API_KEY: string;
@@ -90,6 +94,8 @@ export interface BrokerBindings {
   NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS?: string;
   NETWORK_IDENTITY_HMAC_KEY_VERSION: string;
   NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS?: string;
+  PURI_TOKEN_SECRET?: string;
+  PURI_IDENTITY_HMAC_SECRET?: string;
 }
 
 export type BrokerEnv = {

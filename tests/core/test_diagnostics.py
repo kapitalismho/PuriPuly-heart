@@ -17,6 +17,7 @@ from puripuly_heart.core.diagnostics import (
     diagnostic_operation,
     normalize_diagnostic,
     safe_exception_fields,
+    sanitize_diagnostic_fields,
 )
 from puripuly_heart.core.messages import ErrorDiagnostics
 
@@ -136,6 +137,33 @@ def test_retention_dedup_filter_bounds_eviction_and_restart_are_explicit():
     ):
         with pytest.raises(ValueError):
             history.query(arguments)
+
+
+def test_caught_up_cursor_distinguishes_new_records_from_missing_identity():
+    history = DiagnosticHistory(max_records=1)
+    history.bind_instance(str(uuid4()))
+    first, _ = history.retain(diagnostic(), severity="error", disposition="failed")
+    cursor = first["diagnostic_sequence"]
+    caught_up = history.query({"after": cursor})
+    assert caught_up["lookup"] == "no_new_records"
+    assert caught_up["records"] == []
+    assert caught_up["next_after"] == caught_up["latest_sequence"] == cursor
+    assert caught_up["gap"] is False
+    assert (
+        history.query(
+            {
+                "after": cursor,
+                "diagnostic_id": uuid4().hex,
+            }
+        )["lookup"]
+        == "not_retained"
+    )
+    second, _ = history.retain(diagnostic(), severity="error", disposition="failed")
+    resumed = history.query({"after": cursor})
+    assert resumed["lookup"] == "found"
+    assert resumed["records"] == [second]
+    assert resumed["gap"] is False
+    assert history.query({"after": 0})["gap"] is True
 
 
 @pytest.mark.parametrize("key", ("operation_id", "diagnostic_id"))
@@ -338,3 +366,66 @@ def test_invalid_nonnull_top_level_details_are_counted_without_erasing_cause():
     assert record["detail"]["state"] == "rejected"
     assert record["detail"]["rejected_fields"] == 8
     assert "PRIVATE_" not in json.dumps(record)
+
+
+def test_audio_diagnosis_retains_only_actual_bounded_numeric_measurements():
+    fields = {
+        "target_index": 7,
+        "opened": True,
+        "frames_received": True,
+        "frame_count": 3,
+        "vad_sample_count": 12,
+        "speech_probability_min": 0.1,
+        "speech_probability_max": 0.72,
+        "speech_threshold": 0.95,
+        "speech_probability_ppm": 720000,
+        "level_ppm": 400000,
+        "speech_detected": False,
+        "silence_observed": False,
+        "cleanup_complete": True,
+        "audio_failure_code": "none",
+        "audio_restore_self": "restored",
+        "audio_restore_peer": "not_needed",
+    }
+    record = normalize_diagnostic(
+        diagnostic(
+            component="audio_diagnosis",
+            operation="audio.diagnose",
+            code="audio_diagnose_candidate",
+            fields=fields,
+        ),
+        instance_id=str(uuid4()),
+        severity="info",
+        disposition="recovered",
+        stage="audio_diagnosis",
+    )
+    assert record["component"] == "audio_diagnosis"
+    assert record["operation"] == "audio.diagnose"
+    assert record["fields"] == fields
+    assert record["detail"]["state"] == "available"
+
+
+@pytest.mark.parametrize("value", (-0.1, 1.1, float("nan"), float("inf"), True, "0.7", 10**400))
+def test_audio_diagnostic_probability_fields_reject_non_measurements(value):
+    fields, rejected = sanitize_diagnostic_fields(
+        {
+            "speech_probability_min": value,
+            "speech_probability_max": value,
+            "speech_threshold": value,
+        }
+    )
+    assert fields == {} and rejected == 3
+
+
+def test_audio_diagnostic_history_preserves_scalar_metadata_boundary():
+    fields, rejected = sanitize_diagnostic_fields(
+        {
+            "observed_speech_probabilities": [0.1, 0.55, 0.72],
+            "background_probability_max": 0.1,
+            "synthetic": True,
+            "settings_revision": 9,
+            "speech_probability_ppm": 1000001,
+            "level_ppm": -1,
+        }
+    )
+    assert fields == {} and rejected == 6

@@ -1,99 +1,35 @@
 # Contributing to PuriPuly Heart
 
-Thanks for taking an interest in this project.
-
-## How to Get Started
-
-1. Follow the Development section in the [README](../README.md).
-2. Find something to work on, e.g., issues labeled `good first issue`.
-3. See [Making a Change](#making-a-change) below.
-
-## Where to Get Help
-
-- Post in the issues
-- DM me on Twitter
+Start with [Development](../README.md#development) for setup and run commands. Use the [architecture](../docs/architecture.md) for system boundaries and [issues](https://github.com/kapitalismho/PuriPuly-heart/issues) for questions and proposals.
 
 ## Making a Change
 
-1. Create a branch with a descriptive name.
-2. Do the work you'd like to do. If the change is too big, please discuss it with me in an issue first.
-3. Make sure the CI tests pass.
-4. Open a pull request against `dev`.
+1. Discuss large or cross-component changes in an issue first.
+2. Create a descriptive branch and keep the change focused.
+3. Update affected tests and documentation; run the relevant checks.
+4. Open a pull request against `dev` with the scope, verification evidence, and known limits.
 
 ## PR verification
 
-The [PR workflow](workflows/pr-ci.yml) owns the Python test selections and the nine existing check responsibilities. Use its pinned Python and uv versions. PR setup and commands use `--locked`: stale dependency metadata must fail, not update `uv.lock` during verification. The shared setup action keeps its frozen default for release callers.
+The [PR workflow](workflows/pr-ci.yml) owns check commands, tool versions, and test selections. New tests must belong to a declared selection. Use `--locked` for verification; do not regenerate `uv.lock` during checks.
 
-```powershell
-uv sync --locked --extra dev
-uv run --locked python scripts/ci/check_test_selection.py
-uv run --locked pytest -ra --junitxml=tooling-results.xml tests/scripts tests/cli tests/release_evidence
-```
-
-The selection checker reads the workflow rather than a second partition manifest. New ordinary test files must belong to a declared selection; missing targets, empty protected roots, and source/configuration parsing failures are errors. The remaining `tests/integration` suites are explicitly excluded because they need external providers, servers, credentials, or models. Deterministic helper, scoped-session, and speaker-pipeline contracts belong to ordinary test partitions instead.
-
-The dev extra includes the PE parser required by native-distribution tests. A missing mandatory parser is not a legitimate skip. Pytest summaries include skip reasons, and Python jobs retain JUnit results even after a failing step. The Overlay job separately requires its five selected process cases to execute without skips; this is not a zero-skip claim for every native or device scenario.
-
-Keep tests organized around consumer guarantees. Synthetic PE/GPU payloads and evidence-runner reports do not prove real GPU execution, model decoding, audio capture, or installed-product behavior. Preserve the distinct producer-to-fresh-process bundle checks, adversarial loader cases, safe cleanup tests, and runner failure classification when consolidating fixtures or moving tests.
-
-Run the focused settings concurrency checks with:
-
-```powershell
-uv run --locked pytest -p no:cacheprovider tests/ui/test_settings_queue.py tests/app/test_settings_apply_recovery.py
-```
-
-Their scoped rendezvous helper observes both callback arrival and operation completion under one three-second deadline covering the controlled in-flight schedule. An early return reports the missing callback; operation exceptions propagate unchanged. Every exit opens the release gate and cancels and awaits unfinished owned tasks without replacing the active failure. Cleanup relies on cooperative cancellation: this is not protection against blocking the event loop or indefinitely suppressing cancellation, and it adds no production or suite-wide deadlines.
+Test observable behavior with isolated state. External integrations require their own setup. Synthetic checks do not establish real device, model, or installed-product behavior; report what actually ran and any verification gaps.
 
 ## Native ASR worker builds
 
-Use CMake 3.19 or newer, the Windows Vulkan SDK, and the supported worker build entry point:
+Use CMake 3.19 or newer, the Windows Vulkan SDK, and the supported build entry point:
 
 ```powershell
 $env:VULKAN_SDK = "C:\VulkanSDK\<installed-version>"
 pwsh -File scripts/ci/build-asr-worker-release.ps1 -TargetDir build/asr-worker-cargo -OutputDir build/asr_worker
 ```
 
-The build applies the [Fun-ASR language-name overlay](../native/asr_worker/cmake/funasr-language.cmake) to a generated source file, never the shared Cargo checkout. It checks the pinned upstream source hash and converts the validated ISO code to the [checkpoint's documented language name](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512/blob/2c088f535108689beff7e11cdc3d792af7d56552/README.md#inference). Both Nano variants use this prompt builder; model files and the worker protocol remain unchanged. Review the overlay when changing the transcribe.cpp pin.
-
-Direct Cargo invocations must supply the same `TRANSCRIBE_CMAKE_ARGS` as the build script, including the absolute `CMAKE_PROJECT_transcribe_INCLUDE` path. The worker build rejects missing or stale installed language mappings instead of silently building an unpatched runtime.
-
-The opt-in language regression uses `tests/fixtures/asr/korean-eung.wav`, synthetic Korean “응” generated by Windows Microsoft Heami Desktop, not a user recording. It requires the pinned MLT model and a real worker:
-
-```powershell
-$env:INTEGRATION = "1"
-$env:ASR_WORKER_PATH = "$PWD\build\asr_worker\PuriPulyHeartASRWorker.exe"
-$env:LOCAL_ASR_MODEL_ROOT = "<directory containing the installed model folders>"
-uv run --locked pytest -q tests/integration/test_fun_asr_language_hint_integration.py
-```
+This entry point applies the required upstream patches. Review the [Fun-ASR language overlay](../native/asr_worker/cmake/funasr-language.cmake) when changing the transcribe.cpp pin; do not bypass it with a plain Cargo build.
 
 ## Releases
 
-Pushing a `vMAJOR.MINOR.PATCH` tag, such as `v2.8.2`, runs the [native release workflow](workflows/release-native.yml). It builds and verifies the native Windows installer, uploads only `PuriPulyHeart-Setup-MAJOR.MINOR.PATCH.exe` as the Actions artifact, and creates a GitHub draft release containing that installer alone. The legacy release workflow has been removed; `native-v*` tags no longer trigger a release.
+Pushing a `vMAJOR.MINOR.PATCH` tag runs [Native Release](workflows/release-native.yml), producing a Windows installer and a draft release containing that installer.
 
-The native Windows shell disables optional CMake JNI discovery before configuring Flutter plugins. Android-only transitive dependencies must not introduce a Java runtime dependency based on the build machine's installed JDK. Native DLL dependency closure validation remains enforced.
+Before tagging, synchronize versions in `pyproject.toml`, `src/puripuly_heart/__init__.py`, `installer/application-identity.iss`, `native/overlay/Cargo.toml`, and `native/asr_worker/Cargo.toml`.
 
-The native Flet build pins `shared_preferences_android` to `2.4.28`, the last version before its JNI dependency was introduced. Newer Android implementations require JNI 1.1 and are incompatible with the shell's pinned JNI bridge, even when compiling for Windows.
-
-The draft-release job installs the pinned `PYTHON_VERSION` before running release helpers. These helpers use the project's Python syntax and must not run with the Ubuntu image's default interpreter.
-
-SHA-256 and provenance verification remain inside the pipeline; provenance passes between jobs through job outputs rather than downloadable JSON files. Required third-party licenses and corresponding-source bundles remain embedded in the installer. Successful reruns remove non-installer attachments from the selected release.
-
-Both native build entry points generate `native-asr-models.iss` from the final staged ASR manifests and current settings schema, then pass `/DLocalASRModelsInclude` to Inno Setup. The [build-time emitter](../src/puripuly_heart/release_evidence/local_asr_installer.py) is the authority for that include; do not reintroduce hardcoded model pins or a separate installer schema version. Setup prepares the four required CPU ASR models through the [production installer include](../installer/local-asr.iss), using the same pinned primary/mirror bytes and provisioning lease as the application.
-
-Before creating a tag, commit matching versions in:
-
-- `pyproject.toml`
-- `src/puripuly_heart/__init__.py`
-- `installer/application-identity.iss`
-- `native/overlay/Cargo.toml`
-- `native/asr_worker/Cargo.toml`
-
-Tag the commit containing the workflow changes and version updates, then push that tag:
-
-```sh
-git tag v2.8.2
-git push origin v2.8.2
-```
-
-To rerun an existing release tag manually, use **Native Release → Run workflow** and enter the same `vMAJOR.MINOR.PATCH` tag. The workflow checks out that tag and rejects mismatched versions or source commits. Rerunning does not pick up newer branch commits: commit source fixes and update an unpublished tag before retrying, or create a new version tag. Do not move a tag whose release has already been published.
-
+Manual reruns use the selected tag's commit, not newer branch changes. Never move a published release tag; ship fixes under a new version.

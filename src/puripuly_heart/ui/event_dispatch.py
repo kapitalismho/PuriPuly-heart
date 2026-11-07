@@ -313,6 +313,7 @@ class UIEventBridge:
         clear_managed_auth_pending: object | None = None,
         on_github_star_translation_success: object | None = None,
         on_overlay_state_changed: object | None = None,
+        on_error_presented: object | None = None,
     ):
         self.event_queue = event_queue
         self.runtime_logging = runtime_logging
@@ -320,6 +321,7 @@ class UIEventBridge:
         self._is_translation_enabled_callback = is_translation_enabled
         self._github_star_translation_success_callback = on_github_star_translation_success
         self._overlay_state_changed_callback = on_overlay_state_changed
+        self._error_presented_callback = on_error_presented
         self.dashboard_destination = dashboard_destination
         self.history_destination = history_destination
         self.error_destination = error_destination or AppErrorEventDestination(
@@ -563,3 +565,12 @@ class UIEventBridge:
             authority = event.delivery_authority
             if authority is None or authority.claim_presentation():
                 self.dashboard_destination.publish_error(text)
+                self._notify_error_presented(text, payload)
+
+    def _notify_error_presented(self, text: str, payload: object | None) -> None:
+        if not isinstance(payload, UserErrorReport) or not callable(self._error_presented_callback):
+            return
+        try:
+            self._error_presented_callback(text, payload.diagnostics.diagnostic_id)
+        except Exception:
+            logger.error("A user interface operation failed.")

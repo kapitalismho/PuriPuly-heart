@@ -426,11 +426,11 @@ async def test_leaving_settings_does_not_resubmit_failed_autosave_but_first_stag
     )
     ui._settings_queue = SettingsQueue(apply, lambda _: None)
     ui._run_page_task = workers.append
-    ui._current_tab = 1
+    ui._current_tab = 2
     ui._on_nav_change(3)
     await workers.pop(0)()
     assert calls == [intent]
-    ui._current_tab = 1
+    ui._current_tab = 2
     ui._on_nav_change(3)
     assert workers == []
     assert calls == [intent]

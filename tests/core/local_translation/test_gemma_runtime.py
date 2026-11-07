@@ -24,6 +24,10 @@ from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaRuntimeOwner,
 )
 from puripuly_heart.core.local_translation.runtime_profile import GemmaRuntimePaths
+from puripuly_heart.core.translation_backend import (
+    TranslationProbePreparationRequired,
+    translation_probe_scope,
+)
 
 
 @pytest.mark.asyncio
@@ -307,6 +311,50 @@ def _runtime(
         version_validator=validate_version,
     )
     return owner, commands, processes, transports, provision_calls, logs
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prefix_failure", [False, True])
+async def test_probe_uses_prepared_runtime_without_provisioning_or_restart(
+    tmp_path: Path, prefix_failure: bool
+) -> None:
+    owner, commands, processes, transports, provision_calls, _logs = _runtime(tmp_path)
+    try:
+        await owner.prepare(
+            backend="gpu",
+            source_language="ko",
+            target_language="en",
+            system_prompt="existing live prompt",
+        )
+        transport = transports[0]
+        if prefix_failure:
+            transport.prefix_failure = RuntimeError("synthetic prefix failure")
+
+        async def translate():
+            with translation_probe_scope():
+                return await owner.translate(
+                    backend="gpu",
+                    source_language="en",
+                    target_language="es",
+                    system_prompt="fixed synthetic prompt",
+                    user_message="Hello.",
+                )
+
+        if prefix_failure:
+            with pytest.raises(TranslationProbePreparationRequired):
+                await translate()
+            assert transport.translations == []
+        else:
+            response = await translate()
+            assert response.text == "translated"
+            assert transport.translations == [("fixed synthetic prompt", "Hello.")]
+        assert len(provision_calls) == 1
+        assert len(commands) == 1
+        assert len(processes) == 1
+        assert processes[0].terminated is False
+        assert processes[0].killed is False
+    finally:
+        await owner.close()
 
 
 @pytest.mark.asyncio

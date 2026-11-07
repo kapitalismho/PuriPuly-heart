@@ -279,6 +279,18 @@ class RollingSTTBackend(STTBackend):
         self._last_failures.pop(name, None)
         return True
 
+    async def open_probe_session(
+        self, *, projection: STTSessionProjection
+    ) -> tuple[STTBackendSession, str]:
+        for definition in self.providers:
+            if definition.is_configured() and self._states.get(definition.name) in {
+                None,
+                RollingProviderState.AVAILABLE,
+            }:
+                session = await definition.build_backend().open_session(projection=projection)
+                return session, definition.name.value
+        raise RuntimeError("recognition_probe_backend_unavailable")
+
     async def open_session(
         self,
         *,

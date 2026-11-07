@@ -8,6 +8,7 @@ from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationName,
     OscControlPresentationState,
 )
+from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresence
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
 from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState
 from puripuly_heart.app.services.vrc_mic_sync import (
@@ -31,7 +32,9 @@ def compose_vrc_mic_sync(
     error_sink: Callable[[str], None],
     settings_provider: Callable[[], object | None],
     apply_settings: Callable[[object], Awaitable[object]],
-    apply_mutation: Callable[[Callable[[object], object]], Awaitable[object]] | None = None,
+    apply_mutation: (
+        Callable[[Callable[[object], object], Callable[[], bool]], Awaitable[object]] | None
+    ) = None,
     application_provider: Callable[[], object | None],
     sender_provider: Callable[[], object | None],
     osc_state_provider: Callable[[], OscCanonicalState],
@@ -43,6 +46,7 @@ def compose_vrc_mic_sync(
     ui_state_sink: Callable[[OscControlPresentationState], None] | None = None,
     query_service: OscQueryServicePort | None = None,
     connection_changed: Callable[[], None] | None = None,
+    local_listener_probe: Callable[[str, int], Awaitable[VrchatOscPresence]] | None = None,
 ) -> OscControlIntegrationOwner:
     def diagnostics_sink(event: str, metadata: Mapping[str, object]) -> None:
         log_diagnostic(
@@ -74,6 +78,7 @@ def compose_vrc_mic_sync(
         query_service=query_service or ZeroconfOscQueryService(),
         error_sink=error_sink,
         connection_changed=connection_changed,
+        local_listener_probe=local_listener_probe,
     )
 
 

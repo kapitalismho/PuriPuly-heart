@@ -21,6 +21,7 @@ from puripuly_heart.ui.components.modal_kit import (
 )
 from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.i18n import t
+from puripuly_heart.ui.motion import close_modal, show_modal
 from puripuly_heart.ui.theme import COLOR_BACKGROUND, COLOR_PRIMARY, COLOR_WARNING
 
 logger = logging.getLogger(__name__)
@@ -126,14 +127,14 @@ class ModelAssetsDialog:
         self._dialog = self._build_dialog(entries)
         self._is_open = True
         self.render()
-        self.page.show_dialog(self._dialog)
+        show_modal(self.page, self._dialog)
         self.run_task(self._refresh_and_watch)
 
     def close(self) -> None:
         if not self._is_open:
             return
         self._is_open = False
-        self.page.pop_dialog()
+        close_modal(self.page, self._dialog)
 
     def select(self, model_id: str) -> None:
         if self._selected != model_id:

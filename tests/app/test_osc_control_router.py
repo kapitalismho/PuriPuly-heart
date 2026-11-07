@@ -392,6 +392,65 @@ async def test_router_does_not_project_when_application_suppresses_close_cancell
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("invalidate", (False, True))
+async def test_application_ordered_suspension_separates_admission_pause_from_generation_fence(
+    invalidate,
+) -> None:
+    class GuardedApplication(FakeApplication):
+        async def set_self_asr(self, provider: str) -> object:
+            self.guard = router.current_invocation_guard()
+            self.started.set()
+            await self.gate.wait()
+            if not self.guard():
+                return False
+            self.calls.append(("self_asr", provider))
+
+    application = GuardedApplication()
+    router = OscControlRouter(application, application_orders_mutations=True)
+    packet = asyncio.create_task(router.dispatch_packet("/avatar/parameters/PuriPuly_SelfASR", 1))
+    await application.started.wait()
+    try:
+        generation = router._generation
+        await router.suspend_ingress(invalidate=invalidate)
+        assert not packet.done()
+        assert application.guard() is (not invalidate)
+        assert router._generation == generation + int(invalidate)
+        rejected = await router.dispatch_packet("/avatar/parameters/PuriPuly_ChatboxSource", True)
+        assert rejected.applied is False
+        assert rejected.error == "router_disabled"
+        sequence = router._packet_sequence
+        assert router.handle_packet("/avatar/parameters/PuriPuly_ChatboxSource", True) is False
+        assert router._packet_sequence == sequence
+        router.resume_ingress()
+        application.gate.set()
+        result = await packet
+        assert result.applied is (not invalidate)
+        assert result.error == ("router_disabled" if invalidate else None)
+        assert application.calls == ([] if invalidate else [("self_asr", "local_cpu_auto")])
+        router.set_ingress_enabled(False)
+        assert application.guard() is False
+    finally:
+        application.gate.set()
+        await router.close()
+
+
+@pytest.mark.asyncio
+async def test_application_ordered_packet_scheduling_cannot_cross_an_invalidated_generation() -> (
+    None
+):
+    application = FakeApplication()
+    router = OscControlRouter(application, application_orders_mutations=True)
+    try:
+        assert router.handle_packet("/avatar/parameters/PuriPuly_ChatboxSource", True) is True
+        router.set_ingress_enabled(False)
+        router.resume_ingress()
+        await asyncio.sleep(0)
+        assert application.calls == []
+    finally:
+        await router.close()
+
+
+@pytest.mark.asyncio
 async def test_router_drains_started_command_after_ingress_is_disabled() -> None:
     application = FakeApplication()
     projected: list[str] = []

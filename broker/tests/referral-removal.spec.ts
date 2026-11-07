@@ -76,6 +76,10 @@ describe('referral retirement without allowance or credential mutation', () => {
   ] as const)('delivers and acknowledges %s on schema %s without feature work or allowance PATCH', async (source, throughMigration) => {
     vi.useFakeTimers(); vi.setSystemTime(now);
     const env = createTestBrokerEnv({ throughMigration }); const provider = controlledProvider(); vi.stubGlobal('fetch', provider.fetchImpl);
+    if (throughMigration) {
+      env.__db.exec(readBrokerMigrationSql('0028_add_puri_identity_proofs.sql'));
+      env.__db.exec(readBrokerMigrationSql('0029_puri_token_admission_limits.sql'));
+    }
     if (throughMigration) env.__db.prepare(`INSERT INTO managed_referral_settlement_jobs (source, referral_reward_id, phase, attempt_count, next_attempt_at, created_at, updated_at) VALUES ('qq', 999, 'invitee_pending', 0, ?, ?, ?)`).run(...Array(3).fill(now.toISOString()));
     const queuedBefore = throughMigration ? env.__db.prepare('SELECT * FROM managed_referral_settlement_jobs').all() : null;
     const seeded = await seedRecoverableOperation(env, source, now);

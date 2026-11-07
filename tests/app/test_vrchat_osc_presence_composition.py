@@ -52,12 +52,13 @@ async def test_presence_notice_tracks_effective_connection_and_discovery_recover
     listening_ports: set[int] = set()
     probed_ports: asyncio.Queue[int] = asyncio.Queue()
 
-    def probe(*, port: int):
+    def probe(*, host: str, port: int):
         return probe_vrchat_osc_presence(
+            host=host,
             port=port,
             process_iter=lambda *_args: [SimpleNamespace(info={"pid": 22, "name": "VRChat.exe"})],
             net_connections=lambda **_kwargs: [
-                SimpleNamespace(laddr=SimpleNamespace(port=value), pid=22)
+                SimpleNamespace(laddr=SimpleNamespace(ip="127.0.0.1", port=value), pid=22)
                 for value in listening_ports
             ],
         )

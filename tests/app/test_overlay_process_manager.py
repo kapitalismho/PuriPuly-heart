@@ -3424,3 +3424,212 @@ def test_desktop_child_diagnostic_retains_legitimate_renderer_outcomes(
     assert manager.diagnostics is not None
     assert manager.diagnostics.process_events[0]["event_type"] == event_type
     assert manager.diagnostics.process_events[0]["actual_disposition"] == disposition
+
+
+def _runtime_stop_event(manager, event_type="runtime_stop_requested", reason="runtime_quit"):
+    return {
+        "type": event_type,
+        "overlay_instance_id": manager.overlay_instance_id,
+        "runtime_generation": 1,
+        "stop_origin": "openvr",
+        "stop_reason": reason,
+        **({"cleanup_succeeded": True} if event_type == "shutdown_complete" else {}),
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reason", ["runtime_quit", "driver_requested_quit"])
+@pytest.mark.parametrize("during_startup", [False, True])
+async def test_runtime_stop_requires_terminal_exit_and_reader_cleanup(reason, during_startup):
+    runner = FakeProcessRunner(ready_event_delay_ms=None if during_startup else 0)
+    manager = OverlayProcessManager(process_runner=runner, selected_target="steamvr")
+    starting = asyncio.create_task(manager.start())
+    while runner.last_process is None:
+        await asyncio.sleep(0)
+    process = runner.last_process
+    if not during_startup:
+        await starting
+    await process._events.put(_runtime_stop_event(manager, reason=reason))
+    await process._events.put(_runtime_stop_event(manager, "shutdown_complete", reason))
+    await asyncio.sleep(0)
+    assert manager.runtime_stop_completed is False
+    process._exit_future.set_result(0)
+    await starting
+    if manager._monitor_task is not None:
+        await manager._monitor_task
+    assert manager.state == "off"
+    assert manager.runtime_stop_reason == reason
+    assert manager.runtime_stop_completed is True
+    assert manager.failure_reason is None
+    assert manager.restart_scheduled is False
+    assert manager._process is None
+    assert manager._manifest_path is None
+    assert process.terminated is False
+    receipt = manager.shutdown_receipt()
+    assert receipt["acknowledged"] is False
+    assert receipt["terminal_status_received"] is True
+    assert receipt["exit_confirmed"] is True
+    assert receipt["reader_cleanup"] == "complete"
+    assert receipt["cleanup_succeeded"] is True
+    await manager.stop()
+    assert manager.state == "off"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        "stale_instance",
+        "stale_generation",
+        "bool_generation",
+        "untrusted",
+        "plain_dict",
+        "wrong_origin",
+        "wrong_reason",
+        "terminal_only",
+        "out_of_order",
+        "missing_cleanup",
+        "nonzero_exit",
+    ],
+)
+async def test_invalid_runtime_stop_cannot_normalize_unexpected_exit(invalid):
+    process = FakeOverlayManagedProcess()
+    manager = OverlayProcessManager(selected_target="steamvr")
+    manager.state = "connected"
+    manager._current_phase = "connected"
+    manager._last_transition = "overlay_ready"
+    manager._process = process
+    admission = _runtime_stop_event(manager)
+    terminal = _runtime_stop_event(manager, "shutdown_complete")
+    if invalid == "stale_instance":
+        admission["overlay_instance_id"] = "retired-child"
+    elif invalid == "stale_generation":
+        admission["runtime_generation"] = 2
+    elif invalid == "bool_generation":
+        admission["runtime_generation"] = True
+    elif invalid == "wrong_origin":
+        admission["stop_origin"] = "parent"
+    elif invalid == "wrong_reason":
+        admission["stop_reason"] = "hmd_removed"
+    if invalid == "out_of_order":
+        await manager._handle_lifecycle_event(_process_event(terminal), allow_ready=False)
+    if invalid != "terminal_only":
+        event = (
+            OverlayProcessEvent(admission, "bridge_reverse")
+            if invalid == "untrusted"
+            else admission if invalid == "plain_dict" else _process_event(admission)
+        )
+        await manager._handle_lifecycle_event(event, allow_ready=False)
+    if invalid not in {"out_of_order", "missing_cleanup"}:
+        await manager._handle_lifecycle_event(_process_event(terminal), allow_ready=False)
+    elif invalid == "missing_cleanup":
+        terminal.pop("cleanup_succeeded")
+        await manager._handle_lifecycle_event(_process_event(terminal), allow_ready=False)
+    process._exit_future.set_result(21 if invalid == "nonzero_exit" else 0)
+    await manager._monitor_connected_process()
+    assert manager.runtime_stop_completed is False
+    assert manager.state == "failed"
+    assert manager.failure_reason is not None
+    assert manager.restart_scheduled is (manager.runtime_stop_reason is None)
+    await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_runtime_stop_reader_cleanup_failure_remains_owned_without_restart():
+    class ReaderFailure(FakeOverlayManagedProcess):
+        async def finish_readers(self):
+            raise RuntimeError("synthetic reader failure")
+
+    process = ReaderFailure()
+    manager = OverlayProcessManager(selected_target="steamvr")
+    manager.state = "connected"
+    manager._last_transition = "overlay_ready"
+    manager._process = process
+    await process._events.put(_runtime_stop_event(manager))
+    await process._events.put(_runtime_stop_event(manager, "shutdown_complete"))
+    process._exit_future.set_result(0)
+    await manager._monitor_connected_process()
+    assert manager.state == "failed"
+    assert manager.failure_reason == "shutdown_cleanup_failed"
+    assert manager.restart_scheduled is False
+    assert manager.runtime_stop_completed is False
+    assert manager._process is process
+    assert manager.shutdown_receipt()["reader_cleanup"] == "failed"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("parent_request_sent", [False, True])
+@pytest.mark.parametrize("request_callback", [False, True])
+@pytest.mark.parametrize(
+    "terminal_variant",
+    [
+        "missing",
+        "parent",
+        "mismatched_reason",
+        "mismatched_generation",
+        "stale_instance",
+        "missing_cleanup",
+        "valid_native",
+        "ordinary_parent",
+        "parent_before_admission",
+    ],
+)
+async def test_parent_stop_takeover_requires_admitted_native_terminal(
+    parent_request_sent, request_callback, terminal_variant
+):
+    process = FakeOverlayManagedProcess()
+    request_calls = 0
+
+    async def request_shutdown():
+        nonlocal request_calls
+        request_calls += 1
+
+    manager = OverlayProcessManager(
+        selected_target="steamvr",
+        graceful_shutdown_request=request_shutdown if request_callback else None,
+        graceful_shutdown_timeout_s=0.01,
+    )
+    manager.state = "connected"
+    manager._last_transition = "overlay_ready"
+    manager._process = process
+    manager.mark_shutdown_requested(request_sent=parent_request_sent)
+    terminal = _runtime_stop_event(manager, "shutdown_complete")
+    if terminal_variant == "parent_before_admission":
+        parent_terminal = {**terminal, "stop_origin": "parent", "stop_reason": "app_requested"}
+        await manager._handle_lifecycle_event(_process_event(parent_terminal), allow_ready=False)
+    if terminal_variant != "ordinary_parent":
+        await manager._handle_lifecycle_event(
+            _process_event(_runtime_stop_event(manager)), allow_ready=False
+        )
+    if terminal_variant in {"parent", "ordinary_parent", "parent_before_admission"}:
+        terminal.update(stop_origin="parent", stop_reason="app_requested")
+    elif terminal_variant == "mismatched_reason":
+        terminal["stop_reason"] = "driver_requested_quit"
+    elif terminal_variant == "mismatched_generation":
+        terminal["runtime_generation"] = 2
+    elif terminal_variant == "stale_instance":
+        terminal["overlay_instance_id"] = "retired-child"
+    elif terminal_variant == "missing_cleanup":
+        terminal.pop("cleanup_succeeded")
+    if terminal_variant != "missing":
+        await process._events.put(terminal)
+    process._exit_future.set_result(0)
+    await manager.stop()
+    valid = terminal_variant in {"valid_native", "ordinary_parent"}
+    assert manager.state == ("off" if valid else "failed")
+    receipt = manager.shutdown_receipt()
+    assert receipt["cleanup_succeeded"] is valid
+    assert receipt["graceful_completed"] is (
+        valid and (request_callback or terminal_variant == "valid_native")
+    )
+    assert manager.restart_scheduled is False
+    assert process.terminated is False
+    if not valid:
+        assert manager.failure_reason == "shutdown_terminal_unavailable"
+        assert receipt["terminal_status_received"] is False
+        assert manager.runtime_stop_completed is False
+    if terminal_variant == "valid_native":
+        assert receipt["acknowledged"] is False
+        assert manager.runtime_stop_completed is True
+    if terminal_variant != "ordinary_parent":
+        assert request_calls == 0

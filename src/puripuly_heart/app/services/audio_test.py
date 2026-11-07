@@ -6,19 +6,29 @@ from dataclasses import dataclass, field
 
 from puripuly_heart.app.ports.audio_test import (
     AUDIO_TEST_CHANNELS,
+    AudioDiagnosticCandidate,
     AudioTestCaptureControlPort,
     AudioTestCapturePort,
     AudioTestCaptureRequest,
     AudioTestChannel,
     AudioTestSourceOpener,
 )
+from puripuly_heart.app.services.audio_diagnosis import (
+    AUDIO_DIAGNOSE_CANDIDATE_TIMEOUT_S,
+    AUDIO_DIAGNOSE_MAX_CANDIDATES,
+    AudioDiagnosticEvidence,
+    audio_diagnosis_receipt,
+)
 from puripuly_heart.core.audio.audio_test_vad import (
     AudioTestVadProbe,
     AudioTestVadSample,
     AudioTestVadSettings,
 )
+from puripuly_heart.core.diagnostic_codes import AUDIO_DIAGNOSE_FAILURE_CODES
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.audio_test import AudioTestCaptureRuntime
+
+DIAGNOSTIC_CLEANUP_TIMEOUT_S = 5.0
 
 AudioTestObservationCallback = Callable[[AudioTestChannel, tuple[AudioTestVadSample, ...]], object]
 AudioTestDiagnosticsSink = Callable[[str, Mapping[str, object], BaseException | None], None]
@@ -115,6 +125,20 @@ class AudioTestSessionOwner:
     _closed: bool = field(init=False, default=False, repr=False)
     _starting: bool = field(init=False, default=False, repr=False)
     _admission_revision: int = field(init=False, default=0, repr=False)
+    _diagnosis_task: asyncio.Task[object] | None = field(init=False, default=None, repr=False)
+    _diagnosis_cleanup_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _diagnosis_pause_task: asyncio.Task[bool] | None = field(init=False, default=None, repr=False)
+    _diagnosis_pause_aborted: bool = field(init=False, default=False, repr=False)
+    _diagnostic_evidence: AudioDiagnosticEvidence | None = field(
+        init=False, default=None, repr=False
+    )
+    _restoration_status: dict[AudioTestChannel, str] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    _capture_intent_revision: dict[AudioTestChannel, int] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    _diagnosis_cancel_requested: bool = field(init=False, default=False, repr=False)
     _restore: dict[AudioTestChannel, object] = field(
         init=False,
         default_factory=dict,
@@ -131,9 +155,16 @@ class AudioTestSessionOwner:
         return "AudioTestSessionOwner"
 
     @property
+    def diagnosing(self) -> bool:
+        return self._diagnosis_task is not None
+
+    @property
     def active(self) -> bool:
-        return self._starting or any(
-            session.runtime.has_resources for session in self._sessions.values()
+        return (
+            self._starting
+            or self._diagnosis_cleanup_task is not None
+            or self._diagnosis_pause_task is not None
+            or any(session.runtime.has_resources for session in self._sessions.values())
         )
 
     @property
@@ -167,7 +198,15 @@ class AudioTestSessionOwner:
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
             "owner": self.owner_name,
-            "resource_fields": ("_sessions", "_lifecycle_lock", "_restore", "_closed"),
+            "resource_fields": (
+                "_sessions",
+                "_lifecycle_lock",
+                "_restore",
+                "_closed",
+                "_diagnosis_task",
+                "_diagnosis_cleanup_task",
+                "_diagnosis_pause_task",
+            ),
             "stop_ingress": "close marks the owner closed and rejects new sessions",
             "shutdown_policy": (
                 "close each channel AudioTestCaptureRuntime without restoring paused capture"
@@ -176,6 +215,14 @@ class AudioTestSessionOwner:
         }
 
     def release_capture_restore(self, channel: AudioTestChannel) -> None:
+        self._capture_intent_revision[channel] = self._capture_intent_revision.get(channel, 0) + 1
+        if (
+            channel in self._restore
+            or self._diagnosis_task is not None
+            or self._diagnosis_pause_task is not None
+            or self._diagnosis_cleanup_task is not None
+        ):
+            self._restoration_status[channel] = "skipped"
         self._restore.pop(channel, None)
 
     async def wait_ready(self) -> bool:
@@ -196,6 +243,8 @@ class AudioTestSessionOwner:
             return False
         async with self._lock():
             if self._closed:
+                return False
+            if self._diagnosis_pause_task is not None or self._diagnosis_cleanup_task is not None:
                 return False
             if self.active and any(
                 session.state in {"pending", "ready"} for session in self._sessions.values()
@@ -250,9 +299,235 @@ class AudioTestSessionOwner:
             finally:
                 self._starting = False
 
+    async def diagnose(
+        self,
+        *,
+        candidates: tuple[AudioDiagnosticCandidate, ...],
+        plan_factory: Callable[[AudioDiagnosticCandidate], AudioTestChannelPlan],
+        input_host_api: str,
+        input_device: str,
+    ) -> dict[str, object]:
+        receipt = audio_diagnosis_receipt(input_host_api=input_host_api, input_device=input_device)
+        diagnosis = receipt["diagnosis"]
+        async with self._lock():
+            if self._closed or self.active:
+                diagnosis["failure_code"] = "owner_closed" if self._closed else "audio_test_busy"
+                return receipt
+            self._diagnosis_task = asyncio.current_task()
+            self._starting = True
+            self._restoration_status = {channel: "not_needed" for channel in self.channels}
+            evidence: list[AudioDiagnosticEvidence] = []
+            cancelled = False
+            self._diagnosis_cancel_requested = False
+            self._diagnosis_pause_aborted = False
+            cleanup_failed = False
+            try:
+                if not candidates:
+                    diagnosis["failure_code"] = "no_input_candidates"
+                elif not await self._pause_diagnostic_capture():
+                    diagnosis["failure_code"] = "capture_pause_failed"
+                    for channel in self.channels:
+                        current = self.capture_control.state(channel)
+                        if current.close_exception is not None or current.source_open:
+                            self._restoration_status[channel] = "cleanup_pending"
+                        session = self._sessions.get(channel)
+                        if (
+                            session is not None
+                            and session.failure_reason == "resource_release_incomplete"
+                        ):
+                            diagnosis["failure_code"] = "resource_release_incomplete"
+                else:
+                    diagnosis["state"] = "completed"
+                    if not any(candidate.current_route for candidate in candidates):
+                        diagnosis["failure_code"] = "input_route_unavailable"
+                    for candidate in candidates[:AUDIO_DIAGNOSE_MAX_CANDIDATES]:
+                        if self._closed:
+                            raise asyncio.CancelledError
+                        item = AudioDiagnosticEvidence(candidate)
+                        evidence.append(item)
+                        self._diagnostic_evidence = item
+                        self._emit(
+                            "diagnose_started",
+                            {"channel": "self", "target_index": candidate.device_index},
+                        )
+                        session = self._session("self")
+                        session.reset()
+                        session.state = "pending"
+                        session.readiness = asyncio.get_running_loop().create_future()
+                        started_at = asyncio.get_running_loop().time()
+                        try:
+                            plan = plan_factory(candidate)
+                            task = session.runtime.start(
+                                lambda generation, plan=plan: self._run_session(
+                                    "self", generation, plan=plan
+                                )
+                            )
+                            done, _pending = await asyncio.wait(
+                                {task}, timeout=AUDIO_DIAGNOSE_CANDIDATE_TIMEOUT_S
+                            )
+                            if not done and not item.frame_count:
+                                item.failure_code = "candidate_timeout"
+                        except asyncio.CancelledError:
+                            item.failure_code = item.failure_code or "cancelled"
+                            raise
+                        except Exception as exc:
+                            item.failure_code = "session_start_failed"
+                            self._emit("diagnose_start_failed", {"channel": "self"}, exc)
+                        finally:
+                            item.elapsed_ms = int(
+                                (asyncio.get_running_loop().time() - started_at) * 1000
+                            )
+                        if not await self._release_diagnostic_resources():
+                            item.cleanup_complete = False
+                            cleanup_failed = True
+                            diagnosis["failure_code"] = (
+                                diagnosis["failure_code"] or "resource_release_incomplete"
+                            )
+                            break
+                        self._diagnostic_evidence = None
+                        if self._diagnosis_cancel_requested:
+                            raise asyncio.CancelledError
+            except asyncio.CancelledError:
+                cancelled = True
+            finally:
+                cleanup_complete = (
+                    False
+                    if cleanup_failed
+                    else await self._release_diagnostic_resources(restore_capture=True)
+                )
+                self._diagnostic_evidence = None
+                if evidence:
+                    evidence[-1].cleanup_complete = (
+                        self._diagnosis_cleanup_task is None
+                        and not any(
+                            session.runtime.has_resources for session in self._sessions.values()
+                        )
+                    )
+                diagnosis["cleanup_complete"] = cleanup_complete
+                if not cleanup_complete or self._closed:
+                    for channel in self._restore:
+                        self._restoration_status[channel] = (
+                            "skipped" if self._closed else "cleanup_pending"
+                        )
+                diagnosis["restoration"] = dict(self._restoration_status)
+                diagnosis["candidates"] = [item.snapshot() for item in evidence]
+                selected = max(evidence, key=lambda item: item.selection_rank, default=None)
+                if selected is not None and selected.selection_rank:
+                    diagnosis["selected_candidate_id"] = f"input-{selected.candidate.device_index}"
+                    diagnosis["selection_basis"] = {1: "opened", 2: "frames", 3: "speech"}[
+                        selected.selection_rank
+                    ]
+                if not cleanup_complete:
+                    diagnosis["failure_code"] = (
+                        diagnosis["failure_code"] or "resource_release_incomplete"
+                    )
+                elif "failed" in self._restoration_status.values():
+                    diagnosis["failure_code"] = diagnosis["failure_code"] or "restore_failed"
+                cancelled |= self._diagnosis_cancel_requested
+                if cancelled:
+                    diagnosis["state"] = "cancelled"
+                    receipt["status"] = "cancelled"
+                elif not cleanup_complete or "failed" in self._restoration_status.values():
+                    receipt["status"] = "failed"
+                elif any(item.selection_rank >= 2 for item in evidence):
+                    receipt["status"] = "applied"
+                self._starting = False
+                self._diagnosis_task = None
+            return receipt
+
+    async def _pause_diagnostic_capture(self) -> bool:
+        task = asyncio.create_task(
+            self._pause_translation_capture(), name="AudioTestSessionOwner:diagnose-pause"
+        )
+        self._diagnosis_pause_task = task
+        try:
+            done, _pending = await asyncio.wait({task}, timeout=DIAGNOSTIC_CLEANUP_TIMEOUT_S)
+        except asyncio.CancelledError:
+            self._diagnosis_pause_aborted = True
+            raise
+        if not done:
+            self._diagnosis_pause_aborted = True
+            return False
+        return task.result()
+
+    async def _release_diagnostic_resources(self, *, restore_capture: bool = False) -> bool:
+        task = self._diagnosis_cleanup_task
+        if task is None:
+            task = asyncio.create_task(
+                self._finish_diagnostic_cleanup(restore_capture=restore_capture),
+                name="AudioTestSessionOwner:diagnose-cleanup",
+            )
+            self._diagnosis_cleanup_task = task
+            task.add_done_callback(self._on_diagnostic_cleanup_done)
+        deadline = asyncio.get_running_loop().time() + DIAGNOSTIC_CLEANUP_TIMEOUT_S
+        while not task.done():
+            try:
+                await asyncio.wait(
+                    {task}, timeout=max(0.0, deadline - asyncio.get_running_loop().time())
+                )
+            except asyncio.CancelledError:
+                self._diagnosis_cancel_requested = True
+                continue
+            if not task.done():
+                return False
+        self._diagnosis_cleanup_task = None
+        try:
+            task.result()
+        except Exception as exc:
+            self._emit("diagnose_cleanup_failed", {"channel": "self"}, exc)
+            return False
+        return not any(session.runtime.has_resources for session in self._sessions.values()) and (
+            not restore_capture or "cleanup_pending" not in self._restoration_status.values()
+        )
+
+    def _on_diagnostic_cleanup_done(self, task: asyncio.Task[None]) -> None:
+        if task.cancelled():
+            return
+        failure = task.exception()
+        if (
+            failure is None
+            and self._diagnosis_task is None
+            and self._diagnosis_pause_task is None
+            and not any(session.runtime.has_resources for session in self._sessions.values())
+            and self._diagnosis_cleanup_task is task
+        ):
+            self._diagnosis_cleanup_task = None
+
+    async def _finish_diagnostic_cleanup(self, *, restore_capture: bool) -> None:
+        pause = self._diagnosis_pause_task
+        if pause is not None:
+            try:
+                await asyncio.shield(pause)
+            except asyncio.CancelledError:
+                if not pause.cancelled():
+                    raise
+                self._diagnosis_cancel_requested = True
+            finally:
+                if pause.done() and self._diagnosis_pause_task is pause:
+                    self._diagnosis_pause_task = None
+        await self._stop_sessions()
+        if not restore_capture:
+            return
+        if self._closed:
+            for channel in self._restore:
+                current = self.capture_control.state(channel)
+                if not current.source_open and current.close_exception is None:
+                    self._restoration_status[channel] = "skipped"
+        elif not any(session.runtime.has_resources for session in self._sessions.values()):
+            await self._restore_translation_capture()
+
+    def _cancel_diagnosis(self) -> None:
+        task = self._diagnosis_task
+        if task is not None and task is not asyncio.current_task() and not task.cancelling():
+            task.cancel()
+
     async def stop(self) -> None:
         self._admission_revision += 1
+        self._cancel_diagnosis()
         async with self._lock():
+            if self._diagnosis_cleanup_task is not None or self._diagnosis_pause_task is not None:
+                if not await self._release_diagnostic_resources():
+                    raise RuntimeError("Audio test resource release is incomplete")
             await self._stop_sessions()
             if self.active:
                 raise RuntimeError("Audio test resource release is incomplete")
@@ -262,7 +537,11 @@ class AudioTestSessionOwner:
     async def close(self) -> None:
         self._closed = True
         self._admission_revision += 1
+        self._cancel_diagnosis()
         async with self._lock():
+            if self._diagnosis_cleanup_task is not None or self._diagnosis_pause_task is not None:
+                if not await self._release_diagnostic_resources():
+                    raise RuntimeError("Audio test resource release is incomplete")
             try:
                 await self._stop_sessions(close=True)
                 if self.active:
@@ -288,6 +567,10 @@ class AudioTestSessionOwner:
         if session is None:
             return
         self._fail_session(session, reason, error_type)
+        if self._diagnostic_evidence is not None and channel == "self":
+            self._diagnostic_evidence.failure_code = self._diagnostic_evidence.failure_code or (
+                reason if reason in AUDIO_DIAGNOSE_FAILURE_CODES else "capture_failed"
+            )
 
     def set_device(
         self,
@@ -298,13 +581,27 @@ class AudioTestSessionOwner:
         session = self._current(channel, generation)
         if session is not None:
             session.device = dict(device)
+            if self._diagnostic_evidence is not None and channel == "self":
+                self._diagnostic_evidence.opened = True
+                self._emit(
+                    "diagnose_opened",
+                    {
+                        "channel": channel,
+                        "target_index": self._diagnostic_evidence.candidate.device_index,
+                    },
+                )
 
     def observe_frame(self, channel: AudioTestChannel, generation: int, frame: object) -> None:
         session = self._current(channel, generation)
         if session is None or session.probe is None:
             return
+        evidence = self._diagnostic_evidence if channel == "self" else None
+        if evidence is not None:
+            evidence.frame_count += 1
         session.probe.reconfigure(self.vad_settings(channel))
         samples = session.probe.process(frame)  # type: ignore[arg-type]
+        if evidence is not None:
+            evidence.observe(samples)
         if not samples:
             return
         latest = samples[-1]
@@ -412,6 +709,7 @@ class AudioTestSessionOwner:
     async def _pause_translation_capture(self) -> bool:
         for channel in self.channels:
             initial = self.capture_control.state(channel)
+            intent_revision = self._capture_intent_revision.get(channel, 0)
             if initial.close_exception is not None:
                 self._log(f"[AudioTest] channel={channel} capture cleanup failure is retained")
                 self._fail_session(
@@ -422,6 +720,8 @@ class AudioTestSessionOwner:
                 return False
             if not initial.busy:
                 continue
+            if initial.enabled:
+                self._restoration_status[channel] = "cleanup_pending"
             try:
                 await self.capture_control.set_enabled(channel, False)
                 current = self.capture_control.state(channel)
@@ -438,20 +738,49 @@ class AudioTestSessionOwner:
                     self._session(channel), "capture_pause_failed", type(exc).__name__
                 )
                 return False
-            if initial.enabled:
-                self._restore[channel] = current.token
+            finally:
+                if initial.enabled and intent_revision == self._capture_intent_revision.get(
+                    channel, 0
+                ):
+                    self._restore[channel] = self.capture_control.state(channel).token
+                    self._restoration_status[channel] = "cleanup_pending"
+            if (
+                self._diagnosis_pause_task is asyncio.current_task()
+                and self._diagnosis_pause_aborted
+            ):
+                return False
         return True
 
     async def _restore_translation_capture(self) -> None:
-        restore = dict(self._restore)
-        self._restore.clear()
-        for channel, token in restore.items():
+        for channel, token in tuple(self._restore.items()):
+            if self._closed:
+                return
+            if self._restore.get(channel) != token:
+                self._restoration_status[channel] = "skipped"
+                continue
             try:
                 current = self.capture_control.state(channel)
-                if current.token != token or current.busy:
+                if current.token != token:
+                    self._restore.pop(channel, None)
+                    self._restoration_status[channel] = "skipped"
+                    continue
+                if current.source_open or current.close_exception is not None:
+                    self._restoration_status[channel] = "cleanup_pending"
+                    continue
+                if current.busy:
+                    self._restore.pop(channel, None)
+                    self._restoration_status[channel] = "skipped"
                     continue
                 await self.capture_control.set_enabled(channel, True)
+                if self._restore.get(channel) != token:
+                    self._restoration_status[channel] = "skipped"
+                    continue
+                if not self.capture_control.state(channel).enabled:
+                    raise RuntimeError("translation capture was not restored")
+                self._restore.pop(channel, None)
+                self._restoration_status[channel] = "restored"
             except Exception as exc:
+                self._restoration_status[channel] = "failed"
                 self._log(
                     f"[AudioTest] channel={channel} failed to restore translation capture "
                     f"cause={type(exc).__name__}"

@@ -278,3 +278,153 @@ def test_auth_protected_input_keeps_supported_login_fields(monkeypatch, provider
     fields = {"qq_identity": "synthetic-qq", "credential": "a" * 64} if provider == "qq" else {}
     monkeypatch.setattr(cli.sys, "stdin", io.StringIO(json.dumps(fields)))
     assert cli._auth_input(SimpleNamespace(stdin=True, provider=provider)) == fields
+
+
+@pytest.mark.parametrize("no_wait", (False, True))
+def test_audio_diagnose_dispatches_empty_owned_command_and_preserves_terminal_evidence(
+    monkeypatch, capsys, no_wait
+):
+    record = SimpleNamespace(instance_id="session")
+    monkeypatch.setattr(cli, "_instance", lambda _path: record)
+    accepted = {
+        "instance_id": "session",
+        "operation_id": "diagnosis-operation",
+        "status": "accepted",
+        "terminal": False,
+    }
+    terminal = {
+        **accepted,
+        "status": "applied",
+        "terminal": True,
+        "recognition": "not_exercised",
+        "settings_changed": False,
+        "diagnosis": {
+            "scope": "local_capture_vad",
+            "state": "completed",
+            "cleanup_complete": True,
+            "restoration": {"self": "restored", "peer": "not_needed"},
+            "candidates": [{"id": "input-7", "opened": True, "frames_received": True}],
+        },
+    }
+    calls = []
+
+    async def request(actual_record, method, arguments=None, *, timeout):
+        assert actual_record is record
+        calls.append(method)
+        if method == "submit":
+            assert arguments["name"] == "audio.diagnose"
+            assert arguments["values"] == {}
+            return accepted
+        assert method == "wait"
+        assert arguments["operation_id"] == "diagnosis-operation"
+        return terminal
+
+    monkeypatch.setattr(cli, "request", request)
+    argv = ["audio", "diagnose"] + (["--no-wait"] if no_wait else [])
+    assert cli.main(argv) == 0
+    assert calls == (["submit"] if no_wait else ["submit", "wait"])
+    assert json.loads(capsys.readouterr().out) == {
+        "output_version": 1,
+        **(accepted if no_wait else terminal),
+    }
+
+
+@pytest.mark.parametrize("no_wait", (False, True))
+def test_osc_discovery_retry_dispatches_empty_command_without_claiming_remote_delivery(
+    monkeypatch, capsys, no_wait
+):
+    record = SimpleNamespace(instance_id="session")
+    monkeypatch.setattr(cli, "_instance", lambda _path: record)
+    accepted = {
+        "instance_id": "session",
+        "operation_id": "osc-retry-operation",
+        "status": "accepted",
+        "terminal": False,
+    }
+    terminal = {
+        **accepted,
+        "status": "applied",
+        "terminal": True,
+        "retry_started": True,
+        "effect": "discovery_target_applied",
+        "output": {
+            "destination_source": "discovered",
+            "discovered_remote_present": True,
+            "remote_delivery": "unacknowledged",
+        },
+    }
+    calls = []
+
+    async def request(actual_record, method, arguments=None, *, timeout):
+        assert actual_record is record
+        calls.append(method)
+        if method == "submit":
+            assert arguments["name"] == "osc.discovery.retry"
+            assert arguments["values"] == {}
+            return accepted
+        assert method == "wait"
+        assert arguments["operation_id"] == "osc-retry-operation"
+        return terminal
+
+    monkeypatch.setattr(cli, "request", request)
+    argv = ["osc", "discovery", "retry"] + (["--no-wait"] if no_wait else [])
+    assert cli.main(argv) == 0
+    assert calls == (["submit"] if no_wait else ["submit", "wait"])
+    assert json.loads(capsys.readouterr().out) == {
+        "output_version": 1,
+        **(accepted if no_wait else terminal),
+    }
+
+
+def test_osc_status_remains_query_only(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_instance", lambda _path: SimpleNamespace(instance_id="session"))
+
+    async def request(_record, method, arguments=None, *, timeout):
+        assert method == "query"
+        assert arguments == {"name": "osc.status", "values": {}}
+        return {"output": {"remote_delivery": "unacknowledged"}}
+
+    monkeypatch.setattr(cli, "request", request)
+    assert cli.main(["osc", "status"]) == 0
+    assert json.loads(capsys.readouterr().out)["output"]["remote_delivery"] == "unacknowledged"
+
+
+@pytest.mark.parametrize(
+    "extra",
+    (["--host", "127.0.0.1"], ["--send-port", "19000"], ["--text", "synthetic"]),
+)
+def test_osc_discovery_retry_rejects_caller_owned_destinations_and_text(extra):
+    with pytest.raises(SystemExit) as raised:
+        cli.build_parser().parse_args(["osc", "discovery", "retry", *extra])
+    assert raised.value.code == 2
+
+
+def test_audio_diagnose_rejects_unowned_route_and_duration_arguments():
+    for extra in (["--device", "arbitrary"], ["--duration", "999"]):
+        with pytest.raises(SystemExit) as raised:
+            cli.build_parser().parse_args(["audio", "diagnose", *extra])
+        assert raised.value.code == 2
+
+
+def test_diagnosis_operation_cancel_preserves_cleanup_debt_receipt(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_instance", lambda _path: SimpleNamespace(instance_id="session"))
+    receipt = {
+        "operation_id": "diagnosis",
+        "status": "cancelled",
+        "terminal": True,
+        "diagnosis": {
+            "state": "cancelled",
+            "cleanup_complete": False,
+            "failure_code": "resource_release_incomplete",
+            "restoration": {"self": "cleanup_pending", "peer": "not_needed"},
+        },
+    }
+
+    async def request(_record, method, arguments=None, *, timeout):
+        assert method == "cancel"
+        assert arguments == {"operation_id": "diagnosis"}
+        return receipt
+
+    monkeypatch.setattr(cli, "request", request)
+    assert cli.main(["operation", "cancel", "diagnosis"]) == 6
+    assert json.loads(capsys.readouterr().out) == {"output_version": 1, **receipt}

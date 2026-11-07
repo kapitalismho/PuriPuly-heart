@@ -12,6 +12,7 @@ import flet as ft
 
 from puripuly_heart.app.ports.ui_models import OptionItem
 from puripuly_heart.ui.flet_runtime import is_hover_active
+from puripuly_heart.ui.motion import close_modal, press_event, show_modal
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_NEUTRAL_DARK,
@@ -126,7 +127,7 @@ class SettingsModal:
             bgcolor=ft.Colors.TRANSPARENT,
         )
 
-        self._page.show_dialog(self._dialog)
+        show_modal(self._page, self._dialog)
 
     def replace_options(self, options: Sequence[OptionItem]) -> None:
         """Replace the option list after the modal is open.
@@ -326,6 +327,7 @@ class SettingsModal:
             alignment=ft.Alignment.CENTER,
             on_click=None if option.disabled else lambda e, val=option.value: self._select(val),
             on_hover=None if option.disabled else self._on_item_hover,
+            on_tap_down=None if option.disabled else press_event,
             animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
             height=110,
         )
@@ -430,5 +432,5 @@ class SettingsModal:
                 self._on_selection_change(self._selected_values())
             return
         if self._dialog:
-            self._page.pop_dialog()
+            close_modal(self._page, self._dialog)
         self._on_select(value)

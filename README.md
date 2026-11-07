@@ -211,7 +211,6 @@ If audio capture does not work, open **Settings > General** and follow these ste
 1. Change **Audio Host API** to **Auto** or **MME**.
 2. Select the correct microphone.
 3. Restart the app.
-
 ---
 
 ### Note for Users in China
@@ -416,10 +415,6 @@ Network, proxy, TLS certificate, and service errors do not mean your key is inva
 
 See [`docs/architecture.md`](docs/architecture.md).
 
-## Roadmap
-
-Upcoming work is tracked publicly on the [PuriPuly project board](https://github.com/users/kapitalismho/projects/2).
-
 ---
 
 ## Development
@@ -438,9 +433,6 @@ uv sync --locked --extra dev --python 3.14.10
 uv run python -m puripuly_heart.main run-gui
 ```
 
-The main-card input uses the source language's font and letter spacing independently of the UI language. Languages without extra letter spacing use zero tracking; the placeholder retains the UI language's typography.
-The placeholder shows the default prompt on the first launch. From the second launch on, one of four placeholders (the default prompt or a tip) is picked at random once per launch.
-
 ### CLI
 
 The CLI can run the application without a GUI or control an already-running application. See the [CLI guide](docs/cli.md) for commands.
@@ -456,16 +448,6 @@ uv run --locked black --check .
 uv run --locked ruff check .
 uv run --locked python scripts/ci/check_test_selection.py
 ```
-
-Run the affected Python partition or individual failing node using the [PR verification guide](.github/CONTRIBUTING.md#pr-verification) and [workflow selections](.github/workflows/pr-ci.yml). The workflow keeps live-provider/model integrations explicitly excluded. A focused test pass does not replace wider checks or actual-application verification.
-
-PR CI uses the Python and uv versions pinned in its workflow and keeps six independently reproducible Python partitions. Contracts and Runtime use two file-grouped pytest workers, capture stdout/stderr for failure diagnosis, and do not restart failed workers. Other Python partitions remain serial. Reproduce a reported node serially with `uv run --locked pytest -ra <nodeid>` when live output is useful.
-
-Every job still performs locked installation and its complete declared checks. uv uses a same-volume temporary cache without remote persistence; measured restore/save costs exceeded download savings. Lint reuses Black's content-aware cache but always runs `black --check`. Native checks reuse dependency builds at the short Windows target path and still stage fonts and run both deterministic and serial graphics checks on every run.
-
-When profiling tests, use `--durations=20` with the affected partition. Remove avoidable preparation or incomplete fake lifecycles before adding workers; preserve real-process, persistence, ordering, cancellation, recovery, and shutdown observations. Compare workflow elapsed time separately from summed job duration, and include cache restore/save costs. Pytest JUnit testcase times include setup and teardown, not only the test body.
-
-Keep a permanent test only when it adds meaningful fault detection or materially better diagnosis beyond the retained suite; compare the same failure family across files and layers before adding another case. Preserve consequential boundaries, state transitions, privacy, persistence, ordering, cancellation, recovery, and continued progress. Change-specific probes need not become permanent tests: remove redundant cases and their unused fixtures instead of moving them into helpers or larger matrices.
 
 ---
 

@@ -12,6 +12,7 @@ from puripuly_heart.app.ports.chatgpt_account import (
     ChatGptConnectResult,
     ChatGptSignOutResult,
 )
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_view import (
     AlibabaConnectionApplyResult,
     AlibabaConnectionDraftSnapshot,
@@ -181,6 +182,9 @@ class UiAudioTestRuntimeAdapter:
     async def start_audio_test(self, *, observation_callback=None) -> bool:
         return await self.audio_test.start(observation_callback=observation_callback)
 
+    async def diagnose_audio(self, *, is_current: Callable[[], bool]) -> dict[str, object]:
+        return await self.audio_test.diagnose(is_current=is_current)
+
     def audio_test_snapshot(self) -> dict[str, object]:
         return self.audio_test.snapshot
 
@@ -244,6 +248,51 @@ class UiManagedRuntimeAdapter:
 
     def dashboard_managed_auth_prompt_kind(self) -> str:
         return self.managed.auth.dashboard_prompt_kind()
+
+    def managed_account_snapshot(self) -> dict:
+        auth = self.managed.auth
+        state = auth.state_provider()
+        usage = self.managed.usage
+        usage_state = usage.state_provider()
+        scope_matches = (
+            state.settings_available
+            and state.managed_selected
+            and usage_state.settings_available
+            and usage_state.managed_key_visible
+            and bool(usage_state.entitlement_ref)
+            and usage_state.entitlement_ref == usage.usage_metadata_entitlement_ref
+        )
+        metadata = usage.usage_metadata
+        remaining = usage.remaining_percent if scope_matches else None
+        return {
+            "provider": (
+                ("qq" if state.managed_china else "discord")
+                if state.settings_available and state.managed_selected
+                else None
+            ),
+            "selected": state.managed_selected if state.settings_available else None,
+            "available": (
+                state.release_service_available and not state.ingress_frozen
+                if state.settings_available
+                else None
+            ),
+            "credential_present": (
+                state.local_key_available
+                if state.settings_available and state.managed_selected
+                else None
+            ),
+            "in_progress": auth.dashboard_action() == "in_progress",
+            "budget": {
+                "unit": "percent",
+                "remaining_percent": remaining,
+                "availability": (
+                    "cached"
+                    if remaining is not None
+                    else "stale" if metadata is not None and not scope_matches else "unknown"
+                ),
+                "freshness": "unknown",
+            },
+        }
 
     async def start_qq_managed_auth_from_dialog(self, **kwargs: object) -> object:
         return await self.managed.auth.start_qq(
@@ -610,7 +659,9 @@ class UiProviderRuntimeAdapter:
             ),
         )
 
-    async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:
+    async def verify_api_key(
+        self, provider: str, key: str
+    ) -> ProviderCredentialVerificationOutcome:
         return await self.credential_verification.verify(provider, key)
 
     def persist_api_key_verification(

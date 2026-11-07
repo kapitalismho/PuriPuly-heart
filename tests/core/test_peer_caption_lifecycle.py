@@ -587,6 +587,37 @@ async def test_qwen_empty_partial_retains_last_nonempty_and_text_capacity_is_exp
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("configured_source", "expected_name"),
+    [("zh-CN", "Chinese (Simplified)"), ("zh-TW", "Chinese (Traditional)"), ("ja", "Japanese")],
+)
+async def test_manual_regional_source_translates_final_without_detected_language(
+    configured_source, expected_name
+):
+    harness, backend, events, _ = setup()
+    harness.configuration.replace(
+        replace(
+            harness.configuration.snapshot().value,
+            peer_source_mode="manual",
+            peer_source_language=configured_source,
+            peer_target_language="ko",
+        )
+    )
+    try:
+        await harness.start()
+        await final(harness, transcript("你好。", 1), provider="qwen_audio")
+        await idle(harness)
+        assert [request.text for request in backend.calls] == ["你好。"]
+        assert backend.calls[0].source_language == configured_source
+        assert expected_name in backend.calls[0].system_prompt
+        assert events[-1].type == "translation_final"
+        assert events[-1].text == "translated:你好。"
+        assert events[-1].source_language == configured_source
+    finally:
+        await harness.stop()
+
+
+@pytest.mark.asyncio
 async def test_local_peer_uses_unchanged_per_final_translation_without_preview_or_join(monkeypatch):
     harness, backend, events, clock = setup()
     monkeypatch.setattr(

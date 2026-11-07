@@ -22,6 +22,8 @@ import type {
 import { hasOtherLiveOperation, markOperationActiveOnAck, sweepStaleManagedOperations } from './managed-operation';
 import { runNetworkIdentityBackfill } from './network-identity-migration';
 import { resolveNetworkIdentitySecrets } from './network-identity';
+import { deleteExpiredChallengePreflightInstallations } from './preflight-retention';
+import { deleteExpiredPuriProofNonces } from './puri-token';
 
 import {
   applyAppActiveDayRetention,
@@ -121,6 +123,10 @@ async function applyScheduledRetention(db: D1Database, now: Date): Promise<void>
   await runScheduledPhase(failures, () =>
     applyAppActiveDayRetention(db, now),
   );
+  await runScheduledPhase(failures, () =>
+    deleteExpiredChallengePreflightInstallations(db, { now }),
+  );
+  await runScheduledPhase(failures, () => deleteExpiredPuriProofNonces(db, now));
   throwFirstScheduledFailure(failures);
 }
 

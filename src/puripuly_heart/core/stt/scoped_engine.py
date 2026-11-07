@@ -100,6 +100,10 @@ STTScopedSessionFactory = Callable[
     [AudioSegmentSettingsSnapshot, str],
     Awaitable[STTScopedTurnSession],
 ]
+STTProbeSessionFactory = Callable[
+    [AudioSegmentSettingsSnapshot, str],
+    Awaitable[tuple[STTScopedTurnSession, str]],
+]
 STTScopedTurnEventSink = Callable[[STTProviderTurnEvent], Awaitable[None] | None]
 STTScopedDiagnosticSink = Callable[[object], Awaitable[None] | None]
 STTWatchdogResolver = Callable[[AudioSegmentSettingsSnapshot], "STTRecognitionWatchdogs"]
@@ -219,6 +223,9 @@ class ScopedRecognitionEngine:
         Callable[[Exception | ErrorDiagnostics], Awaitable[None] | None] | None
     ) = None
     session_lifetime_enabled: bool = True
+    probe_session_factory: STTProbeSessionFactory | None = None
+    probe_settings: AudioSegmentSettingsSnapshot | None = None
+    probe_sessions: list[STTScopedTurnSession] = field(init=False, default_factory=list, repr=False)
     exclusive_provider_ids: frozenset[str] = frozenset(
         {
             "local_cpu_auto",
@@ -353,10 +360,11 @@ class ScopedRecognitionEngine:
             sum(not task.done() for task in self._cleanup_tasks)
             + sum(not task.done() for task in self._factory_tasks)
             + int(self._quarantined_session is not None)
+            + len(self.probe_sessions)
         )
         if session_debt:
             return session_debt
-        return int(self._backend_close_task is not None and not self._backend_close_task.done())
+        return int(self._backend_close_task is not None)
 
     @property
     def is_at_utterance_boundary(self) -> bool:
@@ -996,20 +1004,34 @@ class ScopedRecognitionEngine:
 
     async def close_backend(self) -> None:
         await self.close()
+        for session in tuple(self.probe_sessions):
+            await session.close()
+            self.probe_sessions.remove(session)
         if self._backend_closed:
             return
-        self._backend_closed = True
-        if self.backend_close is None:
-            return
-        task = asyncio.create_task(
-            self._close_backend_after_cleanup(),
-            name="scoped-stt-backend-close",
-        )
-        self._backend_close_task = task
-        task.add_done_callback(self._backend_close_done)
+        task = self._backend_close_task
+        if task is None or task.done():
+            if self.backend_close is None:
+                self._backend_closed = True
+                return
+            task = asyncio.create_task(
+                self._close_backend_after_cleanup(),
+                name="scoped-stt-backend-close",
+            )
+            self._backend_close_task = task
+            task.add_done_callback(self._backend_close_done)
         done, _pending = await asyncio.wait({task}, timeout=self.event_drain_timeout_s)
         if task in done:
             self._consume_task_result(task)
+
+    async def close_backend_and_wait(self) -> None:
+        await self.close_backend()
+        task = self._backend_close_task
+        if task is not None:
+            await asyncio.shield(task)
+            if self._backend_close_task is task:
+                self._backend_closed = True
+                self._backend_close_task = None
 
     async def _handle_start(
         self,
@@ -2961,7 +2983,8 @@ class ScopedRecognitionEngine:
             await close_result
 
     def _backend_close_done(self, task: asyncio.Task[None]) -> None:
-        if self._backend_close_task is task:
+        if self._backend_close_task is task and not task.cancelled() and task.exception() is None:
+            self._backend_closed = True
             self._backend_close_task = None
         self._observe_cleanup_task(task)
 

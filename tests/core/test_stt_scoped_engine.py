@@ -4983,3 +4983,64 @@ async def test_successful_resume_context_does_not_admit_newly_stale_onset(
         for event in emitted
         if isinstance(event, STTProviderInputTerminal)
     ] == [(sessions[0].requests[0].identity, "submitted")]
+
+
+async def test_bounded_backend_close_keeps_pending_cleanup_for_explicit_settlement():
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    closed = asyncio.Event()
+
+    async def close_backend():
+        entered.set()
+        await release.wait()
+        closed.set()
+
+    async def factory(_settings, _epoch):
+        pytest.fail("backend close must not open a recognition session")
+
+    engine = ScopedRecognitionEngine(
+        factory, backend_close=close_backend, event_drain_timeout_s=0.001
+    )
+    waiting = None
+    try:
+        await asyncio.wait_for(engine.close_backend(), timeout=1)
+        assert entered.is_set() and not closed.is_set()
+        assert engine.cleanup_debt > 0
+        waiting = asyncio.create_task(engine.close_backend_and_wait())
+        await asyncio.sleep(0)
+        assert not waiting.done() and not closed.is_set()
+        release.set()
+        await asyncio.wait_for(waiting, timeout=1)
+        assert closed.is_set() and engine.cleanup_debt == 0
+        await engine.close_backend_and_wait()
+    finally:
+        release.set()
+        if waiting is not None:
+            await waiting
+        await engine.close_backend_and_wait()
+
+
+async def test_failed_backend_teardown_remains_owned_and_retryable_until_resource_release():
+    fail = True
+    resource_alive = True
+
+    async def close_backend():
+        nonlocal resource_alive
+        if fail:
+            raise RuntimeError("controlled cleanup failure")
+        resource_alive = False
+
+    async def factory(_settings, _epoch):
+        pytest.fail("backend close must not open a recognition session")
+
+    engine = ScopedRecognitionEngine(factory, backend_close=close_backend)
+    try:
+        with pytest.raises(RuntimeError):
+            await engine.close_backend_and_wait()
+        assert resource_alive and engine.cleanup_debt > 0
+        fail = False
+        await engine.close_backend_and_wait()
+        assert not resource_alive and engine.cleanup_debt == 0
+    finally:
+        fail = False
+        await engine.close_backend_and_wait()

@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.managed_gemma_translation import ManagedGemmaTranslationSelection
+from puripuly_heart.app.ports.settings_secrets import SettingsSecretValuesSnapshot
 from puripuly_heart.app.ports.settings_view import (
     ActivationNoticeSettingsIntent,
     AudioInputSettingsIntent,
@@ -59,9 +60,18 @@ from puripuly_heart.app.ports.settings_view import (
     VrcMicInterceptSettingsIntent,
 )
 from puripuly_heart.app.services.application_control_events import ControlEvents
+from puripuly_heart.app.services.audio_diagnosis import audio_diagnosis_receipt
 from puripuly_heart.app.services.canonical_settings_persistence import canonical_snapshot_values
 from puripuly_heart.app.services.capture.peer_capture_target_application import (
     PeerCaptureTargetUnavailable,
+)
+from puripuly_heart.app.services.recognition_probe import (
+    RECOGNITION_PROBE_METADATA,
+    run_recognition_probe,
+)
+from puripuly_heart.app.services.translation_probe import (
+    TRANSLATION_PROBE_METADATA,
+    run_translation_probe,
 )
 from puripuly_heart.config.provider_values import (
     QwenRegion,
@@ -80,6 +90,7 @@ from puripuly_heart.core.diagnostics import (
     normalize_diagnostic,
     sanitize_diagnostic_fields,
 )
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.local_translation.provisioning import (
     GemmaProvisioningCancelled,
     GemmaProvisioningError,
@@ -115,8 +126,11 @@ COMMANDS = {
     "app.stop": "Request ordered host shutdown",
     "capture.set": "Set self or peer capture explicitly",
     "translation.set": "Set translation explicitly",
+    "translation.probe": "Probe the attached translation backend without publishing output",
+    "recognition.probe": "Probe Self or Peer recognition with bundled speech without capture or output",
     "text.submit": "Submit manual text through the self pipeline",
     "audio.test": "Start or stop the microphone and loopback audio test",
+    "audio.diagnose": "Diagnose actual microphone routes using bounded local capture and VAD",
     "audio.target.set": "Set peer loopback target",
     "audio.retry": "Retry lost peer process target",
     "settings.apply": "Apply focused typed settings changes",
@@ -141,6 +155,7 @@ COMMANDS = {
     "overlay.size": "Select desktop overlay size",
     "overlay.position.reset": "Reset desktop overlay position",
     "overlay.calibrate": "Begin, change, apply or cancel overlay calibration",
+    "osc.discovery.retry": "Refresh or recover automatic OSC discovery without changing settings",
 }
 QUERIES = {
     "app.status",
@@ -154,6 +169,7 @@ QUERIES = {
     "gpu.status",
     "models.status",
     "secrets.presence",
+    "accounts.status",
     "auth.status",
     "overlay.status",
     "osc.status",
@@ -170,8 +186,11 @@ COMMAND_ARGUMENTS = {
         "accept_terms": "optional boolean (true only for peer enabled; defaults false)",
     },
     "translation.set": {"enabled": "boolean"},
+    "translation.probe": {},
+    "recognition.probe": {"channel": ["self", "peer"]},
     "text.submit": {"text": "non-empty string (protected content)"},
     "audio.test": {"enabled": "boolean"},
+    "audio.diagnose": {},
     "audio.target.set": {"value": "available audio.target option value"},
     "audio.retry": {},
     "settings.apply": {
@@ -225,6 +244,7 @@ COMMAND_ARGUMENTS = {
     "gemma.prepare": {},
     "gemma.cancel": {},
     "overlay.position.reset": {},
+    "osc.discovery.retry": {},
     "overlay.calibrate": {
         "action": ["begin", "change", "apply", "cancel"],
         "field": "required for change: anchor, offset_x, offset_y, distance, text_scale, background_alpha",
@@ -370,6 +390,90 @@ def _secret_keys(application: UiApplicationBoundary) -> tuple[str, ...]:
     return tuple(keys)
 
 
+def _effective_secret_presence(
+    keys: tuple[str, ...], snapshot: SettingsSecretValuesSnapshot
+) -> dict[str, bool]:
+    from puripuly_heart.config.alibaba_connection import alibaba_credential_sources
+
+    env_vars = {
+        "google_api_key": "GOOGLE_API_KEY",
+        "openrouter_api_key": "OPENROUTER_API_KEY",
+        "openai_api_key": "OPENAI_API_KEY",
+        "deepseek_api_key": "DEEPSEEK_API_KEY",
+        "deepgram_api_key": "DEEPGRAM_API_KEY",
+        "gemini_transcribe_api_key": "GEMINI_API_KEY",
+        "elevenlabs_scribe_api_key": "ELEVENLABS_API_KEY",
+        "soniox_api_key": "SONIOX_API_KEY",
+    }
+    presence = {}
+    for key in keys:
+        value = snapshot.get(key)
+        if key in {"alibaba_api_key_beijing", "alibaba_api_key_singapore"}:
+            region = "beijing" if key.endswith("_beijing") else "singapore"
+            _, legacy_keys, sources = alibaba_credential_sources(region)
+            value = value or next(
+                (snapshot.get(name) for name in legacy_keys if snapshot.get(name)), None
+            )
+            value = value or next((os.getenv(name) for name in sources if os.getenv(name)), None)
+        elif key in env_vars:
+            value = value or os.getenv(env_vars[key])
+        presence[key] = bool(value.strip()) if type(value) is str else False
+    return presence
+
+
+def _accounts_status(application: object) -> dict:
+    chatgpt = {"available": False, "signed_in": None, "in_progress": None, "sign_in_required": None}
+    account = getattr(application, "chatgpt_account_snapshot", None)
+    if callable(account):
+        try:
+            snapshot = account()
+            required = getattr(application, "chatgpt_sign_in_required", None)
+            chatgpt.update(
+                available=True,
+                signed_in=snapshot.signed_in if type(snapshot.signed_in) is bool else None,
+                in_progress=snapshot.in_progress if type(snapshot.in_progress) is bool else None,
+                sign_in_required=(
+                    required() if callable(required) and type(snapshot.signed_in) is bool else None
+                ),
+            )
+            if type(chatgpt["sign_in_required"]) is not bool:
+                chatgpt["sign_in_required"] = None
+        except Exception:
+            chatgpt["available"] = None
+    managed = {}
+    accessor = getattr(application, "managed_account_snapshot", None)
+    if callable(accessor):
+        try:
+            source = accessor()
+            source = source if isinstance(source, Mapping) else {}
+            managed = {
+                key: source[key] if type(source.get(key)) is bool else None
+                for key in ("available", "selected", "credential_present", "in_progress")
+            }
+            provider = source.get("provider")
+            managed["provider"] = provider if provider in ("qq", "discord") else None
+            budget = source.get("budget")
+            budget = budget if isinstance(budget, Mapping) else {}
+            availability = budget.get("availability")
+            availability = (
+                availability if availability in ("cached", "unknown", "stale") else "unknown"
+            )
+            remaining = budget.get("remaining_percent")
+            if type(remaining) is not int or not 0 <= remaining <= 100:
+                remaining = None
+                if availability == "cached":
+                    availability = "unknown"
+            managed["budget"] = {
+                "unit": "percent",
+                "availability": availability,
+                "remaining_percent": remaining if availability == "cached" else None,
+                "freshness": "unknown",
+            }
+        except Exception:
+            managed = {}
+    return {"chatgpt": chatgpt, "managed": managed}
+
+
 def _known_secret(application: UiApplicationBoundary, name: str) -> str:
     if name not in _secret_keys(application):
         raise InvalidArgumentsError("unknown or undeclared secret")
@@ -488,6 +592,10 @@ class ApplicationControlOwner:
     gemma_selection: Callable[[AppSettingsVNext], ManagedGemmaTranslationSelection]
     instance_id: str | None = None
     selection_committed: Callable[[AppSettingsVNext], None] | None = None
+    recognition_probe_request: (
+        Callable[[AppSettingsVNext, str], ProviderRuntimeBuildRequest] | None
+    ) = None
+    osc_discovery_retry: Callable[[], Awaitable[dict[str, object]]] | None = None
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _resource_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _stop_requested: asyncio.Event = field(default_factory=asyncio.Event)
@@ -700,7 +808,9 @@ class ApplicationControlOwner:
         return self._revision
 
     async def apply_mutation(
-        self, mutator: Callable[[object], object]
+        self,
+        mutator: Callable[[object], object],
+        is_current: Callable[[], bool] = lambda: True,
     ) -> tuple[object, object, object]:
         """OSC focused edit: obtain canonical under the shared mutation lock."""
         import copy
@@ -710,6 +820,8 @@ class ApplicationControlOwner:
                 current = self.application.compatibility_settings()
                 if current is None:
                     raise RuntimeError("settings not loaded")
+                if not is_current():
+                    return False, current, current
                 previous = copy.deepcopy(current)
                 updated = mutator(copy.deepcopy(current))
                 result = await self.application._settings.apply_settings(updated)
@@ -724,7 +836,14 @@ class ApplicationControlOwner:
                 key: {
                     "description": value,
                     "arguments": COMMAND_ARGUMENTS[key],
-                    "cancellable": key in {"models.install", "gemma.prepare"},
+                    "cancellable": key
+                    in {
+                        "models.install",
+                        "gemma.prepare",
+                        "translation.probe",
+                        "recognition.probe",
+                        "audio.diagnose",
+                    },
                 }
                 for key, value in COMMANDS.items()
             },
@@ -1407,6 +1526,8 @@ class ApplicationControlOwner:
                 "ports": self.application.effective_osc_ports(),
                 "output": _json(output["osc"]),
             }
+        if name == "accounts.status":
+            return {**base, **_accounts_status(self.application)}
         if name == "auth.status":
             return {
                 **base,
@@ -1427,7 +1548,7 @@ class ApplicationControlOwner:
             }
         if name == "secrets.presence":
             keys = _secret_keys(self.application)
-            result = self.application.settings_secrets().load_values(keys)
+            result = self.application.settings_secrets().load_values((*keys, "alibaba_api_key"))
             if result.snapshot is None or result.diagnostics is not None:
                 diagnostic = (
                     self._retain_diagnostic(result.diagnostics, disposition="failed")
@@ -1446,6 +1567,7 @@ class ApplicationControlOwner:
                 **base,
                 "status": "applied",
                 "presence": {key: bool(result.snapshot.get(key)) for key in keys},
+                "effective_presence": _effective_secret_presence(keys, result.snapshot),
             }
         raise AssertionError(name)
 
@@ -1490,6 +1612,17 @@ class ApplicationControlOwner:
             "terminal": False,
             "revision": self._current_revision(),
         }
+        if command == "translation.probe":
+            receipt.update(TRANSLATION_PROBE_METADATA)
+        if command == "recognition.probe":
+            receipt.update(
+                RECOGNITION_PROBE_METADATA,
+                channel=(
+                    arguments.get("channel")
+                    if arguments.get("channel") in ("self", "peer")
+                    else None
+                ),
+            )
         runtime_toggle = None
         if command in {"translation.set", "capture.set"}:
             try:
@@ -1508,7 +1641,8 @@ class ApplicationControlOwner:
             runtime_toggle=runtime_toggle,
             audio_test_revision=(
                 self.application.audio_test_start_revision()
-                if command == "audio.test" and arguments.get("enabled") is True
+                if command == "audio.diagnose"
+                or (command == "audio.test" and arguments.get("enabled") is True)
                 else None
             ),
         )
@@ -1608,6 +1742,92 @@ class ApplicationControlOwner:
             exception=exception,
         )
 
+    def _retain_audio_diagnosis(self, result: dict) -> None:
+        diagnosis = result["diagnosis"]
+        summaries = []
+        for candidate in diagnosis["candidates"]:
+            route_id = hashlib.sha256(
+                json.dumps(
+                    [
+                        candidate["input_host_api"],
+                        candidate["input_device"],
+                        candidate["device_index"],
+                    ],
+                    ensure_ascii=False,
+                ).encode("utf-8")
+            ).hexdigest()[:16]
+            fields = {
+                "target_index": candidate["device_index"],
+                "route_id": route_id,
+                "candidate_current_route": candidate["current_route"],
+                "opened": candidate["opened"],
+                "frames_received": candidate["frames_received"],
+                "frame_count": candidate["frame_count"],
+                "vad_sample_count": candidate["vad_sample_count"],
+                "silence_observed": candidate["silence_observed"],
+                "speech_detected": candidate["speech_detected"],
+                "level_ppm": int(candidate["peak_level"] * 1_000_000),
+                "speech_probability_ppm": int(
+                    (candidate["speech_probability_max"] or 0.0) * 1_000_000
+                ),
+                "speech_probability_min": candidate["speech_probability_min"],
+                "speech_probability_max": candidate["speech_probability_max"],
+                "speech_threshold": candidate["speech_threshold"],
+                "elapsed_ms": candidate["elapsed_ms"],
+                "audio_failure_code": candidate["failure_code"] or "none",
+                "cleanup_complete": candidate["cleanup_complete"],
+            }
+            summaries.append(("audio_diagnose_candidate", fields))
+        summaries.append(
+            (
+                "audio_diagnose_completed",
+                {
+                    "count": len(diagnosis["candidates"]),
+                    "cleanup_complete": diagnosis["cleanup_complete"],
+                    "audio_restore_self": diagnosis["restoration"]["self"],
+                    "audio_restore_peer": diagnosis["restoration"]["peer"],
+                    "audio_failure_code": diagnosis["failure_code"] or "none",
+                    "outcome": ("cancelled" if diagnosis["state"] == "cancelled" else "completed"),
+                },
+            )
+        )
+        for code, fields in summaries:
+            failed = fields["audio_failure_code"] != "none"
+            diagnostic = ErrorDiagnostics(
+                component="audio_diagnosis",
+                operation="audio.diagnose",
+                code=code,
+                category="lifecycle",
+                visibility="diagnostic_only",
+                content_policy=CONTENT_POLICY_METADATA_ONLY,
+                status_code=None,
+                retry_after_ms=None,
+                fields=fields,
+            )
+            self._retain_diagnostic(
+                diagnostic,
+                disposition=(
+                    "cancelled"
+                    if diagnosis["state"] == "cancelled"
+                    else "failed" if failed else "recovered"
+                ),
+                stage="audio_diagnosis",
+                severity="warning" if failed else "info",
+            )
+            runtime_logging = getattr(self.application, "_runtime_logging", None)
+            if runtime_logging is not None:
+                tokens = " ".join(
+                    f"{key}={str(value).lower() if isinstance(value, bool) else value}"
+                    for key, value in fields.items()
+                    if key
+                    not in {
+                        "speech_probability_min",
+                        "speech_probability_max",
+                        "speech_threshold",
+                    }
+                )
+                runtime_logging.emit_diagnostic(f"[Capture] {code} {tokens}")
+
     def _notify_presentation(self, receipt: dict, primary: dict | None = None) -> None:
         try:
             self.sync_ui()
@@ -1699,6 +1919,8 @@ class ApplicationControlOwner:
         completed = False
         acquired = False
         try:
+            if operation.interrupt_requested:
+                raise asyncio.CancelledError
             operation.receipt["status"] = "running"
             translation_enable = (
                 command == "translation.set"
@@ -1736,7 +1958,7 @@ class ApplicationControlOwner:
                 or operation.runtime_toggle is not None
                 or safe_capture_off
                 or safe_locale
-                or command == "secrets.verify"
+                or command in {"secrets.verify", "translation.probe", "recognition.probe"}
                 else self._resource_lock
             )
             if resource_lock is not None:
@@ -1784,6 +2006,21 @@ class ApplicationControlOwner:
                                     "install",
                                     self._start_model_install(arguments, operation_id),
                                 )
+                        elif command == "audio.diagnose":
+                            _validate_command_args(
+                                command, arguments, locale_choices=self.locale_choices
+                            )
+                            deferred = ("audio_diagnose", None)
+                        elif command == "translation.probe":
+                            _validate_command_args(
+                                command, arguments, locale_choices=self.locale_choices
+                            )
+                            deferred = ("probe", None)
+                        elif command == "recognition.probe":
+                            _validate_command_args(
+                                command, arguments, locale_choices=self.locale_choices
+                            )
+                            deferred = ("recognition_probe", arguments["channel"])
                         elif command == "text.submit":
                             _validate_command_args(
                                 command, arguments, locale_choices=self.locale_choices
@@ -1844,6 +2081,30 @@ class ApplicationControlOwner:
                             raise asyncio.CancelledError
                         if deferred[0] == "install":
                             result = await self._install_result(deferred[1])
+                        elif deferred[0] == "audio_diagnose":
+                            result = await self.application.diagnose_audio(
+                                admission_revision=operation.audio_test_revision
+                            )
+                            self._retain_audio_diagnosis(result)
+                        elif deferred[0] == "probe":
+                            result = await run_translation_probe(
+                                lambda: getattr(self.pipeline, "llm_runtime", None)
+                            )
+                        elif deferred[0] == "recognition_probe":
+                            result = await run_recognition_probe(
+                                lambda: getattr(self.pipeline, "local_asr_runtime", None),
+                                deferred[1],
+                                (
+                                    (
+                                        lambda: self.recognition_probe_request(
+                                            self.application.compatibility_settings(), deferred[1]
+                                        )
+                                    )
+                                    if self.recognition_probe_request is not None
+                                    else None
+                                ),
+                                self._current_revision,
+                            )
                         else:
                             result = self._text_admission_data(
                                 await self.application.submit_text(deferred[1])
@@ -1898,6 +2159,18 @@ class ApplicationControlOwner:
                     completed = True
         except asyncio.CancelledError, GemmaProvisioningCancelled:
             operation.receipt["status"] = "interrupted" if not self._open else "cancelled"
+            if command == "audio.diagnose":
+                audio = self.application.compatibility_settings().intent.audio
+                result = audio_diagnosis_receipt(
+                    input_host_api=audio.input_host_api,
+                    input_device=audio.input_device,
+                    failure_code="cancelled",
+                )
+                result["diagnosis"]["state"] = "cancelled"
+                operation.receipt.update(
+                    {key: value for key, value in result.items() if key != "status"}
+                )
+                self._retain_audio_diagnosis(result)
         except PeerCaptureTargetUnavailable:
             operation.receipt.update(
                 status="action_required", error={"code": "capture_target_unavailable"}
@@ -1984,6 +2257,26 @@ class ApplicationControlOwner:
                         transaction, operation.receipt["status"]
                     )
                 operation.receipt["revision"] = captured.committed_revision
+            if (
+                command in {"translation.probe", "recognition.probe", "audio.diagnose"}
+                and not self._open
+                and operation.receipt["status"] == "cancelled"
+            ):
+                operation.receipt["status"] = "interrupted"
+            if command == "translation.probe" and operation.receipt["status"] in {
+                "interrupted",
+                "cancelled",
+            }:
+                operation.receipt.update(
+                    translation_result=operation.receipt["status"],
+                    output_delivery="not_exercised",
+                    display="not_exercised",
+                )
+            if command == "recognition.probe" and operation.receipt["status"] in {
+                "interrupted",
+                "cancelled",
+            }:
+                operation.receipt["recognition_result"] = operation.receipt["status"]
             operation.receipt["terminal"] = operation.receipt["status"] in TERMINAL
             if self._lock_owner is asyncio.current_task():
                 self._lock_owner = None
@@ -2357,12 +2650,17 @@ class ApplicationControlOwner:
                     "verification": "unavailable",
                     "reason": "secret_has_no_verification_protocol",
                 }
-            verified, reason = await app.verify_api_key(provider, key)
+            outcome = await app.verify_api_key(provider, key)
+            verified = outcome.status == "verified"
             return {
                 "status": "applied" if verified else "rejected",
                 "verification": "verified" if verified else "failed",
-                "reason": reason if verified else "verification_failed",
+                "reason": "Verification successful" if verified else "verification_failed",
             }
+        if command == "osc.discovery.retry":
+            if self.osc_discovery_retry is None:
+                raise RuntimeError("OSC discovery owner is unavailable")
+            return await self.osc_discovery_retry()
         if command == "overlay.set":
             enabled = _boolean(args, "enabled")
             await app.set_overlay_enabled(enabled)
@@ -3048,6 +3346,13 @@ class ApplicationControlOwner:
             owner = self.gemma()
             if owner is not None:
                 owner.cancel()
+        elif operation.task.get_name().startswith(
+            ("control:translation.probe:", "control:recognition.probe:", "control:audio.diagnose:")
+        ):
+            operation.interrupt_requested = True
+            if operation.receipt["status"] == "accepted":
+                await operation.task
+                return dict(operation.receipt)
         else:
             return {**operation.receipt, "cancellation": "unsupported"}
         operation.task.cancel()
@@ -3125,6 +3430,7 @@ def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[st
     required = {
         "capture.set": {"channel", "enabled"},
         "translation.set": {"enabled"},
+        "recognition.probe": {"channel"},
         "text.submit": {"text"},
         "audio.test": {"enabled"},
         "audio.target.set": {"value"},
@@ -3158,6 +3464,9 @@ def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[st
     ):
         raise InvalidArgumentsError("directory must be a non-empty string")
 
+    if command == "recognition.probe":
+        if type(args["channel"]) is not str or args["channel"] not in {"self", "peer"}:
+            raise InvalidArgumentsError("channel must be self or peer")
     if command == "capture.set":
         if type(args["channel"]) is not str or args["channel"] not in {"self", "peer"}:
             raise InvalidArgumentsError("channel must be self or peer")

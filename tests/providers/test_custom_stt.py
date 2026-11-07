@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 from typing import Any
 from uuid import uuid4
@@ -1048,3 +1049,132 @@ async def test_realtime_close_does_not_raise_cancelled_error() -> None:
     session = await backend.open_session()
     await session.close()
     assert ws.closed is True
+
+
+class _StartupWebSocket(_FakeWebSocket):
+    def __init__(self, *, block_update=False, block_close=False):
+        super().__init__([], hang=True)
+        self.update_started = asyncio.Event()
+        self.update_release = asyncio.Event()
+        self.update_cancelled = asyncio.Event()
+        self.close_started = asyncio.Event()
+        self.close_release = asyncio.Event()
+        self.close_failure = None
+        self.audio = bytearray()
+        if not block_update:
+            self.update_release.set()
+        if not block_close:
+            self.close_release.set()
+
+    async def send(self, payload):
+        packet = json.loads(payload)
+        if packet["type"] == "session.update":
+            self.update_started.set()
+            try:
+                await self.update_release.wait()
+            except asyncio.CancelledError:
+                self.update_cancelled.set()
+                raise
+        await super().send(payload)
+        if packet["type"] == "input_audio_buffer.append":
+            self.audio.extend(base64.b64decode(packet["audio"]))
+        if packet["type"] == "input_audio_buffer.commit":
+            await self.push(
+                json.dumps(
+                    {
+                        "type": "input_audio_buffer.committed",
+                        "item_id": "owned-synthetic-item",
+                        "event_id": "owned-synthetic-commit",
+                    }
+                )
+            )
+            await self.push(
+                json.dumps(
+                    {
+                        "type": "conversation.item.input_audio_transcription.completed",
+                        "item_id": "owned-synthetic-item",
+                        "event_id": "owned-synthetic-final",
+                        "transcript": "isolated synthetic final",
+                    }
+                )
+            )
+
+    async def close(self):
+        self.close_started.set()
+        await self.close_release.wait()
+        if self.close_failure is not None:
+            raise self.close_failure
+        await super().close()
+
+
+@pytest.mark.parametrize("timeout", [False, True])
+async def test_realtime_partial_startup_drains_socket_close_on_cancel_and_timeout(timeout):
+    live_socket = _StartupWebSocket()
+    opening_socket = _StartupWebSocket(block_update=True, block_close=True)
+    sockets = iter((live_socket, opening_socket))
+
+    async def connect(*args, **kwargs):
+        return next(sockets)
+
+    backend = _backend(mode="realtime", compatibility="openai_realtime", websocket_connect=connect)
+    live = await backend.open_session()
+
+    async def opening_session():
+        async with asyncio.timeout(0.02 if timeout else 5):
+            return await backend.open_session()
+
+    opening = asyncio.create_task(opening_session())
+    try:
+        await asyncio.wait_for(opening_socket.update_started.wait(), 1)
+        if not timeout:
+            opening.cancel()
+        await asyncio.wait_for(opening_socket.close_started.wait(), 1)
+        assert opening_socket.update_cancelled.is_set()
+        assert not opening.done() and not opening_socket.closed
+        assert not live_socket.closed
+        if not timeout:
+            opening.cancel()
+            await asyncio.sleep(0)
+            assert not opening.done()
+        opening_socket.close_release.set()
+        with pytest.raises(TimeoutError if timeout else asyncio.CancelledError):
+            await opening
+        assert opening_socket.closed and not live_socket.closed
+        await backend.close()
+        assert not live_socket.closed
+    finally:
+        opening_socket.close_release.set()
+        await asyncio.gather(opening, return_exceptions=True)
+        await live.close()
+        await backend.close()
+
+
+async def test_realtime_failed_startup_cleanup_remains_owned_for_backend_close_retry():
+    live_socket = _StartupWebSocket()
+    opening_socket = _StartupWebSocket(block_update=True)
+    opening_socket.close_failure = RuntimeError("controlled startup cleanup failure")
+    sockets = iter((live_socket, opening_socket))
+
+    async def connect(*args, **kwargs):
+        return next(sockets)
+
+    backend = _backend(mode="realtime", compatibility="openai_realtime", websocket_connect=connect)
+    live = await backend.open_session()
+    opening = asyncio.create_task(backend.open_session())
+    try:
+        await asyncio.wait_for(opening_socket.update_started.wait(), 1)
+        opening.cancel()
+        with pytest.raises(RuntimeError):
+            await opening
+        assert not opening_socket.closed
+        with pytest.raises(RuntimeError):
+            await backend.close()
+        assert not opening_socket.closed and not live_socket.closed
+        opening_socket.close_failure = None
+        await backend.close()
+        assert opening_socket.closed and not live_socket.closed
+    finally:
+        opening_socket.close_failure = None
+        await asyncio.gather(opening, return_exceptions=True)
+        await live.close()
+        await backend.close()

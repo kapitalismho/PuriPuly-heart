@@ -252,6 +252,7 @@ LAYER_RULES = (
             "puripuly_heart.core.osc.control_codec",
             "puripuly_heart.core.osc.oscquery_contract",
             "puripuly_heart.core.osc.receiver_contract",
+            "puripuly_heart.core.osc.vrchat_osc_presence_contract",
         ),
         forbidden_layers=frozenset(
             {

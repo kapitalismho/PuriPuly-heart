@@ -48,6 +48,7 @@ from puripuly_heart.app.ports.ui_models import (
 )
 from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
 from puripuly_heart.app.ports.vrchat_osc_presence import VrchatOscPresencePort
+from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.app.services.application_after_launch import (
     ApplicationAfterLaunchOwner,
 )
@@ -160,6 +161,7 @@ from puripuly_heart.app.wiring import (
     resolve_overlay_config_from_vnext,
     runtime_pipeline_inputs_from_vnext,
 )
+from puripuly_heart.app.wiring.wiring_agent_chat import compose_agent_transport
 from puripuly_heart.app.wiring.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
 )
@@ -1232,7 +1234,9 @@ def compose_application_runtime(
                     next_settings,
                     reload_settings_view=False,
                 ),
-                apply_mutation=lambda mutate: application.control().apply_mutation(mutate),
+                apply_mutation=lambda mutate, is_current: application.control().apply_mutation(
+                    mutate, is_current
+                ),
                 application_provider=lambda: application,
                 sender_provider=lambda: pipeline.sender,
                 osc_state_provider=osc_state,
@@ -1243,6 +1247,7 @@ def compose_application_runtime(
                 connection_changed=lambda: (
                     vrchat_presence.connection_changed() if vrchat_presence is not None else None
                 ),
+                local_listener_probe=getattr(vrchat_osc_presence, "observe", None),
             )
         return vrc_mic_sync
 
@@ -1610,6 +1615,8 @@ def compose_application_runtime(
             return None
         connection = vrc_mic_sync.output_snapshot()
         if connection["effective_mode"] == "off" or connection["local_availability"] == "starting":
+            return None
+        if vrc_mic_sync.effective_send_host not in {"127.0.0.1", "localhost"}:
             return None
         port = connection["effective_send_port"]
         return port if isinstance(port, int) else None
@@ -2417,12 +2424,40 @@ def compose_application_runtime(
         locale_choices=presentation.available_locales(),
         localize=presentation.localize,
         gemma_selection=managed_gemma_selection,
+        recognition_probe_request=lambda canonical, channel: (
+            build_self_stt_provider_request_from_vnext(canonical)
+            if channel == "self"
+            else build_peer_stt_provider_request(
+                build_peer_capture_session_config_from_vnext(canonical),
+                gpu_device_id=canonical.intent.stt.gpu_device_id,
+            )
+        ),
         selection_committed=index_selection.selection_changed,
+        osc_discovery_retry=lambda: require_vrc_mic_sync().retry_automatic_discovery(),
     )
     application.attach_control(control)
+    agent_chat = AgentChatOwner(
+        control,
+        compose_agent_transport(settings=settings, config_path=config_path),
+        localize=presentation.localize,
+        support_log_snapshot=runtime_logging.support_log_snapshot,
+    )
+    application.attach_agent_chat(agent_chat)
     settings.observe_commits(control._publish_committed)
     application.register_application_shutdown_callbacks(
         (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="AgentChatOwner",
+                callback_name="freeze_ingress",
+                callback=agent_chat.freeze_ingress,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="AgentChatOwner",
+                callback_name="close",
+                callback=agent_chat.close,
+            ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
                 owner_name="ApplicationControlOwner",

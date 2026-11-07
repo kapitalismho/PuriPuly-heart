@@ -12,6 +12,7 @@ from puripuly_heart.ui.components.warm_document_dialog import (
     split_body_paragraphs,
 )
 from puripuly_heart.ui.i18n import t
+from puripuly_heart.ui.motion import close_modal
 
 
 class ChatGptAuthDialog:
@@ -91,7 +92,7 @@ class ChatGptAuthDialog:
     def close(self) -> None:
         if not self._is_open:
             return
-        self._page.pop_dialog()
+        close_modal(self._page, self._dialog_result.dialog)
         self._is_open = False
         self._is_waiting = False
 

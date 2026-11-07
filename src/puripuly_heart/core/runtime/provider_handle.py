@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from puripuly_heart.core.stt.backend import scoped_event_for_delivery
@@ -32,6 +33,7 @@ class ProviderRuntimeHandle:
         "idle_release_task",
         "retained_scoped_providers",
         "generation",
+        "provider_uses",
     )
     max_retained_scoped_providers = 9
     toggle_off_policy = (
@@ -73,6 +75,7 @@ class ProviderRuntimeHandle:
         self._retained_scoped_providers: list[object] = []
         self._retirement_tasks: set[asyncio.Task[None]] = set()
         self._pending_handoff: tuple[object, bool, asyncio.Future[object | None]] | None = None
+        self._provider_uses: dict[int, tuple[int, asyncio.Event]] = {}
         self._lock = asyncio.Lock()
 
     @property
@@ -102,6 +105,7 @@ class ProviderRuntimeHandle:
             or bool(self._retirement_tasks)
             or bool(self._retained_scoped_providers)
             or self._pending_handoff is not None
+            or bool(self._provider_uses)
         )
 
     @property
@@ -117,6 +121,26 @@ class ProviderRuntimeHandle:
         """Return whether a captured provider/generation is still current."""
 
         return generation == self._generation and provider is self._provider and not self._closed
+
+    @contextmanager
+    def retain_current_provider(self) -> Iterator[tuple[object | None, int]]:
+        provider, generation = self.current_provider_generation()
+        if provider is None or self._closed:
+            yield None, generation
+            return
+        key = id(provider)
+        use = self._provider_uses.get(key)
+        count, settled = use if use is not None else (0, asyncio.Event())
+        self._provider_uses[key] = count + 1, settled
+        try:
+            yield provider, generation
+        finally:
+            count, settled = self._provider_uses[key]
+            if count == 1:
+                self._provider_uses.pop(key)
+                settled.set()
+            else:
+                self._provider_uses[key] = count - 1, settled
 
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
@@ -198,7 +222,7 @@ class ProviderRuntimeHandle:
                 else:
                     try:
                         await self._close_provider_for_shutdown(old_provider)
-                    except Exception:
+                    except Exception, asyncio.CancelledError:
                         self._retain_retired_provider(old_provider)
                         raise
             return old_provider
@@ -617,6 +641,9 @@ class ProviderRuntimeHandle:
     async def _close_provider_for_shutdown(self, provider: object | None) -> None:
         if provider is None:
             return
+        use = self._provider_uses.get(id(provider))
+        if use is not None:
+            await use[1].wait()
         close_backend = getattr(provider, "close_backend", None)
         if callable(close_backend):
             result = close_backend()
