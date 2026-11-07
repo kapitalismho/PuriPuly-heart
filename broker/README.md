@@ -35,21 +35,59 @@ Public error envelopes distinguish retryable, terminal, and security failures fr
 
 ## Deployment and Schema Changes
 
-The manual [direct-deploy workflow](../.github/workflows/deploy-broker-direct.yml) is the production entry point and authority for required environment secrets/variables. It renders deployment configuration, exports D1 before migrations, reconciles the OpenRouter guardrail, deploys, checks health, and runs a synthetic issuance/routing smoke. The checked-in [Wrangler config](wrangler.jsonc) contains a placeholder D1 identifier and is not production-ready by itself.
+The manual [direct-deploy workflow](../.github/workflows/deploy-broker-direct.yml) deploys code to an **already initialized, supported Broker database**. Leave `apply_migrations` off for ordinary code updates. The workflow checks the canonical `dev` target and database readiness, deploys once, and verifies `/healthz` and `/v1/foundation`. These public checks do not prove authentication, key issuance, or upstream model routing.
 
-- Keep credentials in the production environment, never source or logs. Managed issuance uses provider-created child keys; deployment does not require or upload a shared OpenRouter API key. [Config rendering](scripts/render-production-wrangler-config.mjs) supplies deployment-specific bindings and network-identity key versions; [fingerprint bootstrap](scripts/render-fingerprint-bootstrap-sql.mjs) is guarded against replacing initialized state.
-- Existing databases must complete the historical `0021`/`0024` privacy transition with the prior supported Worker before installing the referral-free runtime. Empty databases complete those migrations before their first deployment. Do not rewrite historical migrations, force migration state, or bypass request/hook conversion gates.
-- Health success is not issuance or model-routing success. Account-level OpenRouter settings can narrow effective routing; review the production smoke before connecting app/public traffic. A failed post-deploy check does not imply rollback.
-- Ordinary deployment excludes both `0025` telemetry deletion and `0027` referral-schema retirement. Migration files and local checks are not evidence that production data was removed.
+The GitHub `production` environment needs:
 
-The manual [daily-auth-cap maintenance workflow](../.github/workflows/maintenance-broker-abuse-controls.yml) requires explicit confirmation, updates only the daily auth cap, and verifies it by readback. Caps must be canonical positive decimals from 1 through 100000; oversized inputs are rejected before numeric-value arithmetic, config rendering, or D1 access. Config preparation uses `BROKER_D1_DATABASE_ID_PRODUCTION`, the required `NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION` variable, and optional `NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION` overlap, as in deployment. Missing or invalid required configuration stops the workflow before D1 access; no key-version default is substituted.
+- Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `BROKER_D1_DATABASE_ID_PRODUCTION`.
+- Variables: `BROKER_CANONICAL_WORKERS_DEV_URL`, `NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION`; optionally `NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION`.
+- Dispatch confirmation: `deploy puripuly-heart-broker from dev`.
+
+Existing Worker secrets are preserved, not uploaded again. Deployment uses `--keep-vars` to preserve non-owned runtime variables. Omitting the optional previous version does not remove a deployed previous-version variable or secret; this workflow is not a key-rotation/removal mechanism. Keep configured key versions aligned with the deployed secrets.
+
+### Ordinary Migration Maintenance
+
+Select `apply_migrations` only when ordinary schema changes are intended. One staged migration set excludes `0025` telemetry deletion and `0027` referral retirement. The workflow requires completed historical privacy maintenance and initialized fingerprint state before applying anything, then checks the actual ordinary migration journal and required cleanup schema before deployment. A code-only run with pending ordinary migrations stops rather than deploying against an outdated schema.
+
+This workflow does not install an empty database, bootstrap salts, wait for historical backfills, finalize legacy configuration, change OpenRouter guardrails, issue provider keys, or delete retired data. Existing databases requiring the old `0021`/`0024` transition must use the prior supported Worker and historical SQL gates. Do not rewrite migrations or force their journal state.
+
+**No workflow backup or recovery checkpoint is created or required.** There is no SQL export, encryption key, backup artifact, Time Travel bookmark gate, or automatic restore. The owner chose this simpler maintenance contract. Any available Cloudflare-native history is an operator recovery option, not a verified restore guarantee or an independent recovery copy. A failed migration/deployment can require manual repair; successfully applied migrations are not automatically rolled back if deployment or a later check fails.
+
+### Operator-Only Maintenance
+
+Provision or change secrets through the canonical Worker's Cloudflare settings or an explicitly authorized Wrangler secret operation, not ordinary code deployment. Preserve unrelated bindings and runtime settings. Replacing `QQ_AUTH_HMAC_PSK` requires the versioned subject-reference migration described above, not a simple secret replacement. Change the existing OpenRouter guardrail deliberately when model/provider policy changes; retain its enforcement for issued keys.
+
+For authorized one-time SQL maintenance, render the production config from `broker/`:
+
+```sh
+node scripts/render-production-wrangler-config.mjs \
+  --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION" \
+  --network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION" \
+  --out wrangler.production.jsonc
+```
+
+Include `--network-identity-hmac-key-version-previous` with its configured value when applicable. The [fingerprint renderer](scripts/render-fingerprint-bootstrap-sql.mjs) accepts `--salt` and `--out` for a private SQL file and changes only an uninitialized placeholder; never use it to rotate initialized state. The [daily-summary](deploy/finalize-daily-summary-v2.sql) and [active-day](deploy/finalize-app-active-day.sql) finalizers remain standalone upgrade tools, not deployment steps. For example, after specifically approving active-day configuration cleanup, run `pnpm exec wrangler d1 execute puripuly-heart-broker --remote --config wrangler.production.jsonc --file deploy/finalize-app-active-day.sql --yes` from `broker/`.
+
+The [daily-auth-cap maintenance workflow](../.github/workflows/maintenance-broker-abuse-controls.yml) remains separately confirmed and verifies its update by readback. Caps must be canonical positive decimals from 1 through 100000. It uses the same explicit database and network-key-version configuration; invalid configuration stops before D1 access.
+
+Full live issuance/routing acceptance remains available from the repository root when explicitly authorized:
+
+```sh
+BROKER_DEPLOY_SMOKE_RUN=true \
+BROKER_DEPLOY_SMOKE_BASE_URL="$BROKER_CANONICAL_WORKERS_DEV_URL" \
+BROKER_DEPLOY_SMOKE_QQ_AUTH_HMAC_PSK="$QQ_AUTH_HMAC_PSK" \
+BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL="$DISALLOWED_MODEL" \
+pnpm exec vitest run broker/tests/deploy-smoke/canonical-production.spec.ts
+```
+
+Supply operator-held values without publishing them; the disallowed model must be outside the current managed allowlist. This check creates real provider keys and makes model requests. It is not part of normal deployment, and public health success is not a substitute for it after relevant authentication, issuance, or policy changes.
 
 ### Separately Authorized Retirement
 
-- **Legacy translation telemetry (`0025`):** inspect production aggregate counts/date ranges and external or operator-created dependencies, then obtain explicit deletion approval. Use the workflow's dedicated deletion controls; dispatch confirmation does not prove that review or approval occurred. Deletion uses the run's backup and applies only the held migration after health and production smoke checks.
-- **Referral storage (`0027`):** complete the privacy prerequisites, back up D1, deploy and verify the referral-free Worker, and establish that prior-version requests and scheduled invocations have drained. Health alone does not prove this. Apply only the pending referral-removal migration through a dedicated staged directory, without including `0025`. Read back the migration journal/schema and verify surviving operation, attempt, delivery, cleanup, and entitlement relationships. Retirement does not change provider budgets.
+- **Legacy translation telemetry (`0025`):** inspect aggregate counts/date ranges and external or operator-created consumers, obtain explicit deletion approval, and apply only that migration through a dedicated staged directory. There is no deployment deletion checkbox or backup prerequisite.
+- **Referral storage (`0027`):** complete privacy prerequisites, verify the referral-free Worker, and establish that prior-version requests and scheduled invocations have drained. Apply only the pending referral-removal migration through a dedicated staged directory without including `0025`. Read back journal/schema and surviving operation, attempt, delivery, cleanup, and entitlement relationships. Retirement does not change provider budgets.
 
-The [migration directory](migrations/) defines the forward schema history. Production deletion and deployment require their own authorization; development verification does not authorize either.
+These operations are destructive and have no workflow-managed recovery copy. Health alone does not authorize them. The [migration directory](migrations/) preserves forward schema history; local verification does not authorize production changes.
 
 ## Development and Verification
 
@@ -64,7 +102,7 @@ pnpm exec vitest run broker/tests --exclude "broker/tests/deploy-smoke/**"
 
 `verify:config` checks the pinned Wrangler binding contract without cloud credentials. Use isolated synthetic state and controlled provider responses for local behavior checks. The [Broker CI job](../.github/workflows/pr-ci.yml) defines automated checks; production smoke is a separate, explicitly authorized live operation.
 
-For focused offline maintenance coverage, run `pnpm exec vitest run broker/tests/deploy-automation.spec.ts`. It executes the maintained guard, renderer, cap update, and readback with synthetic configuration and local SQLite; it does not verify live D1 access or authorize a production dispatch.
+For focused offline deployment/maintenance coverage, run `pnpm exec vitest run broker/tests/deploy-automation.spec.ts broker/tests/minimal-deploy.spec.ts`. It exercises the actual workflow shell, renderer, read-only default, explicit ordinary migrations, rejection/failure ordering, public HTTP checks, fingerprint helper, and cap update/readback with isolated synthetic SQLite and controlled local ports. It does not exercise live Cloudflare deployment, provider issuance, or recovery.
 
 ## Source Map
 
