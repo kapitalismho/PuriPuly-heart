@@ -10,7 +10,7 @@ from puripuly_heart.ui.flet_runtime import (
     update_control_if_mounted,
 )
 from puripuly_heart.ui.i18n import t
-from puripuly_heart.ui.motion import close_modal, press_event, show_modal
+from puripuly_heart.ui.motion import PRESS, close_modal, press_event, show_modal
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_NEUTRAL_DARK,
@@ -239,6 +239,8 @@ class OscConnectionModal:
                 on_hover=self._on_mode_hover,
                 on_tap_down=press_event,
                 animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
+                animate_scale=PRESS,
+                scale=1.0,
                 height=_OPTION_CARD_HEIGHT,
             )
             cards[value] = card

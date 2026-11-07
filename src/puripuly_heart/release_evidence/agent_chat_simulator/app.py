@@ -1095,7 +1095,6 @@ class ScenarioApp:
             "opened": True,
             "field_visible": self.screen_provider is not None,
             "verification_available": self.screen_provider is not None,
-            "guidance": f"{section} settings are open.",
         }
 
     def channels(self) -> dict:
@@ -1513,7 +1512,9 @@ class ScenarioApp:
                 receipt.update(
                     channel=arguments["channel"],
                     final_event=ready,
-                    fixture_language="ko",
+                    configured_language=self.recognition_configuration(arguments["channel"])[
+                        "source_language"
+                    ],
                     recognition_scope="synthetic_component_only",
                 )
         else:

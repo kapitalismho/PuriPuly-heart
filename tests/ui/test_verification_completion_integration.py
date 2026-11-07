@@ -148,7 +148,6 @@ async def test_real_secure_field_completion_keeps_settings_in_place_and_unbinds(
         ("openrouter", success, None if success else "verification_failed"),
     )
     assert opened == ["settings"]
-    assert view._agent_navigation_banner.visible
     assert view._provider_snapshot.translation == before.translation
     assert "synthetic-private-value" not in repr(owner.calls)
     app._unbind_agent_navigation()
@@ -288,10 +287,6 @@ async def test_actual_setup_tool_and_navigation_expose_fields_without_provider_s
                 view._provider_edits,
                 view.has_provider_changes,
             ) == before
-        await owner._tools.execute("open_settings", {"section": "api", "provider": "openrouter"})
-        view._return_to_agent(None)
-        assert {provider: field.visible for provider, field in fields.items()} == before_visibility
-        assert opened[-1] == "agent"
         assert mutations == []
         assert control.queries == []
         assert owner.snapshot.recent_changes == ()

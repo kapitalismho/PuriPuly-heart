@@ -146,8 +146,6 @@ def assert_isolated(result):
     assert result["terminal"]
     for field in ("capture", "translation", "output_delivery", "display", "accuracy"):
         assert result[field] == "not_exercised"
-    assert result["fixture_language"] == "ko"
-    assert result["language_coverage"] == "korean_fixture_only"
     assert result["fixture_duration_seconds"] == pytest.approx(1.194376417)
     assert "synthetic recognition" not in json.dumps(result)
     assert "PRIVATE" not in json.dumps(result)
@@ -451,7 +449,7 @@ async def test_command_rejects_invalid_channel_and_external_audio(tmp_path, monk
 def test_bundled_speech_is_single_known_asset_and_resolves_independent_of_cwd(
     tmp_path, monkeypatch
 ):
-    resource = current_runtime_layout().package_resource("data", "diagnostics", "korean-eung.wav")
+    resource = current_runtime_layout().package_resource("data", "diagnostics", "eung.wav")
     assert (
         hashlib.sha256(resource.read_bytes()).hexdigest()
         == "fcbbaa5b5a548685cc6107a0b62ea43a238e0bb5570201237baaf0e9b0a03ffc"
@@ -460,7 +458,7 @@ def test_bundled_speech_is_single_known_asset_and_resolves_independent_of_cwd(
     monkeypatch.chdir(tmp_path)
     assert load_recognition_probe_audio(16000) == expected
     native_root = tmp_path / "installed"
-    installed = native_root / "puripuly_heart" / "data" / "diagnostics" / "korean-eung.wav"
+    installed = native_root / "puripuly_heart" / "data" / "diagnostics" / "eung.wav"
     installed.parent.mkdir(parents=True)
     installed.write_bytes(resource.read_bytes())
     monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(native_root))

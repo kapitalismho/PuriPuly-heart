@@ -143,7 +143,7 @@ def test_native_child_consumes_production_bundle_resources_without_installed_wri
         "data/licenses/PYTHON-3.14.10-LICENSE.txt",
         "data/models/granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu.manifest.json",
         "data/models/gigaam-v3-e2e-ctc-q8-0-transcribe-cpu.manifest.json",
-        "data/diagnostics/korean-eung.wav",
+        "data/diagnostics/eung.wav",
     )
     for relative in resource_paths:
         destination = package / relative
@@ -189,7 +189,7 @@ resources = [
     font,
     layout.package_resource("data", "THIRD_PARTY_NOTICES.txt"),
     layout.package_resource("data", "licenses", "PYTHON-3.14.10-LICENSE.txt"),
-    layout.package_resource("data", "diagnostics", "korean-eung.wav"),
+    layout.package_resource("data", "diagnostics", "eung.wav"),
 ]
 manifest = local_stt_assets.load_local_stt_asset_manifest()
 with wave.open(str(resources[-1]), "rb") as speech:

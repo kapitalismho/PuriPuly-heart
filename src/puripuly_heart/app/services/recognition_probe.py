@@ -28,9 +28,7 @@ RECOGNITION_PROBE_METADATA = {
     "configured_provider": None,
     "exercised_provider": None,
     "recognition_scope": "isolated_configured_backend_session",
-    "fixture_language": "ko",
     "fixture_duration_seconds": 26336 / 22050,
-    "language_coverage": "korean_fixture_only",
     "accuracy": "not_exercised",
     "capture": "not_exercised",
     "translation": "not_exercised",
@@ -40,7 +38,7 @@ RECOGNITION_PROBE_METADATA = {
 
 
 def load_recognition_probe_audio(sample_rate_hz: int) -> bytes:
-    path = current_runtime_layout().package_resource("data", "diagnostics", "korean-eung.wav")
+    path = current_runtime_layout().package_resource("data", "diagnostics", "eung.wav")
     with wave.open(str(path), "rb") as audio:
         if (
             audio.getnchannels(),

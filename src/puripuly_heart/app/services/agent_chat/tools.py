@@ -1281,11 +1281,9 @@ class AgentTools:
                         "recognition_scope",
                         "input_samples",
                         "sample_rate_hz",
-                        "fixture_language",
                         "fixture_duration_seconds",
                         "configured_language",
                         "source_mode",
-                        "language_coverage",
                         "accuracy",
                         "capture",
                         "translation",
@@ -1359,7 +1357,6 @@ class AgentTools:
             "field_visible": False,
             "completion_observable": False,
             "verification_available": False,
-            "guidance": "Settings navigation is unavailable in this host.",
         }
         if self._navigation is not None:
             try:
@@ -1369,10 +1366,8 @@ class AgentTools:
                 result["verification_available"] = (
                     result["field_visible"] and observed.get("verification_available") is True
                 )
-                if type(observed.get("guidance")) is str:
-                    result["guidance"] = observed["guidance"]
             except Exception:
-                result["guidance"] = "Settings navigation could not be completed."
+                result.update(opened=False, field_visible=False, verification_available=False)
         result["status"] = "opened" if result["opened"] else "unavailable"
         result["completion_observable"] = watching
         if provider is not None:

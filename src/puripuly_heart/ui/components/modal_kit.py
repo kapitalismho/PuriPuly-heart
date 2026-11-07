@@ -5,7 +5,7 @@ from collections.abc import Callable
 import flet as ft
 
 from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
-from puripuly_heart.ui.motion import press
+from puripuly_heart.ui.motion import PRESS, press
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_NEUTRAL_DARK,
@@ -136,6 +136,8 @@ class ModalCard(ft.Container):
             on_hover=self._handle_hover,
             on_tap_down=self._handle_tap_down,
             animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
+            animate_scale=PRESS,
+            scale=1.0,
         )
         self._paint()
 

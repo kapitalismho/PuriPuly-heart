@@ -1220,7 +1220,6 @@ class TranslatorApp:
                 "field_visible": False,
                 "completion_observable": False,
                 "verification_available": False,
-                "guidance": "설정 화면을 열 수 없어요.",
             }
         return self.view_settings.open_agent_section(
             section,

@@ -245,7 +245,6 @@ async def test_actual_receipt_approved_revert_and_following_navigation(catalog):
                 "opened": section == "overlay",
                 "field_visible": False,
                 "completion_observable": False,
-                "guidance": "Overlay settings are open.",
             }
         )
         opened = await tools.execute("open_settings", {"section": "overlay", "provider": None})
@@ -631,7 +630,6 @@ async def test_navigation_hidden_field_precedes_navigation_and_requires_real_wat
                 "field_visible": False,
                 "completion_observable": False,
                 "verification_available": False,
-                "guidance": "Choose the intended provider to reveal its input.",
             }
 
         headless = await tools.execute("open_settings", {"section": "api", "provider": "openai"})

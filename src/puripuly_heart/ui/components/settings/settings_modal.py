@@ -12,7 +12,7 @@ import flet as ft
 
 from puripuly_heart.app.ports.ui_models import OptionItem
 from puripuly_heart.ui.flet_runtime import is_hover_active
-from puripuly_heart.ui.motion import close_modal, press_event, show_modal
+from puripuly_heart.ui.motion import PRESS, close_modal, press_event, show_modal
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_NEUTRAL_DARK,
@@ -329,6 +329,8 @@ class SettingsModal:
             on_hover=None if option.disabled else self._on_item_hover,
             on_tap_down=None if option.disabled else press_event,
             animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
+            animate_scale=PRESS,
+            scale=1.0,
             height=110,
         )
 

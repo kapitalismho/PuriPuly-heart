@@ -24,7 +24,7 @@ async def test_korean_hint_keeps_ambiguous_korean_speech_in_korean(
     model_root = Path(require_env("LOCAL_ASR_MODEL_ROOT"))
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
     monkeypatch.setenv("APPDATA", str(tmp_path / "roaming"))
-    fixture = current_runtime_layout().package_resource("data", "diagnostics", "korean-eung.wav")
+    fixture = current_runtime_layout().package_resource("data", "diagnostics", "eung.wav")
     samples, rate = load_audio_wav(fixture)
     factor = math.gcd(rate, 16000)
     samples = resample_poly(samples, 16000 // factor, rate // factor).astype(np.float32)

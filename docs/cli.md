@@ -31,6 +31,8 @@ uv run python -m puripuly_heart.main cli --config C:\work\puripuly-dev.json app 
 - `app stop` waits for the original endpoint and observed process identity to disappear. `cleanup_outcome: unobserved` does not certify every teardown callback or resource release. `--no-wait` returns only shutdown acceptance.
 - `--timeout <seconds>` bounds client waiting, not operation lifetime, and never retries a mutation. `Ctrl+C` exits 130; a background host remains independent.
 
+Source changes are not hot-reloaded. Restart a running source host after changing code or bundled resource names; installed builds require a rebuilt application payload.
+
 ## Discover Before Acting
 
 | Need | Authority |
@@ -93,6 +95,11 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 - Apply a translation model and its connection together using a combination from `settings choices`. For ASR, `asr set --channel self|peer|both --provider <choice>` is the convenience form.
 - Explicit provider fields can retry pending provider application; unrelated general settings edits do not. Observe committed settings and effective provider state separately, including after restart when checking persistence.
 
+### GUI Settings Selection
+
+- An enabled modal option applies on its first click. Single-select dialogs close after selection; multi-select dialogs stay open and retain at least one selection.
+- Puri can still open settings and reveal a provider's secure key field without changing the selected provider. Settings no longer show the temporary Puri guidance banner or its return button; use the main navigation to return to Puri.
+
 ### GUI Autosave
 
 - GUI settings edits are coalesced and attempted once per submitted edit. There are no timed retries or automatic runtime-only replays after failure. Saved-but-unapplied edits remain saved; persistence and effective runtime state are separate results.
@@ -135,7 +142,7 @@ puripuly.exe command recognition.probe --arguments '{"channel":"peer"}'
 puripuly.exe command translation.probe
 ```
 
-Read the terminal receipt, not admission or readiness. Recognition reports `recognition_result`, final-event authority, configured/exercised provider, and captured/current revision and generation. It uses the bundled 1.194-second Korean speech sample without changing the configured language; `language_coverage: korean_fixture_only` is a limitation, not an accuracy guarantee. For `rolling_free`, `recognition_scope: single_eligible_rolling_member` identifies only the tested member, not full rolling-route health.
+Read the terminal receipt, not admission or readiness. Recognition reports `recognition_result`, final-event authority, configured/exercised provider, and captured/current revision and generation. It uses the bundled 1.194-second `data/diagnostics/eung.wav` sample without changing the configured language. `configured_language` reports the language applied to that recognition session, not a detected sample language or an accuracy guarantee. For `rolling_free`, `recognition_scope: single_eligible_rolling_member` identifies only the tested member, not full rolling-route health.
 
 An inactive configured recognition channel can use a probe-owned backend without enabling capture. An attached channel keeps its live sessions/model capacity; the probe owns only its isolated session. Missing assets/authentication/readiness return a prerequisite or failure, without provisioning, login, provider switching, or settings changes. Translation requires an already attached usable backend and reports `translation_result`; managed preparation is not silently performed. Existing selected-provider routing can involve more than one transport attempt and may incur its normal cost.
 
