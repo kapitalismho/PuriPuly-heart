@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDeployScenario, readEvents, readWorker, runDeployWorkflow, type DeployScenario } from './test-support/deploy-scenario';
 
 const scenarios: DeployScenario[] = [];
+const codeOnlyInputs = [
+  { selection: 'workflow default', env: {} },
+  { selection: 'explicit false', env: { APPLY_MIGRATIONS: 'false' } },
+];
 
 beforeEach(() => {
   vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('External networking is forbidden.'));
@@ -62,8 +66,8 @@ function expectAdmissionMigration(value: DeployScenario) {
 }
 
 describe('minimal production Relay deployment', () => {
-  it('deploys code only by default while preserving database bytes and deployed secrets', async () => {
-    const value = scenario({ env: { APPLY_MIGRATIONS: 'false' } });
+  it.each(codeOnlyInputs)('deploys code only with $selection while preserving database bytes and deployed secrets', async ({ env }) => {
+    const value = scenario({ env });
     const databaseBefore = readFileSync(value.databasePath);
     const workerBefore = readWorker(value);
     const result = await deploy(value);
@@ -130,14 +134,15 @@ describe('minimal production Relay deployment', () => {
     expect(result.storageRequests).toEqual([]);
   }, 20000);
 
-  it('blocks pending migrations on the default code-only path', async () => {
-    const value = scenario({ pendingMigration: true });
+  it.each(codeOnlyInputs)('blocks pending migrations with $selection before mutation or deployment', async ({ env }) => {
+    const value = scenario({ pendingMigration: true, env });
     const before = readFileSync(value.databasePath);
+    const workerBefore = readWorker(value);
     const result = await deploy(value);
-    expect(result.status).not.toBe(0);
+    expect(result.status, 'Pending ordinary migrations require explicit opt-in.').not.toBe(0);
     expect(result.failedStep).toBe('Require deploy-ready relay schema');
     expect(readFileSync(value.databasePath)).toEqual(before);
-    expect(readWorker(value).deployments).toBe(0);
+    expect(readWorker(value)).toEqual(workerBefore);
     expect(readEvents(value).some(({ event }) => event === 'migrate' || event === 'deploy')).toBe(false);
     expect(result.requests).toEqual([]);
   }, 20000);

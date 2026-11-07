@@ -14,6 +14,10 @@ import {
 } from './test-support/deploy-scenario';
 
 const scenarios: DeployScenario[] = [];
+const codeOnlyInputs = [
+  { selection: 'workflow default', env: {} },
+  { selection: 'explicit false', env: { APPLY_MIGRATIONS: 'false' } },
+];
 
 afterEach(() => {
   for (const scenario of scenarios.splice(0)) rmSync(scenario.root, { recursive: true, force: true });
@@ -35,8 +39,8 @@ function changeDatabase(value: DeployScenario, sql: string) {
 }
 
 describe('minimal production Broker deployment', () => {
-  it.each(['false', ''])('deploys code once with apply_migrations=%j without database, secret, policy or issuance mutations', async (applyMigrations) => {
-    const value = scenario({ env: { APPLY_MIGRATIONS: applyMigrations } });
+  it.each([...codeOnlyInputs, { selection: 'empty value', env: { APPLY_MIGRATIONS: '' } }])('deploys code once with $selection without database, secret, policy or issuance mutations', async ({ env }) => {
+    const value = scenario({ env });
     const databaseBefore = readFileSync(value.databasePath);
     const workerBefore = readWorker(value);
     const result = await runDeployWorkflow(value);
@@ -161,13 +165,15 @@ describe('minimal production Broker deployment', () => {
     expect(result.requests).toEqual([]);
   });
 
-  it('rejects a pending runtime-required migration on the code-only path', async () => {
-    const value = scenario({ pendingMigration: true });
+  it.each(codeOnlyInputs)('rejects a pending runtime-required migration with $selection before mutation or deployment', async ({ env }) => {
+    const value = scenario({ pendingMigration: true, env });
     const before = readFileSync(value.databasePath);
+    const workerBefore = readWorker(value);
     const result = await runDeployWorkflow(value);
-    expect(result.status).not.toBe(0);
+    expect(result.status, 'Pending ordinary migrations require explicit opt-in.').not.toBe(0);
     expect(readFileSync(value.databasePath)).toEqual(before);
-    expect(readWorker(value).deployments).toBe(0);
+    expect(readWorker(value)).toEqual(workerBefore);
+    expect(readEvents(value).some(({ event }) => event === 'migrate' || event === 'deploy')).toBe(false);
     expect(result.requests).toEqual([]);
   });
 
