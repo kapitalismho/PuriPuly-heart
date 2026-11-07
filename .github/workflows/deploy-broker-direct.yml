@@ -7,15 +7,11 @@ on:
         description: Type `deploy puripuly-heart-broker from dev` to confirm the canonical production deploy.
         required: true
         type: string
-      delete_legacy_translation_telemetry:
-        description: Delete retired translation telemetry after the deployed broker passes its checks
+      apply_migrations:
+        description: Apply ordinary migrations to an already initialized supported database before deploying code.
         required: false
         default: false
         type: boolean
-      confirm_legacy_translation_telemetry_deletion:
-        description: Type `delete retired translation telemetry from production D1` to confirm deletion
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -32,190 +28,38 @@ jobs:
     env:
       NODE_VERSION: '22.23.4'
       BROKER_CANONICAL_WORKERS_DEV_URL: ${{ vars.BROKER_CANONICAL_WORKERS_DEV_URL }}
-      BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION: ${{ vars.BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION }}
-      BROKER_CANONICAL_WORKER_NAME: puripuly-heart-broker
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
+      NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
+      NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}
+      APPLY_MIGRATIONS: ${{ inputs.apply_migrations }}
     steps:
-      - name: Guard production deploy ref and confirmation
+      - name: Guard production deploy ref and configuration
         shell: bash
         env:
-          CONFIRM_PRODUCTION_DEPLOY: ${{ github.event.inputs.confirm_production_deploy }}
-          DELETE_LEGACY_TRANSLATION_TELEMETRY: ${{ github.event.inputs.delete_legacy_translation_telemetry }}
-          CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: ${{ github.event.inputs.confirm_legacy_translation_telemetry_deletion }}
-          BROKER_CANONICAL_WORKERS_DEV_URL: ${{ vars.BROKER_CANONICAL_WORKERS_DEV_URL }}
-          BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION: ${{ vars.BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
-          OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION: ${{ secrets.OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION }}
-          OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION }}
-          OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION }}
-          QQ_AUTH_HMAC_PSK_PRODUCTION: ${{ secrets.QQ_AUTH_HMAC_PSK_PRODUCTION }}
-          TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION: ${{ secrets.TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION }}
-          DISCORD_CLIENT_ID_PRODUCTION: ${{ secrets.DISCORD_CLIENT_ID_PRODUCTION }}
-          DISCORD_CLIENT_SECRET_PRODUCTION: ${{ secrets.DISCORD_CLIENT_SECRET_PRODUCTION }}
-          DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION: ${{ secrets.DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION }}
-          NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION: ${{ secrets.NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION }}
-          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: ${{ secrets.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION }}
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}
-          DISCORD_USER_REF_SECRET_PRODUCTION: ${{ secrets.DISCORD_USER_REF_SECRET_PRODUCTION }}
-          DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION: ${{ secrets.DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION }}
+          CONFIRM_PRODUCTION_DEPLOY: ${{ inputs.confirm_production_deploy }}
         run: |
           if [[ "$GITHUB_REF" != 'refs/heads/dev' ]]; then
             echo 'Direct production broker deploys must be launched from refs/heads/dev.' >&2
             exit 1
           fi
-
           if [[ "$CONFIRM_PRODUCTION_DEPLOY" != 'deploy puripuly-heart-broker from dev' ]]; then
             echo 'confirm_production_deploy must exactly match: deploy puripuly-heart-broker from dev' >&2
             exit 1
           fi
-          case "$DELETE_LEGACY_TRANSLATION_TELEMETRY" in
-            ''|'false')
-              if [[ -n "${CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION//[[:space:]]/}" ]]; then
-                echo 'confirm_legacy_translation_telemetry_deletion must be blank unless deletion is enabled.' >&2
-                exit 1
-              fi
-              ;;
-            'true')
-              if [[ "$CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION" != 'delete retired translation telemetry from production D1' ]]; then
-                echo 'confirm_legacy_translation_telemetry_deletion must exactly match: delete retired translation telemetry from production D1' >&2
-                exit 1
-              fi
-              ;;
-            *)
-              echo 'delete_legacy_translation_telemetry must be false or true.' >&2
-              exit 1
-              ;;
+          case "$APPLY_MIGRATIONS" in
+            ''|'false'|'true') ;;
+            *) echo 'apply_migrations must be false or true.' >&2; exit 1 ;;
           esac
-
-          if [[ -z "${BROKER_CANONICAL_WORKERS_DEV_URL//[[:space:]]/}" ]]; then
-            echo 'BROKER_CANONICAL_WORKERS_DEV_URL is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${CLOUDFLARE_API_TOKEN//[[:space:]]/}" ]]; then
-            echo 'CLOUDFLARE_API_TOKEN is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${CLOUDFLARE_ACCOUNT_ID//[[:space:]]/}" ]]; then
-            echo 'CLOUDFLARE_ACCOUNT_ID is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${BROKER_D1_DATABASE_ID_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'BROKER_D1_DATABASE_ID_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${QQ_AUTH_HMAC_PSK_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'QQ_AUTH_HMAC_PSK_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${DISCORD_CLIENT_ID_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'DISCORD_CLIENT_ID_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${DISCORD_CLIENT_SECRET_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'DISCORD_CLIENT_SECRET_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          IFS=',' read -ra configured_discord_redirects <<< "$DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION"
-          for required_discord_redirect in \
-            'http://127.0.0.1:62187/discord/callback' \
-            'http://127.0.0.1:62188/discord/callback' \
-            'http://127.0.0.1:62189/discord/callback'; do
-            found_discord_redirect=0
-            for configured_discord_redirect in "${configured_discord_redirects[@]}"; do
-              configured_discord_redirect="${configured_discord_redirect#"${configured_discord_redirect%%[![:space:]]*}"}"
-              configured_discord_redirect="${configured_discord_redirect%"${configured_discord_redirect##*[![:space:]]}"}"
-              if [[ "$configured_discord_redirect" == "$required_discord_redirect" ]]; then
-                found_discord_redirect=1
-                break
-              fi
-            done
-            if [[ "$found_discord_redirect" != '1' ]]; then
-              echo "DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION must include $required_discord_redirect." >&2
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID BROKER_D1_DATABASE_ID_PRODUCTION; do
+            value="${!name}"
+            if [[ -z "${value//[[:space:]]/}" ]]; then
+              echo "$name is required and must not be blank." >&2
               exit 1
             fi
           done
-
-          if [[ -z "${DISCORD_USER_REF_SECRET_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'DISCORD_USER_REF_SECRET_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-          if [[ ! "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION" =~ ^[1-9][0-9]*$ ]]; then
-            echo 'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.' >&2
-            exit 1
-          fi
-
-          if [[ -n "${NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
-            if [[ ! "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION" =~ ^[1-9][0-9]*$ ]]; then
-              echo 'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must be a positive integer when set.' >&2
-              exit 1
-            fi
-            if [[ -z "${NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
-              echo 'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is set.' >&2
-              exit 1
-            fi
-            if [[ "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION" == "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION" ]]; then
-              echo 'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must differ from NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION.' >&2
-              exit 1
-            fi
-          elif [[ -n "${NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is set.' >&2
-            exit 1
-          fi
-
-          if [[ -z "${DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION//[[:space:]]/}" ]]; then
-            echo 'DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION is required and must not be blank.' >&2
-            exit 1
-          fi
-
-      - name: Validate canonical workers.dev smoke target
-        shell: bash
-        run: |
-          if [[ ! "$BROKER_CANONICAL_WORKERS_DEV_URL" =~ ^https://puripuly-heart-broker\..+\.workers\.dev/?$ ]]; then
+          if [[ ! "$BROKER_CANONICAL_WORKERS_DEV_URL" =~ ^https://puripuly-heart-broker\.[a-z0-9-]+\.workers\.dev/?$ ]]; then
             echo 'BROKER_CANONICAL_WORKERS_DEV_URL must target the canonical puripuly-heart-broker workers.dev hostname.' >&2
             exit 1
           fi
@@ -225,48 +69,10 @@ jobs:
         with:
           ref: refs/heads/dev
 
-      - name: Validate disallowed smoke probe against managed allowlist
-        shell: bash
-        run: |
-          managed_models_json="$(python3 - <<'PY'
-          import ast
-          import json
-          import re
-          from pathlib import Path
-
-          source = Path('broker/src/trial-policy.ts').read_text(encoding='utf-8')
-          match = re.search(
-              r"export const MANAGED_TRIAL_ALLOWED_MODELS = \[(?P<body>.*?)\] as const;",
-              source,
-              re.S,
-          )
-          if match is None:
-              raise SystemExit('MANAGED_TRIAL_ALLOWED_MODELS was not found in broker/src/trial-policy.ts')
-          body = '[' + match.group('body') + ']'
-          print(json.dumps(ast.literal_eval(body)))
-          PY
-          )"
-
-          python3 - <<'PY' "$managed_models_json" "$BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION"
-          import json
-          import sys
-
-          managed_models = json.loads(sys.argv[1])
-          disallowed_model = sys.argv[2]
-          if disallowed_model in managed_models:
-              raise SystemExit(
-                  'BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION must differ from the managed allowlisted models.'
-              )
-          PY
-
-      - name: Install backup encryption tool
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends age
-
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
         with:
+          version: 10.34.9
           run_install: false
 
       - name: Setup Node
@@ -278,812 +84,180 @@ jobs:
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Render deploy-time broker assets
-        id: render
+      - name: Render production Wrangler config
         shell: bash
         working-directory: broker
-        env:
-          BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
-          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}
         run: |
-          deploy_dir='.deploy-direct'
-          config_path='wrangler.production.jsonc'
-          pre_backfill_migrations_dir="$deploy_dir/staged-migrations-pre-backfill"
-          post_backfill_migrations_dir="$deploy_dir/staged-migrations-post-backfill"
-          legacy_deletion_migrations_dir="$deploy_dir/staged-migrations-legacy-telemetry-deletion"
-          pre_backfill_config_path="$deploy_dir/wrangler.production.pre-backfill.jsonc"
-          post_backfill_config_path="$deploy_dir/wrangler.production.post-backfill.jsonc"
-          legacy_deletion_config_path="$deploy_dir/wrangler.production.legacy-telemetry-deletion.jsonc"
-          bootstrap_sql_path="$deploy_dir/fingerprint-bootstrap.sql"
-          mkdir -p "$deploy_dir"
-          fingerprint_salt="$(python3 - <<'PY'
-          import secrets
-          print(secrets.token_urlsafe(32))
-          PY
-          )"
-          echo "::add-mask::$fingerprint_salt"
-
-          network_identity_version_args=(--network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION")
+          version_args=(--network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION")
           if [[ -n "${NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
-            network_identity_version_args+=(--network-identity-hmac-key-version-previous "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION")
+            version_args+=(--network-identity-hmac-key-version-previous "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION")
           fi
-
           node scripts/render-production-wrangler-config.mjs \
             --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION" \
-            "${network_identity_version_args[@]}" \
-            --out "$config_path"
+            "${version_args[@]}" --out wrangler.production.jsonc
 
-          node scripts/render-fingerprint-bootstrap-sql.mjs \
-            --salt "$fingerprint_salt" \
-            --out "$bootstrap_sql_path"
+      - name: Validate production Wrangler config
+        working-directory: broker
+        run: pnpm exec wrangler types --config wrangler.production.jsonc
 
-          python3 - "$config_path" \
-            "$pre_backfill_config_path" "$(basename "$pre_backfill_migrations_dir")" \
-            "$post_backfill_config_path" "$(basename "$post_backfill_migrations_dir")" \
-            "$legacy_deletion_config_path" "$(basename "$legacy_deletion_migrations_dir")" <<'PY'
-          import re
-          import sys
-          from pathlib import Path
-
-          config_path_arg = sys.argv[1]
-          config_text = Path(config_path_arg).read_text(encoding='utf-8')
-          if '"migrations_dir"' in config_text:
-              raise SystemExit('rendered wrangler config already defines migrations_dir')
-          for staged_config_path_arg, staged_migrations_name in zip(
-              sys.argv[2::2], sys.argv[3::2], strict=True
-          ):
-              staged_config_text, replacements = re.subn(
-                  r'("database_id"\s*:\s*"[^"]+")',
-                  r'\1, "migrations_dir": "%s"' % staged_migrations_name,
-                  config_text,
-                  count=1,
-              )
-              if replacements != 1:
-                  raise SystemExit('rendered wrangler config database_id was not found')
-              Path(staged_config_path_arg).write_text(
-                  staged_config_text, encoding='utf-8'
-              )
-          PY
-
-          {
-            echo "config_path=$config_path"
-            echo "pre_backfill_config_path=$pre_backfill_config_path"
-            echo "post_backfill_config_path=$post_backfill_config_path"
-            echo "legacy_deletion_config_path=$legacy_deletion_config_path"
-            echo "bootstrap_sql_path=$bootstrap_sql_path"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Stage ordinary broker deployment migrations
+      - name: Require initialized supported Broker database
         shell: bash
         working-directory: broker
         run: |
-          pre_backfill_migrations_dir='.deploy-direct/staged-migrations-pre-backfill'
-          post_backfill_migrations_dir='.deploy-direct/staged-migrations-post-backfill'
-          deferred_migrations='0021_network_identity_purge.sql 0024_allow_unattributed_request_events.sql'
-          held_migration='0025_drop_legacy_translation_telemetry.sql'
-          referral_retirement_migration='0027_remove_managed_referrals.sql'
+          journal_json="$(pnpm exec wrangler d1 execute \
+            puripuly-heart-broker --remote --config wrangler.production.jsonc \
+            --command "SELECT name FROM d1_migrations;" --json)"
+          readiness_json="$(pnpm exec wrangler d1 execute \
+            puripuly-heart-broker --remote --config wrangler.production.jsonc \
+            --command "SELECT key, value FROM broker_config WHERE key IN ('fingerprint_salt', 'network_identity_migration') UNION ALL SELECT 'legacy_column', name FROM pragma_table_info('broker_request_events') WHERE name = 'ip' UNION ALL SELECT 'legacy_column', name FROM pragma_table_info('broker_issue_success_events') WHERE name IN ('ip_hash', 'ip_prefix_hash') UNION ALL SELECT 'legacy_column', name FROM pragma_table_info('referral_rewards') WHERE name = 'attempt_ip_hash';" --json)"
+          python3 - "$journal_json" "$readiness_json" <<'PY'
+          import json
+          import sys
 
-          for migration_name in $deferred_migrations $held_migration $referral_retirement_migration; do
-            test -f "migrations/$migration_name"
-          done
-          mkdir -p "$pre_backfill_migrations_dir" "$post_backfill_migrations_dir"
-          rm -f "$pre_backfill_migrations_dir"/*.sql "$post_backfill_migrations_dir"/*.sql
+          def rows(raw):
+              payload = json.loads(raw)
+              if len(payload) != 1 or payload[0].get('success') is not True:
+                  raise SystemExit('Broker readiness query did not succeed.')
+              return payload[0]['results']
 
-          for migration_path in migrations/*.sql; do
-            migration_name="$(basename "$migration_path")"
-            migration_number="${migration_name%%_*}"
-            case "$migration_number" in
-              ''|*[!0-9]*)
-                echo "unexpected migration filename: $migration_name" >&2
-                exit 1
-                ;;
-            esac
+          applied = {row['name'] for row in rows(sys.argv[1])}
+          required = {
+              '0021_network_identity_purge.sql',
+              '0022_managed_operation_issuance_context.sql',
+              '0023_backfill_operation_route_rate_limits.sql',
+              '0024_allow_unattributed_request_events.sql',
+          }
+          if not required <= applied:
+              raise SystemExit('Unsupported Broker migration history; complete privacy maintenance before deployment.')
+          state = rows(sys.argv[2])
+          if any(row['key'] == 'legacy_column' for row in state):
+              raise SystemExit('Unsupported legacy network identity columns remain.')
+          config = {row['key']: json.loads(row['value']) for row in state}
+          fingerprint = config.get('fingerprint_salt', {}).get('current', {})
+          salt = fingerprint.get('salt')
+          version = fingerprint.get('version')
+          if not isinstance(salt, str) or not salt.strip() or salt == '__BOOTSTRAP_REQUIRED__' or type(version) is not int or version <= 0:
+              raise SystemExit('Broker fingerprint salt must already be initialized.')
+          if config.get('network_identity_migration', {}).get('phase') != 'keyed_only':
+              raise SystemExit('Broker privacy transition must already be keyed_only.')
+          PY
 
-            if [[ "$migration_name" != "$held_migration" && "$migration_name" != "$referral_retirement_migration" ]]; then
-              cp "$migration_path" "$post_backfill_migrations_dir/$migration_name"
-            fi
-
-            deferred_match=0
-            for deferred_migration in $deferred_migrations; do
-              if [[ "$migration_name" == "$deferred_migration" ]]; then
-                deferred_match=1
-                break
-              fi
-            done
-            if [[ "$deferred_match" != '1' && "$migration_name" != "$held_migration" && "$migration_name" != "$referral_retirement_migration" ]]; then
-              cp "$migration_path" "$pre_backfill_migrations_dir/$migration_name"
-            fi
-          done
-
-          test -f "$pre_backfill_migrations_dir/0020_network_identity_hmac.sql"
-          test -f "$pre_backfill_migrations_dir/0022_managed_operation_issuance_context.sql"
-          test -f "$pre_backfill_migrations_dir/0023_backfill_operation_route_rate_limits.sql"
-          for deferred_migration in $deferred_migrations; do
-            test ! -e "$pre_backfill_migrations_dir/$deferred_migration"
-            test -f "$post_backfill_migrations_dir/$deferred_migration"
-          done
-          test ! -e "$pre_backfill_migrations_dir/$held_migration"
-          test ! -e "$post_backfill_migrations_dir/$held_migration"
-          test ! -e "$pre_backfill_migrations_dir/$referral_retirement_migration"
-          test ! -e "$post_backfill_migrations_dir/$referral_retirement_migration"
-
-      - name: Validate rendered Wrangler config
-        working-directory: broker
-        run: >-
-          pnpm exec wrangler types --config
-          "${{ steps.render.outputs.config_path }}"
-
-      - name: Validate staged pre-backfill Wrangler config
-        working-directory: broker
-        run: >-
-          pnpm exec wrangler types --config
-          "${{ steps.render.outputs.pre_backfill_config_path }}"
-      - name: Validate staged post-backfill Wrangler config
-        working-directory: broker
-        run: >-
-          pnpm exec wrangler types --config
-          "${{ steps.render.outputs.post_backfill_config_path }}"
-
-      - name: Require completed privacy migration before referral-free deployment
-        id: privacy_prerequisite
+      - name: Stage and apply explicitly selected ordinary migrations
+        if: inputs.apply_migrations
         shell: bash
         working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          stage='.deploy-direct/migrations'
+          mkdir -p "$stage"
+          for migration in migrations/*.sql; do
+            case "$(basename "$migration")" in
+              0025_drop_legacy_translation_telemetry.sql|0027_remove_managed_referrals.sql) continue ;;
+            esac
+            cp "$migration" "$stage/"
+          done
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          config = Path('wrangler.production.jsonc').read_text(encoding='utf-8')
+          config, count = re.subn(
+              r'("database_id"\s*:\s*"[^"]+")',
+              r'\1, "migrations_dir": "migrations"',
+              config,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit('Production database_id was not found.')
+          Path('.deploy-direct/wrangler.migrations.jsonc').write_text(config, encoding='utf-8')
+          PY
+          pnpm exec wrangler d1 migrations apply puripuly-heart-broker \
+            --remote --config .deploy-direct/wrangler.migrations.jsonc
+
+      - name: Require deploy-ready ordinary schema
+        shell: bash
+        working-directory: broker
         run: |
           schema_json="$(pnpm exec wrangler d1 execute \
-            puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
-            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('installations', 'broker_config');" \
-            --json)"
-          first_install="$(python3 - "$schema_json" <<'PY'
+            puripuly-heart-broker --remote --config wrangler.production.jsonc \
+            --command "SELECT 'migration' AS kind, name FROM d1_migrations UNION ALL SELECT 'column', name FROM pragma_table_info('managed_operation_attempts');" --json)"
+          python3 - "$schema_json" <<'PY'
           import json
           import sys
-          rows = json.loads(sys.argv[1])[0]['results']
-          names = {row['name'] for row in rows}
-          if names and names != {'installations', 'broker_config'}:
-              raise SystemExit('Incomplete existing Broker schema; repair it before deployment.')
-          print('false' if names else 'true')
-          PY
-          )"
-          echo "first_install=$first_install" >> "$GITHUB_OUTPUT"
-          if [[ "$first_install" == 'false' ]]; then
-            journal_json="$(pnpm exec wrangler d1 execute \
-              puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
-              --command "SELECT name FROM d1_migrations;" --json)"
-            python3 - "$journal_json" <<'PY'
-          import json
-          import sys
-          applied = {row['name'] for row in json.loads(sys.argv[1])[0]['results']}
-          required = {'0021_network_identity_purge.sql', '0024_allow_unattributed_request_events.sql'}
-          if not required <= applied:
-              raise SystemExit(
-                  'Complete 0021/0024 privacy migration with the prior supported Worker before '
-                  'deploying referral removal. This workflow does not bypass the historical gate.'
-              )
-          PY
-          fi
-
-      - name: Export pre-migration production D1 backup
-        id: d1_backup
-        timeout-minutes: 8
-        shell: bash
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          BROKER_D1_BACKUP_AGE_RECIPIENT_PRODUCTION: ${{ vars.BROKER_D1_BACKUP_AGE_RECIPIENT_PRODUCTION }}
-        run: |
-          umask 077
-          recipient="${BROKER_D1_BACKUP_AGE_RECIPIENT_PRODUCTION:-}"
-          if [[ ! "$recipient" =~ ^age1[0-9a-z]{58}$ ]]; then
-            echo 'BROKER_D1_BACKUP_AGE_RECIPIENT_PRODUCTION must be a native age recipient.' >&2
-            exit 1
-          fi
-          private_dir="$(mktemp -d "$RUNNER_TEMP/puripuly-heart-broker-plaintext-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.XXXXXX")"
-          backup_path="$RUNNER_TEMP/puripuly-heart-broker-pre-migration-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql.age"
-          complete=false
-          cleanup() {
-            rm -rf -- "$private_dir"
-            if [[ "$complete" != true ]]; then
-              rm -f -- "$backup_path"
-            fi
-          }
-          trap cleanup EXIT
-          trap 'exit 129' HUP
-          trap 'exit 130' INT
-          trap 'exit 143' TERM
-          timeout --signal=TERM --kill-after=10s 60s age --encrypt \
-            --recipient "$recipient" --output "$private_dir/recipient-check.age" /dev/null
-          plaintext_path="$private_dir/backup.sql"
-          export_status=0
-          WRANGLER_LOG_PATH="$private_dir/wrangler-export.log" \
-            timeout --signal=TERM --kill-after=10s 300s pnpm exec wrangler d1 export puripuly-heart-broker \
-              --remote --config "${{ steps.render.outputs.config_path }}" \
-              --output "$plaintext_path" >/dev/null 2>&1 || export_status=$?
-          if [[ "$export_status" != 0 ]]; then
-            printf 'Production D1 export failed (exit status %s); sensitive exporter diagnostics suppressed.\n' "$export_status" >&2
-            exit "$export_status"
-          fi
-          test -s "$plaintext_path"
-          timeout --signal=TERM --kill-after=10s 60s age --encrypt \
-            --recipient "$recipient" --output "$backup_path" "$plaintext_path"
-          test -s "$backup_path"
-          backup_sha256="$(sha256sum "$backup_path" | cut -d ' ' -f 1)"
-          rm -rf -- "$private_dir"
-          test ! -e "$private_dir"
-          printf 'backup_path=%s\nbackup_sha256=%s\n' "$backup_path" "$backup_sha256" >> "$GITHUB_OUTPUT"
-          complete=true
-
-      - name: Upload pre-migration D1 backup
-        id: d1_backup_upload
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: puripuly-heart-broker-pre-migration-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ steps.d1_backup.outputs.backup_path }}
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Verify persisted pre-migration D1 backup
-        shell: bash
-        working-directory: broker
-        env:
-          D1_BACKUP_PATH: ${{ steps.d1_backup.outputs.backup_path }}
-          D1_BACKUP_SHA256: ${{ steps.d1_backup.outputs.backup_sha256 }}
-          D1_BACKUP_UPLOAD_OUTCOME: ${{ steps.d1_backup_upload.outcome }}
-          D1_BACKUP_ARTIFACT_ID: ${{ steps.d1_backup_upload.outputs.artifact-id }}
-          D1_BACKUP_ARTIFACT_DIGEST: ${{ steps.d1_backup_upload.outputs.artifact-digest }}
-        run: bash scripts/verify-persisted-d1-backup.sh
-
-      - name: Apply staged pre-backfill D1 migrations
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: >-
-          pnpm exec wrangler d1 migrations apply
-          puripuly-heart-broker --remote --config
-          "${{ steps.render.outputs.pre_backfill_config_path }}"
-
-      - name: Complete empty-database privacy schema before first deployment
-        if: steps.privacy_prerequisite.outputs.first_install == 'true'
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: >-
-          pnpm exec wrangler d1 migrations apply
-          puripuly-heart-broker --remote --config
-          "${{ steps.render.outputs.post_backfill_config_path }}"
-
-      - name: Bootstrap fingerprint salt while the migration placeholder is still present
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: >-
-          pnpm exec wrangler d1 execute
-          puripuly-heart-broker --remote --config
-          "${{ steps.render.outputs.config_path }}" --file
-          "${{ steps.render.outputs.bootstrap_sql_path }}" --yes
-
-      - name: Verify fingerprint salt bootstrap completed
-        shell: bash
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          bootstrap_state_json="$(pnpm exec wrangler d1 execute \
-            puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
-            --command "SELECT json_extract(value, '$.current.salt') AS salt FROM broker_config WHERE key = 'fingerprint_salt';" \
-            --json)"
-
-          python3 - <<'PY' "$bootstrap_state_json"
-          import json
-          import sys
+          from pathlib import Path
 
           payload = json.loads(sys.argv[1])
-          results = payload[0].get('results', [])
-
-          if len(results) != 1:
-              raise SystemExit('fingerprint_salt bootstrap validation returned an unexpected row count')
-
-          salt = results[0].get('salt')
-
-          if not salt or salt == '__BOOTSTRAP_REQUIRED__':
-              raise SystemExit('fingerprint_salt bootstrap validation failed; placeholder still present')
+          if len(payload) != 1 or payload[0].get('success') is not True:
+              raise SystemExit('Broker ordinary-schema query did not succeed.')
+          rows = payload[0]['results']
+          held = {'0025_drop_legacy_translation_telemetry.sql', '0027_remove_managed_referrals.sql'}
+          required = {path.name for path in Path('migrations').glob('*.sql')} - held
+          applied = {row['name'] for row in rows if row['kind'] == 'migration'}
+          if not required <= applied:
+              raise SystemExit('Required ordinary migrations are pending; explicitly select apply_migrations or complete maintenance manually.')
+          columns = {row['name'] for row in rows if row['kind'] == 'column'}
+          if not {
+              'cleanup_token', 'cleanup_started_at', 'scan_offset',
+              'create_in_flight', 'legacy_cleanup_state', 'legacy_cleanup_checked_at',
+          } <= columns:
+              raise SystemExit('Required managed-attempt cleanup schema is missing despite migration history.')
           PY
-
-      - name: Reconcile production OpenRouter guardrail
-        shell: bash
-        env:
-          OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION: ${{ secrets.OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION }}
-          OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION }}
-        run: |
-          guardrail_url="https://openrouter.ai/api/v1/guardrails/$OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION"
-          expected_models_json="$(python3 - <<'PY'
-          import ast
-          import json
-          import re
-          from pathlib import Path
-
-          source = Path('broker/src/trial-policy.ts').read_text(encoding='utf-8')
-          match = re.search(
-              r"export const MANAGED_TRIAL_ALLOWED_MODELS = \[(?P<body>.*?)\] as const;",
-              source,
-              re.S,
-          )
-          if match is None:
-              raise SystemExit('MANAGED_TRIAL_ALLOWED_MODELS was not found in broker/src/trial-policy.ts')
-          body = '[' + match.group('body') + ']'
-          print(json.dumps(ast.literal_eval(body)))
-          PY
-          )"
-          guardrail_patch_json="$(python3 - <<'PY'
-          import json
-          import ast
-          import re
-          from pathlib import Path
-
-          source = Path('broker/src/trial-policy.ts').read_text(encoding='utf-8')
-          match = re.search(
-              r"export const MANAGED_TRIAL_ALLOWED_MODELS = \[(?P<body>.*?)\] as const;",
-              source,
-              re.S,
-          )
-          if match is None:
-              raise SystemExit('MANAGED_TRIAL_ALLOWED_MODELS was not found in broker/src/trial-policy.ts')
-          body = '[' + match.group('body') + ']'
-          managed_models = ast.literal_eval(body)
-
-          print(json.dumps({
-              'allowed_models': managed_models,
-              'allowed_providers': None,
-              'ignored_providers': None,
-              'enforce_zdr': False,
-          }))
-          PY
-          )"
-
-          patch_response="$(curl --fail-with-body --silent --show-error --max-time 30 \
-            -H "Authorization: Bearer $OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION" \
-            -H 'Content-Type: application/json' \
-            -X PATCH "$guardrail_url" \
-            --data "$guardrail_patch_json")"
-          current_response="$(curl --fail-with-body --silent --show-error --max-time 30 \
-            -H "Authorization: Bearer $OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION" \
-            "$guardrail_url")"
-
-          python3 - <<'PY' "$patch_response" "$current_response" "$expected_models_json" "$OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION"
-          import json
-          import sys
-
-          patch_raw, current_raw, expected_models_raw, guardrail_id = sys.argv[1:5]
-          expected_models = sorted(json.loads(expected_models_raw))
-
-          def read_guardrail(raw: str, label: str) -> dict:
-              payload = json.loads(raw)
-              data = payload.get('data')
-              if not isinstance(data, dict):
-                  raise SystemExit(f'{label} response missing data object')
-              if data.get('id') != guardrail_id:
-                  raise SystemExit(f'{label} id mismatch for {guardrail_id}')
-              return data
-
-          def normalize_optional_string_list(value, field_name: str, label: str):
-              if value is None:
-                  return None
-              if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-                  raise SystemExit(f'{label} {field_name} must be null or a string list')
-              return sorted(value)
-
-          def assert_cleared(data: dict, field_name: str, label: str) -> None:
-              normalized = normalize_optional_string_list(data.get(field_name), field_name, label)
-              if normalized not in (None, []):
-                  raise SystemExit(f'{label} {field_name} must be cleared (null or [])')
-
-          def model_matches(expected: str, actual: str) -> bool:
-              if actual == expected or actual.startswith(expected + '-'):
-                  return True
-              date_suffix_match = __import__('re').search(r'-(?:\d{2}-\d{2}|\d{4})$', expected)
-              if date_suffix_match:
-                  family_prefix = expected[: date_suffix_match.start()]
-                  return actual == family_prefix or actual.startswith(family_prefix + '-')
-              return False
-
-          def assert_models_match(actual_models, label: str) -> None:
-              if actual_models is None:
-                  raise SystemExit(f'{label} allowed_models must not be null')
-              if len(actual_models) != len(expected_models):
-                  raise SystemExit(f'{label} allowed_models count mismatch: {actual_models!r}')
-              unmatched = []
-              remaining_actual = list(actual_models)
-              for expected in expected_models:
-                  match_index = next(
-                      (idx for idx, actual in enumerate(remaining_actual) if model_matches(expected, actual)),
-                      None,
-                  )
-                  if match_index is None:
-                      unmatched.append(expected)
-                      continue
-                  remaining_actual.pop(match_index)
-              if unmatched or remaining_actual:
-                  raise SystemExit(
-                      f'{label} allowed_models mismatch: unmatched_expected={unmatched!r} remaining_actual={remaining_actual!r}'
-                  )
-
-          for label, data in (
-              ('PATCH guardrail', read_guardrail(patch_raw, 'PATCH guardrail')),
-              ('GET guardrail', read_guardrail(current_raw, 'GET guardrail')),
-          ):
-              allowed_models = normalize_optional_string_list(
-                  data.get('allowed_models'),
-                  'allowed_models',
-                  label,
-              )
-              assert_models_match(allowed_models, label)
-              assert_cleared(data, 'allowed_providers', label)
-              assert_cleared(data, 'ignored_providers', label)
-              if data.get('enforce_zdr') is not False:
-                  raise SystemExit(f'{label} enforce_zdr must be false')
-          PY
-
-      - name: Sync worker secrets for managed issuance, QQ production issuance, and Discord OAuth operations
-        shell: bash
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION: ${{ secrets.OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION }}
-          OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION }}
-          OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION: ${{ secrets.OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION }}
-          QQ_AUTH_HMAC_PSK_PRODUCTION: ${{ secrets.QQ_AUTH_HMAC_PSK_PRODUCTION }}
-          TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION: ${{ secrets.TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION }}
-          DISCORD_CLIENT_ID_PRODUCTION: ${{ secrets.DISCORD_CLIENT_ID_PRODUCTION }}
-          DISCORD_CLIENT_SECRET_PRODUCTION: ${{ secrets.DISCORD_CLIENT_SECRET_PRODUCTION }}
-          DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION: ${{ secrets.DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION }}
-          DISCORD_USER_REF_SECRET_PRODUCTION: ${{ secrets.DISCORD_USER_REF_SECRET_PRODUCTION }}
-          NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION: ${{ secrets.NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION }}
-          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: ${{ secrets.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION }}
-          DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION: ${{ secrets.DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION }}
-        run: |
-          # OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION is required for managed child-key creation and cleanup.
-          printf '%s' "$OPENROUTER_MANAGEMENT_API_KEY_PRODUCTION" \
-            | pnpm exec wrangler secret put OPENROUTER_MANAGEMENT_API_KEY --config "${{ steps.render.outputs.config_path }}"
-          # OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION must assign the canonical production guardrail to every issued child key.
-          printf '%s' "$OPENROUTER_MANAGED_GUARDRAIL_ID_PRODUCTION" \
-            | pnpm exec wrangler secret put OPENROUTER_MANAGED_GUARDRAIL_ID --config "${{ steps.render.outputs.config_path }}"
-          # OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION derives the deterministic managed OpenRouter user id
-          # for each installation at runtime via OPENROUTER_MANAGED_USER_HMAC_SECRET.
-          printf '%s' "$OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION" \
-            | pnpm exec wrangler secret put OPENROUTER_MANAGED_USER_HMAC_SECRET --config "${{ steps.render.outputs.config_path }}"
-          # QQ_AUTH_HMAC_PSK_PRODUCTION verifies QQ Bot assertions; with the OpenRouter
-          # management key and guardrail id present, the route performs QQ production issuance.
-          printf '%s' "$QQ_AUTH_HMAC_PSK_PRODUCTION" \
-            | pnpm exec wrangler secret put QQ_AUTH_HMAC_PSK --config "${{ steps.render.outputs.config_path }}"
-          printf '%s' "$TELEMETRY_SUBJECT_HMAC_SECRET_PRODUCTION" \
-            | pnpm exec wrangler secret put TELEMETRY_SUBJECT_HMAC_SECRET --config "${{ steps.render.outputs.config_path }}"
-          # Discord OAuth runtime secrets are required for the GUI-managed onboarding flow.
-          printf '%s' "$DISCORD_CLIENT_ID_PRODUCTION" \
-            | pnpm exec wrangler secret put DISCORD_CLIENT_ID --config "${{ steps.render.outputs.config_path }}"
-          printf '%s' "$DISCORD_CLIENT_SECRET_PRODUCTION" \
-            | pnpm exec wrangler secret put DISCORD_CLIENT_SECRET --config "${{ steps.render.outputs.config_path }}"
-          printf '%s' "$DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION" \
-            | pnpm exec wrangler secret put DISCORD_REDIRECT_URI_ALLOWLIST --config "${{ steps.render.outputs.config_path }}"
-          printf '%s' "$DISCORD_USER_REF_SECRET_PRODUCTION" \
-            | pnpm exec wrangler secret put DISCORD_USER_REF_SECRET --config "${{ steps.render.outputs.config_path }}"
-          # DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION fans out to both runtime webhook bindings so
-          # immediate alerts and the daily heartbeat reach the operator-facing Discord destination.
-          printf '%s' "$DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION" \
-            | pnpm exec wrangler secret put DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL --config "${{ steps.render.outputs.config_path }}"
-          printf '%s' "$DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION" \
-            | pnpm exec wrangler secret put DISCORD_DAILY_REPORT_WEBHOOK_URL --config "${{ steps.render.outputs.config_path }}"
-          printf '%s' "$NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION" \
-            | pnpm exec wrangler secret put NETWORK_IDENTITY_HMAC_SECRET --config "${{ steps.render.outputs.config_path }}"
-          if [[ -n "${NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
-            printf '%s' "$NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION" \
-              | pnpm exec wrangler secret put NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS --config "${{ steps.render.outputs.config_path }}"
-          else
-            previous_list_path="$RUNNER_TEMP/network-identity-previous-secret-list.json"
-            previous_list_error_path="$RUNNER_TEMP/network-identity-previous-secret-list.stderr"
-            previous_list_status=0
-            pnpm exec wrangler secret list --config "${{ steps.render.outputs.config_path }}" --format json \
-              >"$previous_list_path" 2>"$previous_list_error_path" || previous_list_status=$?
-            previous_secret_state="$(python3 - "$previous_list_status" "$previous_list_path" "$previous_list_error_path" <<'PY'
-          import json
-          import sys
-
-          list_status, list_path, error_path = sys.argv[1:4]
-          list_output = open(list_path, encoding='utf-8').read()
-          list_error = open(error_path, encoding='utf-8').read()
-          if int(list_status) == 0:
-              secret_names = [
-                  entry.get('name') for entry in json.loads(list_output) if isinstance(entry, dict)
-              ]
-              print('present' if 'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS' in secret_names else 'absent')
-          elif 'Worker' in list_error and 'not found.' in list_error:
-              print('absent')
-          else:
-              raise SystemExit('unexpected worker secret list failure: ' + list_error[-2000:])
-          PY
-            )"
-            if [[ "$previous_secret_state" == 'present' ]]; then
-              pnpm exec wrangler secret delete NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS --config "${{ steps.render.outputs.config_path }}"
-            elif [[ "$previous_secret_state" != 'absent' ]]; then
-              echo "unexpected NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS state: $previous_secret_state" >&2
-              exit 1
-            fi
-          fi
 
       - name: Deploy canonical broker worker
         working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: >-
-          pnpm exec wrangler deploy --config
-          "${{ steps.render.outputs.config_path }}"
+        run: pnpm exec wrangler deploy --keep-vars --config wrangler.production.jsonc
 
-      - name: Wait for deployed workers.dev healthz
+      - name: Verify deployed health and public foundation
         shell: bash
         timeout-minutes: 5
         run: |
-          healthz_url="${BROKER_CANONICAL_WORKERS_DEV_URL%/}/healthz"
-
+          probe_dir="$(mktemp -d)"
+          trap 'rm -rf -- "$probe_dir"' EXIT
           for attempt in {1..12}; do
-            if curl --fail --silent --show-error --max-time 10 "$healthz_url" >/dev/null; then
+            health_status=0
+            foundation_status=0
+            health_status="$(curl --silent --show-error --max-time 10 \
+              --output "$probe_dir/health.json" --write-out '%{http_code}' \
+              "${BROKER_CANONICAL_WORKERS_DEV_URL%/}/healthz")" || health_status=0
+            foundation_status="$(curl --silent --show-error --max-time 10 \
+              --output "$probe_dir/foundation.json" --write-out '%{http_code}' \
+              "${BROKER_CANONICAL_WORKERS_DEV_URL%/}/v1/foundation")" || foundation_status=0
+            if [[ "$health_status" == '200' && "$foundation_status" == '200' ]] && python3 - "$probe_dir" <<'PY'
+          import ast
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          try:
+              root = Path(sys.argv[1])
+              health = json.loads((root / 'health.json').read_text(encoding='utf-8'))
+              foundation = json.loads((root / 'foundation.json').read_text(encoding='utf-8'))
+              assert health['ok'] is True
+              assert health['service'] == foundation['service'] == 'puripuly-heart-broker'
+              assert foundation['runtime']['runtime'] == 'Cloudflare Workers'
+              assert foundation['runtime']['database'] == 'Cloudflare D1'
+              assert foundation['bindings']['d1'] == 'BROKER_DB'
+              assert foundation['serviceBoundary'] == {
+                  'role': 'trial-credential-broker',
+                  'proxiesTranslationText': False,
+                  'inferencePath': 'app-direct-to-openrouter',
+              }
+              trial = foundation['trialProviderPolicy']['managedFreeTrial']
+              assert trial['provider'] == 'OpenRouter'
+              expected_models = ast.literal_eval(re.search(
+                  r'export const MANAGED_TRIAL_ALLOWED_MODELS = (\[.*?\]) as const;',
+                  Path('broker/src/trial-policy.ts').read_text(encoding='utf-8'),
+                  re.S,
+              ).group(1))
+              assert isinstance(trial['models'], list) and set(trial['models']) == set(expected_models)
+          except (AssertionError, KeyError, TypeError, ValueError):
+              raise SystemExit('Deployed Broker public contract did not match.')
+          PY
+            then
+              echo 'Deployed Broker health and public foundation verified.'
               exit 0
             fi
-
-            sleep 10
+            if [[ "$attempt" != '12' ]]; then sleep 5; fi
           done
-
-          echo "Timed out waiting for deployed broker healthz at $healthz_url" >&2
+          echo 'Timed out verifying deployed Broker health and public foundation.' >&2
           exit 1
-
-      - name: Await network identity backfill until keyed_only
-        shell: bash
-        working-directory: broker
-        timeout-minutes: 35
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          attempt=1
-          max_attempts=30
-          while [[ "$attempt" -le "$max_attempts" ]]; do
-            migration_state_json="$(pnpm exec wrangler d1 execute \
-              puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
-              --command "SELECT value FROM broker_config WHERE key = 'network_identity_migration';" \
-              --json)"
-            migration_phase="$(python3 - "$migration_state_json" <<'PY'
-          import json
-          import sys
-
-          payload = json.loads(sys.argv[1])
-          results = payload[0].get('results', [])
-          if len(results) != 1:
-              raise SystemExit('network_identity_migration lookup returned an unexpected row count')
-          print(json.loads(results[0]['value']).get('phase', ''))
-          PY
-            )"
-            if [[ "$migration_phase" == 'keyed_only' ]]; then
-              exit 0
-            fi
-            if [[ "$attempt" -eq "$max_attempts" ]]; then
-              echo "network identity backfill did not reach keyed_only within $max_attempts minutes (last phase: $migration_phase)" >&2
-              exit 1
-            fi
-            attempt=$((attempt + 1))
-            sleep 60
-          done
-
-      - name: Verify deferred network identity migrations are consistent
-        shell: bash
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          journal_json="$(pnpm exec wrangler d1 execute \
-            puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
-            --command "SELECT name FROM d1_migrations;" \
-            --json)"
-
-          python3 - "$journal_json" <<'PY'
-          import json
-          import sys
-          payload = json.loads(sys.argv[1])
-          applied = {str(row.get('name')) for row in payload[0].get('results', [])}
-          if '0022_managed_operation_issuance_context.sql' not in applied:
-              raise SystemExit('0022 issuance-context migration must be applied before the deferred 0021 purge')
-          if '0023_backfill_operation_route_rate_limits.sql' not in applied:
-              raise SystemExit('0023 route rate-limit migration must be applied before the deferred 0021 purge')
-          deferred = {
-              '0021_network_identity_purge.sql',
-              '0024_allow_unattributed_request_events.sql',
-          }
-          applied_deferred = deferred & applied
-          if applied_deferred and applied_deferred != deferred:
-              raise SystemExit(
-                  '0021 purge and 0024 unattributed-schema rebuild must be either both pending or both applied'
-              )
-          PY
-
-      - name: Apply deferred 0021 purge followed by 0024 rebuild
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: >-
-          pnpm exec wrangler d1 migrations apply
-          puripuly-heart-broker --remote --config
-          "${{ steps.render.outputs.post_backfill_config_path }}"
-
-      - name: Verify legacy network identity columns are gone
-        shell: bash
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          legacy_columns_json="$(pnpm exec wrangler d1 execute \
-            puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
-            --command "SELECT name FROM pragma_table_info('broker_request_events') WHERE name = 'ip' UNION ALL SELECT name FROM pragma_table_info('broker_issue_success_events') WHERE name IN ('ip_hash', 'ip_prefix_hash') UNION ALL SELECT name FROM pragma_table_info('referral_rewards') WHERE name = 'attempt_ip_hash';" \
-            --json)"
-
-          python3 - "$legacy_columns_json" <<'PY'
-          import json
-          import sys
-
-          payload = json.loads(sys.argv[1])
-          results = payload[0].get('results', [])
-          if results:
-              raise SystemExit(
-                  'legacy network identity columns remain: '
-                  + ', '.join(sorted(str(row.get('name')) for row in results))
-              )
-          PY
-
-      - name: Finalize daily summary v2 runtime config
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: >-
-          pnpm exec wrangler d1 execute
-          puripuly-heart-broker --remote --config
-          "${{ steps.render.outputs.config_path }}" --file
-          deploy/finalize-daily-summary-v2.sql --yes
-
-      - name: Verify daily summary v2 runtime config finalization
-        shell: bash
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          finalization_json="$(pnpm exec wrangler d1 execute \
-            puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
-            --command "SELECT json_type(value, '$.dailyReport.includeZeroActivity') AS legacy_type FROM broker_config WHERE key = 'abuse_controls';" \
-            --json)"
-
-          python3 - <<'PY' "$finalization_json"
-          import json
-          import sys
-
-          payload = json.loads(sys.argv[1])
-          results = payload[0].get('results', [])
-
-          if len(results) != 1 or results[0].get('legacy_type') is not None:
-              raise SystemExit('daily summary v2 config finalization did not remove includeZeroActivity')
-          PY
-
-      - name: Finalize app active-day runtime config
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: >-
-          pnpm exec wrangler d1 execute
-          puripuly-heart-broker --remote --config
-          "${{ steps.render.outputs.config_path }}" --file
-          deploy/finalize-app-active-day.sql --yes
-
-      - name: Verify app active-day runtime config finalization
-        shell: bash
-        working-directory: broker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          finalization_json="$(pnpm exec wrangler d1 execute \
-            puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
-            --command "SELECT json_type(value, '$.telemetryTranslationSuccessDayIp') AS legacy_type FROM broker_config WHERE key = 'abuse_controls';" \
-            --json)"
-
-          python3 - <<'PY' "$finalization_json"
-          import json
-          import sys
-
-          payload = json.loads(sys.argv[1])
-          results = payload[0].get('results', [])
-
-          if len(results) != 1 or results[0].get('legacy_type') is not None:
-              raise SystemExit('app active-day config finalization did not remove telemetryTranslationSuccessDayIp')
-          PY
-
-      - name: Run deployed broker production QQ issuance smoke test
-        timeout-minutes: 10
-        env:
-          BROKER_DEPLOY_SMOKE_RUN: 'true'
-          BROKER_DEPLOY_SMOKE_BASE_URL: ${{ env.BROKER_CANONICAL_WORKERS_DEV_URL }}
-          BROKER_DEPLOY_CANONICAL_WORKER_NAME: ${{ env.BROKER_CANONICAL_WORKER_NAME }}
-          BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL: ${{ env.BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION }}
-          BROKER_DEPLOY_SMOKE_QQ_AUTH_HMAC_PSK: ${{ secrets.QQ_AUTH_HMAC_PSK_PRODUCTION }}
-        run: >-
-          pnpm exec vitest run broker/tests/deploy-smoke/canonical-production.spec.ts
-          --reporter=verbose
-
-      - name: Apply explicitly authorized legacy telemetry deletion
-        id: legacy_telemetry_deletion
-        shell: bash
-        working-directory: broker
-        env:
-          DELETE_LEGACY_TRANSLATION_TELEMETRY: ${{ github.event.inputs.delete_legacy_translation_telemetry }}
-          CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: ${{ github.event.inputs.confirm_legacy_translation_telemetry_deletion }}
-          LEGACY_DELETION_CONFIG_PATH: ${{ steps.render.outputs.legacy_deletion_config_path }}
-          D1_BACKUP_PATH: ${{ steps.d1_backup.outputs.backup_path }}
-          D1_BACKUP_SHA256: ${{ steps.d1_backup.outputs.backup_sha256 }}
-          D1_BACKUP_UPLOAD_OUTCOME: ${{ steps.d1_backup_upload.outcome }}
-          D1_BACKUP_ARTIFACT_ID: ${{ steps.d1_backup_upload.outputs.artifact-id }}
-          D1_BACKUP_ARTIFACT_DIGEST: ${{ steps.d1_backup_upload.outputs.artifact-digest }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          if [[ "$DELETE_LEGACY_TRANSLATION_TELEMETRY" != 'true' ]]; then
-            echo 'applied=false' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [[ "$CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION" != 'delete retired translation telemetry from production D1' ]]; then
-            echo 'confirm_legacy_translation_telemetry_deletion must exactly match: delete retired translation telemetry from production D1' >&2
-            exit 1
-          fi
-          bash scripts/verify-persisted-d1-backup.sh
-
-          staged_migrations_dir='.deploy-direct/staged-migrations-legacy-telemetry-deletion'
-          held_migration='0025_drop_legacy_translation_telemetry.sql'
-          mkdir -p "$staged_migrations_dir"
-          rm -f "$staged_migrations_dir"/*.sql
-          cp "migrations/$held_migration" "$staged_migrations_dir/$held_migration"
-          staged_migrations=("$staged_migrations_dir"/*.sql)
-          if [[ "${#staged_migrations[@]}" != '1' || "$(basename "${staged_migrations[0]}")" != "$held_migration" ]]; then
-            echo 'legacy telemetry deletion stage must contain only migration 0025.' >&2
-            exit 1
-          fi
-
-          pnpm exec wrangler types --config "$LEGACY_DELETION_CONFIG_PATH"
-          pnpm exec wrangler d1 migrations apply \
-            puripuly-heart-broker --remote --config "$LEGACY_DELETION_CONFIG_PATH"
-          echo 'applied=true' >> "$GITHUB_OUTPUT"
-
-      - name: Post-smoke boundary reminder
-        if: ${{ success() }}
-        shell: bash
-        run: |
-          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
-          Direct broker smoke passed.
-
-          Verified synthetic QQ production issuance, one-time child-key metadata, positive Qwen/DeepSeek/Gemini routing, and disallowed-model guardrail enforcement.
-
-          Do not connect app / public traffic to the broker until this run has been reviewed and an explicit cutover is approved.
-          EOF
-
-      - name: Clean up local D1 backup files
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          rm -rf -- "$RUNNER_TEMP"/puripuly-heart-broker-plaintext-"${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}".*
-          rm -f -- "$RUNNER_TEMP/puripuly-heart-broker-pre-migration-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql.age"
