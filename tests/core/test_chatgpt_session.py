@@ -4,12 +4,14 @@ import asyncio
 import json
 from pathlib import Path
 from threading import Event
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
 import httpx
 import pytest
 
+from puripuly_heart.app.services.chatgpt_account import ChatGptAccountOwner
+from puripuly_heart.core.chatgpt.loopback import ChatGptOAuthCallback
 from puripuly_heart.core.chatgpt.oauth import (
     CHATGPT_PLAN_SCOPE,
     CHATGPT_REVOKE_URL,
@@ -395,6 +397,157 @@ async def test_sign_in_supersedes_logout_before_removal(revoke_status: int) -> N
         release.set()
         await asyncio.gather(logout, return_exceptions=True)
         await session.close()
+
+
+@pytest.mark.parametrize("revoke_status", [200, 500])
+async def test_failed_sign_in_rollback_does_not_supersede_logout(
+    tmp_path: Path, revoke_status: int
+) -> None:
+    path = tmp_path / "secrets.json"
+
+    class FailingStore(EncryptedFileSecretStore):
+        fail_sign_in = True
+
+        def set(self, key: str, value: str) -> None:
+            super().set(key, value)
+            if (
+                self.fail_sign_in
+                and key == CHATGPT_REFRESH_TOKEN_SECRET
+                and value == "authorized-refresh"
+            ):
+                self.fail_sign_in = False
+                raise OSError("synthetic partial sign-in write failure")
+
+    store = FailingStore(path, passphrase="synthetic")
+    before = {
+        CHATGPT_CLIENT_ID_SECRET: "oaiapp_client",
+        CHATGPT_REFRESH_TOKEN_SECRET: "r0",
+        CHATGPT_ACCOUNT_SECRET: json.dumps({"subject": "s", "email": "u@example.com"}),
+    }
+    for key, value in before.items():
+        store.set(key, value)
+    store.set(CHATGPT_HOST_ID_SECRET, "host")
+    store.set("unrelated", "keep")
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    server = _TokenServer()
+    server.revoke_status = revoke_status
+    authorization_params: dict[str, list[str]] = {}
+
+    def capture_authorization(url: str) -> None:
+        authorization_params.update(parse_qs(urlsplit(url).query))
+
+    class Listener:
+        redirect_uri = "http://127.0.0.1:1455/auth/callback"
+        closed = False
+
+        def wait(self, timeout: float | None = None) -> ChatGptOAuthCallback:
+            assert not self.closed
+            return ChatGptOAuthCallback(
+                state=authorization_params["state"][0],
+                code="synthetic-code",
+                client_id=None,
+                scope=CHATGPT_PLAN_SCOPE,
+                error=None,
+            )
+
+        def close(self) -> None:
+            self.closed = True
+
+    class Verifier:
+        async def verify(self, token: str, *, client_id: str, nonce: str) -> ChatGptIdentity:
+            return ChatGptIdentity(subject="new-user", email="new@example.invalid")
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == CHATGPT_REVOKE_URL:
+            entered.set()
+            await release.wait()
+        elif str(request.url) == CHATGPT_TOKEN_URL:
+            form = parse_qs(request.content.decode())
+            if form["grant_type"] == ["authorization_code"]:
+                return httpx.Response(
+                    200,
+                    json={
+                        "access_token": "authorized-access",
+                        "refresh_token": "authorized-refresh",
+                        "id_token": "synthetic-id-token",
+                        "expires_in": 3600,
+                        "scope": CHATGPT_PLAN_SCOPE,
+                    },
+                )
+        return server.handler(request)
+
+    session = ChatGptSession(
+        secret_store=lambda: store,
+        http_factory=lambda: httpx.AsyncClient(
+            transport=httpx.MockTransport(handler), trust_env=False
+        ),
+        clock=lambda: 1000,
+    )
+    account = ChatGptAccountOwner(
+        session=session,
+        listener_factory=lambda **kwargs: Listener(),
+        verifier_factory=lambda http: Verifier(),
+    )
+    logout = asyncio.create_task(account.sign_out())
+    try:
+        await asyncio.wait_for(entered.wait(), 5)
+        failed = await asyncio.wait_for(
+            account.connect(open_browser=False, authorization_url_sink=capture_authorization), 5
+        )
+        assert failed.succeeded is False
+        assert failed.failure_code == "credential_store_failed"
+        assert failed.diagnostics.code == "chatgpt_credential_store_failed"
+        assert failed.diagnostics.operation == "credential_store"
+        assert failed.diagnostics.category == "transaction"
+        assert failed.diagnostics.fields["exception_class"] == "OSError"
+        assert failed.secondary_diagnostics == ()
+        fresh = EncryptedFileSecretStore(path, passphrase="synthetic")
+        assert {key: fresh.get(key) for key in before} == before
+        assert account.snapshot().signed_in is True
+        assert not logout.done()
+
+        release.set()
+        result = await asyncio.wait_for(logout, 5)
+        assert result.local_credentials_removed is True
+        assert result.remote_revoked is (revoke_status == 200)
+        assert result.secondary_diagnostics == ()
+        if revoke_status == 500:
+            assert result.diagnostics.code == "chatgpt_remote_revocation_unconfirmed"
+            assert result.diagnostics.status_code == 500
+            assert result.diagnostics.fields["remote_revoked"] is False
+            assert result.diagnostics.fields["local_credentials_removed"] is True
+        else:
+            assert result.diagnostics is None
+        assert server.revoke_calls == 1
+        assert server.refresh_calls == 0
+        assert fresh.get(CHATGPT_REFRESH_TOKEN_SECRET) is None
+        assert account.snapshot().signed_in is False
+        assert {key: fresh.get(key) for key in before if key != CHATGPT_REFRESH_TOKEN_SECRET} == {
+            key: value for key, value in before.items() if key != CHATGPT_REFRESH_TOKEN_SECRET
+        }
+
+        authorized = await asyncio.wait_for(
+            account.connect(open_browser=False, authorization_url_sink=capture_authorization), 5
+        )
+        assert authorized.succeeded is True
+        assert await session.access_token() == "authorized-access"
+        session.invalidate_access_token("authorized-access")
+        tokens = await asyncio.wait_for(
+            asyncio.gather(*(session.access_token() for _ in range(5))), 5
+        )
+        assert set(tokens) == {"a1" + "x" * REAL_ACCESS_TOKEN_LENGTH}
+        assert server.refresh_calls == 1
+        assert fresh.get(CHATGPT_REFRESH_TOKEN_SECRET) == "r1"
+        assert fresh.get(CHATGPT_CLIENT_ID_SECRET) == "oaiapp_client"
+        assert fresh.get(CHATGPT_HOST_ID_SECRET) == "host"
+        assert fresh.get("unrelated") == "keep"
+        assert account.snapshot().signed_in is True
+        assert account.snapshot().email == "new@example.invalid"
+    finally:
+        release.set()
+        await asyncio.wait_for(asyncio.gather(logout, return_exceptions=True), 5)
+        await account.close()
 
 
 @pytest.mark.parametrize("mutation", ["rotation", "rejection", "logout"])

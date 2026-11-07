@@ -186,8 +186,8 @@ class ChatGptSession:
         identity: ChatGptIdentity,
     ) -> None:
         with self._credential_lock:
-            self._credential_epoch += 1
             self._store_sign_in(client_id=client_id, tokens=tokens, identity=identity)
+            self._credential_epoch += 1
 
     def _store_sign_in(
         self,
