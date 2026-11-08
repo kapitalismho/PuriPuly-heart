@@ -20,6 +20,9 @@ fn input(grip: bool, distance: f32) -> LegacyVrInput {
         head,
         left,
         right: IDENTITY,
+        left_handgrip: IDENTITY,
+        right_handgrip: IDENTITY,
+        reference_epoch: 1,
         left_index: 1,
         right_index: 2,
         grip,
@@ -51,7 +54,7 @@ impl Fixture {
     fn new(attempt: u64) -> Self {
         let start = Instant::now();
         let config = TemporaryInteractionConfig {
-            wrist_transform: IDENTITY,
+            wrist_transform: Some(IDENTITY),
             ..Default::default()
         };
         let mut interaction = PhotoInteraction::new(config);
@@ -230,10 +233,10 @@ fn active_grab_and_return_remain_visible_outside_both_cones() {
 fn grip_must_begin_in_range_not_merely_enter_while_held() {
     let mut f = Fixture::new(0);
     f.look();
-    assert!(!f.step(360, Some(input(true, 0.071))).grab);
+    assert!(!f.step(360, Some(input(true, 0.081))).grab);
     assert!(!f.step(370, Some(input(true, 0.0))).grab);
     f.step(380, Some(input(false, 0.0)));
-    assert!(f.step(390, Some(input(true, 0.07))).grab);
+    assert!(f.step(390, Some(input(true, 0.08))).grab);
     assert_eq!(f.interaction.frame.icon.unwrap().device, 1);
 }
 
@@ -401,7 +404,9 @@ fn temporary_config_rejects_nonrigid_and_nonfinite_values() {
     config.grab_m = f32::NAN;
     assert_eq!(config.validate(), Err(PhotoError::Manifest));
     config = Default::default();
-    config.wrist_transform[0][0] = 2.0;
+    let mut invalid = IDENTITY;
+    invalid[0][0] = 2.0;
+    config.wrist_transform = Some(invalid);
     assert_eq!(config.validate(), Err(PhotoError::Manifest));
 }
 
@@ -413,6 +418,7 @@ fn loss_role_change_replacement_removal_and_expiry_cancel_every_active_placement
             "roles",
             "replacement",
             "removed",
+            "component",
             "expired",
             "deadline",
         ] {
@@ -436,6 +442,7 @@ fn loss_role_change_replacement_removal_and_expiry_cancel_every_active_placement
             let mut ms = 540;
             match interruption {
                 "roles" => sample.left_index = 7,
+                "component" => sample.reference_epoch += 1,
                 "replacement" => {
                     f.photo.photo_id = "new-photo".into();
                     f.interaction.snapshot(
@@ -464,7 +471,7 @@ fn loss_role_change_replacement_removal_and_expiry_cancel_every_active_placement
             assert!(frame.photo.is_none(), "{placement}/{interruption}");
             assert!(!frame.grab, "{placement}/{interruption}");
             assert!(!frame.pull, "{placement}/{interruption}");
-            if interruption == "loss" || interruption == "roles" {
+            if matches!(interruption, "loss" | "roles" | "component") {
                 assert_eq!(frame.hidden, placement == "held");
                 assert!(!f.step(550, Some(sample)).grab);
                 f.step(600, Some(sample));
@@ -521,4 +528,194 @@ fn default_held_photo_keeps_375mm_width_and_150ms_reversible_transition() {
     assert!((half.alpha - 0.5).abs() < 0.0001);
     assert!((half.width - 0.2025).abs() < 0.0001);
     assert!(f.step(690, Some(input(false, 0.12))).photo.is_none());
+}
+
+fn referenced_input(grip: bool, separation: f32) -> LegacyVrInput {
+    let center = [0.347, -0.314, -0.44];
+    LegacyVrInput {
+        head: [
+            [1.0, 0.0, 0.0, center[0]],
+            [0.0, 1.0, 0.0, center[1]],
+            [0.0, 0.0, 1.0, center[2] + 0.5],
+        ],
+        left: [
+            [0.0, 0.0, 1.0, center[0] + separation - 0.03],
+            [0.0, 1.0, 0.0, center[1] + 0.07],
+            [-1.0, 0.0, 0.0, center[2] + 0.14],
+        ],
+        right: [
+            [1.0, 0.0, 0.0, 0.3],
+            [0.0, 0.0, -1.0, -0.2],
+            [0.0, 1.0, 0.0, -0.4],
+        ],
+        left_handgrip: [
+            [1.0, 0.0, 0.0, 0.14],
+            [0.0, 0.0, -1.0, -0.07],
+            [0.0, 1.0, 0.0, 0.03],
+        ],
+        right_handgrip: [
+            [0.0, -1.0, 0.0, 0.11],
+            [1.0, 0.0, 0.0, -0.04],
+            [0.0, 0.0, 1.0, 0.09],
+        ],
+        left_index: 3,
+        right_index: 8,
+        reference_epoch: 7,
+        grip,
+    }
+}
+
+fn assert_transform_close(actual: Transform, expected: Transform) {
+    for (actual, expected) in actual.iter().flatten().zip(expected.iter().flatten()) {
+        assert!(
+            (actual - expected).abs() < 0.00001,
+            "{actual} != {expected}"
+        );
+    }
+}
+
+fn referenced_fixture(attempt: u64) -> Fixture {
+    let mut f = Fixture::new(attempt);
+    f.interaction.config.wrist_transform = None;
+    for ms in [0, 50, 150, 350] {
+        f.step(ms, Some(referenced_input(false, 0.04)));
+    }
+    f
+}
+
+#[test]
+fn rotated_handgrips_share_the_visible_near_and_relative_pull_anchor() {
+    let mut f = referenced_fixture(0);
+    let sample = referenced_input(false, 0.04);
+    let world_wrist = [
+        [1.0, 0.0, 0.0, 0.347],
+        [0.0, 1.0, 0.0, -0.314],
+        [0.0, 0.0, 1.0, -0.44],
+    ];
+    let icon = f.interaction.frame.icon.unwrap();
+    assert_eq!(icon.device, sample.right_index);
+    assert_transform_close(compose(sample.right, icon.transform), world_wrist);
+    assert!(distance(sample.left, world_wrist) > f.interaction.config.grab_m);
+    assert!(f.step(351, Some(sample)).glow);
+    assert!(!f.step(352, Some(referenced_input(true, 0.081))).grab);
+    f.step(353, Some(sample));
+    let grabbed = f.step(360, Some(referenced_input(true, 0.04)));
+    assert!(grabbed.grab);
+    assert_transform_close(
+        compose(sample.left, grabbed.icon.unwrap().transform),
+        world_wrist,
+    );
+    assert!(!f.step(370, Some(referenced_input(true, 0.159))).pull);
+    assert!(f.step(380, Some(referenced_input(true, 0.161))).pull);
+    assert!(!f.step(390, Some(referenced_input(true, 0.30))).pull);
+}
+
+#[test]
+fn referenced_grab_follows_raw_attachment_and_returns_to_the_moving_right_anchor() {
+    let mut f = referenced_fixture(0);
+    let sample = referenced_input(true, 0.04);
+    let grabbed = f.step(360, Some(sample)).icon.unwrap();
+    let mut moved = referenced_input(true, 0.10);
+    moved.left[1][3] += 0.01;
+    let followed = f.step(380, Some(moved));
+    assert!(!followed.pull);
+    assert_eq!(followed.icon.unwrap().transform, grabbed.transform);
+    let followed_world = compose(moved.left, grabbed.transform);
+    moved.grip = false;
+    let returned = f.step(400, Some(moved));
+    assert!(!returned.pull);
+    assert_eq!(returned.icon.unwrap().device, moved.right_index);
+    assert_transform_close(
+        compose(moved.right, returned.icon.unwrap().transform),
+        followed_world,
+    );
+    moved.right[0][3] += 0.2;
+    let half = f.step(512, Some(moved)).icon.unwrap();
+    let end = f.step(625, Some(moved)).icon.unwrap();
+    let endpoint = compose(moved.right, end.transform);
+    assert!((endpoint[0][3] - 0.547).abs() < 0.00001);
+    assert!((endpoint[1][3] + 0.314).abs() < 0.00001);
+    assert!((endpoint[2][3] + 0.44).abs() < 0.00001);
+    assert!(
+        distance(half.transform, end.transform)
+            < distance(returned.icon.unwrap().transform, end.transform)
+    );
+}
+
+#[test]
+fn common_rigid_motion_of_rotated_references_cannot_authorize_a_request() {
+    let mut f = referenced_fixture(0);
+    assert!(f.step(360, Some(referenced_input(true, 0.04))).grab);
+    let motion = [
+        [0.0, 0.0, 1.0, 0.8],
+        [0.0, 1.0, 0.0, -0.3],
+        [-1.0, 0.0, 0.0, 0.2],
+    ];
+    let mut sample = referenced_input(true, 0.04);
+    sample.head = compose(motion, sample.head);
+    sample.left = compose(motion, sample.left);
+    sample.right = compose(motion, sample.right);
+    let moved = f.step(380, Some(sample));
+    assert!(!moved.pull);
+    assert_eq!(moved.icon.unwrap().device, sample.left_index);
+    sample.grip = false;
+    assert!(!f.step(400, Some(sample)).pull);
+}
+
+#[test]
+fn default_wrist_moves_with_component_position_but_explicit_matrix_remains_raw() {
+    for explicit in [false, true] {
+        let mut f = Fixture::new(0);
+        let raw_wrist = [
+            [1.0, 0.0, 0.0, 0.047],
+            [0.0, 0.0, 1.0, -0.04],
+            [0.0, -1.0, 0.0, 0.114],
+        ];
+        f.interaction.config = serde_json::from_value(if explicit {
+            json!({"wrist_transform": raw_wrist})
+        } else {
+            json!({})
+        })
+        .unwrap();
+        let mut sample = referenced_input(false, 0.04);
+        for ms in [0, 50, 150, 350] {
+            f.step(ms, Some(sample));
+        }
+        assert_transform_close(f.interaction.frame.icon.unwrap().transform, raw_wrist);
+        sample.right_handgrip[0][3] += 0.025;
+        sample.reference_epoch += 1;
+        assert!(f.step(360, Some(sample)).icon.is_none());
+        for ms in [410, 510, 610] {
+            f.step(ms, Some(sample));
+        }
+        let mut expected = raw_wrist;
+        if !explicit {
+            expected[0][3] += 0.025;
+        }
+        assert_transform_close(f.interaction.frame.icon.unwrap().transform, expected);
+    }
+}
+
+#[test]
+fn referenced_retained_photo_stays_raw_left_relative_with_unchanged_animation() {
+    let mut f = referenced_fixture(1);
+    f.step(360, Some(referenced_input(true, 0.04)));
+    assert!(f.step(380, Some(referenced_input(true, 0.161))).pull);
+    let mut sample = referenced_input(true, 0.161);
+    sample.left[0][3] += 0.2;
+    let half = f.step(455, Some(sample)).photo.unwrap();
+    assert_eq!(half.device, sample.left_index);
+    assert_eq!(half.transform, f.interaction.config.photo_transform);
+    assert!((half.alpha - 0.5).abs() < 0.00001);
+    assert!((half.width - 0.2025).abs() < 0.00001);
+    let full = f.step(530, Some(sample)).photo.unwrap();
+    assert_eq!(full.width, 0.375);
+    assert_eq!(full.alpha, 1.0);
+    assert_eq!(full.transform, f.interaction.config.photo_transform);
+    sample.grip = false;
+    assert!(f.step(540, Some(sample)).hidden);
+    let half = f.step(615, Some(sample)).photo.unwrap();
+    assert!((half.alpha - 0.5).abs() < 0.00001);
+    assert!((half.width - 0.2025).abs() < 0.00001);
+    assert!(f.step(690, Some(sample)).photo.is_none());
 }

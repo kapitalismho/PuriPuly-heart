@@ -23,14 +23,14 @@ pub struct TemporaryInteractionConfig {
     pub facing_hide_deg: f32,
     pub forward_hide_deg: f32,
     pub dwell_ms: u64,
-    pub wrist_transform: Transform,
+    pub wrist_transform: Option<Transform>,
     pub photo_transform: Transform,
 }
 
 impl Default for TemporaryInteractionConfig {
     fn default() -> Self {
         Self {
-            grab_m: 0.07,
+            grab_m: 0.08,
             icon_width_m: 0.03,
             photo_width_m: 0.375,
             facing_show_deg: 45.0,
@@ -38,11 +38,7 @@ impl Default for TemporaryInteractionConfig {
             facing_hide_deg: 55.0,
             forward_hide_deg: 45.0,
             dwell_ms: 50,
-            wrist_transform: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.035],
-                [0.0, -1.0, 0.0, 0.08],
-            ],
+            wrist_transform: None,
             photo_transform: [
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0, 0.12],
@@ -67,12 +63,28 @@ impl TemporaryInteractionConfig {
                 show.is_finite() && hide.is_finite() && *show > 0.0 && show < hide && *hide < 90.0
             })
             || self.dwell_ms > 5000
-            || !valid_transform(self.wrist_transform)
+            || self.wrist_transform.is_some_and(|t| !valid_transform(t))
             || !valid_transform(self.photo_transform)
         {
             return Err(PhotoError::Manifest);
         }
         Ok(())
+    }
+
+    pub fn effective_wrist_transform(&self, handgrip: Transform) -> Transform {
+        self.wrist_transform.unwrap_or_else(|| {
+            let point = [0.0, 0.063, 0.024];
+            let mut wrist = [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, -1.0, 0.0, 0.0],
+            ];
+            for i in 0..3 {
+                wrist[i][3] =
+                    handgrip[i][3] + (0..3).map(|j| handgrip[i][j] * point[j]).sum::<f32>();
+            }
+            wrist
+        })
     }
 }
 
@@ -178,7 +190,7 @@ struct Return {
 pub struct PhotoInteraction {
     pub config: TemporaryInteractionConfig,
     key: Option<String>,
-    roles: Option<(u32, u32)>,
+    roles: Option<(u32, u32, u64)>,
     grip: bool,
     armed: bool,
     change_since: Option<Instant>,
@@ -283,7 +295,7 @@ impl PhotoInteraction {
             };
             return self.frame;
         };
-        let roles = (input.left_index, input.right_index);
+        let roles = (input.left_index, input.right_index, input.reference_epoch);
         if self.roles != Some(roles) {
             self.roles = Some(roles);
             self.armed = false;
@@ -302,7 +314,8 @@ impl PhotoInteraction {
         }
         let pressed = self.armed && input.grip && !self.grip;
         self.grip = input.grip;
-        let wrist = compose(input.right, self.config.wrist_transform);
+        let wrist_local = self.config.effective_wrist_transform(input.right_handgrip);
+        let wrist = compose(input.right, wrist_local);
         let head_to_icon = subtract(column(wrist, 3), column(input.head, 3));
         let facing = subtract(column(input.head, 3), column(wrist, 3));
         let forward = column(input.head, 2).map(|v| -v);
@@ -353,7 +366,7 @@ impl PhotoInteraction {
                 now.saturating_duration_since(shown) >= Duration::from_millis(200)
             });
         let photo = photo.unwrap();
-        let current_distance = distance(input.left, wrist);
+        let current_distance = distance(compose(input.left, input.left_handgrip), wrist);
         let near = current_distance <= self.config.grab_m;
         let mut out = InteractionFrame {
             glow: near && interactive && photo.can_pull(),
@@ -425,7 +438,7 @@ impl PhotoInteraction {
                     / 0.225)
                     .min(1.0);
                 let ease = 1.0 - (1.0 - t) * (1.0 - t);
-                let mut transform = self.config.wrist_transform;
+                let mut transform = wrist_local;
                 for i in 0..3 {
                     transform[i][3] =
                         returning.from[i][3] + (transform[i][3] - returning.from[i][3]) * ease;
@@ -435,7 +448,7 @@ impl PhotoInteraction {
                 }
                 (input.right_index, transform)
             } else {
-                (input.right_index, self.config.wrist_transform)
+                (input.right_index, wrist_local)
             };
             out.icon = Some(Placement {
                 device,

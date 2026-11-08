@@ -734,6 +734,9 @@ pub struct LegacyVrInput {
     pub head: [[f32; 4]; 3],
     pub left: [[f32; 4]; 3],
     pub right: [[f32; 4]; 3],
+    pub left_handgrip: [[f32; 4]; 3],
+    pub right_handgrip: [[f32; 4]; 3],
+    pub reference_epoch: u64,
     pub left_index: u32,
     pub right_index: u32,
     pub grip: bool,
@@ -809,11 +812,148 @@ impl Drop for OpenVrRuntimeLease {
 }
 
 #[cfg(windows)]
+struct HandReference {
+    index: u32,
+    model: CString,
+    serial: CString,
+    transform: [[f32; 4]; 3],
+}
+
+#[cfg(windows)]
+#[derive(Default)]
+struct PhotoHandReferences {
+    initialized: bool,
+    render_models: Option<*mut openvr_sys::VR_IVRRenderModels_FnTable>,
+    hands: [Option<HandReference>; 2],
+    epoch: u64,
+}
+
+#[cfg(windows)]
+impl PhotoHandReferences {
+    fn invalidate(&mut self) {
+        if self.hands.iter().any(Option::is_some) {
+            self.hands = [None, None];
+            self.epoch += 1;
+        }
+    }
+
+    fn sample(
+        &mut self,
+        api: &openvr_sys::VR_IVRSystem_FnTable,
+        indices: [u32; 2],
+        states: &mut [openvr_sys::VRControllerState_t; 2],
+    ) -> Option<([[[f32; 4]; 3]; 2], u64)> {
+        if !self.initialized {
+            self.initialized = true;
+            self.render_models = initialize_render_models_api().ok();
+        }
+        let render_models = unsafe { &*self.render_models? };
+        let component_state = render_models.GetComponentState?;
+        let property = api.GetStringTrackedDeviceProperty?;
+        let controller_state = api.GetControllerState?;
+        for (hand, index) in indices.into_iter().enumerate() {
+            let mut model = std::mem::MaybeUninit::<
+                [i8; openvr_sys::k_unMaxPropertyStringSize as usize],
+            >::uninit();
+            let mut serial = std::mem::MaybeUninit::<
+                [i8; openvr_sys::k_unMaxPropertyStringSize as usize],
+            >::uninit();
+            let read = |name, buffer: *mut i8| {
+                let mut error = openvr_sys::ETrackedPropertyError_TrackedProp_Success;
+                let length = unsafe {
+                    property(
+                        index,
+                        name,
+                        buffer,
+                        openvr_sys::k_unMaxPropertyStringSize,
+                        &mut error,
+                    )
+                } as usize;
+                (error == openvr_sys::ETrackedPropertyError_TrackedProp_Success
+                    && length > 1
+                    && length <= openvr_sys::k_unMaxPropertyStringSize as usize)
+                    .then_some(length)
+            };
+            let model_len = read(
+                openvr_sys::ETrackedDeviceProperty_Prop_RenderModelName_String,
+                model.as_mut_ptr().cast(),
+            )?;
+            let serial_len = read(
+                openvr_sys::ETrackedDeviceProperty_Prop_SerialNumber_String,
+                serial.as_mut_ptr().cast(),
+            )?;
+            let model = CStr::from_bytes_with_nul(unsafe {
+                std::slice::from_raw_parts(model.as_ptr().cast::<u8>(), model_len)
+            })
+            .ok()?;
+            let serial = CStr::from_bytes_with_nul(unsafe {
+                std::slice::from_raw_parts(serial.as_ptr().cast::<u8>(), serial_len)
+            })
+            .ok()?;
+            if !unsafe {
+                controller_state(
+                    index,
+                    &mut states[hand],
+                    std::mem::size_of_val(&states[hand]) as u32,
+                )
+            } {
+                return None;
+            }
+            let mut mode = openvr_sys::RenderModel_ControllerMode_State_t::default();
+            let mut component = openvr_sys::RenderModel_ComponentState_t::default();
+            if !unsafe {
+                component_state(
+                    model.as_ptr().cast_mut(),
+                    c"handgrip".as_ptr().cast_mut(),
+                    &mut states[hand],
+                    &mut mode,
+                    &mut component,
+                )
+            } || !crate::photo::interaction::valid_transform(
+                component.mTrackingToComponentLocal.m,
+            ) {
+                return None;
+            }
+            let transform = component.mTrackingToComponentLocal.m;
+            match &mut self.hands[hand] {
+                Some(cached)
+                    if cached.index == index
+                        && cached.model.as_c_str() == model
+                        && cached.serial.as_c_str() == serial =>
+                {
+                    if cached.transform != transform {
+                        cached.transform = transform;
+                        self.epoch += 1;
+                    }
+                }
+                entry => {
+                    *entry = Some(HandReference {
+                        index,
+                        model: model.to_owned(),
+                        serial: serial.to_owned(),
+                        transform,
+                    });
+                    self.epoch += 1;
+                }
+            }
+        }
+        Some((
+            [
+                self.hands[0].as_ref()?.transform,
+                self.hands[1].as_ref()?.transform,
+            ],
+            self.epoch,
+        ))
+    }
+}
+
+#[cfg(windows)]
 struct WindowsOpenVrSession {
     overlay_api: *mut openvr_sys::VR_IVROverlay_FnTable,
     system_api: *mut openvr_sys::VR_IVRSystem_FnTable,
     compositor_api: Option<*mut openvr_sys::VR_IVRCompositor_FnTable>,
     output_adapter: OpenVrOutputAdapter,
+    hand_references: RefCell<PhotoHandReferences>,
     _runtime: OpenVrRuntimeLease,
 }
 
@@ -830,11 +970,20 @@ impl WindowsOpenVrSession {
             system_api,
             compositor_api,
             output_adapter,
+            hand_references: RefCell::new(PhotoHandReferences::default()),
             _runtime: runtime,
         })
     }
 
     fn legacy_input(&self) -> Option<LegacyVrInput> {
+        let input = self.sample_legacy_input();
+        if input.is_none() {
+            self.hand_references.borrow_mut().invalidate();
+        }
+        input
+    }
+
+    fn sample_legacy_input(&self) -> Option<LegacyVrInput> {
         let api = unsafe { &*self.system_api };
         if api
             .IsInputAvailable
@@ -872,19 +1021,24 @@ impl WindowsOpenVrSession {
                 && crate::photo::interaction::valid_transform(pose.mDeviceToAbsoluteTracking.m))
             .then_some(pose.mDeviceToAbsoluteTracking.m)
         };
-        let mut state = openvr_sys::VRControllerState_t::default();
-        if !unsafe {
-            api.GetControllerState?(left_index, &mut state, std::mem::size_of_val(&state) as u32)
-        } {
-            return None;
-        }
+        let head = pose(0)?;
+        let left = pose(left_index)?;
+        let right = pose(right_index)?;
+        let mut states = [openvr_sys::VRControllerState_t::default(); 2];
+        let ([left_handgrip, right_handgrip], reference_epoch) = self
+            .hand_references
+            .borrow_mut()
+            .sample(api, [left_index, right_index], &mut states)?;
         Some(LegacyVrInput {
-            head: pose(0)?,
-            left: pose(left_index)?,
-            right: pose(right_index)?,
+            head,
+            left,
+            right,
+            left_handgrip,
+            right_handgrip,
+            reference_epoch,
             left_index,
             right_index,
-            grip: state.ulButtonPressed & (1u64 << openvr_sys::EVRButtonId_k_EButton_Grip) != 0,
+            grip: states[0].ulButtonPressed & (1u64 << openvr_sys::EVRButtonId_k_EButton_Grip) != 0,
         })
     }
 }
@@ -1611,6 +1765,21 @@ fn initialize_system_api() -> Result<*mut openvr_sys::VR_IVRSystem_FnTable, Open
     }
 
     Ok(system_api as *mut openvr_sys::VR_IVRSystem_FnTable)
+}
+
+#[cfg(windows)]
+fn initialize_render_models_api() -> Result<*mut openvr_sys::VR_IVRRenderModels_FnTable, OpenVrError>
+{
+    let version = fn_table_interface_version(openvr_sys::IVRRenderModels_Version)?;
+    let mut error = openvr_sys::EVRInitError_VRInitError_None;
+    let api = unsafe { openvr_sys::VR_GetGenericInterface(version.as_ptr(), &mut error) };
+    if error != openvr_sys::EVRInitError_VRInitError_None || api == 0 {
+        return Err(OpenVrError::Init(format!(
+            "VR_GetGenericInterface (render models) failed: {}",
+            vr_init_error_name(error)
+        )));
+    }
+    Ok(api as *mut openvr_sys::VR_IVRRenderModels_FnTable)
 }
 
 #[cfg(windows)]

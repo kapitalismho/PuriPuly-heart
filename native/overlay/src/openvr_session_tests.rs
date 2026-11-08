@@ -144,6 +144,7 @@ fn session(api: &mut openvr_sys::VR_IVROverlay_FnTable) -> OpenVrSession {
                 requested_identity: AdapterIdentity::Test,
                 adapter: None,
             },
+            hand_references: RefCell::new(PhotoHandReferences::default()),
             _runtime: OpenVrRuntimeLease { shutdown },
         }),
     }
@@ -216,6 +217,11 @@ struct LegacyCalls {
     invalid_pose: Option<usize>,
     interaction_distance: Option<f32>,
     pulses: Vec<(u32, u32, u16)>,
+    replacement: bool,
+    missing_component: bool,
+    invalid_component: bool,
+    model_changed: bool,
+    component_changed: bool,
 }
 
 thread_local! { static LEGACY: RefCell<LegacyCalls> = RefCell::new(LegacyCalls { left: 1, right: 2, ..Default::default() }); }
@@ -281,6 +287,10 @@ unsafe extern "C" fn poses(
                     0.0
                 };
                 pose.mDeviceToAbsoluteTracking.m[2][3] = if i == 0 { 0.5 } else { 0.0 };
+                if i == calls.left as usize {
+                    pose.mDeviceToAbsoluteTracking.m[1][3] = 0.03;
+                    pose.mDeviceToAbsoluteTracking.m[2][3] = -0.04;
+                }
             }
         }
     });
@@ -288,6 +298,96 @@ unsafe extern "C" fn poses(
 
 unsafe extern "C" fn pulse(device: u32, axis: u32, duration: u16) {
     LEGACY.with(|calls| calls.borrow_mut().pulses.push((device, axis, duration)));
+}
+
+unsafe extern "C" fn device_property(
+    index: u32,
+    property: openvr_sys::ETrackedDeviceProperty,
+    value: *mut i8,
+    capacity: u32,
+    error: *mut openvr_sys::ETrackedPropertyError,
+) -> u32 {
+    LEGACY.with(|calls| {
+        let calls = calls.borrow();
+        let text = if property == openvr_sys::ETrackedDeviceProperty_Prop_RenderModelName_String {
+            if calls.model_changed {
+                "replacement-model"
+            } else {
+                "actual-model"
+            }
+        } else if calls.replacement {
+            "replacement-device"
+        } else if index == calls.left {
+            "actual-left"
+        } else {
+            "actual-right"
+        };
+        assert!(capacity as usize > text.len());
+        unsafe {
+            std::ptr::copy_nonoverlapping(text.as_ptr().cast::<i8>(), value, text.len());
+            *value.add(text.len()) = 0;
+            *error = openvr_sys::ETrackedPropertyError_TrackedProp_Success;
+        }
+        text.len() as u32 + 1
+    })
+}
+
+unsafe extern "C" fn handgrip_state(
+    model: *mut i8,
+    component: *mut i8,
+    _: *mut openvr_sys::VRControllerState_t,
+    _: *mut openvr_sys::RenderModel_ControllerMode_State_t,
+    state: *mut openvr_sys::RenderModel_ComponentState_t,
+) -> bool {
+    LEGACY.with(|calls| {
+        let calls = calls.borrow();
+        assert_eq!(unsafe { CStr::from_ptr(component) }, c"handgrip");
+        assert_eq!(
+            unsafe { CStr::from_ptr(model) },
+            if calls.model_changed {
+                c"replacement-model"
+            } else {
+                c"actual-model"
+            },
+        );
+        unsafe {
+            (*state).mTrackingToComponentLocal.m = [
+                [0.0, -1.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, -0.03],
+                [0.0, 0.0, 1.0, 0.04],
+            ];
+            if calls.component_changed {
+                (*state).mTrackingToComponentLocal.m[0][0] = 1.0;
+                (*state).mTrackingToComponentLocal.m[0][1] = 0.0;
+                (*state).mTrackingToComponentLocal.m[1][0] = 0.0;
+                (*state).mTrackingToComponentLocal.m[1][1] = 1.0;
+            }
+            if calls.invalid_component {
+                (*state).mTrackingToComponentLocal.m[0][0] = f32::NAN;
+            }
+        }
+        !calls.missing_component
+    })
+}
+
+fn configure_input(
+    session: &mut OpenVrSession,
+    system: &mut openvr_sys::VR_IVRSystem_FnTable,
+    models: &mut openvr_sys::VR_IVRRenderModels_FnTable,
+) {
+    system.GetTrackedDeviceIndexForControllerRole = Some(controller_role);
+    system.GetControllerState = Some(controller_state);
+    system.GetDeviceToAbsoluteTrackingPose = Some(poses);
+    system.GetStringTrackedDeviceProperty = Some(device_property);
+    system.TriggerHapticPulse = Some(pulse);
+    models.GetComponentState = Some(handgrip_state);
+    let inner = Rc::get_mut(&mut session.inner).unwrap();
+    inner.system_api = system;
+    *inner.hand_references.get_mut() = PhotoHandReferences {
+        initialized: true,
+        render_models: Some(models),
+        ..Default::default()
+    };
 }
 
 #[test]
@@ -301,12 +401,9 @@ fn legacy_grip_poses_and_haptic_hands_resolve_roles_fresh_and_fail_closed() {
     });
     let mut overlay_api = api();
     let mut system_api: openvr_sys::VR_IVRSystem_FnTable = unsafe { std::mem::zeroed() };
-    system_api.GetTrackedDeviceIndexForControllerRole = Some(controller_role);
-    system_api.GetControllerState = Some(controller_state);
-    system_api.GetDeviceToAbsoluteTrackingPose = Some(poses);
-    system_api.TriggerHapticPulse = Some(pulse);
+    let mut models = unsafe { std::mem::zeroed() };
     let mut session = session(&mut overlay_api);
-    Rc::get_mut(&mut session.inner).unwrap().system_api = &mut system_api;
+    configure_input(&mut session, &mut system_api, &mut models);
     assert!(!session.legacy_input().unwrap().grip);
     LEGACY.with(|calls| calls.borrow_mut().grip = true);
     assert!(session.legacy_input().unwrap().grip);
@@ -339,6 +436,113 @@ fn legacy_grip_poses_and_haptic_hands_resolve_roles_fresh_and_fail_closed() {
     });
     assert!(session.legacy_input().is_none());
     LEGACY.with(|calls| assert_eq!(calls.borrow().pulses.len(), 2));
+}
+
+#[test]
+fn missing_invalid_or_replaced_handgrips_cancel_and_require_fresh_ready_grip() {
+    use crate::photo::interaction::{PhotoInteraction, TemporaryInteractionConfig, IDENTITY};
+    use crate::photo::state::Photo;
+    use std::time::{Duration, Instant};
+    for interruption in [
+        "missing",
+        "invalid",
+        "model",
+        "device",
+        "component",
+        "tracking",
+    ] {
+        LEGACY.with(|calls| {
+            *calls.borrow_mut() = LegacyCalls {
+                left: 1,
+                right: 2,
+                interaction_distance: Some(0.0),
+                ..Default::default()
+            };
+        });
+        let mut overlay_api = api();
+        let mut system_api = unsafe { std::mem::zeroed() };
+        let mut models = unsafe { std::mem::zeroed() };
+        let mut session = session(&mut overlay_api);
+        configure_input(&mut session, &mut system_api, &mut models);
+        let photo: Photo = serde_json::from_value(serde_json::json!({
+            "photo_id":"reference-loss", "path":"unused.png", "file_size":1,
+            "shutter_unix_ms":1000, "attempt_id":0, "phase":"offer", "offer_open":true,
+            "visible":false, "image":null, "preparations":[], "blocks":[],
+            "failure_code":null, "first_block_drawn":false
+        }))
+        .unwrap();
+        let start = Instant::now();
+        let mut interaction = PhotoInteraction::new(TemporaryInteractionConfig {
+            wrist_transform: Some(IDENTITY),
+            ..Default::default()
+        });
+        interaction.snapshot(Some(&photo), start, 1000);
+        let mut step = |ms| {
+            interaction.step(
+                Some(&photo),
+                session.legacy_input(),
+                start + Duration::from_millis(ms),
+            )
+        };
+        for ms in [0, 50, 150, 350] {
+            step(ms);
+        }
+        let original = session.legacy_input().unwrap();
+        assert_eq!(original.left[1][3], 0.03);
+        assert_eq!(original.left_handgrip[1][3], -0.03);
+        assert_eq!(original.left_handgrip[0][1], -1.0);
+        assert_eq!(
+            session.legacy_input().unwrap().reference_epoch,
+            original.reference_epoch
+        );
+        LEGACY.with(|calls| calls.borrow_mut().grip = true);
+        assert!(step(360).grab);
+        LEGACY.with(|calls| {
+            let mut calls = calls.borrow_mut();
+            calls.interaction_distance = Some(0.2);
+            match interruption {
+                "missing" => calls.missing_component = true,
+                "invalid" => calls.invalid_component = true,
+                "model" => calls.model_changed = true,
+                "device" => calls.replacement = true,
+                "component" => calls.component_changed = true,
+                "tracking" => calls.invalid_pose = Some(1),
+                _ => unreachable!(),
+            }
+        });
+        assert_eq!(
+            session.pulse(TrackedHand::Right),
+            matches!(interruption, "model" | "device" | "component"),
+        );
+        LEGACY.with(|calls| {
+            let mut calls = calls.borrow_mut();
+            calls.missing_component = false;
+            calls.invalid_component = false;
+            calls.invalid_pose = None;
+        });
+        let canceled = step(380);
+        assert!(canceled.icon.is_none(), "{interruption}");
+        assert!(!canceled.pull, "{interruption}");
+        LEGACY.with(|calls| {
+            let mut calls = calls.borrow_mut();
+            calls.missing_component = false;
+            calls.invalid_component = false;
+            calls.invalid_pose = None;
+            calls.interaction_distance = Some(0.0);
+        });
+        for ms in [400, 450, 550, 750] {
+            let recovered = step(ms);
+            assert!(!recovered.grab, "{interruption}");
+            assert!(!recovered.pull, "{interruption}");
+        }
+        assert!(session.legacy_input().unwrap().reference_epoch > original.reference_epoch);
+        LEGACY.with(|calls| calls.borrow_mut().grip = false);
+        step(760);
+        LEGACY.with(|calls| calls.borrow_mut().grip = true);
+        assert!(step(770).grab, "{interruption}");
+        LEGACY.with(|calls| calls.borrow_mut().interaction_distance = Some(0.121));
+        assert!(step(790).pull, "{interruption}");
+    }
 }
 
 #[test]
@@ -395,12 +599,9 @@ async fn windows_graphics_controlled_held_photo_runtime_reports_first_draw_once_
         });
         let mut overlay_api = api();
         let mut system_api: openvr_sys::VR_IVRSystem_FnTable = unsafe { std::mem::zeroed() };
-        system_api.GetTrackedDeviceIndexForControllerRole = Some(controller_role);
-        system_api.GetControllerState = Some(controller_state);
-        system_api.GetDeviceToAbsoluteTrackingPose = Some(poses);
-        system_api.TriggerHapticPulse = Some(pulse);
+        let mut models = unsafe { std::mem::zeroed() };
         let mut session = session(&mut overlay_api);
-        Rc::get_mut(&mut session.inner).unwrap().system_api = &mut system_api;
+        configure_input(&mut session, &mut system_api, &mut models);
         let icon = OpenVrOverlay::in_session(&session, "photo.controlled-runtime.icon").unwrap();
         let photo = OpenVrOverlay::in_session(&session, "photo.controlled-runtime.photo").unwrap();
         crate::photo::runtime::PhotoRuntime::assert_controlled_held_render_frame(

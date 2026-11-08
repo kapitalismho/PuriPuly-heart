@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use super::{
     OpenVrError, OpenVrOutputAdapter, OpenVrRuntimeLease, OverlayPlacementPolicy,
-    SpatialReanchorOutcome, WindowsOpenVrOverlay, WindowsOpenVrSession,
+    PhotoHandReferences, SpatialReanchorOutcome, WindowsOpenVrOverlay, WindowsOpenVrSession,
     DEFAULT_OVERLAY_WIDTH_METERS,
 };
 use crate::presentation::AdapterIdentity;
@@ -187,6 +187,7 @@ impl ControlledOwner {
                     requested_identity: AdapterIdentity::Unavailable,
                     adapter: None,
                 },
+                hand_references: RefCell::new(PhotoHandReferences::default()),
                 _runtime: OpenVrRuntimeLease { shutdown: || {} },
             }),
         });
