@@ -27,13 +27,13 @@ pub struct TemporaryInteractionConfig {
     pub wrist_handgrip_point_m: Option<[f32; 3]>,
     pub debug_grab_volume: bool,
     pub debug_case_label: Option<String>,
-    pub photo_transform: Transform,
+    pub photo_transform: Option<Transform>,
 }
 
 impl Default for TemporaryInteractionConfig {
     fn default() -> Self {
         Self {
-            grab_m: 0.08,
+            grab_m: 0.10,
             icon_width_m: 0.03,
             photo_width_m: 0.375,
             facing_show_deg: 45.0,
@@ -45,11 +45,7 @@ impl Default for TemporaryInteractionConfig {
             wrist_handgrip_point_m: None,
             debug_grab_volume: false,
             debug_case_label: None,
-            photo_transform: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.12],
-                [0.0, 0.0, 1.0, -0.08],
-            ],
+            photo_transform: None,
         }
     }
 }
@@ -79,7 +75,7 @@ impl TemporaryInteractionConfig {
                     || label.split('\n').any(str::is_empty)
                     || !label.bytes().all(|b| b == b'\n' || (b' '..=b'~').contains(&b))
             })
-            || !valid_transform(self.photo_transform)
+            || self.photo_transform.is_some_and(|t| !valid_transform(t))
         {
             return Err(PhotoError::Manifest);
         }
@@ -88,17 +84,14 @@ impl TemporaryInteractionConfig {
 
     pub fn effective_wrist_transform(&self, handgrip: Transform) -> Transform {
         self.wrist_transform.unwrap_or_else(|| {
-            let point = self.wrist_handgrip_point_m.unwrap_or([0.0, 0.063, 0.024]);
-            let mut wrist = [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, -1.0, 0.0, 0.0],
-            ];
-            for i in 0..3 {
-                wrist[i][3] =
-                    handgrip[i][3] + (0..3).map(|j| handgrip[i][j] * point[j]).sum::<f32>();
-            }
-            wrist
+            let point = self
+                .wrist_handgrip_point_m
+                .unwrap_or([0.035, 0.10153344, 0.03473191]);
+            compose(handgrip, [
+                [0.0, 0.0, 1.0, point[0]],
+                [-0.268297781, -0.963336027, 0.0, point[1]],
+                [0.963336027, -0.268297781, 0.0, point[2]],
+            ])
         })
     }
 }
@@ -159,6 +152,34 @@ fn distance(a: Transform, b: Transform) -> f32 {
 fn within(a: [f32; 3], b: [f32; 3], degrees: f32) -> bool {
     let norm = (dot(a, a) * dot(b, b)).sqrt();
     norm > 0.000001 && dot(a, b) >= norm * degrees.to_radians().cos()
+}
+
+fn normalized(vector: [f32; 3]) -> [f32; 3] {
+    let length = dot(vector, vector).sqrt();
+    vector.map(|value| value / length)
+}
+
+fn photo_edge_anchor(input: LegacyVrInput) -> Transform {
+    let pivot = compose(input.left, input.left_handgrip);
+    let toward_head = subtract(column(input.head, 3), column(pivot, 3));
+    let normal = if dot(toward_head, toward_head) > 0.000001 {
+        normalized(toward_head)
+    } else {
+        column(input.head, 2)
+    };
+    let head_up = column(input.head, 1);
+    let projected_up = subtract(head_up, normal.map(|value| value * dot(head_up, normal)));
+    let right = if dot(projected_up, projected_up) > 0.000001 {
+        normalized(cross(projected_up, normal))
+    } else {
+        column(input.head, 0)
+    };
+    let up = cross(normal, right);
+    let mut world = IDENTITY;
+    for i in 0..3 {
+        world[i] = [right[i], up[i], normal[i], pivot[i][3]];
+    }
+    compose(inverse(input.left), world)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -231,6 +252,11 @@ struct Return {
     from: Transform,
 }
 
+struct PhotoRelease {
+    started: Instant,
+    from: f32,
+}
+
 pub struct PhotoInteraction {
     pub config: TemporaryInteractionConfig,
     key: Option<String>,
@@ -245,6 +271,8 @@ pub struct PhotoInteraction {
     returning: Option<Return>,
     held: bool,
     photo_alpha: f32,
+    photo_anchor: Option<Transform>,
+    photo_release: Option<PhotoRelease>,
     last: Option<Instant>,
     deadline: Option<Instant>,
     offer_deadline: Option<Instant>,
@@ -270,6 +298,8 @@ impl PhotoInteraction {
             returning: None,
             held: false,
             photo_alpha: 0.0,
+            photo_anchor: None,
+            photo_release: None,
             last: None,
             deadline: None,
             offer_deadline: None,
@@ -308,7 +338,7 @@ impl PhotoInteraction {
     pub fn active(&self, photo: &Photo, now: Instant) -> bool {
         self.key.as_deref() == Some(photo.photo_id.as_str())
             && photo.phase != PhotoPhase::Expired
-            && (if photo.attempt_id == 0 {
+            && (if photo.attempt_id == 0 && !self.offer_pulled {
                 self.offer_deadline
             } else {
                 self.deadline
@@ -356,6 +386,8 @@ impl PhotoInteraction {
             self.returning = None;
             self.held = false;
             self.photo_alpha = 0.0;
+            self.photo_anchor = None;
+            self.photo_release = None;
             self.gaze = false;
             self.change_since = None;
             self.shown_at = None;
@@ -374,6 +406,8 @@ impl PhotoInteraction {
             self.grab = None;
             self.held = false;
             self.photo_alpha = 0.0;
+            self.photo_anchor = None;
+            self.photo_release = None;
             self.returning = None;
             self.gaze = false;
             self.change_since = None;
@@ -458,12 +492,19 @@ impl PhotoInteraction {
                 start_distance: current_distance,
                 relative: compose(inverse(input.left), wrist),
             });
+            self.photo_anchor = Some(photo_edge_anchor(input));
+            self.photo_release = None;
+            self.photo_alpha = 0.0;
             out.grab = true;
         }
         if let Some(grab) = &self.grab {
             let icon = compose(input.left, grab.relative);
-            let triggered = input.grip && current_distance - grab.start_distance >= 0.12;
-            if !input.grip || triggered {
+            let progress = ((current_distance - grab.start_distance) / 0.12).clamp(0.0, 1.0);
+            let triggered = input.grip && photo.can_pull() && progress >= 1.0;
+            if input.grip && photo.can_pull() {
+                self.photo_alpha = progress;
+            }
+            if !input.grip || !photo.can_pull() || triggered {
                 self.returning = Some(Return {
                     started: now,
                     from: compose(inverse(input.right), icon),
@@ -471,32 +512,46 @@ impl PhotoInteraction {
                 self.grab = None;
                 if triggered {
                     out.pull = true;
-                    if photo.attempt_id == 0 {
-                        self.offer_pulled = true;
-                    }
-                    self.held = photo.attempt_id > 0;
+                    self.offer_pulled |= photo.attempt_id == 0;
+                    self.held = true;
+                    self.photo_alpha = 1.0;
+                } else {
+                    self.photo_release = Some(PhotoRelease {
+                        started: now,
+                        from: self.photo_alpha,
+                    });
                 }
             }
         }
         if self.held && (!input.grip || !photo.can_pull()) {
             self.held = false;
             out.hidden = true;
+            self.photo_release = Some(PhotoRelease {
+                started: now,
+                from: self.photo_alpha,
+            });
         }
-        self.photo_alpha = approach(
-            self.photo_alpha,
-            if self.held { 1.0 } else { 0.0 },
-            if prior_held != self.held {
-                0.0
-            } else {
-                dt / 0.15
-            },
-        );
+        if let Some(release) = &self.photo_release {
+            let progress = now.saturating_duration_since(release.started).as_secs_f32() / 0.15;
+            self.photo_alpha = release.from * (1.0 - progress).max(0.0);
+            if progress >= 1.0 {
+                self.photo_release = None;
+                self.photo_anchor = None;
+            }
+        }
         if self.photo_alpha > 0.0 {
+            let width = self.config.photo_width_m * self.photo_alpha;
+            let transform = self.config.photo_transform.unwrap_or_else(|| {
+                let mut transform = self.photo_anchor.unwrap();
+                for row in &mut transform {
+                    row[3] += row[0] * width * 0.5;
+                }
+                transform
+            });
             out.photo = Some(Placement {
                 device: input.left_index,
-                transform: self.config.photo_transform,
-                width: self.config.icon_width_m
-                    + (self.config.photo_width_m - self.config.icon_width_m) * self.photo_alpha,
+                transform,
+                width,
                 alpha: self.photo_alpha,
             });
         }

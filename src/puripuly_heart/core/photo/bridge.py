@@ -77,7 +77,7 @@ class PhotoBridge:
         self.shutdown_complete.clear()
         self._commands.clear()
         return {
-            "protocol_version": 1,
+            "protocol_version": 2,
             "role": "photo",
             "bridge_url": self._url,
             "session_token": self._token,
@@ -93,7 +93,10 @@ class PhotoBridge:
     def send(self, command: dict) -> bool:
         if self._connection is None or len(self._commands) >= 16:
             return False
-        if command.get("type", "").startswith("photo_probe_") and self._backend != "probe":
+        if (
+            command.get("type", "").startswith("photo_probe_")
+            or command.get("type") == "photo_debug_preview_source"
+        ) and self._backend != "probe":
             return False
         self._commands.append(command)
         self._changed.set()
@@ -180,7 +183,7 @@ class PhotoBridge:
         token = value.get("session_token")
         return (
             value.get("type") == "photo_auth"
-            and value.get("protocol_version") == 1
+            and value.get("protocol_version") == 2
             and type(value.get("protocol_version")) is int
             and value.get("role") == "photo"
             and isinstance(token, str)

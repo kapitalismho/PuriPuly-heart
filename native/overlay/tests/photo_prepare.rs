@@ -1,6 +1,6 @@
-use image::{Rgb, RgbImage};
+use image::{GenericImageView, Rgb, RgbImage};
 use puripuly_heart_overlay::photo::prepare::{
-    file_identity, prepare, PreparationWorker, PrepareRequest,
+    file_identity, prepare, PreparationCompletion, PreparationWorker, PrepareRequest,
 };
 use std::fs::File;
 use std::sync::{
@@ -151,7 +151,7 @@ async fn image_worker_runs_off_async_progress_and_shutdown_drains_started_work()
     .await
     .unwrap();
     worker.shutdown().await;
-    let result = worker.next_result().await.unwrap();
+    let PreparationCompletion::Prepared(result) = worker.next_result().await.unwrap() else { panic!("Preparation completion required") };
     assert_eq!(result.result.err(), Some("preparation_cancelled"));
     assert!(!directory.0.join("output/source.png").exists());
 }
@@ -180,4 +180,124 @@ fn shared_source_decoder_advances_jpeg_recovery_and_preparation_without_extensio
     let prepared = prepare(&request, &AtomicBool::new(false)).ok().unwrap();
     assert_eq!(&*prepared.original, &decoded);
     assert_eq!(std::fs::read(&prepared.source_path).unwrap(), bytes);
+}
+
+#[tokio::test]
+async fn grab_source_is_local_and_reused_without_decode_for_authorized_preparation() {
+    use puripuly_heart_overlay::photo::prepare::SourceRequest;
+    let directory = Directory::new("preview-reuse");
+    let request = directory.request(640, 360);
+    let mut worker = PreparationWorker::new().unwrap();
+    let local = SourceRequest {
+        photo_id: request.photo_id.clone(),
+        source_path: request.source_path.clone(),
+        expected_file_id: request.expected_file_id.clone(),
+        max_size: [320, 180],
+    };
+    worker.start_source(local.clone()).unwrap();
+    let PreparationCompletion::Source(completion) = worker.next_result().await.unwrap() else { panic!("Local source completion required") };
+    let source = completion.result.unwrap();
+    assert_eq!(source.original.dimensions(), (640, 360));
+    assert_eq!(source.working.as_ref().unwrap().pixels.dimensions(), (320, 180));
+    assert!(std::fs::read_dir(&request.output_dir).unwrap().next().is_none());
+    worker.start_source(local).unwrap();
+    let PreparationCompletion::Source(regrab) = worker.next_result().await.unwrap() else { panic!("Regrab source completion required") };
+    assert!(Arc::ptr_eq(&source, &regrab.result.unwrap()));
+    worker.start(request.clone()).unwrap();
+    let PreparationCompletion::Prepared(completion) = worker.next_result().await.unwrap() else { panic!("Authorized completion required") };
+    let prepared = completion.result.unwrap();
+    assert!(Arc::ptr_eq(&source.original, &prepared.original));
+    assert!(Arc::ptr_eq(source.working.as_ref().unwrap(), prepared.working.as_ref().unwrap()));
+    assert_eq!(prepared.decode_ms, 0.0);
+    assert_eq!(std::fs::read(&prepared.source_path).unwrap(), std::fs::read(&request.source_path).unwrap());
+    assert_eq!(image::open(&prepared.jpeg_path).unwrap().dimensions(), (1280, 720));
+    worker.shutdown().await;
+}
+
+#[tokio::test]
+async fn authorization_queued_while_grab_decode_is_pending_reuses_the_same_source() {
+    use puripuly_heart_overlay::photo::prepare::SourceRequest;
+    let directory = Directory::new("preview-pending");
+    let request = directory.request(640, 360);
+    let full = std::fs::read(&request.source_path).unwrap();
+    std::fs::write(&request.source_path, &full[..24]).unwrap();
+    let path = request.source_path.clone();
+    let writer = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(100));
+        std::fs::write(path, full).unwrap();
+    });
+    let mut worker = PreparationWorker::new().unwrap();
+    worker.start_source(SourceRequest {
+        photo_id: request.photo_id.clone(),
+        source_path: request.source_path.clone(),
+        expected_file_id: request.expected_file_id.clone(),
+        max_size: [320, 180],
+    }).unwrap();
+    worker.start(request).unwrap();
+    let PreparationCompletion::Source(completion) = worker.next_result().await.unwrap() else { panic!("Source must settle before queued preparation") };
+    let source = completion.result.unwrap();
+    let PreparationCompletion::Prepared(completion) = worker.next_result().await.unwrap() else { panic!("Authorized completion required") };
+    let prepared = completion.result.unwrap();
+    assert!(Arc::ptr_eq(&source.original, &prepared.original));
+    assert!(Arc::ptr_eq(source.working.as_ref().unwrap(), prepared.working.as_ref().unwrap()));
+    assert_eq!(prepared.decode_ms, 0.0);
+    writer.join().unwrap();
+    worker.shutdown().await;
+}
+
+#[tokio::test]
+async fn selected_preview_source_cannot_silently_switch_on_write_or_replacement() {
+    use puripuly_heart_overlay::photo::prepare::SourceRequest;
+    for replace in [false, true] {
+        let directory = Directory::new(if replace { "preview-replaced" } else { "preview-changed" });
+        let request = directory.request(320, 180);
+        let mut worker = PreparationWorker::new().unwrap();
+        worker.start_source(SourceRequest {
+            photo_id: request.photo_id.clone(),
+            source_path: request.source_path.clone(),
+            expected_file_id: request.expected_file_id.clone(),
+            max_size: [320, 180],
+        }).unwrap();
+        let PreparationCompletion::Source(completion) = worker.next_result().await.unwrap() else { panic!("Source completion required") };
+        let source = completion.result.unwrap();
+        if replace {
+            std::fs::rename(&request.source_path, directory.0.join("old.png")).unwrap();
+            RgbImage::new(640, 360).save(&request.source_path).unwrap();
+        } else {
+            std::fs::write(&request.source_path, b"changed same-file bytes").unwrap();
+            assert_eq!(file_identity(&File::open(&request.source_path).unwrap()).unwrap(), request.expected_file_id);
+        }
+        worker.start(request.clone()).unwrap();
+        let PreparationCompletion::Prepared(completion) = worker.next_result().await.unwrap() else { panic!("Preparation completion required") };
+        assert_eq!(completion.result.err(), Some(if replace { "source_replaced" } else { "source_changed" }));
+        assert_eq!(*source.original.get_pixel(0, 0), Rgb([200, 90, 35]));
+        assert!(std::fs::read_dir(&request.output_dir).unwrap().next().is_none());
+        worker.shutdown().await;
+    }
+}
+
+#[tokio::test]
+async fn incomplete_local_preview_can_fail_then_recover_on_a_new_explicit_grab() {
+    use puripuly_heart_overlay::photo::prepare::SourceRequest;
+    let directory = Directory::new("preview-recover");
+    let request = directory.request(320, 180);
+    let full = std::fs::read(&request.source_path).unwrap();
+    std::fs::write(&request.source_path, b"incomplete").unwrap();
+    let local = SourceRequest {
+        photo_id: request.photo_id.clone(),
+        source_path: request.source_path.clone(),
+        expected_file_id: request.expected_file_id.clone(),
+        max_size: [320, 180],
+    };
+    let mut worker = PreparationWorker::new().unwrap();
+    worker.start_source(local.clone()).unwrap();
+    let PreparationCompletion::Source(completion) = worker.next_result().await.unwrap() else { panic!("Local failure completion required") };
+    assert_eq!(completion.result.err(), Some("source_incomplete"));
+    assert!(std::fs::read_dir(&request.output_dir).unwrap().next().is_none());
+    std::fs::write(&request.source_path, full).unwrap();
+    worker.start_source(local).unwrap();
+    let PreparationCompletion::Source(completion) = worker.next_result().await.unwrap() else { panic!("Local recovery completion required") };
+    assert_eq!(completion.result.unwrap().original.dimensions(), (320, 180));
+    assert!(std::fs::read_dir(&request.output_dir).unwrap().next().is_none());
+    worker.shutdown().await;
 }

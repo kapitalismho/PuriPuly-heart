@@ -4,6 +4,7 @@ use serde_json::json;
 fn photo(attempt: u64) -> Photo {
     serde_json::from_value(json!({
         "photo_id":"test-a", "path":"test.png", "file_size":1, "shutter_unix_ms":1000,
+        "expected_file_id":["1","2"],
         "attempt_id":attempt, "phase":if attempt == 0 {"offer"} else {"requesting"},
         "offer_open":attempt == 0, "visible":attempt > 0, "image":null,
         "preparations":[], "blocks":[], "failure_code":null, "first_block_drawn":false
@@ -233,10 +234,10 @@ fn active_grab_and_return_remain_visible_outside_both_cones() {
 fn grip_must_begin_in_range_not_merely_enter_while_held() {
     let mut f = Fixture::new(0);
     f.look();
-    assert!(!f.step(360, Some(input(true, 0.081))).grab);
+    assert!(!f.step(360, Some(input(true, 0.1001))).grab);
     assert!(!f.step(370, Some(input(true, 0.0))).grab);
     f.step(380, Some(input(false, 0.0)));
-    assert!(f.step(390, Some(input(true, 0.08))).grab);
+    assert!(f.step(390, Some(input(true, 0.10))).grab);
     assert_eq!(f.interaction.frame.icon.unwrap().device, 1);
 }
 
@@ -254,7 +255,7 @@ fn relative_pull_rejects_common_arm_motion_and_triggers_exact_threshold_once() {
     assert!(!f.step(400, Some(input(true, 0.1199))).pull);
     let trigger = f.step(420, Some(input(true, 0.12)));
     assert!(trigger.pull);
-    assert!(trigger.photo.is_none());
+    assert_eq!(trigger.photo.unwrap().alpha, 1.0);
     assert_eq!(trigger.icon.unwrap().device, 2);
     assert!(!f.step(440, Some(input(true, 0.20))).pull);
     f.step(650, Some(input(false, 0.0)));
@@ -265,7 +266,7 @@ fn relative_pull_rejects_common_arm_motion_and_triggers_exact_threshold_once() {
     f.photo.visible = true;
     f.interaction
         .snapshot(Some(&f.photo), f.start + Duration::from_millis(670), 1670);
-    assert!(f.step(680, Some(input(true, 0.0))).photo.is_none());
+    assert!(f.step(680, Some(input(true, 0.0))).photo.is_some());
 }
 
 #[test]
@@ -289,15 +290,15 @@ fn early_release_sends_nothing_and_returns_with_wrist_relative_ease_out() {
 }
 
 #[test]
-fn retained_pull_appears_and_reverses_alpha_and_width_without_snapshot_reopen() {
+fn retained_pull_progress_and_release_keep_width_without_snapshot_reopen() {
     let mut f = Fixture::new(1);
     f.interaction.config.photo_width_m = 0.64;
     f.look();
     f.step(360, Some(input(true, 0.0)));
-    assert!(f.step(380, Some(input(true, 0.12))).pull);
-    let half = f.step(455, Some(input(true, 0.12))).photo.unwrap();
+    let half = f.step(380, Some(input(true, 0.06))).photo.unwrap();
     assert!((half.alpha - 0.5).abs() < 0.0001);
-    assert!((half.width - 0.335).abs() < 0.0001);
+    assert!((half.width - 0.32).abs() < 0.0001);
+    assert!(f.step(455, Some(input(true, 0.12))).pull);
     let full = f.step(530, Some(input(true, 0.12))).photo.unwrap();
     assert_eq!(full.width, 0.64);
     assert_eq!(full.alpha, 1.0);
@@ -308,7 +309,7 @@ fn retained_pull_appears_and_reverses_alpha_and_width_without_snapshot_reopen() 
         .snapshot(Some(&f.photo), f.start + Duration::from_millis(560), 1560);
     let half = f.step(625, Some(input(false, 0.12))).photo.unwrap();
     assert!((half.alpha - 0.5).abs() < 0.0001);
-    assert!((half.width - 0.335).abs() < 0.0001);
+    assert!((half.width - 0.32).abs() < 0.0001);
     assert!(f.step(700, Some(input(false, 0.12))).photo.is_none());
     assert!(f.step(900, Some(input(false, 0.12))).photo.is_none());
     f.step(920, Some(input(true, 0.0)));
@@ -514,32 +515,32 @@ fn tracking_loss_during_hide_dwell_resets_visibility_and_show_input_timers() {
 }
 
 #[test]
-fn default_held_photo_keeps_375mm_width_and_150ms_reversible_transition() {
+fn default_held_photo_uses_distance_progress_and_150ms_release() {
     let mut f = Fixture::new(1);
     f.look();
     f.step(360, Some(input(true, 0.0)));
-    let pulled = f.step(380, Some(input(true, 0.12)));
-    assert!(pulled.pull);
-    assert!(pulled.photo.is_none());
-    let half = f.step(455, Some(input(true, 0.12))).photo.unwrap();
+    let half = f.step(380, Some(input(true, 0.06))).photo.unwrap();
     assert!((half.alpha - 0.5).abs() < 0.0001);
-    assert!((half.width - 0.2025).abs() < 0.0001);
+    assert!((half.width - 0.1875).abs() < 0.0001);
+    let pulled = f.step(455, Some(input(true, 0.12)));
+    assert!(pulled.pull);
+    assert_eq!(pulled.photo.unwrap().alpha, 1.0);
     let full = f.step(530, Some(input(true, 0.12))).photo.unwrap();
     assert_eq!(full.alpha, 1.0);
     assert_eq!(full.width, 0.375);
     assert!(f.step(540, Some(input(false, 0.12))).hidden);
     let half = f.step(615, Some(input(false, 0.12))).photo.unwrap();
     assert!((half.alpha - 0.5).abs() < 0.0001);
-    assert!((half.width - 0.2025).abs() < 0.0001);
+    assert!((half.width - 0.1875).abs() < 0.0001);
     assert!(f.step(690, Some(input(false, 0.12))).photo.is_none());
 }
 
 fn referenced_input(grip: bool, separation: f32) -> LegacyVrInput {
-    let center = [0.347, -0.314, -0.44];
+    let center = [0.30846656, -0.32473191, -0.405];
     LegacyVrInput {
         head: [
-            [1.0, 0.0, 0.0, center[0]],
-            [0.0, 1.0, 0.0, center[1]],
+            [0.9800666, -0.19866933, 0.0, center[0]],
+            [0.19866933, 0.9800666, 0.0, center[1]],
             [0.0, 0.0, 1.0, center[2] + 0.5],
         ],
         left: [
@@ -592,16 +593,16 @@ fn rotated_handgrips_share_the_visible_near_and_relative_pull_anchor() {
     let mut f = referenced_fixture(0);
     let sample = referenced_input(false, 0.04);
     let world_wrist = [
-        [1.0, 0.0, 0.0, 0.347],
-        [0.0, 1.0, 0.0, -0.314],
-        [0.0, 0.0, 1.0, -0.44],
+        [0.268297781, 0.963336027, 0.0, 0.30846656],
+        [-0.963336027, 0.268297781, 0.0, -0.32473191],
+        [0.0, 0.0, 1.0, -0.405],
     ];
     let icon = f.interaction.frame.icon.unwrap();
     assert_eq!(icon.device, sample.right_index);
     assert_transform_close(compose(sample.right, icon.transform), world_wrist);
     assert!(distance(sample.left, world_wrist) > f.interaction.config.grab_m);
     assert!(f.step(351, Some(sample)).glow);
-    assert!(!f.step(352, Some(referenced_input(true, 0.081))).grab);
+    assert!(!f.step(352, Some(referenced_input(true, 0.1001))).grab);
     f.step(353, Some(sample));
     let grabbed = f.step(360, Some(referenced_input(true, 0.04)));
     assert!(grabbed.grab);
@@ -637,9 +638,9 @@ fn referenced_grab_follows_raw_attachment_and_returns_to_the_moving_right_anchor
     let half = f.step(512, Some(moved)).icon.unwrap();
     let end = f.step(625, Some(moved)).icon.unwrap();
     let endpoint = compose(moved.right, end.transform);
-    assert!((endpoint[0][3] - 0.547).abs() < 0.00001);
-    assert!((endpoint[1][3] + 0.314).abs() < 0.00001);
-    assert!((endpoint[2][3] + 0.44).abs() < 0.00001);
+    assert!((endpoint[0][3] - 0.50846656).abs() < 0.00001);
+    assert!((endpoint[1][3] + 0.32473191).abs() < 0.00001);
+    assert!((endpoint[2][3] + 0.405).abs() < 0.00001);
     assert!(
         distance(half.transform, end.transform)
             < distance(returned.icon.unwrap().transform, end.transform)
@@ -661,6 +662,7 @@ fn common_rigid_motion_of_rotated_references_cannot_authorize_a_request() {
     sample.right = compose(motion, sample.right);
     let moved = f.step(380, Some(sample));
     assert!(!moved.pull);
+    assert!(moved.photo.map_or(0.0, |placement| placement.alpha) < 0.00001);
     assert_eq!(moved.icon.unwrap().device, sample.left_index);
     sample.grip = false;
     assert!(!f.step(400, Some(sample)).pull);
@@ -671,9 +673,9 @@ fn default_wrist_moves_with_component_position_but_explicit_matrix_remains_raw()
     for explicit in [false, true] {
         let mut f = Fixture::new(0);
         let raw_wrist = [
-            [1.0, 0.0, 0.0, 0.047],
-            [0.0, 0.0, 1.0, -0.04],
-            [0.0, -1.0, 0.0, 0.114],
+            [0.268297781, 0.963336027, 0.0, 0.00846656],
+            [0.0, 0.0, 1.0, -0.005],
+            [0.963336027, -0.268297781, 0.0, 0.12473191],
         ];
         f.interaction.config = serde_json::from_value(if explicit {
             json!({"wrist_transform": raw_wrist})
@@ -701,48 +703,48 @@ fn default_wrist_moves_with_component_position_but_explicit_matrix_remains_raw()
 }
 
 #[test]
-fn referenced_retained_photo_stays_raw_left_relative_with_unchanged_animation() {
+fn explicit_photo_center_override_keeps_its_complete_raw_left_contract() {
     let mut f = referenced_fixture(1);
+    let explicit = [
+        [0.0, -1.0, 0.0, 0.04],
+        [1.0, 0.0, 0.0, 0.12],
+        [0.0, 0.0, 1.0, -0.08],
+    ];
+    f.interaction.config.photo_transform = Some(explicit);
     f.step(360, Some(referenced_input(true, 0.04)));
-    assert!(f.step(380, Some(referenced_input(true, 0.161))).pull);
+    let half = f.step(380, Some(referenced_input(true, 0.10))).photo.unwrap();
+    assert_transform_close(half.transform, explicit);
+    assert!((half.alpha - 0.5).abs() < 0.00001);
+    assert!((half.width - 0.1875).abs() < 0.00001);
+    assert!(f.step(400, Some(referenced_input(true, 0.161))).pull);
     let mut sample = referenced_input(true, 0.161);
     sample.left[0][3] += 0.2;
-    let half = f.step(455, Some(sample)).photo.unwrap();
-    assert_eq!(half.device, sample.left_index);
-    assert_eq!(half.transform, f.interaction.config.photo_transform);
-    assert!((half.alpha - 0.5).abs() < 0.00001);
-    assert!((half.width - 0.2025).abs() < 0.00001);
     let full = f.step(530, Some(sample)).photo.unwrap();
     assert_eq!(full.width, 0.375);
     assert_eq!(full.alpha, 1.0);
-    assert_eq!(full.transform, f.interaction.config.photo_transform);
+    assert_transform_close(full.transform, explicit);
     sample.grip = false;
     assert!(f.step(540, Some(sample)).hidden);
     let half = f.step(615, Some(sample)).photo.unwrap();
     assert!((half.alpha - 0.5).abs() < 0.00001);
-    assert!((half.width - 0.2025).abs() < 0.00001);
+    assert!((half.width - 0.1875).abs() < 0.00001);
+    assert_transform_close(half.transform, explicit);
     assert!(f.step(690, Some(sample)).photo.is_none());
 }
 
 #[test]
-fn separated_cases_use_actual_component_points_and_spherical_boundaries() {
-    let a = [0.0, 0.04373328, 0.01863404];
-    let b = [0.0, 0.063, 0.024];
-    let c = [0.0, 0.08226672, 0.02936596];
+fn watch_gate_and_optional_point_override_share_the_sphere() {
+    let radius = 0.10;
+    let volume = true;
+    let label = "Watch candidate\nRadius fixed: 10 cm";
     let mut evidence = Vec::new();
-    for (point, radius, volume, label) in [
-        (a, 0.08, false, "Position A\nGrab 8 cm fixed"),
-        (b, 0.08, false, "Position B\nGrab 8 cm fixed"),
-        (c, 0.08, false, "Position C\nGrab 8 cm fixed"),
-        (b, 0.08, true, "Radius 8 cm\nPosition B fixed"),
-        (b, 0.12, true, "Radius 12 cm\nPosition B fixed"),
-        (b, 0.15, true, "Radius 15 cm\nPosition B fixed"),
-    ] {
+    for point_override in [None, Some([0.025, 0.12, 0.04])] {
+        let point = point_override.unwrap_or([0.035, 0.10153344, 0.03473191]);
         for direction in [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.57735026; 3]] {
             for (offset, admitted) in [(-0.00001, true), (0.00001, false)] {
                 let mut f = Fixture::new(0);
                 f.interaction.config.wrist_transform = None;
-                f.interaction.config.wrist_handgrip_point_m = Some(point);
+                f.interaction.config.wrist_handgrip_point_m = point_override;
                 f.interaction.config.grab_m = radius;
                 f.interaction.config.debug_grab_volume = volume;
                 f.interaction.config.debug_case_label = Some(label.into());
@@ -754,7 +756,7 @@ fn separated_cases_use_actual_component_points_and_spherical_boundaries() {
                 for i in 0..3 {
                     assert!((local[i][3] - component_point[i][3]).abs() < 0.000001);
                 }
-                assert_eq!(column(local, 2), [0.0, 1.0, 0.0]);
+                assert_eq!(column(local, 2), column(sample.right_handgrip, 0));
                 let center = compose(sample.right, local);
                 let left_point = compose(sample.left, sample.left_handgrip);
                 for i in 0..3 {
@@ -801,7 +803,7 @@ fn separated_cases_use_actual_component_points_and_spherical_boundaries() {
             }
         }
     }
-    for radius in [0.08, 0.12, 0.15] {
+    for radius in [0.08, 0.10, 0.15] {
         let mut f = Fixture::new(0);
         f.interaction.config.grab_m = radius;
         f.look();
@@ -812,7 +814,7 @@ fn separated_cases_use_actual_component_points_and_spherical_boundaries() {
     if let Some(directory) = std::env::var_os("PURIPULY_PHOTO341_EVIDENCE") {
         let directory = std::path::PathBuf::from(directory);
         std::fs::create_dir_all(&directory).unwrap();
-        std::fs::write(directory.join("separated-case-geometry.json"), serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+        std::fs::write(directory.join("watch-gate-geometry.json"), serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
     }
 }
 
@@ -926,7 +928,135 @@ fn ring_planes_face_either_head_side_without_moving_the_sphere() {
             assert!(distance(plane, world) < 0.000001);
             assert!(dot(column(plane, 2), subtract(column(head, 3), column(world, 3))) > 0.0);
             let normal = column(plane, 2);
-            assert_eq!(normal.iter().filter(|v| v.abs() > 0.99).count(), 1);
+            assert!((dot(normal, normal) - 1.0).abs() < 0.00001);
         }
+    }
+}
+
+#[test]
+fn first_continuous_grip_unfolds_by_distance_and_remains_held_across_authorization() {
+    let mut f = Fixture::new(0);
+    assert_eq!(f.interaction.config.grab_m, 0.10);
+    f.look();
+    assert!(f.step(360, Some(input(true, 0.0))).grab);
+    let half = f.step(380, Some(input(true, 0.06)));
+    assert!(!half.pull);
+    assert!((half.photo.unwrap().alpha - 0.5).abs() < 0.00001);
+    assert!((half.photo.unwrap().width - 0.1875).abs() < 0.00001);
+    assert_eq!(f.step(5000, Some(input(true, 0.06))).photo.unwrap().alpha, half.photo.unwrap().alpha);
+    let full = f.step(9500, Some(input(true, 0.12)));
+    assert!(full.pull);
+    assert!(!full.hidden);
+    assert_eq!(full.photo.unwrap().alpha, 1.0);
+    let waiting_policy = f.step(10001, Some(input(true, 0.0)));
+    assert!(!waiting_policy.pull);
+    assert_eq!(waiting_policy.photo.unwrap().width, 0.375);
+    f.photo.attempt_id = 1;
+    f.photo.offer_open = false;
+    f.photo.phase = PhotoPhase::Preparing;
+    f.interaction.snapshot(Some(&f.photo), f.start + Duration::from_millis(10010), 11010);
+    let prepared = f.step(10020, Some(input(true, 0.0)));
+    assert!(!prepared.pull);
+    assert_eq!(prepared.photo.unwrap().alpha, 1.0);
+    assert!(f.step(10030, Some(input(false, 0.0))).hidden);
+    assert!((f.step(10105, Some(input(false, 0.0))).photo.unwrap().alpha - 0.5).abs() < 0.00001);
+    assert!(f.step(10180, Some(input(false, 0.0))).photo.is_none());
+}
+
+#[test]
+fn partial_release_has_no_authorization_and_takes_150ms_from_its_current_progress() {
+    for progress in [0.25, 0.5, 0.99] {
+        let mut f = Fixture::new(0);
+        f.look();
+        f.step(360, Some(input(true, 0.0)));
+        let distance = 0.12 * progress;
+        let unfolded = f.step(380, Some(input(true, distance)));
+        assert!(!unfolded.pull);
+        assert!((unfolded.photo.unwrap().alpha - progress).abs() < 0.00001);
+        assert!(!f.step(5000, Some(input(true, distance))).pull);
+        let released = f.step(5010, Some(input(false, distance)));
+        assert!(!released.pull);
+        assert!((released.photo.unwrap().alpha - progress).abs() < 0.00001);
+        let half = f.step(5085, Some(input(false, distance))).photo.unwrap();
+        assert!((half.alpha - progress * 0.5).abs() < 0.00001);
+        assert!((half.width - 0.375 * progress * 0.5).abs() < 0.00001);
+        assert!(f.step(5160, Some(input(false, distance))).photo.is_none());
+        assert!(!f.interaction.offer_pulled);
+    }
+}
+
+#[test]
+fn left_edge_stays_at_actual_handgrip_through_rotation_growth_and_release() {
+    let mut records = Vec::new();
+    for attempt in [0, 1] {
+        let mut f = referenced_fixture(attempt);
+        let initial = referenced_input(true, 0.04);
+        assert!(f.step(360, Some(initial)).grab);
+        let wrist = compose(initial.right, f.interaction.config.effective_wrist_transform(initial.right_handgrip));
+        let mut reference_rotation = None;
+        let mut pull_count = 0;
+        for (index, (progress, ms)) in [(0.25, 380), (0.5, 800), (0.99, 820), (1.01, 840), (0.0, 860)].into_iter().enumerate() {
+            let angle = index as f32 * 0.37;
+            let motion = [
+                [angle.cos(), -angle.sin(), 0.0, 0.0],
+                [angle.sin(), angle.cos(), 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+            ];
+            let mut sample = initial;
+            sample.left = compose(motion, sample.left);
+            let pivot = compose(sample.left, sample.left_handgrip);
+            for i in 0..3 {
+                let target = wrist[i][3] + if i == 0 { 0.04 + progress * 0.12 } else { 0.0 };
+                sample.left[i][3] += target - pivot[i][3];
+            }
+            if index > 0 {
+                sample.head[0][3] += 0.4;
+                sample.head[1][3] += 0.2;
+            }
+            let frame = f.step(ms, Some(sample));
+            pull_count += usize::from(frame.pull);
+            let placement = frame.photo.unwrap();
+            let expected_progress = if index >= 3 { 1.0 } else { progress };
+            assert!((placement.alpha - expected_progress).abs() < 0.00001);
+            assert!((placement.width - 0.375 * expected_progress).abs() < 0.00001);
+            let world = compose(sample.left, placement.transform);
+            let grip = compose(sample.left, sample.left_handgrip);
+            for i in 0..3 {
+                assert!((world[i][3] - world[i][0] * placement.width * 0.5 - grip[i][3]).abs() < 0.00001);
+            }
+            let mut rotation = placement.transform;
+            for row in &mut rotation { row[3] = 0.0; }
+            if let Some(reference) = reference_rotation {
+                assert_transform_close(rotation, reference);
+            } else {
+                reference_rotation = Some(rotation);
+                let toward_head = normalized(subtract(column(initial.head, 3), column(compose(initial.left, initial.left_handgrip), 3)));
+                assert!(dot(column(world, 2), toward_head) > 0.999);
+                let up = column(initial.head, 1);
+                let projected = normalized(subtract(up, toward_head.map(|v| v * dot(up, toward_head))));
+                assert!(dot(column(world, 1), projected) > 0.999);
+            }
+            records.push(json!({"attempt":attempt,"input": {
+                "head":sample.head,"left":sample.left,"left_handgrip":sample.left_handgrip,
+                "right":sample.right,"right_handgrip":sample.right_handgrip,
+            },"frame":frame,"world_photo":world,"world_left_handgrip":grip}));
+        }
+        assert_eq!(pull_count, 1);
+        let mut sample = initial;
+        sample.grip = false;
+        f.step(900, Some(sample));
+        let release = f.step(975, Some(sample)).photo.unwrap();
+        let world = compose(sample.left, release.transform);
+        let grip = compose(sample.left, sample.left_handgrip);
+        assert!((release.alpha - 0.5).abs() < 0.00001);
+        for i in 0..3 {
+            assert!((world[i][3] - world[i][0] * release.width * 0.5 - grip[i][3]).abs() < 0.00001);
+        }
+        assert!(f.step(1050, Some(sample)).photo.is_none());
+    }
+    if let Some(directory) = std::env::var_os("PURIPULY_PHOTO341_EVIDENCE") {
+        let directory = std::path::PathBuf::from(directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join("held-edge-geometry.json"), serde_json::to_vec_pretty(&records).unwrap()).unwrap();
     }
 }

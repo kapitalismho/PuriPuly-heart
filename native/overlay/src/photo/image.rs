@@ -85,6 +85,7 @@ pub struct DecodedOriginal {
     pub attempt_id: u64,
     pub path: String,
     pub pixels: Arc<image::RgbImage>,
+    pub working: Option<Arc<super::processing::WorkingPhoto>>,
 }
 
 pub struct PhotoImageWorker {
@@ -165,12 +166,14 @@ impl PhotoImageBoundary {
         attempt_id: u64,
         path: String,
         pixels: Arc<image::RgbImage>,
+        working: Option<Arc<super::processing::WorkingPhoto>>,
     ) {
         self.original.send_replace(Some(Arc::new(DecodedOriginal {
             photo_id,
             attempt_id,
             path,
             pixels,
+            working,
         })));
     }
 
@@ -183,7 +186,7 @@ impl PhotoImageBoundary {
                     && photo
                         .image
                         .as_ref()
-                        .map_or(photo.attempt_id == original.attempt_id, |image| {
+                        .map_or(photo.path == original.path || photo.attempt_id == original.attempt_id, |image| {
                             image.path == original.path
                         })
             }) {
@@ -193,6 +196,7 @@ impl PhotoImageBoundary {
                         photo.attempt_id,
                         original.path.clone(),
                         original.pixels.clone(),
+                        original.working.clone(),
                     );
                 }
                 Some(_) => {}

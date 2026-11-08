@@ -35,11 +35,20 @@ impl RunningImageWorker {
                     {
                         continue;
                     }
+                    let retained = boundary.decoded_original(&input);
+                    if let (Some(source), Some(photo)) = (&retained, &input.photo) {
+                        if let Some(working) = &source.working {
+                            let key = (photo.photo_id.clone(), source.path.clone());
+                            if pipeline.source_key.as_ref() != Some(&key) {
+                                pipeline.source_key = Some(key);
+                                pipeline.working = Some(working.clone());
+                                pipeline.clear_attempt(0);
+                            }
+                        }
+                    }
                     let outcome = pipeline.process(
                         &input,
-                        boundary
-                            .decoded_original(&input)
-                            .map(|source| source.pixels.clone()),
+                        retained.map(|source| source.pixels.clone()),
                         || !boundary.is_cancelled(&input),
                         |output| {
                             if boundary.is_cancelled(&input) {

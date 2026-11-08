@@ -125,11 +125,17 @@ async def test_offer_preopens_without_preparation_or_send_then_reopen_reuses_res
     try:
         photo_id = await h.offer()
         assert h.prepares == []
+        assert h.photo["expected_file_id"] == ["1", "2"]
+        assert h.photo["attempt_id"] == 0
+        assert h.photo["image"] is None
+        assert h.photo["preparations"] == []
+        assert h.photo["blocks"] == []
         assert h.owner.request_starts == 0
         assert h.owner.pull(photo_id, "pull-1")
         await eventually(lambda: h.photo["phase"] == "completed")
         assert h.owner.request_starts == 1
         assert len(h.prepares) == 1
+        assert h.prepares[0] == (photo_id, 1, Path(h.photo["path"]), (1, 2))
         assert h.photo["blocks"][0]["bbox"] == [0.0, 0.0, 150.0, 150.0]
         assert h.photo["preparations"][0]["source_line_count"] == 1
         h.owner.hidden(photo_id)
@@ -145,6 +151,50 @@ async def test_offer_preopens_without_preparation_or_send_then_reopen_reuses_res
     finally:
         await h.owner.close()
     assert list(tmp_path.iterdir()) == []
+
+
+async def test_capture_identity_is_immutable_through_prepare_reopen_and_replacement(tmp_path):
+    h = Harness(tmp_path, [
+        [block(), PhotoStreamCompleted({}, "gpt-6-luna")],
+        [block(), PhotoStreamCompleted({}, "gpt-6-luna")],
+    ])
+    first = PhotoCapture(tmp_path / "first.png", 17, (9, 2**100), 1234, 0)
+    second = PhotoCapture(tmp_path / "second.png", 23, (10, 2**101), 1235, 0)
+    try:
+        assert await h.owner.captured(first)
+        await eventually(lambda: h.connections and h.connections[0].opened)
+        before_pull = h.photo
+        first_id = before_pull["photo_id"]
+        assert before_pull["path"] == str(first.path)
+        assert before_pull["expected_file_id"] == ["9", str(2**100)]
+        assert before_pull["attempt_id"] == 0
+        assert before_pull["image"] is None
+        assert before_pull["preparations"] == before_pull["blocks"] == []
+        assert not before_pull["visible"]
+        assert h.prepares == []
+        assert h.owner.request_starts == h.connections[0].starts == 0
+        before_pull["expected_file_id"][0] = "mutated-consumer-copy"
+        assert h.photo["expected_file_id"] == ["9", str(2**100)]
+        assert h.owner.pull(first_id, "authorize")
+        await eventually(lambda: h.photo["phase"] == "completed")
+        assert h.prepares == [(first_id, 1, first.path, first.file_id)]
+        h.owner.hidden(first_id)
+        assert h.owner.pull(first_id, "reopen")
+        assert len(h.prepares) == h.owner.request_starts == 1
+        assert h.photo["path"] == str(first.path)
+        assert h.photo["expected_file_id"] == ["9", str(2**100)]
+        assert await h.owner.captured(second)
+        second_id = h.photo["photo_id"]
+        assert second_id != first_id
+        assert h.photo["path"] == str(second.path)
+        assert h.photo["expected_file_id"] == ["10", str(2**101)]
+        assert h.photo["attempt_id"] == 0 and h.photo["image"] is None
+        assert not h.owner.pull(first_id, "stale")
+        assert h.owner.pull(second_id, "authorize-second")
+        await eventually(lambda: h.photo["phase"] == "completed")
+        assert h.prepares[-1] == (second_id, 1, second.path, second.file_id)
+    finally:
+        await h.owner.close()
 
 
 async def test_offer_expiry_and_started_request_retention_are_distinct(tmp_path):
@@ -198,6 +248,12 @@ async def test_google_quota_fallback_consumes_second_send_and_does_not_retry_aga
         assert h.owner.request_starts == 2
         assert h.photo["attempt_id"] == 2
         assert len(h.prepares) == 1
+        assert h.photo["expected_file_id"] == ["1", "2"]
+        assert all(
+            snapshot["photo"]["expected_file_id"] == ["1", "2"]
+            for snapshot in h.snapshots if snapshot["photo"] is not None
+        )
+        assert h.prepares[0][3] == (1, 2)
     finally:
         await h.owner.close()
 

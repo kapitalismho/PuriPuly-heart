@@ -113,6 +113,16 @@ async def test_actual_native_pull_preparation_cumulative_reopen_restart_and_shut
             lambda: owner.lifecycle.snapshot["photo"] is not None and owner.bridge.ready.is_set()
         )
         photo_id = owner.lifecycle.snapshot["photo"]["photo_id"]
+        captured = owner.lifecycle.snapshot["photo"]
+        source_stat = source.stat()
+        expected_file_id = [str(source_stat.st_dev), str(source_stat.st_ino)]
+        assert captured["path"] == str(source)
+        assert captured["expected_file_id"] == expected_file_id
+        assert captured["attempt_id"] == 0
+        assert captured["preparations"] == captured["blocks"] == []
+        assert owner.bridge._preparations == {}
+        assert owner.lifecycle.request_starts == 0
+        assert not any(temporary.rglob("*.jpg"))
         assert records["starts"] == 0
         assert owner.lifecycle.snapshot["photo"]["image"] is None
         assert owner.bridge.send(
@@ -161,6 +171,8 @@ async def test_actual_native_pull_preparation_cumulative_reopen_restart_and_shut
         assert owner.supervisor.pid != old_pid
         assert owner.supervisor.instance_id != old_instance
         assert records["starts"] == 1
+        assert owner.lifecycle.snapshot["photo"]["path"] == str(source)
+        assert owner.lifecycle.snapshot["photo"]["expected_file_id"] == expected_file_id
         assert not owner.lifecycle.snapshot["photo"]["first_block_drawn"]
         print(
             {

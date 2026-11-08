@@ -56,6 +56,9 @@ def test_no_payload_before_pull_and_ten_second_offer_expiry(preview):
     state.offer(100, 123000)
     offer = snapshots[-1]["photo"]
     assert (offer["attempt_id"], offer["image"], offer["offer_open"]) == (0, None, True)
+    source_stat = state.image.stat()
+    assert offer["expected_file_id"] == [str(source_stat.st_dev), str(source_stat.st_ino)]
+    assert offer["preparations"] == offer["blocks"] == []
     state.tick(109.999)
     assert state.photo["offer_open"]
     pull(state, 110)
@@ -77,6 +80,24 @@ def test_pull_before_deadline_opens_native_base_image_only(preview):
     assert photo["blocks"] == photo["preparations"] == []
     assert photo["first_block_drawn"] is False
     assert snapshots[-2]["photo"]["image"] is None
+
+
+def test_preview_keeps_offered_identity_until_new_photo_despite_path_replacement(preview):
+    state, snapshots, events = preview
+    state.offer(100, 123000)
+    original = dict(state.photo)
+    replacement = make_png_header(state.image.with_name("replacement.png"))
+    replacement.replace(state.image)
+    pull(state, 101)
+    state.control({"type": "photo_hidden", "photo_id": state.photo["photo_id"]}, 1, 102)
+    pull(state, 103, "reopen")
+    assert state.photo["path"] == original["path"]
+    assert state.photo["expected_file_id"] == original["expected_file_id"]
+    state.offer(104, 127000)
+    current_stat = state.image.stat()
+    assert state.photo["photo_id"] != original["photo_id"]
+    assert state.photo["expected_file_id"] == [str(current_stat.st_dev), str(current_stat.st_ino)]
+    assert state.photo["attempt_id"] == 0 and state.photo["image"] is None
 
 
 def test_latest_only_replacement_rejects_stale_pull_and_hide(preview):
@@ -315,11 +336,11 @@ async def test_cleanup_escalates_unresponsive_child_and_drains():
     bridge.close.assert_awaited_once()
 
 
-def test_tuning_schedule_preserves_full_windows_fresh_ids_and_released_boundaries(preview):
+def test_repeat_schedule_preserves_full_windows_fresh_ids_and_released_boundaries(preview):
     state, snapshots, events = preview
     commands = []
     barrier = probe.Quiescence(lambda command: commands.append(command) or True, Mock(), 1)
-    schedule = probe.TuningSchedule(state, barrier, 100, 60, 2, Mock())
+    schedule = probe.RepeatOfferSchedule(state, barrier, 100, 60, 2, Mock())
     assert not schedule.tick(101.99, 0)
     assert state.photo is None
     schedule.tick(102, 102000)
@@ -355,11 +376,11 @@ def test_tuning_schedule_preserves_full_windows_fresh_ids_and_released_boundarie
 
 
 @pytest.mark.parametrize("first_poll", [102.001, 120.0])
-def test_late_first_tuning_poll_guarantees_full_opportunity_before_boundary(preview, first_poll):
+def test_late_first_repeat_poll_guarantees_full_opportunity_before_boundary(preview, first_poll):
     state, snapshots, events = preview
     commands = []
     barrier = probe.Quiescence(lambda command: commands.append(command) or True, Mock(), 1)
-    schedule = probe.TuningSchedule(state, barrier, 100, 12, 2, Mock())
+    schedule = probe.RepeatOfferSchedule(state, barrier, 100, 12, 2, Mock())
     assert not schedule.tick(first_poll, int(first_poll * 1000))
     assert state.photo is not None
     photo_id = state.photo["photo_id"]
@@ -380,7 +401,7 @@ def test_late_first_tuning_poll_guarantees_full_opportunity_before_boundary(prev
 
 
 @pytest.mark.asyncio
-async def test_tuning_cleanup_requires_shutdown_ack_even_with_zero_exit():
+async def test_repeat_cleanup_requires_shutdown_ack_even_with_zero_exit():
     bridge = SimpleNamespace(
         send=Mock(return_value=True), close=AsyncMock(), shutdown_complete=asyncio.Event()
     )
@@ -392,7 +413,7 @@ async def test_tuning_cleanup_requires_shutdown_ack_even_with_zero_exit():
 
 
 @pytest.fixture
-def tuning_launch(tmp_path, monkeypatch):
+def repeat_launch(tmp_path, monkeypatch):
     from puripuly_heart.core.photo.bridge import PhotoBridge
 
     clock = SimpleNamespace(now=0.0)
@@ -421,6 +442,8 @@ def tuning_launch(tmp_path, monkeypatch):
                     self.shutdown_complete.set()
                 harness.active.returncode = 0
                 harness.active.exited.set()
+                harness.active.stdout.feed_eof()
+                harness.active.stderr.feed_eof()
             elif command["type"] == "photo_probe_pull":
                 self._control({**command, "type": "photo_pull"}, self._generation)
             elif command["type"] == "photo_probe_hide":
@@ -430,6 +453,13 @@ def tuning_launch(tmp_path, monkeypatch):
                 make_png_header(export_dir / f"{command['label']}.png")
                 (export_dir / f"{command['label']}.json").write_text(
                     json.dumps({"blocks": [], "original_uploads": 1}), encoding="utf-8"
+                )
+            elif command["type"] == "photo_debug_preview_source":
+                assert self._snapshot["photo"]["attempt_id"] == 0
+                assert self._snapshot["photo"]["image"] is None
+                harness.active.stdout.feed_data(
+                    b'{"stage":"display_source_ready"}\n'
+                    b'{"stage":"composed","original_uploads":1}\n'
                 )
             return True
 
@@ -466,12 +496,6 @@ def tuning_launch(tmp_path, monkeypatch):
             pid=100 + len(harness.manifests), returncode=None, exited=asyncio.Event(),
             stdout=asyncio.StreamReader(), stderr=asyncio.StreamReader(),
         )
-        process.stdout.feed_data(
-            b'{"stage":"display_source_ready"}\n'
-            b'{"stage":"composed","original_uploads":1}\n'
-        )
-        process.stdout.feed_eof()
-        process.stderr.feed_eof()
 
         async def wait():
             await process.exited.wait()
@@ -488,7 +512,7 @@ def tuning_launch(tmp_path, monkeypatch):
     executable.write_bytes(b"synthetic executable, never run")
     harness.args = probe.parser().parse_args(
         ["--image", str(image), "--executable", str(executable), "--backend", "offscreen",
-         "--tune-wrist-and-grab", "--seconds", "12", "--offer-delay", "1"]
+         "--repeat-offers", "--seconds", "12", "--offer-delay", "1"]
     )
     monkeypatch.setattr(
         "puripuly_heart.core.photo.bridge.PhotoBridge", new_bridge
@@ -505,44 +529,38 @@ def tuning_launch(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_one_launch_runs_two_fixed_factor_phases_and_waits_for_boundary_and_cleanup(tuning_launch):
-    harness = tuning_launch
+async def test_repeat_launch_uses_one_default_watch_candidate_and_waits_for_cleanup(repeat_launch):
+    harness = repeat_launch
     harness.ack_delay = 4
     harness.cleanup_delay = 2
-    assert await probe.run_tuning(harness.args, harness.evidence) == 0
-    manifests = harness.manifests
-    assert len(manifests) == 6
-    assert [item["generation"] for item in manifests] == list(range(1, 7))
-    assert len({item["instance_id"] for item in manifests}) == 6
-    assert len({item["session_token"] for item in manifests}) == 6
-    interaction = [item["interaction"] for item in manifests]
-    assert [item["wrist_handgrip_point_m"] for item in interaction[:3]] == [
-        [0, 0.04373328, 0.01863404], [0, 0.063, 0.024], [0, 0.08226672, 0.02936596]
-    ]
-    assert [item["grab_m"] for item in interaction[:3]] == [0.08] * 3
-    assert [item["grab_m"] for item in interaction[3:]] == [0.08, 0.12, 0.15]
-    assert all(item["wrist_handgrip_point_m"] == [0, 0.063, 0.024] for item in interaction[3:])
-    assert [item["debug_grab_volume"] for item in interaction] == [False] * 3 + [True] * 3
-    assert all(item["image"]["debug_controls"] for item in manifests)
-    assert all(
-        item["debug_case_label"].isascii()
-        and len(item["debug_case_label"]) <= 128
-        and len(item["debug_case_label"].splitlines()) <= 2
-        for item in interaction
-    )
+    assert await probe.run(harness.args, harness.evidence) == 0
+    assert len(harness.manifests) == 1
+    manifest = harness.manifests[0]
+    interaction = manifest["interaction"]
+    assert interaction["grab_m"] == 0.10
+    assert interaction["debug_grab_volume"] is True
+    assert "wrist_handgrip_point_m" not in interaction
+    assert "wrist_transform" not in interaction
+    assert "photo_transform" not in interaction
+    label = interaction["debug_case_label"]
+    assert label.isascii() and len(label) <= 128 and len(label.splitlines()) == 2
+    assert manifest["image"]["debug_controls"] is True
     assert [kind for kind, _ in harness.events] == [
-        kind for _ in range(6)
-        for kind in ("spawn", "photo_debug_quiesce", "quiescent", "shutdown", "closed")
+        "spawn", "photo_debug_quiesce", "quiescent", "shutdown", "closed"
     ]
-    assert all(case["elapsed_s"] >= 18 for case in harness.evidence.summary["cases"])
-    assert harness.evidence.summary["status"] == "experiment_completed"
-    assert not list(harness.evidence.path.rglob("launch.json"))
+    assert harness.events[-1][1] >= 18
+    assert harness.evidence.summary["mode"] == "repeat_offers"
+    assert harness.evidence.summary["status"] == "duration_completed"
+    assert harness.evidence.summary["shutdown_acknowledged"] is True
+    assert harness.evidence.summary["native_exit_code"] == 0
+    assert harness.evidence.summary["executable_sha256"]
+    assert not (harness.evidence.path / "launch.json").exists()
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failure", ["native", "missing_ack", "cancel"])
-async def test_tuning_failure_or_interruption_never_starts_next_child(tuning_launch, failure):
-    harness = tuning_launch
+async def test_repeat_failure_or_interruption_cleans_owned_child(repeat_launch, failure):
+    harness = repeat_launch
     if failure == "native":
         harness.fail_at = 3
     elif failure == "missing_ack":
@@ -551,94 +569,151 @@ async def test_tuning_failure_or_interruption_never_starts_next_child(tuning_lau
         harness.cancel_at = 3
     if failure == "cancel":
         with pytest.raises(asyncio.CancelledError):
-            await probe.run_tuning(harness.args, harness.evidence)
+            await probe.run(harness.args, harness.evidence)
         assert harness.evidence.summary["status"] == "interrupted"
     else:
-        assert await probe.run_tuning(harness.args, harness.evidence) == 2
-        assert harness.evidence.summary["status"] == "experiment_aborted"
+        assert await probe.run(harness.args, harness.evidence) == 2
+        assert harness.evidence.summary["status"] == "cleanup_failed"
     assert len(harness.manifests) == 1
     assert harness.active is None
-    assert not list(harness.evidence.path.rglob("launch.json"))
+    assert not (harness.evidence.path / "launch.json").exists()
 
 
-def test_tuning_rejects_live_watch_directory_before_launch(tmp_path):
+def test_repeat_rejects_live_watch_directory_before_launch(tmp_path):
     with pytest.raises(SystemExit) as result:
         probe.main([
             "--image", "unused.png", "--executable", "unused.exe",
-            "--tune-wrist-and-grab", "--watch-dir", str(tmp_path),
+            "--repeat-offers", "--watch-dir", str(tmp_path),
         ])
     assert result.value.code == 2
 
 
 @pytest.mark.asyncio
-async def test_tuning_repeats_synthetic_offers_with_full_windows_in_real_runner(tuning_launch):
-    harness = tuning_launch
+async def test_repeat_offers_keep_full_windows_in_one_native_session(repeat_launch):
+    harness = repeat_launch
     harness.args.seconds = 60
     harness.args.offer_delay = 2
-    assert await probe.run_tuning(harness.args, harness.evidence) == 0
-    for case in harness.evidence.summary["cases"]:
-        records = [
-            json.loads(line)
-            for line in (harness.evidence.path / case["evidence"] / "events.jsonl")
-            .read_text(encoding="utf-8").splitlines()
-        ]
-        offers = [record for record in records if record["event"] == "synthetic_offer"]
-        assert len(offers) == 4
-        assert len({offer["photo_id"] for offer in offers}) == 4
-        assert all(offer["target_remaining_s"] >= 10 for offer in offers)
-        assert all(
-            later["elapsed_s"] - earlier["elapsed_s"] >= 15
-            for earlier, later in zip(offers, offers[1:])
-        )
-        acknowledgements = [
-            record for record in records if record["event"] == "boundary_acknowledged"
-        ]
-        assert len(acknowledgements) == 4
-        assert all(
-            ack["elapsed_s"] <= offer["elapsed_s"]
-            for ack, offer in zip(acknowledgements, offers[1:])
-        )
-
-
-@pytest.mark.asyncio
-async def test_offscreen_tuning_smoke_finishes_early_but_waits_for_quiescence(tuning_launch):
-    harness = tuning_launch
-    harness.args.seconds = 60
-    harness.args.software_pull_after = 0.2
-    harness.ack_delay = 2
-    assert await probe.run_tuning(harness.args, harness.evidence) == 0
-    assert len(harness.manifests) == 6
-    assert harness.evidence.summary["offscreen_verification"] is True
-    for case in harness.evidence.summary["cases"]:
-        assert case["status"] == "offscreen_preview_exported"
-        assert case["elapsed_s"] < 60
-        path = harness.evidence.path / case["evidence"]
-        assert (path / "preview.png").is_file()
-        assert (path / "reopened.png").is_file()
-    kinds = [kind for kind, _ in harness.events]
-    assert kinds.count("photo_probe_pull") == 12
-    assert kinds.count("photo_debug_export") == 12
-    assert kinds.count("quiescent") == 6
+    assert await probe.run(harness.args, harness.evidence) == 0
+    assert len(harness.manifests) == 1
+    records = [
+        json.loads(line)
+        for line in (harness.evidence.path / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    offers = [record for record in records if record["event"] == "synthetic_offer"]
+    assert len(offers) == 4
+    assert len({offer["photo_id"] for offer in offers}) == 4
+    assert all(offer["target_remaining_s"] >= 10 for offer in offers)
     assert all(
-        kinds[index - 1] == "quiescent"
-        for index, kind in enumerate(kinds) if kind == "shutdown"
+        later["elapsed_s"] - earlier["elapsed_s"] >= 15
+        for earlier, later in zip(offers, offers[1:])
+    )
+    acknowledgements = [
+        record for record in records if record["event"] == "boundary_acknowledged"
+    ]
+    assert len(acknowledgements) == 4
+    assert all(
+        ack["elapsed_s"] <= offer["elapsed_s"]
+        for ack, offer in zip(acknowledgements, offers[1:])
     )
 
 
 @pytest.mark.asyncio
+async def test_offscreen_repeat_smoke_finishes_early_after_quiescence(repeat_launch):
+    harness = repeat_launch
+    harness.args.seconds = 60
+    harness.args.software_pull_after = 0.2
+    harness.ack_delay = 2
+    assert await probe.run(harness.args, harness.evidence) == 0
+    assert len(harness.manifests) == 1
+    assert harness.evidence.summary["offscreen_verification"] is True
+    assert harness.evidence.summary["status"] == "offscreen_preview_exported"
+    assert harness.events[-1][1] < 60
+    assert (harness.evidence.path / "preview.png").is_file()
+    assert (harness.evidence.path / "pre-pull.png").is_file()
+    assert (harness.evidence.path / "reopened.png").is_file()
+    kinds = [kind for kind, _ in harness.events]
+    assert kinds.count("photo_probe_pull") == 2
+    assert kinds.count("photo_debug_export") == 3
+    assert kinds.count("quiescent") == 1
+    assert kinds[kinds.index("shutdown") - 1] == "quiescent"
+    assert kinds.index("photo_debug_preview_source") < kinds.index("photo_debug_export")
+    assert kinds.index("photo_debug_export") < kinds.index("photo_probe_pull")
+    records = [
+        json.loads(line)
+        for line in (harness.evidence.path / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    pre_pull_export = next(
+        index for index, record in enumerate(records)
+        if record["event"] == "offscreen_exported" and record["label"] == "pre-pull"
+    )
+    assert not any(record["event"] == "preview_opened" for record in records[:pre_pull_export])
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("cancel", [False, True])
-async def test_failure_during_unacknowledged_boundary_aborts_without_next_child(tuning_launch, cancel):
-    harness = tuning_launch
+async def test_failure_during_repeat_boundary_cleans_up_without_replacement(repeat_launch, cancel):
+    harness = repeat_launch
     harness.ack_delay = 60
     if cancel:
         harness.cancel_at = 14
         with pytest.raises(asyncio.CancelledError):
-            await probe.run_tuning(harness.args, harness.evidence)
+            await probe.run(harness.args, harness.evidence)
     else:
         harness.fail_at = 14
-        assert await probe.run_tuning(harness.args, harness.evidence) == 2
+        assert await probe.run(harness.args, harness.evidence) == 2
     assert len(harness.manifests) == 1
     kinds = [kind for kind, _ in harness.events]
     assert kinds.count("photo_debug_quiesce") == 1
     assert "quiescent" not in kinds
     assert harness.active is None
+
+
+@pytest.mark.asyncio
+async def test_ordinary_preview_remains_single_offer_without_candidate_overrides(repeat_launch):
+    harness = repeat_launch
+    harness.args.repeat_offers = False
+    harness.args.seconds = 32
+    assert await probe.run(harness.args, harness.evidence) == 0
+    assert len(harness.manifests) == 1
+    assert "interaction" not in harness.manifests[0]
+    records = [
+        json.loads(line)
+        for line in (harness.evidence.path / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert sum(record["event"] == "preview_offer" for record in records) == 1
+    assert not any(record["event"] == "boundary_requested" for record in records)
+    assert harness.evidence.summary["mode"] == "ordinary_preview"
+
+
+@pytest.mark.asyncio
+async def test_repeat_preserves_native_failure_drained_during_shutdown(repeat_launch, monkeypatch):
+    harness = repeat_launch
+
+    async def drain_failure(stream, evidence, signals):
+        await harness.processes[0].exited.wait()
+        signals["error"] = "graphics_failed"
+
+    monkeypatch.setattr(probe, "drain", drain_failure)
+    assert await probe.run(harness.args, harness.evidence) == 2
+    assert harness.evidence.summary["native_error"] == "graphics_failed"
+    assert harness.evidence.summary["status"] == "native_terminal_error"
+    assert harness.evidence.summary["cleanup_errors"] == []
+    assert harness.active is None
+
+
+@pytest.mark.asyncio
+async def test_offscreen_smoke_never_authorizes_without_local_source_readiness(repeat_launch, monkeypatch):
+    harness = repeat_launch
+    harness.args.software_pull_after = 0.2
+
+    async def no_readiness(stream, evidence, signals):
+        await harness.processes[0].exited.wait()
+
+    monkeypatch.setattr(probe, "drain", no_readiness)
+    assert await probe.run(harness.args, harness.evidence) == 2
+    kinds = [kind for kind, _ in harness.events]
+    assert "photo_debug_preview_source" in kinds
+    assert "photo_probe_pull" not in kinds
+    assert "photo_debug_export" not in kinds
+    assert harness.evidence.summary["status"] == "smoke_incomplete"
+    assert harness.evidence.summary["shutdown_acknowledged"] is True

@@ -50,6 +50,9 @@ pub async fn run(path: &Path) -> Result<(), PhotoError> {
             photo_id: "offline".into(),
             path: source.clone(),
             file_size: 1,
+            expected_file_id: super::prepare::file_identity(
+                &std::fs::File::open(&job.source_path).map_err(|_| PhotoError::Image)?
+            ).map_err(|_| PhotoError::Image)?,
             shutter_unix_ms: 1,
             attempt_id: 1,
             phase: PhotoPhase::Requesting,

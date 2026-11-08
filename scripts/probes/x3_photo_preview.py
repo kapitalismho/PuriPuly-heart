@@ -50,7 +50,7 @@ class Quiescence:
         self.acknowledged.clear()
 
 
-class TuningSchedule:
+class RepeatOfferSchedule:
     def __init__(self, state, barrier, started, seconds, delay, event, *, repeat=True):
         self.state = state
         self.barrier = barrier
@@ -71,7 +71,7 @@ class TuningSchedule:
                 return False
             self.end = max(self.end, now + 10)
         if self.early_finish or now >= self.end:
-            self.barrier.request("case_end")
+            self.barrier.request("session_end")
             return self.barrier.acknowledged.is_set()
         if now + 10 > self.end:
             return False
@@ -94,104 +94,6 @@ class TuningSchedule:
             target_remaining_s=self.end - now,
         )
         return False
-
-
-def tuning_cases():
-    points = (
-        ("A", "-2 cm", [0, 0.04373328, 0.01863404]),
-        ("B", "current", [0, 0.063, 0.024]),
-        ("C", "+2 cm", [0, 0.08226672, 0.02936596]),
-    )
-    cases = []
-    for index, (name, direction, point) in enumerate(points, 1):
-        cases.append(
-            {
-                "phase": "position",
-                "case": name,
-                "interaction": {
-                    "wrist_handgrip_point_m": point,
-                    "grab_m": 0.08,
-                    "debug_grab_volume": False,
-                    "debug_case_label": (
-                        f"POSITION {index}/3: {name} ({direction})\nRadius fixed: 8 cm"
-                    ),
-                },
-            }
-        )
-    for index, radius in enumerate((0.08, 0.12, 0.15), 1):
-        cases.append(
-            {
-                "phase": "radius",
-                "case": f"{round(radius * 100):02d}cm",
-                "interaction": {
-                    "wrist_handgrip_point_m": points[1][2],
-                    "grab_m": radius,
-                    "debug_grab_volume": True,
-                    "debug_case_label": (
-                        f"RADIUS {index}/3: {round(radius * 100)} cm\nPosition fixed: B"
-                    ),
-                },
-            }
-        )
-    return cases
-
-
-async def run_tuning(args, evidence):
-    cases = tuning_cases()
-    evidence.summary.update(
-        mode="wrist_and_grab_two_phases",
-        target_seconds_per_case=args.seconds,
-        offscreen_verification=args.software_pull_after is not None,
-        cases=[],
-    )
-    evidence.event(
-        "experiment_plan",
-        phases=[
-            "Position: A handward heuristic, B current, C forearmward heuristic; radius 0.08m; volume OFF",
-            "Radius: 0.08m, 0.12m, 0.15m; position B; wireframe volume ON",
-        ],
-        heuristic_not_anatomical=True,
-        target_seconds_per_case=args.seconds,
-        release_wait_may_extend=True,
-    )
-    try:
-        for generation, case in enumerate(cases, 1):
-            child = Evidence(
-                evidence.path / f"{generation:02d}-{case['phase']}-{case['case']}",
-                experiment_phase=case["phase"],
-                case=case["case"],
-            )
-            try:
-                result = await run(args, child, case=case, generation=generation)
-            except asyncio.CancelledError:
-                child.summary["status"] = "interrupted"
-                raise
-            except Exception as exc:
-                child.summary["status"] = "launcher_error"
-                child.event("launcher_error", error_type=type(exc).__name__)
-                result = 2
-            finally:
-                child.finish()
-                evidence.summary["cases"].append(
-                    {"evidence": child.path.name, **child.summary}
-                )
-            clean = (
-                result == 0
-                and child.summary.get("native_exit_code") == 0
-                and child.summary.get("shutdown_acknowledged") is True
-                and child.summary.get("cleanup_errors") == []
-                and child.summary.get("native_error") is None
-            )
-            evidence.event("case_outcome", phase=case["phase"], case=case["case"], clean=clean)
-            if not clean:
-                evidence.summary["status"] = "experiment_aborted"
-                return 2
-        evidence.summary["status"] = "experiment_completed"
-        return 0
-    except asyncio.CancelledError:
-        evidence.summary["status"] = "interrupted"
-        evidence.event("experiment_interrupted")
-        raise
 
 
 class PreviewState:
@@ -231,10 +133,12 @@ class PreviewState:
     def offer(self, now, wall_ms):
         self.shutter = now
         self.pulls.clear()
+        source_stat = self.image.stat()
         self.photo = {
             "photo_id": str(uuid4()),
             "path": str(self.image),
-            "file_size": self.image.stat().st_size,
+            "file_size": source_stat.st_size,
+            "expected_file_id": [str(source_stat.st_dev), str(source_stat.st_ino)],
             "shutter_unix_ms": wall_ms,
             "attempt_id": 0,
             "phase": "offer",
@@ -308,10 +212,9 @@ def png_dimensions(path):
 
 
 class Evidence:
-    def __init__(self, path=None, **tags):
+    def __init__(self, path=None):
         self.path = Path(tempfile.mkdtemp(prefix="puripuly-x3-preview-")) if path is None else path
         self.path.mkdir(parents=True, exist_ok=True)
-        self.tags = tags
         self.stream = (self.path / "events.jsonl").open("x", encoding="utf-8")
         self.started = time.monotonic()
         self.summary = {
@@ -321,13 +224,11 @@ class Evidence:
             "translation_blocks": 0,
             "physical_observations": "unperformed",
         }
-        self.summary.update(tags)
 
     def event(self, kind, **fields):
         record = {
             "event": kind,
             "elapsed_s": time.monotonic() - self.started,
-            **self.tags,
             **fields,
         }
         self.stream.write(json.dumps(record, allow_nan=False) + "\n")
@@ -453,7 +354,8 @@ async def stop_child(process, bridge, readers, evidence, *, require_ack=False):
     return errors
 
 
-async def run(args, evidence, *, case=None, generation=1):
+async def run(args, evidence):
+    generation = 1
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
     from puripuly_heart.core.photo.bridge import PhotoBridge
     from puripuly_heart.core.photo.capture import PhotoCaptureWatcher
@@ -472,6 +374,9 @@ async def run(args, evidence, *, case=None, generation=1):
         image_dimensions=[width, height],
         max_size=[2560, 1440] if args.reference_1440 else [1920, 1080],
         source_script=str(Path(__file__).resolve()),
+        mode="repeat_offers" if args.repeat_offers else "ordinary_preview",
+        target_seconds=args.seconds,
+        offscreen_verification=args.software_pull_after is not None,
         python_executable=sys.executable,
         offer_source=(
             "new_file_signal_same_selected_asset" if args.watch_dir else "delayed_synthetic"
@@ -500,7 +405,7 @@ async def run(args, evidence, *, case=None, generation=1):
 
     bridge = PhotoBridge(control=control)
     state = PreviewState(image, width, height, bridge.publish, evidence.event, generation)
-    if case is not None:
+    if args.repeat_offers:
         barrier = Quiescence(bridge.send, evidence.event, generation)
     state.snapshot()
     process = None
@@ -519,12 +424,16 @@ async def run(args, evidence, *, case=None, generation=1):
             "debug_controls": True,
             "export_dir": str(evidence.path),
         }
-        if case is not None:
-            manifest["interaction"] = case["interaction"]
-            evidence.summary["requested_interaction"] = case["interaction"]
+        if args.repeat_offers:
+            manifest["interaction"] = {
+                "grab_m": 0.10,
+                "debug_grab_volume": True,
+                "debug_case_label": "WRIST WATCH\nGrab radius: 10 cm",
+            }
+            evidence.summary["requested_interaction"] = manifest["interaction"]
             evidence.event(
-                "case_parameters",
-                interaction=case["interaction"],
+                "repeat_parameters",
+                interaction=manifest["interaction"],
                 configuration_source="immutable_launch_manifest",
                 measured_world_pose=False,
                 generation=generation,
@@ -574,11 +483,11 @@ async def run(args, evidence, *, case=None, generation=1):
         evidence.event("native_ready", handshake=True, preview_decoded=False)
         started = time.monotonic()
         schedule = (
-            TuningSchedule(
+            RepeatOfferSchedule(
                 state, barrier, started, args.seconds, args.offer_delay, evidence.event,
                 repeat=args.software_pull_after is None,
             )
-            if case is not None else None
+            if args.repeat_offers else None
         )
         offered_at = None
         smoke_stage = 0
@@ -624,16 +533,26 @@ async def run(args, evidence, *, case=None, generation=1):
             if args.software_pull_after is not None and offered_at is not None:
                 photo = state.photo
                 if smoke_stage == 0 and now - offered_at >= args.software_pull_after:
+                    signals.update(decoded=False, composed=False)
+                    if not bridge.send(
+                        {"type": "photo_debug_preview_source", "photo_id": photo["photo_id"]}
+                    ):
+                        raise RuntimeError("local preview rejected")
+                    evidence.event(
+                        "offscreen_preview_source", physical_grab=False, authorized=False
+                    )
+                    smoke_stage = -2
+                elif smoke_stage == -2 and signals["decoded"] and signals["composed"]:
                     if not bridge.send(
                         {
-                            "type": "photo_probe_pull",
+                            "type": "photo_debug_export",
                             "photo_id": photo["photo_id"],
-                            "event_id": str(uuid4()),
+                            "label": "pre-pull",
                         }
                     ):
-                        raise RuntimeError("software pull rejected")
-                    evidence.event("offscreen_software_pull", physical_gesture=False)
-                    smoke_stage = 1
+                        raise RuntimeError("pre-pull export rejected")
+                    smoke_stage = -1
+                    exported_at = now
                 elif (
                     smoke_stage in (1, 4)
                     and photo["visible"]
@@ -651,8 +570,8 @@ async def run(args, evidence, *, case=None, generation=1):
                         raise RuntimeError("export rejected")
                     smoke_stage += 1
                     exported_at = now
-                elif smoke_stage in (2, 5):
-                    label = "preview" if smoke_stage == 2 else "reopened"
+                elif smoke_stage in (-1, 2, 5):
+                    label = {-1: "pre-pull", 2: "preview", 5: "reopened"}[smoke_stage]
                     png = evidence.path / f"{label}.png"
                     metadata = evidence.path / f"{label}.json"
                     if png.exists() and metadata.exists():
@@ -667,6 +586,13 @@ async def run(args, evidence, *, case=None, generation=1):
                             list(dimensions) != expected
                             or data["blocks"]
                             or data["original_uploads"] != 1
+                            or smoke_stage == -1 and (
+                                photo["attempt_id"] != 0
+                                or photo["image"] is not None
+                                or photo["visible"]
+                                or photo["preparations"]
+                                or photo["blocks"]
+                            )
                         ):
                             raise RuntimeError("preview export contract mismatch")
                         evidence.event(
@@ -677,7 +603,25 @@ async def run(args, evidence, *, case=None, generation=1):
                             original_uploads=data["original_uploads"],
                             physical_display=False,
                         )
-                        if smoke_stage == 5:
+                        if smoke_stage == -1:
+                            evidence.event(
+                                "pre_pull_verified",
+                                attempt_id=photo["attempt_id"],
+                                image=None,
+                                preparations=0,
+                                authorized=False,
+                            )
+                            if not bridge.send(
+                                {
+                                    "type": "photo_probe_pull",
+                                    "photo_id": photo["photo_id"],
+                                    "event_id": str(uuid4()),
+                                }
+                            ):
+                                raise RuntimeError("software pull rejected")
+                            evidence.event("offscreen_software_pull", physical_gesture=False)
+                            smoke_stage = 1
+                        elif smoke_stage == 5:
                             if schedule is None:
                                 evidence.summary["status"] = "offscreen_preview_exported"
                                 result = 0
@@ -720,7 +664,7 @@ async def run(args, evidence, *, case=None, generation=1):
         evidence.event("launcher_error", error_type=type(exc).__name__)
     finally:
         errors = await stop_child(
-            process, bridge, readers, evidence, require_ack=case is not None
+            process, bridge, readers, evidence, require_ack=args.repeat_offers
         )
         for task in (ready_task, exit_task):
             if task is not None:
@@ -731,7 +675,7 @@ async def run(args, evidence, *, case=None, generation=1):
         manifest_path.unlink(missing_ok=True)
         evidence.summary["cleanup_errors"] = errors
         evidence.event(
-            "case_cleanup" if case is not None else "cleanup",
+            "cleanup",
             errors=errors,
             native_exit_code=evidence.summary.get("native_exit_code"),
             shutdown_acknowledged=evidence.summary.get("shutdown_acknowledged", False),
@@ -746,6 +690,9 @@ async def run(args, evidence, *, case=None, generation=1):
             composed=signals["composed"],
             native_error=signals["error"],
         )
+        if result == 0 and signals["error"]:
+            evidence.summary["status"] = "native_terminal_error"
+            result = 2
     return result
 
 
@@ -786,18 +733,18 @@ def parser():
     )
     command.add_argument(
         "--seconds", type=float, default=60,
-        help="Duration after native ready; tuning target PER CASE (default 60s), extended for release",
+        help="Target duration after native ready (default 60s); repeat mode may extend for first offer/release",
     )
     command.add_argument("--startup-timeout", type=float, default=10)
     command.add_argument(
-        "--tune-wrist-and-grab",
+        "--repeat-offers",
         action="store_true",
-        help="Six serial cases: positions A/B/C at 8cm, then radii 8/12/15cm at B; --seconds per case",
+        help="One native wrist-watch candidate at 10cm radius; repeat synthetic opportunities safely",
     )
     command.add_argument(
         "--software-pull-after",
         type=float,
-        help="OFFSCREEN ONLY: seconds after synthetic offer; export, hide, reopen, export, then exit",
+        help="OFFSCREEN ONLY: delay to local pre-pull export, then pull/export/hide/reopen/export and exit",
     )
     return command
 
@@ -822,10 +769,10 @@ def main(argv=None):
         command.error(
             "--software-pull-after requires --backend offscreen, no --watch-dir, and delay < 10s"
         )
-    if args.tune_wrist_and_grab and args.watch_dir:
-        command.error("--tune-wrist-and-grab uses synthetic --image offers; no --watch-dir")
-    if args.tune_wrist_and_grab and args.seconds < args.offer_delay + 10:
-        command.error("tuning --seconds must fit --offer-delay plus the full 10s offer window")
+    if args.repeat_offers and args.watch_dir:
+        command.error("--repeat-offers uses synthetic --image offers; no --watch-dir")
+    if args.repeat_offers and args.seconds < args.offer_delay + 10:
+        command.error("repeat --seconds must fit --offer-delay plus the full 10s offer window")
     evidence = Evidence()
     print(f"Local evidence: {evidence.path}", flush=True)
     print(
@@ -834,9 +781,7 @@ def main(argv=None):
         flush=True,
     )
     try:
-        result = asyncio.run(
-            run_tuning(args, evidence) if args.tune_wrist_and_grab else run(args, evidence)
-        )
+        result = asyncio.run(run(args, evidence))
     except KeyboardInterrupt:
         result = 130
     except Exception as exc:

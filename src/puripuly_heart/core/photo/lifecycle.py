@@ -92,6 +92,7 @@ class PhotoLifecycle:
             value = {
                 "photo_id": photo.photo_id,
                 "path": str(capture.path),
+                "expected_file_id": [str(item) for item in capture.file_id],
                 "file_size": capture.file_size,
                 "shutter_unix_ms": capture.shutter_unix_ms,
                 "attempt_id": photo.attempt_id,

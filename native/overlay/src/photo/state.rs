@@ -47,6 +47,7 @@ pub struct Photo {
     pub photo_id: String,
     pub path: String,
     pub file_size: u64,
+    pub expected_file_id: [String; 2],
     pub shutter_unix_ms: u64,
     pub attempt_id: u64,
     pub phase: PhotoPhase,
@@ -75,6 +76,11 @@ impl Photo {
             || self.attempt_id > 2
             || self.path.is_empty()
             || self.blocks.len() > 4096
+            || !self.expected_file_id.iter().all(|part| {
+                !part.is_empty()
+                    && part.bytes().all(|byte| byte.is_ascii_digit())
+                    && part.parse::<u128>().is_ok()
+            })
             || self.preparations.len() > 4096
             || (self.attempt_id == 0
                 && (self.image.is_some()
@@ -198,7 +204,10 @@ impl PhotoState {
                 if next.attempt_id < current.attempt_id {
                     return Ok(SnapshotAdmission::Stale);
                 }
-                if current.path != next.path || current.shutter_unix_ms != next.shutter_unix_ms {
+                if current.path != next.path
+                    || current.shutter_unix_ms != next.shutter_unix_ms
+                    || current.expected_file_id != next.expected_file_id
+                {
                     return Err(PhotoError::Protocol);
                 }
                 if next.attempt_id == current.attempt_id {

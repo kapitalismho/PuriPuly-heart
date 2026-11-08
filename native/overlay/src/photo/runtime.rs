@@ -11,7 +11,7 @@ use super::image::{
     PhotoImageBoundary, PhotoImageOutput, PhotoImageResult, PhotoImageWorker, PhotoTexture,
 };
 use super::manifest::{PhotoBackend, PhotoError, PhotoManifest, PHOTO_PROTOCOL_VERSION};
-use super::prepare::{PreparationWorker, PrepareCompletion};
+use super::prepare::{PreparationCompletion, PreparationWorker, PrepareCompletion, SourceCompletion, SourceRequest};
 use super::state::{PhotoState, SnapshotAdmission};
 use super::interaction::{HapticCue, PhotoInteraction};
 #[cfg(windows)]
@@ -130,6 +130,8 @@ pub struct PhotoRuntime {
     texture: Option<PhotoTexture>,
     preparation: PreparationWorker,
     preparation_started: bool,
+    source_request: Option<SourceRequest>,
+    source_max_size: [u32; 2],
     live_drawn_block: Option<u64>,
     #[cfg(windows)]
     compositor: Option<PhotoCompositor>,
@@ -205,6 +207,8 @@ impl PhotoRuntime {
                 texture: None,
                 preparation: PreparationWorker::new().map_err(|_| PhotoError::Protocol)?,
                 preparation_started: false,
+                source_request: None,
+                source_max_size: manifest.image.max_size,
                 #[cfg(windows)]
                 compositor,
                 debug_controls: manifest.image.debug_controls,
@@ -275,7 +279,10 @@ impl PhotoRuntime {
                         self.image_result(result, &mut bridge).await?;
                     }
                     Some(completion) = self.preparation.next_result() => {
-                        self.prepared(completion, &mut bridge).await?;
+                        match completion {
+                            PreparationCompletion::Prepared(completion) => self.prepared(completion, &mut bridge).await?,
+                            PreparationCompletion::Source(completion) => self.preview_source(completion, &mut bridge).await?,
+                        }
                     }
                     _ = tick.tick() => {
                         if let Backend::OpenVr(surfaces) = &mut self.backend { surfaces.poll()?; }
@@ -290,6 +297,7 @@ impl PhotoRuntime {
         .await;
         self.preparation.shutdown().await;
         while let Some(completion) = self.preparation.try_result() {
+            let PreparationCompletion::Prepared(completion) = completion else { continue };
             if let Err(error) = self.prepared(completion, &mut bridge).await {
                 if outcome.is_ok() {
                     outcome = Err(error);
@@ -344,9 +352,13 @@ impl PhotoRuntime {
                     .map(|photo| (photo.photo_id.clone(), photo.attempt_id));
                 if prior != current {
                     self.pulls.clear();
-                    self.preparation.cancel();
+                    self.preparation.cancel_prepare();
                     self.preparation_started = false;
-                    self.texture = None;
+                    if prior.as_ref().map(|key| &key.0) != current.as_ref().map(|key| &key.0) {
+                        self.preparation.cancel_source();
+                        self.source_request = None;
+                        self.texture = None;
+                    }
                     #[cfg(windows)]
                     if let Some(compositor) = &mut self.compositor {
                         if prior.as_ref().map(|key| &key.0) == current.as_ref().map(|key| &key.0) {
@@ -392,6 +404,7 @@ impl PhotoRuntime {
                         && photo.attempt_id > 0
                         && photo.phase == super::state::PhotoPhase::Preparing
                         && photo.path == request.source_path
+                        && photo.expected_file_id == request.expected_file_id
                 });
                 if !current {
                     bridge
@@ -419,6 +432,14 @@ impl PhotoRuntime {
                         .send(json!({"type": "photo_prepare_failed", "photo_id": photo_id,
                         "attempt_id": attempt_id, "code": code}))
                         .await?;
+                }
+            }
+            PhotoIncoming::DebugPreviewSource { photo_id } => {
+                if !self.debug_controls || !matches!(self.backend, Backend::Offscreen) {
+                    return Err(PhotoError::Protocol);
+                }
+                if self.state.photo().is_some_and(|photo| photo.photo_id == photo_id) {
+                    self.enqueue_preview_source();
                 }
             }
             PhotoIncoming::ProbePull { photo_id, event_id } => {
@@ -580,6 +601,70 @@ impl PhotoRuntime {
         }
     }
 
+    fn enqueue_preview_source(&mut self) {
+        let Some(photo) = self.state.photo().filter(|photo| {
+            photo.image.is_none() && photo.can_pull() && self.interaction.active(photo, Instant::now())
+        }) else {
+            return;
+        };
+        if self.source_request.is_some() || self.interaction.quiescing() {
+            return;
+        }
+        let request = SourceRequest {
+            photo_id: photo.photo_id.clone(),
+            source_path: photo.path.clone(),
+            expected_file_id: photo.expected_file_id.clone(),
+            max_size: self.source_max_size,
+        };
+        match self.preparation.start_source(request.clone()) {
+            Ok(()) => self.source_request = Some(request),
+            Err(code) => eprintln!("{}", json!({"type":"photo_image_failed","stage":"local_source","code":code})),
+        }
+    }
+
+    async fn preview_source(&mut self, completion: SourceCompletion, bridge: &mut PhotoBridge) -> Result<(), PhotoError> {
+        if self.source_request.as_ref() != Some(&completion.request)
+            || !self.state.photo().is_some_and(|photo| {
+                photo.photo_id == completion.request.photo_id
+                    && photo.path == completion.request.source_path
+                    && photo.expected_file_id == completion.request.expected_file_id
+                    && self.interaction.active(photo, Instant::now())
+            })
+        {
+            return Ok(());
+        }
+        match completion.result {
+            Ok(source) => {
+                let photo = self.state.photo().ok_or(PhotoError::Protocol)?;
+                if photo.image.as_ref().is_none_or(|image| image.path == completion.request.source_path) {
+                    self.images.retain_original(
+                        completion.request.photo_id,
+                        photo.attempt_id,
+                        completion.request.source_path,
+                        source.original.clone(),
+                        source.working.clone(),
+                    );
+                }
+                #[cfg(windows)]
+                if let Some(compositor) = &mut self.compositor {
+                    compositor.set_original(source.working.as_ref().ok_or(PhotoError::Image)?.clone())?;
+                }
+                println!("{}", json!({
+                    "type":"photo_image_stage", "stage":"display_source_ready", "local_preview":true,
+                    "before_authorization":self.state.photo().is_some_and(|photo| photo.attempt_id == 0),
+                }));
+                self.render_frame(bridge).await?;
+            }
+            Err(code) => {
+                self.source_request = None;
+                if code != "preparation_cancelled" {
+                    eprintln!("{}", json!({"type":"photo_image_failed","stage":"local_source","code":code}));
+                }
+            }
+        }
+        Ok(())
+    }
+
     async fn prepared(
         &mut self,
         completion: PrepareCompletion,
@@ -624,6 +709,7 @@ impl PhotoRuntime {
                     request.attempt_id,
                     prepared.source_path.to_string_lossy().into_owned(),
                     prepared.original.clone(),
+                    prepared.working.clone(),
                 );
                 prepared.hand_off();
             }
@@ -780,23 +866,32 @@ impl PhotoRuntime {
     }
 
     async fn interaction_tick(&mut self, bridge: &mut PhotoBridge) -> Result<(), PhotoError> {
+        if !self.state.photo().is_some_and(|photo| self.interaction.active(photo, Instant::now())) {
+            self.preparation.cancel_source();
+            self.source_request = None;
+        }
         let Backend::OpenVr(surfaces) = &self.backend else {
             return Ok(());
         };
         let input = surfaces._session.legacy_input();
-        let frame = self
-            .interaction
-            .step(self.state.photo(), input, Instant::now());
+        self.interaction_input(input, Instant::now(), bridge).await
+    }
+
+    async fn interaction_input(
+        &mut self,
+        input: Option<crate::openvr::LegacyVrInput>,
+        now: Instant,
+        bridge: &mut PhotoBridge,
+    ) -> Result<(), PhotoError> {
+        let frame = self.interaction.step(self.state.photo(), input, now);
+        if frame.grab {
+            self.enqueue_preview_source();
+        }
         if frame.pull {
             self.haptic(HapticCue::Pull);
             self.pull_sequence += 1;
             if let Some(photo) = self.state.photo() {
                 bridge.send(json!({"type":"photo_pull","photo_id":photo.photo_id,"event_id":format!("native-{}",self.pull_sequence)})).await?;
-                if photo.attempt_id == 0 {
-                    bridge
-                        .send(json!({"type":"photo_hidden","photo_id":photo.photo_id}))
-                        .await?;
-                }
             }
         }
         if frame.hidden {

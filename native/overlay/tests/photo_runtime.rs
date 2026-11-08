@@ -15,7 +15,7 @@ use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
 
 fn manifest() -> PhotoManifest {
     PhotoManifest {
-        protocol_version: 1,
+        protocol_version: puripuly_heart_overlay::photo::manifest::PHOTO_PROTOCOL_VERSION,
         role: "photo".into(),
         bridge_url: "ws://127.0.0.1:12345".into(),
         session_token: "isolated-synthetic-token".into(),
@@ -32,6 +32,7 @@ fn photo() -> Photo {
         photo_id: "synthetic-photo-a".into(),
         path: "synthetic-metadata.png".into(),
         file_size: 123,
+        expected_file_id: ["1".into(), "2".into()],
         shutter_unix_ms: 1,
         attempt_id: 0,
         phase: PhotoPhase::Offer,
@@ -376,7 +377,7 @@ async fn actual_photo_process_authenticates_accumulates_pulls_replays_and_exits(
         let auth = receive(&mut socket).await;
         assert_eq!(
             auth,
-            json!({"type":"photo_auth","protocol_version":1,"role":"photo","session_token":config.session_token,"instance_id":config.instance_id,"generation":config.generation})
+            json!({"type":"photo_auth","protocol_version":2,"role":"photo","session_token":config.session_token,"instance_id":config.instance_id,"generation":config.generation})
         );
         let initial = if run == 0 { photo() } else { retained.clone() };
         send(
@@ -505,6 +506,7 @@ async fn decoded_source_is_retained_without_copy_for_retry_and_fenced_on_replace
         1,
         current.image.as_ref().unwrap().path.clone(),
         pixels.clone(),
+        None,
     );
     boundary.publish(state.snapshot().unwrap());
     let input = worker.next_input().await.unwrap();
@@ -549,6 +551,7 @@ async fn actual_photo_process_settles_retired_and_shutdown_preparations_before_e
         .unwrap();
         let mut current = requested();
         current.path = source.to_str().unwrap().into();
+        current.expected_file_id = identity.clone();
         current.phase = PhotoPhase::Preparing;
         current.image = None;
         send(
@@ -754,6 +757,9 @@ async fn actual_native_pipeline() {
     }
     pixels.save(&source).unwrap();
     current.path = source.to_string_lossy().into_owned();
+    current.expected_file_id = puripuly_heart_overlay::photo::prepare::file_identity(
+        &std::fs::File::open(&source).unwrap(),
+    ).unwrap();
     send(
         &mut socket,
         json!({"type":"photo_snapshot","revision":1,"photo":current}),
@@ -1068,4 +1074,237 @@ async fn actual_photo_process_rejects_unauthorized_or_invalid_quiesce() {
         assert!(stderr.contains("protocol_invalid"));
         std::fs::remove_dir_all(directory).unwrap();
     }
+}
+
+#[test]
+fn photo_protocol_two_requires_an_immutable_capture_identity() {
+    let mut old_manifest = manifest();
+    old_manifest.protocol_version = 1;
+    assert_eq!(old_manifest.validate(), Err(PhotoError::Manifest));
+    let mut document = serde_json::to_value(photo()).unwrap();
+    document.as_object_mut().unwrap().remove("expected_file_id");
+    assert!(serde_json::from_value::<Photo>(document).is_err());
+    let mut state = PhotoState::default();
+    state.apply(1, Some(photo())).unwrap();
+    let mut changed = photo();
+    changed.expected_file_id[1] = "3".into();
+    assert_eq!(state.apply(2, Some(changed)), Err(PhotoError::Protocol));
+    let mut invalid = photo();
+    invalid.expected_file_id[0] = "not-a-decimal-id".into();
+    assert_eq!(PhotoState::default().apply(1, Some(invalid)), Err(PhotoError::Protocol));
+}
+
+#[cfg(windows)]
+#[tokio::test]
+async fn actual_offscreen_grab_preview_precedes_authorization_and_reuses_its_pixels() {
+    actual_offscreen_preview_handoff(true).await;
+}
+
+#[cfg(windows)]
+#[tokio::test]
+async fn actual_offscreen_standalone_snapshot_reuses_preview_through_hide_and_reopen() {
+    actual_offscreen_preview_handoff(false).await;
+}
+
+#[cfg(windows)]
+async fn actual_offscreen_preview_handoff(prepare_private: bool) {
+    use std::io::BufRead;
+    let name = if prepare_private { "prepared" } else { "standalone" };
+    let mut config = manifest();
+    config.backend = PhotoBackend::Offscreen;
+    config.image.debug_controls = true;
+    config.image.max_size = if prepare_private { [320, 180] } else { [1920, 1080] };
+    config.image.model_path = Some("must-not-load-for-original-preview.onnx".into());
+    config.interaction.debug_case_label = Some("Watch candidate\nRadius fixed: 10 cm".into());
+    let external = std::env::var_os("PURIPULY_PHOTO341_EVIDENCE").map(std::path::PathBuf::from);
+    let exports = external.clone().unwrap_or_else(|| {
+        std::env::temp_dir().join(format!("puri341-local-preview-{}-{name}", std::process::id()))
+    }).join(format!("offscreen-child-{name}"));
+    config.image.export_dir = Some(exports.clone());
+    let (mut child, mut socket, directory) = start_child(&config, &format!("grab-local-preview-{name}")).await;
+    let (stages, mut stage_receiver) = tokio::sync::mpsc::unbounded_channel();
+    let stdout = child.0.stdout.take().unwrap();
+    let reader = std::thread::spawn(move || {
+        let mut log = Vec::new();
+        for line in std::io::BufReader::new(stdout).lines() {
+            let value: Value = serde_json::from_str(&line.unwrap()).unwrap();
+            log.push(value.clone());
+            let _ = stages.send(value);
+        }
+        log
+    });
+    assert_eq!(receive(&mut socket).await["protocol_version"], 2);
+    std::fs::create_dir_all(&exports).unwrap();
+    let source = exports.join("capture.png");
+    let mut pixels = image::RgbImage::new(320, 180);
+    for (x, y, pixel) in pixels.enumerate_pixels_mut() {
+        *pixel = image::Rgb([if x < 160 { 210 } else { 35 }, if y < 90 { 55 } else { 195 }, 85]);
+    }
+    pixels.save(&source).unwrap();
+    let mut current = photo();
+    current.path = source.to_string_lossy().into_owned();
+    current.expected_file_id = puripuly_heart_overlay::photo::prepare::file_identity(
+        &std::fs::File::open(&source).unwrap(),
+    ).unwrap();
+    current.file_size = std::fs::metadata(&source).unwrap().len();
+    current.shutter_unix_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
+    std::fs::write(exports.join("capture.json"), serde_json::to_vec_pretty(&json!({
+        "path":current.path,"expected_file_id":current.expected_file_id,"width":320,"height":180
+    })).unwrap()).unwrap();
+    send(&mut socket, json!({"type":"photo_snapshot","revision":1,"photo":current})).await;
+    assert_eq!(receive(&mut socket).await["revision"], 1);
+    assert_eq!(receive(&mut socket).await["type"], "photo_ready");
+    let output = directory.join("prepared");
+    std::fs::create_dir(&output).unwrap();
+    send(&mut socket, json!({"type":"photo_debug_preview_source","photo_id":"wrong-photo"})).await;
+    send(&mut socket, json!({"type":"photo_debug_preview_source","photo_id":current.photo_id})).await;
+    let ready = image_stage(&mut stage_receiver, "display_source_ready", None).await;
+    assert_eq!(ready["local_preview"], true);
+    assert_eq!(ready["before_authorization"], true);
+    assert!(tokio::time::timeout(Duration::from_millis(20), socket.next()).await.is_err());
+    assert!(std::fs::read_dir(&output).unwrap().next().is_none());
+    send(&mut socket, json!({"type":"photo_debug_export","photo_id":current.photo_id,"label":"before-pull"})).await;
+    let (preview, metadata) = wait_export(&exports, "before-pull").await;
+    assert_eq!(preview.dimensions(), (config.image.max_size[0], config.image.max_size[1]));
+    let expected = if prepare_private {
+        pixels
+    } else {
+        image::imageops::resize(&pixels, 1920, 1080, image::imageops::FilterType::Lanczos3)
+    };
+    assert!(preview.pixels().zip(expected.pixels()).all(|(actual, expected)| actual.0[..3] == expected.0 && actual[3] == 255));
+    assert_eq!(metadata["original_uploads"], 1);
+    assert_eq!(metadata["blocks"], json!([]));
+    send(&mut socket, json!({"type":"photo_prepare","photo_id":current.photo_id,"attempt_id":1,
+        "source_path":current.path,"output_dir":output,"expected_file_id":current.expected_file_id})).await;
+    assert_eq!(receive(&mut socket).await["code"], "preparation_not_current");
+    assert!(std::fs::read_dir(&output).unwrap().next().is_none());
+    send(&mut socket, json!({"type":"photo_probe_pull","photo_id":current.photo_id,"event_id":"software-authorized-pull"})).await;
+    assert_eq!(receive(&mut socket).await["type"], "photo_pull");
+    current.attempt_id = 1;
+    current.phase = if prepare_private { PhotoPhase::Preparing } else { PhotoPhase::Completed };
+    current.offer_open = false;
+    current.visible = true;
+    if !prepare_private {
+        current.image = Some(PhotoImage { path:current.path.clone(), width:320, height:180 });
+    }
+    send(&mut socket, json!({"type":"photo_snapshot","revision":2,"photo":current})).await;
+    assert_eq!(receive(&mut socket).await["revision"], 2);
+    let mut revision = 2;
+    if prepare_private {
+        send(&mut socket, json!({"type":"photo_prepare","photo_id":current.photo_id,"attempt_id":1,
+            "source_path":current.path,"output_dir":output,"expected_file_id":current.expected_file_id})).await;
+        let prepared = receive(&mut socket).await;
+        assert_eq!(prepared["type"], "photo_prepared");
+        assert_eq!(prepared["decode_ms"], 0.0);
+        assert_eq!(std::fs::read(prepared["source_path"].as_str().unwrap()).unwrap(), std::fs::read(&source).unwrap());
+        current.image = Some(PhotoImage {
+            path: prepared["source_path"].as_str().unwrap().into(), width:320, height:180,
+        });
+        current.phase = PhotoPhase::Requesting;
+        revision += 1;
+        send(&mut socket, json!({"type":"photo_snapshot","revision":revision,"photo":current})).await;
+        assert_eq!(receive(&mut socket).await["revision"], revision);
+    }
+    let authorized_ready = image_stage(&mut stage_receiver, "display_source_ready", None).await;
+    assert_eq!(authorized_ready["recovered"], false);
+    let after_label = if prepare_private { "after-prepare" } else { "after-pull" };
+    send(&mut socket, json!({"type":"photo_debug_export","photo_id":current.photo_id,"label":after_label})).await;
+    let (after, metadata) = wait_export(&exports, after_label).await;
+    assert_eq!(after, preview);
+    assert_eq!(metadata["original_uploads"], 1);
+    if !prepare_private {
+        send(&mut socket, json!({"type":"photo_probe_hide","photo_id":current.photo_id})).await;
+        assert_eq!(receive(&mut socket).await["type"], "photo_hidden");
+        current.visible = false;
+        revision += 1;
+        send(&mut socket, json!({"type":"photo_snapshot","revision":revision,"photo":current})).await;
+        assert_eq!(receive(&mut socket).await["revision"], revision);
+        send(&mut socket, json!({"type":"photo_probe_pull","photo_id":current.photo_id,"event_id":"software-reopen"})).await;
+        assert_eq!(receive(&mut socket).await["type"], "photo_pull");
+        current.visible = true;
+        revision += 1;
+        send(&mut socket, json!({"type":"photo_snapshot","revision":revision,"photo":current})).await;
+        assert_eq!(receive(&mut socket).await["revision"], revision);
+        send(&mut socket, json!({"type":"photo_debug_export","photo_id":current.photo_id,"label":"reopened"})).await;
+        let (reopened, metadata) = wait_export(&exports, "reopened").await;
+        assert_eq!(reopened, preview);
+        assert_eq!(metadata["original_uploads"], 1);
+        assert!(std::fs::read_dir(&output).unwrap().next().is_none());
+    }
+    send(&mut socket, json!({"type":"photo_debug_quiesce","request_id":"preview-complete"})).await;
+    assert_eq!(receive(&mut socket).await["type"], "photo_debug_quiescent");
+    send(&mut socket, json!({"type":"shutdown"})).await;
+    assert_eq!(receive(&mut socket).await["type"], "photo_shutdown_complete");
+    assert!(child.0.wait().unwrap().success());
+    let log = reader.join().unwrap();
+    std::fs::write(exports.join("native-log.json"), serde_json::to_vec_pretty(&log).unwrap()).unwrap();
+    assert_eq!(log.iter().filter(|line| line["type"] == "photo_image_prepared").count(), usize::from(prepare_private));
+    assert!(!log.iter().any(|line| line["stage"] == "display_source_ready" && line["recovered"] == true));
+    std::fs::remove_dir_all(directory).unwrap();
+    if external.is_none() { std::fs::remove_dir_all(exports.parent().unwrap()).unwrap(); }
+}
+
+#[cfg(windows)]
+#[tokio::test]
+async fn preview_source_control_rejects_non_offscreen_or_non_debug_children() {
+    for (index, backend, debug) in [
+        (0, PhotoBackend::Probe, false), (1, PhotoBackend::Probe, true),
+        (2, PhotoBackend::Offscreen, false),
+    ] {
+        let mut config = manifest();
+        config.backend = backend;
+        config.image.debug_controls = debug;
+        let (mut child, mut socket, directory) = start_child(&config, &format!("preview-gate-{index}")).await;
+        assert_eq!(receive(&mut socket).await["type"], "photo_auth");
+        send(&mut socket, json!({"type":"photo_snapshot","revision":1,"photo":null})).await;
+        assert_eq!(receive(&mut socket).await["type"], "photo_state_received");
+        assert_eq!(receive(&mut socket).await["type"], "photo_ready");
+        send(&mut socket, json!({"type":"photo_debug_preview_source","photo_id":"synthetic"})).await;
+        assert!(!child.0.wait().unwrap().success());
+        use std::io::Read;
+        let mut stderr = String::new();
+        child.0.stderr.as_mut().unwrap().read_to_string(&mut stderr).unwrap();
+        assert!(stderr.contains("protocol_invalid"));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn local_original_survives_offer_preparing_and_matching_raw_image_only() {
+    use puripuly_heart_overlay::photo::processing::WorkingPhoto;
+    use std::sync::Arc;
+    let (mut boundary, mut worker) = PhotoImageBoundary::channel();
+    let mut state = PhotoState::default();
+    let mut current = photo();
+    state.apply(1, Some(current.clone())).unwrap();
+    let pixels = Arc::new(image::RgbImage::new(320, 180));
+    let working = Arc::new(WorkingPhoto::new(pixels.clone(), [320, 180]).unwrap());
+    boundary.retain_original(current.photo_id.clone(), 0, current.path.clone(), pixels.clone(), Some(working.clone()));
+    boundary.publish(state.snapshot().unwrap());
+    let offer = worker.next_input().await.unwrap();
+    assert!(worker.decoded_original(&offer).is_none());
+    current.attempt_id = 1;
+    current.phase = PhotoPhase::Preparing;
+    current.offer_open = false;
+    state.apply(2, Some(current.clone())).unwrap();
+    boundary.publish(state.snapshot().unwrap());
+    let preparing = worker.next_input().await.unwrap();
+    assert!(worker.decoded_original(&preparing).is_none());
+    current.phase = PhotoPhase::Completed;
+    current.image = Some(PhotoImage { path:current.path.clone(), width:320, height:180 });
+    state.apply(3, Some(current.clone())).unwrap();
+    boundary.publish(state.snapshot().unwrap());
+    let completed = worker.next_input().await.unwrap();
+    let retained = worker.decoded_original(&completed).unwrap();
+    assert!(Arc::ptr_eq(&retained.pixels, &pixels));
+    assert!(Arc::ptr_eq(retained.working.as_ref().unwrap(), &working));
+    current.attempt_id = 2;
+    current.image.as_mut().unwrap().path = "different-source.png".into();
+    state.apply(4, Some(current)).unwrap();
+    boundary.publish(state.snapshot().unwrap());
+    let different = worker.next_input().await.unwrap();
+    assert!(worker.decoded_original(&different).is_none());
+    state.apply(5, None).unwrap();
+    boundary.publish(state.snapshot().unwrap());
+    assert!(worker.decoded_original(&completed).is_none());
 }

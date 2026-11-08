@@ -9,6 +9,7 @@ fn input(
 ) -> PhotoSnapshot {
     PhotoSnapshot {revision,photo:Some(Arc::new(serde_json::from_value(json!({
         "photo_id":"synthetic","path":"no-decoder-must-open-this.png","file_size":1,"shutter_unix_ms":1,
+        "expected_file_id":["1","2"],
         "attempt_id":attempt,"phase":"requesting","offer_open":false,"visible":false,
         "image":{"path":"retained-only.png","width":128,"height":72},"blocks":blocks,"preparations":preparations,
         "failure_code":null,"first_block_drawn":false

@@ -26,9 +26,9 @@ Verification used 23 photos × four experimental conditions at the default 1920�
 
 `x3_photo_preview.py` launches the actual native photo role and uses its authenticated loopback bridge. It offers an explicitly selected existing PNG, without provider calls, credentials, OCR or pixel processing in Python. Native decodes and draws the image. A recorded translated composite is shown as a **base-image preview with zero translation blocks**; it cannot produce a genuine first-translated-block notification. Test right-hand notification through the actual block path, not by pretending this prerecorded image is a newly translated block.
 
-Native's optional manifest `interaction` object exposes `grab_m`, `icon_width_m`, `photo_width_m`, `facing_show_deg`, `forward_show_deg`, `facing_hide_deg`, `forward_hide_deg`, `dwell_ms`, `wrist_transform` and `photo_transform`. The initial grab-radius candidate is **8 cm**, and icon width is 3 cm. With no explicit `wrist_transform`, the default center is the actual right controller's `handgrip` applied to `(0, 0.063, 0.024)` m. Only the position uses the component rotation; the icon keeps its existing raw-right-device-relative face rotation. Explicit `wrist_transform` and `photo_transform` remain rigid 3×4 raw-controller-relative overrides in metres. See [hand reference and coordinate semantics](../../docs/photo-vr-interaction.md).
+The selected grab radius is **10 cm**; icon width remains 3 cm. Native defaults now compose both position and rotation with actual right `handgrip` for a dorsal wristwatch candidate. The former A/B/C thumb-side placement was rejected by the owner. Default photo placement pins its left edge to actual left handgrip rather than using a remote raw-controller offset. Explicit `wrist_transform` and `photo_transform` remain complete raw-controller-relative rigid overrides; omitted/null photo placement uses the new edge pivot. See [hand reference, geometry and protocol 2 semantics](../../docs/photo-vr-interaction.md).
 
-The owner selected a default held-photo width of **37.5 cm**, matching the serialized VRChat Print prefab's width only. Preserve the source aspect ratio without adding card borders or letterboxing: a 16:9 photo is 37.5 × 21.09375 cm. An explicit `photo_width_m` still overrides the default for temporary tuning. Held-photo appearance/release remains linear over 150 ms; icon return remains 225 ms ease-out.
+The owner selected a default full photo width of **37.5 cm**, matching the serialized VRChat Print prefab's width only. Preserve source aspect without card borders or letterboxing: a 16:9 photo is 37.5 × 21.09375 cm. `photo_width_m` remains a temporary override. Alpha and width now increase with pull distance, not a timed pop-out. Release reverses from current progress over 150 ms; icon return remains 225 ms ease-out.
 
 The owner selected VRCT's wrist visibility and input timing policy, based on its pinned [constants](https://github.com/misyaguziya/VRCT/blob/61e153aca43c011d65afb05357c9ad4b9120915f/src-python/models/overlay/overlay.py#L77-L89) and [visibility logic](https://github.com/misyaguziya/VRCT/blob/61e153aca43c011d65afb05357c9ad4b9120915f/src-python/models/overlay/overlay.py#L2232-L2286):
 
@@ -45,7 +45,7 @@ Both angle conditions must hold; this uses HMD orientation, not eye tracking. In
 
 Size provenance: read-only inspection of VRChat `2026.4.1p1-1937-299983b13b-Release` (Steam build `26309255`) found `Print Prefab` in `VRChat_Data/resources.assets` (GameObject 26792, root Transform 49493). Its root scale is 0.75; child `Mesh` Transform 47927 has X/Z scale 0.05/0.03515625 and references the built-in `Plane` mesh 10209, whose X/Z bounds are 10/10 units. The serialized outer card is therefore nominally 0.375 × 0.263671875 metres. `resources.assets` SHA-256: `a7db7942724288a4afb09f9c16777cdf43fff56537af06a5d304d40b773b6c1b`. The owner selected width-only matching, not this outer card's aspect ratio. Runtime spawn/avatar scaling and native portrait behavior were not observed; this is an asset-derived target, not proof of an in-headset size match. The [official Print documentation](https://wiki.vrchat.com/wiki/Prints) supplies pixel margins, not physical dimensions.
 
-Compared with the former 50 cm candidate, the card's geometry is 25% smaller in each physical dimension. At the same viewing distance, unchanged text sizes subtend smaller angles despite higher pixels per metre. The separately approved 1.5% minimum font size approximately compensates for this shrinkage for text at the former 1.1% floor; it does not enlarge all text. Moving the card to 75% of the former eye-to-card distance restores its angular size. The 1080p default, source aspect ratio and hand-relative placement are unchanged; headset legibility remains an X3 observation.
+Compared with the former 50 cm candidate, the card's full geometry is 25% smaller in each physical dimension. At the same viewing distance, unchanged text sizes subtend smaller angles despite higher pixels per metre. The separately approved 1.5% minimum font size approximately compensates for this shrinkage for text at the former 1.1% floor; it does not enlarge all text. Moving the card to 75% of the former eye-to-card distance restores its angular size. The 1080p default and source aspect remain unchanged; the new edge-pinned placement still needs headset legibility observations.
 
 Build and assemble the executable using the [native instructions](../../native/overlay/README.md#build-and-verification). Start SteamVR and VRChat manually before a physical run. From the repository root:
 
@@ -58,12 +58,13 @@ python scripts/probes/x3_photo_preview.py --executable $overlay --image $image -
 
 Use a Python environment with the project's existing dependencies. No new project dependency is required. The launcher prints the exact executable identity and a private evidence directory. It refuses OpenVR launch when SteamVR is not already running.
 
-After native readiness, this command creates one synthetic offer after five seconds. Look at the right wrist, wait for the icon's input-ready highlight with the left hand nearby, then start a fresh left grip inside the grab range. Pull the left hand 12 cm farther from the wrist anchor:
+After native readiness, this command creates one synthetic offer after five seconds. Turn the back of the right wrist toward your face as if checking a watch. Bring the left hand into range, wait for the input-ready highlight, then press the **left side grip**, not the index trigger:
 
-- Grab-start is silent. The valid pull requests one left-hand pulse. The icon returns to the wrist; the first pull authorizes the preview but does not leave the photo held.
-- Release, then grab and pull again to open the retained preview in the left hand. It appears over 150 ms; releasing reverses alpha and width over 150 ms, then hides it. Reopening does not resend or regenerate anything.
-- Releasing before the pull threshold returns the icon without opening/authorizing the photo. Moving both hands together without increasing their separation must not trigger.
-- The initial opportunity lasts ten seconds; only the latest authorized preview remains available for ten minutes after the offer. Start another invocation for another synthetic opportunity, or use actual photo signals below.
+- Grab-start is silent. Native begins reading the real original locally. Keep holding grip and increase the distance between left hand and right wrist: the photo grows from its left edge at the left hand.
+- At 12 cm increased separation, the left controller pulses, the icon returns, and the full photo remains held **on this first gesture**. Do not release and pull again merely to open it.
+- Rotate/move the left controller: the held edge should stay at the hand and the photo should follow its rotation, not aim continuously at the head.
+- Release to hide over 150 ms. A partial pull also reverses from its current size; releasing before threshold authorizes nothing. Common movement of both arms without increasing separation must not unfold/trigger.
+- The initial opportunity lasts ten seconds. The latest authorized preview remains available for ten minutes; another grab/pull reopens it without a new request. A fast pull can precede real pixel readiness, but the same held gesture must display those pixels when ready.
 
 For the scoped real-shot observations, append `--watch-dir '<explicit VRChat photo directory>'`. The existing watcher ignores files present at startup. Every new PNG signal offers **the same selected preview image**, not a translation of the newly captured photo. No camera control or transmission is performed. This mode lets the operator record reaction, false triggers and missed windows using the existing rendered material; it is not the assembled provider flow.
 
@@ -71,40 +72,35 @@ For the 1440p reference, select the corresponding `native_outline_1440/.../compo
 
 Physical observations should cover wrist visibility, grip recognition, cancellation/relative pull, held-photo readability at the candidate geometry, release/reopen and felt left feedback. Shared game input is accepted. Record what was actually seen/felt; software composition or submission does not establish HMD consumption. The planned X3 sample remains about 20 real shots, not a new image-quality campaign or a new decision on the selected 1080p default.
 
-### One-launch wrist-position and grab-radius experiment
+### One-launch watch and held-photo experiment
 
-After assembling the new native executable, start SteamVR and VRChat yourself, then run **one invocation**:
-
-```powershell
-python scripts/probes/x3_photo_preview.py --executable $overlay --image $image --tune-wrist-and-grab
-```
-
-This is six cases in **two separate phases**, not nine combinations. The launcher prints both phases before starting any child. It restarts the native photo child serially with immutable per-case configuration; there is no hot configuration, midphase choice, or new VRChat button binding.
-
-| Phase/order | Variable | Fixed factor | Grab-volume visualization |
-| --- | --- | --- | --- |
-| Position A, B, C | Actual right-handgrip-local points below | Radius 0.08 m | OFF |
-| Radius 0.08, 0.12, 0.15 m | Grab radius | Position B | ON |
-
-- A: `[0, 0.04373328, 0.01863404]` m — handward **heuristic**.
-- B: `[0, 0.063, 0.024]` m — current candidate.
-- C: `[0, 0.08226672, 0.02936596]` m — forearmward **heuristic**.
-
-A/C are B ±2 cm along the heuristic proximal vector `[0, 0.963336, 0.268298]`; those directional labels are not anatomical tracking or a universal controller axis. The native temporary label identifies the phase, value and fixed factor. Radius visualization is a wireframe with a centerline, **not a filled sphere**. It represents the native admission geometry, not measured physical wrist anatomy.
-
-`--seconds` defaults to a **60-second target per case** after native readiness; `--offer-delay` defaults to two seconds. Offers automatically reuse the selected `--image` with a fresh photo ID; no real capture is needed. The first actual offer always receives its full ten-second opportunity: if polling is late, the target case end extends to at least ten seconds after that offer, even if the original target has already passed. Subsequent offers start no sooner than 15 seconds after the previous one, only after native acknowledges the quiescent boundary, and only if their complete unchanged ten-second window fits before the case end. The unchanged latest-photo retention is 600 seconds. This mode rejects `--watch-dir`; ordinary preview/watch mode is unchanged.
-
-At an offer or case boundary, native stops admitting new grabs and shows release-to-continue while an existing grab, pull, return, held photo or release fade finishes. **Release the grip to continue**. There is no timeout that cuts an active hold: waiting can extend the case. A matching native quiescent reply is required before replacement or normal case shutdown; shutdown acknowledgement, exit 0 and successful owned cleanup are required before the next child. Failure or Ctrl+C aborts the remaining experiment.
-
-The printed `%TEMP%\puripuly-x3-preview-*` root contains aggregate `events.jsonl`/`summary.json` and six numbered per-case directories, each with its own evidence. Records include requested immutable manifest parameters, each executable SHA-256, fresh child identity/generation, offers, matched boundary acknowledgements and cleanup outcome. These are software configuration and lifecycle evidence, not observed world-space placement or actual HMD presentation. Token-bearing manifests are removed during cleanup. The base image still has zero translation blocks: grab-start is silent, valid-pull haptics are left-only, and genuine first-block right feedback is unavailable here.
-
-For a controlled **offscreen verification**, not a full physical timing session:
+Start SteamVR and VRChat yourself. Tell the assistant when ready; it launches the prepared candidate. The equivalent standalone command is:
 
 ```powershell
-python scripts/probes/x3_photo_preview.py --executable $overlay --image $image --tune-wrist-and-grab --backend offscreen --offer-delay 0.1 --seconds 15 --software-pull-after 0.2
+python scripts/probes/x3_photo_preview.py --executable $overlay --image $image --repeat-offers --seconds 180
 ```
 
-This uses the existing software pull/export/hide/reopen check once per case and may finish before the target duration. It still waits for native quiescence and clean shutdown between all six children. Software injection remains forbidden in OpenVR. Neither this check nor the temporary wireframe is final UI or physical X3/HMD proof.
+This uses **one native process and one candidate**, not the retired six-case comparison. The label reads `WRIST WATCH` / `Grab radius: 10 cm`. The visible range is three thin great-circle rings whose centerlines mark the actual spherical admission boundary, not a filled sphere or measured wrist anatomy. Native defaults own placement and unfolding; the launcher supplies no wrist/photo transform overrides.
+
+Check three outcomes:
+
+1. The icon lies on the back of the wrist like a watch, not below the thumb.
+2. A fresh side-grip press inside the 10 cm range reliably grabs; presses outside do not.
+3. A single continuous pull grows the photo from the left hand, keeps its left edge there through controller rotation, and leaves it held until release.
+
+`--seconds` still defaults to 60; the command above requests 180 seconds after native readiness. Offers reuse the selected `--image` with fresh photo IDs; no real capture is needed. `--offer-delay` defaults to two seconds. The first actual offer always receives its full ten-second opportunity, extending the target if polling is late. Further offers start at least 15 seconds apart, only after acknowledged native quiescence and only when another full opportunity fits. Latest-photo retention remains 600 seconds. `--repeat-offers` rejects `--watch-dir`; ordinary preview/watch mode remains available.
+
+At an offer or end boundary, native stops admitting new grabs and displays `RELEASE TO CONTINUE` while the current grab, return, hold or release fade finishes. **Release the grip to continue.** Waiting may extend the run; no timeout cuts an active hold. Replacement and normal shutdown require the matching quiescent reply. Failure or Ctrl+C aborts the run and performs owned cleanup.
+
+The printed `%TEMP%\puripuly-x3-preview-*` directory contains `events.jsonl` and `summary.json`: executable hash, native identity, immutable configuration, offers, matching boundary acknowledgements and cleanup results. Token-bearing manifests are removed. These records do not prove HMD visibility or felt feedback. The prerecorded base image has zero translated blocks, so genuine right-hand first-block feedback is unavailable.
+
+For the corresponding controlled offscreen check:
+
+```powershell
+python scripts/probes/x3_photo_preview.py --executable $overlay --image $image --repeat-offers --backend offscreen --offer-delay 0.1 --seconds 15 --software-pull-after 0.2
+```
+
+It observes real pre-authorization source pixels before the existing software pull/export/hide/reopen sequence, and may finish early. It does not inject a physical grip or qualify the watch/handheld feel. Software injection remains forbidden in OpenVR.
 
 ### Quiet GPU handoff
 
@@ -126,7 +122,7 @@ A separate synthetic one-frame probe reproduced the same missing post-submit dis
 python scripts/probes/x3_photo_preview.py --executable $overlay --image $image --backend offscreen --offer-delay 0.1 --software-pull-after 0.2 --seconds 15
 ```
 
-This explicit offscreen control performs a software pull, exports `preview.png`, hides, reopens, exports `reopened.png`, and shuts down the child. Add `--reference-1440` with the reference asset to preserve its resolution. Software injection is rejected in OpenVR mode. `bridge_control_mode=probe` permits the existing debug commands, while `requested_native_backend=offscreen` selects real GPU rendering; the receipt-only probe backend is not claimed to draw.
+This explicit offscreen control first requests `photo_debug_preview_source`, waits for actual source/composition readiness and exports `pre-pull.png` while the offer remains attempt 0 with no authorized image. Only then does it perform the software pull, export `preview.png`, hide, reopen and export `reopened.png`. Missing pre-pull readiness never authorizes. Add `--reference-1440` for the reference asset. The source diagnostic requires native offscreen plus debug controls; Python rejects it in OpenVR mode. `bridge_control_mode=probe` allows diagnostic messages, while `requested_native_backend=offscreen` selects real GPU rendering rather than the receipt-only probe backend.
 
 The evidence directory contains `events.jsonl`, `summary.json` and the requested exports. The token-bearing launch manifest is removed during owned cleanup. Keep outputs private when the selected asset contains personal photos. Exit success and `shutdown_acknowledged`/`native_exit_code` establish different facts from physical display.
 

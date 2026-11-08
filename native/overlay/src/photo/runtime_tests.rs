@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn feedback_requires_live_draw_and_is_once_per_attempt_even_after_snapshot_ack() {
     let manifest = PhotoManifest {
-        protocol_version: 1,
+        protocol_version: PHOTO_PROTOCOL_VERSION,
         role: "photo".into(),
         bridge_url: "ws://127.0.0.1:12345".into(),
         session_token: "synthetic".into(),
@@ -16,6 +16,7 @@ fn feedback_requires_live_draw_and_is_once_per_attempt_even_after_snapshot_ack()
     let (mut runtime, _worker) = PhotoRuntime::new(&manifest).unwrap();
     let photo = serde_json::from_value(json!({
         "photo_id":"synthetic", "path":"capture.png", "file_size":1, "shutter_unix_ms":1,
+        "expected_file_id":["1","2"],
         "attempt_id":1,"phase":"completed","offer_open":false,"visible":true,
         "image":{"path":"snapshot.png","width":1280,"height":720},"preparations":[],
         "blocks":[{"block_id":0,"bbox":[1,2,100,50],"source":"A","translation":"B"}],
@@ -40,7 +41,7 @@ fn feedback_requires_live_draw_and_is_once_per_attempt_even_after_snapshot_ack()
 #[test]
 fn feedback_tracks_first_drawable_block_after_kept_prefix() {
     let manifest: PhotoManifest = serde_json::from_value(json!({
-        "protocol_version":1,"role":"photo","bridge_url":"ws://127.0.0.1:12345",
+        "protocol_version":2,"role":"photo","bridge_url":"ws://127.0.0.1:12345",
         "session_token":"synthetic","instance_id":"11111111-1111-4111-8111-111111111111",
         "generation":1,"backend":"probe"
     }))
@@ -48,6 +49,7 @@ fn feedback_tracks_first_drawable_block_after_kept_prefix() {
     let (mut runtime, _worker) = PhotoRuntime::new(&manifest).unwrap();
     let photo = serde_json::from_value(json!({
         "photo_id":"synthetic","path":"capture.png","file_size":1,"shutter_unix_ms":1,
+        "expected_file_id":["1","2"],
         "attempt_id":1,"phase":"completed","offer_open":false,"visible":true,
         "image":{"path":"snapshot.png","width":1280,"height":720},"preparations":[],
         "blocks":[
@@ -71,7 +73,7 @@ fn feedback_tracks_first_drawable_block_after_kept_prefix() {
 async fn windows_graphics_photo341_icons_and_held_preview_readback() {
     use super::super::typeset::PhotoTypesetter;
     let manifest: PhotoManifest = serde_json::from_value(json!({
-        "protocol_version":1,"role":"photo","bridge_url":"ws://127.0.0.1:12345",
+        "protocol_version":2,"role":"photo","bridge_url":"ws://127.0.0.1:12345",
         "session_token":"synthetic","instance_id":"11111111-1111-4111-8111-111111111111",
         "generation":1,"backend":"offscreen",
         "image":{"debug_controls":true},
@@ -462,7 +464,7 @@ impl PhotoRuntime {
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let mut manifest = json!({
-            "protocol_version":1, "role":"photo",
+            "protocol_version":2, "role":"photo",
             "bridge_url":format!("ws://{}", listener.local_addr().unwrap()),
             "session_token":"controlled-runtime", "instance_id":"11111111-1111-4111-8111-111111111111",
             "generation":1, "backend":"offscreen", "interaction":{"wrist_transform":IDENTITY},
@@ -504,6 +506,7 @@ impl PhotoRuntime {
         assert_eq!(message(&mut socket).await["type"], "photo_state_received");
         let mut photo: Photo = serde_json::from_value(json!({
             "photo_id":"controlled-photo", "path":"synthetic.png", "file_size":1,
+            "expected_file_id":["1","2"],
             "shutter_unix_ms":unix_ms(), "attempt_id":1, "phase":"requesting",
             "offer_open":false, "visible":false,
             "image":{"path":"synthetic.png", "width":320, "height":180}, "preparations":[],
@@ -707,13 +710,14 @@ async fn quiescent_bridge_ack_waits_for_interaction_and_release_or_loss() {
     for (phase, loss) in [(0, false), (1, false), (2, false), (3, false), (2, true)] {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let manifest: PhotoManifest = serde_json::from_value(json!({
-            "protocol_version":1, "role":"photo", "bridge_url":format!("ws://{}",listener.local_addr().unwrap()),
+            "protocol_version":2, "role":"photo", "bridge_url":format!("ws://{}",listener.local_addr().unwrap()),
             "session_token":"synthetic", "instance_id":"11111111-1111-4111-8111-111111111111",
             "generation":1, "backend":"probe", "image":{"debug_controls":true},
             "interaction":{"wrist_transform":IDENTITY,"debug_case_label":"Position B\nGrab 8 cm fixed"}
         })).unwrap();
         let current = json!({
             "photo_id":"synthetic", "path":"synthetic.png", "file_size":1, "shutter_unix_ms":unix_ms(),
+            "expected_file_id":["1","2"],
             "attempt_id":1, "phase":"requesting", "offer_open":false, "visible":true, "image":null,
             "preparations":[], "blocks":[], "failure_code":null, "first_block_drawn":false
         });
@@ -768,4 +772,197 @@ async fn quiescent_bridge_ack_waits_for_interaction_and_release_or_loss() {
         runtime.ack_quiescent(&mut bridge).await.unwrap();
         assert!(tokio::time::timeout(Duration::from_millis(20), socket.next()).await.is_err());
     }
+}
+
+#[cfg(windows)]
+#[tokio::test]
+async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() {
+    use super::super::interaction::compose;
+    use super::super::prepare::file_identity;
+    use super::super::state::{Photo, PhotoPhase};
+    use futures_util::{SinkExt, StreamExt};
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::{accept_async, tungstenite::Message};
+    let directory = std::env::temp_dir().join(format!("puri341-grab-preview-{}", std::process::id()));
+    std::fs::create_dir(&directory).unwrap();
+    let source = directory.join("capture.png");
+    let pixels = image::RgbImage::from_pixel(320, 180, image::Rgb([45, 125, 205]));
+    pixels.save(&source).unwrap();
+    let mut photo: Photo = serde_json::from_value(json!({
+        "photo_id":"local-grab-a","path":source,"file_size":std::fs::metadata(&source).unwrap().len(),
+        "expected_file_id":file_identity(&std::fs::File::open(&source).unwrap()).unwrap(),
+        "shutter_unix_ms":unix_ms(),"attempt_id":0,"phase":"offer","offer_open":true,
+        "visible":false,"image":null,"preparations":[],"blocks":[],"failure_code":null,"first_block_drawn":false,
+    })).unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let manifest: PhotoManifest = serde_json::from_value(json!({
+        "protocol_version":2,"role":"photo","bridge_url":format!("ws://{}",listener.local_addr().unwrap()),
+        "session_token":"synthetic","instance_id":"11111111-1111-4111-8111-111111111111",
+        "generation":1,"backend":"offscreen","image":{"max_size":[320,180],"debug_controls":true}
+    })).unwrap();
+    let server = async {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+        let auth = socket.next().await.unwrap().unwrap();
+        assert_eq!(serde_json::from_str::<serde_json::Value>(auth.to_text().unwrap()).unwrap()["type"], "photo_auth");
+        socket.send(Message::Text(json!({"type":"photo_snapshot","revision":1,"photo":photo}).to_string().into())).await.unwrap();
+        socket
+    };
+    let (connection, mut socket) = tokio::join!(PhotoBridge::connect(&manifest), server);
+    let (mut bridge, first) = connection.unwrap();
+    let (mut runtime, _worker) = PhotoRuntime::new(&manifest).unwrap();
+    runtime.receive(first, &mut bridge).await.unwrap();
+    socket.next().await.unwrap().unwrap();
+    let clock = Instant::now();
+    let sample = |grip: bool, separation: f32| {
+        let right = [[1.0,0.0,0.0,0.3],[0.0,0.0,-1.0,-0.2],[0.0,1.0,0.0,-0.4]];
+        let right_handgrip = [[0.0,-1.0,0.0,0.11],[1.0,0.0,0.0,-0.04],[0.0,0.0,1.0,0.09]];
+        let left_handgrip = [[1.0,0.0,0.0,0.14],[0.0,0.0,-1.0,-0.07],[0.0,1.0,0.0,0.03]];
+        let wrist = compose(right, super::super::interaction::TemporaryInteractionConfig::default().effective_wrist_transform(right_handgrip));
+        let mut left = [[0.0,0.0,1.0,0.0],[0.0,1.0,0.0,0.0],[-1.0,0.0,0.0,0.0]];
+        let pivot = compose(left, left_handgrip);
+        let mut head = [[0.9800666,-0.19866933,0.0,0.0],[0.19866933,0.9800666,0.0,0.0],[0.0,0.0,1.0,0.0]];
+        for i in 0..3 {
+            left[i][3] = wrist[i][3] - pivot[i][3] + if i == 0 { separation } else { 0.0 };
+            head[i][3] = wrist[i][3] + if i == 2 { 0.5 } else { 0.0 };
+        }
+        crate::openvr::LegacyVrInput {
+            head,left,right,left_handgrip,right_handgrip,reference_epoch:7,left_index:3,right_index:8,grip,
+        }
+    };
+    for ms in [0,50,150,350] {
+        runtime.interaction_input(Some(sample(false,0.0)),clock+Duration::from_millis(ms),&mut bridge).await.unwrap();
+    }
+    assert!(runtime.source_request.is_none());
+    runtime.interaction_input(Some(sample(true,0.0)),clock+Duration::from_millis(360),&mut bridge).await.unwrap();
+    assert!(runtime.interaction.frame.grab);
+    assert!(runtime.source_request.is_some());
+    runtime.interaction_input(Some(sample(true,0.06)),clock+Duration::from_millis(380),&mut bridge).await.unwrap();
+    let PreparationCompletion::Source(completion) = runtime.preparation.next_result().await.unwrap() else { panic!("Real local decode required") };
+    runtime.preview_source(completion,&mut bridge).await.unwrap();
+    assert!((runtime.interaction.frame.photo.unwrap().alpha-0.5).abs()<0.00001);
+    assert_eq!(runtime.pull_sequence,0);
+    assert!(!runtime.preparation_started);
+    let first_directory = std::env::var_os("PURIPULY_PHOTO341_EVIDENCE").map(std::path::PathBuf::from).unwrap_or_else(||directory.clone());
+    std::fs::create_dir_all(&first_directory).unwrap();
+    let first_path = first_directory.join("compiled-first-grab-before-pull.png");
+    let compositor = runtime.compositor.as_mut().unwrap();
+    compositor.ready().await.unwrap();
+    compositor.save(&first_path).unwrap();
+    assert_eq!(image::open(first_path).unwrap().into_rgb8(),pixels);
+    runtime.preparation.start_source(runtime.source_request.clone().unwrap()).unwrap();
+    let PreparationCompletion::Source(late_release) = runtime.preparation.next_result().await.unwrap() else { panic!("Actual late release result required") };
+    runtime.interaction_input(Some(sample(false,0.06)),clock+Duration::from_millis(400),&mut bridge).await.unwrap();
+    runtime.interaction_input(Some(sample(false,0.0)),clock+Duration::from_millis(550),&mut bridge).await.unwrap();
+    assert!(runtime.interaction.frame.photo.is_none());
+    runtime.preview_source(late_release,&mut bridge).await.unwrap();
+    assert!(runtime.texture.is_some());
+    assert!(runtime.interaction.frame.photo.is_none());
+    assert_eq!(runtime.pull_sequence,0);
+    assert!(!runtime.preparation_started);
+    for (ms,grip,separation) in [(625,false,0.0),(650,false,0.0),(660,true,0.0),(680,true,0.06)] {
+        runtime.interaction_input(Some(sample(grip,separation)),clock+Duration::from_millis(ms),&mut bridge).await.unwrap();
+    }
+    let partial = runtime.interaction.frame;
+    assert!((partial.photo.unwrap().alpha-0.5).abs()<0.00001);
+    assert!((partial.photo.unwrap().width-0.1875).abs()<0.00001);
+    assert_eq!(runtime.pull_sequence,0);
+    assert!(tokio::time::timeout(Duration::from_millis(20),socket.next()).await.is_err());
+    assert!(!runtime.drawn_reported);
+    assert!(runtime.live_drawn_block.is_none());
+    assert!(!runtime.take_haptic_grant());
+    let evidence = std::env::var_os("PURIPULY_PHOTO341_EVIDENCE").map(std::path::PathBuf::from);
+    let image_path = evidence.clone().unwrap_or_else(||directory.clone()).join("compiled-grab-before-pull.png");
+    std::fs::create_dir_all(image_path.parent().unwrap()).unwrap();
+    let compositor = runtime.compositor.as_mut().unwrap();
+    compositor.ready().await.unwrap();
+    compositor.save(&image_path).unwrap();
+    let rendered = image::open(&image_path).unwrap().into_rgb8();
+    assert_eq!(rendered,pixels);
+    assert_eq!(compositor.original_uploads,1);
+    if let Some(evidence) = &evidence {
+        std::fs::write(evidence.join("compiled-grab-before-pull.json"),serde_json::to_vec_pretty(&json!({
+            "frame":partial,"attempt_id":runtime.state.photo().unwrap().attempt_id,
+            "authorized_pulls":runtime.pull_sequence,"preparation_started":runtime.preparation_started,
+            "input_boundary":"Synthetic nonidentity native poses through the production interaction_input function; not OpenVR/HMD input",
+        })).unwrap()).unwrap();
+    }
+    runtime.interaction_input(Some(sample(true,0.121)),clock+Duration::from_millis(700),&mut bridge).await.unwrap();
+    let pull = socket.next().await.unwrap().unwrap();
+    assert_eq!(serde_json::from_str::<serde_json::Value>(pull.to_text().unwrap()).unwrap()["type"],"photo_pull");
+    assert_eq!(runtime.interaction.frame.photo.unwrap().alpha,1.0);
+    assert!(tokio::time::timeout(Duration::from_millis(20),socket.next()).await.is_err());
+    photo.attempt_id=1;
+    photo.phase=PhotoPhase::Preparing;
+    photo.offer_open=false;
+    photo.visible=true;
+    runtime.receive(PhotoIncoming::Snapshot { revision:2,photo:Some(photo.clone()) },&mut bridge).await.unwrap();
+    socket.next().await.unwrap().unwrap();
+    runtime.interaction_input(Some(sample(true,0.0)),clock+Duration::from_millis(720),&mut bridge).await.unwrap();
+    assert_eq!(runtime.interaction.frame.photo.unwrap().width,0.375);
+    assert_eq!(runtime.pull_sequence,1);
+    assert_eq!(runtime.compositor.as_ref().unwrap().original_uploads,1);
+    runtime.interaction_input(None,clock+Duration::from_millis(740),&mut bridge).await.unwrap();
+    socket.next().await.unwrap().unwrap();
+    assert!(runtime.interaction.frame.photo.is_none());
+    runtime.preparation.start_source(runtime.source_request.clone().unwrap()).unwrap();
+    let PreparationCompletion::Source(late) = runtime.preparation.next_result().await.unwrap() else { panic!("Cached local result required") };
+    runtime.preview_source(late,&mut bridge).await.unwrap();
+    assert!(runtime.interaction.frame.photo.is_none());
+    assert_eq!(runtime.pull_sequence,1);
+    runtime.preparation.start_source(runtime.source_request.clone().unwrap()).unwrap();
+    let PreparationCompletion::Source(stale_a) = runtime.preparation.next_result().await.unwrap() else { panic!("Actual stale A result required") };
+    let second = directory.join("second.png");
+    image::RgbImage::from_pixel(320,180,image::Rgb([205,45,125])).save(&second).unwrap();
+    let mut replacement = photo.clone();
+    replacement.photo_id="local-grab-b".into();
+    replacement.path=second.to_string_lossy().into_owned();
+    replacement.expected_file_id=file_identity(&std::fs::File::open(&second).unwrap()).unwrap();
+    replacement.attempt_id=0;
+    replacement.phase=PhotoPhase::Offer;
+    replacement.offer_open=true;
+    replacement.visible=false;
+    runtime.receive(PhotoIncoming::Snapshot { revision:3,photo:Some(replacement.clone()) },&mut bridge).await.unwrap();
+    socket.next().await.unwrap().unwrap();
+    runtime.preview_source(stale_a,&mut bridge).await.unwrap();
+    assert!(runtime.texture.is_none());
+    assert_eq!(runtime.compositor.as_ref().unwrap().metadata()["width"],serde_json::Value::Null);
+    runtime.enqueue_preview_source();
+    let PreparationCompletion::Source(stale_b) = runtime.preparation.next_result().await.unwrap() else { panic!("Actual B decode required") };
+    replacement.phase=PhotoPhase::Expired;
+    replacement.offer_open=false;
+    runtime.receive(PhotoIncoming::Snapshot { revision:4,photo:Some(replacement) },&mut bridge).await.unwrap();
+    socket.next().await.unwrap().unwrap();
+    runtime.preview_source(stale_b,&mut bridge).await.unwrap();
+    assert!(runtime.texture.is_none());
+    assert!(runtime.interaction.frame.photo.is_none());
+    std::fs::write(&source,b"incomplete").unwrap();
+    photo.photo_id="local-grab-c".into();
+    photo.attempt_id=0;
+    photo.phase=PhotoPhase::Offer;
+    photo.offer_open=true;
+    photo.visible=false;
+    photo.shutter_unix_ms=unix_ms();
+    runtime.receive(PhotoIncoming::Snapshot { revision:5,photo:Some(photo) },&mut bridge).await.unwrap();
+    socket.next().await.unwrap().unwrap();
+    runtime.enqueue_preview_source();
+    let PreparationCompletion::Source(failed) = runtime.preparation.next_result().await.unwrap() else { panic!("Actual incomplete-source failure required") };
+    assert_eq!(failed.result.as_ref().err().copied(),Some("source_incomplete"));
+    runtime.preview_source(failed,&mut bridge).await.unwrap();
+    assert!(runtime.source_request.is_none());
+    assert!(runtime.texture.is_none());
+    assert!(!runtime.preparation_started);
+    assert_eq!(runtime.pull_sequence,1);
+    assert!(tokio::time::timeout(Duration::from_millis(20),socket.next()).await.is_err());
+    pixels.save(&source).unwrap();
+    runtime.enqueue_preview_source();
+    let PreparationCompletion::Source(recovered) = runtime.preparation.next_result().await.unwrap() else { panic!("Explicit source recovery required") };
+    runtime.preview_source(recovered,&mut bridge).await.unwrap();
+    assert!(runtime.texture.is_some());
+    assert!(runtime.interaction.frame.photo.is_none());
+    assert_eq!(runtime.pull_sequence,1);
+    assert!(!runtime.preparation_started);
+    runtime.preparation.shutdown().await;
+    drop(runtime);
+    std::fs::remove_dir_all(directory).unwrap();
 }
