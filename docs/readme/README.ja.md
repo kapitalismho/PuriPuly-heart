@@ -83,9 +83,9 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 ---
 
 ## 翻訳比較
-![音声認識と翻訳を組み合わせた全体パイプラインの文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はベンチマーク時のPuriPuly構成：Gemini Transcribe → GPT-6 Luna (0.676)、Soniox STT → GPT-6 Luna (0.942)、Qwen ASR 1.7B → Gemma 26B (1.024)、Gemini Transcribe → Gemma 26B (1.084)、Soniox STT → Gemma 26B (1.293)、Qwen ASR 0.6B → Gemma 26B (2.374)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (2.108)、Gemini 3.5 Live Translate (3.754)、Soniox Translate (4.989)。評価モデル：Gemini 3.7 Flash。](../images/performance/1.png)
+![文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：GPT 6 Luna (0.189)、DeepSeek V4.1 Flash (0.452)、Gemma 4 26B A4B (0.639)、Index-Translate 35B (1.090)、Gemma 4 E4B QAT Q4 (1.927)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (1.168)、Papago (2.784)、Gemini 3.5 Translate (2.969)、Soniox Translate (3.501)、DeepL (3.938)、Google Translation (4.477)。Qwen 3.8、Gemini 3.5、Sonioxは文字誤り率（CER）が5%以下の結果のみを選別。評価モデル：GPT-6 Astra (high reasoning effort)。](../images/performance/1.png)
 
-![文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：GPT-6 Luna (0.130)、Gemma 4 26B A4B (0.387)、DeepSeek-V4 Flash 0731 (0.571)、Gemma 4 E4B QAT Q4 (1.577)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (1.392)、Papago (2.699)、Gemini 3.5 Translate (2.991)、Soniox Translate (3.473)、DeepL (3.914)、Google Translation (5.731)。Qwen 3.8、Gemini 3.5、Sonioxは文字誤り率（CER）が5%以下の結果のみを選別。評価モデル：Gemini 3.7 Flash。](../images/performance/2.png)
+![音声認識と翻訳を組み合わせた全体パイプラインの文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はベンチマーク時のPuriPuly構成：Gemini Transcribe → Luna (0.608)、Gemini Transcribe → Gemma 26B (1.083)、Soniox STT → Gemma 26B (1.317)、Qwen ASR 1.7B → Gemma 26B (1.320)、Fun ASR Nano MLT → Gemma 26B (1.494)、Gemini Transcribe → Index (1.567)、Fun ASR Nano MLT → Index (2.154)。オレンジの棒は外部の比較対象：Qwen 3.8 Translate (1.858)、Gemini 3.5 Live Translate (3.526)、Soniox Translate (4.665)。評価モデル：GPT-6 Astra (high reasoning effort)。](../images/performance/2.png)
 
 - 青い棒はベンチマーク時のPuriPuly構成です。
 - マイクロソフトのGemba MQMフレームワークを使って実験しました。
