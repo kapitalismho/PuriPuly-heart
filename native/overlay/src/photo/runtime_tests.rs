@@ -73,9 +73,18 @@ async fn windows_graphics_photo341_icons_and_held_preview_readback() {
     let manifest: PhotoManifest = serde_json::from_value(json!({
         "protocol_version":1,"role":"photo","bridge_url":"ws://127.0.0.1:12345",
         "session_token":"synthetic","instance_id":"11111111-1111-4111-8111-111111111111",
-        "generation":1,"backend":"offscreen"
+        "generation":1,"backend":"offscreen",
+        "image":{"debug_controls":true},
+        "interaction":{"grab_m":0.12,"debug_grab_volume":true,"debug_case_label":"Radius 12 cm\nPosition B fixed"}
     }))
     .unwrap();
+    let mut default_manifest = manifest.clone();
+    default_manifest.interaction = Default::default();
+    default_manifest.image.debug_controls = false;
+    let (default_runtime, _) = PhotoRuntime::new(&default_manifest).unwrap();
+    assert!(default_runtime.grab_ring.is_none());
+    assert!(default_runtime.case_labels.is_none());
+    drop(default_runtime);
     let (mut runtime, _worker) = PhotoRuntime::new(&manifest).unwrap();
     let supplied = std::env::var_os("PURIPULY_PHOTO341_EVIDENCE");
     let directory = supplied
@@ -100,6 +109,45 @@ async fn windows_graphics_photo341_icons_and_held_preview_readback() {
     }
     assert_ne!(icons[0], icons[1]);
     assert_ne!(icons[0], icons[2]);
+    let ring_path = directory.join("grab-ring.png");
+    compositor.save_texture(runtime.grab_ring.as_ref().unwrap(), 256, 256, &ring_path).unwrap();
+    let ring = image::open(ring_path).unwrap().into_rgba8();
+    assert_eq!(ring.get_pixel(128, 128)[3], 0);
+    assert_eq!(ring.get_pixel(0, 0)[3], 0);
+    let mut weighted_radius = 0.0_f64;
+    let mut weight = 0.0_f64;
+    let mut ink = 0;
+    for (x, y, pixel) in ring.enumerate_pixels() {
+        assert!(pixel.0[..3].iter().all(|channel| *channel <= pixel[3]));
+        let radius = ((x as f64 + 0.5 - 128.0).powi(2) + (y as f64 + 0.5 - 128.0).powi(2)).sqrt();
+        if pixel[3] > 0 {
+            assert!((radius - 112.0).abs() < 1.5);
+            assert!(pixel[3] <= 150);
+            ink += 1;
+            weighted_radius += radius * f64::from(pixel[3]);
+            weight += f64::from(pixel[3]);
+        }
+    }
+    assert!((1200..2400).contains(&ink));
+    assert!((weighted_radius / weight - 112.0).abs() < 0.02);
+    let labels = runtime.case_labels.as_ref().unwrap();
+    let mut readbacks = Vec::new();
+    for (index, status) in ["case", "draining"].into_iter().enumerate() {
+        let path = directory.join(format!("label-{status}.png"));
+        compositor.save_texture(&labels[index], 1024, 256, &path).unwrap();
+        let label = image::open(path).unwrap().into_rgba8();
+        assert_eq!(label.get_pixel(0, 0)[3], 0);
+        assert!(label.enumerate_pixels().any(|(_, y, pixel)| y < 150 && pixel[3] > 200));
+        assert!(label.pixels().all(|pixel| pixel.0[..3].iter().all(|channel| *channel <= pixel[3])));
+        assert_eq!(label.enumerate_pixels().any(|(_, y, pixel)| y > 160 && pixel[3] > 200), index == 1);
+        readbacks.push(label);
+    }
+    assert_ne!(readbacks[0], readbacks[1]);
+    assert_eq!(
+        image::imageops::crop_imm(&readbacks[1], 0, 0, 1024, 150).to_image(),
+        image::imageops::crop_imm(&readbacks[0], 0, 0, 1024, 150).to_image(),
+        "Draining must retain the complete case and fixed-factor pixels",
+    );
     let (working, region) = synthetic_drawable();
     compositor.set_original(working.clone()).unwrap();
     let now = Instant::now();
@@ -138,6 +186,11 @@ async fn windows_graphics_photo341_icons_and_held_preview_readback() {
     let original = image::open(directory.join("held-original.png")).unwrap();
     let translated = image::open(directory.join("held-translated.png")).unwrap();
     assert_ne!(original, translated);
+    let _late_label = compositor.case_label_texture("RADIUS 2/3: 12 cm\nPosition fixed: B", true).unwrap();
+    compositor.render(now + Duration::from_millis(150), false).unwrap();
+    compositor.ready().await.unwrap();
+    compositor.save(&directory.join("held-after-label.png")).unwrap();
+    assert_eq!(image::open(directory.join("held-after-label.png")).unwrap(), translated);
     if supplied.is_none() {
         std::fs::remove_dir_all(directory).unwrap();
     }
@@ -443,6 +496,8 @@ impl PhotoRuntime {
         runtime.backend = Backend::OpenVr(PhotoOpenVrSurfaces {
             icon: Some(icon),
             photo: Some(photo_surface),
+            grab_volume: [None, None, None],
+            case_label: None,
             _session: session,
         });
         runtime.receive(first, &mut bridge).await.unwrap();
@@ -640,5 +695,77 @@ impl PhotoRuntime {
         assert!(runtime.interaction.frame.photo.is_none());
         no_report(&mut socket).await;
         bridge.close().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn quiescent_bridge_ack_waits_for_interaction_and_release_or_loss() {
+    use super::super::interaction::IDENTITY;
+    use futures_util::{SinkExt, StreamExt};
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::{accept_async, tungstenite::Message};
+    for (phase, loss) in [(0, false), (1, false), (2, false), (3, false), (2, true)] {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let manifest: PhotoManifest = serde_json::from_value(json!({
+            "protocol_version":1, "role":"photo", "bridge_url":format!("ws://{}",listener.local_addr().unwrap()),
+            "session_token":"synthetic", "instance_id":"11111111-1111-4111-8111-111111111111",
+            "generation":1, "backend":"probe", "image":{"debug_controls":true},
+            "interaction":{"wrist_transform":IDENTITY,"debug_case_label":"Position B\nGrab 8 cm fixed"}
+        })).unwrap();
+        let current = json!({
+            "photo_id":"synthetic", "path":"synthetic.png", "file_size":1, "shutter_unix_ms":unix_ms(),
+            "attempt_id":1, "phase":"requesting", "offer_open":false, "visible":true, "image":null,
+            "preparations":[], "blocks":[], "failure_code":null, "first_block_drawn":false
+        });
+        let server = async {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut socket = accept_async(stream).await.unwrap();
+            let auth = socket.next().await.unwrap().unwrap();
+            assert_eq!(serde_json::from_str::<serde_json::Value>(auth.to_text().unwrap()).unwrap()["type"], "photo_auth");
+            socket.send(Message::Text(json!({"type":"photo_snapshot","revision":1,"photo":current}).to_string().into())).await.unwrap();
+            socket
+        };
+        let (connection, mut socket) = tokio::join!(PhotoBridge::connect(&manifest), server);
+        let (mut bridge, first) = connection.unwrap();
+        let (mut runtime, _worker) = PhotoRuntime::new(&manifest).unwrap();
+        runtime.receive(first, &mut bridge).await.unwrap();
+        let receipt = socket.next().await.unwrap().unwrap();
+        assert_eq!(serde_json::from_str::<serde_json::Value>(receipt.to_text().unwrap()).unwrap()["type"], "photo_state_received");
+        let clock = Instant::now();
+        let step = |runtime: &mut PhotoRuntime, ms, grip, separation| {
+            let mut head = IDENTITY;
+            head[2][3] = 0.5;
+            let mut left = IDENTITY;
+            left[0][3] = separation;
+            runtime.interaction.step(runtime.state.photo(), Some(crate::openvr::LegacyVrInput {
+                head, left, right: IDENTITY, left_handgrip: IDENTITY, right_handgrip: IDENTITY,
+                reference_epoch:1, left_index:1, right_index:2, grip,
+            }), clock + Duration::from_millis(ms))
+        };
+        for ms in [0, 50, 150, 350] { step(&mut runtime, ms, false, 0.0); }
+        assert!(step(&mut runtime, 360, true, 0.0).grab);
+        if phase >= 1 { assert!(step(&mut runtime, 380, true, 0.12).pull); }
+        if phase >= 2 { assert!(step(&mut runtime, 530, true, 0.12).photo.is_some()); }
+        if phase >= 3 { assert!(step(&mut runtime, 550, false, 0.12).photo.is_some()); }
+        socket.send(Message::Text(json!({"type":"photo_debug_quiesce","request_id":"bounded-request"}).to_string().into())).await.unwrap();
+        let incoming = bridge.next().await.unwrap();
+        runtime.receive(incoming, &mut bridge).await.unwrap();
+        runtime.ack_quiescent(&mut bridge).await.unwrap();
+        assert!(tokio::time::timeout(Duration::from_millis(20), socket.next()).await.is_err());
+        if loss {
+            runtime.interaction.step(runtime.state.photo(), None, clock + Duration::from_millis(600));
+        } else {
+            step(&mut runtime, 600, false, 0.12);
+            runtime.ack_quiescent(&mut bridge).await.unwrap();
+            assert!(tokio::time::timeout(Duration::from_millis(20), socket.next()).await.is_err());
+            step(&mut runtime, 825, false, 0.0);
+        }
+        runtime.ack_quiescent(&mut bridge).await.unwrap();
+        let ack = socket.next().await.unwrap().unwrap();
+        assert_eq!(serde_json::from_str::<serde_json::Value>(ack.to_text().unwrap()).unwrap(),
+            json!({"type":"photo_debug_quiescent","request_id":"bounded-request"}));
+        assert!(!step(&mut runtime, 840, true, 0.0).grab);
+        runtime.ack_quiescent(&mut bridge).await.unwrap();
+        assert!(tokio::time::timeout(Duration::from_millis(20), socket.next()).await.is_err());
     }
 }

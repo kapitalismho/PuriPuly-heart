@@ -129,6 +129,11 @@ impl PhotoManifest {
         }
         self.image.validate()?;
         self.interaction.validate()?;
+        if !self.image.debug_controls
+            && (self.interaction.debug_grab_volume || self.interaction.debug_case_label.is_some())
+        {
+            return Err(PhotoError::Manifest);
+        }
         Ok(())
     }
 }

@@ -33,19 +33,43 @@ pub fn surface_identity(manifest: &PhotoManifest, surface: &str) -> String {
 pub struct PhotoOpenVrSurfaces {
     icon: Option<OpenVrOverlay>,
     photo: Option<OpenVrOverlay>,
+    grab_volume: [Option<OpenVrOverlay>; 3],
+    case_label: Option<OpenVrOverlay>,
     _session: OpenVrSession,
 }
 
 impl PhotoOpenVrSurfaces {
     pub fn new(manifest: &PhotoManifest) -> Result<Self, PhotoError> {
         let session = OpenVrSession::new().map_err(|_| PhotoError::OpenVr)?;
+        Self::in_session(manifest, session)
+    }
+
+    pub(crate) fn in_session(manifest: &PhotoManifest, session: OpenVrSession) -> Result<Self, PhotoError> {
         let icon = OpenVrOverlay::in_session(&session, &surface_identity(manifest, "icon"))
             .map_err(|_| PhotoError::OpenVr)?;
         let photo = OpenVrOverlay::in_session(&session, &surface_identity(manifest, "photo"))
             .map_err(|_| PhotoError::OpenVr)?;
+        let grab_volume = ["grab-volume.xy", "grab-volume.xz", "grab-volume.yz"].map(|name| {
+            if manifest.interaction.debug_grab_volume {
+                OpenVrOverlay::in_session(&session, &surface_identity(manifest, name))
+                    .map(Some).map_err(|_| PhotoError::OpenVr)
+            } else {
+                Ok(None)
+            }
+        });
+        let [xy, xz, yz] = grab_volume;
+        let grab_volume = [xy?, xz?, yz?];
+        let case_label = if manifest.interaction.debug_case_label.is_some() {
+            Some(OpenVrOverlay::in_session(&session, &surface_identity(manifest, "case-label"))
+                .map_err(|_| PhotoError::OpenVr)?)
+        } else {
+            None
+        };
         Ok(Self {
             icon: Some(icon),
             photo: Some(photo),
+            grab_volume,
+            case_label,
             _session: session,
         })
     }
@@ -63,8 +87,20 @@ impl PhotoOpenVrSurfaces {
         self.photo.as_mut()
     }
 
+    fn surfaces(&mut self) -> impl Iterator<Item = &mut OpenVrOverlay> {
+        [&mut self.icon, &mut self.photo].into_iter()
+            .chain(self.grab_volume.iter_mut()).chain([&mut self.case_label]).flatten()
+    }
+
+    fn close_diagnostics(&mut self) {
+        for surface in &mut self.grab_volume {
+            surface.take();
+        }
+        self.case_label.take();
+    }
+
     fn poll(&mut self) -> Result<(), PhotoError> {
-        for surface in [&mut self.icon, &mut self.photo].into_iter().flatten() {
+        for surface in self.surfaces() {
             if surface
                 .poll_runtime_events(32)
                 .iter()
@@ -106,6 +142,14 @@ pub struct PhotoRuntime {
     #[cfg(windows)]
     icons: Option<[PhotoTexture; 3]>,
     icon_state: Option<usize>,
+    #[cfg(windows)]
+    grab_ring: Option<PhotoTexture>,
+    #[cfg(windows)]
+    case_labels: Option<[PhotoTexture; 2]>,
+    diagnostic_submitted: bool,
+    label_state: Option<usize>,
+    quiesce_requests: HashSet<String>,
+    quiesce_request: Option<(String, bool)>,
 }
 
 impl PhotoRuntime {
@@ -137,6 +181,16 @@ impl PhotoRuntime {
         } else {
             None
         };
+        #[cfg(windows)]
+        let grab_ring = compositor.as_ref().filter(|_| manifest.interaction.debug_grab_volume)
+            .map(|compositor| compositor.icon_texture(&icon::grab_ring_pixels(), super::interaction::GRAB_RING_SIZE))
+            .transpose()?;
+        #[cfg(windows)]
+        let case_labels = if let (Some(compositor), Some(label)) = (&compositor, &manifest.interaction.debug_case_label) {
+            Some([compositor.case_label_texture(label, false)?, compositor.case_label_texture(label, true)?])
+        } else {
+            None
+        };
         let (images, worker) = PhotoImageBoundary::channel();
         Ok((
             Self {
@@ -162,6 +216,14 @@ impl PhotoRuntime {
                 #[cfg(windows)]
                 icons,
                 icon_state: None,
+                #[cfg(windows)]
+                grab_ring,
+                #[cfg(windows)]
+                case_labels,
+                diagnostic_submitted: false,
+                label_state: None,
+                quiesce_requests: HashSet::new(),
+                quiesce_request: None,
             },
             worker,
         ))
@@ -219,6 +281,7 @@ impl PhotoRuntime {
                         if let Backend::OpenVr(surfaces) = &mut self.backend { surfaces.poll()?; }
                         self.interaction_tick(&mut bridge).await?;
                         self.render_frame(&mut bridge).await?;
+                        self.ack_quiescent(&mut bridge).await?;
                     }
                 }
             }
@@ -237,11 +300,12 @@ impl PhotoRuntime {
         if let Some(worker) = worker {
             worker.shutdown().await;
         }
-        self.texture = None;
         if let Backend::OpenVr(surfaces) = &mut self.backend {
+            surfaces.close_diagnostics();
             surfaces.close_icon();
             surfaces.close_photo();
         }
+        self.texture = None;
         outcome?;
         drop(self);
         bridge
@@ -295,15 +359,15 @@ impl PhotoRuntime {
                 }
                 self.interaction
                     .snapshot(self.state.photo(), Instant::now(), unix_ms());
+                if !self.interaction.quiescing() {
+                    self.quiesce_request = None;
+                }
                 let snapshot = self.state.snapshot().ok_or(PhotoError::Protocol)?;
                 self.images.publish(snapshot);
                 let photo = snapshot.photo.as_deref();
                 if let Backend::OpenVr(surfaces) = &mut self.backend {
                     if current.is_none() {
-                        for surface in [&mut surfaces.icon, &mut surfaces.photo]
-                            .into_iter()
-                            .flatten()
-                        {
+                        for surface in surfaces.surfaces() {
                             surface
                                 .set_overlay_visible(false)
                                 .map_err(|_| PhotoError::OpenVr)?;
@@ -364,8 +428,7 @@ impl PhotoRuntime {
                 if event_id.is_empty() || event_id.len() > 256 {
                     return Err(PhotoError::Protocol);
                 }
-                if self
-                    .state
+                if !self.interaction.quiescing() && self.state
                     .photo()
                     .is_some_and(|photo| photo.photo_id == photo_id && photo.can_pull())
                     && self.pulls.insert(event_id.clone())
@@ -436,6 +499,24 @@ impl PhotoRuntime {
                         compositor.render(Instant::now(), false)?;
                         compositor.ready().await?;
                         compositor.save(&directory.join(format!("{label}.png")))?;
+                        if let Some(texture) = &self.grab_ring {
+                            let size = super::interaction::GRAB_RING_SIZE;
+                            compositor.save_texture(texture, size, size, &directory.join(format!("{label}-grab-ring.png")))?;
+                        }
+                        if let Some(textures) = &self.case_labels {
+                            let [width, height] = super::interaction::CASE_LABEL_SIZE;
+                            for (texture, status) in textures.iter().zip(["case", "draining"]) {
+                                compositor.save_texture(texture, width, height, &directory.join(format!("{label}-{status}.png")))?;
+                            }
+                        }
+                        std::fs::write(
+                            directory.join(format!("{label}-interaction.json")),
+                            serde_json::to_vec_pretty(&json!({
+                                "interaction": self.interaction.config,
+                                "frame": self.interaction.frame,
+                                "quiescing": self.interaction.quiescing(),
+                            })).map_err(|_| PhotoError::Image)?,
+                        ).map_err(|_| PhotoError::Image)?;
                         std::fs::write(
                             directory.join(format!("{label}.json")),
                             serde_json::to_vec_pretty(&compositor.metadata())
@@ -445,9 +526,35 @@ impl PhotoRuntime {
                     }
                 }
             }
+            PhotoIncoming::DebugQuiesce { request_id } => {
+                if !self.debug_controls
+                    || self.interaction.config.debug_case_label.is_none()
+                    || request_id.is_empty()
+                    || request_id.len() > 128
+                    || !request_id.is_ascii()
+                {
+                    return Err(PhotoError::Protocol);
+                }
+                if self.quiesce_requests.insert(request_id.clone()) {
+                    self.interaction.quiesce();
+                    self.quiesce_request = Some((request_id, false));
+                }
+            }
             PhotoIncoming::Shutdown => return Ok(false),
         }
         Ok(true)
+    }
+
+    async fn ack_quiescent(&mut self, bridge: &mut PhotoBridge) -> Result<(), PhotoError> {
+        if self.interaction.quiescent() {
+            if let Some((request_id, acknowledged)) = &mut self.quiesce_request {
+                if !*acknowledged {
+                    bridge.send(json!({"type":"photo_debug_quiescent", "request_id":request_id})).await?;
+                    *acknowledged = true;
+                }
+            }
+        }
+        Ok(())
     }
     fn reset_feedback(&mut self, recovering: bool) {
         self.haptic_granted = false;
@@ -766,6 +873,36 @@ impl PhotoRuntime {
                 } else {
                     icon.set_overlay_visible(false)
                         .map_err(|_| PhotoError::OpenVr)?;
+                }
+                if let Some(placements) = frame.grab_volume.filter(|_| active) {
+                    for (surface, placement) in surfaces.grab_volume.iter_mut().zip(placements) {
+                        let surface = surface.as_mut().ok_or(PhotoError::OpenVr)?;
+                        if !self.diagnostic_submitted {
+                            compositor.submit_texture(surface, self.grab_ring.as_ref().ok_or(PhotoError::Graphics)?)?;
+                        }
+                        surface.set_tracked_presentation(placement.device, placement.transform, placement.width, placement.alpha)
+                            .map_err(|_| PhotoError::OpenVr)?;
+                        surface.set_overlay_visible(true).map_err(|_| PhotoError::OpenVr)?;
+                    }
+                    self.diagnostic_submitted = true;
+                } else {
+                    for surface in surfaces.grab_volume.iter_mut().flatten() {
+                        surface.set_overlay_visible(false).map_err(|_| PhotoError::OpenVr)?;
+                    }
+                }
+                if let Some(surface) = &mut surfaces.case_label {
+                    if let Some(placement) = frame.case_label.filter(|_| active) {
+                        let state = usize::from(self.interaction.quiescing());
+                        if self.label_state != Some(state) {
+                            compositor.submit_texture(surface, &self.case_labels.as_ref().ok_or(PhotoError::Graphics)?[state])?;
+                            self.label_state = Some(state);
+                        }
+                        surface.set_tracked_presentation(placement.device, placement.transform, placement.width, placement.alpha)
+                            .map_err(|_| PhotoError::OpenVr)?;
+                        surface.set_overlay_visible(true).map_err(|_| PhotoError::OpenVr)?;
+                    } else {
+                        surface.set_overlay_visible(false).map_err(|_| PhotoError::OpenVr)?;
+                    }
                 }
                 let surface = surfaces.photo().ok_or(PhotoError::OpenVr)?;
                 if let (Some(placement), Some(texture)) =

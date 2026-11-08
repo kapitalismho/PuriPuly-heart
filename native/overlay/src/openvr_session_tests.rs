@@ -7,6 +7,7 @@ struct Calls {
     destroyed: Vec<u64>,
     shutdowns: usize,
     fail_create: bool,
+    fail_create_at: Option<usize>,
     transforms: Vec<(u32, [[f32; 4]; 3])>,
     widths: Vec<f32>,
     surface_widths: Vec<(u64, f32)>,
@@ -27,7 +28,7 @@ unsafe extern "C" fn create(
 ) -> openvr_sys::EVROverlayError {
     CALLS.with(|calls| {
         let mut calls = calls.borrow_mut();
-        if calls.fail_create {
+        if calls.fail_create || calls.fail_create_at == Some(calls.keys.len() + 1) {
             return openvr_sys::EVROverlayError_VROverlayError_UnknownOverlay;
         }
         calls
@@ -206,6 +207,46 @@ fn failed_surface_creation_does_not_shutdown_other_live_surface() {
         assert_eq!(calls.destroyed, [1]);
         assert_eq!(calls.shutdowns, 1);
     });
+}
+
+#[test]
+fn diagnostic_surfaces_share_session_and_partial_creation_cleans_every_owned_handle() {
+    use crate::photo::manifest::PhotoManifest;
+    use crate::photo::runtime::PhotoOpenVrSurfaces;
+    let manifest: PhotoManifest = serde_json::from_value(serde_json::json!({
+        "protocol_version":1, "role":"photo", "bridge_url":"ws://127.0.0.1:12345",
+        "session_token":"synthetic", "instance_id":"11111111-1111-4111-8111-111111111111",
+        "generation":1, "backend":"openvr", "image":{"debug_controls":true},
+        "interaction":{"debug_grab_volume":true,"debug_case_label":"Radius 12 cm\nPosition B fixed"}
+    })).unwrap();
+    for fail_at in [None, Some(4), Some(6)] {
+        CALLS.with(|calls| *calls.borrow_mut() = Calls { fail_create_at: fail_at, ..Default::default() });
+        let mut api = api();
+        let session = session(&mut api);
+        let surfaces = PhotoOpenVrSurfaces::in_session(&manifest, session);
+        if fail_at.is_some() {
+            assert!(surfaces.is_err());
+        } else {
+            let mut surfaces = surfaces.unwrap();
+            surfaces.close_icon();
+            surfaces.close_photo();
+            CALLS.with(|calls| {
+                let calls = calls.borrow();
+                assert_eq!(calls.shutdowns, 0);
+                assert_eq!(calls.keys.len(), 6);
+                assert_eq!(calls.keys.iter().collect::<std::collections::HashSet<_>>().len(), 6);
+                assert_eq!(calls.destroyed, [1, 2]);
+            });
+            drop(surfaces);
+        }
+        CALLS.with(|calls| {
+            let calls = calls.borrow();
+            let mut destroyed = calls.destroyed.clone();
+            destroyed.sort_unstable();
+            assert_eq!(destroyed, (1..=calls.keys.len() as u64).collect::<Vec<_>>());
+            assert_eq!(calls.shutdowns, 1);
+        });
+    }
 }
 
 #[derive(Default)]
@@ -648,4 +689,24 @@ async fn windows_graphics_controlled_held_photo_runtime_reports_first_draw_once_
             )
         });
     }
+}
+
+#[test]
+fn default_photo_session_creates_only_icon_and_photo_surfaces() {
+    CALLS.with(|calls| *calls.borrow_mut() = Calls::default());
+    let mut api = api();
+    let session = session(&mut api);
+    let manifest: crate::photo::manifest::PhotoManifest = serde_json::from_value(serde_json::json!({
+        "protocol_version":1, "role":"photo", "bridge_url":"ws://127.0.0.1:12345",
+        "session_token":"synthetic", "instance_id":"11111111-1111-4111-8111-111111111111",
+        "generation":1, "backend":"openvr"
+    })).unwrap();
+    let surfaces = crate::photo::runtime::PhotoOpenVrSurfaces::in_session(&manifest, session).unwrap();
+    CALLS.with(|calls| assert_eq!(calls.borrow().keys.len(), 2));
+    drop(surfaces);
+    CALLS.with(|calls| {
+        let calls = calls.borrow();
+        assert_eq!(calls.destroyed.len(), 2);
+        assert_eq!(calls.shutdowns, 1);
+    });
 }

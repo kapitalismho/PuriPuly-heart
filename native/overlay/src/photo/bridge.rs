@@ -27,6 +27,8 @@ pub enum PhotoIncoming {
     DebugOriginal { photo_id: String, enabled: bool },
     #[serde(rename = "photo_debug_export")]
     DebugExport { photo_id: String, label: String },
+    #[serde(rename = "photo_debug_quiesce")]
+    DebugQuiesce { request_id: String },
     #[serde(rename = "photo_haptic")]
     Haptic {
         photo_id: String,

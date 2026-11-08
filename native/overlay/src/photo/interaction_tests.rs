@@ -423,6 +423,8 @@ fn loss_role_change_replacement_removal_and_expiry_cancel_every_active_placement
             "deadline",
         ] {
             let mut f = Fixture::new(if placement == "held" { 1 } else { 0 });
+            f.interaction.config.debug_grab_volume = true;
+            f.interaction.config.debug_case_label = Some("Position B\nGrab 8 cm fixed".into());
             f.look();
             assert!(f.step(360, Some(input(true, 0.0))).grab);
             match placement {
@@ -469,6 +471,8 @@ fn loss_role_change_replacement_removal_and_expiry_cancel_every_active_placement
             );
             assert!(frame.icon.is_none(), "{placement}/{interruption}");
             assert!(frame.photo.is_none(), "{placement}/{interruption}");
+            assert!(frame.grab_volume.is_none(), "{placement}/{interruption}");
+            assert!(frame.case_label.is_none(), "{placement}/{interruption}");
             assert!(!frame.grab, "{placement}/{interruption}");
             assert!(!frame.pull, "{placement}/{interruption}");
             if matches!(interruption, "loss" | "roles" | "component") {
@@ -718,4 +722,211 @@ fn referenced_retained_photo_stays_raw_left_relative_with_unchanged_animation() 
     assert!((half.alpha - 0.5).abs() < 0.00001);
     assert!((half.width - 0.2025).abs() < 0.00001);
     assert!(f.step(690, Some(sample)).photo.is_none());
+}
+
+#[test]
+fn separated_cases_use_actual_component_points_and_spherical_boundaries() {
+    let a = [0.0, 0.04373328, 0.01863404];
+    let b = [0.0, 0.063, 0.024];
+    let c = [0.0, 0.08226672, 0.02936596];
+    let mut evidence = Vec::new();
+    for (point, radius, volume, label) in [
+        (a, 0.08, false, "Position A\nGrab 8 cm fixed"),
+        (b, 0.08, false, "Position B\nGrab 8 cm fixed"),
+        (c, 0.08, false, "Position C\nGrab 8 cm fixed"),
+        (b, 0.08, true, "Radius 8 cm\nPosition B fixed"),
+        (b, 0.12, true, "Radius 12 cm\nPosition B fixed"),
+        (b, 0.15, true, "Radius 15 cm\nPosition B fixed"),
+    ] {
+        for direction in [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.57735026; 3]] {
+            for (offset, admitted) in [(-0.00001, true), (0.00001, false)] {
+                let mut f = Fixture::new(0);
+                f.interaction.config.wrist_transform = None;
+                f.interaction.config.wrist_handgrip_point_m = Some(point);
+                f.interaction.config.grab_m = radius;
+                f.interaction.config.debug_grab_volume = volume;
+                f.interaction.config.debug_case_label = Some(label.into());
+                let mut sample = referenced_input(false, 0.0);
+                let local = f.interaction.config.effective_wrist_transform(sample.right_handgrip);
+                let component_point = compose(sample.right_handgrip, [
+                    [1.0, 0.0, 0.0, point[0]], [0.0, 1.0, 0.0, point[1]], [0.0, 0.0, 1.0, point[2]],
+                ]);
+                for i in 0..3 {
+                    assert!((local[i][3] - component_point[i][3]).abs() < 0.000001);
+                }
+                assert_eq!(column(local, 2), [0.0, 1.0, 0.0]);
+                let center = compose(sample.right, local);
+                let left_point = compose(sample.left, sample.left_handgrip);
+                for i in 0..3 {
+                    sample.head[i][3] = center[i][3] + if i == 2 { 0.5 } else { 0.0 };
+                    sample.left[i][3] += center[i][3] + direction[i] * (radius + offset) - left_point[i][3];
+                }
+                for ms in [0, 50, 150, 350] {
+                    f.step(ms, Some(sample));
+                }
+                let ready = f.interaction.frame;
+                assert_eq!(ready.glow, admitted);
+                assert_eq!(ready.grab_volume.is_some(), volume);
+                assert_eq!(ready.case_label.unwrap().device, sample.right_index);
+                let rings = grab_ring_transforms(local, sample.right, sample.head);
+                let normals = rings.map(|ring| column(compose(sample.right, ring), 2));
+                for i in 0..3 {
+                    for j in 0..3 {
+                        assert!((dot(normals[i], normals[j]) - if i == j { 1.0 } else { 0.0 }).abs() < 0.00001);
+                    }
+                    let world = compose(sample.right, rings[i]);
+                    assert!(distance(world, center) < 0.000001);
+                    assert!(dot(normals[i], subtract(column(sample.head, 3), column(center, 3))) >= -0.000001);
+                    for angle in [0.0_f32, 0.7, 1.9, 3.8] {
+                        let mut p = IDENTITY;
+                        p[0][3] = radius * angle.cos();
+                        p[1][3] = radius * angle.sin();
+                        assert!((distance(compose(world, p), center) - radius).abs() < 0.000001);
+                    }
+                }
+                assert!((grab_ring_width(radius) * GRAB_RING_RADIUS_PX / GRAB_RING_SIZE as f32 - radius).abs() < 0.000001);
+                if admitted && direction == [1.0, 0.0, 0.0] {
+                    evidence.push(json!({
+                        "config": f.interaction.config, "input_head": sample.head,
+                        "raw_right": sample.right, "right_handgrip": sample.right_handgrip,
+                        "raw_left": sample.left, "left_handgrip": sample.left_handgrip,
+                        "world_gate_center_transform": center, "frame": ready,
+                        "padded_ring_width_m": grab_ring_width(radius),
+                        "texture_size": GRAB_RING_SIZE, "centerline_radius_px": GRAB_RING_RADIUS_PX,
+                        "source": "production PhotoInteraction with nonidentity synthetic components; not HMD evidence",
+                    }));
+                }
+                sample.grip = true;
+                assert_eq!(f.step(360, Some(sample)).grab, admitted);
+            }
+        }
+    }
+    for radius in [0.08, 0.12, 0.15] {
+        let mut f = Fixture::new(0);
+        f.interaction.config.grab_m = radius;
+        f.look();
+        assert!(f.step(360, Some(input(true, radius))).grab);
+        assert!(!f.step(380, Some(input(true, radius + 0.119))).pull);
+        assert!(f.step(400, Some(input(true, radius + 0.121))).pull);
+    }
+    if let Some(directory) = std::env::var_os("PURIPULY_PHOTO341_EVIDENCE") {
+        let directory = std::path::PathBuf::from(directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join("separated-case-geometry.json"), serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+    }
+}
+
+#[test]
+fn diagnostics_stay_wrist_fixed_through_grab_return_hold_and_disappear_on_loss() {
+    let mut f = Fixture::new(1);
+    f.interaction.config.debug_grab_volume = true;
+    f.interaction.config.debug_case_label = Some("Radius 12 cm\nPosition B fixed".into());
+    f.look();
+    for (ms, grip, separation) in [(360, true, 0.0), (380, true, 0.121), (530, true, 0.121), (550, false, 0.121), (625, false, 0.121)] {
+        let mut sample = input(grip, separation);
+        sample.right[0][3] = 0.01 + (ms - 360) as f32 * 0.0001;
+        sample.left[0][3] += sample.right[0][3];
+        let frame = f.step(ms, Some(sample));
+        if ms == 380 { assert!(frame.pull); }
+        if ms == 530 { assert_eq!(frame.photo.unwrap().alpha, 1.0); }
+        for ring in frame.grab_volume.unwrap() {
+            assert_eq!(ring.device, sample.right_index);
+            assert!(distance(compose(sample.right, ring.transform), sample.right) < 0.000001);
+            assert_eq!(ring.alpha, frame.icon.unwrap().alpha);
+        }
+        assert_eq!(frame.case_label.unwrap().device, sample.right_index);
+    }
+    let lost = f.step(650, None);
+    assert!(lost.grab_volume.is_none());
+    assert!(lost.case_label.is_none());
+    let mut default = Fixture::new(0);
+    default.look();
+    assert!(default.interaction.frame.grab_volume.is_none());
+    assert!(default.interaction.frame.case_label.is_none());
+}
+
+#[test]
+fn quiesce_drains_grab_return_hold_and_release_without_admitting_new_grabs() {
+    for phase in ["grab", "return", "held", "release"] {
+        let mut f = Fixture::new(1);
+        f.look();
+        assert!(f.step(360, Some(input(true, 0.0))).grab);
+        if phase != "grab" {
+            assert!(f.step(380, Some(input(true, 0.12))).pull);
+        }
+        if matches!(phase, "held" | "release") {
+            f.step(530, Some(input(true, 0.12)));
+        }
+        if phase == "release" {
+            f.step(550, Some(input(false, 0.12)));
+        }
+        f.interaction.quiesce();
+        assert!(!f.interaction.quiescent(), "{phase}");
+        if phase == "grab" {
+            assert!(f.step(560, Some(input(true, 0.12))).pull);
+        }
+        let held = f.step(580, Some(input(true, 0.12)));
+        if phase != "release" {
+            assert!(held.photo.is_some());
+        }
+        assert!(!f.interaction.quiescent());
+        f.step(600, Some(input(false, 0.12)));
+        assert!(!f.interaction.quiescent());
+        f.step(674, Some(input(false, 0.12)));
+        assert!(!f.interaction.quiescent());
+        f.step(825, Some(input(false, 0.0)));
+        assert!(f.interaction.quiescent());
+        assert!(!f.step(840, Some(input(true, 0.0))).grab);
+        assert!(!f.interaction.quiescent());
+        f.step(850, None);
+        assert!(f.interaction.quiescent());
+        f.interaction.snapshot(Some(&f.photo), f.start + Duration::from_millis(860), 1860);
+        assert!(f.interaction.quiescing());
+        f.photo.photo_id = "new-case-repeat".into();
+        f.interaction.snapshot(Some(&f.photo), f.start + Duration::from_millis(870), 1870);
+        assert!(!f.interaction.quiescing());
+        for ms in [880, 930, 1030, 1230] {
+            f.step(ms, Some(input(false, 0.0)));
+        }
+        assert!(f.step(1240, Some(input(true, 0.0))).grab);
+    }
+}
+
+#[test]
+fn quiesce_before_press_blocks_admission_and_loss_cancels_safely() {
+    let mut f = Fixture::new(0);
+    f.look();
+    f.interaction.quiesce();
+    assert!(f.interaction.quiescent());
+    assert!(!f.step(360, Some(input(true, 0.0))).grab);
+    assert!(!f.interaction.quiescent());
+    assert!(!f.step(400, Some(input(true, 0.2))).pull);
+    f.step(420, None);
+    assert!(f.interaction.quiescent());
+    let mut f = Fixture::new(1);
+    f.look();
+    f.step(360, Some(input(true, 0.0)));
+    f.interaction.quiesce();
+    f.step(370, None);
+    assert!(f.interaction.quiescent());
+}
+
+#[test]
+fn ring_planes_face_either_head_side_without_moving_the_sphere() {
+    let sample = referenced_input(false, 0.0);
+    let wrist = TemporaryInteractionConfig::default().effective_wrist_transform(sample.right_handgrip);
+    let world = compose(sample.right, wrist);
+    for side in [-1.0, 1.0] {
+        let mut head = IDENTITY;
+        for i in 0..3 { head[i][3] = world[i][3] + side * [0.2, 0.3, 0.5][i]; }
+        let planes = grab_ring_transforms(wrist, sample.right, head);
+        for plane in planes {
+            assert!(valid_transform(plane));
+            let plane = compose(sample.right, plane);
+            assert!(distance(plane, world) < 0.000001);
+            assert!(dot(column(plane, 2), subtract(column(head, 3), column(world, 3))) > 0.0);
+            let normal = column(plane, 2);
+            assert_eq!(normal.iter().filter(|v| v.abs() > 0.99).count(), 1);
+        }
+    }
 }

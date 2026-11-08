@@ -16,8 +16,184 @@ from pathlib import Path
 from uuid import uuid4
 
 
+class Quiescence:
+    def __init__(self, send, event, generation):
+        self.send = send
+        self.event = event
+        self.generation = generation
+        self.request_id = None
+        self.acknowledged = asyncio.Event()
+
+    def request(self, reason):
+        if self.request_id is not None:
+            return
+        self.request_id = str(uuid4())
+        self.acknowledged.clear()
+        if not self.send({"type": "photo_debug_quiesce", "request_id": self.request_id}):
+            raise RuntimeError("quiescence request rejected")
+        self.event("boundary_requested", request_id=self.request_id, reason=reason)
+
+    def control(self, value, generation):
+        if (
+            generation != self.generation
+            or self.request_id is None
+            or value["request_id"] != self.request_id
+        ):
+            self.event("boundary_ack_rejected", request_id=value["request_id"], generation=generation)
+            return
+        if not self.acknowledged.is_set():
+            self.acknowledged.set()
+            self.event("boundary_acknowledged", request_id=self.request_id, generation=generation)
+
+    def reset(self):
+        self.request_id = None
+        self.acknowledged.clear()
+
+
+class TuningSchedule:
+    def __init__(self, state, barrier, started, seconds, delay, event, *, repeat=True):
+        self.state = state
+        self.barrier = barrier
+        self.end = started + seconds
+        self.first = started + delay
+        self.event = event
+        self.repeat = repeat
+        self.offered_at = None
+        self.early_finish = False
+
+    def finish_early(self):
+        self.early_finish = True
+
+    def tick(self, now, wall_ms):
+        self.state.tick(now)
+        if self.early_finish or now >= self.end:
+            self.barrier.request("case_end")
+            return self.barrier.acknowledged.is_set()
+        if now + 10 > self.end:
+            return False
+        if self.barrier.request_id is not None:
+            if not self.barrier.acknowledged.is_set():
+                return False
+            self.barrier.reset()
+        elif self.offered_at is not None:
+            if not self.repeat or now - self.offered_at < 15:
+                return False
+            self.barrier.request("next_offer")
+            return False
+        elif now < self.first:
+            return False
+        self.state.offer(now, wall_ms)
+        self.offered_at = now
+        self.event(
+            "synthetic_offer",
+            photo_id=self.state.photo["photo_id"],
+            offer_window_s=10,
+            retention_s=600,
+            target_remaining_s=self.end - now,
+        )
+        return False
+
+
+def tuning_cases():
+    points = (
+        ("A", "-2 cm", [0, 0.04373328, 0.01863404]),
+        ("B", "current", [0, 0.063, 0.024]),
+        ("C", "+2 cm", [0, 0.08226672, 0.02936596]),
+    )
+    cases = []
+    for index, (name, direction, point) in enumerate(points, 1):
+        cases.append(
+            {
+                "phase": "position",
+                "case": name,
+                "interaction": {
+                    "wrist_handgrip_point_m": point,
+                    "grab_m": 0.08,
+                    "debug_grab_volume": False,
+                    "debug_case_label": (
+                        f"POSITION {index}/3: {name} ({direction})\nRadius fixed: 8 cm"
+                    ),
+                },
+            }
+        )
+    for index, radius in enumerate((0.08, 0.12, 0.15), 1):
+        cases.append(
+            {
+                "phase": "radius",
+                "case": f"{round(radius * 100):02d}cm",
+                "interaction": {
+                    "wrist_handgrip_point_m": points[1][2],
+                    "grab_m": radius,
+                    "debug_grab_volume": True,
+                    "debug_case_label": (
+                        f"RADIUS {index}/3: {round(radius * 100)} cm\nPosition fixed: B"
+                    ),
+                },
+            }
+        )
+    return cases
+
+
+async def run_tuning(args, evidence):
+    cases = tuning_cases()
+    evidence.summary.update(
+        mode="wrist_and_grab_two_phases",
+        target_seconds_per_case=args.seconds,
+        offscreen_verification=args.software_pull_after is not None,
+        cases=[],
+    )
+    evidence.event(
+        "experiment_plan",
+        phases=[
+            "Position: A handward heuristic, B current, C forearmward heuristic; radius 0.08m; volume OFF",
+            "Radius: 0.08m, 0.12m, 0.15m; position B; wireframe volume ON",
+        ],
+        heuristic_not_anatomical=True,
+        target_seconds_per_case=args.seconds,
+        release_wait_may_extend=True,
+    )
+    try:
+        for generation, case in enumerate(cases, 1):
+            child = Evidence(
+                evidence.path / f"{generation:02d}-{case['phase']}-{case['case']}",
+                experiment_phase=case["phase"],
+                case=case["case"],
+            )
+            try:
+                result = await run(args, child, case=case, generation=generation)
+            except asyncio.CancelledError:
+                child.summary["status"] = "interrupted"
+                raise
+            except Exception as exc:
+                child.summary["status"] = "launcher_error"
+                child.event("launcher_error", error_type=type(exc).__name__)
+                result = 2
+            finally:
+                child.finish()
+                evidence.summary["cases"].append(
+                    {"evidence": child.path.name, **child.summary}
+                )
+            clean = (
+                result == 0
+                and child.summary.get("native_exit_code") == 0
+                and child.summary.get("shutdown_acknowledged") is True
+                and child.summary.get("cleanup_errors") == []
+                and child.summary.get("native_error") is None
+            )
+            evidence.event("case_outcome", phase=case["phase"], case=case["case"], clean=clean)
+            if not clean:
+                evidence.summary["status"] = "experiment_aborted"
+                return 2
+        evidence.summary["status"] = "experiment_completed"
+        return 0
+    except asyncio.CancelledError:
+        evidence.summary["status"] = "interrupted"
+        evidence.event("experiment_interrupted")
+        raise
+
+
 class PreviewState:
-    def __init__(self, image: Path, width: int, height: int, publish, event):
+    def __init__(self, image: Path, width: int, height: int, publish, event, generation=1):
         self.image = image
         self.width = width
         self.height = height
@@ -27,6 +203,7 @@ class PreviewState:
         self.photo = None
         self.shutter = 0.0
         self.pulls = set()
+        self.generation = generation
 
     def snapshot(self):
         self.publish(
@@ -86,7 +263,7 @@ class PreviewState:
         kind = value["type"]
         photo = self.photo
         if (
-            generation != 1
+            generation != self.generation
             or photo is None
             or value.get("photo_id") != photo["photo_id"]
             or photo["phase"] == "expired"
@@ -129,8 +306,10 @@ def png_dimensions(path):
 
 
 class Evidence:
-    def __init__(self):
-        self.path = Path(tempfile.mkdtemp(prefix="puripuly-x3-preview-"))
+    def __init__(self, path=None, **tags):
+        self.path = Path(tempfile.mkdtemp(prefix="puripuly-x3-preview-")) if path is None else path
+        self.path.mkdir(parents=True, exist_ok=True)
+        self.tags = tags
         self.stream = (self.path / "events.jsonl").open("x", encoding="utf-8")
         self.started = time.monotonic()
         self.summary = {
@@ -140,9 +319,15 @@ class Evidence:
             "translation_blocks": 0,
             "physical_observations": "unperformed",
         }
+        self.summary.update(tags)
 
     def event(self, kind, **fields):
-        record = {"event": kind, "elapsed_s": time.monotonic() - self.started, **fields}
+        record = {
+            "event": kind,
+            "elapsed_s": time.monotonic() - self.started,
+            **self.tags,
+            **fields,
+        }
         self.stream.write(json.dumps(record, allow_nan=False) + "\n")
         self.stream.flush()
         print(json.dumps(record, allow_nan=False), flush=True)
@@ -206,7 +391,7 @@ async def drain(stream, evidence, signals):
             signals["composed"] = True
 
 
-async def stop_child(process, bridge, readers, evidence):
+async def stop_child(process, bridge, readers, evidence, *, require_ack=False):
     errors = []
     if process is not None:
         try:
@@ -218,6 +403,8 @@ async def stop_child(process, bridge, readers, evidence):
                 try:
                     await asyncio.wait_for(process.wait(), 3)
                 except TimeoutError:
+                    if require_ack:
+                        errors.append("shutdown_timeout")
                     evidence.event("shutdown_escalated", action="terminate")
                     process.terminate()
                     try:
@@ -248,6 +435,15 @@ async def stop_child(process, bridge, readers, evidence):
             )
         except TimeoutError:
             errors.append("reader_drain_timeout")
+    if process is not None and require_ack and not bridge.shutdown_complete.is_set():
+        if process.returncode == 0:
+            try:
+                await asyncio.wait_for(bridge.shutdown_complete.wait(), 1)
+            except TimeoutError:
+                pass
+        if not bridge.shutdown_complete.is_set():
+            errors.append("shutdown_ack_missing")
+    evidence.summary["shutdown_acknowledged"] = bridge.shutdown_complete.is_set()
     try:
         await asyncio.wait_for(bridge.close(), 3)
     except Exception as exc:
@@ -255,7 +451,7 @@ async def stop_child(process, bridge, readers, evidence):
     return errors
 
 
-async def run(args, evidence):
+async def run(args, evidence, *, case=None, generation=1):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
     from puripuly_heart.core.photo.bridge import PhotoBridge
     from puripuly_heart.core.photo.capture import PhotoCaptureWatcher
@@ -291,10 +487,19 @@ async def run(args, evidence):
         evidence.summary["status"] = "runtime_not_running"
         evidence.event("runtime_not_running", native_started=False, steamvr_launch_attempted=False)
         return 2
-    bridge = PhotoBridge(
-        control=lambda value, generation: state.control(value, generation, time.monotonic())
-    )
-    state = PreviewState(image, width, height, bridge.publish, evidence.event)
+    barrier = None
+
+    def control(value, owner):
+        if value["type"] == "photo_debug_quiescent":
+            if barrier is not None:
+                barrier.control(value, owner)
+            return
+        state.control(value, owner, time.monotonic())
+
+    bridge = PhotoBridge(control=control)
+    state = PreviewState(image, width, height, bridge.publish, evidence.event, generation)
+    if case is not None:
+        barrier = Quiescence(bridge.send, evidence.event, generation)
     state.snapshot()
     process = None
     readers = []
@@ -305,13 +510,26 @@ async def run(args, evidence):
     result = 1
     try:
         await bridge.start()
-        manifest = await bridge.activate(1, backend=control_mode)
+        manifest = await bridge.activate(generation, backend=control_mode)
         manifest["backend"] = args.backend
         manifest["image"] = {
             "max_size": evidence.summary["max_size"],
             "debug_controls": True,
             "export_dir": str(evidence.path),
         }
+        if case is not None:
+            manifest["interaction"] = case["interaction"]
+            evidence.summary["requested_interaction"] = case["interaction"]
+            evidence.event(
+                "case_parameters",
+                interaction=case["interaction"],
+                configuration_source="immutable_launch_manifest",
+                measured_world_pose=False,
+                generation=generation,
+                instance_id=manifest["instance_id"],
+                target_seconds=args.seconds,
+                offscreen_verification=args.software_pull_after is not None,
+            )
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         if os.name != "nt":
             manifest_path.chmod(0o600)
@@ -353,15 +571,32 @@ async def run(args, evidence):
             return 2
         evidence.event("native_ready", handshake=True, preview_decoded=False)
         started = time.monotonic()
+        schedule = (
+            TuningSchedule(
+                state, barrier, started, args.seconds, args.offer_delay, evidence.event,
+                repeat=args.software_pull_after is None,
+            )
+            if case is not None else None
+        )
         offered_at = None
         smoke_stage = 0
         exported_at = None
         last_receipt = -1
-        while time.monotonic() - started < args.seconds:
+        while schedule is not None or time.monotonic() - started < args.seconds:
             now = time.monotonic()
             if exit_task.done() or bridge.disconnected.is_set() or signals["error"]:
                 evidence.summary["status"] = "native_terminal_error"
                 return 2
+            if schedule is not None:
+                if schedule.tick(now, int(time.time() * 1000)):
+                    smoke_complete = args.software_pull_after is None or schedule.early_finish
+                    evidence.summary["status"] = (
+                        "offscreen_preview_exported" if schedule.early_finish
+                        else "duration_completed" if smoke_complete else "smoke_incomplete"
+                    )
+                    result = 0 if smoke_complete else 2
+                    break
+                offered_at = schedule.offered_at
             if watcher:
                 capture = await watcher.poll()
                 if capture is not None:
@@ -370,7 +605,7 @@ async def run(args, evidence):
                     evidence.event(
                         "new_file_signal", selected_asset_unchanged=True, captured_pixels_read=False
                     )
-            elif offered_at is None and now - started >= args.offer_delay:
+            elif schedule is None and offered_at is None and now - started >= args.offer_delay:
                 state.offer(now, int(time.time() * 1000))
                 offered_at = now
             state.tick(now)
@@ -441,14 +676,22 @@ async def run(args, evidence):
                             physical_display=False,
                         )
                         if smoke_stage == 5:
-                            evidence.summary["status"] = "offscreen_preview_exported"
-                            result = 0
-                            break
-                        if not bridge.send(
-                            {"type": "photo_probe_hide", "photo_id": photo["photo_id"]}
-                        ):
-                            raise RuntimeError("hide rejected")
-                        smoke_stage = 3
+                            if schedule is None:
+                                evidence.summary["status"] = "offscreen_preview_exported"
+                                result = 0
+                                break
+                            if not bridge.send(
+                                {"type": "photo_probe_hide", "photo_id": photo["photo_id"]}
+                            ):
+                                raise RuntimeError("final hide rejected")
+                            schedule.finish_early()
+                            smoke_stage = 6
+                        else:
+                            if not bridge.send(
+                                {"type": "photo_probe_hide", "photo_id": photo["photo_id"]}
+                            ):
+                                raise RuntimeError("hide rejected")
+                            smoke_stage = 3
                     elif now - exported_at > 5:
                         raise RuntimeError("preview export timeout")
                 elif smoke_stage == 3 and not photo["visible"]:
@@ -474,7 +717,9 @@ async def run(args, evidence):
         evidence.summary["status"] = "launcher_error"
         evidence.event("launcher_error", error_type=type(exc).__name__)
     finally:
-        errors = await stop_child(process, bridge, readers, evidence)
+        errors = await stop_child(
+            process, bridge, readers, evidence, require_ack=case is not None
+        )
         for task in (ready_task, exit_task):
             if task is not None:
                 task.cancel()
@@ -483,6 +728,12 @@ async def run(args, evidence):
         )
         manifest_path.unlink(missing_ok=True)
         evidence.summary["cleanup_errors"] = errors
+        evidence.event(
+            "case_cleanup" if case is not None else "cleanup",
+            errors=errors,
+            native_exit_code=evidence.summary.get("native_exit_code"),
+            shutdown_acknowledged=evidence.summary.get("shutdown_acknowledged", False),
+        )
         if errors:
             evidence.event("cleanup_failed", errors=errors)
             evidence.summary["primary_status"] = evidence.summary["status"]
@@ -529,12 +780,18 @@ def parser():
         "--offer-delay",
         type=float,
         default=2,
-        help="Seconds after native ready for one synthetic offer without --watch-dir",
+        help="Seconds after native ready for the first synthetic offer without --watch-dir",
     )
     command.add_argument(
-        "--seconds", type=float, default=60, help="Finite duration after native ready"
+        "--seconds", type=float, default=60,
+        help="Duration after native ready; tuning target PER CASE (default 60s), extended for release",
     )
     command.add_argument("--startup-timeout", type=float, default=10)
+    command.add_argument(
+        "--tune-wrist-and-grab",
+        action="store_true",
+        help="Six serial cases: positions A/B/C at 8cm, then radii 8/12/15cm at B; --seconds per case",
+    )
     command.add_argument(
         "--software-pull-after",
         type=float,
@@ -563,6 +820,10 @@ def main(argv=None):
         command.error(
             "--software-pull-after requires --backend offscreen, no --watch-dir, and delay < 10s"
         )
+    if args.tune_wrist_and_grab and args.watch_dir:
+        command.error("--tune-wrist-and-grab uses synthetic --image offers; no --watch-dir")
+    if args.tune_wrist_and_grab and args.seconds < args.offer_delay + 10:
+        command.error("tuning --seconds must fit --offer-delay plus the full 10s offer window")
     evidence = Evidence()
     print(f"Local evidence: {evidence.path}", flush=True)
     print(
@@ -571,7 +832,9 @@ def main(argv=None):
         flush=True,
     )
     try:
-        result = asyncio.run(run(args, evidence))
+        result = asyncio.run(
+            run_tuning(args, evidence) if args.tune_wrist_and_grab else run(args, evidence)
+        )
     except KeyboardInterrupt:
         result = 130
     except Exception as exc:

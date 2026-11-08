@@ -24,6 +24,9 @@ pub struct TemporaryInteractionConfig {
     pub forward_hide_deg: f32,
     pub dwell_ms: u64,
     pub wrist_transform: Option<Transform>,
+    pub wrist_handgrip_point_m: Option<[f32; 3]>,
+    pub debug_grab_volume: bool,
+    pub debug_case_label: Option<String>,
     pub photo_transform: Transform,
 }
 
@@ -39,6 +42,9 @@ impl Default for TemporaryInteractionConfig {
             forward_hide_deg: 45.0,
             dwell_ms: 50,
             wrist_transform: None,
+            wrist_handgrip_point_m: None,
+            debug_grab_volume: false,
+            debug_case_label: None,
             photo_transform: [
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0, 0.12],
@@ -64,6 +70,15 @@ impl TemporaryInteractionConfig {
             })
             || self.dwell_ms > 5000
             || self.wrist_transform.is_some_and(|t| !valid_transform(t))
+            || self.wrist_handgrip_point_m.is_some_and(|p| !p.iter().all(|v| v.is_finite()))
+            || (self.wrist_transform.is_some() && self.wrist_handgrip_point_m.is_some())
+            || self.debug_case_label.as_ref().is_some_and(|label| {
+                label.is_empty()
+                    || label.len() > 128
+                    || label.split('\n').count() > 2
+                    || label.split('\n').any(str::is_empty)
+                    || !label.bytes().all(|b| b == b'\n' || (b' '..=b'~').contains(&b))
+            })
             || !valid_transform(self.photo_transform)
         {
             return Err(PhotoError::Manifest);
@@ -73,7 +88,7 @@ impl TemporaryInteractionConfig {
 
     pub fn effective_wrist_transform(&self, handgrip: Transform) -> Transform {
         self.wrist_transform.unwrap_or_else(|| {
-            let point = [0.0, 0.063, 0.024];
+            let point = self.wrist_handgrip_point_m.unwrap_or([0.0, 0.063, 0.024]);
             let mut wrist = [
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
@@ -160,7 +175,7 @@ impl HapticCue {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub struct Placement {
     pub device: u32,
     pub transform: Transform,
@@ -168,10 +183,39 @@ pub struct Placement {
     pub alpha: f32,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+pub const GRAB_RING_SIZE: u32 = 256;
+pub const GRAB_RING_RADIUS_PX: f32 = 112.0;
+pub const CASE_LABEL_SIZE: [u32; 2] = [1024, 256];
+
+pub fn grab_ring_width(radius_m: f32) -> f32 {
+    radius_m * GRAB_RING_SIZE as f32 / GRAB_RING_RADIUS_PX
+}
+
+fn face_head(mut plane: Transform, right: Transform, head: Transform) -> Transform {
+    let world = compose(right, plane);
+    if dot(column(world, 2), subtract(column(head, 3), column(world, 3))) < 0.0 {
+        for row in &mut plane {
+            row[0] = -row[0];
+            row[2] = -row[2];
+        }
+    }
+    plane
+}
+
+pub fn grab_ring_transforms(wrist: Transform, right: Transform, head: Transform) -> [Transform; 3] {
+    [
+        IDENTITY,
+        [[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, -1.0, 0.0], [0.0, 1.0, 0.0, 0.0]],
+        [[0.0, 0.0, 1.0, 0.0], [0.0, 1.0, 0.0, 0.0], [-1.0, 0.0, 0.0, 0.0]],
+    ].map(|plane| face_head(compose(wrist, plane), right, head))
+}
+
+#[derive(Debug, Default, Clone, Copy, Serialize)]
 pub struct InteractionFrame {
     pub icon: Option<Placement>,
     pub photo: Option<Placement>,
+    pub grab_volume: Option<[Placement; 3]>,
+    pub case_label: Option<Placement>,
     pub glow: bool,
     pub pull: bool,
     pub hidden: bool,
@@ -205,6 +249,8 @@ pub struct PhotoInteraction {
     deadline: Option<Instant>,
     offer_deadline: Option<Instant>,
     offer_pulled: bool,
+    quiescing: bool,
+    input_released: bool,
     pub frame: InteractionFrame,
 }
 
@@ -228,6 +274,8 @@ impl PhotoInteraction {
             deadline: None,
             offer_deadline: None,
             offer_pulled: false,
+            quiescing: false,
+            input_released: true,
             frame: InteractionFrame::default(),
         }
     }
@@ -236,8 +284,10 @@ impl PhotoInteraction {
         let key = photo.map(|p| p.photo_id.as_str());
         if self.key.as_deref() != key {
             let config = self.config.clone();
+            let quiescing = self.quiescing && key.is_none();
             *self = Self::new(config);
             self.key = key.map(str::to_owned);
+            self.quiescing = quiescing;
         }
         for (deadline, lifetime) in [
             (&mut self.offer_deadline, 10_000),
@@ -266,6 +316,23 @@ impl PhotoInteraction {
             .is_some_and(|deadline| now < deadline)
     }
 
+    pub fn quiesce(&mut self) {
+        self.quiescing = true;
+    }
+
+    pub fn quiescing(&self) -> bool {
+        self.quiescing
+    }
+
+    pub fn quiescent(&self) -> bool {
+        self.quiescing
+            && self.input_released
+            && self.grab.is_none()
+            && self.returning.is_none()
+            && !self.held
+            && self.photo_alpha == 0.0
+    }
+
     pub fn step(
         &mut self,
         photo: Option<&Photo>,
@@ -278,7 +345,11 @@ impl PhotoInteraction {
             .map_or(0.0, |old| now.saturating_duration_since(old).as_secs_f32());
         let prior_held = self.held;
         let active = photo.is_some_and(|p| self.active(p, now));
+        self.input_released = input.is_none_or(|input| !input.grip);
         let Some(input) = input.filter(|_| active) else {
+            if input.is_none() {
+                self.input_released = true;
+            }
             self.armed = false;
             self.grip = true;
             self.grab = None;
@@ -369,11 +440,12 @@ impl PhotoInteraction {
         let current_distance = distance(compose(input.left, input.left_handgrip), wrist);
         let near = current_distance <= self.config.grab_m;
         let mut out = InteractionFrame {
-            glow: near && interactive && photo.can_pull(),
+            glow: near && interactive && photo.can_pull() && !self.quiescing,
             hidden: prior_held && !self.held,
             ..Default::default()
         };
         if pressed
+            && !self.quiescing
             && near
             && interactive
             && photo.can_pull()
@@ -456,6 +528,24 @@ impl PhotoInteraction {
                 width: self.config.icon_width_m,
                 alpha: self.icon_alpha,
             });
+            if self.config.debug_grab_volume {
+                out.grab_volume = Some(grab_ring_transforms(wrist_local, input.right, input.head).map(|transform| Placement {
+                    device: input.right_index,
+                    transform,
+                    width: grab_ring_width(self.config.grab_m),
+                    alpha: self.icon_alpha,
+                }));
+            }
+            if self.config.debug_case_label.is_some() {
+                let mut offset = IDENTITY;
+                offset[1][3] = -(if self.config.debug_grab_volume { self.config.grab_m } else { self.config.icon_width_m * 0.5 } + 0.045);
+                out.case_label = Some(Placement {
+                    device: input.right_index,
+                    transform: compose(wrist_local, offset),
+                    width: 0.24,
+                    alpha: self.icon_alpha,
+                });
+            }
         } else if self
             .returning
             .as_ref()

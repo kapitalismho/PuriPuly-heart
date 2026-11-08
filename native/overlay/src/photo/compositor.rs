@@ -29,6 +29,12 @@ use windows::Win32::Graphics::Dxgi::{
     IDXGIDevice, IDXGISurface,
 };
 use windows_core::BOOL;
+use windows::core::w;
+use windows::Win32::Graphics::DirectWrite::{
+    DWriteCreateFactory, IDWriteFactory, IDWriteFontCollection, DWRITE_FACTORY_TYPE_SHARED,
+    DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT_MEDIUM,
+    DWRITE_TEXT_METRICS, DWRITE_WORD_WRAPPING_NO_WRAP,
+};
 use windows_numerics::{Matrix3x2, Vector2};
 
 use super::gpu::{query, GpuTimer};
@@ -170,6 +176,68 @@ impl PhotoCompositor {
                 .UpdateSubresource(&texture, 0, None, bgra.as_ptr().cast(), size * 4, 0);
         }
         Ok(PhotoTexture::new(texture))
+    }
+
+    pub fn case_label_texture(&self, label: &str, draining: bool) -> Result<PhotoTexture, PhotoError> {
+        use super::interaction::CASE_LABEL_SIZE;
+        let factory: IDWriteFactory = unsafe { DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED) }
+            .map_err(|_| PhotoError::Graphics)?;
+        let layout = |text: &str, size: f32| {
+            let format = unsafe {
+                factory.CreateTextFormat(
+                    w!("Segoe UI"), None::<&IDWriteFontCollection>, DWRITE_FONT_WEIGHT_MEDIUM,
+                    DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size, w!("en-US"),
+                )
+            }.map_err(|_| PhotoError::Graphics)?;
+            unsafe { format.SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP) }
+                .map_err(|_| PhotoError::Graphics)?;
+            unsafe { factory.CreateTextLayout(&text.encode_utf16().collect::<Vec<_>>(), &format, 8192.0, 256.0) }
+                .map_err(|_| PhotoError::Graphics)
+        };
+        let combined = draining.then(|| format!("{label}\n\nRELEASE TO CONTINUE"));
+        let content = combined.as_deref().unwrap_or(label);
+        let mut text = layout(content, 36.0)?;
+        let mut metrics = DWRITE_TEXT_METRICS::default();
+        unsafe { text.GetMetrics(&mut metrics) }.map_err(|_| PhotoError::Graphics)?;
+        if metrics.widthIncludingTrailingWhitespace > 976.0 {
+            text = layout(content, 36.0 * 976.0 / metrics.widthIncludingTrailingWhitespace)?;
+        }
+        let fill = unsafe { self.d2d.CreateSolidColorBrush(&color([240, 248, 255], 1.0), None) }
+            .map_err(|_| PhotoError::Graphics)?;
+        let outline = unsafe { self.d2d.CreateSolidColorBrush(&color([8, 12, 20], 1.0), None) }
+            .map_err(|_| PhotoError::Graphics)?;
+        let texture = self.create_texture(CASE_LABEL_SIZE[0], CASE_LABEL_SIZE[1], false)?;
+        let surface: IDXGISurface = texture.cast().map_err(|_| PhotoError::Graphics)?;
+        let target = unsafe {
+            self.d2d.CreateBitmapFromDxgiSurface(&surface, Some(&bitmap_properties(
+                D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+            )))
+        }.map_err(|_| PhotoError::Graphics)?;
+        let previous_target = unsafe { self.d2d.GetTarget().ok() };
+        let mut previous_transform = Matrix3x2::identity();
+        unsafe {
+            self.d2d.GetTransform(&mut previous_transform);
+            self.d2d.SetTransform(&Matrix3x2::identity());
+        }
+        let result = (|| {
+            let commands = render_text_layout_to_command_list(
+                &self.d2d, &self.factory, &text, &fill, &outline, 2.0,
+            ).map_err(|_| PhotoError::Graphics)?;
+            unsafe {
+                self.d2d.SetTarget(&target);
+                self.d2d.BeginDraw();
+                self.d2d.Clear(Some(&color([0, 0, 0], 0.0)));
+                self.d2d.DrawImage(&commands, Some(&Vector2 { X: 24.0, Y: 20.0 }), None,
+                    D2D1_INTERPOLATION_MODE_LINEAR, D2D1_COMPOSITE_MODE_SOURCE_OVER);
+                self.d2d.EndDraw(None, None).map_err(|_| PhotoError::Graphics)?;
+            }
+            Ok(PhotoTexture::new(texture))
+        })();
+        unsafe {
+            self.d2d.SetTarget(previous_target.as_ref());
+            self.d2d.SetTransform(&previous_transform);
+        }
+        result
     }
 
     pub fn submit_texture(

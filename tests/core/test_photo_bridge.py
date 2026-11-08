@@ -275,3 +275,63 @@ async def test_image_timing_preserves_hidden_work_and_current_progress_after_sta
             assert controls[-1][0]["block_id"] == 8
     finally:
         await bridge.close()
+
+
+@pytest.mark.parametrize(
+    "receipt",
+    [
+        {"type": "photo_debug_quiescent"},
+        {"type": "photo_debug_quiescent", "request_id": ""},
+        {"type": "photo_debug_quiescent", "request_id": "x" * 129},
+        {"type": "photo_debug_quiescent", "request_id": "한"},
+        {"type": "photo_debug_quiescent", "request_id": True},
+        {"type": "photo_debug_quiescent", "request_id": 1},
+        {"type": "photo_debug_quiescent", "request_id": "valid", "photo_id": "unexpected"},
+        {"type": "photo_debug_quiesce", "request_id": "wrong_direction"},
+    ],
+)
+async def test_quiescence_rejects_bad_receipts_without_routing(receipt):
+    controls = []
+    bridge = PhotoBridge(control=lambda value, generation: controls.append((value, generation)))
+    await bridge.start()
+    manifest = await bridge.activate(1, backend="probe")
+    try:
+        async with connect(manifest["bridge_url"]) as connection:
+            await connection.send(json.dumps(auth(manifest)))
+            await receive(connection, "photo_snapshot")
+            await connection.send(json.dumps(receipt))
+            with pytest.raises(ConnectionClosed):
+                await connection.recv()
+        assert controls == []
+    finally:
+        await bridge.close()
+
+
+async def test_quiescent_receipt_requires_authenticated_current_generation_and_routes_once():
+    controls = []
+    bridge = PhotoBridge(control=lambda value, generation: controls.append((value, generation)))
+    await bridge.start()
+    old = await bridge.activate(1, backend="openvr")
+    manifest = await bridge.activate(2, backend="openvr")
+    receipt = {"type": "photo_debug_quiescent", "request_id": "x" * 128}
+    try:
+        for first in (receipt, auth(old), auth(manifest) | {"session_token": "wrong"}):
+            async with connect(manifest["bridge_url"]) as connection:
+                await connection.send(json.dumps(first))
+                with pytest.raises(ConnectionClosed):
+                    await connection.recv()
+        assert controls == []
+        async with connect(manifest["bridge_url"]) as connection:
+            await connection.send(json.dumps(auth(manifest)))
+            await receive(connection, "photo_snapshot")
+            request = {"type": "photo_debug_quiesce", "request_id": receipt["request_id"]}
+            assert bridge.send(request)
+            assert await receive(connection, "photo_debug_quiesce") == request
+            assert not bridge.send({"type": "photo_probe_pull", "photo_id": "p", "event_id": "e"})
+            await connection.send(json.dumps(receipt))
+            await connection.send(json.dumps({"type": "photo_ready"}))
+            await asyncio.wait_for(bridge.ready.wait(), 1)
+            assert controls == [(receipt, 2)]
+        assert not bridge.shutdown_complete.is_set()
+    finally:
+        await bridge.close()

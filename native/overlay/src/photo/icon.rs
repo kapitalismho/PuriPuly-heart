@@ -42,3 +42,25 @@ pub fn pixels(state: IconState) -> Vec<u8> {
     }
     rgba
 }
+
+pub fn grab_ring_pixels() -> Vec<u8> {
+    use super::interaction::{GRAB_RING_RADIUS_PX, GRAB_RING_SIZE};
+    let mut rgba = vec![0; (GRAB_RING_SIZE * GRAB_RING_SIZE * 4) as usize];
+    for y in 0..GRAB_RING_SIZE {
+        for x in 0..GRAB_RING_SIZE {
+            let dx = x as f32 + 0.5 - GRAB_RING_SIZE as f32 * 0.5;
+            let dy = y as f32 + 0.5 - GRAB_RING_SIZE as f32 * 0.5;
+            let coverage = (1.5 - ((dx * dx + dy * dy).sqrt() - GRAB_RING_RADIUS_PX).abs()).clamp(0.0, 1.0);
+            let alpha = (coverage * 150.0).round() as u8;
+            let pixel = [
+                (u16::from(alpha) * 90 / 255) as u8,
+                (u16::from(alpha) * 220 / 255) as u8,
+                alpha,
+                alpha,
+            ];
+            let offset = ((y * GRAB_RING_SIZE + x) * 4) as usize;
+            rgba[offset..offset + 4].copy_from_slice(&pixel);
+        }
+    }
+    rgba
+}

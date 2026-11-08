@@ -216,6 +216,7 @@ class PhotoBridge:
             },
             "photo_ready": {},
             "photo_shutdown_complete": {},
+            "photo_debug_quiescent": {"request_id": str},
             "photo_prepared": {
                 "photo_id": str,
                 "attempt_id": int,
@@ -246,6 +247,8 @@ class PhotoBridge:
                 return False
             if type(item) is int and item < 0:
                 return False
+        if kind == "photo_debug_quiescent" and not value["request_id"].isascii():
+            return False
         if kind == "photo_image_timing":
             if value["stage"] not in _IMAGE_TIMING_STAGES:
                 return False

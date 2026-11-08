@@ -95,6 +95,36 @@ fn photo_manifest_and_startup_contract_are_role_specific() {
 }
 
 #[test]
+fn experiment_manifest_validates_points_labels_and_debug_authority() {
+    let mut config = manifest();
+    config.interaction.wrist_handgrip_point_m = Some([0.0, 0.04373328, 0.01863404]);
+    assert_eq!(config.validate(), Ok(()));
+    config.interaction.wrist_transform = Some(puripuly_heart_overlay::photo::interaction::IDENTITY);
+    assert_eq!(config.validate(), Err(PhotoError::Manifest));
+    config.interaction.wrist_transform = None;
+    config.interaction.wrist_handgrip_point_m = Some([0.0, f32::INFINITY, 0.0]);
+    assert_eq!(config.validate(), Err(PhotoError::Manifest));
+    config.interaction.wrist_handgrip_point_m = None;
+    config.interaction.debug_grab_volume = true;
+    assert_eq!(config.validate(), Err(PhotoError::Manifest));
+    config.image.debug_controls = true;
+    assert_eq!(config.validate(), Ok(()));
+    for label in ["", "one\ntwo\nthree", "one\n", "\ntwo", "tab\t", "bad\r", "한글", "\u{7f}"] {
+        config.interaction.debug_case_label = Some(label.into());
+        assert_eq!(config.validate(), Err(PhotoError::Manifest), "{label:?}");
+    }
+    config.interaction.debug_case_label = Some("a".repeat(129));
+    assert_eq!(config.validate(), Err(PhotoError::Manifest));
+    for label in ["a".repeat(128), "Position A\nGrab 8 cm fixed".into()] {
+        config.interaction.debug_case_label = Some(label);
+        assert_eq!(config.validate(), Ok(()));
+    }
+    config.interaction.debug_grab_volume = false;
+    config.image.debug_controls = false;
+    assert_eq!(config.validate(), Err(PhotoError::Manifest));
+}
+
+#[test]
 fn cumulative_state_preserves_independent_blocks_and_fences_replacements() {
     let mut state = PhotoState::default();
     let mut current = requested();
@@ -970,4 +1000,72 @@ async fn actual_native_pipeline() {
     assert!(child.0.wait().unwrap().success());
     reader.join().unwrap();
     std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[tokio::test]
+async fn actual_photo_process_quiesce_latches_until_an_accepted_new_photo() {
+    let mut config = manifest();
+    config.image.debug_controls = true;
+    config.interaction.debug_case_label = Some("Position B\nGrab 8 cm fixed".into());
+    let (mut child, mut socket, directory) = start_child(&config, "quiesce").await;
+    assert_eq!(receive(&mut socket).await["type"], "photo_auth");
+    let current = requested();
+    send(&mut socket, json!({"type":"photo_snapshot","revision":1,"photo":current})).await;
+    assert_eq!(receive(&mut socket).await["revision"], 1);
+    assert_eq!(receive(&mut socket).await["type"], "photo_ready");
+    send(&mut socket, json!({"type":"photo_debug_quiesce","request_id":"first"})).await;
+    assert_eq!(receive(&mut socket).await, json!({"type":"photo_debug_quiescent","request_id":"first"}));
+    send(&mut socket, json!({"type":"photo_probe_pull","photo_id":current.photo_id,"event_id":"blocked"})).await;
+    send(&mut socket, json!({"type":"photo_debug_quiesce","request_id":"first"})).await;
+    send(&mut socket, json!({"type":"photo_snapshot","revision":2,"photo":current})).await;
+    assert_eq!(receive(&mut socket).await["revision"], 2);
+    let mut replacement = current.clone();
+    replacement.photo_id = "synthetic-photo-b".into();
+    send(&mut socket, json!({"type":"photo_snapshot","revision":1,"photo":replacement})).await;
+    send(&mut socket, json!({"type":"photo_probe_pull","photo_id":current.photo_id,"event_id":"still-blocked"})).await;
+    send(&mut socket, json!({"type":"photo_probe_hide","photo_id":current.photo_id})).await;
+    assert_eq!(receive(&mut socket).await["type"], "photo_hidden");
+    send(&mut socket, json!({"type":"photo_snapshot","revision":3,"photo":replacement})).await;
+    assert_eq!(receive(&mut socket).await["photo_id"], replacement.photo_id);
+    send(&mut socket, json!({"type":"photo_debug_quiesce","request_id":"first"})).await;
+    send(&mut socket, json!({"type":"photo_probe_pull","photo_id":replacement.photo_id,"event_id":"resumed"})).await;
+    assert_eq!(receive(&mut socket).await["event_id"], "resumed");
+    send(&mut socket, json!({"type":"photo_debug_quiesce","request_id":"second"})).await;
+    assert_eq!(receive(&mut socket).await, json!({"type":"photo_debug_quiescent","request_id":"second"}));
+    send(&mut socket, json!({"type":"photo_snapshot","revision":4,"photo":current})).await;
+    send(&mut socket, json!({"type":"photo_probe_pull","photo_id":replacement.photo_id,"event_id":"retired-does-not-resume"})).await;
+    send(&mut socket, json!({"type":"photo_probe_hide","photo_id":replacement.photo_id})).await;
+    assert_eq!(receive(&mut socket).await["type"], "photo_hidden");
+    send(&mut socket, json!({"type":"shutdown"})).await;
+    assert_eq!(receive(&mut socket).await["type"], "photo_shutdown_complete");
+    let status = child.0.wait().unwrap();
+    assert!(status.success());
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[tokio::test]
+async fn actual_photo_process_rejects_unauthorized_or_invalid_quiesce() {
+    for (index, enabled, label, request) in [
+        (0, false, None, "id".to_owned()),
+        (1, true, None, "id".to_owned()),
+        (2, true, Some("Case"), String::new()),
+        (3, true, Some("Case"), "a".repeat(129)),
+        (4, true, Some("Case"), "한글".to_owned()),
+    ] {
+        let mut config = manifest();
+        config.image.debug_controls = enabled;
+        config.interaction.debug_case_label = label.map(str::to_owned);
+        let (mut child, mut socket, directory) = start_child(&config, &format!("quiesce-invalid-{index}")).await;
+        assert_eq!(receive(&mut socket).await["type"], "photo_auth");
+        send(&mut socket, json!({"type":"photo_snapshot","revision":1,"photo":null})).await;
+        assert_eq!(receive(&mut socket).await["type"], "photo_state_received");
+        assert_eq!(receive(&mut socket).await["type"], "photo_ready");
+        send(&mut socket, json!({"type":"photo_debug_quiesce","request_id":request})).await;
+        use std::io::Read;
+        assert!(!child.0.wait().unwrap().success());
+        let mut stderr = String::new();
+        child.0.stderr.as_mut().unwrap().read_to_string(&mut stderr).unwrap();
+        assert!(stderr.contains("protocol_invalid"));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 }
