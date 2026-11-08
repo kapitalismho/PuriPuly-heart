@@ -66,6 +66,10 @@ class TuningSchedule:
 
     def tick(self, now, wall_ms):
         self.state.tick(now)
+        if self.offered_at is None and not self.early_finish:
+            if now < self.first:
+                return False
+            self.end = max(self.end, now + 10)
         if self.early_finish or now >= self.end:
             self.barrier.request("case_end")
             return self.barrier.acknowledged.is_set()
@@ -79,8 +83,6 @@ class TuningSchedule:
             if not self.repeat or now - self.offered_at < 15:
                 return False
             self.barrier.request("next_offer")
-            return False
-        elif now < self.first:
             return False
         self.state.offer(now, wall_ms)
         self.offered_at = now

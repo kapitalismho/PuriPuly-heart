@@ -354,6 +354,31 @@ def test_tuning_schedule_preserves_full_windows_fresh_ids_and_released_boundarie
     assert {photo["photo_id"] for photo in offers} == {first, second}
 
 
+@pytest.mark.parametrize("first_poll", [102.001, 120.0])
+def test_late_first_tuning_poll_guarantees_full_opportunity_before_boundary(preview, first_poll):
+    state, snapshots, events = preview
+    commands = []
+    barrier = probe.Quiescence(lambda command: commands.append(command) or True, Mock(), 1)
+    schedule = probe.TuningSchedule(state, barrier, 100, 12, 2, Mock())
+    assert not schedule.tick(first_poll, int(first_poll * 1000))
+    assert state.photo is not None
+    photo_id = state.photo["photo_id"]
+    assert state.photo["offer_open"]
+    assert state.shutter == first_poll
+    assert schedule.end >= first_poll + 10
+    assert commands == []
+    assert not schedule.tick(first_poll + 9.999, 0)
+    assert state.photo["offer_open"]
+    assert commands == []
+    assert not schedule.tick(first_poll + 10, 0)
+    assert not state.photo["offer_open"]
+    assert state.photo["photo_id"] == photo_id
+    assert len(commands) == 1
+    assert commands[0]["type"] == "photo_debug_quiesce"
+    barrier.control({"request_id": commands[0]["request_id"]}, 1)
+    assert schedule.tick(first_poll + 11, 0)
+
+
 @pytest.mark.asyncio
 async def test_tuning_cleanup_requires_shutdown_ack_even_with_zero_exit():
     bridge = SimpleNamespace(
