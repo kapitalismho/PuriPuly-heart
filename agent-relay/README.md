@@ -121,7 +121,7 @@ uv run --no-sync python -m puripuly_heart.release_evidence.agent_chat_simulator 
 
 `smoke` uses controlled model responses. Live evaluation requires an isolated Relay/Broker and a context manifest from the [exact emitted Worker](operations/export-context.mjs). Freeze source, context, cases, and judge; preserve failed/blocked attempts and historical reports. Benchmark authentication is separate from the app's account. HTML export reads saved results without model calls or rejudgment.
 
-[Evaluation scope](https://github.com/kapitalismho/PuriPuly-heart/issues/332) defines the cases and accepted limits. Human calibration remains tracked in [#365](https://github.com/kapitalismho/PuriPuly-heart/issues/365); final GUI verification belongs to [#333](https://github.com/kapitalismho/PuriPuly-heart/issues/333).
+The [#332 closure](https://github.com/kapitalismho/PuriPuly-heart/issues/332#issuecomment-6702068939) and [#333 closure](https://github.com/kapitalismho/PuriPuly-heart/issues/333#issuecomment-6702069184) preserve historical evaluation/UI decisions and discard the remaining work, rather than certify it as passed or defer it. [#365](https://github.com/kapitalismho/PuriPuly-heart/issues/365#issuecomment-6701890465) records calibration completed during #332, with no separate follow-up or reported agreement counts. [#367](https://github.com/kapitalismho/PuriPuly-heart/issues/367#issuecomment-6703215301) records separate bounded Windows/hosted checks, not a full final-GUI acceptance pass.
 
 ## Source Map
 

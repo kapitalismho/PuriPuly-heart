@@ -95,6 +95,13 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 - Apply a translation model and its connection together using a combination from `settings choices`. For ASR, `asr set --channel self|peer|both --provider <choice>` is the convenience form.
 - Explicit provider fields can retry pending provider application; unrelated general settings edits do not. Observe committed settings and effective provider state separately, including after restart when checking persistence.
 
+### Settings Files and Retired Choices
+
+- Missing settings use canonical first-run defaults. A flat pre-vNext settings object is archived byte-for-byte, then replaced with canonical reset defaults without a UI notice; its previous values are not imported. File shape, not its legacy version number, selects this path. Reset defaults and current first-run defaults are separately owned policies.
+- Current canonical settings load normally. Recognized older canonical files are backed up and forward-migrated. Invalid JSON, non-object input, malformed canonical settings and unsupported future canonical versions fail closed rather than silently reset.
+- Backup failure leaves the original file untouched. Write or validation failure retains the archive and attempts exact-byte restoration; persistence or restoration failure remains an error, not a successful reset. Secret storage is separate and is not copied or deleted by this settings reset.
+- Fast Translation and Context mode selectors remain retired. Supported canonical historical booleans normalize to the fixed product policies and cannot restore the old selectors after save or restart. This does not preserve flat pre-vNext values or revive the retired AppSettings object facade.
+
 ### GUI Settings Selection
 
 - An enabled modal option applies on its first click. Single-select dialogs close after selection; multi-select dialogs stay open and retain at least one selection.
@@ -320,6 +327,13 @@ puripuly.exe events follow --topic translation --channel peer --include-translat
 - Subscribers have independent bounded buffers. Slow consumers cannot block producers; gaps require refreshing owner snapshots. Ordering is per owner/topic/channel, not global.
 - Use `--after <event-sequence> --instance-id <originating-instance>` for replay. Without `--after`, follow observes new events only.
 - CLI logs are sanitized metadata, not a copy of every GUI log row or the main file. Main logs may contain permitted conversation records: review/redact them before sharing.
+
+## Log Audiences and Local Files
+
+- The GUI Logs surface and ordinary Basic delivery show accepted Self/Peer source text and completed translations, including source-only outcomes, plus concise measured recognition RTF, VAD/SmartTurn activity, useful local latency and meaningful failures or state changes. There is no Detailed mode. Failure log copy states the situation without troubleshooting advice; unrelated help and recovery controls are separate.
+- Selected technical diagnostics use the existing main file, not the live Logs audience, regardless of severity. A concise Basic failure and its structured diagnostic are different projections of the same owning cause. CLI `logs follow` is sanitized metadata, not a mirror of every GUI/file row. This does not guarantee that foreground console capture is conversation-free; review it before sharing.
+- RTF is decode time divided by processed audio duration, not end-to-end latency. Missing measurements remain unavailable. Admission, local output acceptance, transport send, renderer observation and physical display are distinct; neither a successful UDP send nor a local latency row proves remote receipt or display.
+- One bounded asynchronous writer batches actual main-file writes; warning/error/terminal records request early delivery. Live Basic delivery does not wait for ordinary file batching. Flush is not fsync, and full queues, failed/stalled I/O, shutdown timeouts or forced termination can lose records. Consult delivery health rather than assuming enqueue or aggregate written counts prove individual persistence. Exact batching constants belong in the owning implementation. Review conversation-bearing files before sharing; see [local information](../PRIVACY.md#5-local-information-and-deletion) for rotation/retention and the separate explicit support-upload policy.
 
 ## Retained Diagnostics and Delivery Health
 

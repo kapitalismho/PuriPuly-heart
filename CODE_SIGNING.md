@@ -1,7 +1,7 @@
 # Code signing policy
 
-PuriPuly is applying to the SignPath Foundation open-source code-signing program.
-Current official releases are unsigned until the application and signing integration are complete.
+The SignPath Foundation project was accepted. Hosted TEST-only signing passed at signing-branch revision `4358383ea319d26807f7dd435d66cefbd27769f7` ([#225 evidence](https://github.com/kapitalismho/PuriPuly-heart/issues/225#issuecomment-6157644990)); this does not qualify the current integrated source or production trust.
+The integrated Native Release workflow does not yet perform SignPath signing. Production signing remains unready, and test-signed candidates are not production releases.
 
 Free code signing provided by SignPath.io, certificate by SignPath Foundation.
 
@@ -25,7 +25,7 @@ Approved responsibilities:
 
 One person holds all three roles; no second approver is required. Signing waits if the Approver is unavailable. Repository review rules still apply.
 
-GitHub and SignPath access must use MFA. SignPath setup and MFA verification are pending.
+GitHub and SignPath access must use MFA. The accepted test setup does not establish production account/MFA readiness. Actual production certificate, valid policy, narrowly approved origin/build restrictions and public signer/root evidence remain prerequisites; the last published portal snapshot is historical, not a fresh current-state check.
 
 ## Signing scope
 
@@ -52,7 +52,7 @@ Retain GitHub-hosted, tag-triggered builds and manually published draft releases
 5. Validate the installer and installed signing targets. Attach only the validated signed installer to a draft release.
 6. Publish only by explicit maintainer action.
 
-Changing this two-request sequence requires maintainer approval. Uninstaller generation and reuse were tested locally; Foundation integration and real signing remain unverified.
+Changing this two-request sequence requires maintainer approval. The historical signing-branch TEST run completed both manually approved requests, exact signed-byte rebuild, actual installation, installed-target validation and uninstall. It used an approved test certificate, not production trust, and does not qualify a changed integrated candidate. See [the TEST receipt and production handoff](https://github.com/kapitalismho/PuriPuly-heart/issues/225#issuecomment-6159370038).
 
 Missing artifacts, signing rejection or failure, or invalid signatures, publisher, metadata, or provenance must block the signed release. Never substitute unsigned files. Verify the certificate chain, applicable timestamp, expected publisher, product metadata, and installed inner artifacts.
 
@@ -66,7 +66,7 @@ Usage statistics default to ON, with agreement preselected. Declining turns stat
 
 Statistics OFF does not disable update checks, model downloads, authentication, or selected external services. See the Privacy Policy for these flows.
 
-Existing published installers predate this implementation. Foundation assessment remains pending.
+Preparation-era published installers were unsigned. Foundation project acceptance and the historical TEST result do not establish production readiness or authorize signing, deployment or publication.
 
 ## Foundation attribution
 
