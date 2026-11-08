@@ -17,7 +17,8 @@ Python and native must agree on the manifest, protocol, and advertised execution
 ## Caption and Presentation Contracts
 
 - Snapshots replace the scene; equal or older revisions are rejected. Python prunes expired content before sending. Native does not independently expire captions or use semantic retirement metadata to remove blocks.
-- Python rejects stale publications and fixes speaker style at first readable publication. Native receives presentation styles, not speaker identities; source and translation share that style. Self and non-diarized Peer captions keep their distinct styles without consuming diarized speaker slots.
+- Python rejects stale publications. Native receives presentation styles and overflow-divider state, not speaker identities; source and translation share the selected style. Self and non-diarized Peer captions keep their distinct styles without consuming diarized speaker slots.
+- Speaker style normally freezes at first readable publication. Native Soniox Peer previews instead stay gray; accepted authoritative final/repair revisions update matching source, translation, attribution, style and divider together. Style-only delivery or duplicate events do not independently restart pages/lifetime, reorder captions or revive expired content.
 - Qwen Audio Peer captions carry explicit non-diarized attribution from their first preview, preserving the same gold style through preview refreshes and final settlement.
 - Native exclusively owns bounded presentation retries. Eligible scene changes protect the latest accepted scene rather than replaying intermediate snapshots. Fresh rendering and GPU readiness precede submission; a cached texture or scheduled retry is not evidence of a completed presentation opportunity.
 - Retry metadata cannot extend caption lifetime, revive removed content, or reset stalled-work responsibility. Runtime replacement seeds only currently valid content. Desktop presentation does not schedule native retries.
@@ -34,6 +35,14 @@ Python and native must agree on the manifest, protocol, and advertised execution
 - Explicit OpenVR runtime or driver shutdown requests stop CAPTIONS normally only after a matching native completion, successful child exit, and resource cleanup. Python clears the ephemeral enabled intent without changing the saved VR target, calibration, or desktop bounds. It does not restart the overlay or switch to Desktop; restarting SteamVR requires enabling CAPTIONS again. Capture and translation remain independent.
 - Own-process quit faults, connection loss, rendering failures, and unexpected exits remain failures; quit events for another process are ignored. Already-polled faults and cleanup failures remain visible even alongside an explicit runtime shutdown request. Once that request is admitted, failure recovery cannot restart into the quitting runtime.
 - Initial enable while SteamVR is absent retains the existing Desktop fallback. This is distinct from an already-running VR overlay receiving an explicit shutdown request.
+
+### Desktop Startup and Interaction
+
+- The Desktop renderer uses a separately owned Flet view process. Flet is the sole ordinary-startup geometry and visibility writer; Win32 binds the owned process and observes bounds/visibility while providing native-only topmost and click-through behavior.
+- Startup is generation-scoped: page configuration, native readiness, canonical bounds, visible-state confirmation, then READY. An early first-visible observation is distinct from full readiness. Native window-state confirmation is not proof of rendered pixels or freedom from occlusion.
+- The actual owned process is binding authority. PID-file and endpoint observations validate identity; they must not silently redirect binding to a different view. Retired generations cannot acknowledge readiness or persist startup bounds as user movement.
+- Failed, cancelled and replaced views retain an explicit cleanup owner through confirmed process exit and PID-file cleanup. A replacement is a different generation, not retroactive success of the failed attempt; unresolved cleanup is not success.
+- While locked, the Windows adapter owns an event-driven relative-Z-order watcher. It may restore an overlapping topmost peer's ordering without activation or geometry changes; unlock, rebind and close retire the watcher. Window visibility/topmost flags alone do not establish caption pixels.
 
 ## Rendering Boundaries
 
