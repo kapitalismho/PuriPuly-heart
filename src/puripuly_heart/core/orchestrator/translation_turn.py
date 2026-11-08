@@ -926,7 +926,7 @@ class TranslationTurnLifecycleOwner:
                     ),
                 )
             )
-        settled = bool(targets) and all(target.status != "pending" for target in targets)
+        settled = all(target.status != "pending" for target in targets)
         status = parent.terminal_status or (
             ("failed" if any(target.status == "failed" for target in targets) else "complete")
             if parent.source_closed and settled
@@ -1032,6 +1032,9 @@ class TranslationTurnLifecycleOwner:
             await parent.source_closed_event.wait()
             if parent.closed or self._parent_cancellation_requested(parent):
                 raise asyncio.CancelledError
+            if not parent.children:
+                await self._close_parent(parent)
+                return
             await self._admit_draft_execution(parent)
             if parent.closed:
                 return

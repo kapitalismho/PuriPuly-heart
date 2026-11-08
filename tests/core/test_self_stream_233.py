@@ -142,3 +142,36 @@ async def test_late_predecessor_correction_gets_first_page_before_successor_prev
         ]
     finally:
         await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_punctuation_only_turn_does_not_block_later_chatbox_output():
+    clock = SystemClock()
+    sender = FakeSender()
+    provider = ControlledProvider()
+    harness = compose_translation_test_harness(
+        llm=provider,
+        stt=None,
+        osc=ChatboxPaginator(sender=sender, clock=clock),
+        chatbox_include_source=False,
+        clock=clock,
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=20,
+        self_target_languages=("en",),
+    )
+    try:
+        for text in ("alpha", "bravo"):
+            provider.releases[(text, "en")] = asyncio.Event()
+            provider.releases[(text, "en")].set()
+        await source(harness, "alpha")
+        await eventually(lambda: sender.sent == ["en:alpha"])
+        await eventually(lambda: harness.self_owner.merge_buffer is None)
+        await source(harness, "。")
+        await eventually(lambda: harness.self_owner.merge_buffer is None)
+        await source(harness, "bravo")
+        await eventually(lambda: sender.sent == ["en:alpha", "en:bravo"])
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), 2)
+        assert [call["text"] for call in provider.calls] == ["alpha", "bravo"]
+        assert not harness.translation_turns.has_resources
+    finally:
+        await asyncio.wait_for(harness.stop(), 2)
