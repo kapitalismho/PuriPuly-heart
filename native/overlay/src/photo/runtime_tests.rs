@@ -429,15 +429,15 @@ impl PhotoRuntime {
                 .unwrap();
         }
 
-        fn hold(runtime: &mut PhotoRuntime, clock: Instant) {
+        fn hold(runtime: &mut PhotoRuntime, clock: Instant, separation: f32) {
             let photo = runtime.state.photo().unwrap();
             for (ms, grip, distance) in [
                 (0, false, 0.0),
                 (50, false, 0.0),
                 (350, false, 0.0),
                 (360, true, 0.0),
-                (380, true, 0.12),
-                (455, true, 0.12),
+                (380, true, separation),
+                (455, true, separation),
             ] {
                 let mut head = IDENTITY;
                 head[2][3] = 0.5;
@@ -527,9 +527,6 @@ impl PhotoRuntime {
             .unwrap()
             .needs_frame(Instant::now()));
         no_report(&mut socket).await;
-        photo.visible = true;
-        publish(&mut runtime, &mut bridge, &mut socket, 3, &photo).await;
-        no_report(&mut socket).await;
         set_input(false, 0.0);
         runtime.interaction_tick(&mut bridge).await.unwrap();
         tokio::time::sleep(Duration::from_millis(350)).await;
@@ -544,16 +541,29 @@ impl PhotoRuntime {
         runtime.interaction_tick(&mut bridge).await.unwrap();
         assert!(!runtime.interaction.frame.pull);
         assert_pulses(&[]);
-        set_input(true, 0.12);
-        runtime.interaction_tick(&mut bridge).await.unwrap();
-        assert!(runtime.interaction.frame.pull);
-        assert_pulses(&[(1, 0, 900)]);
-        assert_eq!(message(&mut socket).await["type"], "photo_pull");
-        tokio::time::sleep(Duration::from_millis(160)).await;
-        runtime.interaction_tick(&mut bridge).await.unwrap();
-        assert!(!runtime.interaction.frame.pull);
-        assert_pulses(&[(1, 0, 900)]);
-        let clock = Instant::now();
+        let partial = runtime.interaction.frame.photo.unwrap();
+        assert!(partial.alpha > 0.0 && partial.alpha < 1.0);
+        assert!((partial.width - photo_width_m.unwrap_or(0.375) * partial.alpha).abs() < 0.00001);
+        assert!(!runtime.state.photo().unwrap().visible);
+        assert_eq!(runtime.pull_sequence, 0);
+        runtime.compositor.as_mut().unwrap().view_original(true);
+        runtime.render_frame(&mut bridge).await.unwrap();
+        no_report(&mut socket).await;
+        assert!(!runtime.drawn_reported);
+        let supplied = std::env::var_os("PURIPULY_PHOTO341_EVIDENCE");
+        let directory = supplied.clone().map(std::path::PathBuf::from).unwrap_or_else(|| {
+            std::env::temp_dir().join(format!("puri341-first-draw-{}", std::process::id()))
+        });
+        std::fs::create_dir_all(&directory).unwrap();
+        let case = if photo_width_m.is_some() { "override" } else { "default" };
+        let original_path = directory.join(format!("hidden-partial-{case}-original.png"));
+        runtime.compositor.as_ref().unwrap().save(&original_path).unwrap();
+        let original = image::open(&original_path).unwrap().into_rgba8();
+        assert!(original.pixels().all(|pixel| pixel.0 == [35, 45, 60, 255]));
+        runtime.compositor.as_mut().unwrap().view_original(false);
+        if let Backend::OpenVr(surfaces) = &mut runtime.backend {
+            surfaces.photo.as_mut().unwrap().set_overlay_visible(false).unwrap();
+        }
         fail_photo_show(true);
         assert_eq!(
             runtime.render_frame(&mut bridge).await,
@@ -563,7 +573,28 @@ impl PhotoRuntime {
         no_report(&mut socket).await;
         fail_photo_show(false);
         runtime.render_frame(&mut bridge).await.unwrap();
-        assert_held_width();
+        let visible = match &runtime.backend {
+            Backend::OpenVr(surfaces) => surfaces.photo.as_ref().unwrap().observed_overlay_visible(),
+            _ => panic!("Controlled OpenVR presentation required"),
+        };
+        assert_eq!(visible, Some(true));
+        let translated_path = directory.join(format!("hidden-partial-{case}-translated.png"));
+        let compositor = runtime.compositor.as_ref().unwrap();
+        compositor.save(&translated_path).unwrap();
+        let translated = image::open(&translated_path).unwrap().into_rgba8();
+        let glyph_pixels = translated.pixels().filter(|pixel| pixel[0] > 200 && pixel[1] > 200 && pixel[2] > 190).count();
+        let erased_pixels = translated.pixels().filter(|pixel| pixel.0 == [70, 90, 110, 255]).count();
+        assert!(glyph_pixels > 100);
+        assert!(erased_pixels > 100);
+        for (x, y) in [(0, 0), (319, 0), (0, 179), (319, 179)] {
+            assert_eq!(translated.get_pixel(x, y), original.get_pixel(x, y));
+        }
+        std::fs::write(directory.join(format!("hidden-partial-{case}-presentation.json")), serde_json::to_vec_pretty(&json!({
+            "photo":runtime.state.photo(), "placement":partial, "observed_overlay_visible":visible,
+            "pull_sequence":runtime.pull_sequence, "preparation_started":runtime.preparation_started,
+            "glyph_pixels":glyph_pixels, "erased_pixels":erased_pixels, "compositor":compositor.metadata(),
+            "input_boundary":"Controlled OpenVR system/surface function tables; production interaction/render_frame and real D3D pixels; no HMD",
+        })).unwrap()).unwrap();
         let first = message(&mut socket).await;
         assert_eq!(
             first,
@@ -573,33 +604,29 @@ impl PhotoRuntime {
             })
         );
         assert_eq!(runtime.state.photo().unwrap().phase, PhotoPhase::Requesting);
-        grant(
-            &mut runtime,
-            &mut bridge,
-            &mut socket,
-            &photo.photo_id,
-            1,
-            0,
-        )
-        .await;
-        grant(
-            &mut runtime,
-            &mut bridge,
-            &mut socket,
-            &photo.photo_id,
-            1,
-            1,
-        )
-        .await;
-        grant(
-            &mut runtime,
-            &mut bridge,
-            &mut socket,
-            &photo.photo_id,
-            1,
-            1,
-        )
-        .await;
+        assert_eq!(runtime.pull_sequence, 0);
+        no_report(&mut socket).await;
+        grant(&mut runtime, &mut bridge, &mut socket, &photo.photo_id, 1, 0).await;
+        assert_pulses(&[]);
+        grant(&mut runtime, &mut bridge, &mut socket, &photo.photo_id, 1, 1).await;
+        grant(&mut runtime, &mut bridge, &mut socket, &photo.photo_id, 1, 1).await;
+        assert_pulses(&[(2, 0, 900)]);
+        set_input(true, 0.12);
+        runtime.interaction_tick(&mut bridge).await.unwrap();
+        assert!(runtime.interaction.frame.pull);
+        assert_pulses(&[(2, 0, 900), (1, 0, 900)]);
+        assert_eq!(message(&mut socket).await["type"], "photo_pull");
+        tokio::time::sleep(Duration::from_millis(160)).await;
+        runtime.interaction_tick(&mut bridge).await.unwrap();
+        assert!(!runtime.interaction.frame.pull);
+        runtime.render_frame(&mut bridge).await.unwrap();
+        assert_held_width();
+        no_report(&mut socket).await;
+        assert_pulses(&[(2, 0, 900), (1, 0, 900)]);
+        let clock = Instant::now();
+        if supplied.is_none() {
+            std::fs::remove_dir_all(&directory).unwrap();
+        }
         for ms in [550, 700] {
             let mut head = IDENTITY;
             head[2][3] = 0.5;
@@ -622,7 +649,7 @@ impl PhotoRuntime {
         runtime.render_frame(&mut bridge).await.unwrap();
         publish(&mut runtime, &mut bridge, &mut socket, 4, &photo).await;
         assert!(runtime.interaction.frame.photo.is_none());
-        hold(&mut runtime, clock + Duration::from_millis(800));
+        hold(&mut runtime, clock + Duration::from_millis(800), 0.12);
         runtime.render_frame(&mut bridge).await.unwrap();
         no_report(&mut socket).await;
 
@@ -633,7 +660,7 @@ impl PhotoRuntime {
         runtime.backend = backend;
         publish(&mut runtime, &mut bridge, &mut socket, 5, &photo).await;
         compose_blocks(&mut runtime);
-        hold(&mut runtime, Instant::now());
+        hold(&mut runtime, Instant::now(), 0.12);
         runtime.render_frame(&mut bridge).await.unwrap();
         no_report(&mut socket).await;
         grant(
@@ -697,6 +724,19 @@ impl PhotoRuntime {
         grant(&mut runtime, &mut bridge, &mut socket, &old_id, 2, 1).await;
         assert!(runtime.interaction.frame.photo.is_none());
         no_report(&mut socket).await;
+        runtime.compositor.as_mut().unwrap().set_original(synthetic_drawable().0).unwrap();
+        let pull_sequence = runtime.pull_sequence;
+        hold(&mut runtime, Instant::now(), 0.119);
+        runtime.render_frame(&mut bridge).await.unwrap();
+        assert!(runtime.interaction.frame.photo.unwrap().alpha > 0.0);
+        assert!(!runtime.interaction.frame.pull);
+        assert_eq!(runtime.pull_sequence, pull_sequence);
+        assert!(!runtime.preparation_started);
+        assert!(!runtime.drawn_reported);
+        assert!(runtime.live_drawn_block.is_none());
+        no_report(&mut socket).await;
+        runtime.interaction.step(Some(&photo), None, Instant::now() + Duration::from_secs(1));
+        runtime.render_frame(&mut bridge).await.unwrap();
         bridge.close().await.unwrap();
     }
 }

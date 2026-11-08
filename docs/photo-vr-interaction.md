@@ -90,6 +90,8 @@ The correction leaves these contracts unchanged:
 - The 10-second offer, 600-second latest-photo retention, no pre-pull photo transmission, retained-result reopening without another request and separate photo/caption process ownership.
 - No Python product OCR UI, input suppression, ray fallback, provider-policy change or new retry/telemetry framework.
 
+An authorized retained photo can display translated content during a partial pull, before another 12 cm crossing. Its first translated draw uses the existing native presentation report, not Python's `visible` intent, to request the right-hand feedback grant. Current photo/attempt/block/renderer identity, draw eligibility and once-per-attempt/recovery fences still apply. This neither authorizes another provider request nor changes visibility intent; original-only preview cannot produce translated-block feedback.
+
 Prior live component evidence used Quest Pro controllers, not physical Quest 3, PICO 4 or Ultra tests. The owner rejected A/B/C anatomical placement and the former remotely bound photo behavior. The new candidate has synthetic nonidentity-pose checks and actual offscreen source/texture/preparation evidence, not a physical pass. Wrist alignment, edge grip, rotation comfort, HMD visibility/readability and felt haptics require a new owner observation.
 
 PICO Connect, Steam Link, Virtual Desktop and ALVR may expose different or emulated model identities. Inspecting one transport's assets is not a guarantee for every transport/version. Legacy Streaming Assistant `9.5.6.1` was not extractable with the available archive tools; current Connect findings are not relabeled as historical support.

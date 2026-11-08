@@ -211,7 +211,6 @@ class PhotoLifecycle:
             or photo.photo_id != photo_id
             or photo.attempt_id != attempt_id
             or not any(block["block_id"] == block_id for block in photo.blocks)
-            or not photo.visible
             or photo.first_block_drawn
             or (photo_id, attempt_id) not in self._draw_eligible
         ):

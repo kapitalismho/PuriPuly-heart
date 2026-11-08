@@ -684,10 +684,10 @@ async fn windows_graphics_controlled_held_photo_runtime_reports_first_draw_once_
             assert_eq!(calls.shutdowns, 1);
         });
         LEGACY.with(|calls| {
-            assert_eq!(
-                calls.borrow().pulses,
-                [(1, 0, 900), (2, 0, 900), (2, 0, 900)]
-            )
+            let pulses = &calls.borrow().pulses;
+            assert_eq!(pulses.len(), 3);
+            assert_eq!(pulses.iter().filter(|pulse| **pulse == (1, 0, 900)).count(), 1);
+            assert_eq!(pulses.iter().filter(|pulse| **pulse == (2, 0, 900)).count(), 2);
         });
     }
 }

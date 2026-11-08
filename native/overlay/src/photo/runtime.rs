@@ -1017,9 +1017,7 @@ impl PhotoRuntime {
                     surface
                         .set_overlay_visible(true)
                         .map_err(|_| PhotoError::OpenVr)?;
-                    drawn = placement.alpha > 0.0
-                        && photo.is_some_and(|p| p.visible)
-                        && !compositor.original_view;
+                    drawn = placement.alpha > 0.0 && !compositor.original_view;
                 } else {
                     if updated {
                         if let Some(texture) = &self.texture {

@@ -339,6 +339,46 @@ async def test_haptic_requires_draw_and_is_not_replayed_after_reopen_or_recovery
         await h.owner.close()
 
 
+async def test_first_draw_while_hidden_grants_without_changing_request_or_visibility(tmp_path):
+    ready = asyncio.Event()
+    h = Harness(tmp_path, [[ready, block(), PhotoStreamCompleted({}, "gpt-6-luna")]])
+    try:
+        h.owner.renderer_changed(1)
+        photo_id = await h.offer()
+        assert h.owner.first_block_drawn(photo_id, 0, 0, 1) is None
+        assert h.owner.pull(photo_id, "authorize")
+        await eventually(lambda: h.owner.request_starts == 1)
+        h.owner.hidden(photo_id)
+        assert h.owner.first_block_drawn(photo_id, 1, 0, 1) is None
+        ready.set()
+        await eventually(lambda: h.photo["phase"] == "completed")
+        before = h.photo
+        assert not before["visible"] and not before["first_block_drawn"]
+        assert h.owner.first_block_drawn("stale-photo", 1, 0, 1) is None
+        assert h.owner.first_block_drawn(photo_id, 0, 0, 1) is None
+        assert h.owner.first_block_drawn(photo_id, 1, 1, 1) is None
+        assert h.owner.first_block_drawn(photo_id, 1, 0, 2) is None
+        assert h.photo == before
+        assert h.owner.first_block_drawn(photo_id, 1, 0, 1) == {
+            "type": "photo_haptic",
+            "photo_id": photo_id,
+            "attempt_id": 1,
+            "block_id": 0,
+        }
+        assert h.photo == {**before, "first_block_drawn": True}
+        assert h.owner.first_block_drawn(photo_id, 1, 0, 1) is None
+        assert h.owner.pull(photo_id, "full-pull")
+        h.owner.hidden(photo_id)
+        assert h.owner.pull(photo_id, "reopen")
+        assert h.owner.first_block_drawn(photo_id, 1, 0, 1) is None
+        h.owner.renderer_changed(2)
+        assert h.owner.first_block_drawn(photo_id, 1, 0, 2) is None
+        assert len(h.prepares) == h.owner.request_starts == h.connections[0].starts == 1
+    finally:
+        ready.set()
+        await h.owner.close()
+
+
 async def test_replaced_preparation_drains_and_cannot_publish_stale_image(tmp_path):
     started = asyncio.Event()
     finish = asyncio.Event()
