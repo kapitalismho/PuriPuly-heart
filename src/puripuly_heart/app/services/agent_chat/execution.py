@@ -203,6 +203,144 @@ def request_schemas(catalog: dict) -> list[dict]:
     ]
 
 
+def app_tool_schemas(catalog: dict, *, family: str | None = None) -> dict[str, dict]:
+    from puripuly_heart.app.services.agent_chat.modules import TOPICS
+    from puripuly_heart.app.services.agent_chat.provider_setup import NAVIGATION_PROVIDERS
+    from puripuly_heart.app.services.agent_chat.tools import settings_tool_schema
+
+    def sparse(schema):
+        if "anyOf" in schema:
+            variants = [item for item in schema["anyOf"] if item != {"type": "null"}]
+            if len(variants) == 1:
+                return sparse(variants[0])
+        result = dict(schema)
+        if result.get("type") == "object":
+            result["properties"] = {
+                key: sparse(value) for key, value in result["properties"].items()
+            }
+            result["required"] = []
+        return result
+
+    def request(actions, fields=None, optional=()):
+        schema = object_schema({"action": scalar("string", actions), **(fields or {})})
+        schema["required"] = [key for key in schema["properties"] if key not in optional]
+        return schema
+
+    provider = scalar("string", sorted(NAVIGATION_PROVIDERS))
+    identity = scalar("string", minLength=1, maxLength=64)
+    queries = request_schemas(catalog)
+    simple_queries = [
+        spec["properties"]["action"]["enum"][0].removeprefix("query.")
+        for spec in queries
+        if spec["properties"]["action"]["enum"][0].startswith("query.")
+        and len(spec["properties"]) == 1
+    ]
+    history = next(
+        spec
+        for spec in queries
+        if spec["properties"]["action"]["enum"] == ["query.diagnostics.history"]
+    )
+    reads = [
+        request(simple_queries),
+        request(
+            ["diagnostics.history"],
+            {key: sparse(value) for key, value in history["properties"].items() if key != "action"},
+            ("operation_id", "diagnostic_id", "after", "limit"),
+        ),
+        request(
+            ["context"],
+            {
+                "topic": scalar("string", sorted(TOPICS)),
+                "diagnostic_id": identity,
+                "operation_id": identity,
+                "after": scalar("integer", minimum=0),
+            },
+            ("diagnostic_id", "operation_id", "after"),
+        ),
+        request(["provider.setup"], {"provider": provider}),
+        request(["operation"], {"operation_id": identity}),
+    ]
+    executions = [
+        request(
+            ["capture.set"],
+            {"channel": scalar("string", ("self", "peer")), "enabled": scalar("boolean")},
+        ),
+        request(["translation.set", "overlay.set"], {"enabled": scalar("boolean")}),
+        request(["recognition.probe"], {"channel": scalar("string", ("self", "peer"))}),
+        request(
+            [
+                "audio.diagnose",
+                "osc.discovery.retry",
+                "translation.probe",
+                "audio.retry",
+                "ui.accounts",
+            ]
+        ),
+        request(["models.retry"], {"backend": scalar("string", ("gpu",))}, ("backend",)),
+        request(["ui.provider_setup"], {"provider": provider}),
+        request(
+            ["ui.settings"],
+            {
+                "section": scalar("string", ("api", "general", "overlay", "prompts")),
+                "provider": provider,
+            },
+            ("provider",),
+        ),
+        request(["confirmation.withdraw"], {"card_id": identity}),
+    ]
+    proposals = [
+        request(["settings"], {"changes": sparse(settings_tool_schema(catalog))})
+        if family in (None, "propose_app")
+        else request(["settings"]),
+        request(["report"], {"summary": scalar("string", minLength=1, maxLength=2000)}),
+        *[spec for spec in queries if spec["properties"]["action"]["enum"][0] in CARD_COMMANDS],
+    ]
+    return {
+        name: object_schema({"request": {"anyOf": variants}})
+        for name, variants in (
+            ("read_app", reads),
+            ("execute_app", executions),
+            ("propose_app", proposals),
+        )
+    }
+
+
+def app_tool_target(name: str, arguments: dict) -> tuple[str, dict]:
+    request = dict(arguments["request"])
+    action = request.pop("action")
+    if name == "read_app":
+        if action == "context":
+            return "get_app_context", request
+        if action == "provider.setup":
+            return "get_provider_setup", request
+        if action == "operation":
+            return "read_operation", request
+        return "control_app", {"request": {"action": "query." + action, **request}}
+    if name == "propose_app":
+        if action == "settings":
+            return "change_settings", request
+        if action == "report":
+            return "propose_report", request
+        return "control_app", {"request": {"action": action, **request}}
+    targets = {
+        "capture.set": "set_capture",
+        "translation.set": "set_translation",
+        "audio.diagnose": "diagnose_microphone",
+        "osc.discovery.retry": "retry_osc_discovery",
+        "translation.probe": "probe_translation",
+        "ui.provider_setup": "get_provider_setup",
+        "ui.settings": "open_settings",
+        "confirmation.withdraw": "withdraw_confirmation",
+    }
+    if action == "recognition.probe":
+        return f"probe_{request['channel']}_recognition", {}
+    if action == "ui.accounts":
+        return "get_app_context", {"topic": "accounts"}
+    if action in targets:
+        return targets[action], request
+    return "control_app", {"request": {"action": action, **request}}
+
+
 def validate(value, schema: dict, *, partial: bool = False) -> None:
     if "anyOf" in schema:
         for variant in schema["anyOf"]:
@@ -248,7 +386,7 @@ def validate(value, schema: dict, *, partial: bool = False) -> None:
         if value.keys() - fields.keys() or (not partial and required - value.keys()):
             raise ValueError("invalid_control_fields")
         for key, item in value.items():
-            validate(item, fields[key], partial=True)
+            validate(item, fields[key], partial=partial)
     if kind == "array":
         if not schema.get("minItems", 0) <= len(value) <= schema.get("maxItems", 100):
             raise ValueError("invalid_control_length")

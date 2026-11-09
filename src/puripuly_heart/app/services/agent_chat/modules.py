@@ -327,8 +327,88 @@ def _diagnostics(snapshot: Mapping) -> dict:
     return result
 
 
+def compact_evidence(value: object) -> object:
+    if isinstance(value, Mapping):
+        result = {
+            key: compact_evidence(item)
+            for key, item in value.items()
+            if key != "observed_speech_probabilities"
+        }
+        if isinstance(result.get("candidates"), list):
+            fields = {
+                "id",
+                "current_route",
+                "input_host_api",
+                "input_device",
+                "opened",
+                "frames_received",
+                "speech_detected",
+                "silence_observed",
+                "peak_level",
+                "speech_probability_min",
+                "speech_probability_max",
+                "speech_threshold",
+                "failure_code",
+                "cleanup_complete",
+            }
+            result["candidates"] = [
+                {key: item for key, item in candidate.items() if key in fields}
+                for candidate in result["candidates"][:4]
+            ]
+        if "observed_speech_probabilities" in value:
+            result["samples"] = "omitted_from_model"
+        return result
+    if isinstance(value, list):
+        return [compact_evidence(item) for item in value]
+    return deepcopy(value)
+
+
+def operation_header(operation: Mapping) -> dict:
+    result = _mapping(operation.get("result"))
+    receipt = _mapping(result.get("receipt", operation.get("receipt")))
+    return {
+        **{
+            key: operation[key]
+            for key in ("action_id", "tool", "phase", "changed")
+            if key in operation
+        },
+        **{key: result[key] for key in ("status", "changes", "code", "error") if key in result},
+        **{
+            key: compact_evidence(receipt[key])
+            for key in (
+                "instance_id",
+                "operation_id",
+                "request_id",
+                "status",
+                "terminal",
+                "revision",
+                "diagnostic_id",
+                "reason",
+                "effect",
+                "error",
+                "saved",
+                "runtime_ready",
+                "settings_changed",
+                "cleanup_complete",
+                "cleanup_outcome",
+                "diagnosis",
+                "recognition_result",
+                "recognition_scope",
+                "translation_result",
+                "configured_provider",
+                "exercised_provider",
+                "output_delivery",
+                "display",
+                "runtime_observation",
+                "transaction",
+            )
+            if key in receipt
+        },
+    }
+
+
 def _core(snapshot: Mapping) -> dict:
-    activity = _mapping(snapshot.get("last_activity"))
+    activity = _mapping(snapshot.get("activity_events", snapshot.get("last_activity")))
     result: dict = {
         "revision": snapshot.get("revision"),
         "app": deepcopy(snapshot.get("app")),
@@ -337,8 +417,10 @@ def _core(snapshot: Mapping) -> dict:
             "availability": snapshot.get("activity_availability"),
             **deepcopy(dict(activity)),
         },
-        "recent_actions": deepcopy(snapshot.get("recent_agent_actions", [])),
-        "operations": deepcopy(snapshot.get("agent_operations", [])),
+        "recent_actions": [
+            operation_header(item) for item in snapshot.get("recent_agent_actions", [])
+        ],
+        "operations": [operation_header(item) for item in snapshot.get("agent_operations", [])],
         "pending_confirmation": deepcopy(snapshot.get("pending_confirmation")),
         "support_reports": deepcopy(snapshot.get("support_reports", [])),
         "puri_allowance": deepcopy(snapshot.get("puri_allowance")),
@@ -430,6 +512,11 @@ def model_context(
         modules = ordered_modules(modules)
     result: dict = {
         "observed_at": snapshot.get("observed_at"),
+        **(
+            {"observed_monotonic": snapshot["observed_monotonic"]}
+            if "observed_monotonic" in snapshot
+            else {}
+        ),
         "modules": list(modules),
         "missing": list(snapshot.get("missing", [])),
     }
@@ -445,9 +532,9 @@ def model_context(
 def model_receipt(result: Mapping) -> dict:
     context = result.get("context")
     if not isinstance(context, Mapping) or not isinstance(context.get("settings"), Mapping):
-        return dict(result)
+        return compact_evidence(result)
     return {
-        **result,
+        **compact_evidence(result),
         "context": {
             **context,
             "settings": setting_values(context["settings"]),

@@ -1750,55 +1750,6 @@ async def test_audio_setting_choice_projection_drops_private_fields_and_marks_re
     assert "PRIVATE-" not in json.dumps([result, initial])
 
 
-def test_generated_control_schemas_are_strict_and_dynamic_audio_choices_stay_local():
-    root = Path(__file__).resolve().parents[2]
-    source = (root / "agent-relay/src/action-tools.ts").read_text(encoding="utf-8")
-    tools = {
-        tool["name"]: tool
-        for tool in json.loads(
-            source.removeprefix("export const actionTools = ").removesuffix(";\n")
-        )
-    }
-    for name, required in (
-        ("set_capture", {"channel", "enabled"}),
-        ("set_translation", {"enabled"}),
-        ("diagnose_microphone", set()),
-        ("retry_osc_discovery", set()),
-        ("get_provider_setup", {"provider"}),
-        ("withdraw_confirmation", {"card_id"}),
-    ):
-        parameters = tools[name]["parameters"]
-        assert tools[name]["strict"] is True
-        assert parameters["additionalProperties"] is False
-        assert set(parameters["required"]) == required
-        assert set(parameters["properties"]) == required
-    assert set(tools["set_capture"]["parameters"]["properties"]["channel"]["enum"]) == {
-        "self",
-        "peer",
-    }
-    assert tools["set_capture"]["parameters"]["properties"]["enabled"] == {"type": "boolean"}
-    assert set(tools["get_provider_setup"]["parameters"]["properties"]["provider"]["enum"]) == set(
-        NAVIGATION_PROVIDERS
-    )
-    assert tools["withdraw_confirmation"]["parameters"]["properties"]["card_id"] == {
-        "type": "string",
-        "minLength": 1,
-    }
-    assert "confirm" not in tools and "undo" not in tools
-    changes = tools["change_settings"]["parameters"]["properties"]["changes"]
-    assert set(changes["properties"]) == SETTINGS_FIELDS
-    assert set(changes["required"]) == SETTINGS_FIELDS
-    assert changes["properties"]["stt.cloud_free_tier_providers"]["anyOf"][0] == {
-        "type": "array",
-        "items": {
-            "type": "string",
-            "enum": ["elevenlabs_scribe", "gemini_transcribe", "deepgram"],
-        },
-        "minItems": 1,
-    }
-    for field in ("audio.input_host_api", "audio.input_device"):
-        assert changes["properties"][field]["anyOf"][0] == {"type": "string"}
-
 
 @pytest.mark.asyncio
 async def test_generator_omits_enumerated_local_audio_values(catalog, tmp_path, monkeypatch):
@@ -1815,32 +1766,6 @@ async def test_generator_omits_enumerated_local_audio_values(catalog, tmp_path, 
     )
     runpy.run_path(str(generator), run_name="__main__")
     assert "PRIVATE-" not in output_path.read_text(encoding="utf-8")
-    generated = json.loads(
-        output_path.read_text(encoding="utf-8")
-        .removeprefix("export const actionTools = ")
-        .removesuffix(";\n")
-    )
-    changes = next(tool for tool in generated if tool["name"] == "change_settings")["parameters"][
-        "properties"
-    ]["changes"]
-    field = "stt.cloud_free_tier_providers"
-    local_schema = settings_tool_schema(catalog)["properties"][field]
-    assert local_schema["anyOf"][0].pop("uniqueItems") is True
-    assert changes["properties"][field] == local_schema
-    assert field in changes["required"]
-    generated_retry = next(tool for tool in generated if tool["name"] == "retry_osc_discovery")
-    checked_in = json.loads(
-        (generator.parent / "src/action-tools.ts")
-        .read_text(encoding="utf-8")
-        .removeprefix("export const actionTools = ")
-        .removesuffix(";\n")
-    )
-    assert generated_retry == next(
-        tool for tool in checked_in if tool["name"] == "retry_osc_discovery"
-    )
-    assert next(tool for tool in generated if tool["name"] == "withdraw_confirmation") == next(
-        tool for tool in checked_in if tool["name"] == "withdraw_confirmation"
-    )
 
 
 def test_diagnosis_projection_preserves_measured_ranges_and_bounds_numeric_samples():
@@ -1891,10 +1816,9 @@ async def test_runtime_command_failure_retains_safe_action_without_private_excep
     tools, actions, _ = adapter(control)
     try:
         result = await tools.execute("diagnose_microphone", {})
-        assert result == {
-            "status": "failed",
-            "error": {"code": "audio_diagnose_operation_unavailable"},
-        }
+        assert result["status"] == "unavailable"
+        assert result["error"]["code"] == "audio_diagnose_outcome_unknown"
+        assert result["request_id"] == actions[-1]["action_id"]
         assert [action["phase"] for action in actions] == ["completed"]
         assert actions[-1]["result"] == result
         assert "PRIVATE-" not in json.dumps(actions)

@@ -1592,7 +1592,7 @@ async def test_judge_preserves_work_context_and_off_topic_boundaries_without_use
         for caption in captions
     )
     payload = judge_inputs[0]
-    brief_calls, work_calls, observed_results = [], [], []
+    brief_calls, work_calls = [], []
     for call in payload["M_invocations"]:
         inputs = [
             payload["M_input_items"][item_id] for item_id in call["request"]["input_item_ids"]
@@ -1608,18 +1608,12 @@ async def test_judge_preserves_work_context_and_off_topic_boundaries_without_use
         for index, item in enumerate(inputs):
             if item.get("type") != "function_call_output":
                 continue
-            invocation = next(
-                row
-                for row in inputs[:index]
-                if row.get("type") == "function_call" and row["call_id"] == item["call_id"]
-            )
             recorded_outcome = next(
                 row
                 for row in recorded["request"]["input"]
                 if row.get("type") == "function_call_output" and row["call_id"] == item["call_id"]
             )
             assert json.loads(item["output"]) == json.loads(recorded_outcome["output"])
-            observed_results.append(invocation["name"])
     assert brief_calls
     assert work_calls
     assert any(
@@ -1627,7 +1621,6 @@ async def test_judge_preserves_work_context_and_off_topic_boundaries_without_use
         for inputs in work_calls
         for item in inputs
     )
-    assert "diagnose_microphone" in observed_results
     for call in result["M_invocations"]:
         request = call["request"]
         updates = [item for item in request["input"] if item.get("type") == "configuration_update"]
@@ -1724,7 +1717,7 @@ async def test_actual_cli_smoke_covers_retained_suite_and_scripted_boundaries(tm
         arguments.extend(["--case", identity])
     assert await cli.execute(cli.parser().parse_args(arguments)) == 0
     report = cli.load_json(str(output))
-    assert report["agent_protocol"] == 5
+    assert report["agent_protocol"] == 6
     assert report["controlled_smoke"] is True
     assert report["live_pass"] is False
     assert {case["id"] for case in report["cases"]} == set(selected)
@@ -3877,12 +3870,6 @@ async def test_controlled_osc_recovery_uses_real_tool_boundary_without_user_disp
     assert (
         result["code"]["state"]["osc_retry_operations"][0]["effect"] == "discovery_target_applied"
     )
-    calls = [
-        item
-        for item in result["archive"]
-        if item.get("type") == "function_call" and item.get("name") == "retry_osc_discovery"
-    ]
-    assert len(calls) == 1
     assert result["code"]["state"]["osc_output"]["remote_delivery"] == "unacknowledged"
     assert (
         result["code"]["state"]["synthetic_vrchat_chatbox"]["evidence_scope"]

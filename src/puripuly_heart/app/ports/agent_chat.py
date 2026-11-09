@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol, TypedDict
 
-AGENT_CHAT_PROTOCOL = 5
+AGENT_CHAT_PROTOCOL = 6
 
 AgentEffort = Literal["low", "high", "xhigh"]
 AgentRoute = Literal["work", "social", "out_of_scope", "unclear"]

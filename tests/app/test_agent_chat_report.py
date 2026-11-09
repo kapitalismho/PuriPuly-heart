@@ -162,7 +162,9 @@ async def test_inline_consent_sends_complete_archive_and_static_receipt(tmp_path
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failed", (False, True))
 @pytest.mark.parametrize("reset", (False, True))
-async def test_next_user_request_sees_only_current_completed_support_receipt(failed, reset):
+async def test_next_user_request_distinguishes_sending_and_completed_support_receipts(
+    failed, reset
+):
     entered, release = asyncio.Event(), asyncio.Event()
 
     async def upload(request):
@@ -188,7 +190,10 @@ async def test_next_user_request_sees_only_current_completed_support_receipt(fai
         await asyncio.wait_for(entered.wait(), 2)
         assert calls == (len(transport.classifications), len(transport.requests))
         assert (await owner.send("Has the upload completed yet?")).status == "completed"
-        assert context_of(transport.requests[-1])["core"]["support_reports"] == []
+        pending = context_of(transport.requests[-1])["core"]["support_reports"]
+        assert pending == [
+            {"status": "sending", "offer_id": offer.id, "displayed": False, "clicked": True}
+        ]
         if reset:
             owner.new_conversation()
         calls = len(transport.classifications), len(transport.requests)
@@ -202,9 +207,17 @@ async def test_next_user_request_sees_only_current_completed_support_receipt(fai
             []
             if reset
             else (
-                [{"status": "failed"}]
+                [{"status": "failed", "offer_id": offer.id, "displayed": False, "clicked": True}]
                 if failed
-                else [{"status": "sent", "ticket": result["ticket"]}]
+                else [
+                    {
+                        "status": "sent",
+                        "ticket": result["ticket"],
+                        "offer_id": offer.id,
+                        "displayed": False,
+                        "clicked": True,
+                    }
+                ]
             )
         )
         assert context["core"]["support_reports"] == expected
@@ -338,7 +351,8 @@ async def test_repeated_proposal_has_one_action_and_rejection_never_uploads():
     try:
         assert len(owner.snapshot.report_offers) == 1
         results = owner.snapshot.tool_results
-        assert results[0].result["offer_id"] == results[1].result["offer_id"] == offer.id
+        assert results[0].result["offer_id"] == offer.id
+        assert results[1].status == "not_executed"
         assert owner.reject_report(offer.id) == {"status": "rejected", "offer_id": offer.id}
         assert (await owner.send_report(offer.id))["status"] == "rejected"
         assert not transport.uploads

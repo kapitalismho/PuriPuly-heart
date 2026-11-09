@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from puripuly_heart.app.services.agent_chat.context import TOPICS
-from puripuly_heart.app.services.agent_chat.execution import request_schemas
+from puripuly_heart.app.services.agent_chat.execution import app_tool_schemas, request_schemas
 from puripuly_heart.app.services.agent_chat.provider_setup import NAVIGATION_PROVIDERS
 from puripuly_heart.app.services.agent_chat.tools import settings_tool_schema
 
@@ -18,12 +18,76 @@ def _openai_schema(value: object) -> object:
     return value
 
 
+def unified_tools(catalog: dict) -> list[dict]:
+    schemas = app_tool_schemas(catalog)
+    proposal = schemas["propose_app"]
+    changes = proposal["properties"]["request"]["anyOf"][0]["properties"]["changes"]
+    groups = {}
+    for field, schema in changes["properties"].items():
+        groups.setdefault(json.dumps(schema, sort_keys=True), []).append(field)
+    definitions = {}
+    for fields in groups.values():
+        if len(fields) < 2:
+            continue
+        identity = f"value{len(definitions) + 1}"
+        definitions[identity] = changes["properties"][fields[0]]
+        for field in fields:
+            changes["properties"][field] = {"$ref": f"#/$defs/{identity}"}
+    if definitions:
+        proposal["$defs"] = definitions
+    descriptions = {
+        "read_app": (
+            "Observe app context, allowlisted queries or provider setup metadata without UI or runtime effects. "
+            "Independent reads may share a batch; results are not an atomic snapshot. "
+            "Use observed diagnostic IDs/cursors for retained details; not_retained is not an operation failure."
+        ),
+        "execute_app": (
+            "Run listed immediate operations or explicitly stage existing UI controls. "
+            "ui.provider_setup returns metadata and stages links/secure entry; ui.accounts stages account buttons. "
+            "Staged is not displayed, clicked, verified or ready. Only users enter credentials and authorize accounts. "
+            "Probes are active, scoped synthetic checks, not proof of live capture, quality or display. "
+            "audio.diagnose exercises local capture/VAD, not recognition, and never changes settings. "
+            "OSC target application does not prove remote receipt. Inspect terminal receipts; do not replay uncertain work. "
+            "confirmation.withdraw removes only the exact pending proposal, never saved changes."
+        ),
+        "propose_app": (
+            "Propose sparse typed settings, key deletion, logout, position reset or a support report. "
+            "Settings require revision-bound user approval; supply only changed fields, never null placeholders. "
+            "Submit translation model and connection together. Coupled audio routes retain validation. "
+            "The app queues cards with at most two blocks; explain and end the turn without resubmitting. "
+            "Key deletion is local, not provider revocation. Reports upload only after the user's explicit click. "
+            "Approval, required user action, pending work or blocking failure stops later effects."
+        ),
+    }
+    return [
+        {
+            "type": "function",
+            "name": name,
+            "description": descriptions[name],
+            "strict": False,
+            "parameters": _openai_schema(schema),
+        }
+        for name, schema in schemas.items()
+    ]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("choices", type=Path)
-    parser.add_argument("--output", type=Path, default=Path("agent-relay/src/action-tools.ts"))
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--protocol", type=int, choices=(5, 6), default=6)
     args = parser.parse_args()
     catalog = json.loads(args.choices.read_text(encoding="utf-8"))
+    if args.protocol == 6:
+        output = args.output or Path("agent-relay/src/app-tools.ts")
+        output.write_text(
+            "export const appTools = "
+            + json.dumps(unified_tools(catalog), ensure_ascii=False, indent=2)
+            + ";\n",
+            encoding="utf-8",
+        )
+        return
+    args.output = args.output or Path("agent-relay/src/action-tools.ts")
     tools = [
         {
             "type": "function",

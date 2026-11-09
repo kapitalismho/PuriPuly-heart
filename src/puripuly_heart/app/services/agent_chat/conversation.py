@@ -43,7 +43,7 @@ class AgentConversation:
             return deepcopy(context)
         result = {
             key: deepcopy(context[key])
-            for key in ("observed_at", "modules", "missing", "view")
+            for key in ("observed_at", "observed_monotonic", "modules", "missing", "view")
             if key in context
         }
         catalogs = {

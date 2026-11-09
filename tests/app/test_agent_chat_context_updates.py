@@ -151,7 +151,7 @@ async def test_account_read_stages_current_controls_even_when_account_facts_are_
         staged, repeated = second.tool_results
         assert staged.status == "observed"
         assert "account.chatgpt.setup" in staged.result["context"]["accounts"]["actions"]
-        assert repeated.status == "unchanged"
+        assert repeated.status == "not_executed"
         first_actions = {action.id for action in owner.snapshot.setup_actions if action.available}
         assert any(
             action.action_id == "account.chatgpt.setup" for action in owner.snapshot.setup_actions

@@ -7,6 +7,8 @@ import unicodedata
 from collections import Counter
 from copy import deepcopy
 
+from puripuly_heart.app.services.agent_chat.execution import app_tool_target
+
 from .models import JUDGE_EFFORT, JUDGE_MODEL
 
 CRITERIA = (
@@ -487,11 +489,7 @@ def _expressed_paid_refusal(text: str) -> bool:
 
 
 def _tool_exchanges(archive: list[dict], name: str) -> list[dict]:
-    calls = {
-        item.get("call_id"): item
-        for item in archive
-        if item.get("type") == "function_call" and item.get("name") == name
-    }
+    calls = {item.get("call_id"): item for item in archive if item.get("type") == "function_call"}
     exchanges = []
     for item in archive:
         call = calls.get(item.get("call_id"))
@@ -500,6 +498,11 @@ def _tool_exchanges(archive: list[dict], name: str) -> list[dict]:
         try:
             arguments = json.loads(call["arguments"])
             result = json.loads(item["output"])
+            actual_name = call.get("name")
+            if actual_name in {"read_app", "execute_app", "propose_app"}:
+                actual_name, arguments = app_tool_target(actual_name, arguments)
+            if actual_name != name:
+                continue
         except KeyError, TypeError, ValueError:
             continue
         if isinstance(arguments, dict) and isinstance(result, dict):
@@ -638,7 +641,9 @@ def _pending_card_disposition(
             branch = "exact_card_rejected"
         elif refused:
             for tool in result.get("tool_results", []):
-                if tool.get("tool") != "withdraw_confirmation" or not tool.get("call_id"):
+                if tool.get("tool") not in {"withdraw_confirmation", "execute_app"} or not tool.get(
+                    "call_id"
+                ):
                     continue
                 if any(
                     exchange["call_id"] == tool.get("call_id")

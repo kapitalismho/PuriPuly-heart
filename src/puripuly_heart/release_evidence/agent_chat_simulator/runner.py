@@ -225,7 +225,7 @@ class ConversationRecorder:
         self.seen_messages = len(snapshot.messages)
         for item in snapshot.tool_results:
             if (
-                item.tool == "get_provider_setup"
+                (item.tool == "get_provider_setup" or item.result.get("controls_staged") is True)
                 and item.status == "available"
                 and item.result.get("provider") in KEY_FIELDS
             ):
@@ -373,7 +373,9 @@ async def run_attempt(
         transport,
         context_mode=context_mode,
         localize=lambda key: t_for_locale(scenario.persona.language, key),
-        support_log_snapshot=lambda: b"Synthetic simulator log only. No microphone, private logs, or real providers.\n",
+        support_log_snapshot=lambda: (
+            b"Synthetic simulator log only. No microphone, private logs, or real providers.\n"
+        ),
     )
     owner.bind_navigation(app.navigate)
     owner.bind_verification_providers(frozenset(KEY_FIELDS))
@@ -1046,15 +1048,48 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
         }
 
     def tool(name: str, arguments: dict) -> dict:
+        identity = f"smoke-{len(app.operations)}-{name}"
+        if name == "get_app_context":
+            family, request = "read_app", {"action": "context", **arguments}
+        elif name == "control_app":
+            request = dict(arguments["request"])
+            action = request["action"]
+            if action.startswith("query."):
+                family = "read_app"
+                request["action"] = action.removeprefix("query.")
+            else:
+                family = "execute_app"
+        elif name in {"change_settings", "propose_report"}:
+            family = "propose_app"
+            request = {"action": "settings" if name == "change_settings" else "report", **arguments}
+        else:
+            actions = {
+                "set_capture": "capture.set",
+                "set_translation": "translation.set",
+                "diagnose_microphone": "audio.diagnose",
+                "retry_osc_discovery": "osc.discovery.retry",
+                "probe_translation": "translation.probe",
+                "open_settings": "ui.settings",
+                "get_provider_setup": "ui.provider_setup",
+                "withdraw_confirmation": "confirmation.withdraw",
+            }
+            family = "execute_app"
+            if name in {"probe_self_recognition", "probe_peer_recognition"}:
+                request = {"action": "recognition.probe", "channel": name.split("_")[1]}
+            else:
+                request = {
+                    "action": actions[name],
+                    **{key: value for key, value in arguments.items() if value is not None},
+                }
         return {
             "status": "completed",
             "output": [
                 {
                     "type": "function_call",
                     "status": "completed",
-                    "call_id": f"smoke-{len(app.operations)}-{name}",
-                    "name": name,
-                    "arguments": json.dumps(arguments),
+                    "call_id": identity,
+                    "name": family,
+                    "arguments": json.dumps({"request": request}),
                 }
             ],
         }
@@ -1290,8 +1325,10 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 result = answer("구성 요소 검사를 마쳤어. 실제 화면 결과와는 구분해서 볼게.")
             else:
                 result = tool(
-                    "probe_recognition" if cause == "recognition_auth" else "probe_translation",
-                    {"channel": "self"} if cause == "recognition_auth" else {},
+                    "probe_self_recognition"
+                    if cause == "recognition_auth"
+                    else "probe_translation",
+                    {},
                 )
         elif cause in {"slow_luna", "slow_gemma"}:
             replacement = "deepseek_v4_flash_41"

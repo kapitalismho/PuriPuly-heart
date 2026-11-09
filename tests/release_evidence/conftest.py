@@ -173,7 +173,7 @@ def relay_context_manifest() -> dict:
     marker = "TRUSTED_CONTEXT_ONLY_NOT_FOR_TERRA"
     return {
         "format": "puri-agent-relay-context-1",
-        "agent_protocol": 5,
+        "agent_protocol": 6,
         "relay_build": "a" * 64,
         "bundle_hashes": {"index.js": "a" * 64, "guide.md": "b" * 64},
         "contexts": {
