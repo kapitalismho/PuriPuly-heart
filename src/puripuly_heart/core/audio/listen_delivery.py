@@ -43,7 +43,9 @@ class ListenDeliveryController:
     HARD_LIMIT_S = 6.0
     CLOUD_FIVE_SECOND_PAUSE_MS = 192
     CLOUD_HARD_LIMIT_S = 10.0
-    CLOUD_FINAL_PROVIDER_IDS = frozenset({"soniox", "deepgram", "gemini_transcribe", "qwen_audio"})
+    CLOUD_FINAL_PROVIDER_IDS = frozenset(
+        {"soniox", "deepgram", "gemini_transcribe", "qwen_audio", "elevenlabs_scribe"}
+    )
     HARD_CUT_OVERLAP_MS = PEER_HARD_ROLLOVER_PRE_ROLL_MS
     SMART_PROBE_MS = 224
     SMART_COMPLETE_MS = 512

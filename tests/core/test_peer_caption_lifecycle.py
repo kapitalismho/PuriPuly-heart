@@ -28,7 +28,7 @@ from puripuly_heart.core.stt.backend import (
 )
 from puripuly_heart.core.translation_backend import TranslationBackend
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
-from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
+from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun, Transcript, Translation
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity
 from tests.core.test_peer_overlay_policy import Timeline
 from tests.helpers.fakes import RecordingOscQueue
@@ -857,7 +857,8 @@ async def test_native_empty_or_epoch_retirement_closes_preview_and_unblocks_succ
         is_current_recognition_stream=lambda identity: identity == current[0]
     )
     harness.peer_owner.local_asr_runtime = SimpleNamespace(
-        is_current_recognition_stream=lambda _channel, identity: identity == current[0]
+        snapshot=harness.peer_owner.local_asr_runtime.snapshot,
+        is_current_recognition_stream=lambda _channel, identity: identity == current[0],
     )
     unit = STTRecognitionUnit(
         RecognitionUnitIdentity(stream, uuid4(), 1),
@@ -986,7 +987,9 @@ async def test_failed_or_timed_out_version_clears_preview_and_preserves_authorit
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider", ["soniox", "deepgram", "gemini_transcribe"])
+@pytest.mark.parametrize(
+    "provider", ["soniox", "deepgram", "gemini_transcribe", "elevenlabs_scribe"]
+)
 async def test_complete_partial_retraction_prevents_non_qwen_preview(provider):
     harness, backend, events, clock = setup()
     try:
@@ -1003,6 +1006,58 @@ async def test_complete_partial_retraction_prevents_non_qwen_preview(provider):
         assert [request.text for request in backend.calls] == ["Supported later final."]
     finally:
         await harness.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("provider", "speaker_diarization", "preview_style", "final_style"),
+    [
+        ("qwen_audio", False, "gold", "gold"),
+        ("soniox", False, "gold", "gold"),
+        ("deepgram", False, "gold", "gold"),
+        ("gemini_transcribe", False, "gold", "gold"),
+        ("elevenlabs_scribe", False, "gold", "gold"),
+        ("soniox", True, "gray", "gold"),
+    ],
+)
+async def test_long_speech_preview_keeps_non_diarized_peer_caption_gold(
+    provider, speaker_diarization, preview_style, final_style
+):
+    clock = FakeClock()
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    harness, backend, _, clock = setup(overlay_sink=presenter, clock=clock)
+    harness.peer_owner.cloud_captions.speaker_diarization = (
+        lambda provider_id: speaker_diarization and provider_id == "soniox"
+    )
+    try:
+        await harness.start()
+        item = transcript("We are going to meet at the station later today", 1)
+        await partial(harness, item, provider=provider)
+        clock.advance(5)
+        await harness.peer_owner.cloud_captions.check_previews()
+        await idle(harness)
+        assert [request.text for request in backend.calls] == [item.text]
+        assert [block.speaker_style for block in presenter.snapshot().blocks] == [preview_style]
+        if speaker_diarization:
+            item = replace(
+                item,
+                is_final=True,
+                final_speaker_runs=(
+                    FinalSpeakerRun(
+                        item.text,
+                        "1",
+                        "soniox-scope",
+                        source="soniox",
+                        attribution_state="identified",
+                    ),
+                ),
+            )
+        await final(harness, item, provider=provider)
+        await idle(harness)
+        assert [block.speaker_style for block in presenter.snapshot().blocks] == [final_style]
+    finally:
+        await harness.stop()
+        await presenter.close()
 
 
 @pytest.mark.asyncio

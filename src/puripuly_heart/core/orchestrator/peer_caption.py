@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import re
 from collections import OrderedDict
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 from uuid import UUID
@@ -43,7 +43,9 @@ from puripuly_heart.domain.models import (
     Transcript,
 )
 
-CLOUD_PEER_PROVIDERS = frozenset({"soniox", "deepgram", "gemini_transcribe", "qwen_audio"})
+CLOUD_PEER_PROVIDERS = frozenset(
+    {"soniox", "deepgram", "gemini_transcribe", "qwen_audio", "elevenlabs_scribe"}
+)
 PeerRequestKind = Literal["final", "preview", "repair", "continuation"]
 _OPEN_WORDS = frozenset(
     "a about am an and are as at because but can could for from had has have her his how if in "
@@ -169,6 +171,7 @@ class PeerCaptionOwner:
     speaker_identities: PeerSpeakerIdentityAllocator = field(
         default_factory=PeerSpeakerIdentityAllocator
     )
+    speaker_diarization: Callable[[str], bool] = lambda _provider_id: False
     max_source_chars: int = 65536
     max_requests: int = 32
     request_timeout_s: float = 30.0
@@ -311,7 +314,7 @@ class PeerCaptionOwner:
                 transcript.created_at if transcript.created_at is not None else self.clock.now()
             )
             caption = self._new_caption(transcript, provider_id, scope)
-            if provider_id == "qwen_audio":
+            if not self.speaker_diarization(provider_id):
                 caption.speaker_assignment = SpeakerAssignment(
                     SpeakerAttribution("non_diarized"),
                     scope_order=(caption.generation, caption.source_order, 0),

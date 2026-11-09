@@ -94,6 +94,7 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 - Settings/provider changes commit together, then runtime owners apply them. A runtime failure can return `degraded` while the intent remains saved. Cancellation does not undo a durable commit.
 - Apply a translation model and its connection together using a combination from `settings choices`. For ASR, `asr set --channel self|peer|both --provider <choice>` is the convenience form.
 - Explicit provider fields can retry pending provider application; unrelated general settings edits do not. Observe committed settings and effective provider state separately, including after restart when checking persistence.
+- Effective ASR configuration changes only when the replacement provider is installed. Cancelling a pending replacement leaves the active configuration, including Soniox speaker separation, unchanged.
 
 ### Settings Files and Retired Choices
 

@@ -702,7 +702,9 @@ async def test_repeated_activation_reprobes_and_listen_off_stays_silent() -> Non
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider_id", ["soniox", "deepgram", "gemini_transcribe", "qwen_audio"])
+@pytest.mark.parametrize(
+    "provider_id", ["soniox", "deepgram", "gemini_transcribe", "qwen_audio", "elevenlabs_scribe"]
+)
 async def test_cloud_final_keeps_four_second_192ms_opportunity(provider_id: str) -> None:
     harness = Harness(provider_id=provider_id, profile="off", threshold=None, hangover_ms=800)
     await harness.open()
@@ -718,7 +720,9 @@ async def test_cloud_final_keeps_four_second_192ms_opportunity(provider_id: str)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider_id", ["soniox", "deepgram", "gemini_transcribe", "qwen_audio"])
+@pytest.mark.parametrize(
+    "provider_id", ["soniox", "deepgram", "gemini_transcribe", "qwen_audio", "elevenlabs_scribe"]
+)
 async def test_cloud_final_five_second_opportunity_requires_192ms(provider_id: str) -> None:
     harness = Harness(provider_id=provider_id, profile="off", threshold=None, hangover_ms=800)
     await harness.open()
@@ -737,7 +741,9 @@ async def test_cloud_final_five_second_opportunity_requires_192ms(provider_id: s
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider_id", ["soniox", "deepgram", "gemini_transcribe", "qwen_audio"])
+@pytest.mark.parametrize(
+    "provider_id", ["soniox", "deepgram", "gemini_transcribe", "qwen_audio", "elevenlabs_scribe"]
+)
 async def test_cloud_final_continuous_speech_survives_six_seconds_and_cuts_at_ten(
     provider_id: str,
 ) -> None:
@@ -769,7 +775,6 @@ async def test_cloud_final_continuous_speech_survives_six_seconds_and_cuts_at_te
         "local_fun_asr_mlt_nano",
         "local_parakeet_ja",
         "local_qwen_gpu",
-        "elevenlabs_scribe",
         "rolling_free",
         "custom",
         "custom_offline",

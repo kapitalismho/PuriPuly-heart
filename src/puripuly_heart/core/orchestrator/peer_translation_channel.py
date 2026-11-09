@@ -116,7 +116,12 @@ class PeerTranslationChannelOwner:
             self.output_projection,
             self.clock,
             speaker_identities=self._speaker_identities,
+            speaker_diarization=self._speaker_diarization,
         )
+
+    def _speaker_diarization(self, provider_id: str) -> bool:
+        channel = self.local_asr_runtime.snapshot.channel_for("peer")
+        return channel.provider_id == provider_id and channel.speaker_diarization
 
     @property
     def accepting_events(self) -> bool:

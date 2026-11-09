@@ -149,6 +149,9 @@ class LocalASRProviderRuntimeOwner:
         self._model_ids: dict[ProviderRuntimeChannel, str | None] = {
             channel: _prebuilt_model_id(initial_providers.get(channel)) for channel in _CHANNELS
         }
+        self._speaker_diarization: dict[ProviderRuntimeChannel, bool] = {
+            channel: False for channel in _CHANNELS
+        }
         self._last_requests: dict[ProviderRuntimeChannel, ProviderRuntimeBuildRequest] = {}
         self._last_terminal_failure_sinks: dict[
             ProviderRuntimeChannel,
@@ -434,6 +437,7 @@ class LocalASRProviderRuntimeOwner:
             except Exception as exc:
                 if handle.provider is provider:
                     self._provider_ids[channel] = request.provider_id
+                    self._speaker_diarization[channel] = _speaker_diarization(request)
                     self._model_ids[channel] = request.model_id
                     self._last_requests[channel] = request
                     self._last_terminal_failure_sinks[channel] = on_terminal_failure
@@ -459,6 +463,7 @@ class LocalASRProviderRuntimeOwner:
                     failure_diagnostics=failure_diagnostics,
                 )
             self._provider_ids[channel] = request.provider_id
+            self._speaker_diarization[channel] = _speaker_diarization(request)
             self._model_ids[channel] = request.model_id
             self._last_requests[channel] = request
             self._last_terminal_failure_sinks[channel] = on_terminal_failure
@@ -547,6 +552,7 @@ class LocalASRProviderRuntimeOwner:
             finally:
                 current = self._handles[channel].provider
                 self._provider_ids[channel] = _prebuilt_provider_id(current)
+                self._speaker_diarization[channel] = False
                 self._model_ids[channel] = _prebuilt_model_id(current)
                 self._channel_phases[channel] = (
                     "inactive" if current is None else "running" if start else "ready"
@@ -583,6 +589,7 @@ class LocalASRProviderRuntimeOwner:
                 raise
             self._pending_candidates.pop(channel, None)
             self._provider_ids[channel] = _prebuilt_provider_id(provider)
+            self._speaker_diarization[channel] = False
             self._model_ids[channel] = _prebuilt_model_id(provider)
             self._channel_phases[channel] = "running" if start else "ready"
             await self._publish_state()
@@ -672,6 +679,7 @@ class LocalASRProviderRuntimeOwner:
             self._pending_candidates.pop(channel, None)
             self._pending_requests.pop(channel, None)
             self._provider_ids[channel] = request.provider_id
+            self._speaker_diarization[channel] = _speaker_diarization(request)
             self._model_ids[channel] = request.model_id
             self._last_requests[channel] = request
             self._last_terminal_failure_sinks[channel] = on_terminal_failure
@@ -706,10 +714,9 @@ class LocalASRProviderRuntimeOwner:
         request = self._pending_requests.get(channel)
         candidate = self._pending_candidates.get(channel)
         await self._handles[channel].commit_pending_handoff()
-        if request is not None and (
-            request.provider_id != "qwen_audio" or self._handles[channel].provider is candidate
-        ):
+        if request is not None and self._handles[channel].provider is candidate:
             self._provider_ids[channel] = request.provider_id
+            self._speaker_diarization[channel] = _speaker_diarization(request)
             self._model_ids[channel] = request.model_id
         await self._publish_state()
 
@@ -763,6 +770,7 @@ class LocalASRProviderRuntimeOwner:
                 finally:
                     if handle.provider is None:
                         self._provider_ids[channel] = None
+                        self._speaker_diarization[channel] = False
                         self._model_ids[channel] = None
                         self._channel_phases[channel] = "inactive"
             else:
@@ -1583,6 +1591,7 @@ class LocalASRProviderRuntimeOwner:
             pending_handoff=bool(lifecycle["pending_handoff"]),
             has_resources=handle.has_resources,
             provider_live=(provider is not None and bool(getattr(provider, "is_live", True))),
+            speaker_diarization=self._speaker_diarization[channel],
         )
 
     def _failed_result(
@@ -1826,6 +1835,10 @@ def _optional_string(value: object) -> str | None:
 
 def _gpu_discovery_failure_code(exc: BaseException) -> str:
     return _optional_string(getattr(exc, "code", None)) or type(exc).__name__
+
+
+def _speaker_diarization(request: ProviderRuntimeBuildRequest) -> bool:
+    return request.config.provider_options.get("enable_speaker_diarization") is True
 
 
 def _prebuilt_provider_id(provider: object | None) -> str | None:
