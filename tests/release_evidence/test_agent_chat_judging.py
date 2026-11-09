@@ -659,7 +659,7 @@ def report_evidence_calls(*, inspection_first=True, source="initial_context"):
             {
                 "type": "function_call",
                 "call_id": "diag-1",
-                "name": "get_app_context",
+                "name": "read_app",
                 "arguments": '{"topic":"diagnostics"}',
             },
             {
@@ -680,7 +680,15 @@ def report_evidence_calls(*, inspection_first=True, source="initial_context"):
     offered = {
         "method": "respond",
         "request": {"input": [update]},
-        "response": {"output": [{"type": "function_call", "name": "propose_report"}]},
+        "response": {
+            "output": [
+                {
+                    "type": "function_call",
+                    "name": "propose_app",
+                    "arguments": '{"action":"report","summary":"Synthetic unresolved issue."}',
+                }
+            ]
+        },
     }
     return [observed, offered] if inspection_first else [offered, observed]
 

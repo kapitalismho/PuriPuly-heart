@@ -77,7 +77,7 @@ def extract_decision(result: object) -> AgentDecision:
         if len(efforts) == 1 and efforts[0].get("type") == "choice"
         else None
     )
-    invalid_effort = effort not in ("low", "high", "xhigh")
+    invalid_effort = effort not in ("low", "medium", "high")
     if invalid_effort:
         effort = "high"
     context = _context_selection(answers) if route == "work" and not invalid_effort else {}

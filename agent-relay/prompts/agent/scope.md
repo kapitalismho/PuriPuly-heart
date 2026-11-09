@@ -43,8 +43,8 @@ Examples illustrate role boundaries, not keyword rules:
 Choose the reasoning effort for the assistant's reply. If uncertain, choose higher. Code owns fallback and forces brief routes to low.
 
 - low: app facts, one clear action, or a brief social/refusal reply.
-- high: setup, recommendations, comparisons, ordinary troubleshooting or unclear intent.
-- xhigh: complex diagnosis combining evidence, or a problem still unresolved after a relevant repair.
+- medium: setup, settings changes or unclear intent.
+- high: recommendations, comparisons, troubleshooting, diagnosis combining evidence, or a problem still unresolved after a relevant repair.
 
 ## Context modules
 

@@ -4616,7 +4616,7 @@ def test_report_evidence_cannot_be_supplied_after_the_offer(unified):
         "type": "function_call",
         "name": "propose_app" if unified else "propose_report",
         "arguments": json.dumps(
-            {"request": {"action": "report", "summary": "Synthetic issue"}}
+            {"action": "report", "summary": "Synthetic issue"}
             if unified
             else {"summary": "Synthetic issue"}
         ),

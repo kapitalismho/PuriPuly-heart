@@ -240,10 +240,10 @@ def _settings(
     groups: dict[str, dict] = {}
     for field in fields:
         descriptor = SETTINGS_PRESENTATION[field]
-        entry: dict = {
-            "label": setting_label(field, localize),
-            "description": localize(descriptor.description_key),
-        }
+        entry: dict = {"label": setting_label(field, localize)}
+        description = localize(descriptor.description_key)
+        if description != entry["label"]:
+            entry["description"] = description
         if descriptor.local_only:
             presence = _mapping(private.get(field)).get("presence")
             result.setdefault("private", {})[field] = (
@@ -452,6 +452,8 @@ def _module(snapshot: Mapping, module: str, localize: Callable[[str], str]) -> t
             for key, value in snapshot["audio"].items()
             if key != "current_route"
         }
+    if module == "audio" and snapshot.get("audio_test"):
+        result["audio_test"] = deepcopy(snapshot["audio_test"])
     if module == "output" and isinstance(snapshot.get("output"), Mapping):
         result.update(deepcopy(dict(snapshot["output"])))
     return result, catalog
@@ -521,7 +523,12 @@ def model_context(
         "missing": list(snapshot.get("missing", [])),
     }
     if topic == "diagnostics":
-        result["view"] = "diagnostics"
+        return {
+            **result,
+            "modules": [],
+            "view": "diagnostics",
+            "diagnostics": _diagnostics(snapshot),
+        }
     for module in modules:
         result[module], catalog = _module(snapshot, module, localize)
         if catalog:

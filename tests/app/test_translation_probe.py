@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
 import httpx
 import pytest
 
+from puripuly_heart.app.services.agent_chat.execution import validate_app_request
 from puripuly_heart.app.services.agent_chat.tools import AgentTools
 from puripuly_heart.app.services.application_control import ApplicationControlOwner
 from puripuly_heart.app.services.application_control_events import ControlEvents
@@ -358,31 +358,12 @@ async def test_agent_probe_reports_interruption_before_recovery_on_current_runti
         await runtime.close()
 
 
-def test_relay_probe_schema_is_strict_empty_and_matches_generator():
-    import ast
-
-    root = Path(__file__).resolve().parents[2]
-    generated = (root / "agent-relay/src/action-tools.ts").read_text(encoding="utf-8")
-    tools = json.loads(generated.removeprefix("export const actionTools = ").removesuffix(";\n"))
-    probe = next(tool for tool in tools if tool["name"] == "probe_translation")
-    tree = ast.parse((root / "agent-relay/generate-tools.py").read_text(encoding="utf-8"))
-    declaration = next(
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Dict)
-        and any(
-            isinstance(value, ast.Constant) and value.value == "probe_translation"
-            for value in node.values
-        )
-    )
-    assert ast.literal_eval(declaration) == probe
-    assert probe["strict"] is True
-    assert probe["parameters"] == {
-        "type": "object",
-        "properties": {},
-        "required": [],
-        "additionalProperties": False,
+def test_translation_probe_action_accepts_no_arguments():
+    assert validate_app_request("execute_app", {"action": "translation.probe"}, {}) == {
+        "action": "translation.probe"
     }
+    with pytest.raises(ValueError):
+        validate_app_request("execute_app", {"action": "translation.probe", "text": "hello"}, {})
 
 
 async def test_probe_cancelled_before_execution_never_invokes_backend():

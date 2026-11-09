@@ -7,7 +7,7 @@ import httpx
 import pytest
 
 from puripuly_heart.app.adapters.agent_relay_transport import AgentRelayTransport
-from puripuly_heart.app.ports.agent_chat import AgentTransportError
+from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL, AgentTransportError
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.app.services.agent_chat.presentation import completed_sentences
 from tests.app.test_agent_chat import Records, Responses, Tokens, answer, tool
@@ -39,7 +39,7 @@ async def test_held_http_stream_presents_sentence_before_terminal_without_commit
     await transport._client.aclose()
 
     def handle(request):
-        assert json.loads(request.content)["agent_protocol"] == 5
+        assert json.loads(request.content)["agent_protocol"] == AGENT_CHAT_PROTOCOL
         if request.url.path == "/v1/classify":
             return httpx.Response(
                 200,

@@ -44,7 +44,7 @@ describe('app protocol contracts', () => {
           .toEqual(expect.arrayContaining(contract.contextModules.map(({ name }) => `context_${name}`)));
       } else if (body.route === 'work' || body.route === 'unclear') {
         expect(sent.tools.map(({ name }: { name: string }) => name)).toEqual(names);
-        expect(sent.input[0].content[0].text).toContain(contract.appContext.trim());
+        expect(sent.input[0].content[0].text).toContain(contract.appContext.replaceAll('\r\n', '\n').trim());
       }
       for (const item of body.input) {
         if (item.type === 'function_call') expect(names).toContain(item.name);

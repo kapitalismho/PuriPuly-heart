@@ -1082,15 +1082,9 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
     def tool(name: str, arguments: dict) -> dict:
         identity = f"smoke-{len(app.operations)}-{name}"
         if name == "get_app_context":
-            family, request = "read_app", {"action": "context", **arguments}
+            family, request = "read_app", dict(arguments)
         elif name == "control_app":
-            request = dict(arguments["request"])
-            action = request["action"]
-            if action.startswith("query."):
-                family = "read_app"
-                request["action"] = action.removeprefix("query.")
-            else:
-                family = "execute_app"
+            family, request = "execute_app", dict(arguments["request"])
         elif name in {"change_settings", "propose_report"}:
             family = "propose_app"
             request = {"action": "settings" if name == "change_settings" else "report", **arguments}
@@ -1121,7 +1115,7 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                     "status": "completed",
                     "call_id": identity,
                     "name": family,
-                    "arguments": json.dumps({"request": request}),
+                    "arguments": json.dumps(request),
                 }
             ],
         }
@@ -1216,9 +1210,7 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 else answer("유료 변경은 적용하지 않았어. 원래 구성을 유지하려면 카드를 거절해 줘.")
             )
         elif app.scenario.category == "unsolvable":
-            if not any(
-                "diagnostics" in item.get("context", {}).get("core", {}) for item in outputs
-            ):
+            if not any(item.get("context", {}).get("view") == "diagnostics" for item in outputs):
                 result = tool("get_app_context", {"topic": "diagnostics"})
             elif any(item.get("status") in {"pending", "offered"} for item in outputs):
                 result = answer(

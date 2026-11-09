@@ -280,6 +280,10 @@ async def collect_agent_context(
                     "stopping",
                 ),
             )
+            result["audio_test"] = _pick(
+                app.get("audio_test"),
+                ("state", "ready", "active", "failure_code", "cleanup_complete"),
+            )
             result["channels"] = {}
             for channel in ("self", "peer"):
                 source = _mapping(_mapping(app.get("channels")).get(channel))
@@ -361,7 +365,11 @@ async def collect_agent_context(
         overlay = await query("overlay.status")
         osc = await query("osc.status")
         result["output"] = {
-            "overlay": _pick(overlay.get("output"), OVERLAY_FIELDS) if overlay else None,
+            "overlay": (
+                {**_pick(overlay.get("output"), OVERLAY_FIELDS), **_pick(overlay, ("locked",))}
+                if overlay
+                else None
+            ),
             "osc": project_osc_output(osc.get("output")) if osc else None,
         }
     if "diagnostics" in queries:

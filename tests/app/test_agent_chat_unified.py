@@ -7,7 +7,7 @@ import pytest
 
 from puripuly_heart.app.services.agent_chat.context import AgentActivity, collect_agent_context
 from puripuly_heart.app.services.agent_chat.conversation import AgentConversation
-from puripuly_heart.app.services.agent_chat.execution import app_tool_schemas, validate
+from puripuly_heart.app.services.agent_chat.execution import validate_app_request
 from puripuly_heart.app.services.agent_chat.modules import model_context
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from tests.app.test_agent_chat import Records, Responses, answer
@@ -16,12 +16,13 @@ from tests.app.test_agent_chat_tools import catalog as catalog
 
 
 def call(identity, family, action, **arguments):
+    key = "topic" if family == "read_app" else "action"
     return {
         "type": "function_call",
         "status": "completed",
         "call_id": identity,
         "name": family,
-        "arguments": json.dumps({"request": {"action": action, **arguments}}),
+        "arguments": json.dumps({key: action, **arguments}),
     }
 
 
@@ -30,30 +31,29 @@ def batch(*calls):
 
 
 @pytest.mark.asyncio
-async def test_three_queries_keep_independent_results_on_partial_failure(catalog):
+async def test_three_topic_reads_keep_independent_results_on_partial_failure(catalog):
     control = Records()
     control.values["settings.choices"] = catalog
-    control.fail.add("diagnostics.health")
+    control.fail.add("gpu.status")
     transport = Responses(
         batch(
-            call("osc", "read_app", "osc.status"),
-            call("health", "read_app", "diagnostics.health"),
-            call("history", "read_app", "diagnostics.history"),
+            call("output", "read_app", "output"),
+            call("gpu", "read_app", "gpu"),
+            call("diagnostics", "read_app", "diagnostics"),
         ),
         answer(),
     )
     owner = AgentChatOwner(control, transport, localize=str)
     await owner.start()
     try:
-        result = await owner.send("Inspect OSC and diagnostic health and history.")
+        result = await owner.send("Inspect OSC, GPU and diagnostics.")
         assert [(item.call_id, item.status) for item in result.tool_results] == [
-            ("osc", "observed"),
-            ("health", "unavailable"),
-            ("history", "observed"),
+            ("output", "unchanged"),
+            ("gpu", "unavailable"),
+            ("diagnostics", "observed"),
         ]
-        assert (
-            result.tool_results[0].result["result"]["output"]["remote_delivery"] == "unacknowledged"
-        )
+        diagnostics = result.tool_results[2].result["context"]
+        assert diagnostics["view"] == "diagnostics" and "core" not in diagnostics
         assert len(transport.requests) == 2
     finally:
         await owner.close()
@@ -71,9 +71,9 @@ async def test_read_action_read_observes_order_and_proposal_stops_effects(catalo
     control = Ordered(catalog)
     transport = Responses(
         batch(
-            call("before", "read_app", "app.status"),
+            call("before", "read_app", "general"),
             call("execute", "execute_app", "overlay.set", enabled=True),
-            call("after", "read_app", "app.status"),
+            call("after", "read_app", "general"),
         ),
         batch(
             call("proposal", "propose_app", "settings", changes={"overlay.background_alpha": 0.4}),
@@ -105,7 +105,7 @@ async def test_pure_provider_read_does_not_replace_staged_secure_entry(catalog):
     transport = Responses(
         batch(call("stage", "execute_app", "ui.provider_setup", provider="openrouter")),
         answer(),
-        batch(call("read", "read_app", "provider.setup", provider="deepseek")),
+        batch(call("read", "read_app", "provider_setup", provider="deepseek")),
         answer(),
     )
     owner = AgentChatOwner(control, transport, localize=str)
@@ -115,7 +115,7 @@ async def test_pure_provider_read_does_not_replace_staged_secure_entry(catalog):
         staged = owner.snapshot.secure_entry_requests
         assert [item.provider for item in staged] == ["openrouter"]
         assert staged[0].status == "ready" and not staged[0].displayed
-        read = call("pure-read", "read_app", "provider.setup", provider="deepseek")
+        read = call("pure-read", "read_app", "provider_setup", provider="deepseek")
         result = await owner._execute_call(read, owner._arguments(read), owner._generation)
         assert result["status"] == "available"
         assert owner.snapshot.secure_entry_requests == staged
@@ -125,29 +125,35 @@ async def test_pure_provider_read_does_not_replace_staged_secure_entry(catalog):
 
 
 @pytest.mark.asyncio
-async def test_sparse_schema_rejects_unknown_null_and_missing_execution_values(catalog):
-    schemas = app_tool_schemas(catalog)
+async def test_flat_requests_reject_unknown_null_foreign_and_missing_values(catalog):
     for family, request in (
         ("propose_app", {"action": "settings", "changes": {"overlay.background_alpha": None}}),
         ("propose_app", {"action": "settings", "changes": {"private": "value"}}),
         ("execute_app", {"action": "capture.set", "channel": "self"}),
         ("execute_app", {"action": "recognition.probe", "channel": "both"}),
         ("execute_app", {"action": "auth.login", "provider": "chatgpt"}),
+        ("execute_app", {"action": "translation.set", "enabled": True, "channel": "self"}),
+        ("read_app", {"topic": "gpu", "after": 1}),
+        ("read_app", {"topic": "settings.current"}),
+        ("read_app", {"topic": "provider_setup"}),
+        ("read_app", {"request": {"topic": "overview"}}),
     ):
         with pytest.raises(ValueError):
-            validate({"request": request}, schemas[family])
-    validate(
+            validate_app_request(family, request, catalog)
+    assert validate_app_request(
+        "propose_app",
         {
-            "request": {
-                "action": "settings",
-                "changes": {
-                    "translation.model": "gemma4_26b_31b",
-                    "translation.connection": "openrouter",
-                },
-            }
+            "action": "settings",
+            "changes": {
+                "translation.model": "gemma4_26b_31b",
+                "translation.connection": "openrouter",
+            },
         },
-        schemas["propose_app"],
-    )
+        catalog,
+    )["changes"] == {"translation.model": "gemma4_26b_31b", "translation.connection": "openrouter"}
+    assert validate_app_request(
+        "execute_app", {"action": "ui.settings", "section": "api", "provider": None}, catalog
+    ) == {"action": "ui.settings", "section": "api"}
 
 
 @pytest.mark.asyncio

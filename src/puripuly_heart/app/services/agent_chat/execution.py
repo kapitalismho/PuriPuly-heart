@@ -203,7 +203,16 @@ def request_schemas(catalog: dict) -> list[dict]:
     ]
 
 
-def app_tool_schemas(catalog: dict, *, family: str | None = None) -> dict[str, dict]:
+APP_TOOLS = ("read_app", "execute_app", "propose_app")
+DETAIL_TOPICS = {
+    "gpu": "gpu.status",
+    "models": "models.status",
+    "auth": "auth.status",
+    "peer_consent": "consent.peer_translation",
+}
+
+
+def app_tool_variants(catalog: dict, family: str) -> list[dict]:
     from puripuly_heart.app.services.agent_chat.modules import TOPICS
     from puripuly_heart.app.services.agent_chat.provider_setup import NAVIGATION_PROVIDERS
     from puripuly_heart.app.services.agent_chat.tools import settings_tool_schema
@@ -221,101 +230,134 @@ def app_tool_schemas(catalog: dict, *, family: str | None = None) -> dict[str, d
             result["required"] = []
         return result
 
-    def request(actions, fields=None, optional=()):
-        schema = object_schema({"action": scalar("string", actions), **(fields or {})})
-        schema["required"] = [key for key in schema["properties"] if key not in optional]
+    def variant(key, values, fields=None, optional=()):
+        schema = object_schema({key: scalar("string", values), **(fields or {})})
+        schema["required"] = [name for name in schema["properties"] if name not in optional]
         return schema
 
     provider = scalar("string", sorted(NAVIGATION_PROVIDERS))
     identity = scalar("string", minLength=1, maxLength=64)
-    queries = request_schemas(catalog)
-    simple_queries = [
-        spec["properties"]["action"]["enum"][0].removeprefix("query.")
-        for spec in queries
-        if spec["properties"]["action"]["enum"][0].startswith("query.")
-        and len(spec["properties"]) == 1
-    ]
-    history = next(
-        spec
-        for spec in queries
-        if spec["properties"]["action"]["enum"] == ["query.diagnostics.history"]
+    if family == "read_app":
+        return [
+            variant("topic", sorted(TOPICS - {"diagnostics"} | DETAIL_TOPICS.keys())),
+            variant(
+                "topic",
+                ["diagnostics"],
+                {
+                    "diagnostic_id": identity,
+                    "operation_id": identity,
+                    "after": scalar("integer", minimum=0),
+                },
+                ("diagnostic_id", "operation_id", "after"),
+            ),
+            variant("topic", ["provider_setup"], {"provider": provider}),
+            variant("topic", ["operation"], {"operation_id": identity}),
+        ]
+    if family == "execute_app":
+        return [
+            variant(
+                "action",
+                ["capture.set"],
+                {"channel": scalar("string", ("self", "peer")), "enabled": scalar("boolean")},
+            ),
+            variant("action", ["translation.set", "overlay.set"], {"enabled": scalar("boolean")}),
+            variant(
+                "action", ["recognition.probe"], {"channel": scalar("string", ("self", "peer"))}
+            ),
+            variant(
+                "action",
+                [
+                    "translation.probe",
+                    "audio.diagnose",
+                    "audio.retry",
+                    "osc.discovery.retry",
+                    "ui.accounts",
+                ],
+            ),
+            variant(
+                "action", ["models.retry"], {"backend": scalar("string", ("gpu",))}, ("backend",)
+            ),
+            variant("action", ["ui.provider_setup"], {"provider": provider}),
+            variant(
+                "action",
+                ["ui.settings"],
+                {
+                    "section": scalar("string", ("api", "general", "overlay", "prompts")),
+                    "provider": provider,
+                },
+                ("provider",),
+            ),
+            variant("action", ["confirmation.withdraw"], {"card_id": identity}),
+        ]
+    if family == "propose_app":
+        return [
+            variant("action", ["settings"], {"changes": sparse(settings_tool_schema(catalog))}),
+            variant(
+                "action", ["report"], {"summary": scalar("string", minLength=1, maxLength=2000)}
+            ),
+            *[
+                spec
+                for spec in request_schemas(catalog)
+                if spec["properties"]["action"]["enum"][0] in CARD_COMMANDS
+            ],
+        ]
+    raise ValueError("unsupported_app_tool")
+
+
+def app_tool_schemas(catalog: dict, *, family: str | None = None) -> dict[str, dict]:
+    schemas = {}
+    for name in APP_TOOLS if family is None else (family,):
+        variants = app_tool_variants(catalog, name)
+        key = next(iter(variants[0]["properties"]))
+        properties = {
+            key: scalar(
+                "string", [value for item in variants for value in item["properties"][key]["enum"]]
+            )
+        }
+        for item in variants:
+            for field, schema in item["properties"].items():
+                if field != key and properties.setdefault(field, schema) != schema:
+                    raise ValueError("conflicting_app_tool_field")
+        schemas[name] = {
+            "type": "object",
+            "properties": properties,
+            "required": [key],
+            "additionalProperties": False,
+        }
+    return schemas
+
+
+def validate_app_request(family: str, arguments: dict, catalog: dict) -> dict:
+    request = {key: value for key, value in arguments.items() if value is not None}
+    key = "topic" if family == "read_app" else "action"
+    variant = next(
+        (
+            item
+            for item in app_tool_variants(catalog, family)
+            if request.get(key) in item["properties"][key]["enum"]
+        ),
+        None,
     )
-    reads = [
-        request(simple_queries),
-        request(
-            ["diagnostics.history"],
-            {key: sparse(value) for key, value in history["properties"].items() if key != "action"},
-            ("operation_id", "diagnostic_id", "after", "limit"),
-        ),
-        request(
-            ["context"],
-            {
-                "topic": scalar("string", sorted(TOPICS)),
-                "diagnostic_id": identity,
-                "operation_id": identity,
-                "after": scalar("integer", minimum=0),
-            },
-            ("diagnostic_id", "operation_id", "after"),
-        ),
-        request(["provider.setup"], {"provider": provider}),
-        request(["operation"], {"operation_id": identity}),
-    ]
-    executions = [
-        request(
-            ["capture.set"],
-            {"channel": scalar("string", ("self", "peer")), "enabled": scalar("boolean")},
-        ),
-        request(["translation.set", "overlay.set"], {"enabled": scalar("boolean")}),
-        request(["recognition.probe"], {"channel": scalar("string", ("self", "peer"))}),
-        request(
-            [
-                "audio.diagnose",
-                "osc.discovery.retry",
-                "translation.probe",
-                "audio.retry",
-                "ui.accounts",
-            ]
-        ),
-        request(["models.retry"], {"backend": scalar("string", ("gpu",))}, ("backend",)),
-        request(["ui.provider_setup"], {"provider": provider}),
-        request(
-            ["ui.settings"],
-            {
-                "section": scalar("string", ("api", "general", "overlay", "prompts")),
-                "provider": provider,
-            },
-            ("provider",),
-        ),
-        request(["confirmation.withdraw"], {"card_id": identity}),
-    ]
-    proposals = [
-        request(["settings"], {"changes": sparse(settings_tool_schema(catalog))})
-        if family in (None, "propose_app")
-        else request(["settings"]),
-        request(["report"], {"summary": scalar("string", minLength=1, maxLength=2000)}),
-        *[spec for spec in queries if spec["properties"]["action"]["enum"][0] in CARD_COMMANDS],
-    ]
-    return {
-        name: object_schema({"request": {"anyOf": variants}})
-        for name, variants in (
-            ("read_app", reads),
-            ("execute_app", executions),
-            ("propose_app", proposals),
-        )
-    }
+    if variant is None:
+        raise ValueError("invalid_control_choice")
+    validate(request, variant)
+    return request
 
 
 def app_tool_target(name: str, arguments: dict) -> tuple[str, dict]:
-    request = dict(arguments["request"])
-    action = request.pop("action")
+    request = dict(arguments)
     if name == "read_app":
-        if action == "context":
-            return "get_app_context", request
-        if action == "provider.setup":
+        topic = request.pop("topic")
+        if topic == "provider_setup":
             return "get_provider_setup", request
-        if action == "operation":
+        if topic == "operation":
             return "read_operation", request
-        return "control_app", {"request": {"action": "query." + action, **request}}
+        if topic in DETAIL_TOPICS:
+            if request:
+                raise ValueError("unsupported_read_filters")
+            return "control_app", {"request": {"action": "query." + DETAIL_TOPICS[topic]}}
+        return "get_app_context", {"topic": topic, **request}
+    action = request.pop("action")
     if name == "propose_app":
         if action == "settings":
             return "change_settings", request

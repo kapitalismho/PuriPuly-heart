@@ -30,9 +30,8 @@ from puripuly_heart.app.ports.application_control import ApplicationControl
 from puripuly_heart.app.services.agent_chat.context import AgentActivity, collect_agent_context
 from puripuly_heart.app.services.agent_chat.conversation import AgentConversation
 from puripuly_heart.app.services.agent_chat.execution import (
-    app_tool_schemas,
     app_tool_target,
-    validate,
+    validate_app_request,
 )
 from puripuly_heart.app.services.agent_chat.modules import (
     MODULES,
@@ -1445,8 +1444,9 @@ class AgentChatOwner:
                     else {}
                 )
                 self._require_current(generation)
-                validate(arguments, app_tool_schemas(catalog, family=family)[family])
-                name, arguments = app_tool_target(family, arguments)
+                name, arguments = app_tool_target(
+                    family, validate_app_request(family, arguments, catalog)
+                )
             except Exception:
                 result = {"status": "rejected", "code": "invalid_tool_call"}
                 self._record_result(call, None, result)

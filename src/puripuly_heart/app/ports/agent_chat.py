@@ -6,7 +6,7 @@ from typing import Literal, Protocol, TypedDict
 
 AGENT_CHAT_PROTOCOL = 6
 
-AgentEffort = Literal["low", "high", "xhigh"]
+AgentEffort = Literal["low", "medium", "high"]
 AgentRoute = Literal["work", "social", "out_of_scope", "unclear"]
 AgentDecisionEntry = Literal["message", "error", "notice"]
 AgentContextMode = Literal["selected", "full"]

@@ -7,8 +7,8 @@ import { maxClassifyBytes, maxRespondBytes } from '../src/requests';
 import { checkAllowance, recordUsage, turnLifetimeMs } from '../src/usage';
 import { accountingDatabase, authHeaders, installationHash, relayEvents, relayMigrations, responseEvents, testEnv, turnId, usageDatabase } from './fixtures';
 
-const classify = { agent_protocol: 5, turn_id: turnId, input: [{ role: 'user', content: 'Synthetic request' }] };
-const respond = { agent_protocol: 5, turn_id: turnId, input: [
+const classify = { agent_protocol: 6, turn_id: turnId, input: [{ role: 'user', content: 'Synthetic request' }] };
+const respond = { agent_protocol: 6, turn_id: turnId, input: [
   { type: 'configuration_update', reasoning: { effort: 'high' } }, ...classify.input,
 ], route: 'work', effort: 'high', allow_tools: true };
 const returned = { object: 'response', status: 'completed', output: [], answers: [], usage: { input_tokens: 10, output_tokens: 2 } };
@@ -37,7 +37,7 @@ describe('durable model request admission', () => {
       expect((await relay.fetch(request(true), env)).status).toBe(200);
       for (let admission = 2; admission <= 15; admission++) {
         const response = await relay.fetch(request(false, { ...respond, input: [...respond.input,
-          { type: 'function_call', call_id: `call-${admission}`, name: 'get_app_context', arguments: '{}' },
+          { type: 'function_call', call_id: `call-${admission}`, name: 'read_app', arguments: '{"topic":"overview"}' },
           { type: 'function_call_output', call_id: `call-${admission}`, output: '{}' },
           { role: 'user', content: '[app notice] Synthetic state change' },
         ] }), env);

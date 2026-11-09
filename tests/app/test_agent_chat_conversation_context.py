@@ -95,14 +95,32 @@ def reconstruct(conversation):
                 result["catalogs"].pop(module, None)
         result["catalogs"].update(deepcopy(context.get("catalogs", {})))
         for module in context["modules"]:
-            if module in context:
+            if module == "core" and module in context:
+                result["state"]["core"] = {
+                    **result["state"].get("core", {}),
+                    **deepcopy(context["core"]),
+                }
+            elif module in context:
                 result["state"][module] = deepcopy(context[module])
     return result
 
 
+def effective(state):
+    return {
+        module: (
+            {key: item for key, item in value.items() if item is not None}
+            if module == "core"
+            else value
+        )
+        for module, value in state.items()
+    }
+
+
 def assert_reconstructed(conversation, context):
     restored = reconstruct(conversation)
-    assert restored["state"] == {module: context[module] for module in context["modules"]}
+    assert effective(restored["state"]) == effective(
+        {module: context[module] for module in context["modules"]}
+    )
     assert restored["catalogs"] == context.get("catalogs", {})
     assert restored["missing"] == context["missing"]
     assert restored["observed_at"] == context["observed_at"]
@@ -193,6 +211,62 @@ def test_catalog_and_complete_module_changes_are_independent():
     assert both_projection["audio"] == both_changed["audio"]
     assert both_projection["catalogs"] == {"audio": {}}
     assert_reconstructed(conversation, both_changed)
+
+
+def test_core_sends_only_changed_fields_and_nulls_removed_ones():
+    conversation = AgentConversation()
+    original = canonical_context()
+    transmit(conversation, original)
+    changed = deepcopy(original)
+    changed["observed_at"] = "second"
+    changed["core"]["status"]["running"] = True
+    del changed["core"]["diagnostics"]
+
+    projected = transmit(conversation, changed)
+
+    assert projected["core"] == {"status": {"running": True}, "diagnostics": None}
+    assert projected["unchanged"] == ["audio", "accounts"]
+    assert_reconstructed(conversation, changed)
+    assert conversation.project_context(changed)["unchanged"] == changed["modules"]
+    changed["core"]["diagnostics"] = {"records": [], "coverage": {"complete": False}}
+    assert conversation.project_context(changed)["core"] == {
+        "diagnostics": changed["core"]["diagnostics"]
+    }
+
+
+def test_trim_resends_only_core_fields_whose_anchor_was_trimmed():
+    conversation = AgentConversation(token_limit=0)
+    context = canonical_context()
+    transmit(conversation, context)
+    conversation.begin()
+    context["core"]["status"]["running"] = True
+    assert transmit(conversation, context)["core"] == {"status": {"running": True}}
+
+    conversation.trim()
+
+    projected = conversation.project_context(context)
+    assert projected["core"] == {
+        "revision": context["core"]["revision"],
+        "diagnostics": context["core"]["diagnostics"],
+    }
+    transmit(conversation, context)
+    assert_reconstructed(conversation, context)
+
+
+def test_trim_cuts_history_deeply_once_over_the_limit_so_later_turns_keep_the_prefix():
+    conversation = AgentConversation(token_limit=100, retained_tokens=50)
+    trimmed_at = []
+    for turn in range(1, 9):
+        before = deepcopy(conversation.items)
+        conversation.begin()
+        conversation.append({"role": "user", "content": str(turn) * 69})
+        conversation.trim()
+        if conversation.items[: len(before)] != before:
+            trimmed_at.append(turn)
+            assert sum(len(json.dumps(item)) for item in conversation.items) <= 200
+
+    assert trimmed_at == [5, 8]
+    assert [item["content"][0] for item in conversation.items] == ["7", "8"]
 
 
 def test_module_replacement_preserves_nulls_and_removes_deleted_properties():

@@ -46,7 +46,7 @@ async def _app_requests() -> list[dict]:
                 {
                     **tool(),
                     "name": "read_app",
-                    "arguments": json.dumps({"request": {"action": "context", "topic": "output"}}),
+                    "arguments": json.dumps({"topic": "output"}),
                 },
             ],
         },

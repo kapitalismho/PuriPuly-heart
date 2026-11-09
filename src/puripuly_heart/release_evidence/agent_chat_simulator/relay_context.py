@@ -132,7 +132,7 @@ def validate_relay_context(value: object, *, relay_build: str | None) -> dict:
         if "reasoning" in context:
             _require(
                 isinstance(context["reasoning"], dict)
-                and context["reasoning"].get("effort") in ("low", "high", "xhigh"),
+                and context["reasoning"].get("effort") in ("low", "medium", "high"),
                 f"{identity}.reasoning must declare an effort",
             )
         if "prompt_cache_options" in context:

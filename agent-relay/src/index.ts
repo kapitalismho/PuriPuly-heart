@@ -15,14 +15,14 @@ type Env = UsageEnv & SupportEnv & {
   AGENT_SERVICE_ENABLED?: string;
 };
 
-const developerMessage = (text: string) => ({
+const developerMessage = (text: string, breakpoint: Record<string, string> = { mode: 'explicit' }) => ({
   role: 'developer',
-  content: [{ type: 'input_text', text, prompt_cache_breakpoint: { mode: 'explicit' } }],
+  content: [{ type: 'input_text', text, prompt_cache_breakpoint: breakpoint }],
 });
 const prepared = new Map([...contracts].map(([protocol, contract]) => [protocol, {
   classifierDeveloperMessage: developerMessage(classifierInstructions(contract)),
   questions: classifierQuestions(contract),
-  workDeveloperMessage: developerMessage(workInstructions(contract)),
+  workDeveloperMessage: developerMessage(workInstructions(contract), { mode: 'explicit', ttl: '12h' }),
   workOptions: {
     tools: contract.tools,
     reasoning: { effort: 'high' },

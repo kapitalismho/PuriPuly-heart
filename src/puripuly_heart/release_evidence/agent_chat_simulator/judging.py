@@ -605,10 +605,10 @@ def _local_diagnostics_observed(calls: list[dict]) -> bool:
                 if isinstance(value, dict)
                 else None
             )
-            if (
-                isinstance(context, dict)
-                and isinstance(context.get("core"), dict)
+            if isinstance(context, dict) and (
+                isinstance(context.get("core"), dict)
                 and "diagnostics" in context["core"]
+                or context.get("view") == "diagnostics"
             ):
                 return True
         if any(

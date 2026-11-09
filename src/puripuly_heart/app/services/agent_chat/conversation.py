@@ -17,13 +17,15 @@ class _Group:
 
 
 class AgentConversation:
-    def __init__(self, *, token_limit: int = 48_000) -> None:
+    def __init__(self, *, token_limit: int = 48_000, retained_tokens: int = 18_000) -> None:
         self.items: list[dict] = []
         self.messages: list[AgentMessage] = []
         self.archive: list[dict] = []
         self._groups: deque[_Group] = deque()
         self._token_limit = token_limit
+        self._retained_tokens = retained_tokens
         self._module_contexts: dict[str, tuple[dict, _Group]] = {}
+        self._core_fields: dict[str, tuple[object, _Group]] = {}
         self._catalogs: dict[str, tuple[dict, _Group]] = {}
 
     @property
@@ -57,6 +59,13 @@ class AgentConversation:
         for module in context["modules"]:
             if module not in context:
                 continue
+            if module == "core":
+                changes = self._core_changes(context["core"], forced=module in force_modules)
+                if changes:
+                    result["core"] = changes
+                else:
+                    unchanged.append(module)
+                continue
             baseline = self._module_contexts.get(module)
             if (
                 module not in force_modules
@@ -69,6 +78,21 @@ class AgentConversation:
         if unchanged:
             result["unchanged"] = unchanged
         return result
+
+    def _core_changes(self, core: dict, *, forced: bool) -> dict:
+        changes = {
+            key: deepcopy(value)
+            for key, value in core.items()
+            if forced or key not in self._core_fields or value != self._core_fields[key][0]
+        }
+        changes.update(
+            {
+                key: None
+                for key, (value, _) in self._core_fields.items()
+                if key not in core and value is not None
+            }
+        )
+        return changes
 
     def append(self, item: dict, *, archive: bool = True, context: dict | None = None) -> None:
         if not self._groups:
@@ -89,11 +113,16 @@ class AgentConversation:
             for module in context["modules"]:
                 self._module_contexts.pop(module, None)
                 self._catalogs.pop(module, None)
+            if "core" in context["modules"]:
+                self._core_fields.clear()
             return
         for module, catalog in context.get("catalogs", {}).items():
             self._catalogs[module] = (deepcopy(catalog), group)
         for module in context["modules"]:
-            if module in context:
+            if module == "core" and module in context:
+                for key, value in context["core"].items():
+                    self._core_fields[key] = (deepcopy(value), group)
+            elif module in context:
                 self._module_contexts[module] = (deepcopy(context[module]), group)
 
     def display(
@@ -110,11 +139,14 @@ class AgentConversation:
 
     def trim(self) -> None:
         characters = sum(group.characters for group in self._groups)
-        while len(self._groups) > 1 and characters > self._token_limit * 4:
+        if characters <= self._token_limit * 4:
+            return
+        retained = min(self._retained_tokens, self._token_limit) * 4
+        while len(self._groups) > 1 and characters > retained:
             group = self._groups.popleft()
             del self.items[: group.item_count]
             characters -= group.characters
-            for baselines in (self._module_contexts, self._catalogs):
+            for baselines in (self._module_contexts, self._core_fields, self._catalogs):
                 for module in [
                     module for module, (_, anchor) in baselines.items() if anchor is group
                 ]:
@@ -126,6 +158,7 @@ class AgentConversation:
         self.items.clear()
         self._groups.clear()
         self._module_contexts.clear()
+        self._core_fields.clear()
         self._catalogs.clear()
 
     def reset(self, separator: str) -> None:
