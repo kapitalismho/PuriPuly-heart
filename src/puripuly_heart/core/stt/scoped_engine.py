@@ -481,7 +481,11 @@ class ScopedRecognitionEngine:
                         self._retire_current_session(watchdogs)
                         self._stream_recovery = None
                         return
-                    stream = replace(recovery.stream, provider_epoch_id=self._provider_epoch_id)
+                    stream = replace(
+                        recovery.stream,
+                        provider_epoch_id=self._provider_epoch_id,
+                        recognizer_id=self._recognizer_id(session),
+                    )
                     if not await self._run_stream_write(
                         session,
                         session.begin_stream(stream),
@@ -1085,6 +1089,7 @@ class ScopedRecognitionEngine:
             provider_epoch_id=epoch_id,
             provider_turn_id=uuid4().hex,
             settings_scope=self._settings_scope(settings),
+            recognizer_id=self._recognizer_id(session),
         )
         loop = asyncio.get_running_loop()
         independent = isinstance(session, STTIndependentRecognitionSession) and (
@@ -1152,6 +1157,7 @@ class ScopedRecognitionEngine:
                 identity.segment.capture_epoch,
                 identity.provider_epoch_id,
                 identity.settings_scope,
+                identity.recognizer_id,
             )
             self._register_recognition_stream(stream, settings)
             if startup_last_speech_at is not None:
@@ -2843,18 +2849,21 @@ class ScopedRecognitionEngine:
                     ),
                 )
                 emit_failure(logger, diagnostics, stage="event_loop")
-                self._event_delivery_failed = True
-                self._event_buffer.wake_admission()
                 failed_soniox = (
                     isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal)
                     and bool(event.identity.settings_scope)
                     and event.identity.settings_scope[0] == "soniox"
                 )
+                soniox_session = (
+                    self._session_scope is not None and self._session_scope[0] == "soniox"
+                )
+                if not (failed_soniox or soniox_session):
+                    continue
+                self._event_delivery_failed = True
+                self._event_buffer.wake_admission()
                 if failed_soniox:
                     self._event_buffer.discard_updates(epoch_id=event.identity.provider_epoch_id)
-                if (self._session_scope is not None and self._session_scope[0] == "soniox") or (
-                    failed_soniox and self._session_scope is None
-                ):
+                if soniox_session or (failed_soniox and self._session_scope is None):
                     self._revoke_soniox_admission()
                     await self.abort(
                         reason="provider_event_delivery_failed", failure_diagnostics=diagnostics
@@ -3154,6 +3163,11 @@ class ScopedRecognitionEngine:
         if inspect.isawaitable(result):
             task = asyncio.create_task(result)
             task.add_done_callback(self._notification_done)
+
+    @staticmethod
+    def _recognizer_id(session: object | None) -> str | None:
+        recognizer_id = getattr(session, "recognizer_id", None)
+        return recognizer_id if isinstance(recognizer_id, str) else None
 
     @staticmethod
     def _settings_scope(settings: AudioSegmentSettingsSnapshot) -> tuple[object, ...]:

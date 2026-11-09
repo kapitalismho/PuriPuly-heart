@@ -10,6 +10,7 @@ from uuid import UUID
 
 import numpy as np
 
+from puripuly_heart.config.provider_values import is_cloud_final_stt_provider
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import OwnedVadEvent, PeerAudioSegmentLedger
 from puripuly_heart.core.audio.smart_turn import (
@@ -43,9 +44,6 @@ class ListenDeliveryController:
     HARD_LIMIT_S = 6.0
     CLOUD_FIVE_SECOND_PAUSE_MS = 192
     CLOUD_HARD_LIMIT_S = 10.0
-    CLOUD_FINAL_PROVIDER_IDS = frozenset(
-        {"soniox", "deepgram", "gemini_transcribe", "qwen_audio", "elevenlabs_scribe"}
-    )
     HARD_CUT_OVERLAP_MS = PEER_HARD_ROLLOVER_PRE_ROLL_MS
     SMART_PROBE_MS = 224
     SMART_COMPLETE_MS = 512
@@ -130,7 +128,7 @@ class ListenDeliveryController:
             self._pause_started_at_s = None
             self._pause_id += 1
             self._sample_rate_hz = owned.segment.settings.target_sample_rate_hz
-            cloud_final = owned.segment.settings.provider_id in self.CLOUD_FINAL_PROVIDER_IDS
+            cloud_final = is_cloud_final_stt_provider(owned.segment.settings.provider_id)
             self._five_second_pause_ms = (
                 self.CLOUD_FIVE_SECOND_PAUSE_MS if cloud_final else self.FIVE_SECOND_PAUSE_MS
             )

@@ -3212,6 +3212,77 @@ async def test_bound_event_sink_does_not_block_speech_end_on_downstream_delivery
     await engine.close()
 
 
+@pytest.mark.asyncio
+async def test_bound_event_sink_failure_does_not_stop_later_delivery() -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
+    first_start, _first_chunk, first_end = segment_events(ledger, start_sample=1400, now=14.0)
+    second_start, _second_chunk, second_end = segment_events(ledger, start_sample=1500, now=15.0)
+    session = ControlledScopedSession()
+    session.terminal_on_seal = ("final", "ready")
+    delivered: list[STTProviderTurnTerminal] = []
+
+    async def failing_once(event: STTProviderTurnEvent) -> None:
+        if not isinstance(event, STTProviderTurnTerminal):
+            return
+        if not delivered:
+            delivered.append(event)
+            raise ValueError("downstream rejected the first terminal")
+        delivered.append(event)
+
+    engine = ScopedRecognitionEngine(
+        channel="peer",
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        watchdog_resolver=lambda _settings: watchdogs(),
+    )
+    engine.bind_event_sink(failing_once)
+
+    await engine.handle_owned_vad_event(first_start)
+    await engine.handle_owned_vad_event(first_end)
+    await wait_until(lambda: len(delivered) == 1)
+    await engine.handle_owned_vad_event(second_start)
+    await engine.handle_owned_vad_event(second_end)
+    await wait_until(lambda: len(delivered) == 2)
+    await asyncio.wait_for(engine.wait_for_event_ingress_drain(), timeout=0.2)
+
+    assert [terminal.identity for terminal in delivered] == [
+        request.identity for request in session.requests
+    ]
+    await engine.close()
+
+
+@pytest.mark.asyncio
+async def test_turn_identity_carries_the_session_recognizer_without_changing_identity() -> None:
+    class MemberSession(ControlledScopedSession):
+        recognizer_id = "elevenlabs_scribe"
+
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("rolling_free"))
+    start, _chunk, end = segment_events(ledger, start_sample=1600, now=16.0)
+    session = MemberSession()
+    session.terminal_on_seal = ("final", "ready")
+    delivered: list[STTProviderTurnTerminal] = []
+
+    async def receive(event: STTProviderTurnEvent) -> None:
+        if isinstance(event, STTProviderTurnTerminal):
+            delivered.append(event)
+
+    engine = ScopedRecognitionEngine(
+        channel="peer",
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        watchdog_resolver=lambda _settings: watchdogs(),
+    )
+    engine.bind_event_sink(receive)
+
+    await engine.handle_owned_vad_event(start)
+    await engine.handle_owned_vad_event(end)
+    await wait_until(lambda: len(delivered) == 1)
+
+    identity = delivered[0].identity
+    assert identity.recognizer_id == "elevenlabs_scribe"
+    assert identity.settings_scope[0] == "rolling_free"
+    assert identity == replace(identity, recognizer_id=None)
+    await engine.close()
+
+
 def test_stable_contribution_provenance_preserves_suffix_and_detects_contradiction() -> None:
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
     identity = STTProviderTurnIdentity(

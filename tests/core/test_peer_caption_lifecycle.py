@@ -959,6 +959,51 @@ async def test_native_empty_or_epoch_retirement_closes_preview_and_unblocks_succ
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("recognizer_id", [None, "gemini_transcribe"], ids=["alias", "member"])
+async def test_rolling_free_partials_and_finals_share_the_caption_route(recognizer_id):
+    harness, backend, events, clock = setup()
+    callbacks = TranslationChannelOwnerCallbacks(harness.stt_sessions)
+    callbacks.bind_peer(harness.peer_owner)
+    stream = RecognitionStreamIdentity(
+        "peer", 1, 0, "rolling-epoch", ("rolling_free",), recognizer_id
+    )
+    callbacks._peer_capture = SimpleNamespace(
+        is_current_recognition_stream=lambda identity: identity == stream
+    )
+    harness.peer_owner.local_asr_runtime = SimpleNamespace(
+        snapshot=harness.peer_owner.local_asr_runtime.snapshot,
+        is_current_recognition_stream=lambda _channel, identity: identity == stream,
+    )
+    sources = [f"Sentence number {order}." for order in range(1, 6)]
+    try:
+        await harness.start()
+        for order, source in enumerate(sources, start=1):
+            unit_id = uuid4()
+            await callbacks.peer_event_handler(
+                STTRecognitionUnit(
+                    RecognitionUnitIdentity(stream, unit_id, order * 2 - 1),
+                    source[:8],
+                    is_final=False,
+                    observed_at=clock.now(),
+                )
+            )
+            await callbacks.peer_event_handler(
+                STTRecognitionUnitTerminal(
+                    STTRecognitionUnit(RecognitionUnitIdentity(stream, unit_id, order * 2), source),
+                    "final",
+                )
+            )
+            await asyncio.wait_for(idle(harness), 1)
+            assert harness.peer_owner.cloud_captions._segments == {}
+        finals = [event for event in events if event.type == "translation_final"]
+        assert [event.source_text for event in finals] == sources
+        assert all(event.peer_caption_revision >= 1 for event in finals)
+        assert [request.text for request in backend.calls] == sources
+    finally:
+        await asyncio.wait_for(harness.stop(), 1)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("failure", ["error", "timeout"])
 @pytest.mark.parametrize("repair", [False, True], ids=["settlement", "repair-absorption"])
 async def test_failed_or_timed_out_version_clears_preview_and_preserves_authoritative_source(

@@ -776,13 +776,16 @@ async def test_rolling_gemini_preserves_independent_stream_units_across_local_tu
         provider_epoch_id="outer-epoch",
         provider_turn_id="local-A",
         settings_scope=("rolling", ("rolling",), ("capture",)),
+        recognizer_id=session.recognizer_id,
     )
     second = replace(
         first,
         segment=AudioSegmentIdentity(3, 2, uuid4(), 7),
         provider_turn_id="local-B",
     )
-    stream = RecognitionStreamIdentity("peer", 3, 7, "outer-epoch", first.settings_scope)
+    stream = RecognitionStreamIdentity(
+        "peer", 3, 7, "outer-epoch", first.settings_scope, first.recognizer_id
+    )
     if stream_only:
         await session.begin_stream(stream)
     else:
@@ -806,6 +809,11 @@ async def test_rolling_gemini_preserves_independent_stream_units_across_local_tu
     events = [event async for event in session.turn_events()]
 
     assert session.accepts_stream_input and session.independent_recognition_units
+    assert session.recognizer_id == "gemini_transcribe"
+    assert {
+        (item if isinstance(item, STTRecognitionUnit) else item.unit).identity.stream.recognizer_id
+        for item in events
+    } == {"gemini_transcribe"}
     assert inner.audio == [(b"\x00\x01", ())]
     assert inner.fences == ["source_eof"]
     assert [

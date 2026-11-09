@@ -43,9 +43,6 @@ from puripuly_heart.domain.models import (
     Transcript,
 )
 
-CLOUD_PEER_PROVIDERS = frozenset(
-    {"soniox", "deepgram", "gemini_transcribe", "qwen_audio", "elevenlabs_scribe"}
-)
 PeerRequestKind = Literal["final", "preview", "repair", "continuation"]
 _OPEN_WORDS = frozenset(
     "a about am an and are as at because but can could for from had has have her his how if in "
