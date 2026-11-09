@@ -11,6 +11,7 @@ from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.prompts import get_default_prompt
 from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.orchestrator.channel_runtime import ContextEntry
 from puripuly_heart.core.orchestrator.peer_caption import join_action, preview_source
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
@@ -18,6 +19,7 @@ from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
 )
 from puripuly_heart.core.overlay.peer_caption_layout import estimate_peer_translation_lines
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
+from puripuly_heart.core.runtime.local_asr_provider_runtime import LocalASRProviderRuntimeOwner
 from puripuly_heart.core.stt.backend import (
     STTProviderEpochEnded,
     STTProviderTurnIdentity,
@@ -30,6 +32,13 @@ from puripuly_heart.core.translation_backend import TranslationBackend
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun, Transcript, Translation
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity
+from tests.core.runtime.test_local_asr_provider_runtime import (
+    FakeGpuRuntimeFactory,
+    FakeProviderFactory,
+    FakeProvisioningPort,
+    _resolved_config,
+    _wait_until,
+)
 from tests.core.test_peer_overlay_policy import Timeline
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness, owned_peer_speech_end
@@ -65,7 +74,7 @@ async def turn_loop():
         await asyncio.sleep(0)
 
 
-def setup(*, overlay_sink=None, clock=None):
+def setup(*, overlay_sink=None, clock=None, local_asr_provider_runtime_factory=None):
     backend = ControlledBackend()
     events = []
 
@@ -84,8 +93,37 @@ def setup(*, overlay_sink=None, clock=None):
         target_language="ko",
         system_prompt=get_default_prompt(),
         peer_translation_enabled=True,
+        local_asr_provider_runtime_factory=local_asr_provider_runtime_factory,
     )
     return harness, backend, events, clock
+
+
+class CommittedProviderRuntimeFactory:
+    def __init__(self):
+        self.providers = FakeProviderFactory()
+        self.owner = None
+
+    def create(self, callbacks):
+        self.owner = LocalASRProviderRuntimeOwner(
+            provider_factory=self.providers,
+            gpu_runtime_factory=FakeGpuRuntimeFactory(),
+            provisioning=FakeProvisioningPort(),
+            self_event_handler=callbacks.self_event_handler,
+            peer_event_handler=callbacks.peer_event_handler,
+            retired_event_handler=callbacks.retired_event_handler,
+            self_exception_handler=callbacks.self_exception_handler,
+            peer_exception_handler=callbacks.peer_exception_handler,
+        )
+        return self.owner
+
+
+def soniox_request(speaker_diarization):
+    return ProviderRuntimeBuildRequest(
+        config=replace(
+            _resolved_config("peer", "soniox"),
+            provider_options={"enable_speaker_diarization": speaker_diarization},
+        )
+    )
 
 
 def transcript(text, order, *, identity=None, final=False):
@@ -1056,6 +1094,77 @@ async def test_long_speech_preview_keeps_non_diarized_peer_caption_gold(
         await idle(harness)
         assert [block.speaker_style for block in presenter.snapshot().blocks] == [final_style]
     finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("committed", "candidate", "preview_style"),
+    [
+        (True, None, "gray"),
+        (False, None, "gold"),
+        (True, "pending", "gray"),
+        (True, "cancelled", "gray"),
+    ],
+)
+async def test_peer_preview_style_follows_committed_provider_diarization(
+    committed, candidate, preview_style
+):
+    clock = FakeClock()
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    runtime_factory = CommittedProviderRuntimeFactory()
+    harness, backend, _, clock = setup(
+        overlay_sink=presenter,
+        clock=clock,
+        local_asr_provider_runtime_factory=runtime_factory,
+    )
+    owner = runtime_factory.owner
+    handoff = None
+    try:
+        await harness.start()
+        await owner.replace_provider(soniox_request(committed), start=False)
+        if candidate is not None:
+            runtime_factory.providers.providers[-1].is_at_utterance_boundary = False
+            handoff = asyncio.create_task(
+                owner.handoff_provider(soniox_request(not committed), start=False)
+            )
+            await _wait_until(lambda: owner.snapshot.channel_for("peer").pending_handoff)
+        if candidate == "cancelled":
+            handoff.cancel()
+            await asyncio.wait_for(asyncio.gather(handoff, return_exceptions=True), 1)
+            await owner.commit_handoff("peer")
+        item = transcript("We are going to meet at the station later today", 1)
+        await partial(harness, item)
+        clock.advance(5)
+        await harness.peer_owner.cloud_captions.check_previews()
+        await asyncio.wait_for(idle(harness), 1)
+        assert [request.text for request in backend.calls] == [item.text]
+        assert [block.speaker_style for block in presenter.snapshot().blocks] == [preview_style]
+        if committed:
+            item = replace(
+                item,
+                is_final=True,
+                final_speaker_runs=(
+                    FinalSpeakerRun(
+                        item.text,
+                        "1",
+                        "soniox-scope",
+                        source="soniox",
+                        attribution_state="identified",
+                    ),
+                ),
+            )
+        await final(harness, item)
+        await asyncio.wait_for(idle(harness), 1)
+        assert len(backend.calls) == 2
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [item.text]
+        assert [block.speaker_style for block in presenter.snapshot().blocks] == ["gold"]
+        assert harness.osc.messages == []
+    finally:
+        if handoff is not None:
+            handoff.cancel()
+            await asyncio.gather(handoff, return_exceptions=True)
         await harness.stop()
         await presenter.close()
 
