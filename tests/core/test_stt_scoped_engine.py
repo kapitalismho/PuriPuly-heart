@@ -3251,6 +3251,53 @@ async def test_bound_event_sink_failure_does_not_stop_later_delivery() -> None:
 
 
 @pytest.mark.asyncio
+async def test_retired_soniox_epoch_delivery_failure_keeps_fail_stop() -> None:
+    class EpochEndingSession(ControlledScopedSession):
+        epoch_id = ""
+
+        async def stop(self) -> None:
+            await super().stop()
+            self.buffer.put(STTProviderEpochEnded(self.epoch_id, orderly=True, reason="stopped"))
+
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("soniox"))
+    start, _chunk, end = segment_events(ledger, start_sample=1700, now=17.0)
+    session = EpochEndingSession()
+
+    async def factory(_settings, epoch_id):
+        session.epoch_id = epoch_id
+        return session
+
+    async def failing_epoch_end(event: object) -> None:
+        if isinstance(event, STTProviderEpochEnded):
+            raise ValueError("downstream rejected the retired epoch")
+
+    engine = ScopedRecognitionEngine(
+        channel="peer",
+        session_factory=factory,
+        watchdog_resolver=lambda _settings: watchdogs(),
+    )
+    engine.bind_event_sink(failing_epoch_end)
+
+    await engine.handle_owned_vad_event(start)
+    await engine.handle_owned_vad_event(end)
+    session.emit(
+        STTProviderTurnTerminal(
+            identity=session.requests[0].identity,
+            outcome="final",
+            text="retiring",
+            text_authority="authoritative",
+            epoch_disposition="retire",
+        )
+    )
+    await wait_until(lambda: engine._event_dispatch_task.done())
+
+    with pytest.raises(ValueError, match="retired epoch"):
+        engine._event_dispatch_task.result()
+    assert engine._event_delivery_failed is True
+    await engine.close()
+
+
+@pytest.mark.asyncio
 async def test_turn_identity_carries_the_session_recognizer_without_changing_identity() -> None:
     class MemberSession(ControlledScopedSession):
         recognizer_id = "elevenlabs_scribe"
