@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import socket
 import ssl
 from dataclasses import dataclass, field, replace
 from typing import Any, cast
@@ -182,33 +183,6 @@ class BarrierCleanupScopedSession(ControlledScopedSession):
                     task.uncancel()
         self.calls.append(("close_done",))
         self.buffer.close()
-
-
-class InterruptibleCleanupScopedSession(ControlledScopedSession):
-    __slots__ = ("stop_gate", "close_gate", "stop_cancellations", "close_cancellations")
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.stop_gate = asyncio.Event()
-        self.close_gate = asyncio.Event()
-        self.stop_cancellations = 0
-        self.close_cancellations = 0
-
-    async def stop(self) -> None:
-        self.calls.append(("stop",))
-        try:
-            await self.stop_gate.wait()
-        except asyncio.CancelledError:
-            self.stop_cancellations += 1
-            raise
-
-    async def close(self) -> None:
-        self.calls.append(("close",))
-        try:
-            await self.close_gate.wait()
-        except asyncio.CancelledError:
-            self.close_cancellations += 1
-            raise
 
 
 def settings(
@@ -1375,49 +1349,125 @@ async def test_cloud_cleanup_quarantines_one_epoch_until_physical_release() -> N
 
 
 @pytest.mark.asyncio
-async def test_interruptible_cloud_cleanup_releases_within_drain_and_resumes() -> None:
-    cloud_settings = settings("deepgram")
-    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=cloud_settings)
-    first_start, _first_chunk, first_end = segment_events(
-        ledger,
-        start_sample=900,
-        now=9.0,
-    )
-    second_start, _second_chunk, second_end = segment_events(
-        ledger,
-        start_sample=1000,
-        now=10.0,
-    )
-    first = InterruptibleCleanupScopedSession()
-    first.terminal_on_seal = ("failed", "")
-    second = ControlledScopedSession()
-    second.terminal_on_seal = ("empty", "")
-    sessions = [first, second]
-    emitted: list[object] = []
-    provider_failures: list[Exception] = []
+@pytest.mark.parametrize("close_failure", ["cancelled", "exception"])
+@pytest.mark.parametrize("retry_safe", [True, None])
+async def test_unconfirmed_retry_safe_cleanup_keeps_resources_owned_until_reclaim_and_shutdown(
+    close_failure: str, retry_safe: bool | None
+) -> None:
+    class ResourceSession(ControlledScopedSession):
+        def __init__(self, outcome: str, text: str) -> None:
+            super().__init__()
+            self.resource = socket.socket()
+            self.release = asyncio.Event()
+            self.close_entered = asyncio.Event()
+            self.close_exited = asyncio.Event()
+            self.terminal_on_seal = (outcome, text)
+            if retry_safe is not None:
+                self.readiness_retry_safe = retry_safe
 
-    async def factory(_settings: AudioSegmentSettingsSnapshot, _epoch: str):
-        return sessions.pop(0)
+        async def close(self) -> None:
+            self.close_entered.set()
+            try:
+                if not self.release.is_set():
+                    if close_failure == "exception":
+                        raise OSError("physical resource still open")
+                    await self.release.wait()
+                self.resource.close()
+                await super().close()
+            finally:
+                self.close_exited.set()
+
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("deepgram"))
+    segments = [
+        segment_events(ledger, start_sample=index * 100, now=float(index)) for index in range(3)
+    ]
+    sessions: list[ResourceSession] = []
+    emitted: list[object] = []
+    backend_closes: list[None] = []
+
+    async def factory(_settings, _epoch):
+        session = (
+            ResourceSession("failed", "") if not sessions else ResourceSession("final", "fresh")
+        )
+        sessions.append(session)
+        return session
+
+    async def close_backend() -> None:
+        backend_closes.append(None)
+
+    def open_resources() -> int:
+        return sum(session.resource.fileno() >= 0 for session in sessions)
 
     engine = ScopedRecognitionEngine(
-        session_factory=factory,
-        event_sink=lambda event: emitted.append(event),
-        terminal_failure_sink=lambda exc: provider_failures.append(exc),
-        watchdog_resolver=lambda _settings: watchdogs(drain_timeout_s=0.01),
+        factory,
+        event_sink=emitted.append,
+        backend_close=close_backend,
+        watchdog_resolver=lambda _: watchdogs(
+            readiness_timeout_s=0.05,
+            drain_timeout_s=0.01,
+        ),
+        event_drain_timeout_s=0.05,
     )
-    await engine.handle_owned_vad_event(first_start)
-    await engine.handle_owned_vad_event(first_end)
-    await wait_until(lambda: engine.cleanup_debt == 0)
-    assert first.stop_cancellations == 1
-    assert first.close_cancellations == 1
+    try:
+        await engine.handle_owned_vad_event(segments[0][0])
+        await engine.handle_owned_vad_event(segments[0][2])
+        first = sessions[0]
+        await asyncio.wait_for(first.close_entered.wait(), timeout=1)
+        await asyncio.wait_for(first.close_exited.wait(), timeout=1)
+        await wait_until(lambda: not engine._cleanup_tasks)
+        assert engine.cleanup_debt == 1 and open_resources() == 1
+        assert getattr(first, "readiness_retry_safe", True)
+        old_identity = first.requests[0].identity
+        assert first.emit(
+            STTProviderTurnTerminal(
+                old_identity,
+                outcome="final",
+                text="obsolete",
+                text_authority="authoritative",
+            )
+        )
 
-    await engine.handle_owned_vad_event(second_start)
-    await engine.handle_owned_vad_event(second_end)
-    terminals = [item for item in emitted if isinstance(item, STTProviderTurnTerminal)]
-    assert [item.outcome for item in terminals] == ["failed", "empty"]
-    assert provider_failures == []
-    assert sessions == []
-    await engine.close()
+        await engine.handle_owned_vad_event(segments[1][0])
+        await engine.handle_owned_vad_event(segments[1][2])
+        assert len(sessions) == 1 and open_resources() == 1
+        assert engine.cleanup_debt == 1
+        terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
+        assert [event.outcome for event in terminals] == ["failed", "failed"]
+        assert terminals[-1].failure_reason == "provider_not_ready"
+
+        first.release.set()
+        await engine.handle_owned_vad_event(segments[2][0])
+        await engine.handle_owned_vad_event(segments[2][2])
+        terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
+        assert [(event.outcome, event.text) for event in terminals] == [
+            ("failed", ""),
+            ("failed", ""),
+            ("final", "fresh"),
+        ]
+        assert len(sessions) == 2 and open_resources() == 1
+        assert engine.cleanup_debt == 0
+        assert first.resource.fileno() == -1
+        assert [request.identity.segment for request in sessions[1].requests] == [
+            segments[2][0].segment.identity
+        ]
+
+        with pytest.raises(RuntimeError, match="provider_resource_quarantined"):
+            await engine.close_backend_and_wait()
+        await wait_until(lambda: not engine._cleanup_tasks)
+        assert open_resources() == 1 and engine.cleanup_debt == 1
+        assert backend_closes == []
+        sessions[1].release.set()
+        await engine.close_backend_and_wait()
+        assert open_resources() == 0 and engine.cleanup_debt == 0
+        assert backend_closes == [None]
+    finally:
+        for session in sessions:
+            session.release.set()
+        try:
+            await engine.close_backend_and_wait()
+        finally:
+            for session in sessions:
+                session.resource.close()
 
 
 @pytest.mark.asyncio

@@ -27,7 +27,9 @@ from tests.providers.test_qwen_audio import ScriptedSocket, SocketFactory, contr
 from tests.providers.test_qwen_audio_delivery_recovery import SelfSourceObserver
 
 
-async def make_engine(channel, *, sink=None, factory=None, clock=None):
+async def make_engine(
+    channel, *, sink=None, factory=None, clock=None, finish_timeout_s=0.5, send_timeout_s=0.2
+):
     factory = factory or SocketFactory()
     sessions = []
 
@@ -38,8 +40,8 @@ async def make_engine(channel, *, sink=None, factory=None, clock=None):
             language_hints=("en",),
             websocket_factory=factory,
             task_start_timeout_s=0.2,
-            task_finish_timeout_s=0.5,
-            send_timeout_s=0.2,
+            task_finish_timeout_s=finish_timeout_s,
+            send_timeout_s=send_timeout_s,
         )
         if clock is not None:
             backend.monotonic_clock = clock.now
@@ -243,6 +245,123 @@ async def test_two_logical_turn_limit_holds_completed_successor_until_predecesso
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_failed_predecessor_releases_completed_successor_before_physical_close_and_reclaims(
+    channel,
+):
+    class CloseBlockedSocket(ScriptedSocket):
+        def __init__(self):
+            super().__init__()
+            self.close_entered = asyncio.Event()
+            self.release = asyncio.Event()
+
+        async def close(self):
+            self.close_entered.set()
+            await self.release.wait()
+            await super().close()
+
+    old = [CloseBlockedSocket(), CloseBlockedSocket()]
+    factory = SocketFactory(old)
+    emitted = []
+    engine, _, sessions = await make_engine(
+        channel,
+        sink=emitted.append,
+        factory=factory,
+        finish_timeout_s=60,
+        send_timeout_s=60,
+    )
+    engine.watchdog_resolver = lambda _: watchdogs(final_timeout_s=60)
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("qwen_audio"))
+    segments = [
+        segment_events(ledger, start_sample=index * 100, now=float(index)) for index in range(4)
+    ]
+
+    def terminals():
+        return [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
+
+    def open_sockets():
+        return sum(not socket.closed for socket in factory.sockets)
+
+    try:
+        for start, _, end in segments[:2]:
+            await engine.handle_owned_vad_event(start)
+            await engine.handle_owned_vad_event(end)
+        a, b = old
+        await b.push(native(b.task_ids[0], text="completed B"))
+        await b.push(control(b.task_ids[0], "task-finished"))
+        await wait_until(
+            lambda: any(
+                turn.identity.segment == segments[1][0].segment.identity
+                and turn.terminal_ready.done()
+                for turn in engine._turns.values()
+            )
+        )
+        assert terminals() == []
+        await a.push(control(a.task_ids[0], "task-failed", error_code="500"))
+        await asyncio.wait_for(a.close_entered.wait(), timeout=1)
+        await wait_until(lambda: len(terminals()) == 2)
+        assert [(event.identity.segment, event.outcome, event.text) for event in terminals()] == [
+            (segments[0][0].segment.identity, "failed", ""),
+            (segments[1][0].segment.identity, "final", "completed B"),
+        ]
+        assert terminals()[0].failure_reason == "provider_task_failed"
+        assert not any(socket.release.is_set() for socket in old)
+        assert open_sockets() == 2
+        await asyncio.wait_for(b.close_entered.wait(), timeout=1)
+        await wait_until(lambda: not engine._cleanup_tasks)
+        assert engine.cleanup_debt == 1 and open_sockets() == 2
+        audio_before_retry = [
+            [value for value in socket.sent if isinstance(value, bytes)] for socket in old
+        ]
+
+        await engine.handle_owned_vad_event(segments[2][0])
+        await engine.handle_owned_vad_event(segments[2][2])
+        assert len(sessions) == 1 and len(factory.sockets) == 2
+        assert open_sockets() == 2 and engine.cleanup_debt == 1
+        assert [(event.outcome, event.text) for event in terminals()] == [
+            ("failed", ""),
+            ("final", "completed B"),
+            ("failed", ""),
+        ]
+        assert terminals()[-1].failure_reason == "provider_not_ready"
+        assert [
+            [value for value in socket.sent if isinstance(value, bytes)] for socket in old
+        ] == audio_before_retry
+        for socket in old:
+            await sessions[0].inject_event(native(socket.task_ids[0], 2, "obsolete"))
+            await sessions[0].inject_event(control(socket.task_ids[0], "task-finished"))
+            socket.release.set()
+
+        await engine.handle_owned_vad_event(segments[3][0])
+        await engine.handle_owned_vad_event(segments[3][2])
+        assert len(sessions) == 2 and len(factory.sockets) == 3
+        assert all(socket.closed for socket in old) and open_sockets() == 1
+        fresh = factory.sockets[-1]
+        await fresh.push(native(fresh.task_ids[0], text="fresh"))
+        await fresh.push(control(fresh.task_ids[0], "task-finished"))
+        await wait_until(lambda: len(terminals()) == 4)
+        assert [(event.identity.segment, event.outcome, event.text) for event in terminals()][
+            -1
+        ] == (segments[3][0].segment.identity, "final", "fresh")
+        assert not any(
+            "obsolete" in event.text
+            for event in emitted
+            if isinstance(event, (STTProviderTurnTerminal, STTProviderTurnUpdate))
+        )
+        assert engine.cleanup_debt == 0
+        await engine.close()
+        assert open_sockets() == 0
+    finally:
+        for socket in old:
+            socket.release.set()
+        try:
+            await engine.abort()
+            await engine.close()
+        finally:
+            await asyncio.gather(*(socket.close() for socket in factory.sockets))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
 @pytest.mark.parametrize("reason", ["toggle_off", "configuration_replaced", "source_discontinuity"])
 async def test_abort_invalidates_both_slots_then_new_scope_recovers_without_old_audio(
     channel, reason
@@ -397,7 +516,6 @@ async def test_idle_close_cancellation_requires_confirmed_release_before_fresh_r
         await wait_until(lambda: not engine._cleanup_tasks, timeout=2)
         if confirm_abort:
             assert all(socket.closed for socket in sockets)
-            assert engine.cleanup_debt == 0
         else:
             assert not any(socket.closed for socket in sockets)
             assert engine.cleanup_debt == 1

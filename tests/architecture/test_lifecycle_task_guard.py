@@ -495,9 +495,10 @@ TASK_CREATION_REVIEWS = (
         {
             "_QwenAudioSession._ready": 1,
             "_QwenAudioSession._seal": 1,
+            "_QwenAudioSession._start_slot_close": 1,
             "_QwenAudioSession._schedule_slot_retirement": 1,
         },
-        "Each Qwen channel retains two logical slot receivers, per-task final watchdogs and at most one retiring transport task per slot; stop and abort join active and retiring cleanup",
+        "Each Qwen channel retains slot receivers, final watchdogs, retiring transports and one shielded close task per physical slot; stop and abort join cleanup, and unconfirmed session release remains quarantined",
     ),
     *_reviews(
         "providers/stt/sdk_network.py",

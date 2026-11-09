@@ -219,6 +219,7 @@ class _QwenSlot:
     number: int
     websocket: Any = None
     receiver: asyncio.Task[None] | None = None
+    close_task: asyncio.Task[None] | None = None
     task: _QwenTask | None = None
     finished_at_s: float | None = None
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -247,6 +248,8 @@ class _QwenAudioSession(STTBackendSession):
         )
         self._legacy_capacity = asyncio.Semaphore(2)
         self._admission_lock = asyncio.Lock()
+        self._stop_lock = asyncio.Lock()
+        self._drain_interrupted = False
         self._closing = False
         self._aborted = False
         self._task_finished_count = 0
@@ -908,11 +911,35 @@ class _QwenAudioSession(STTBackendSession):
             type(exc).__name__,
         )
         try:
-            await self._close_slot(task.slot)
-        finally:
             await self._complete(task, reason=reason)
+        finally:
+            self._start_slot_close(task.slot)
 
     async def _close_slot(self, slot: _QwenSlot) -> None:
+        closing = self._start_slot_close(slot)
+        try:
+            await asyncio.shield(closing)
+        except asyncio.CancelledError:
+            if slot.websocket is not None and (self._slots[slot.number] is slot or self._closing):
+                self.readiness_retry_safe = False
+            raise
+
+    def _start_slot_close(self, slot: _QwenSlot) -> asyncio.Task[None]:
+        closing = slot.close_task
+        if closing is None or closing.done():
+            closing = asyncio.create_task(
+                self._close_slot_transport(slot), name=f"qwen-audio-close:{slot.number}"
+            )
+            slot.close_task = closing
+            closing.add_done_callback(self._slot_close_done)
+        return closing
+
+    @staticmethod
+    def _slot_close_done(task: asyncio.Task[None]) -> None:
+        if not task.cancelled():
+            task.exception()
+
+    async def _close_slot_transport(self, slot: _QwenSlot) -> None:
         websocket = slot.websocket
         receiver, slot.receiver = slot.receiver, None
         if receiver is not None and receiver is not asyncio.current_task():
@@ -1020,7 +1047,7 @@ class _QwenAudioSession(STTBackendSession):
         await self.abort_for_toggle_off()
 
     async def abort_for_toggle_off(self) -> None:
-        if self._aborted:
+        if self._stopped:
             return
         self._aborted = self._closing = True
         for slot in self._slots:
@@ -1030,25 +1057,7 @@ class _QwenAudioSession(STTBackendSession):
                 task.ready.set()
                 if task.final_wait is not None:
                     task.final_wait.cancel()
-        await self._close_slots()
-        timers = [
-            slot.task.final_wait
-            for slot in self._slots
-            if slot.task is not None and slot.task.final_wait is not None
-        ]
-        if timers:
-            await asyncio.gather(*timers, return_exceptions=True)
-        self._tasks.clear()
-        self._legacy_current = None
-        self._legacy_order.clear()
-        self._event_projection.close()
-        if self._event_projection.is_legacy:
-            while not self._legacy_events.empty():
-                self._legacy_events.get_nowait()
-            self._legacy_events.put_nowait(None)
-            self._legacy_capacity.release()
-            self._legacy_capacity.release()
-        self._stopped = True
+        await self.stop()
 
     async def turn_events(self):
         async for event in self._event_projection.turn_events():
@@ -1100,31 +1109,48 @@ class _QwenAudioSession(STTBackendSession):
             yield event
 
     async def stop(self) -> None:
-        if self._stopped:
-            return
-        self._closing = True
-        for slot in self._slots:
-            task = slot.task
-            if task is not None and not task.done.is_set():
-                await self._seal(task)
-        pending = [slot.task.done.wait() for slot in self._slots if slot.task is not None]
-        if pending:
-            await asyncio.gather(*pending)
-        timers = [
-            slot.task.final_wait
-            for slot in self._slots
-            if slot.task is not None and slot.task.final_wait is not None
-        ]
-        if timers:
-            await asyncio.gather(*timers, return_exceptions=True)
-        await self._close_slots()
-        self._event_projection.close()
-        if self._event_projection.is_legacy:
-            await self._legacy_events.put(None)
-        self._stopped = True
+        async with self._stop_lock:
+            if self._stopped:
+                return
+            self._closing = True
+            try:
+                for slot in self._slots:
+                    task = slot.task
+                    if task is not None and not task.done.is_set():
+                        await self._seal(task)
+                pending = [slot.task.done.wait() for slot in self._slots if slot.task is not None]
+                if pending:
+                    await asyncio.gather(*pending)
+                timers = [
+                    slot.task.final_wait
+                    for slot in self._slots
+                    if slot.task is not None and slot.task.final_wait is not None
+                ]
+                if timers:
+                    await asyncio.gather(*timers, return_exceptions=True)
+                await self._close_slots()
+            except BaseException:
+                self._drain_interrupted = True
+                raise
+            if self._aborted:
+                self._tasks.clear()
+                self._legacy_current = None
+                self._legacy_order.clear()
+            self._event_projection.close()
+            if self._event_projection.is_legacy:
+                if self._aborted:
+                    while not self._legacy_events.empty():
+                        self._legacy_events.get_nowait()
+                    self._legacy_capacity.release()
+                    self._legacy_capacity.release()
+                await self._legacy_events.put(None)
+            self._stopped = True
 
     async def close(self) -> None:
-        await self.stop()
+        if self._drain_interrupted:
+            await self.abort_for_toggle_off()
+        else:
+            await self.stop()
 
 
 __all__ = [

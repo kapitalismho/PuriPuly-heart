@@ -2899,7 +2899,7 @@ class ScopedRecognitionEngine:
         closed = await self._bounded_cleanup_call(session.close(), watchdogs.drain_timeout_s)
         if closed and self._quarantined_session is session:
             self._quarantined_session = None
-        elif not closed and not getattr(session, "readiness_retry_safe", True):
+        elif not closed:
             self._quarantined_session = session
         if consumer is not None and not consumer.done():
             consumer.cancel()
@@ -2950,7 +2950,7 @@ class ScopedRecognitionEngine:
         self._record_cleanup_failure(TimeoutError(), "provider_cleanup_timeout")
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
-        return False
+        return not task.cancelled() and task.exception() is None
 
     def _schedule_late_factory_reclaim(
         self,

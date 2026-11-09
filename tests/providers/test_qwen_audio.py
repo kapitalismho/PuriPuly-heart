@@ -66,6 +66,25 @@ class ScriptedSocket:
         await self.incoming.put(None)
 
 
+class CloseGatedSocket(ScriptedSocket):
+    def __init__(self):
+        super().__init__()
+        self.close_entered = asyncio.Event()
+        self.close_release = asyncio.Event()
+        self.active_closes = 0
+        self.max_active_closes = 0
+
+    async def close(self):
+        self.active_closes += 1
+        self.max_active_closes = max(self.max_active_closes, self.active_closes)
+        self.close_entered.set()
+        try:
+            await self.close_release.wait()
+            await super().close()
+        finally:
+            self.active_closes -= 1
+
+
 class SocketFactory:
     def __init__(self, sockets=()):
         self.planned = list(sockets)
@@ -219,8 +238,8 @@ async def test_readiness_prevents_binary_and_times_out_without_replay(channel):
         await writing
     event = await session.turn_events().__anext__()
     assert event.outcome == "failed" and event.failure_reason == "qwen_readiness_failed"
-    assert socket.closed and not any(isinstance(value, bytes) for value in socket.sent)
     await session.close()
+    assert socket.closed and not any(isinstance(value, bytes) for value in socket.sent)
 
 
 @pytest.mark.asyncio
@@ -417,6 +436,155 @@ async def test_failure_is_explicit_and_cannot_replay_uncertain_pcm(channel, faul
     finally:
         await session.abort_for_toggle_off()
         await receiver
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize("failure", ["native", "final_timeout"])
+async def test_failed_terminal_is_published_before_socket_close(channel, failure):
+    failed_socket = CloseGatedSocket()
+    session, factory = await open_session(
+        channel,
+        SocketFactory([failed_socket]),
+        task_finish_timeout_s=0.2 if failure == "final_timeout" else 5,
+        send_timeout_s=5,
+    )
+    events = []
+    receiver = asyncio.create_task(collect(session, events))
+    try:
+        first = request(channel)
+        await session.begin_turn(first)
+        await send(session, first)
+        await seal(session, first)
+        if failure == "native":
+            await failed_socket.push(
+                control(
+                    failed_socket.task_ids[0],
+                    "task-failed",
+                    error_code="400",
+                    error_message="scripted native failure",
+                )
+            )
+        await asyncio.wait_for(failed_socket.close_entered.wait(), timeout=1)
+        await wait_until(
+            lambda: sum(isinstance(event, STTProviderTurnTerminal) for event in events) == 1
+        )
+        assert not failed_socket.closed and not failed_socket.close_release.is_set()
+        terminals = [event for event in events if isinstance(event, STTProviderTurnTerminal)]
+        assert [event.identity for event in terminals] == [first.identity]
+        assert [event.outcome for event in terminals] == ["failed"]
+        assert terminals[0].failure_reason == (
+            "qwen_final_timeout" if failure == "final_timeout" else "provider_task_failed"
+        )
+        before_late = tuple(events)
+        await session.inject_event(native(failed_socket.task_ids[0], text="late failure tail"))
+        await session.inject_event(control(failed_socket.task_ids[0], "task-finished"))
+        await session.inject_event(control(failed_socket.task_ids[0], "task-failed"))
+        await asyncio.sleep(0)
+        assert tuple(events) == before_late
+    finally:
+        failed_socket.close_release.set()
+        try:
+            await session.close()
+            await asyncio.wait_for(receiver, timeout=1)
+        finally:
+            receiver.cancel()
+            await asyncio.gather(receiver, return_exceptions=True)
+    assert all(socket.closed for socket in factory.sockets)
+    assert tuple(events) == before_late
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize("cancelled_method", ["stop", "close"])
+async def test_cancelled_cleanup_waiter_preserves_shared_physical_close(channel, cancelled_method):
+    socket = CloseGatedSocket()
+    session, _ = await open_session(channel, SocketFactory([socket]), send_timeout_s=5)
+    events = []
+    receiver = asyncio.create_task(collect(session, events))
+    cleanup_tasks = []
+    try:
+        req = request(channel)
+        await session.begin_turn(req)
+        await send(session, req)
+        await seal(session, req)
+        await session.inject_event(control(socket.task_ids[0], "task-finished"))
+        await wait_until(
+            lambda: any(isinstance(event, STTProviderTurnTerminal) for event in events)
+        )
+        cancelled = asyncio.create_task(getattr(session, cancelled_method)())
+        cleanup_tasks.append(cancelled)
+        await asyncio.wait_for(socket.close_entered.wait(), timeout=1)
+        surviving_method = "close" if cancelled_method == "stop" else "stop"
+        surviving = asyncio.create_task(getattr(session, surviving_method)())
+        cleanup_tasks.append(surviving)
+        done, _ = await asyncio.wait(cleanup_tasks, timeout=0.03)
+        assert not done
+        cancelled.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(asyncio.shield(cancelled), timeout=1)
+        assert not socket.closed and not surviving.done()
+        assert socket.max_active_closes == 1
+        socket.close_release.set()
+        await asyncio.wait_for(surviving, timeout=1)
+        await receiver
+        assert socket.closed and socket.max_active_closes == 1
+    finally:
+        socket.close_release.set()
+        await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+        try:
+            await session.close()
+        finally:
+            receiver.cancel()
+            await asyncio.gather(receiver, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_close_after_cancelled_stop_does_not_restart_missing_final_drain(channel):
+    socket = ScriptedSocket()
+    session, _ = await open_session(
+        channel, SocketFactory([socket]), task_finish_timeout_s=60, send_timeout_s=5
+    )
+    events = []
+    receiver = asyncio.create_task(collect(session, events))
+    cleanup_tasks = []
+    try:
+        req = request(channel)
+        await session.begin_turn(req)
+        await send(session, req)
+        stopping = asyncio.create_task(session.stop())
+        cleanup_tasks.append(stopping)
+        await wait_until(
+            lambda: any(
+                isinstance(packet, str) and json.loads(packet)["header"]["action"] == "finish-task"
+                for packet in socket.sent
+            )
+        )
+        stopping.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await stopping
+        closing = asyncio.create_task(session.close())
+        cleanup_tasks.append(closing)
+        await asyncio.wait_for(asyncio.shield(closing), timeout=1)
+        assert socket.closed
+        await session.inject_event(native(socket.task_ids[0], text="late drain tail"))
+        await session.inject_event(control(socket.task_ids[0], "task-finished"))
+        await receiver
+        assert not any(
+            isinstance(event, STTProviderTurnTerminal) and event.outcome == "final"
+            for event in events
+        )
+    finally:
+        for task in cleanup_tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+        try:
+            await session.abort_for_toggle_off()
+        finally:
+            receiver.cancel()
+            await asyncio.gather(receiver, return_exceptions=True)
 
 
 @pytest.mark.asyncio
