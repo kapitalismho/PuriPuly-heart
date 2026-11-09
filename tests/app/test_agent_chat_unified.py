@@ -225,7 +225,7 @@ async def test_uncertain_wait_reconciles_same_receipt_before_later_effects(catal
 
     control = Uncertain(catalog)
     transport = Responses(
-        batch(call("original", "execute_app", "overlay.set", enabled=True)),
+        batch(call("original", "execute_app", "recognition.probe", channel="self")),
         answer("The accepted operation is still pending."),
         batch(
             call("receipt", "read_app", "operation", operation_id="op-1"),
@@ -241,7 +241,7 @@ async def test_uncertain_wait_reconciles_same_receipt_before_later_effects(catal
     owner = AgentChatOwner(control, transport, localize=lambda key, **values: key)
     try:
         await owner.start()
-        await owner.send("Enable the overlay.")
+        await owner.send("Check Self capture and recognition scope.")
         await owner.send("Read the existing receipt before enabling translation.")
         outputs = {
             item["call_id"]: json.loads(item["output"])
@@ -251,11 +251,19 @@ async def test_uncertain_wait_reconciles_same_receipt_before_later_effects(catal
         assert outputs["receipt"]["status"] == "pending"
         assert outputs["receipt"]["receipt"]["request_id"] == "original"
         assert outputs["blocked"]["status"] == "not_executed"
-        assert [item["command"] for item in control.submissions] == ["overlay.set"]
-        control.operations["op-1"].update(status="applied", terminal=True)
+        assert [item["command"] for item in control.submissions] == ["recognition.probe"]
+        control.operations["op-1"].update(
+            status="applied",
+            terminal=True,
+            recognition_result="not_exercised",
+            recognition_scope="capture_vad_only",
+            configured_provider="gemini_transcribe",
+            exercised_provider=None,
+            cleanup_complete=True,
+        )
         await owner.send("Now enable translation.")
         assert [item["command"] for item in control.submissions] == [
-            "overlay.set",
+            "recognition.probe",
             "translation.set",
         ]
         completed = next(
@@ -265,5 +273,40 @@ async def test_uncertain_wait_reconciles_same_receipt_before_later_effects(catal
         )
         assert completed["status"] == "applied"
         assert completed["receipt"]["request_id"] == "original"
+        assert completed["receipt"]["recognition_scope"] == "capture_vad_only"
+        assert completed["receipt"]["recognition_result"] == "not_exercised"
+        assert completed["receipt"]["configured_provider"] == "gemini_transcribe"
+        assert completed["receipt"]["exercised_provider"] is None
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_settings_ui_stops_dependent_actions_until_user_continuation(catalog):
+    control = ExecutionControl(catalog)
+    transport = Responses(
+        batch(
+            call("settings", "execute_app", "ui.settings", section="api", provider="deepseek"),
+            call("premature", "execute_app", "translation.set", enabled=True),
+        ),
+        answer("Use the displayed secure field before continuing."),
+    )
+    owner = AgentChatOwner(control, transport, localize=lambda key, **values: key)
+    opened = []
+    owner.bind_navigation(
+        lambda *args: opened.append(args) or {"opened": True, "field_visible": True}
+    )
+    try:
+        await owner.start()
+        await owner.send("Open the DeepSeek key field before doing anything else.")
+        results = {
+            item["call_id"]: json.loads(item["output"])
+            for item in owner.report_archive
+            if item.get("type") == "function_call_output"
+        }
+        assert opened == [("api", "deepseek")]
+        assert results["settings"]["opened"] is True
+        assert results["premature"]["status"] == "not_executed"
+        assert control.submissions == []
     finally:
         await owner.close()

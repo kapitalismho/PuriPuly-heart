@@ -32,7 +32,6 @@ from puripuly_heart.app.services.agent_chat.conversation import AgentConversatio
 from puripuly_heart.app.services.agent_chat.execution import (
     app_tool_schemas,
     app_tool_target,
-    safe_receipt,
     validate,
 )
 from puripuly_heart.app.services.agent_chat.modules import (
@@ -61,7 +60,7 @@ from puripuly_heart.app.services.agent_chat.routing import (
     classification_input,
     extract_decision,
 )
-from puripuly_heart.app.services.agent_chat.tools import AgentTools
+from puripuly_heart.app.services.agent_chat.tools import AgentTools, project_operation_receipt
 from puripuly_heart.core.diagnostic_validation import contains_known_secret_pattern
 from puripuly_heart.core.lifecycle import LifecycleScope
 from puripuly_heart.core.owned_thread import run_owned_thread_call
@@ -1024,7 +1023,10 @@ class AgentChatOwner:
             except Exception:
                 continue
             if observed.get("terminal") and self._operations.get(item["action_id"]) is item:
-                item["result"] = {"status": observed["status"], "receipt": safe_receipt(observed)}
+                item["result"] = {
+                    "status": observed["status"],
+                    "receipt": project_operation_receipt(observed, item["tool"]),
+                }
                 item["phase"] = "completed"
         pending = [
             item
@@ -1365,6 +1367,7 @@ class AgentChatOwner:
                             "interrupted",
                             "degraded",
                             "persistence_failed",
+                            "not_executed",
                         }:
                             blocked = "read_failed" if pure_read else "previous_call_blocked"
                         elif result.get("controls_staged"):
@@ -1502,7 +1505,7 @@ class AgentChatOwner:
                         self._require_current(generation)
                         result = {
                             "status": receipt["status"] if receipt.get("terminal") else "pending",
-                            "receipt": safe_receipt(receipt),
+                            "receipt": project_operation_receipt(receipt, operation["tool"]),
                         }
                         operation["result"] = deepcopy(result)
                         if receipt.get("terminal"):
@@ -1524,6 +1527,8 @@ class AgentChatOwner:
                 ):
                     self._stage_provider_setup(arguments["provider"], generation)
                     result = {**result, "controls_staged": True, "displayed": False}
+                if name == "open_settings" and result.get("opened") is True:
+                    result = {**result, "controls_staged": True}
                 if isinstance(result.get("context"), dict):
                     self._tools.observe_context(result["context"])
         except Exception:

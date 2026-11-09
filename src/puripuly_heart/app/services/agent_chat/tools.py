@@ -532,6 +532,46 @@ def _safe_receipt(receipt: dict) -> dict:
     return result
 
 
+def project_operation_receipt(receipt: dict, tool: str) -> dict:
+    if tool == "retry_osc_discovery":
+        return _safe_osc_receipt(receipt)
+    result = _safe_receipt(receipt)
+    result.update(
+        _pick(
+            receipt,
+            (
+                "translation_result",
+                "recognition_result",
+                "channel",
+                "captured_settings_revision",
+                "current_settings_revision",
+                "final_event",
+                "configured_provider",
+                "exercised_provider",
+                "recognition_scope",
+                "input_samples",
+                "sample_rate_hz",
+                "fixture_duration_seconds",
+                "configured_language",
+                "source_mode",
+                "accuracy",
+                "capture",
+                "translation",
+                "captured_generation",
+                "current_generation",
+                "source_language",
+                "target_language",
+                "output_delivery",
+                "display",
+                "failure_category",
+                "cleanup_complete",
+                "cleanup_outcome",
+            ),
+        )
+    )
+    return result
+
+
 def _rejected(code: str, explanation: str) -> dict:
     return {"status": "rejected", "error": {"code": code, "explanation": explanation}}
 
@@ -1295,40 +1335,7 @@ class AgentTools:
             )
             if receipt.get("status") not in _TERMINAL:
                 receipt = await self._control.wait(receipt["operation_id"])
-            safe = _safe_receipt(receipt)
-            safe.update(
-                _pick(
-                    receipt,
-                    (
-                        "translation_result",
-                        "recognition_result",
-                        "channel",
-                        "captured_settings_revision",
-                        "current_settings_revision",
-                        "final_event",
-                        "configured_provider",
-                        "exercised_provider",
-                        "recognition_scope",
-                        "input_samples",
-                        "sample_rate_hz",
-                        "fixture_duration_seconds",
-                        "configured_language",
-                        "source_mode",
-                        "accuracy",
-                        "capture",
-                        "translation",
-                        "captured_generation",
-                        "current_generation",
-                        "source_language",
-                        "target_language",
-                        "output_delivery",
-                        "display",
-                        "failure_category",
-                    ),
-                )
-            )
-            if command == "osc.discovery.retry":
-                safe = _safe_osc_receipt(receipt)
+            safe = project_operation_receipt(receipt, name)
             result = {
                 "status": safe["status"] if safe.get("terminal") else "pending",
                 "receipt": safe,
@@ -1341,9 +1348,7 @@ class AgentTools:
                     pass
                 result = {
                     "status": receipt["status"] if receipt.get("terminal") else "pending",
-                    "receipt": _safe_osc_receipt(receipt)
-                    if command == "osc.discovery.retry"
-                    else _safe_receipt(receipt),
+                    "receipt": project_operation_receipt(receipt, name),
                 }
             else:
                 result = {
