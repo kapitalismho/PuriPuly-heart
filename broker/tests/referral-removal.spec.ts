@@ -79,6 +79,7 @@ describe('referral retirement without allowance or credential mutation', () => {
     if (throughMigration) {
       env.__db.exec(readBrokerMigrationSql('0028_add_puri_identity_proofs.sql'));
       env.__db.exec(readBrokerMigrationSql('0029_puri_token_admission_limits.sql'));
+      env.__db.exec(readBrokerMigrationSql('0030_puri_first_enrollment_limits.sql'));
     }
     if (throughMigration) env.__db.prepare(`INSERT INTO managed_referral_settlement_jobs (source, referral_reward_id, phase, attempt_count, next_attempt_at, created_at, updated_at) VALUES ('qq', 999, 'invitee_pending', 0, ?, ?, ?)`).run(...Array(3).fill(now.toISOString()));
     const queuedBefore = throughMigration ? env.__db.prepare('SELECT * FROM managed_referral_settlement_jobs').all() : null;

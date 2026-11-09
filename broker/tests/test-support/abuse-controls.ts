@@ -8,7 +8,13 @@ export interface StoredAbuseControls {
     maxRequests: number;
     windowMinutes: number;
   };
-  puriTokenRegistrationIp: {
+  puriEnrollmentShortIp: {
+    endpoint: string;
+    scope: 'ip';
+    maxRequests: number;
+    windowMinutes: number;
+  };
+  puriEnrollmentLongIp: {
     endpoint: string;
     scope: 'ip';
     maxRequests: number;
@@ -152,14 +158,20 @@ export const TEST_DEFAULT_ABUSE_CONTROLS: StoredAbuseControls = {
   puriTokenIp: {
     endpoint: 'POST /v1/puri/token',
     scope: 'ip',
-    maxRequests: 600,
+    maxRequests: 200,
     windowMinutes: 15,
   },
-  puriTokenRegistrationIp: {
+  puriEnrollmentShortIp: {
     endpoint: 'POST /v1/puri/token',
     scope: 'ip',
-    maxRequests: 20,
-    windowMinutes: 15,
+    maxRequests: 5,
+    windowMinutes: 60,
+  },
+  puriEnrollmentLongIp: {
+    endpoint: 'POST /v1/puri/token',
+    scope: 'ip',
+    maxRequests: 10,
+    windowMinutes: 1440,
   },
   puriTokenInstallation: {
     endpoint: 'POST /v1/puri/token',
