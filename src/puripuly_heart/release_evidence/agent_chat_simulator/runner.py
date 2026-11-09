@@ -9,6 +9,7 @@ from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
+from time import monotonic
 
 import httpx
 
@@ -98,11 +99,16 @@ class RecordingTransport:
         self.support_offer: str | None = None
         self.last_error: str | None = None
         self.classification_call_id: int | None = None
+        self.started_monotonic: float | None = None
+        self.first_response_seconds: float | None = None
 
     async def prepare(self) -> None:
         await self.transport.prepare()
 
     async def _call(self, method: str, arguments: dict) -> dict:
+        started = monotonic()
+        if self.started_monotonic is None:
+            self.started_monotonic = started
         record = {
             "id": len(self.calls) + 1,
             "turn": self.turn,
@@ -111,6 +117,7 @@ class RecordingTransport:
             "request": deepcopy(arguments),
             "upstream_context_id": upstream_context_id(method, arguments),
             "state_before": self.app.state(),
+            "started_seconds": started - self.started_monotonic,
         }
         self.calls.append(record)
         if method == "classify":
@@ -127,11 +134,16 @@ class RecordingTransport:
                 code=self.last_error,
             )
             raise
+        finally:
+            record["elapsed_seconds"] = monotonic() - started
 
     async def classify(self, **arguments) -> dict:
         return await self._call("classify", arguments)
 
     async def respond(self, **arguments):
+        started = monotonic()
+        if self.started_monotonic is None:
+            self.started_monotonic = started
         record = {
             "id": len(self.calls) + 1,
             "turn": self.turn,
@@ -141,6 +153,7 @@ class RecordingTransport:
             "upstream_context_id": upstream_context_id("respond", arguments),
             "state_before": self.app.state(),
             "events": [],
+            "started_seconds": started - self.started_monotonic,
         }
         self.calls.append(record)
         self.app.observe_model_input(record["id"], arguments.get("input", []))
@@ -165,6 +178,8 @@ class RecordingTransport:
                 code=self.last_error,
             )
             raise
+        finally:
+            record["elapsed_seconds"] = monotonic() - started
 
     async def upload_support(self, *, bundle: bytes, **arguments) -> dict:
         upload = {
@@ -220,6 +235,14 @@ class ConversationRecorder:
                 {"turn": self.transport.turn, "role": message.role, "text": message.text}
             )
             if message.role == "assistant":
+                if (
+                    message.text.strip()
+                    and self.transport.started_monotonic is not None
+                    and self.transport.first_response_seconds is None
+                ):
+                    self.transport.first_response_seconds = (
+                        monotonic() - self.transport.started_monotonic
+                    )
                 self.assistant_indices[index] = len(self.transport.app.assistant_messages)
                 self.transport.app.observe_assistant(message.text)
         self.seen_messages = len(snapshot.messages)
@@ -639,6 +662,15 @@ async def run_attempt(
                 status="harness_error",
                 error="User repeatedly pressed controls without ending; safety stop, not additional chat turns",
             )
+        result["timing"] = {
+            "first_response_seconds": transport.first_response_seconds,
+            "dialogue_seconds": (
+                monotonic() - transport.started_monotonic
+                if transport.started_monotonic is not None
+                else None
+            ),
+            "basis": "First response: first nonempty displayed assistant message after first D/M dispatch, excluding greetings. Dialogue: first D/M dispatch through dialogue end, before judging; includes intervening simulated-user and control time. Use completion latency only when the task outcome is accepted. Helpfulness is judged separately.",
+        }
         archive = list(owner.report_archive)
         code = code_judgment(
             app,

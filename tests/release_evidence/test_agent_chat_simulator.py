@@ -4608,3 +4608,43 @@ def test_official_deepseek_key_is_not_ready_until_observed_credit_and_secure_ver
     assert app.signup_completed("deepseek")
     assert app.presence["deepseek_api_key"]
     assert app.intent["translation"] == app.initial_translation
+
+
+@pytest.mark.parametrize("unified", (False, True))
+def test_report_evidence_cannot_be_supplied_after_the_offer(unified):
+    report = {
+        "type": "function_call",
+        "name": "propose_app" if unified else "propose_report",
+        "arguments": json.dumps(
+            {"request": {"action": "report", "summary": "Synthetic issue"}}
+            if unified
+            else {"summary": "Synthetic issue"}
+        ),
+    }
+    offer = {
+        "id": 1,
+        "turn": 1,
+        "method": "respond",
+        "request": {"route": "work", "input": []},
+        "response": {"output": [report]},
+    }
+    observed = {
+        "id": 2,
+        "turn": 2,
+        "method": "respond",
+        "request": {
+            "route": "work",
+            "input": [
+                {
+                    "role": "user",
+                    "content": json.dumps({"app_context": {"core": {"diagnostics": []}}}),
+                }
+            ],
+        },
+        "response": {"output": []},
+    }
+    app = ScenarioApp(select_scenarios(["unsolvable-internal"])[0])
+    late = code_judgment(app, [], [], model_calls=[offer, observed])
+    early = code_judgment(app, [], [], model_calls=[observed, offer])
+    assert late["local_diagnostic_evidence_observed"] is False
+    assert early["local_diagnostic_evidence_observed"] is True
