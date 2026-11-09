@@ -52,6 +52,7 @@ class STTProviderTurnIdentity:
     provider_epoch_id: str
     provider_turn_id: str
     settings_scope: tuple[object, ...] = ()
+    recognizer_id: str | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True, slots=True)

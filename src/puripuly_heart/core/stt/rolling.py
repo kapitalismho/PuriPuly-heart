@@ -480,6 +480,10 @@ class _RollingSession(STTBackendSession):
         return self.definition.name
 
     @property
+    def recognizer_id(self) -> str:
+        return self.definition.name.value
+
+    @property
     def accepts_stream_input(self) -> bool:
         return (
             isinstance(self.inner, STTIndependentRecognitionSession)
@@ -522,6 +526,7 @@ class _RollingSession(STTBackendSession):
                 capture_epoch=identity.segment.capture_epoch,
                 provider_epoch_id=identity.provider_epoch_id,
                 settings_scope=identity.settings_scope,
+                recognizer_id=identity.recognizer_id,
             )
             if self._outer_stream is None:
                 self._outer_stream = stream

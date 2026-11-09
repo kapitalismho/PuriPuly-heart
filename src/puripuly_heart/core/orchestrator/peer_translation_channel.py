@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from uuid import UUID
 
+from puripuly_heart.config.provider_values import is_cloud_final_stt_provider
 from puripuly_heart.core.audio.ownership import (
     AudioSegmentSnapshot,
     AudioSegmentTerminalReceipt,
@@ -25,7 +26,7 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigSnapshot,
     TranslationRuntimeConfigSnapshotPort,
 )
-from puripuly_heart.core.orchestrator.peer_caption import CLOUD_PEER_PROVIDERS, PeerCaptionOwner
+from puripuly_heart.core.orchestrator.peer_caption import PeerCaptionOwner
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
     LatencyInheritanceDiagnostic,
     LatencyStageDiagnostic,
@@ -97,6 +98,9 @@ class PeerTranslationChannelOwner:
         default_factory=PeerSpeakerIdentityAllocator
     )
     _publication_order_by_generation: dict[int, int] = field(default_factory=dict)
+    _unit_publication_order_by_generation: dict[int, int] = field(default_factory=dict)
+    _turn_order_offset_by_generation: dict[int, int] = field(default_factory=dict)
+    _turn_order_offsets: OrderedDict[tuple[int, str], int] = field(default_factory=OrderedDict)
     _retired_local_vad_ids: OrderedDict[UUID, None] = field(default_factory=OrderedDict)
     _accepting_events: bool = field(init=False, default=True)
     cloud_captions: PeerCaptionOwner = field(init=False)
@@ -150,6 +154,9 @@ class PeerTranslationChannelOwner:
         self._clear_peer_logical_turn_state()
         self._retired_local_vad_ids.clear()
         self._publication_order_by_generation.clear()
+        self._unit_publication_order_by_generation.clear()
+        self._turn_order_offset_by_generation.clear()
+        self._turn_order_offsets.clear()
         self.diagnostics.clear_latency_state(channel="peer")
 
     def translation_runtime_config_snapshot(self) -> TranslationRuntimeConfigSnapshot:
@@ -421,6 +428,27 @@ class PeerTranslationChannelOwner:
         self._publication_order_by_generation = {activation_generation: order}
         return order
 
+    def _turn_publication_order(
+        self,
+        activation_generation: int,
+        provider_epoch_id: str,
+        segment_order: int,
+    ) -> int:
+        key = (activation_generation, provider_epoch_id)
+        offset = self._turn_order_offsets.get(key)
+        if offset is None:
+            offset = max(
+                self._turn_order_offset_by_generation.get(activation_generation, 0),
+                self._unit_publication_order_by_generation.get(activation_generation, 0)
+                + 1
+                - segment_order,
+            )
+            self._turn_order_offset_by_generation = {activation_generation: offset}
+            self._turn_order_offsets[key] = offset
+            while len(self._turn_order_offsets) > 64:
+                self._turn_order_offsets.popitem(last=False)
+        return segment_order + offset
+
     async def handle_peer_owned_vad_event(self, owned: object) -> None:
         self._record_peer_owned_vad_event(owned)
         await self.local_asr_runtime.handle_owned_vad_event("peer", owned)
@@ -483,14 +511,19 @@ class PeerTranslationChannelOwner:
         remembered = self._native_caption_orders.pop(unit.identity.unit_id, None)
         if remembered is None and not unit.is_final and not unit.text.strip():
             return
-        order = (
-            self._allocate_publication_order(stream.activation_generation)
-            if remembered is None
-            else remembered[1]
+        provider_id = stream.recognizer_id or (
+            str(stream.settings_scope[0]) if stream.settings_scope else ""
         )
+        if not unit.is_final and not self._cloud_captions_accept(provider_id):
+            if remembered is not None:
+                self._native_caption_orders[unit.identity.unit_id] = remembered
+            return
+        if remembered is None:
+            order = self._allocate_publication_order(stream.activation_generation)
+            self._unit_publication_order_by_generation = {stream.activation_generation: order}
+        else:
+            order = remembered[1]
         if not unit.is_final:
-            if not self._cloud_translation_enabled():
-                return
             self._native_caption_orders[unit.identity.unit_id] = (stream, order)
             await self.cloud_captions.partial(
                 Transcript(
@@ -502,7 +535,7 @@ class PeerTranslationChannelOwner:
                     publication_generation=stream.activation_generation,
                     source_order=order,
                 ),
-                provider_id=str(stream.settings_scope[0]) if stream.settings_scope else "",
+                provider_id=provider_id,
                 scope=(
                     stream.activation_generation,
                     stream.capture_epoch,
@@ -517,7 +550,7 @@ class PeerTranslationChannelOwner:
             publication_order=order,
         )
         self._cloud_final_scopes[transcript.utterance_id] = (
-            str(stream.settings_scope[0]) if stream.settings_scope else "",
+            provider_id,
             (stream.activation_generation, stream.capture_epoch, stream.provider_epoch_id),
             None,
         )
@@ -581,7 +614,11 @@ class PeerTranslationChannelOwner:
             publication_generation=receipt.identity.activation_generation,
             source_order=self._allocate_publication_order(
                 receipt.identity.activation_generation,
-                source_order=receipt.identity.segment_order,
+                source_order=self._turn_publication_order(
+                    receipt.identity.activation_generation,
+                    terminal.identity.provider_epoch_id,
+                    receipt.identity.segment_order,
+                ),
             ),
         )
         event = STTFinalEvent(
@@ -589,7 +626,7 @@ class PeerTranslationChannelOwner:
             transcript=transcript,
         )
         self._cloud_final_scopes[transcript.utterance_id] = (
-            receipt.segment.settings.provider_id,
+            terminal.identity.recognizer_id or receipt.segment.settings.provider_id,
             (
                 receipt.identity.activation_generation,
                 receipt.identity.capture_epoch,
@@ -662,7 +699,7 @@ class PeerTranslationChannelOwner:
             if event.channel != "peer":
                 raise ValueError("Peer translation owner received a non-Peer partial event")
             provider_id = self._current_provider_id()
-            if provider_id in CLOUD_PEER_PROVIDERS and self._cloud_translation_enabled():
+            if self._cloud_captions_accept(provider_id):
                 await self.cloud_captions.partial(
                     event.transcript,
                     provider_id=provider_id,
@@ -683,7 +720,7 @@ class PeerTranslationChannelOwner:
                     None,
                 )
             provider_id, scope, sealed = metadata
-            if provider_id in CLOUD_PEER_PROVIDERS and self._cloud_translation_enabled():
+            if self._cloud_captions_accept(provider_id):
                 await self.cloud_captions.final(
                     event.transcript,
                     provider_id=provider_id,
@@ -692,6 +729,7 @@ class PeerTranslationChannelOwner:
                     sealed=sealed,
                 )
                 return
+            await self.cloud_captions.withdraw(event.transcript.utterance_id)
             configuration = self.translation_runtime_config_snapshot().value
             self.diagnostics.emit(
                 RuntimeDiagnostic(
@@ -728,15 +766,25 @@ class PeerTranslationChannelOwner:
             and self._translation_enabled_for_runtime(self.runtime)
         )
 
+    def _cloud_captions_accept(self, provider_id: str) -> bool:
+        return is_cloud_final_stt_provider(provider_id) and self._cloud_translation_enabled()
+
     async def handle_provider_update(self, event: STTProviderTurnUpdate) -> None:
         if event.is_current is not None and not event.is_current():
             return
         identity = event.identity
-        provider_id = str(identity.settings_scope[0]) if identity.settings_scope else ""
-        if provider_id not in CLOUD_PEER_PROVIDERS or not self._cloud_translation_enabled():
+        provider_id = identity.recognizer_id or (
+            str(identity.settings_scope[0]) if identity.settings_scope else ""
+        )
+        if not self._cloud_captions_accept(provider_id):
             return
+        source_order = self._turn_publication_order(
+            identity.segment.activation_generation,
+            identity.provider_epoch_id,
+            identity.segment.segment_order,
+        )
         if not self.output_projection.output_runtime.peer_publication_is_authorized(
-            identity.segment.activation_generation, identity.segment.segment_order
+            identity.segment.activation_generation, source_order
         ):
             return
         await self.cloud_captions.partial(
@@ -751,7 +799,7 @@ class PeerTranslationChannelOwner:
                 ),
                 channel="peer",
                 publication_generation=identity.segment.activation_generation,
-                source_order=identity.segment.segment_order,
+                source_order=source_order,
             ),
             provider_id=provider_id,
             scope=(
