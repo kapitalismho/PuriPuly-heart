@@ -686,9 +686,7 @@ class ScenarioApp:
                 else (
                     "manual"
                     if mode == "manual"
-                    else "discovered"
-                    if self.osc_discovered_remote_present
-                    else "fallback"
+                    else "discovered" if self.osc_discovered_remote_present else "fallback"
                 )
             ),
             "local_listener": {
@@ -1450,9 +1448,7 @@ class ScenarioApp:
             reason = (
                 "automatic_mode_required"
                 if self.intent["osc"]["connection_mode"] != "automatic"
-                else "discovery_in_progress"
-                if self.osc_retry_pending
-                else None
+                else "discovery_in_progress" if self.osc_retry_pending else None
             )
             if arguments:
                 receipt.update(
@@ -2044,9 +2040,7 @@ class ScenarioApp:
         field = (
             entries[-1]["provider"]
             if entries
-            else self.screen_provider
-            if self.screen_section == "api"
-            else None
+            else self.screen_provider if self.screen_section == "api" else None
         )
         if field is not None:
             screen["secure_key_field"] = field

@@ -208,7 +208,10 @@ class AgentActivity:
         return {
             channel: {
                 "generation": self._generations.get(channel),
-                **{f"{kind}_observed_monotonic": received.get(kind) for kind in ("transcript", "translation")},
+                **{
+                    f"{kind}_observed_monotonic": received.get(kind)
+                    for kind in ("transcript", "translation")
+                },
             }
             for channel, received in self._received.items()
         }

@@ -1349,9 +1349,11 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 result = answer("구성 요소 검사를 마쳤어. 실제 화면 결과와는 구분해서 볼게.")
             else:
                 result = tool(
-                    "probe_self_recognition"
-                    if cause == "recognition_auth"
-                    else "probe_translation",
+                    (
+                        "probe_self_recognition"
+                        if cause == "recognition_auth"
+                        else "probe_translation"
+                    ),
                     {},
                 )
         elif cause in {"slow_luna", "slow_gemma"}:
