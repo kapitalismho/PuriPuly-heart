@@ -19,6 +19,43 @@ from .protocol import PhotoProviderError
 
 _IMAGE_TIMING_STAGES = frozenset({"mask", "erase", "typeset", "roi_upload", "compose_gpu"})
 
+def valid_wrist_calibration(value: object) -> bool:
+    def rigid(matrix):
+        if not isinstance(matrix, list) or len(matrix) != 3:
+            return False
+        if any(not isinstance(row, list) or len(row) != 4 for row in matrix):
+            return False
+        if any(type(v) not in (int, float) or not -3.402823466e38 <= v <= 3.402823466e38 for row in matrix for v in row):
+            return False
+        for i in range(3):
+            for j in range(3):
+                dot = sum(matrix[k][i] * matrix[k][j] for k in range(3))
+                if abs(dot - int(i == j)) >= 0.01:
+                    return False
+        determinant = sum(
+            matrix[0][i] * (matrix[1][(i + 1) % 3] * matrix[2][(i + 2) % 3]
+                            - matrix[1][(i + 2) % 3] * matrix[2][(i + 1) % 3])
+            for i in range(3)
+        )
+        return determinant > 0.99
+
+    if not isinstance(value, dict) or set(value) != {"transform", "reference"}:
+        return False
+    reference = value["reference"]
+    return (
+        rigid(value["transform"])
+        and isinstance(reference, dict)
+        and set(reference) == {"model", "serial", "handgrip_transform"}
+        and rigid(reference["handgrip_transform"])
+        and all(
+            isinstance(reference[key], str)
+            and 0 < len(reference[key].encode("utf-8")) <= 4096
+            and reference[key].isprintable()
+            for key in ("model", "serial")
+        )
+    )
+
+
 
 class PhotoBridge:
     def __init__(self, *, control: Callable[[dict, int], dict | None]) -> None:
@@ -220,6 +257,7 @@ class PhotoBridge:
             "photo_ready": {},
             "photo_shutdown_complete": {},
             "photo_debug_quiescent": {"request_id": str},
+            "photo_debug_wrist_calibrated": {"calibration": dict},
             "photo_prepared": {
                 "photo_id": str,
                 "attempt_id": int,
@@ -252,6 +290,8 @@ class PhotoBridge:
                 return False
         if kind == "photo_debug_quiescent" and not value["request_id"].isascii():
             return False
+        if kind == "photo_debug_wrist_calibrated":
+            return valid_wrist_calibration(value["calibration"])
         if kind == "photo_image_timing":
             if value["stage"] not in _IMAGE_TIMING_STAGES:
                 return False

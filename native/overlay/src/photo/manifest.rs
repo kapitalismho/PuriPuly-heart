@@ -130,8 +130,11 @@ impl PhotoManifest {
         self.image.validate()?;
         self.interaction.validate()?;
         if !self.image.debug_controls
-            && (self.interaction.debug_grab_volume || self.interaction.debug_case_label.is_some())
+            && (self.interaction.debug_grab_volume || self.interaction.debug_case_label.is_some() || self.interaction.debug_calibrate_wrist)
         {
+            return Err(PhotoError::Manifest);
+        }
+        if self.interaction.debug_calibrate_wrist && self.backend != PhotoBackend::Openvr {
             return Err(PhotoError::Manifest);
         }
         Ok(())

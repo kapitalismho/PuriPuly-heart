@@ -1,4 +1,6 @@
 pub mod bridge;
+pub mod calibration;
+pub mod card;
 #[cfg(windows)]
 pub mod compositor;
 #[cfg(windows)]

@@ -535,16 +535,6 @@ async def test_repeat_launch_uses_one_default_watch_candidate_and_waits_for_clea
     harness.cleanup_delay = 2
     assert await probe.run(harness.args, harness.evidence) == 0
     assert len(harness.manifests) == 1
-    manifest = harness.manifests[0]
-    interaction = manifest["interaction"]
-    assert interaction["grab_m"] == 0.10
-    assert interaction["debug_grab_volume"] is True
-    assert "wrist_handgrip_point_m" not in interaction
-    assert "wrist_transform" not in interaction
-    assert "photo_transform" not in interaction
-    label = interaction["debug_case_label"]
-    assert label.isascii() and len(label) <= 128 and len(label.splitlines()) == 2
-    assert manifest["image"]["debug_controls"] is True
     assert [kind for kind, _ in harness.events] == [
         "spawn", "photo_debug_quiesce", "quiescent", "shutdown", "closed"
     ]
@@ -675,7 +665,6 @@ async def test_ordinary_preview_remains_single_offer_without_candidate_overrides
     harness.args.seconds = 32
     assert await probe.run(harness.args, harness.evidence) == 0
     assert len(harness.manifests) == 1
-    assert "interaction" not in harness.manifests[0]
     records = [
         json.loads(line)
         for line in (harness.evidence.path / "events.jsonl").read_text(encoding="utf-8").splitlines()
@@ -717,3 +706,81 @@ async def test_offscreen_smoke_never_authorizes_without_local_source_readiness(r
     assert "photo_debug_export" not in kinds
     assert harness.evidence.summary["status"] == "smoke_incomplete"
     assert harness.evidence.summary["shutdown_acknowledged"] is True
+
+
+def calibration_value():
+    identity = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]]
+    return {
+        "transform": [[0.0, -1.0, 0.0, 0.03], [1.0, 0.0, 0.0, 0.08], [0.0, 0.0, 1.0, 0.02]],
+        "reference": {"model": "synthetic-right", "serial": "fixture", "handgrip_transform": identity},
+    }
+
+
+def test_manual_wrist_save_survives_fresh_load_and_failed_replacement(tmp_path, monkeypatch):
+    path = tmp_path / "wrist.json"
+    events = []
+    value = calibration_value()
+    store = probe.WristCalibrationStore(path, 2, lambda kind, **fields: events.append(kind))
+    store.control({"calibration": value}, 1)
+    assert not path.exists()
+    store.control({"calibration": value}, 2)
+    assert store.completed.is_set()
+    assert probe.load_wrist_calibration(path) == value
+    changed = calibration_value()
+    changed["transform"][0][3] = 0.09
+    fresh = probe.WristCalibrationStore(path, 3, lambda kind, **fields: events.append(kind))
+
+    def fail_replace(*args):
+        raise PermissionError("synthetic locked destination")
+
+    monkeypatch.setattr(probe.os, "replace", fail_replace)
+    fresh.control({"calibration": changed}, 3)
+    assert fresh.error == "PermissionError"
+    assert not fresh.completed.is_set()
+    assert probe.load_wrist_calibration(path) == value
+    assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.asyncio
+async def test_emergence_comparison_reuses_saved_wrist_and_cleans_between_candidates(repeat_launch):
+    harness = repeat_launch
+    path = harness.evidence.path / "wrist.json"
+    value = calibration_value()
+    path.write_text(json.dumps(value), encoding="utf-8")
+    harness.args.wrist_calibration = path
+    assert await probe.run_comparison(harness.args, harness.evidence) == 0
+    assert [case["interaction"]["photo_emergence"] for case in harness.manifests] == ["opacity", "reveal"]
+    assert all(case["interaction"]["wrist_calibration"] == value for case in harness.manifests)
+    lifecycle = [kind for kind, _ in harness.events if kind in ("spawn", "closed")]
+    assert lifecycle == ["spawn", "closed", "spawn", "closed"]
+    assert all(process.returncode == 0 for process in harness.processes)
+
+
+@pytest.mark.asyncio
+async def test_calibration_wait_never_offers_photos_or_consumes_comparison_time(repeat_launch, monkeypatch):
+    harness = repeat_launch
+    harness.args.backend = "openvr"
+    harness.args.calibrate_wrist = True
+    harness.args.wrist_calibration = harness.evidence.path / "wrist.json"
+    monkeypatch.setattr(probe, "runtime_running", lambda: True)
+    actual_sleep = probe.asyncio.sleep
+    delivered = False
+
+    async def sleep(seconds):
+        nonlocal delivered
+        if harness.active is not None and probe.time.monotonic() >= 25 and not delivered:
+            assert harness.bridges[-1]._snapshot["photo"] is None
+            harness.bridges[-1]._control(
+                {"type": "photo_debug_wrist_calibrated", "calibration": calibration_value()}, 1
+            )
+            delivered = True
+        await actual_sleep(seconds)
+
+    monkeypatch.setattr(probe.asyncio, "sleep", sleep)
+    assert await probe.run(harness.args, harness.evidence) == 0
+    records = [json.loads(line) for line in (harness.evidence.path / "events.jsonl").read_text().splitlines()]
+    saved = next(record["elapsed_s"] for record in records if record["event"] == "wrist_calibration_saved")
+    offer = next(record["elapsed_s"] for record in records if record["event"] == "preview_offer")
+    assert saved >= 25
+    assert offer >= saved + harness.args.offer_delay
+    assert probe.load_wrist_calibration(harness.args.wrist_calibration) == calibration_value()

@@ -167,7 +167,7 @@ async fn windows_graphics_photo341_icons_and_held_preview_readback() {
     compositor
         .add_block(1, Some(region), Some(text), 0.0, now)
         .unwrap();
-    assert!(compositor.first_visible_block(now).is_none());
+    assert!(compositor.first_visible_block_in_extent(now, 1.0).is_none());
     compositor
         .render(now + Duration::from_millis(50), false)
         .unwrap();
@@ -183,7 +183,7 @@ async fn windows_graphics_photo341_icons_and_held_preview_readback() {
         .save(&directory.join("held-translated.png"))
         .unwrap();
     assert!(!compositor.needs_frame(now + Duration::from_millis(150)));
-    let visible = compositor.first_visible_block(now + Duration::from_millis(150));
+    let visible = compositor.first_visible_block_in_extent(now + Duration::from_millis(150), 1.0);
     assert_eq!(visible, Some(1));
     let original = image::open(directory.join("held-original.png")).unwrap();
     let translated = image::open(directory.join("held-translated.png")).unwrap();
@@ -443,21 +443,19 @@ impl PhotoRuntime {
                 head[2][3] = 0.5;
                 let mut left = IDENTITY;
                 left[0][3] = distance;
-                runtime.interaction.step(
-                    Some(photo),
-                    Some(crate::openvr::LegacyVrInput {
-                        head,
-                        left,
-                        right: IDENTITY,
-                        left_handgrip: IDENTITY,
-                        right_handgrip: IDENTITY,
-                        reference_epoch: 1,
-                        left_index: 1,
-                        right_index: 2,
-                        grip,
-                    }),
-                    clock + Duration::from_millis(ms),
-                );
+                let input = crate::openvr::LegacyVrInput {
+                    head,
+                    left,
+                    right: IDENTITY,
+                    left_handgrip: IDENTITY,
+                    right_handgrip: IDENTITY,
+                    reference_epoch: 1,
+                    left_index: 1,
+                    right_index: 2,
+                    grip,
+                };
+                runtime.input = Some(input);
+                runtime.interaction.step(Some(photo), Some(input), clock + Duration::from_millis(ms));
             }
             assert!(runtime.interaction.frame.photo.is_some());
         }
@@ -495,11 +493,16 @@ impl PhotoRuntime {
         let (mut bridge, first) = connected.unwrap();
         let (mut runtime, _worker) = Self::new(&manifest).unwrap();
         runtime.compositor.as_mut().unwrap().ready().await.unwrap();
+        let mut card = std::array::from_fn(|_| None);
+        for (index, surface) in card.iter_mut().enumerate() {
+            *surface = Some(OpenVrOverlay::in_session(&session, &format!("controlled-card-{index}")).unwrap());
+        }
         runtime.backend = Backend::OpenVr(PhotoOpenVrSurfaces {
             icon: Some(icon),
             photo: Some(photo_surface),
             grab_volume: [None, None, None],
             case_label: None,
+            card,
             _session: session,
         });
         runtime.receive(first, &mut bridge).await.unwrap();
@@ -543,7 +546,7 @@ impl PhotoRuntime {
         assert_pulses(&[]);
         let partial = runtime.interaction.frame.photo.unwrap();
         assert!(partial.alpha > 0.0 && partial.alpha < 1.0);
-        assert!((partial.width - photo_width_m.unwrap_or(0.375) * partial.alpha).abs() < 0.00001);
+        assert!((partial.width - photo_width_m.unwrap_or(0.375)).abs() < 0.00001);
         assert!(!runtime.state.photo().unwrap().visible);
         assert_eq!(runtime.pull_sequence, 0);
         runtime.compositor.as_mut().unwrap().view_original(true);
@@ -905,7 +908,7 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     }
     let partial = runtime.interaction.frame;
     assert!((partial.photo.unwrap().alpha-0.5).abs()<0.00001);
-    assert!((partial.photo.unwrap().width-0.1875).abs()<0.00001);
+    assert!((partial.photo.unwrap().width-0.375).abs()<0.00001);
     assert_eq!(runtime.pull_sequence,0);
     assert!(tokio::time::timeout(Duration::from_millis(20),socket.next()).await.is_err());
     assert!(!runtime.drawn_reported);
@@ -1005,4 +1008,65 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     runtime.preparation.shutdown().await;
     drop(runtime);
     std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[cfg(windows)]
+#[tokio::test]
+#[ignore = "requires running SteamVR; owned zero-alpha surfaces only"]
+async fn windows_graphics_card_crop_preserves_physical_texel_scale() {
+    use std::ffi::{CStr, CString};
+    use std::sync::Arc;
+    use super::super::interaction::IDENTITY;
+    let session = OpenVrSession::new().unwrap();
+    let identity = format!("photo341.card-geometry.p{}", std::process::id());
+    let mut surface = OpenVrOverlay::in_session(&session, &identity).unwrap();
+    let mut compositor = PhotoCompositor::new(Some(&surface.output_adapter())).unwrap();
+    let original = Arc::new(image::RgbImage::from_pixel(16, 8, image::Rgb([64, 128, 192])));
+    let working = Arc::new(super::super::processing::WorkingPhoto::new(original, [16, 8]).unwrap());
+    compositor.set_original(working).unwrap();
+    let texture = compositor.render(Instant::now(), false).unwrap().unwrap();
+    compositor.ready().await.unwrap();
+    compositor.submit_texture(&surface, &texture).unwrap();
+    let version = CStr::from_bytes_with_nul(openvr_sys::IVROverlay_Version).unwrap();
+    let version = CString::new(format!("FnTable:{}", version.to_str().unwrap())).unwrap();
+    let mut error = 0;
+    let pointer = unsafe { openvr_sys::VR_GetGenericInterface(version.as_ptr(), &mut error) };
+    assert_eq!(error, 0);
+    let api = unsafe { &*(pointer as *const openvr_sys::VR_IVROverlay_FnTable) };
+    let key = CString::new(format!("com.puripuly.heart.overlay.{identity}")).unwrap();
+    let mut handle = 0;
+    assert_eq!(unsafe { api.FindOverlay.unwrap()(key.as_ptr().cast_mut(), &mut handle) }, 0);
+    let mut mouse_scale = openvr_sys::HmdVector2_t { v: [16.0, 8.0] };
+    assert_eq!(unsafe { api.SetOverlayMouseScale.unwrap()(handle, &mut mouse_scale) }, 0);
+    let mut pixels = vec![0u8; 16 * 8 * 4];
+    let (mut width, mut height) = (0, 0);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let result = unsafe { api.GetOverlayImageData.unwrap()(handle, pixels.as_mut_ptr().cast(), pixels.len() as u32, &mut width, &mut height) };
+        if result == 0 && width == 16 && height == 8 && pixels[3] == 255 { break; }
+        assert!(Instant::now() < deadline, "D3D source never reached SteamVR");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let mut records = Vec::new();
+    for extent in [1.0, 0.5, 0.25] {
+        surface.set_card_presentation(None, IDENTITY, 0.375 * extent, 0.0, 1.0, extent).unwrap();
+        surface.set_overlay_visible(true).unwrap();
+        tokio::time::sleep(Duration::from_millis(40)).await;
+        for (y, expected) in [(0.08, true), (0.10, false)] {
+            let mut params = openvr_sys::VROverlayIntersectionParams_t {
+                vSource: openvr_sys::HmdVector3_t { v: [0.0, y, 1.0] },
+                vDirection: openvr_sys::HmdVector3_t { v: [0.0, 0.0, -1.0] },
+                eOrigin: openvr_sys::ETrackingUniverseOrigin_TrackingUniverseStanding,
+            };
+            let mut result = openvr_sys::VROverlayIntersectionResults_t::default();
+            let hit = unsafe { api.ComputeOverlayIntersection.unwrap()(handle, &mut params, &mut result) };
+            records.push(json!({"extent":extent,"y":y,"hit":hit,"uv":result.vUVs.v}));
+            assert_eq!(hit, expected, "extent={extent}, y={y}, uv={:?}", result.vUVs.v);
+        }
+    }
+    surface.set_overlay_visible(false).unwrap();
+    if let Some(directory) = std::env::var_os("PURIPULY_PHOTO341_EVIDENCE") {
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(std::path::PathBuf::from(directory).join("steamvr-crop-geometry.json"), serde_json::to_vec_pretty(&records).unwrap()).unwrap();
+    }
 }

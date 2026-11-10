@@ -497,11 +497,19 @@ impl PhotoCompositor {
         self.blocks.len()
     }
 
-    pub fn first_visible_block(&self, now: Instant) -> Option<u64> {
-        self.blocks
-            .iter()
-            .find(|block| !block.runs.is_empty() && fade_opacity(block.start, now) > 0.0)
-            .map(|block| block.id)
+    pub fn dimensions(&self) -> Option<[u32; 2]> {
+        self.working.as_ref().map(|photo| [photo.pixels.width(), photo.pixels.height()])
+    }
+
+    pub fn first_visible_block_in_extent(&self, now: Instant, extent: f32) -> Option<u64> {
+        let [width, height] = self.dimensions()?;
+        let right = width as f32 * extent;
+        self.blocks.iter().find(|block| {
+            !block.runs.is_empty() && fade_opacity(block.start, now) > 0.0
+                && block.typeset.as_ref().is_some_and(|text| text.collision_boxes.iter().any(|bounds| {
+                    bounds.left < right && bounds.right > 0.0 && bounds.top < height as f32 && bounds.bottom > 0.0
+                }))
+        }).map(|block| block.id)
     }
 
     pub fn needs_frame(&self, _now: Instant) -> bool {

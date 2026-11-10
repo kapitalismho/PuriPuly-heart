@@ -172,6 +172,7 @@ impl ControlledOwner {
             placement_policy: OverlayPlacementPolicy::default(),
             applied_placement_policy: None,
             tracked_presentation: None,
+            card_presentation: None,
             visible: false,
             output_adapter: OpenVrOutputAdapter {
                 identity: AdapterIdentity::Unavailable,

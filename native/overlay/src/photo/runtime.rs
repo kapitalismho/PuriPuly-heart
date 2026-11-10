@@ -14,6 +14,8 @@ use super::manifest::{PhotoBackend, PhotoError, PhotoManifest, PHOTO_PROTOCOL_VE
 use super::prepare::{PreparationCompletion, PreparationWorker, PrepareCompletion, SourceCompletion, SourceRequest};
 use super::state::{PhotoState, SnapshotAdmission};
 use super::interaction::{HapticCue, PhotoInteraction};
+use super::calibration::{WristAdjustment, WristCalibration};
+use super::interaction::compose;
 #[cfg(windows)]
 use super::icon::{self, IconState};
 use crate::openvr::{
@@ -35,6 +37,7 @@ pub struct PhotoOpenVrSurfaces {
     photo: Option<OpenVrOverlay>,
     grab_volume: [Option<OpenVrOverlay>; 3],
     case_label: Option<OpenVrOverlay>,
+    card: [Option<OpenVrOverlay>; 5],
     _session: OpenVrSession,
 }
 
@@ -59,17 +62,23 @@ impl PhotoOpenVrSurfaces {
         });
         let [xy, xz, yz] = grab_volume;
         let grab_volume = [xy?, xz?, yz?];
-        let case_label = if manifest.interaction.debug_case_label.is_some() {
+        let case_label = if manifest.interaction.debug_case_label.is_some() || manifest.interaction.debug_calibrate_wrist {
             Some(OpenVrOverlay::in_session(&session, &surface_identity(manifest, "case-label"))
                 .map_err(|_| PhotoError::OpenVr)?)
         } else {
             None
         };
+        let mut card = std::array::from_fn(|_| None);
+        for (index, name) in ["back", "left", "right", "top", "bottom"].into_iter().enumerate() {
+            card[index] = Some(OpenVrOverlay::in_session(&session, &surface_identity(manifest, name))
+                .map_err(|_| PhotoError::OpenVr)?);
+        }
         Ok(Self {
             icon: Some(icon),
             photo: Some(photo),
             grab_volume,
             case_label,
+            card,
             _session: session,
         })
     }
@@ -79,6 +88,7 @@ impl PhotoOpenVrSurfaces {
     }
     pub fn close_photo(&mut self) {
         self.photo.take();
+        for surface in &mut self.card { surface.take(); }
     }
     pub fn icon(&mut self) -> Option<&mut OpenVrOverlay> {
         self.icon.as_mut()
@@ -89,7 +99,7 @@ impl PhotoOpenVrSurfaces {
 
     fn surfaces(&mut self) -> impl Iterator<Item = &mut OpenVrOverlay> {
         [&mut self.icon, &mut self.photo].into_iter()
-            .chain(self.grab_volume.iter_mut()).chain([&mut self.case_label]).flatten()
+            .chain(self.card.iter_mut()).chain(self.grab_volume.iter_mut()).chain([&mut self.case_label]).flatten()
     }
 
     fn close_diagnostics(&mut self) {
@@ -152,6 +162,14 @@ pub struct PhotoRuntime {
     label_state: Option<usize>,
     quiesce_requests: HashSet<String>,
     quiesce_request: Option<(String, bool)>,
+    wrist_adjustment: Option<WristAdjustment>,
+    wrist_reference_epoch: Option<u64>,
+    input: Option<crate::openvr::LegacyVrInput>,
+    #[cfg(windows)]
+    card_material: Option<PhotoTexture>,
+    card_submitted: bool,
+    #[cfg(windows)]
+    calibration_label: Option<PhotoTexture>,
 }
 
 impl PhotoRuntime {
@@ -193,6 +211,13 @@ impl PhotoRuntime {
         } else {
             None
         };
+        #[cfg(windows)]
+        let card_material = compositor.as_ref().map(|compositor|
+            compositor.icon_texture(&[205, 205, 200, 255], 1)
+        ).transpose()?;
+        #[cfg(windows)]
+        let calibration_label = compositor.as_ref().filter(|_| manifest.interaction.debug_calibrate_wrist)
+            .map(|compositor| compositor.case_label_texture("WRIST SETUP\nGrip, move, release", false)).transpose()?;
         let (images, worker) = PhotoImageBoundary::channel();
         Ok((
             Self {
@@ -228,6 +253,14 @@ impl PhotoRuntime {
                 label_state: None,
                 quiesce_requests: HashSet::new(),
                 quiesce_request: None,
+                wrist_adjustment: manifest.interaction.debug_calibrate_wrist.then(WristAdjustment::default),
+                wrist_reference_epoch: None,
+                input: None,
+                #[cfg(windows)]
+                card_material,
+                card_submitted: false,
+                #[cfg(windows)]
+                calibration_label,
             },
             worker,
         ))
@@ -874,6 +907,37 @@ impl PhotoRuntime {
             return Ok(());
         };
         let input = surfaces._session.legacy_input();
+        if let Some(input) = input {
+            if self.wrist_adjustment.is_none() && self.wrist_reference_epoch != Some(input.reference_epoch) {
+                if let Some(calibration) = &self.interaction.config.wrist_calibration {
+                    if !surfaces._session.wrist_reference_matches(&calibration.reference) {
+                        println!("{}", json!({"type":"photo_runtime_error","code":"wrist_calibration_reference_mismatch"}));
+                        return Err(PhotoError::OpenVr);
+                    }
+                }
+                self.wrist_reference_epoch = Some(input.reference_epoch);
+            }
+        }
+        if let Some(adjustment) = &mut self.wrist_adjustment {
+            let (frame, transform) = adjustment.step(input, &self.interaction.config);
+            self.interaction.frame = frame;
+            self.input = input;
+            if let Some(transform) = transform {
+                let calibration = WristCalibration {
+                    transform,
+                    reference: surfaces._session.wrist_reference().ok_or(PhotoError::OpenVr)?,
+                };
+                if !calibration.valid() { return Err(PhotoError::OpenVr); }
+                self.interaction.config.wrist_transform = None;
+                self.interaction.config.wrist_handgrip_point_m = None;
+                self.interaction.config.wrist_calibration = Some(calibration.clone());
+                bridge.send(json!({"type":"photo_debug_wrist_calibrated","calibration":calibration})).await?;
+                self.wrist_adjustment = None;
+                self.label_state = None;
+                self.icon_state = None;
+            }
+            return Ok(());
+        }
         self.interaction_input(input, Instant::now(), bridge).await
     }
 
@@ -883,6 +947,7 @@ impl PhotoRuntime {
         now: Instant,
         bridge: &mut PhotoBridge,
     ) -> Result<(), PhotoError> {
+        self.input = input;
         let frame = self.interaction.step(self.state.photo(), input, now);
         if frame.grab {
             self.enqueue_preview_source();
@@ -938,7 +1003,7 @@ impl PhotoRuntime {
             let mut drawn = false;
             if let Backend::OpenVr(surfaces) = &mut self.backend {
                 let frame = &self.interaction.frame;
-                let active = photo.is_some_and(|photo| self.interaction.active(photo, now));
+                let active = self.wrist_adjustment.is_some() || photo.is_some_and(|photo| self.interaction.active(photo, now));
                 let icon = surfaces.icon().ok_or(PhotoError::OpenVr)?;
                 if let Some(placement) = frame.icon.filter(|_| active) {
                     let state =
@@ -987,9 +1052,14 @@ impl PhotoRuntime {
                 }
                 if let Some(surface) = &mut surfaces.case_label {
                     if let Some(placement) = frame.case_label.filter(|_| active) {
-                        let state = usize::from(self.interaction.quiescing());
+                        let state = if self.wrist_adjustment.is_some() { 2 } else { usize::from(self.interaction.quiescing()) };
                         if self.label_state != Some(state) {
-                            compositor.submit_texture(surface, &self.case_labels.as_ref().ok_or(PhotoError::Graphics)?[state])?;
+                            let texture = if state == 2 {
+                                self.calibration_label.as_ref().ok_or(PhotoError::Graphics)?
+                            } else {
+                                &self.case_labels.as_ref().ok_or(PhotoError::Graphics)?[state]
+                            };
+                            compositor.submit_texture(surface, texture)?;
                             self.label_state = Some(state);
                         }
                         surface.set_tracked_presentation(placement.device, placement.transform, placement.width, placement.alpha)
@@ -999,34 +1069,37 @@ impl PhotoRuntime {
                         surface.set_overlay_visible(false).map_err(|_| PhotoError::OpenVr)?;
                     }
                 }
-                let surface = surfaces.photo().ok_or(PhotoError::OpenVr)?;
-                if let (Some(placement), Some(texture)) =
-                    (frame.photo.filter(|_| active), &self.texture)
+                let surface = surfaces.photo.as_mut().ok_or(PhotoError::OpenVr)?;
+                if updated {
+                    if let Some(texture) = &self.texture { compositor.submit_texture(surface, texture)?; }
+                }
+                if let (Some(placement), Some(_), Some(input), Some([pixels_w, pixels_h])) =
+                    (frame.photo.filter(|_| active), &self.texture, self.input, compositor.dimensions())
                 {
-                    if updated {
-                        compositor.submit_texture(surface, texture)?;
-                    }
-                    surface
-                        .set_tracked_presentation(
-                            placement.device,
-                            placement.transform,
-                            placement.width,
-                            placement.alpha,
-                        )
+                    let device = (!frame.photo_world).then_some(placement.device);
+                    let world = if frame.photo_world { placement.transform } else { compose(input.left, placement.transform) };
+                    let front_visible = super::card::front_facing(world, input.head);
+                    surface.set_card_presentation(device, placement.transform, placement.width, placement.alpha, 1.0, frame.photo_extent)
                         .map_err(|_| PhotoError::OpenVr)?;
-                    surface
-                        .set_overlay_visible(true)
-                        .map_err(|_| PhotoError::OpenVr)?;
-                    drawn = placement.alpha > 0.0 && !compositor.original_view;
-                } else {
-                    if updated {
-                        if let Some(texture) = &self.texture {
-                            compositor.submit_texture(surface, texture)?;
+                    surface.set_overlay_visible(front_visible).map_err(|_| PhotoError::OpenVr)?;
+                    let height = self.interaction.config.photo_width_m * pixels_h as f32 / pixels_w as f32;
+                    for (surface, face) in surfaces.card.iter_mut().zip(super::card::faces(placement.transform, placement.width, height)) {
+                        let surface = surface.as_mut().ok_or(PhotoError::OpenVr)?;
+                        if !self.card_submitted {
+                            compositor.submit_texture(surface, self.card_material.as_ref().ok_or(PhotoError::Graphics)?)?;
                         }
+                        let face_world = if frame.photo_world { face.transform } else { compose(input.left, face.transform) };
+                        surface.set_card_presentation(device, face.transform, face.width, placement.alpha, face.width / face.height, 1.0)
+                            .map_err(|_| PhotoError::OpenVr)?;
+                        surface.set_overlay_visible(super::card::front_facing(face_world, input.head)).map_err(|_| PhotoError::OpenVr)?;
                     }
-                    surface
-                        .set_overlay_visible(false)
-                        .map_err(|_| PhotoError::OpenVr)?;
+                    self.card_submitted = true;
+                    drawn = front_visible && placement.alpha > 0.0 && !compositor.original_view;
+                } else {
+                    surface.set_overlay_visible(false).map_err(|_| PhotoError::OpenVr)?;
+                    for surface in surfaces.card.iter_mut().flatten() {
+                        surface.set_overlay_visible(false).map_err(|_| PhotoError::OpenVr)?;
+                    }
                 }
             }
             let Some(photo) = photo else {
@@ -1058,7 +1131,7 @@ impl PhotoRuntime {
                 }
             }
             let visible_block = if drawn && !self.drawn_reported && !photo.first_block_drawn {
-                compositor.first_visible_block(now)
+                compositor.first_visible_block_in_extent(now, self.interaction.frame.photo_extent)
             } else {
                 None
             };

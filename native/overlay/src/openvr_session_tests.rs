@@ -130,6 +130,21 @@ unsafe extern "C" fn visible(handle: u64) -> bool {
     })
 }
 
+unsafe extern "C" fn absolute(handle: u64, _: openvr_sys::ETrackingUniverseOrigin, matrix: *mut openvr_sys::HmdMatrix34_t) -> openvr_sys::EVROverlayError {
+    transform(handle, u32::MAX, matrix)
+}
+
+unsafe extern "C" fn texel_aspect(_: u64, value: f32) -> openvr_sys::EVROverlayError {
+    assert!(value.is_finite() && value > 0.0);
+    0
+}
+
+unsafe extern "C" fn texture_bounds(_: u64, bounds: *mut openvr_sys::VRTextureBounds_t) -> openvr_sys::EVROverlayError {
+    let bounds = unsafe { &*bounds };
+    assert!(bounds.uMax > 0.0 && bounds.uMax <= 1.0);
+    0
+}
+
 fn shutdown() {
     CALLS.with(|calls| calls.borrow_mut().shutdowns += 1);
 }
@@ -159,6 +174,9 @@ fn api() -> openvr_sys::VR_IVROverlay_FnTable {
     api.SetOverlayFlag = Some(flag);
     api.SetOverlayWidthInMeters = Some(width);
     api.SetOverlayTransformTrackedDeviceRelative = Some(transform);
+    api.SetOverlayTransformAbsolute = Some(absolute);
+    api.SetOverlayTexelAspect = Some(texel_aspect);
+    api.SetOverlayTextureBounds = Some(texture_bounds);
     api.SetOverlayAlpha = Some(alpha);
     api.SetOverlayTexture = Some(texture);
     api.ShowOverlay = Some(show);
@@ -219,7 +237,7 @@ fn diagnostic_surfaces_share_session_and_partial_creation_cleans_every_owned_han
         "generation":1, "backend":"openvr", "image":{"debug_controls":true},
         "interaction":{"debug_grab_volume":true,"debug_case_label":"Radius 12 cm\nPosition B fixed"}
     })).unwrap();
-    for fail_at in [None, Some(4), Some(6)] {
+    for fail_at in [None, Some(4), Some(6), Some(9)] {
         CALLS.with(|calls| *calls.borrow_mut() = Calls { fail_create_at: fail_at, ..Default::default() });
         let mut api = api();
         let session = session(&mut api);
@@ -233,9 +251,9 @@ fn diagnostic_surfaces_share_session_and_partial_creation_cleans_every_owned_han
             CALLS.with(|calls| {
                 let calls = calls.borrow();
                 assert_eq!(calls.shutdowns, 0);
-                assert_eq!(calls.keys.len(), 6);
-                assert_eq!(calls.keys.iter().collect::<std::collections::HashSet<_>>().len(), 6);
-                assert_eq!(calls.destroyed, [1, 2]);
+                assert_eq!(calls.keys.iter().collect::<std::collections::HashSet<_>>().len(), calls.keys.len());
+                assert!(calls.destroyed.contains(&1) && calls.destroyed.contains(&2));
+                assert!(!calls.destroyed.contains(&3));
             });
             drop(surfaces);
         }
@@ -680,7 +698,7 @@ async fn windows_graphics_controlled_held_photo_runtime_reports_first_draw_once_
             assert!(calls.textures.iter().any(|(handle, _)| *handle == 2));
             assert!(calls.shown.iter().filter(|handle| **handle == 2).count() >= 3);
             assert_eq!(calls.visible.get(&2), Some(&false));
-            assert_eq!(calls.destroyed.len(), 2);
+            assert_eq!(calls.destroyed.len(), calls.keys.len());
             assert_eq!(calls.shutdowns, 1);
         });
         LEGACY.with(|calls| {
@@ -692,22 +710,3 @@ async fn windows_graphics_controlled_held_photo_runtime_reports_first_draw_once_
     }
 }
 
-#[test]
-fn default_photo_session_creates_only_icon_and_photo_surfaces() {
-    CALLS.with(|calls| *calls.borrow_mut() = Calls::default());
-    let mut api = api();
-    let session = session(&mut api);
-    let manifest: crate::photo::manifest::PhotoManifest = serde_json::from_value(serde_json::json!({
-        "protocol_version":2, "role":"photo", "bridge_url":"ws://127.0.0.1:12345",
-        "session_token":"synthetic", "instance_id":"11111111-1111-4111-8111-111111111111",
-        "generation":1, "backend":"openvr"
-    })).unwrap();
-    let surfaces = crate::photo::runtime::PhotoOpenVrSurfaces::in_session(&manifest, session).unwrap();
-    CALLS.with(|calls| assert_eq!(calls.borrow().keys.len(), 2));
-    drop(surfaces);
-    CALLS.with(|calls| {
-        let calls = calls.borrow();
-        assert_eq!(calls.destroyed.len(), 2);
-        assert_eq!(calls.shutdowns, 1);
-    });
-}

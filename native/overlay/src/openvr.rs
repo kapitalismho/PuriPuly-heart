@@ -630,6 +630,7 @@ impl OpenVrOverlay {
                 return Ok(());
             }
             overlay.tracked_presentation = None;
+            overlay.card_presentation = None;
             let api = overlay.overlay_api();
             let set_transform =
                 api.SetOverlayTransformTrackedDeviceRelative
@@ -665,6 +666,60 @@ impl OpenVrOverlay {
         #[cfg(not(windows))]
         {
             let _ = (device, transform, width, alpha);
+            Err(OpenVrError::Init("OpenVR requires Windows".into()))
+        }
+    }
+
+    pub fn set_card_presentation(
+        &mut self,
+        device: Option<u32>,
+        transform: [[f32; 4]; 3],
+        width: f32,
+        alpha: f32,
+        texel_aspect: f32,
+        extent: f32,
+    ) -> Result<(), OpenVrError> {
+        #[cfg(windows)]
+        {
+            let OpenVrBackend::Windows(overlay) = &mut self.backend;
+            let presentation = (device, transform, width, alpha, texel_aspect, extent);
+            if overlay.card_presentation == Some(presentation) {
+                return Ok(());
+            }
+            overlay.card_presentation = None;
+            overlay.tracked_presentation = None;
+            overlay.applied_placement_policy = None;
+            let api = overlay.overlay_api();
+            let mut matrix = openvr_sys::HmdMatrix34_t { m: transform };
+            let error = unsafe {
+                if let Some(device) = device {
+                    api.SetOverlayTransformTrackedDeviceRelative
+                        .ok_or_else(missing_overlay_method("SetOverlayTransformTrackedDeviceRelative"))?
+                        (overlay.overlay_handle, device, &mut matrix)
+                } else {
+                    api.SetOverlayTransformAbsolute
+                        .ok_or_else(missing_overlay_method("SetOverlayTransformAbsolute"))?
+                        (overlay.overlay_handle, openvr_sys::ETrackingUniverseOrigin_TrackingUniverseStanding, &mut matrix)
+                }
+            };
+            map_overlay_submit_error(api, "photo transform", error)?;
+            let mut bounds = openvr_sys::VRTextureBounds_t { uMin: 0.0, vMin: 0.0, uMax: extent, vMax: 1.0 };
+            for (name, error) in unsafe {
+                [
+                    ("SetOverlayWidthInMeters", api.SetOverlayWidthInMeters.ok_or_else(missing_overlay_method("SetOverlayWidthInMeters"))?(overlay.overlay_handle, width)),
+                    ("SetOverlayAlpha", api.SetOverlayAlpha.ok_or_else(missing_overlay_method("SetOverlayAlpha"))?(overlay.overlay_handle, alpha)),
+                    ("SetOverlayTexelAspect", api.SetOverlayTexelAspect.ok_or_else(missing_overlay_method("SetOverlayTexelAspect"))?(overlay.overlay_handle, texel_aspect)),
+                    ("SetOverlayTextureBounds", api.SetOverlayTextureBounds.ok_or_else(missing_overlay_method("SetOverlayTextureBounds"))?(overlay.overlay_handle, &mut bounds)),
+                ]
+            } {
+                map_overlay_submit_error(api, name, error)?;
+            }
+            overlay.card_presentation = Some(presentation);
+            Ok(())
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = (device, transform, width, alpha, texel_aspect, extent);
             Err(OpenVrError::Init("OpenVR requires Windows".into()))
         }
     }
@@ -770,6 +825,34 @@ impl OpenVrSession {
         {
             None
         }
+    }
+
+    pub fn wrist_reference(&self) -> Option<crate::photo::calibration::WristReference> {
+        #[cfg(windows)]
+        {
+            let references = self.inner.hand_references.borrow();
+            let hand = references.hands[1].as_ref()?;
+            Some(crate::photo::calibration::WristReference {
+                model: hand.model.to_str().ok()?.to_owned(),
+                serial: hand.serial.to_str().ok()?.to_owned(),
+                handgrip_transform: hand.transform,
+            })
+        }
+        #[cfg(not(windows))]
+        { None }
+    }
+
+    pub fn wrist_reference_matches(&self, reference: &crate::photo::calibration::WristReference) -> bool {
+        #[cfg(windows)]
+        {
+            self.inner.hand_references.borrow().hands[1].as_ref().is_some_and(|hand| {
+                hand.model.to_bytes() == reference.model.as_bytes()
+                    && hand.serial.to_bytes() == reference.serial.as_bytes()
+                    && hand.transform == reference.handgrip_transform
+            })
+        }
+        #[cfg(not(windows))]
+        { let _ = reference; false }
     }
 
     pub fn pulse(&self, hand: TrackedHand) -> bool {
@@ -1219,6 +1302,7 @@ struct WindowsOpenVrOverlay {
     placement_policy: OverlayPlacementPolicy,
     applied_placement_policy: Option<OverlayPlacementPolicy>,
     tracked_presentation: Option<(u32, [[f32; 4]; 3], f32, f32)>,
+    card_presentation: Option<(Option<u32>, [[f32; 4]; 3], f32, f32, f32, f32)>,
     visible: bool,
     output_adapter: OpenVrOutputAdapter,
     _session: Rc<WindowsOpenVrSession>,
@@ -1248,6 +1332,7 @@ impl WindowsOpenVrOverlay {
             placement_policy: OverlayPlacementPolicy::default(),
             applied_placement_policy: None,
             tracked_presentation: None,
+            card_presentation: None,
             visible: false,
             output_adapter,
             _session: session,
@@ -1320,6 +1405,7 @@ impl WindowsOpenVrOverlay {
         }
         self.applied_placement_policy = None;
         self.tracked_presentation = None;
+        self.card_presentation = None;
         self.placement_policy
             .apply(self.overlay_api(), self.overlay_handle)?;
         self.applied_placement_policy = Some(self.placement_policy.clone());

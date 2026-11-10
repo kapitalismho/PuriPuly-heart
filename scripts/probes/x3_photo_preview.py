@@ -354,6 +354,66 @@ async def stop_child(process, bridge, readers, evidence, *, require_ack=False):
     return errors
 
 
+def load_wrist_calibration(path):
+    from puripuly_heart.core.photo.bridge import valid_wrist_calibration
+
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not valid_wrist_calibration(value):
+        raise ValueError("invalid wrist calibration")
+    return value
+
+
+class WristCalibrationStore:
+    def __init__(self, path, generation, event):
+        self.path = path
+        self.generation = generation
+        self.event = event
+        self.completed = asyncio.Event()
+        self.error = None
+
+    def control(self, value, generation):
+        if generation != self.generation or self.completed.is_set():
+            return
+        temporary = self.path.with_name(self.path.name + "." + str(uuid4()) + ".tmp")
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with temporary.open("x", encoding="utf-8") as stream:
+                json.dump(value["calibration"], stream, allow_nan=False, indent=2)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, self.path)
+            self.event("wrist_calibration_saved", path=str(self.path), source="authenticated_native_release")
+            self.completed.set()
+        except OSError as exc:
+            self.error = type(exc).__name__
+            self.event("wrist_calibration_save_failed", error_type=self.error)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+
+async def run_comparison(args, evidence):
+    evidence.summary.update(mode="emergence_comparison", candidates=[])
+    for index, emergence in enumerate(("opacity", "reveal"), 1):
+        case_args = argparse.Namespace(**vars(args))
+        case_args.emergence = emergence
+        case_args.repeat_offers = True
+        case_args.compare_emergence = False
+        case_args.calibrate_wrist = args.calibrate_wrist and index == 1
+        case = Evidence(evidence.path / f"{index:02d}-{emergence}")
+        evidence.event("candidate_started", candidate=emergence, root=str(case.path))
+        try:
+            result = await run(case_args, case)
+        finally:
+            case.finish()
+        evidence.summary["candidates"].append({"candidate": emergence, "exit_code": result, "root": str(case.path)})
+        evidence.event("candidate_completed", candidate=emergence, exit_code=result)
+        if result != 0:
+            evidence.summary["status"] = "candidate_failed"
+            return result
+    evidence.summary["status"] = "comparison_completed"
+    return 0
+
+
 async def run(args, evidence):
     generation = 1
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
@@ -394,9 +454,23 @@ async def run(args, evidence):
         evidence.summary["status"] = "runtime_not_running"
         evidence.event("runtime_not_running", native_started=False, steamvr_launch_attempted=False)
         return 2
+    calibration = None
+    if args.wrist_calibration and args.wrist_calibration.exists():
+        if not args.calibrate_wrist:
+            calibration = load_wrist_calibration(args.wrist_calibration)
+    elif args.wrist_calibration and not args.calibrate_wrist:
+        raise ValueError("wrist calibration does not exist; calibrate explicitly first")
+    calibration_store = (
+        WristCalibrationStore(args.wrist_calibration, generation, evidence.event)
+        if args.calibrate_wrist else None
+    )
     barrier = None
 
     def control(value, owner):
+        if value["type"] == "photo_debug_wrist_calibrated":
+            if calibration_store is not None:
+                calibration_store.control(value, owner)
+            return
         if value["type"] == "photo_debug_quiescent":
             if barrier is not None:
                 barrier.control(value, owner)
@@ -430,17 +504,27 @@ async def run(args, evidence):
                 "debug_grab_volume": True,
                 "debug_case_label": "WRIST WATCH\nGrab radius: 10 cm",
             }
-            evidence.summary["requested_interaction"] = manifest["interaction"]
-            evidence.event(
-                "repeat_parameters",
-                interaction=manifest["interaction"],
-                configuration_source="immutable_launch_manifest",
-                measured_world_pose=False,
-                generation=generation,
-                instance_id=manifest["instance_id"],
-                target_seconds=args.seconds,
-                offscreen_verification=args.software_pull_after is not None,
+        manifest.setdefault("interaction", {})["photo_emergence"] = args.emergence
+        if args.repeat_offers:
+            manifest["interaction"]["debug_case_label"] = (
+                "A: FULL SIZE FADE\nGrab radius: 10 cm" if args.emergence == "opacity"
+                else "B: PULL OUT REVEAL\nGrab radius: 10 cm"
             )
+        if calibration is not None:
+            manifest["interaction"]["wrist_calibration"] = calibration
+            evidence.event("wrist_calibration_loaded", path=str(args.wrist_calibration))
+        if calibration_store is not None:
+            manifest["interaction"]["debug_calibrate_wrist"] = True
+        evidence.summary["requested_interaction"] = manifest["interaction"]
+        evidence.event(
+            "interaction_parameters",
+            emergence=args.emergence,
+            grab_m=manifest["interaction"].get("grab_m", 0.10),
+            calibration_pending=calibration_store is not None,
+            calibration_loaded=calibration is not None,
+            generation=generation,
+            instance_id=manifest["instance_id"],
+        )
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         if os.name != "nt":
             manifest_path.chmod(0o600)
@@ -481,6 +565,13 @@ async def run(args, evidence):
             evidence.summary["status"] = "native_start_failed"
             return 2
         evidence.event("native_ready", handshake=True, preview_decoded=False)
+        if calibration_store is not None:
+            evidence.event("wrist_calibration_waiting", photo_offered=False)
+            while not calibration_store.completed.is_set():
+                if exit_task.done() or bridge.disconnected.is_set() or signals["error"] or calibration_store.error:
+                    evidence.summary["status"] = "wrist_calibration_failed"
+                    return 2
+                await asyncio.sleep(0.05)
         started = time.monotonic()
         schedule = (
             RepeatOfferSchedule(
@@ -746,12 +837,25 @@ def parser():
         type=float,
         help="OFFSCREEN ONLY: delay to local pre-pull export, then pull/export/hide/reopen/export and exit",
     )
+    command.add_argument("--emergence", choices=("opacity", "reveal"), default="opacity")
+    command.add_argument("--compare-emergence", action="store_true",
+                         help="A full-size fade then B clipped reveal; --seconds applies to each candidate")
+    command.add_argument("--calibrate-wrist", action="store_true",
+                         help="OPENVR ONLY: move the wrist icon with left grip and release to save before offering photos")
+    command.add_argument("--wrist-calibration", type=Path,
+                         help="Explicit local wrist calibration JSON to save or reuse")
     return command
 
 
 def main(argv=None):
     command = parser()
     args = command.parse_args(argv)
+    if args.calibrate_wrist and (args.backend != "openvr" or not args.wrist_calibration or args.watch_dir):
+        command.error("--calibrate-wrist requires OpenVR, --wrist-calibration PATH and no --watch-dir")
+    if args.compare_emergence:
+        if not args.wrist_calibration or args.watch_dir:
+            command.error("--compare-emergence requires --wrist-calibration PATH and no --watch-dir")
+        args.repeat_offers = True
     for name in ("offer_delay", "seconds", "startup_timeout", "software_pull_after"):
         value = getattr(args, name)
         if value is not None and (
@@ -781,7 +885,7 @@ def main(argv=None):
         flush=True,
     )
     try:
-        result = asyncio.run(run(args, evidence))
+        result = asyncio.run(run_comparison(args, evidence) if args.compare_emergence else run(args, evidence))
     except KeyboardInterrupt:
         result = 130
     except Exception as exc:

@@ -340,3 +340,34 @@ async def test_quiescent_receipt_requires_authenticated_current_generation_and_r
         assert not bridge.shutdown_complete.is_set()
     finally:
         await bridge.close()
+
+
+@pytest.mark.parametrize("invalid", ["reflection", "scale", "nan", "extra"])
+async def test_calibration_rejects_invalid_reference_or_nonrigid_pose(invalid):
+    controls = []
+    bridge = PhotoBridge(control=lambda value, generation: controls.append(value))
+    await bridge.start()
+    manifest = await bridge.activate(1, backend="openvr")
+    identity = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]
+    value = {
+        "transform": identity,
+        "reference": {"model": "synthetic", "serial": "fixture", "handgrip_transform": identity},
+    }
+    if invalid == "reflection":
+        identity[0][0] = -1
+    elif invalid == "scale":
+        identity[1][1] = 2
+    elif invalid == "nan":
+        identity[0][3] = float("nan")
+    else:
+        value["reference"]["unknown"] = True
+    try:
+        async with connect(manifest["bridge_url"]) as connection:
+            await connection.send(json.dumps(auth(manifest)))
+            await receive(connection, "photo_snapshot")
+            await connection.send(json.dumps({"type": "photo_debug_wrist_calibrated", "calibration": value}))
+            with pytest.raises(ConnectionClosed):
+                await connection.recv()
+        assert controls == []
+    finally:
+        await bridge.close()
