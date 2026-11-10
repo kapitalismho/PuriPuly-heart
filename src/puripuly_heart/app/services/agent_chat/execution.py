@@ -342,16 +342,20 @@ def validate_app_request(family: str, arguments: dict, catalog: dict) -> dict:
     ):
         request["name"] = SettingsSecretKey.GEMINI_API_KEY.value
     key = "topic" if family == "read_app" else "action"
+    variants = app_tool_variants(catalog, family)
+    if request.keys() - {field for item in variants for field in item["properties"]}:
+        raise ValueError("invalid_control_fields")
     variant = next(
         (
             item
-            for item in app_tool_variants(catalog, family)
+            for item in variants
             if request.get(key) in item["properties"][key]["enum"]
         ),
         None,
     )
     if variant is None:
         raise ValueError("invalid_control_choice")
+    request = {field: value for field, value in request.items() if field in variant["properties"]}
     validate(request, variant)
     return request
 

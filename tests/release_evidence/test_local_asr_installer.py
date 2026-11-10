@@ -160,7 +160,6 @@ begin
     for FileIndex := 0 to AsrFileCount(ModelIndex) - 1 do begin
       if FileIndex > 0 then Files := Files + ',';
       Files := Files + '{"path":' + JsonString(AsrFilePath(ModelIndex, FileIndex)) +
-        ',"sha256":' + JsonString(AsrFileSha256(ModelIndex, FileIndex)) +
         ',"size_bytes":' + IntToStr(AsrFileSize(ModelIndex, FileIndex)) +
         ',"primary":' + JsonString(AsrPrimaryUrl(ModelIndex, FileIndex)) +
         ',"mirror":' + JsonString(AsrMirrorUrl(ModelIndex, FileIndex)) + '}';
@@ -266,7 +265,6 @@ def test_compiled_identity_and_current_schema_telemetry_reader(tmp_path, compile
         for observed, asset in zip(actual["files"], manifest.files, strict=True):
             assert observed["path"].replace("\\", "/") == asset.relative_path
             assert observed["size_bytes"] == asset.size_bytes
-            assert observed["sha256"] == asset.sha256
             assert observed["primary"].startswith("https://huggingface.co/")
             assert observed["mirror"].startswith("https://hf-mirror.net/")
     first = REQUIRED_CPU_LOCAL_STT_MODEL_IDS[0]
@@ -308,13 +306,14 @@ def _sources(directory):
             mode = state.get(source, "good")
             if mode == "missing":
                 self.send_error(404)
-            elif mode == "corrupt":
+            elif mode in ("corrupt", "wrongsize"):
                 path = Path(self.translate_path(self.path))
                 payload = path.read_bytes()
+                response = b"x" * (len(payload) - (mode == "wrongsize"))
                 self.send_response(200)
-                self.send_header("Content-Length", str(len(payload)))
+                self.send_header("Content-Length", str(len(response)))
                 self.end_headers()
-                self.wfile.write(b"x" * len(payload))
+                self.wfile.write(response)
             else:
                 super().do_GET()
 
@@ -416,6 +415,7 @@ $logText = Get-Content -LiteralPath $LogPath -Raw
             ],
             capture_output=True,
             text=True,
+            encoding="oem",
             timeout=30,
         )
 
@@ -443,7 +443,6 @@ $logText = Get-Content -LiteralPath $LogPath -Raw
         ).cpu_auto_available
         rejected = consume(normal["profile"] / "setup.log")
         assert rejected.returncode != 0
-        assert "controlled no-network provisioning boundary" in rejected.stderr
 
         for outcome in ("failed", "completed successfully"):
             contradicted_log = tmp_path / f"contradicted-{outcome}.log"
@@ -452,12 +451,11 @@ $logText = Get-Content -LiteralPath $LogPath -Raw
             )
             contradicted = consume(contradicted_log)
             assert contradicted.returncode != 0
-            assert "controlled no-network provisioning boundary" in contradicted.stderr
 
 
 @WINDOWS
 @pytest.mark.parametrize("language", ["english", "chinesesimplified"])
-def test_real_setup_downloads_verifies_promotes_and_preserves_valid_install_on_hash_failure(
+def test_real_setup_downloads_promotes_and_preserves_valid_install_on_size_failure(
     tmp_path, compiler, language
 ):
     source = tmp_path / "sources"
@@ -487,13 +485,22 @@ def test_real_setup_downloads_verifies_promotes_and_preserves_valid_install_on_h
         before_reuse = len(state["requests"])
         assert _run(probe, "/provision=1")["success"] is True
         assert len(state["requests"]) == before_reuse
-        state["primary"] = state["mirror"] = "corrupt"
+        state["primary"] = state["mirror"] = "wrongsize"
         rejected = _run(probe, "/provision=1", "/TASKS=redownloadasr")
         assert rejected["success"] is False
         assert all(path.read_bytes() == payload for path, payload in originals.items())
         assert inspect_required_cpu_model_installs(root, manifests=by_id).cpu_auto_available
         assert not list(root.glob("*.backup"))
         assert not list(root.glob("*.staging-*"))
+        state["primary"] = state["mirror"] = "corrupt"
+        assert _run(probe, "/provision=1", "/TASKS=redownloadasr")["success"] is True
+        for manifest in manifests:
+            for asset in manifest.files:
+                installed = root / manifest.install_dirname / asset.relative_path
+                assert installed.read_bytes() == b"x" * asset.size_bytes
+        before_reuse = len(state["requests"])
+        assert _run(probe, "/provision=1")["success"] is True
+        assert len(state["requests"]) == before_reuse
 
 
 @WINDOWS

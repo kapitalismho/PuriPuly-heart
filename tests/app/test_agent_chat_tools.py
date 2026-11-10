@@ -1767,6 +1767,79 @@ async def test_generator_omits_enumerated_local_audio_values(catalog, tmp_path, 
     assert "PRIVATE-" not in output_path.read_text(encoding="utf-8")
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("before", "changes", "expected"),
+    [
+        (
+            {"model": "gemma4_26b_31b", "connection": "managed"},
+            {"translation.connection": "openrouter"},
+            {"translation.model": "gemma4_26b_31b", "translation.connection": "openrouter"},
+        ),
+        (
+            {"model": "gemma4_26b_31b", "connection": "openrouter"},
+            {"translation.model": "gpt_6_luna"},
+            {"translation.model": "gpt_6_luna", "translation.connection": "openrouter"},
+        ),
+    ],
+)
+@pytest.mark.parametrize("stale", [False, True])
+async def test_sparse_translation_pair_uses_observed_state_and_revision(
+    catalog, before, changes, expected, stale
+):
+    control = Control(catalog)
+    control.settings["intent"]["translation"].update(before)
+    tools, _, _ = adapter(control)
+    try:
+        result = await tools.execute("change_settings", {"changes": changes})
+        assert result["status"] == "needs_confirmation"
+        card = tools.confirmation_display
+        assert card["changes"] == expected
+        assert card["previous"] == {f"translation.{key}": value for key, value in before.items()}
+        assert not control.submissions
+        if stale:
+            control.settings["intent"]["translation"]["connection"] = "official_byok"
+            control.revision += 1
+        applied = await tools.confirm(card["id"], True)
+        if stale:
+            assert applied["status"] == "rejected"
+            assert applied["receipt"]["error"]["code"] == "revision_conflict"
+            assert control.settings["intent"]["translation"]["connection"] == "official_byok"
+            assert control.settings["intent"]["translation"]["model"] == before["model"]
+        else:
+            assert applied["status"] == "applied"
+            assert control.submissions == [{"changes": expected, "expected_revision": 11}]
+            assert {
+                f"translation.{key}": control.settings["intent"]["translation"][key]
+                for key in before
+            } == expected
+    finally:
+        await tools.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"translation.connection": "cpu"},
+        {"translation.model": "managed_gemma"},
+    ],
+)
+async def test_sparse_translation_pair_rejects_incompatible_observed_route(catalog, changes):
+    control = Control(catalog)
+    control.settings["intent"]["translation"].update(
+        model="gemma4_26b_31b", connection="openrouter"
+    )
+    tools, _, _ = adapter(control)
+    try:
+        result = await tools.execute("change_settings", {"changes": changes})
+        assert result["status"] == "rejected"
+        assert tools.confirmation is None
+        assert not control.submissions
+    finally:
+        await tools.close()
+
+
 def test_diagnosis_projection_preserves_measured_ranges_and_bounds_numeric_samples():
     result = project_audio_diagnosis(
         {

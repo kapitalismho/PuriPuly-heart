@@ -264,18 +264,6 @@ def test_installer_verifier_rejects_any_model_artifact_identity(
         distribution.verify_installer(installer_path)
 
 
-def test_installer_verifier_rejects_application_postinstall_launch(tmp_path: Path) -> None:
-    installer_path = tmp_path / "installer.iss"
-    installer_path.write_text(
-        '[Files]\nSource: "{#MyPackagedAppDir}\\*"\n'
-        '[Run]\nFilename: "{app}\\{#MyAppExeName}"; Flags: nowait postinstall\n',
-        encoding="utf-8",
-    )
-
-    with pytest.raises(RuntimeError, match="launches the application postinstall"):
-        distribution.verify_installer(installer_path)
-
-
 def test_production_installer_does_not_download_managed_gemma() -> None:
     assert (
         distribution.verify_installer(ROOT / "installer.iss")["managed_gemma_install_download"]

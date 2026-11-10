@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -15,8 +16,13 @@ from puripuly_heart.app.services.application_control_events import ControlEvents
 from puripuly_heart.app.services.settings.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
 from puripuly_heart.core.openrouter.managed_openrouter_release import ManagedOpenRouterLLMProvider
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfig,
+    TranslationRuntimeConfigurationOwner,
+)
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackend
 from puripuly_heart.domain.models import Translation
@@ -24,10 +30,18 @@ from puripuly_heart.providers.llm.managed_gemma import ManagedGemmaLLMProvider
 
 
 class ControlledBackend(TranslationBackend):
-    def __init__(self, *, text="Hola, que tengas un buen día.", failure=None, hold=False):
+    def __init__(
+        self,
+        *,
+        text="One moment, I'll get a glass of water.",
+        failure=None,
+        hold=False,
+        fail_target=None,
+    ):
         self.text = text
         self.failure = failure
         self.hold = hold
+        self.fail_target = fail_target
         self.requests = []
         self.entered = asyncio.Event()
         self.release = asyncio.Event()
@@ -48,7 +62,9 @@ class ControlledBackend(TranslationBackend):
                     raise
                 await self.release.wait()
         assert not self.closed
-        if self.failure is not None:
+        if self.failure is not None and (
+            self.fail_target is None or request.target_language == self.fail_target
+        ):
             raise self.failure
         return Translation(utterance_id=request.utterance_id, text=self.text)
 
@@ -56,12 +72,38 @@ class ControlledBackend(TranslationBackend):
         self.closed = True
 
 
-def control_for(backend):
+def control_for(
+    backend, *, source_language="ko", target_language="en", secondary_target_language=""
+):
     runtime = ProviderRuntimeHandle(name="llm", provider=backend)
+    canonical = AppSettingsVNext()
+    canonical = replace(
+        canonical,
+        intent=replace(
+            canonical.intent,
+            languages=replace(
+                canonical.intent.languages,
+                source_language=source_language,
+                target_language=target_language,
+                secondary_target_language=secondary_target_language,
+            ),
+        ),
+    )
+    configuration = TranslationRuntimeConfigurationOwner(
+        TranslationRuntimeConfig(
+            source_language=source_language,
+            target_language=target_language,
+            self_target_languages=tuple(
+                target for target in (target_language, secondary_target_language) if target
+            ),
+        )
+    )
     control = ApplicationControlOwner(
-        application=SimpleNamespace(),
+        application=SimpleNamespace(compatibility_settings=lambda: canonical),
         settings=SimpleNamespace(),
-        pipeline=SimpleNamespace(llm_runtime=runtime),
+        pipeline=SimpleNamespace(
+            llm_runtime=runtime, translation_runtime_configuration=configuration
+        ),
         results=SettingsTransactionResultOwner(),
         events=ControlEvents(instance_id="translation-probe-test"),
         provisioning=lambda: pytest.fail("probe accessed model provisioning"),
@@ -103,18 +145,18 @@ async def test_probe_invokes_current_backend_and_retains_metadata_only_terminal_
         assert result["status"] == "applied"
         assert result["translation_result"] == "succeeded"
         assert result["captured_generation"] == result["current_generation"] == 0
-        assert result["source_language"] == "en"
-        assert result["target_language"] == "es"
+        assert result["source_language"] == "ko"
+        assert result["target_language"] == "en"
+        assert result["target_languages"] == ["en"]
+        assert result["target_results"] == [
+            {"target_language": "en", "translation_result": "succeeded"}
+        ]
         assert len(backend.requests) == 1
         request = backend.requests[0]
-        assert request.text == "Hello, have a nice day."
-        assert request.system_prompt == (
-            "Translate from English to Spanish. Return only the translation."
-        )
         assert request.context == ""
         assert request.scene_participant_count is None
-        assert request.source_language == "en"
-        assert request.target_language == "es"
+        assert request.source_language == "ko"
+        assert request.target_language == "en"
         assert await control.operation(result["operation_id"]) == result
         assert [event["topic"] for event in control.events.history] == ["operation"]
         assert backend.text not in json.dumps(result)
@@ -149,6 +191,9 @@ async def test_probe_unavailable_empty_and_failed_backend_are_not_success(backen
         assert result["status"] == status
         assert result["translation_result"] != "succeeded"
         assert result["error"]["code"] == code
+        assert result["source_language"] == "ko"
+        assert result["target_language"] == "en"
+        assert result["target_languages"] == ["en"]
         assert "PRIVATE" not in json.dumps(result)
         if isinstance(getattr(backend, "failure", None), httpx.ConnectError):
             assert result["failure_category"] == "network"
@@ -160,7 +205,7 @@ async def test_probe_unavailable_empty_and_failed_backend_are_not_success(backen
 async def test_replaced_backend_completion_is_stale_and_resources_drain(failure):
     backend = ControlledBackend(hold=True, failure=failure)
     replacement = ControlledBackend()
-    control, runtime = control_for(backend)
+    control, runtime = control_for(backend, secondary_target_language="ja")
     try:
         accepted = await control.submit("translation.probe", {}, request_id=uuid4().hex)
         await asyncio.wait_for(backend.entered.wait(), timeout=1)
@@ -178,6 +223,10 @@ async def test_replaced_backend_completion_is_stale_and_resources_drain(failure)
         assert result["error"]["code"] == "stale_provider_completion"
         assert result["captured_generation"] == 0
         assert result["current_generation"] == 1
+        assert [item["translation_result"] for item in result["target_results"]] == [
+            "stale", "not_started"
+        ]
+        assert len(backend.requests) == 1
         assert backend.closed is True
         recovered = await submit_probe(control)
         assert recovered["translation_result"] == "succeeded"
@@ -193,7 +242,7 @@ async def test_replaced_backend_completion_is_stale_and_resources_drain(failure)
 async def test_cancellation_and_shutdown_reject_late_success_and_drain_owned_work(shutdown):
     backend = ControlledBackend(hold=True)
     backend.ignore_cancellation = True
-    control, runtime = control_for(backend)
+    control, runtime = control_for(backend, secondary_target_language="ja")
     accepted = await control.submit("translation.probe", {}, request_id=uuid4().hex)
     await asyncio.wait_for(backend.entered.wait(), timeout=1)
     if shutdown:
@@ -214,6 +263,10 @@ async def test_cancellation_and_shutdown_reject_late_success_and_drain_owned_wor
     assert_no_output(result)
     assert result["status"] == ("interrupted" if shutdown else "cancelled")
     assert result["translation_result"] == result["status"]
+    assert [item["translation_result"] for item in result["target_results"]] == [
+        "cancelled", "not_started"
+    ]
+    assert len(backend.requests) == 1
     assert backend.closed is True
     assert runtime.has_resources is False
 
@@ -272,7 +325,7 @@ async def test_probe_does_not_prepare_managed_local_model_or_release_managed_cre
 
 async def test_agent_probe_waits_for_actual_terminal_receipt_without_settings_actions():
     backend = ControlledBackend(hold=True)
-    control, runtime = control_for(backend)
+    control, runtime = control_for(backend, secondary_target_language="ja")
     actions = []
     tools = AgentTools(
         control,
@@ -293,6 +346,12 @@ async def test_agent_probe_waits_for_actual_terminal_receipt_without_settings_ac
         assert result["status"] == "applied"
         assert_no_output(result["receipt"])
         assert result["receipt"]["translation_result"] == "succeeded"
+        assert result["receipt"]["source_language"] == "ko"
+        assert result["receipt"]["target_languages"] == ["en", "ja"]
+        assert result["receipt"]["target_results"] == [
+            {"target_language": "en", "translation_result": "succeeded"},
+            {"target_language": "ja", "translation_result": "succeeded"},
+        ]
         assert [action["phase"] for action in actions] == ["submitted", "completed"]
         assert tools.confirmation is None
         assert backend.text not in json.dumps(actions)
@@ -436,3 +495,150 @@ async def test_pipeline_runtime_replacement_or_detachment_fences_late_probe(repl
         await runtime.close()
         if replacement is not None:
             await replacement.close()
+
+
+async def test_probe_exercises_both_self_targets_with_separate_isolated_requests():
+    backend = ControlledBackend()
+    control, runtime = control_for(backend, secondary_target_language="ja")
+    try:
+        result = await submit_probe(control)
+        assert_no_output(result)
+        assert result["status"] == "applied"
+        assert result["translation_result"] == "succeeded"
+        assert result["target_language"] == "en"
+        assert result["target_languages"] == ["en", "ja"]
+        assert result["target_results"] == [
+            {"target_language": "en", "translation_result": "succeeded"},
+            {"target_language": "ja", "translation_result": "succeeded"},
+        ]
+        assert [request.target_language for request in backend.requests] == ["en", "ja"]
+        assert len({request.utterance_id for request in backend.requests}) == 2
+        for request in backend.requests:
+            assert request.source_language == "ko"
+            assert request.context == ""
+            assert request.scene_participant_count is None
+        assert [event["topic"] for event in control.events.history] == ["operation"]
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("failed_target", ["en", "ja"])
+async def test_probe_reports_each_target_without_claiming_partial_success(failed_target):
+    backend = ControlledBackend(
+        failure=RuntimeError("PRIVATE-PROVIDER-DETAIL"), fail_target=failed_target
+    )
+    control, runtime = control_for(backend, secondary_target_language="ja")
+    try:
+        result = await submit_probe(control)
+        assert_no_output(result)
+        assert result["status"] == "failed"
+        assert result["translation_result"] == "failed"
+        assert result["target_languages"] == ["en", "ja"]
+        assert result["target_results"] == [
+            {
+                "target_language": "en",
+                "translation_result": "failed" if failed_target == "en" else "succeeded",
+            },
+            {
+                "target_language": "ja",
+                "translation_result": "not_started" if failed_target == "en" else "failed",
+            },
+        ]
+        assert "PRIVATE" not in json.dumps(result)
+    finally:
+        await runtime.close()
+
+
+async def test_probe_captures_effective_direction_after_ordered_settings_work():
+    backend = ControlledBackend()
+    control, runtime = control_for(backend)
+    await control._lock.acquire()
+    try:
+        accepted = await control.submit("translation.probe", {}, request_id=uuid4().hex)
+        assert accepted["source_language"] is None
+        assert accepted["target_language"] is None
+        assert accepted["target_languages"] is None
+        await asyncio.sleep(0)
+        assert backend.requests == []
+        control.pipeline.translation_runtime_configuration.replace(
+            TranslationRuntimeConfig(
+                source_language="ja", target_language="ko", self_target_languages=("ko", "zh-TW")
+            )
+        )
+    finally:
+        control._lock.release()
+    try:
+        result = await control.wait(accepted["operation_id"], timeout=2)
+        assert result["source_language"] == "ja"
+        assert result["target_language"] == "ko"
+        assert result["target_languages"] == ["ko", "zh-TW"]
+        assert [request.target_language for request in backend.requests] == ["ko", "zh-TW"]
+        assert control.application.compatibility_settings().intent.languages.source_language == "ko"
+    finally:
+        control.freeze_ingress()
+        await control.drain_operations()
+        await runtime.close()
+
+
+@pytest.mark.parametrize("failure", [None, RuntimeError("PRIVATE-PROVIDER-DETAIL")])
+async def test_probe_retains_admitted_direction_during_settings_changes(failure):
+    backend = ControlledBackend(hold=True, failure=failure)
+    control, runtime = control_for(backend, secondary_target_language="ja")
+    try:
+        accepted = await control.submit("translation.probe", {}, request_id=uuid4().hex)
+        await asyncio.wait_for(backend.entered.wait(), timeout=1)
+        running = await control.operation(accepted["operation_id"])
+        assert running["source_language"] == "ko"
+        assert running["target_languages"] == ["en", "ja"]
+        control.pipeline.translation_runtime_configuration.replace(
+            TranslationRuntimeConfig(source_language="es", target_language="zh-CN")
+        )
+        backend.release.set()
+        result = await control.wait(accepted["operation_id"], timeout=2)
+        assert result["status"] == ("applied" if failure is None else "failed")
+        assert result["source_language"] == "ko"
+        assert result["target_language"] == "en"
+        assert result["target_languages"] == ["en", "ja"]
+        assert all(request.source_language == "ko" for request in backend.requests)
+        assert [request.target_language for request in backend.requests] == (
+            ["en", "ja"] if failure is None else ["en"]
+        )
+        assert_no_output(result)
+    finally:
+        backend.release.set()
+        control.freeze_ingress()
+        await control.drain_operations()
+        await runtime.close()
+
+
+async def test_probe_uses_canonical_direction_when_no_effective_configuration_is_attached():
+    backend = ControlledBackend()
+    control, runtime = control_for(
+        backend, source_language="es", target_language="fr", secondary_target_language="de"
+    )
+    control.pipeline.translation_runtime_configuration = None
+    try:
+        result = await submit_probe(control)
+        assert result["status"] == "applied"
+        assert result["source_language"] == "es"
+        assert result["target_languages"] == ["fr", "de"]
+        assert [request.target_language for request in backend.requests] == ["fr", "de"]
+    finally:
+        await runtime.close()
+
+
+async def test_probe_without_settings_reports_unknown_direction_without_sending_a_request():
+    backend = ControlledBackend()
+    control, runtime = control_for(backend)
+    control.pipeline.translation_runtime_configuration = None
+    control.application.compatibility_settings = lambda: None
+    try:
+        result = await submit_probe(control)
+        assert result["status"] == "action_required"
+        assert result["error"]["code"] == "translation_direction_unavailable"
+        assert result["source_language"] is None
+        assert result["target_language"] is None
+        assert result["target_languages"] == []
+        assert backend.requests == []
+    finally:
+        await runtime.close()

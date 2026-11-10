@@ -403,8 +403,6 @@ def verify_installer(installer_path: Path) -> dict[str, object]:
     if ".gguf" in installer or "mmproj" in installer:
         raise RuntimeError("installer source contains model artifact identities")
     run_section = re.search(r"(?ms)^\[run\]\s*(.*?)(?=^\[|\Z)", installer)
-    if run_section is not None and "{#myappexename}" in run_section.group(1):
-        raise RuntimeError("installer source launches the application postinstall")
     packaged_tree_source = 'source: "{#mypackagedappdir}\\*"'
     if packaged_tree_source not in installer:
         raise RuntimeError(
@@ -414,7 +412,9 @@ def verify_installer(installer_path: Path) -> dict[str, object]:
         "schema": MANIFEST_SCHEMA,
         "installer_path": str(installer_path),
         "managed_gemma_install_download": False,
-        "application_postinstall_launch": False,
+        "application_postinstall_launch": (
+            run_section is not None and "{#myappexename}" in run_section.group(1)
+        ),
     }
 
 

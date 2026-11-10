@@ -143,12 +143,6 @@ def render_model_data(manifests: Sequence[LocalSTTAssetManifest] | None = None) 
         files=True,
     )
     function(
-        "AsrFileSha256",
-        "String",
-        [(key, _string(asset.sha256)) for key, model, asset in files],
-        files=True,
-    )
-    function(
         "AsrFileSize",
         "Int64",
         [(key, str(asset.size_bytes)) for key, model, asset in files],

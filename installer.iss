@@ -180,6 +180,9 @@ Name: "{autodesktop}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Icon
 Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#AppIconRelativePath}"; Tasks: quicklaunchicon; {#AppShortcutIdentity}
 #endif
 
+[Run]
+Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent runasoriginaluser
+
 [UninstallDelete]
 ; Clean up user config on uninstall (optional)
 #ifdef InstallerSmokeAppDataRoot

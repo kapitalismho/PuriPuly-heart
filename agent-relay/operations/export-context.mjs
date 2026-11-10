@@ -76,8 +76,8 @@ function samples() {
       input: [configuration('low'), user('Synthetic app help.')] },
     { id: 'work', route: 'work', effort: 'high', allow_tools: false,
       input: [configuration('low'), user('Synthetic prior app help.'), configuration('high'), user('Synthetic current app help.')] },
-    { id: 'work', route: 'unclear', effort: 'xhigh', allow_tools: true,
-      input: [configuration('xhigh'), user('Synthetic unclear app request.')] },
+    { id: 'work', route: 'unclear', effort: 'medium', allow_tools: true,
+      input: [configuration('medium'), user('Synthetic unclear app request.')] },
     ...['social', 'out_of_scope'].flatMap((route) => [true, false].map((allow_tools) => ({
       id: route, route, effort: 'low', allow_tools, input: [user(`Synthetic ${route} context export.`)],
     }))),
