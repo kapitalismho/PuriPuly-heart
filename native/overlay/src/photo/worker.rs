@@ -177,6 +177,10 @@ impl ImagePipeline {
                 return Ok(());
             }
         }
+        for id in &photo.excluded_blocks {
+            self.prepared.remove(id);
+            self.candidates.remove(id);
+        }
         if self.failed {
             return Ok(());
         }

@@ -232,7 +232,7 @@ fn diagnostic_surfaces_share_session_and_partial_creation_cleans_every_owned_han
     use crate::photo::manifest::PhotoManifest;
     use crate::photo::runtime::PhotoOpenVrSurfaces;
     let manifest: PhotoManifest = serde_json::from_value(serde_json::json!({
-        "protocol_version":2, "role":"photo", "bridge_url":"ws://127.0.0.1:12345",
+        "protocol_version":crate::photo::manifest::PHOTO_PROTOCOL_VERSION, "role":"photo", "bridge_url":"ws://127.0.0.1:12345",
         "session_token":"synthetic", "instance_id":"11111111-1111-4111-8111-111111111111",
         "generation":1, "backend":"openvr", "image":{"debug_controls":true},
         "interaction":{"debug_grab_volume":true,"debug_case_label":"Radius 12 cm\nPosition B fixed"}
@@ -528,6 +528,7 @@ fn missing_invalid_or_replaced_handgrips_cancel_and_require_fresh_ready_grip() {
             "expected_file_id":["1","2"],
             "shutter_unix_ms":1000, "attempt_id":0, "phase":"offer", "offer_open":true,
             "visible":false, "image":null, "preparations":[], "blocks":[],
+            "excluded_blocks":[],
             "failure_code":null, "first_block_drawn":false
         }))
         .unwrap();

@@ -23,6 +23,7 @@ import { handleManagedKeyDeliveryAck } from './managed-key-delivery';
 import { handleManagedOperationResume } from './managed-operation-resume';
 import { handleManagedOperationStatus } from './managed-operation';
 import { handlePuriToken } from './puri-token';
+import { handlePhotoAccess } from './photo-access';
 
 export const app = new Hono<BrokerEnv>();
 
@@ -50,6 +51,7 @@ app.post('/v1/puri/token', bodyLimit({
     });
   },
 }), handlePuriToken);
+app.post('/v1/photo/access', bodyLimit({ maxSize: 4096 }), handlePhotoAccess);
 app.post('/v1/trial/challenge', handleTrialChallenge);
 app.post('/v1/trial/challenge/verify', handleTrialChallengeVerify);
 app.get('/v1/trial/status', handleTrialStatus);

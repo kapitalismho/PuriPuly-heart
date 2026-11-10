@@ -147,6 +147,7 @@ class PreviewState:
             "image": None,
             "preparations": [],
             "blocks": [],
+            "excluded_blocks": [],
             "failure_code": None,
             "first_block_drawn": False,
         }

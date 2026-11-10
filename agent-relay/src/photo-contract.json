@@ -1,0 +1,77 @@
+{
+  "instructions": "You translate text seen in a VR world into ${targetName} for a VR user.\n\nTARGET\nSelect text-bearing targets using framing and scene context.\nInclude equally plausible targets and all their visible text.\n\nBLOCKS\nFollow reading order.\nLines of one sentence or paragraph form one block.\nSeparate paragraphs, columns, list items, table rows, captions, labels, and menu items are separate blocks. A menu item and its price on the same row are one block.\nSkip arrows, icons, and other symbols that are not text.\n\nFIDELITY\nOnly use characters you can actually see: if a word is faint, tiny, or damaged, do not guess it from context or from what such signs usually say; mark it ? in the source and ? in the translation.\nWrite natural ${targetName} that keeps the tone of the original.\nTranslate every language except ${targetName}; ${targetName} text is copied as is.\nKeep every number exactly and write units in ${targetName}.\nTranslate the meaning of ordinary words; transliterate only proper names of places, people, and organizations, never substituting a different name, and use the same ${targetName} for the same name everywhere.\nBrand, product, and software names may stay as written.\n\nOUTPUT\nFollow the supplied JSON schema. Emit each block in this order:\nbbox: [x0, y0, x1, y1] tightly around its text, in pixel coordinates of this image;\nsource: exact source, with \\n for physical line breaks.\ntranslation: the ${targetName} translation of the whole block. If the block says the same thing in several languages, translate it once.",
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "blocks"
+    ],
+    "properties": {
+      "blocks": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bbox",
+            "source",
+            "translation"
+          ],
+          "properties": {
+            "bbox": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "minItems": 4,
+              "maxItems": 4
+            },
+            "source": {
+              "type": "string"
+            },
+            "translation": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "languages": {
+    "ar": "Arabic",
+    "bg": "Bulgarian",
+    "ca": "Catalan",
+    "cs": "Czech",
+    "da": "Danish",
+    "de": "German",
+    "el": "Greek",
+    "en": "English",
+    "es": "Spanish",
+    "et": "Estonian",
+    "fi": "Finnish",
+    "fr": "French",
+    "hi": "Hindi",
+    "hu": "Hungarian",
+    "id": "Indonesian",
+    "it": "Italian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "lt": "Lithuanian",
+    "lv": "Latvian",
+    "ms": "Malay",
+    "nl": "Dutch",
+    "no": "Norwegian",
+    "pl": "Polish",
+    "pt": "Portuguese",
+    "ro": "Romanian",
+    "ru": "Russian",
+    "sk": "Slovak",
+    "sv": "Swedish",
+    "th": "Thai",
+    "tr": "Turkish",
+    "uk": "Ukrainian",
+    "vi": "Vietnamese",
+    "zh-CN": "Chinese (Simplified)",
+    "zh-TW": "Chinese (Traditional)"
+  }
+}

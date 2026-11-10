@@ -2,6 +2,7 @@ import { authenticate, hasTokenSecret } from './auth';
 import { contracts, contractFor, supportedProtocols } from './contracts';
 import { classifierInstructions, outOfScopeInstructions, socialInstructions, workInstructions } from './instructions';
 import { beforeAbort, requestLifetime } from './lifetime';
+import { PhotoEnv, receivePhoto } from './photo';
 import { ClassifyRequest, isClassifyRequest, isRespondRequest, maxClassifyBytes, maxRespondBytes, readRequestJson, RespondRequest } from './requests';
 import { classifierQuestions } from './scope';
 import { receiveSupport, SupportEnv } from './support';
@@ -9,7 +10,7 @@ import { responseStream } from './stream';
 import { isRecord } from './type-guards';
 import { Admission, checkAllowance, usageRecorder, UsageEnv } from './usage';
 
-type Env = UsageEnv & SupportEnv & {
+type Env = UsageEnv & SupportEnv & PhotoEnv & {
   OPENAI_API_KEY?: string;
   PURI_TOKEN_SECRET?: string;
   AGENT_SERVICE_ENABLED?: string;
@@ -53,7 +54,8 @@ export default {
     const url = new URL(request.url);
     const classification = url.pathname === '/v1/classify';
     const support = url.pathname === '/v1/support';
-    if (!classification && !support && url.pathname !== '/v1/respond') {
+    const photo = url.pathname === '/v1/photo';
+    if (!classification && !support && !photo && url.pathname !== '/v1/respond') {
       return error(404, 'not_found', 'Unknown relay endpoint.');
     }
     if (request.method !== 'POST') {
@@ -67,6 +69,7 @@ export default {
       return error(401, 'service_authentication_failed', 'The assistant service could not authenticate. Reconnect through PuriPuly.');
     }
     if (support) return receiveSupport(request, env, installation);
+    if (photo) return receivePhoto(request, env, installation, context);
     if (env.AGENT_SERVICE_ENABLED !== 'true') {
       return error(503, 'service_shutdown', 'The assistant service is stopped. Settings, Cancel and the static guide remain available.');
     }

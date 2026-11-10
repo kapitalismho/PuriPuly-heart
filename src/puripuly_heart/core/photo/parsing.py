@@ -56,12 +56,7 @@ _PUNCTUATION = {
 
 
 class PhotoBlockParser:
-    def __init__(self, *, google: bool = False, width: int = 1280, height: int = 720) -> None:
-        if type(width) is not int or type(height) is not int or width <= 0 or height <= 0:
-            raise ValueError("image dimensions must be positive integers")
-        self._google = google
-        self._width = width
-        self._height = height
+    def __init__(self, *, google: bool = False) -> None:
         self._fields = ("box_2d" if google else "bbox", "source", "translation")
         self._state = "preamble"
         self._depth = 0
@@ -207,7 +202,8 @@ class PhotoBlockParser:
                 self._state = "bbox_number"
             elif char == "]" and len(self._coordinates) == 4:
                 self._depth -= 1
-                self._bbox = self._validate_bbox()
+                a, b, c, d = self._coordinates
+                self._bbox = (a, b, c, d)
                 events.append(BboxReady(index=len(self._blocks), bbox=self._bbox))
                 self._emit_source(events)
                 self._state = "field_separator"
@@ -280,10 +276,3 @@ class PhotoBlockParser:
                 )
             )
             self._source_emitted = True
-
-    def _validate_bbox(self) -> BBox:
-        a, b, c, d = self._coordinates
-        max_a, max_b = (1000, 1000) if self._google else (self._width, self._height)
-        if not (0 <= a < c <= max_a and 0 <= b < d <= max_b):
-            self._fail("bbox must be nondegenerate and inside provider dimensions")
-        return a, b, c, d

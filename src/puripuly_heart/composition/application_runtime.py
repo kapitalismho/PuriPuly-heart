@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import copy
 import logging
+import os
 import sys
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
@@ -163,7 +164,11 @@ from puripuly_heart.app.wiring import (
     resolve_overlay_config_from_vnext,
     runtime_pipeline_inputs_from_vnext,
 )
-from puripuly_heart.app.wiring.wiring_agent_chat import compose_agent_transport
+from puripuly_heart.app.wiring.wiring_agent_chat import (
+    AGENT_RELAY_URL,
+    compose_agent_transport,
+    compose_relay_token_owner,
+)
 from puripuly_heart.app.wiring.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
 )
@@ -286,6 +291,7 @@ from puripuly_heart.core.telemetry import (
     HttpAppActiveDayTelemetryClient,
 )
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 STT_RESET_DEADLINE_S = 300.0
 MANUAL_INPUT_TYPING_IDLE_TIMEOUT_S = 3.0
@@ -1844,14 +1850,29 @@ def compose_application_runtime(
         ),
     )
 
+    relay_token_owner = compose_relay_token_owner(settings=settings, config_path=config_path)
+    photo_source = current_runtime_layout().host_kind == "source"
     photo_provider = PhotoProviderAdapter(
         session=chatgpt_session,
         secret_store=create_settings_secret_store,
+        token_owner=relay_token_owner,
+        installation_id=relay_token_owner.installation_id,
+        broker_base_url=lambda: (
+            os.environ.get("PURIPULY_AGENT_BROKER_URL")
+            or settings.require_canonical().intent.translation.openrouter_broker_base_url
+        ),
+        relay_endpoint=os.environ.get("PURIPULY_AGENT_RELAY_URL", AGENT_RELAY_URL).removesuffix(
+            "/respond"
+        )
+        + "/photo",
+        allow_loopback_http=photo_source,
+        benchmark_route=os.environ.get("PURIPULY_PHOTO_BENCHMARK_ROUTE") if photo_source else None,
     )
 
     def photo_diagnostic(stage: str, fields: dict) -> None:
         if "model" in fields and fields["model"] not in {
             "gpt-6-luna",
+            "openai/gpt-6-luna",
             "gemini-3.5-flash-lite",
             "gemini-3.1-flash-lite",
         }:
@@ -1865,6 +1886,12 @@ def compose_application_runtime(
                 "attempt_id",
                 "block_id",
                 "duration_ms",
+                "request_elapsed_ms",
+                "image_base64_bytes",
+                "output_blocks",
+                "corrected_blocks",
+                "excluded_blocks",
+                "outcome",
                 "model",
                 "failure_code",
                 "generation",
@@ -2479,7 +2506,9 @@ def compose_application_runtime(
     application.attach_control(control)
     agent_chat = AgentChatOwner(
         control,
-        compose_agent_transport(settings=settings, config_path=config_path),
+        compose_agent_transport(
+            settings=settings, config_path=config_path, token_owner=relay_token_owner
+        ),
         localize=presentation.localize,
         support_log_snapshot=runtime_logging.support_log_snapshot,
     )
@@ -2510,6 +2539,18 @@ def compose_application_runtime(
                 owner_name="AgentChatOwner",
                 callback_name="close",
                 callback=agent_chat.close,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="PhotoProviderAdapter",
+                callback_name="close",
+                callback=photo_provider.close,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="AgentRelayTokenOwner",
+                callback_name="close",
+                callback=relay_token_owner.close,
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,

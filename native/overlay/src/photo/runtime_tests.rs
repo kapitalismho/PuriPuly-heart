@@ -21,6 +21,7 @@ fn feedback_requires_live_draw_and_is_once_per_attempt_even_after_snapshot_ack()
         "image":{"path":"snapshot.png","width":1280,"height":720},"preparations":[],
         "blocks":[{"block_id":0,"bbox":[1,2,100,50],"source":"A","translation":"B"}],
         "failure_code":null,"first_block_drawn":true,
+        "excluded_blocks":[],
     }))
     .unwrap();
     runtime.state.apply(1, Some(photo)).unwrap();
@@ -41,7 +42,7 @@ fn feedback_requires_live_draw_and_is_once_per_attempt_even_after_snapshot_ack()
 #[test]
 fn feedback_tracks_first_drawable_block_after_kept_prefix() {
     let manifest: PhotoManifest = serde_json::from_value(json!({
-        "protocol_version":2,"role":"photo","bridge_url":"ws://127.0.0.1:12345",
+        "protocol_version":PHOTO_PROTOCOL_VERSION,"role":"photo","bridge_url":"ws://127.0.0.1:12345",
         "session_token":"synthetic","instance_id":"11111111-1111-4111-8111-111111111111",
         "generation":1,"backend":"probe"
     }))
@@ -52,6 +53,7 @@ fn feedback_tracks_first_drawable_block_after_kept_prefix() {
         "expected_file_id":["1","2"],
         "attempt_id":1,"phase":"completed","offer_open":false,"visible":true,
         "image":{"path":"snapshot.png","width":1280,"height":720},"preparations":[],
+        "excluded_blocks":[],
         "blocks":[
             {"block_id":0,"bbox":[1,2,100,50],"source":"Brand","translation":"Brand"},
             {"block_id":1,"bbox":[200,2,300,50],"source":"Source","translation":"Translation"}
@@ -73,7 +75,7 @@ fn feedback_tracks_first_drawable_block_after_kept_prefix() {
 async fn windows_graphics_photo341_icons_and_held_preview_readback() {
     use super::super::typeset::PhotoTypesetter;
     let manifest: PhotoManifest = serde_json::from_value(json!({
-        "protocol_version":2,"role":"photo","bridge_url":"ws://127.0.0.1:12345",
+        "protocol_version":PHOTO_PROTOCOL_VERSION,"role":"photo","bridge_url":"ws://127.0.0.1:12345",
         "session_token":"synthetic","instance_id":"11111111-1111-4111-8111-111111111111",
         "generation":1,"backend":"offscreen",
         "image":{"debug_controls":true},
@@ -462,7 +464,7 @@ impl PhotoRuntime {
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let mut manifest = json!({
-            "protocol_version":2, "role":"photo",
+            "protocol_version":PHOTO_PROTOCOL_VERSION, "role":"photo",
             "bridge_url":format!("ws://{}", listener.local_addr().unwrap()),
             "session_token":"controlled-runtime", "instance_id":"11111111-1111-4111-8111-111111111111",
             "generation":1, "backend":"offscreen", "interaction":{"wrist_transform":IDENTITY},
@@ -513,6 +515,7 @@ impl PhotoRuntime {
             "shutter_unix_ms":unix_ms(), "attempt_id":1, "phase":"requesting",
             "offer_open":false, "visible":false,
             "image":{"path":"synthetic.png", "width":320, "height":180}, "preparations":[],
+            "excluded_blocks":[],
             "blocks":[
                 {"block_id":0, "bbox":[1,2,100,50], "source":"Brand", "translation":"Brand"},
                 {"block_id":1, "bbox":[30,45,290,125], "source":"Source", "translation":"Temporary photo"}
@@ -753,7 +756,7 @@ async fn quiescent_bridge_ack_waits_for_interaction_and_release_or_loss() {
     for (phase, loss) in [(0, false), (1, false), (2, false), (3, false), (2, true)] {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let manifest: PhotoManifest = serde_json::from_value(json!({
-            "protocol_version":2, "role":"photo", "bridge_url":format!("ws://{}",listener.local_addr().unwrap()),
+            "protocol_version":PHOTO_PROTOCOL_VERSION, "role":"photo", "bridge_url":format!("ws://{}",listener.local_addr().unwrap()),
             "session_token":"synthetic", "instance_id":"11111111-1111-4111-8111-111111111111",
             "generation":1, "backend":"probe", "image":{"debug_controls":true},
             "interaction":{"wrist_transform":IDENTITY,"debug_case_label":"Position B\nGrab 8 cm fixed"}
@@ -762,7 +765,8 @@ async fn quiescent_bridge_ack_waits_for_interaction_and_release_or_loss() {
             "photo_id":"synthetic", "path":"synthetic.png", "file_size":1, "shutter_unix_ms":unix_ms(),
             "expected_file_id":["1","2"],
             "attempt_id":1, "phase":"requesting", "offer_open":false, "visible":true, "image":null,
-            "preparations":[], "blocks":[], "failure_code":null, "first_block_drawn":false
+            "preparations":[], "blocks":[], "failure_code":null, "first_block_drawn":false,
+            "excluded_blocks":[],
         });
         let server = async {
             let (stream, _) = listener.accept().await.unwrap();
@@ -836,10 +840,11 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
         "expected_file_id":file_identity(&std::fs::File::open(&source).unwrap()).unwrap(),
         "shutter_unix_ms":unix_ms(),"attempt_id":0,"phase":"offer","offer_open":true,
         "visible":false,"image":null,"preparations":[],"blocks":[],"failure_code":null,"first_block_drawn":false,
+        "excluded_blocks":[],
     })).unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let manifest: PhotoManifest = serde_json::from_value(json!({
-        "protocol_version":2,"role":"photo","bridge_url":format!("ws://{}",listener.local_addr().unwrap()),
+        "protocol_version":PHOTO_PROTOCOL_VERSION,"role":"photo","bridge_url":format!("ws://{}",listener.local_addr().unwrap()),
         "session_token":"synthetic","instance_id":"11111111-1111-4111-8111-111111111111",
         "generation":1,"backend":"offscreen","image":{"max_size":[320,180],"debug_controls":true}
     })).unwrap();

@@ -57,7 +57,7 @@ export function usageDatabase() {
   return { db: { prepare, batch } as unknown as D1Database, admission, denial, writes, protocols, releases, run, prepare, batch };
 }
 
-export const relayMigrations = ['0001_usage_daily.sql', '0002_support_daily.sql', '0003_prompt_turns.sql', '0004_request_admission.sql', '0005_protocol_daily.sql'];
+export const relayMigrations = ['0001_usage_daily.sql', '0002_support_daily.sql', '0003_prompt_turns.sql', '0004_request_admission.sql', '0005_protocol_daily.sql', '0006_photo_admission.sql'];
 
 export function accountingDatabase(migrations = relayMigrations) {
   const sqlite = new DatabaseSync(':memory:');
@@ -68,6 +68,7 @@ export function accountingDatabase(migrations = relayMigrations) {
   const prepare = (sql: string) => ({ bind: (...values: Statement['values']) => ({
     sql, values,
     first: async () => sqlite.prepare(sql).get(...values) ?? null,
+    all: async () => ({ success: true, results: sqlite.prepare(sql).all(...values) }),
     run: async () => {
       sqlite.prepare(sql).run(...values);
       return { success: true, results: [] };

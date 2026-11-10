@@ -14,8 +14,8 @@ from puripuly_heart.core.lifecycle import LifecycleScope
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 from .capture import PhotoCapture
-from .image import PreparedPhoto
-from .parsing import PhotoBlockParser, PhotoParseError
+from .image import PhotoImageError, PreparedPhoto
+from .parsing import PhotoBlockParser, PhotoParseError, PhotoParseEvent
 from .protocol import (
     PhotoProviderConnection,
     PhotoProviderError,
@@ -44,7 +44,10 @@ class _Photo:
     image: PreparedPhoto | None = None
     preparations: dict[int, dict] = field(default_factory=dict)
     blocks: list[dict] = field(default_factory=list)
+    excluded: dict[int, str] = field(default_factory=dict)
+    corrected: set[int] = field(default_factory=set)
     first_block_drawn: bool = False
+    accepted_at: float | None = None
     pull: asyncio.Event = field(default_factory=asyncio.Event)
     events: deque[str] = field(default_factory=lambda: deque(maxlen=64))
     task: asyncio.Task | None = None
@@ -110,6 +113,7 @@ class PhotoLifecycle:
                 ),
                 "preparations": [dict(item) for item in photo.preparations.values()],
                 "blocks": [dict(item) for item in photo.blocks],
+                "excluded_blocks": list(photo.excluded),
                 "failure_code": photo.failure_code,
                 "first_block_drawn": photo.first_block_drawn,
             }
@@ -189,6 +193,8 @@ class PhotoLifecycle:
         if photo.phase == "offer":
             photo.attempt_id = 1
             photo.phase = "preparing"
+            photo.accepted_at = self._clock()
+            self._measure(photo, "accepted", route=photo.route.identity)
             photo.pull.set()
             self._draw_eligible.add((photo.photo_id, photo.attempt_id))
         self._changed()
@@ -217,6 +223,7 @@ class PhotoLifecycle:
             return None
         photo.first_block_drawn = True
         self._draw_eligible.discard((photo_id, attempt_id))
+        self._measure(photo, "first_display", block_id=block_id)
         self._changed()
         return {
             "type": "photo_haptic",
@@ -227,8 +234,77 @@ class PhotoLifecycle:
 
     def _measure(self, photo: _Photo, stage: str, **fields: object) -> None:
         self._diagnostic(
-            stage, {"photo_id": photo.photo_id, "attempt_id": photo.attempt_id, **fields}
+            stage,
+            {
+                "photo_id": photo.photo_id,
+                "attempt_id": photo.attempt_id,
+                **(
+                    {"request_elapsed_ms": (self._clock() - photo.accepted_at) * 1000}
+                    if photo.accepted_at is not None
+                    else {}
+                ),
+                **fields,
+            },
         )
+
+    def _exclude(self, photo: _Photo, index: int, reason: str) -> None:
+        photo.excluded[index] = reason
+        photo.preparations.pop(index, None)
+        photo.corrected.discard(index)
+        self._measure(photo, "block_excluded", block_id=index, failure_code=reason)
+        self._changed()
+
+    def _discard_unfinished(self, photo: _Photo) -> None:
+        completed = {block["block_id"] for block in photo.blocks}
+        for index in tuple(photo.preparations):
+            if index not in completed:
+                self._exclude(photo, index, "photo_incomplete_block")
+
+    def _accept_parsed(
+        self, photo: _Photo, parsed: PhotoParseEvent, google: bool, elapsed: float
+    ) -> None:
+        if parsed.index in photo.excluded:
+            return
+        if parsed.kind == "bbox_ready":
+            assert photo.image is not None
+            try:
+                mapped = photo.image.map_box(parsed.bbox, google=google)
+            except PhotoImageError as error:
+                self._exclude(photo, parsed.index, error.code)
+                return
+            photo.preparations[parsed.index] = {
+                "block_id": parsed.index,
+                "bbox": list(mapped.bbox),
+                "source": None,
+                "source_line_count": None,
+            }
+            if mapped.corrected:
+                photo.corrected.add(parsed.index)
+                self._measure(photo, "block_corrected", block_id=parsed.index)
+        else:
+            if not parsed.source.strip():
+                self._exclude(photo, parsed.index, "photo_source_empty")
+                return
+            preparation = photo.preparations[parsed.index]
+            if parsed.kind == "source_ready":
+                preparation["source"] = parsed.source
+                preparation["source_line_count"] = parsed.source_line_count
+            else:
+                if not parsed.translation.strip():
+                    self._exclude(photo, parsed.index, "photo_translation_empty")
+                    return
+                photo.blocks.append(
+                    {
+                        "block_id": parsed.index,
+                        "bbox": preparation["bbox"],
+                        "source": parsed.source,
+                        "translation": parsed.translation,
+                    }
+                )
+                if len(photo.blocks) == 1:
+                    self._measure(photo, "first_block", duration_ms=elapsed)
+        self._measure(photo, parsed.kind, duration_ms=elapsed, block_id=parsed.index)
+        self._changed()
 
     async def _connection(self, photo: _Photo, model: str | None) -> PhotoProviderConnection:
         route = await self._resolve_route()
@@ -269,7 +345,12 @@ class PhotoLifecycle:
             )
             if not self._active(photo):
                 return
-            self._measure(photo, "preparation", duration_ms=photo.image.preparation_ms)
+            self._measure(
+                photo,
+                "preparation",
+                duration_ms=photo.image.preparation_ms,
+                image_base64_bytes=len(photo.image.jpeg_base64),
+            )
             self._changed()
             target_language = self._target_language()
             for execution in range(2):
@@ -304,41 +385,7 @@ class PhotoLifecycle:
                                     self._measure(photo, "ttft", duration_ms=elapsed)
                                     first_text = False
                                 for parsed in parser.feed(event.text):
-                                    bbox = list(
-                                        photo.image.map_box(parsed.bbox, google=connection.google)
-                                    )
-                                    if parsed.kind == "bbox_ready":
-                                        photo.preparations[parsed.index] = {
-                                            "block_id": parsed.index,
-                                            "bbox": bbox,
-                                            "source": None,
-                                            "source_line_count": None,
-                                        }
-                                    elif parsed.kind == "source_ready":
-                                        photo.preparations[parsed.index] = {
-                                            "block_id": parsed.index,
-                                            "bbox": bbox,
-                                            "source": parsed.source,
-                                            "source_line_count": parsed.source_line_count,
-                                        }
-                                    else:
-                                        photo.blocks.append(
-                                            {
-                                                "block_id": parsed.index,
-                                                "bbox": bbox,
-                                                "source": parsed.source,
-                                                "translation": parsed.translation,
-                                            }
-                                        )
-                                        if len(photo.blocks) == 1:
-                                            self._measure(photo, "first_block", duration_ms=elapsed)
-                                    self._measure(
-                                        photo,
-                                        parsed.kind,
-                                        duration_ms=elapsed,
-                                        block_id=parsed.index,
-                                    )
-                                    self._changed()
+                                    self._accept_parsed(photo, parsed, connection.google, elapsed)
                             elif isinstance(event, PhotoStreamCompleted):
                                 if sent is None or completed:
                                     raise PhotoProviderError("photo_send_contract", retryable=False)
@@ -349,12 +396,33 @@ class PhotoLifecycle:
                                     "total",
                                     duration_ms=(self._clock() - sent) * 1000,
                                     model=event.model,
+                                    output_blocks=len(photo.blocks),
+                                    corrected_blocks=len(photo.corrected),
+                                    excluded_blocks=len(photo.excluded),
+                                    usage=event.usage,
                                 )
                             else:
                                 raise PhotoProviderError("photo_stream_contract", retryable=False)
                     if not completed:
                         raise PhotoProviderError("photo_incomplete")
-                    photo.phase = "completed"
+                    if photo.excluded:
+                        if not photo.blocks:
+                            raise PhotoProviderError("photo_no_usable_blocks", retryable=False)
+                        photo.phase = "partial"
+                    elif not photo.blocks:
+                        photo.phase = "no_text"
+                    elif photo.corrected:
+                        photo.phase = "completed_corrected"
+                    else:
+                        photo.phase = "completed"
+                    self._measure(
+                        photo,
+                        "result",
+                        outcome=photo.phase,
+                        output_blocks=len(photo.blocks),
+                        corrected_blocks=len(photo.corrected),
+                        excluded_blocks=len(photo.excluded),
+                    )
                     self._changed()
                     return
                 except Exception as exc:
@@ -362,15 +430,24 @@ class PhotoLifecycle:
                         exc
                         if isinstance(exc, PhotoProviderError)
                         else PhotoProviderError(
-                            "photo_parse_failed"
-                            if isinstance(exc, (PhotoParseError, ValueError))
-                            else "photo_request_failed"
+                            (
+                                "photo_parse_failed"
+                                if isinstance(exc, (PhotoParseError, ValueError))
+                                else "photo_request_failed"
+                            ),
+                            retryable=not isinstance(exc, (PhotoParseError, ValueError)),
                         )
                     )
                     self._measure(photo, "request_failed", failure_code=error.code)
                     if not self._active(photo):
                         return
-                    if not error.retryable or execution or photo.starts >= 2:
+                    if (
+                        not error.retryable
+                        or execution
+                        or photo.starts >= 2
+                        or sent is not None
+                        and not connection.google
+                    ):
                         raise error from None
                     model = (
                         "gemini-3.1-flash-lite"
@@ -388,6 +465,8 @@ class PhotoLifecycle:
                         photo.attempt_id += 1
                     photo.preparations.clear()
                     photo.blocks.clear()
+                    photo.excluded.clear()
+                    photo.corrected.clear()
                     photo.first_block_drawn = False
                     photo.phase = "preparing"
                     self._draw_eligible = {(photo.photo_id, photo.attempt_id)}
@@ -404,6 +483,7 @@ class PhotoLifecycle:
                 else:
                     photo.phase = "failed"
                     photo.failure_code = "photo_timeout"
+                    self._discard_unfinished(photo)
                     self._measure(photo, "failed", failure_code=photo.failure_code)
                 self._changed()
         except Exception as exc:
@@ -412,6 +492,7 @@ class PhotoLifecycle:
                 photo.failure_code = (
                     exc.code if isinstance(exc, PhotoProviderError) else "photo_preparation_failed"
                 )
+                self._discard_unfinished(photo)
                 self._measure(photo, "failed", failure_code=photo.failure_code)
                 self._changed()
         finally:

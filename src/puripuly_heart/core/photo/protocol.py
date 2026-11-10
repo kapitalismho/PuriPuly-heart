@@ -27,6 +27,7 @@ PHOTO_FAILURE_CODES = frozenset(
         "photo_stream_contract",
         "photo_incomplete",
         "photo_parse_failed",
+        "photo_no_usable_blocks",
         "photo_request_failed",
         "photo_preparation_failed",
     }

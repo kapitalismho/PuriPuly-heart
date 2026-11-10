@@ -19,6 +19,12 @@ class PhotoImageError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class MappedPhotoBox:
+    bbox: tuple[float, float, float, float]
+    corrected: bool
+
+
+@dataclass(frozen=True, slots=True)
 class PreparedPhoto:
     jpeg_base64: str
     source_path: Path
@@ -29,34 +35,50 @@ class PreparedPhoto:
     offset_y: int
     preparation_ms: float
 
-    def map_box(
-        self, box: tuple[int, int, int, int], *, google: bool
-    ) -> tuple[float, float, float, float]:
+    def map_box(self, box: tuple[int, int, int, int], *, google: bool) -> MappedPhotoBox:
         if len(box) != 4 or any(type(value) is not int for value in box):
             raise PhotoImageError("photo_box_invalid")
         if google:
             y0, x0, y1, x1 = box
-            if not (0 <= x0 < x1 <= 1000 and 0 <= y0 < y1 <= 1000):
-                raise PhotoImageError("photo_box_invalid")
-            left, top, right, bottom = (
-                x0 * _SEND_WIDTH / 1000,
-                y0 * _SEND_HEIGHT / 1000,
-                x1 * _SEND_WIDTH / 1000,
-                y1 * _SEND_HEIGHT / 1000,
-            )
+            try:
+                left, top, right, bottom = (
+                    x0 * _SEND_WIDTH / 1000,
+                    y0 * _SEND_HEIGHT / 1000,
+                    x1 * _SEND_WIDTH / 1000,
+                    y1 * _SEND_HEIGHT / 1000,
+                )
+            except OverflowError:
+                raise PhotoImageError("photo_box_invalid") from None
         else:
             left, top, right, bottom = box
-            if not (0 <= left < right <= _SEND_WIDTH and 0 <= top < bottom <= _SEND_HEIGHT):
-                raise PhotoImageError("photo_box_invalid")
-        mapped = (
-            max(0.0, (left - self.offset_x) / self.scale),
-            max(0.0, (top - self.offset_y) / self.scale),
-            min(float(self.source_width), (right - self.offset_x) / self.scale),
-            min(float(self.source_height), (bottom - self.offset_y) / self.scale),
+        if left >= right or top >= bottom:
+            raise PhotoImageError("photo_box_invalid")
+        clipped = (
+            max(left, self.offset_x),
+            max(top, self.offset_y),
+            min(right, _SEND_WIDTH, self.offset_x + self.source_width * self.scale),
+            min(bottom, _SEND_HEIGHT, self.offset_y + self.source_height * self.scale),
         )
-        if mapped[0] >= mapped[2] or mapped[1] >= mapped[3]:
+        if clipped[0] >= clipped[2] or clipped[1] >= clipped[3]:
             raise PhotoImageError("photo_box_outside_image")
-        return mapped
+        clip_distance = max(
+            clipped[0] - left, clipped[1] - top, right - clipped[2], bottom - clipped[3]
+        )
+        if clip_distance > 2:
+            raise PhotoImageError("photo_box_clipping_excessive")
+        area = (right - left) * (bottom - top)
+        retained = (clipped[2] - clipped[0]) * (clipped[3] - clipped[1])
+        if retained < area * 0.95:
+            raise PhotoImageError("photo_box_clipping_excessive")
+        return MappedPhotoBox(
+            (
+                max(0.0, (clipped[0] - self.offset_x) / self.scale),
+                max(0.0, (clipped[1] - self.offset_y) / self.scale),
+                min(float(self.source_width), (clipped[2] - self.offset_x) / self.scale),
+                min(float(self.source_height), (clipped[3] - self.offset_y) / self.scale),
+            ),
+            corrected=clipped != (left, top, right, bottom),
+        )
 
 
 def _prepared_path(result: Mapping[str, object], key: str, directory: Path) -> Path:

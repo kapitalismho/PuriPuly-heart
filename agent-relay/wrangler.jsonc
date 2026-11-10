@@ -16,6 +16,7 @@
   },
   "vars": {
     "AGENT_SERVICE_ENABLED": "false",
+    "PHOTO_SERVICE_ENABLED": "false",
     "SUPPORT_REPORTS_ENABLED": "false"
   },
   "d1_databases": [

@@ -3,7 +3,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use thiserror::Error;
 
-pub const PHOTO_PROTOCOL_VERSION: u32 = 2;
+pub const PHOTO_PROTOCOL_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

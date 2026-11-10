@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from puripuly_heart.core.photo.image import PhotoImageError, load_prepared_photo
+from puripuly_heart.core.photo.image import PhotoImageError, PreparedPhoto, load_prepared_photo
 
 _FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -54,10 +54,13 @@ async def test_source_and_google_boxes_map_to_original_float_coordinates(tmp_pat
         (900 - prepared.offset_x) / prepared.scale,
         600 / prepared.scale,
     )
-    assert prepared.map_box((300, 100, 900, 600), google=False) == pytest.approx(expected)
-    assert prepared.map_box((0, 0, 1000, 1000), google=True) == pytest.approx((0, 0, 1001, 777))
-    assert prepared.map_box((0, 0, 1280, 720), google=False) == pytest.approx((0, 0, 1001, 777))
-    google = prepared.map_box((100, 200, 800, 700), google=True)
+    mapped = prepared.map_box((300, 100, 900, 600), google=False)
+    assert mapped.bbox == pytest.approx(expected)
+    assert not mapped.corrected
+    for box, google in [((0, 0, 1000, 1000), True), ((0, 0, 1280, 720), False)]:
+        with pytest.raises(PhotoImageError, match="photo_box_clipping_excessive"):
+            prepared.map_box(box, google=google)
+    google = prepared.map_box((100, 200, 800, 700), google=True).bbox
     assert google == pytest.approx(
         (
             (256 - prepared.offset_x) / prepared.scale,
@@ -68,11 +71,55 @@ async def test_source_and_google_boxes_map_to_original_float_coordinates(tmp_pat
     )
     with pytest.raises(PhotoImageError, match="photo_box_outside_image"):
         prepared.map_box((0, 0, prepared.offset_x - 1, 100), google=False)
-    for box in [(10, 0, 9, 100), (0, 0, 1281, 720), (False, 0, 500, 300)]:
+    for box in [(10, 0, 9, 100), (False, 0, 500, 300)]:
         with pytest.raises(PhotoImageError, match="photo_box_invalid"):
             prepared.map_box(box, google=False)
-    with pytest.raises(PhotoImageError, match="photo_box_invalid"):
+    with pytest.raises(PhotoImageError, match="photo_box_clipping_excessive"):
         prepared.map_box((0, 0, 1001, 1000), google=True)
+
+
+@pytest.mark.parametrize(
+    "box, google, expected",
+    [
+        ((-2, 100, 100, 200), False, (0, 100, 100, 200)),
+        ((0, 701, 100, 721), False, (0, 701, 100, 720)),
+        ((100, -1, 200, 100), True, (0, 72, 128, 144)),
+        ((-2, 100, 100, 200), True, (128, 0, 256, 72)),
+    ],
+)
+def test_bounded_clipping_preserves_usable_area(box, google, expected):
+    prepared = PreparedPhoto("", Path("source.png"), 1280, 720, 1, 0, 0, 0)
+    mapped = prepared.map_box(box, google=google)
+    assert mapped.bbox == pytest.approx(expected)
+    assert mapped.corrected
+
+
+@pytest.mark.parametrize(
+    "box, google, reason",
+    [
+        ((-3, 100, 100, 200), False, "photo_box_clipping_excessive"),
+        ((0, 702, 100, 721), False, "photo_box_clipping_excessive"),
+        ((51, 717, 271, 726), False, "photo_box_clipping_excessive"),
+        ((51, 722, 271, 730), False, "photo_box_outside_image"),
+        ((100, -2, 200, 100), True, "photo_box_clipping_excessive"),
+        ((0, 0, 10**400, 1000), True, "photo_box_invalid"),
+    ],
+)
+def test_unusable_boxes_are_not_relocated_or_squeezed_into_the_image(box, google, reason):
+    prepared = PreparedPhoto("", Path("source.png"), 1280, 720, 1, 0, 0, 0)
+    with pytest.raises(PhotoImageError, match=reason):
+        prepared.map_box(box, google=google)
+
+
+def test_clipping_policy_uses_source_content_inside_letterboxing():
+    prepared = PreparedPhoto("", Path("portrait.png"), 360, 720, 1, 460, 0, 0)
+    mapped = prepared.map_box((458, 100, 558, 200), google=False)
+    assert mapped.bbox == (0, 100, 98, 200)
+    assert mapped.corrected
+    with pytest.raises(PhotoImageError, match="photo_box_clipping_excessive"):
+        prepared.map_box((457, 100, 558, 200), google=False)
+    with pytest.raises(PhotoImageError, match="photo_box_outside_image"):
+        prepared.map_box((0, 100, 450, 200), google=False)
 
 
 @pytest.mark.parametrize("key", ["source_path", "jpeg_path"])

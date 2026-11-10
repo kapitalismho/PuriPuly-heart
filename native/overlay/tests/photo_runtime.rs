@@ -41,6 +41,7 @@ fn photo() -> Photo {
         image: None,
         preparations: Vec::new(),
         blocks: Vec::new(),
+        excluded_blocks: Vec::new(),
         failure_code: None,
         first_block_drawn: false,
     }
@@ -377,7 +378,7 @@ async fn actual_photo_process_authenticates_accumulates_pulls_replays_and_exits(
         let auth = receive(&mut socket).await;
         assert_eq!(
             auth,
-            json!({"type":"photo_auth","protocol_version":2,"role":"photo","session_token":config.session_token,"instance_id":config.instance_id,"generation":config.generation})
+            json!({"type":"photo_auth","protocol_version":config.protocol_version,"role":"photo","session_token":config.session_token,"instance_id":config.instance_id,"generation":config.generation})
         );
         let initial = if run == 0 { photo() } else { retained.clone() };
         send(
@@ -1077,9 +1078,9 @@ async fn actual_photo_process_rejects_unauthorized_or_invalid_quiesce() {
 }
 
 #[test]
-fn photo_protocol_two_requires_an_immutable_capture_identity() {
+fn photo_protocol_requires_current_schema_and_immutable_capture_identity() {
     let mut old_manifest = manifest();
-    old_manifest.protocol_version = 1;
+    old_manifest.protocol_version = 2;
     assert_eq!(old_manifest.validate(), Err(PhotoError::Manifest));
     let mut document = serde_json::to_value(photo()).unwrap();
     document.as_object_mut().unwrap().remove("expected_file_id");
@@ -1133,7 +1134,7 @@ async fn actual_offscreen_preview_handoff(prepare_private: bool) {
         }
         log
     });
-    assert_eq!(receive(&mut socket).await["protocol_version"], 2);
+    receive(&mut socket).await;
     std::fs::create_dir_all(&exports).unwrap();
     let source = exports.join("capture.png");
     let mut pixels = image::RgbImage::new(320, 180);
@@ -1307,4 +1308,64 @@ async fn local_original_survives_offer_preparing_and_matching_raw_image_only() {
     state.apply(5, None).unwrap();
     boundary.publish(state.snapshot().unwrap());
     assert!(worker.decoded_original(&completed).is_none());
+}
+
+#[tokio::test]
+async fn excluded_preparations_cannot_resurrect_or_publish_late_results() {
+    let (mut boundary, mut worker) = PhotoImageBoundary::channel();
+    let mut state = PhotoState::default();
+    let mut current = requested();
+    for id in [0, 1] {
+        current.preparations.push(PhotoPreparation {
+            block_id: id,
+            bbox: block(id).bbox,
+            source: Some("A\nB".into()),
+            source_line_count: Some(2),
+        });
+    }
+    state.apply(1, Some(current.clone())).unwrap();
+    boundary.publish(state.snapshot().unwrap());
+    let old_input = worker.next_input().await.unwrap();
+    current.preparations.remove(0);
+    assert_eq!(state.apply(2, Some(current.clone())), Err(PhotoError::Protocol));
+    current.excluded_blocks.push(0);
+    current.blocks.push(block(1));
+    current.phase = PhotoPhase::Partial;
+    state.apply(2, Some(current.clone())).unwrap();
+    assert!(state.photo().unwrap().can_pull());
+    boundary.publish(state.snapshot().unwrap());
+    let late = PhotoImageResult {
+        input: old_input,
+        output: PhotoImageOutput::Prepared {
+            block_id: 0,
+            stage: PreparationStage::Source,
+            elapsed_ms: 1.0,
+        },
+    };
+    assert!(!boundary.accept(&late, state.snapshot().unwrap()));
+    let mut resurrected = current.clone();
+    resurrected.excluded_blocks.clear();
+    resurrected.blocks.push(block(0));
+    assert_eq!(state.apply(3, Some(resurrected)), Err(PhotoError::Protocol));
+    let mut discarded_completed = current.clone();
+    discarded_completed.excluded_blocks.push(1);
+    assert_eq!(state.apply(3, Some(discarded_completed)), Err(PhotoError::Protocol));
+    current.attempt_id += 1;
+    current.excluded_blocks.clear();
+    current.preparations.clear();
+    current.blocks = vec![block(0)];
+    current.phase = PhotoPhase::CompletedCorrected;
+    state.apply(3, Some(current)).unwrap();
+    assert!(state.photo().unwrap().can_pull());
+    assert_eq!(state.photo().unwrap().blocks[0].block_id, 0);
+}
+
+#[test]
+fn no_text_photo_remains_reopenable_without_a_translation_layer() {
+    let mut state = PhotoState::default();
+    let mut current = requested();
+    current.phase = PhotoPhase::NoText;
+    state.apply(1, Some(current)).unwrap();
+    assert!(state.photo().unwrap().can_pull());
+    assert!(state.photo().unwrap().blocks.is_empty());
 }

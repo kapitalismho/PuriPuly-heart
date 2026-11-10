@@ -65,6 +65,7 @@ pub async fn run(path: &Path) -> Result<(), PhotoError> {
             }),
             preparations: Vec::new(),
             blocks: Vec::new(),
+            excluded_blocks: Vec::new(),
             failure_code: None,
             first_block_drawn: false,
         };

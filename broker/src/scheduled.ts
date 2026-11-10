@@ -194,6 +194,7 @@ export async function reconcileStaleManagedKeyDeliveries(
       continue;
     }
     if (delivery.operation_id && delivery.attempt_index) continue;
+    if (delivery.issue_source === 'photo') continue;
     const claimed = await claimStaleManagedKeyDeliveryCleanup(env.BROKER_DB, {
       delivery,
       claimedAt: nowIso,

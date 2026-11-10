@@ -213,6 +213,9 @@ impl PhotoImageBoundary {
         {
             self.prepared.clear();
         }
+        if let Some(photo) = &snapshot.photo {
+            self.prepared.retain(|(id, _)| !photo.excluded_blocks.contains(id));
+        }
         self.input.send_replace(Some(Arc::new(snapshot.clone())));
     }
 

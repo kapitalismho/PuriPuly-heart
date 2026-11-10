@@ -7,7 +7,8 @@ fn photo(attempt: u64) -> Photo {
         "expected_file_id":["1","2"],
         "attempt_id":attempt, "phase":if attempt == 0 {"offer"} else {"requesting"},
         "offer_open":attempt == 0, "visible":attempt > 0, "image":null,
-        "preparations":[], "blocks":[], "failure_code":null, "first_block_drawn":false
+        "preparations":[], "blocks":[], "failure_code":null, "first_block_drawn":false,
+        "excluded_blocks":[],
     }))
     .unwrap()
 }

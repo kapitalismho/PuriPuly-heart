@@ -12,7 +12,8 @@ fn input(
         "expected_file_id":["1","2"],
         "attempt_id":attempt,"phase":"requesting","offer_open":false,"visible":false,
         "image":{"path":"retained-only.png","width":128,"height":72},"blocks":blocks,"preparations":preparations,
-        "failure_code":null,"first_block_drawn":false
+        "failure_code":null,"first_block_drawn":false,
+        "excluded_blocks":[],
     })).unwrap()))}
 }
 
@@ -368,4 +369,44 @@ fn hidden_erase_refresh_reuses_mask_and_only_current_successful_text_commits() {
         .unwrap();
     assert!(completed);
     assert!(pipeline.commit_revision >= 2);
+}
+
+#[test]
+fn quarantined_pending_erase_is_discarded_without_modifying_the_original() {
+    let pixels = Arc::new(image::RgbImage::new(128, 72));
+    let mut pipeline = ImagePipeline::new(PhotoImageConfig {
+        max_size: [128, 72],
+        ..Default::default()
+    });
+    pipeline.process(
+        &input(1, 1, json!([]), json!([])),
+        Some(pixels.clone()),
+        || true,
+        |_| true,
+    ).unwrap();
+    pipeline.candidates.insert(0);
+    pipeline.prepared.insert(0, PendingRegion {
+        region: prepared_patch(),
+        context_revision: 0,
+    });
+    let mut next = input(2, 1, json!([kept(1)]), json!([]));
+    Arc::get_mut(next.photo.as_mut().unwrap()).unwrap().excluded_blocks = vec![0];
+    let mut completed = Vec::new();
+    pipeline.process(
+        &next,
+        Some(pixels.clone()),
+        || true,
+        |output| {
+            if let PhotoImageOutput::Block { block_id, region, .. } = output {
+                assert!(region.is_none());
+                completed.push(block_id);
+            }
+            true
+        },
+    ).unwrap();
+    assert_eq!(completed, vec![1]);
+    assert!(pipeline.prepared.is_empty());
+    assert!(!pipeline.candidates.contains(&0));
+    assert!(pipeline.erase_source.is_none());
+    assert_eq!(pipeline.working.as_ref().unwrap().pixels.as_ref(), pixels.as_ref());
 }

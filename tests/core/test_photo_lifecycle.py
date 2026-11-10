@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from pathlib import Path
 
@@ -154,10 +155,13 @@ async def test_offer_preopens_without_preparation_or_send_then_reopen_reuses_res
 
 
 async def test_capture_identity_is_immutable_through_prepare_reopen_and_replacement(tmp_path):
-    h = Harness(tmp_path, [
-        [block(), PhotoStreamCompleted({}, "gpt-6-luna")],
-        [block(), PhotoStreamCompleted({}, "gpt-6-luna")],
-    ])
+    h = Harness(
+        tmp_path,
+        [
+            [block(), PhotoStreamCompleted({}, "gpt-6-luna")],
+            [block(), PhotoStreamCompleted({}, "gpt-6-luna")],
+        ],
+    )
     first = PhotoCapture(tmp_path / "first.png", 17, (9, 2**100), 1234, 0)
     second = PhotoCapture(tmp_path / "second.png", 23, (10, 2**101), 1235, 0)
     try:
@@ -251,7 +255,8 @@ async def test_google_quota_fallback_consumes_second_send_and_does_not_retry_aga
         assert h.photo["expected_file_id"] == ["1", "2"]
         assert all(
             snapshot["photo"]["expected_file_id"] == ["1", "2"]
-            for snapshot in h.snapshots if snapshot["photo"] is not None
+            for snapshot in h.snapshots
+            if snapshot["photo"] is not None
         )
         assert h.prepares[0][3] == (1, 2)
     finally:
@@ -480,6 +485,19 @@ async def test_every_block_accumulates_and_stage_timing_starts_at_send_not_pull(
             )
             == 4000
         )
+        assert not any(stage == "first_display" for stage, _ in h.measurements)
+        h.time = 14
+        assert h.owner.first_block_drawn(photo_id, 1, 0, 0) is not None
+        display = [fields for stage, fields in h.measurements if stage == "first_display"]
+        assert display[0]["request_elapsed_ms"] == 6000
+        assert h.owner.first_block_drawn(photo_id, 1, 0, 0) is None
+        assert len([stage for stage, _ in h.measurements if stage == "first_display"]) == 1
+        assert (
+            next(
+                fields["request_elapsed_ms"] for stage, fields in h.measurements if stage == "total"
+            )
+            == 4000
+        )
     finally:
         await h.owner.close()
 
@@ -505,14 +523,12 @@ async def test_preopen_failure_is_bounded_without_spending_send_budget(tmp_path)
         await h.owner.close()
 
 
-async def test_new_attempt_can_grant_first_draw_again_but_old_attempt_cannot(tmp_path):
+async def test_interrupted_luna_keeps_attempt_without_blind_paid_replay(tmp_path):
     fail = asyncio.Event()
-    retry = asyncio.Event()
     h = Harness(
         tmp_path,
         [
             [block(), fail, PhotoProviderError("photo_transport_failed")],
-            [retry, block(), PhotoStreamCompleted({}, "gpt-6-luna")],
         ],
     )
     try:
@@ -522,12 +538,135 @@ async def test_new_attempt_can_grant_first_draw_again_but_old_attempt_cannot(tmp
         await eventually(lambda: bool(h.photo["blocks"]))
         assert h.owner.first_block_drawn(photo_id, 1, 0, 1) is not None
         fail.set()
-        await eventually(lambda: h.photo["attempt_id"] == 2)
-        assert not h.photo["first_block_drawn"]
+        await eventually(lambda: h.photo["phase"] == "failed")
+        assert h.photo["attempt_id"] == 1
+        assert h.owner.request_starts == 1
+        assert h.photo["first_block_drawn"]
         assert h.owner.first_block_drawn(photo_id, 1, 0, 1) is None
-        retry.set()
-        await eventually(lambda: h.photo["phase"] == "completed")
-        assert h.owner.first_block_drawn(photo_id, 2, 0, 1) is not None
-        assert h.owner.first_block_drawn(photo_id, 2, 0, 1) is None
+        assert h.photo["failure_code"] == "photo_transport_failed"
+    finally:
+        await h.owner.close()
+
+
+async def test_geometry_quarantine_preserves_later_blocks_and_removes_empty_preparation(tmp_path):
+    translation = asyncio.Event()
+    h = Harness(
+        tmp_path,
+        [
+            [
+                PhotoTextDelta(
+                    '{"blocks":[{"bbox":[51,722,271,730],"source":"outside","translation":"외부"},'
+                    '{"bbox":[-1,100,100,200],"source":"edge","translation":"가장자리"},'
+                    '{"bbox":[100,100,200,200],"source":"empty",'
+                ),
+                translation,
+                PhotoTextDelta(
+                    '"translation":"  "},{"bbox":[200,100,300,200],"source":"last","translation":"마지막"}]}'
+                ),
+                PhotoStreamCompleted({}, "gpt-6-luna"),
+            ]
+        ],
+    )
+    try:
+        photo_id = await h.offer()
+        h.owner.pull(photo_id, "pull")
+        await eventually(
+            lambda: any(
+                p["block_id"] == 2 and p["source"] == "empty" for p in h.photo["preparations"]
+            )
+        )
+        assert h.photo["excluded_blocks"] == [0]
+        assert [b["block_id"] for b in h.photo["blocks"]] == [1]
+        assert h.photo["blocks"][0]["bbox"] == [0, 150, 150, 300]
+        assert all(
+            p["block_id"] != 0
+            for snapshot in h.snapshots
+            if snapshot["photo"]
+            for p in snapshot["photo"]["preparations"]
+        )
+        translation.set()
+        await eventually(lambda: h.photo["phase"] == "partial")
+        assert h.photo["excluded_blocks"] == [0, 2]
+        assert [b["block_id"] for b in h.photo["blocks"]] == [1, 3]
+        assert [p["block_id"] for p in h.photo["preparations"]] == [1, 3]
+        assert h.owner.request_starts == 1
+        assert h.owner.first_block_drawn(photo_id, 1, 0, 0) is None
+        assert h.owner.first_block_drawn(photo_id, 1, 1, 0) is not None
+        h.owner.hidden(photo_id)
+        assert h.owner.pull(photo_id, "reopen")
+        assert h.owner.request_starts == 1
+        result = next(fields for stage, fields in h.measurements if stage == "result")
+        assert (result["output_blocks"], result["corrected_blocks"], result["excluded_blocks"]) == (
+            2,
+            1,
+            2,
+        )
+    finally:
+        translation.set()
+        await h.owner.close()
+
+
+@pytest.mark.parametrize("google", [False, True])
+@pytest.mark.parametrize(
+    "boxes, source, translation, phase, failure",
+    [
+        ([], "source", "translated", "no_text", None),
+        ([[-1, 100, 100, 200]], "source", "translated", "completed_corrected", None),
+        ([[100, 100, 100, 200]], "source", "translated", "failed", "photo_no_usable_blocks"),
+        ([[100, 100, 200, 200]], "  ", "translated", "failed", "photo_no_usable_blocks"),
+        ([[100, 100, 200, 200]], "source", "  ", "failed", "photo_no_usable_blocks"),
+    ],
+)
+async def test_photo_result_distinguishes_correction_empty_and_rejected_output(
+    tmp_path, google, boxes, source, translation, phase, failure
+):
+    document = {
+        "blocks": [
+            {"box_2d" if google else "bbox": box, "source": source, "translation": translation}
+            for box in boxes
+        ]
+    }
+    h = Harness(
+        tmp_path,
+        [[PhotoTextDelta(json.dumps(document)), PhotoStreamCompleted({}, "model")]],
+        google=google,
+    )
+    try:
+        photo_id = await h.offer()
+        h.owner.pull(photo_id, "pull")
+        await eventually(lambda: h.photo["phase"] == phase)
+        assert h.photo["failure_code"] == failure
+        assert h.owner.request_starts == 1
+        assert len(h.connections) == 1
+        assert h.photo["excluded_blocks"] == ([0] if failure else [])
+        if failure:
+            assert h.photo["preparations"] == []
+            assert h.photo["blocks"] == []
+    finally:
+        await h.owner.close()
+
+
+@pytest.mark.parametrize("google", [False, True])
+async def test_truncated_structure_keeps_accepted_blocks_without_retry_or_pending_erase(
+    tmp_path, google
+):
+    field = "box_2d" if google else "bbox"
+    text = (
+        '{"blocks":[{"' + field + '":[0,0,100,100],"source":"one","translation":"하나"},'
+        '{"' + field + '":[100,100,200,200],"source":"unfinished"'
+    )
+    h = Harness(
+        tmp_path, [[PhotoTextDelta(text), PhotoStreamCompleted({}, "model")]], google=google
+    )
+    try:
+        photo_id = await h.offer()
+        h.owner.pull(photo_id, "pull")
+        await eventually(lambda: h.photo["phase"] == "failed")
+        assert h.photo["failure_code"] == "photo_parse_failed"
+        assert [b["block_id"] for b in h.photo["blocks"]] == [0]
+        assert [p["block_id"] for p in h.photo["preparations"]] == [0]
+        assert h.photo["excluded_blocks"] == [1]
+        assert h.owner.request_starts == 1
+        assert len(h.connections) == 1
     finally:
         await h.owner.close()

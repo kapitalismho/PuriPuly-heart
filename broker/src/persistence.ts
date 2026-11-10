@@ -420,7 +420,7 @@ export interface QqManagedEntitlementRecord {
 
 export interface ManagedKeyDeliveryRecord {
   delivery_id: string;
-  issue_source: BrokerIssueSuccessSource;
+  issue_source: BrokerIssueSuccessSource | 'photo';
   subject_ref: string | null;
   installation_id: string | null;
   managed_credential_ref: string;

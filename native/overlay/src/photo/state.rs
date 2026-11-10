@@ -11,6 +11,9 @@ pub enum PhotoPhase {
     Preparing,
     Requesting,
     Completed,
+    CompletedCorrected,
+    Partial,
+    NoText,
     Failed,
     Expired,
 }
@@ -56,6 +59,7 @@ pub struct Photo {
     pub image: Option<PhotoImage>,
     pub preparations: Vec<PhotoPreparation>,
     pub blocks: Vec<PhotoBlock>,
+    pub excluded_blocks: Vec<u64>,
     pub failure_code: Option<String>,
     pub first_block_drawn: bool,
 }
@@ -67,6 +71,7 @@ impl Photo {
                 && matches!(
                     self.phase,
                     PhotoPhase::Preparing | PhotoPhase::Requesting | PhotoPhase::Completed
+                        | PhotoPhase::CompletedCorrected | PhotoPhase::Partial | PhotoPhase::NoText
                 ))
     }
 
@@ -82,10 +87,12 @@ impl Photo {
                     && part.parse::<u128>().is_ok()
             })
             || self.preparations.len() > 4096
+            || self.excluded_blocks.len() > 4096
             || (self.attempt_id == 0
                 && (self.image.is_some()
                     || !self.blocks.is_empty()
                     || !self.preparations.is_empty()
+                    || !self.excluded_blocks.is_empty()
                     || self.first_block_drawn))
             || (self.phase == PhotoPhase::Expired && (self.offer_open || self.visible))
         {
@@ -99,6 +106,11 @@ impl Photo {
             return Err(PhotoError::Protocol);
         }
         let mut ids = HashSet::new();
+        for id in &self.excluded_blocks {
+            if !ids.insert(*id) {
+                return Err(PhotoError::Protocol);
+            }
+        }
         for preparation in &self.preparations {
             validate_bbox(&preparation.bbox, self.image.as_ref())?;
             if !ids.insert(preparation.block_id)
@@ -112,6 +124,7 @@ impl Photo {
             }
         }
         ids.clear();
+        ids.extend(self.excluded_blocks.iter().copied());
         for block in &self.blocks {
             validate_bbox(&block.bbox, self.image.as_ref())?;
             if !ids.insert(block.block_id) {
@@ -232,6 +245,7 @@ fn validate_cumulative(current: &Photo, next: &Photo) -> Result<(), PhotoError> 
     if !next.blocks.starts_with(&current.blocks)
         || (current.first_block_drawn && !next.first_block_drawn)
         || (current.image.is_some() && current.image != next.image)
+        || current.excluded_blocks.iter().any(|id| !next.excluded_blocks.contains(id))
         || (matches!(current.phase, PhotoPhase::Expired) && next.phase != PhotoPhase::Expired)
     {
         return Err(PhotoError::Protocol);
@@ -242,6 +256,9 @@ fn validate_cumulative(current: &Photo, next: &Photo) -> Result<(), PhotoError> 
             .iter()
             .find(|new| new.block_id == old.block_id)
         else {
+            if next.excluded_blocks.contains(&old.block_id) {
+                continue;
+            }
             return Err(PhotoError::Protocol);
         };
         if old.bbox != new.bbox

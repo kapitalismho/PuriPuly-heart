@@ -31,7 +31,6 @@ async def test_wrong_identity_unknown_control_and_old_generation_are_rejected():
     bridge = PhotoBridge(control=lambda value, generation: controls.append((value, generation)))
     await bridge.start()
     first = await bridge.activate(1, backend="probe")
-    assert first["protocol_version"] == 2
     try:
         for mutation in (
             {"session_token": "wrong"},
@@ -39,6 +38,7 @@ async def test_wrong_identity_unknown_control_and_old_generation_are_rejected():
             {"generation": 2},
             {"protocol_version": True},
             {"protocol_version": 1},
+            {"protocol_version": 2},
         ):
             async with connect(first["bridge_url"]) as connection:
                 await connection.send(json.dumps(auth(first) | mutation))
@@ -83,9 +83,7 @@ async def test_full_snapshot_coalescing_retains_every_independent_block_and_gate
             assert not bridge.send(
                 {"type": "photo_probe_pull", "photo_id": "one", "event_id": "probe"}
             )
-            assert not bridge.send(
-                {"type": "photo_debug_preview_source", "photo_id": "one"}
-            )
+            assert not bridge.send({"type": "photo_debug_preview_source", "photo_id": "one"})
             blocks = []
             for revision in range(1, 41):
                 blocks.append({"block_id": revision - 1})
@@ -365,7 +363,9 @@ async def test_calibration_rejects_invalid_reference_or_nonrigid_pose(invalid):
         async with connect(manifest["bridge_url"]) as connection:
             await connection.send(json.dumps(auth(manifest)))
             await receive(connection, "photo_snapshot")
-            await connection.send(json.dumps({"type": "photo_debug_wrist_calibrated", "calibration": value}))
+            await connection.send(
+                json.dumps({"type": "photo_debug_wrist_calibrated", "calibration": value})
+            )
             with pytest.raises(ConnectionClosed):
                 await connection.recv()
         assert controls == []

@@ -133,13 +133,6 @@ def test_google_preserves_provider_yx_coordinates_without_mapping() -> None:
     assert parser.finish() == [PhotoBlock((0, 50, 1000, 900), "One", "하나")]
 
 
-def test_luna_validates_against_actual_input_dimensions() -> None:
-    parser = PhotoBlockParser(width=1920, height=1080)
-    block = {"bbox": [0, 0, 1920, 1080], "source": "One", "translation": "하나"}
-    assert parser.feed(_response(block))[0] == BboxReady(0, (0, 0, 1920, 1080))
-    assert parser.finish()[0].bbox == (0, 0, 1920, 1080)
-
-
 @pytest.mark.parametrize("google", [False, True])
 @pytest.mark.parametrize(
     "coordinates",
@@ -153,16 +146,11 @@ def test_luna_validates_against_actual_input_dimensions() -> None:
         [0, 0, float("inf"), 1],
         [0, 0, "1", 1],
         [0, 0, None, 1],
-        [-1, 0, 1, 1],
-        [1, 0, 1, 1],
-        [2, 0, 1, 1],
-        [0, 1, 1, 1],
-        [0, 2, 1, 1],
-        [0, 0, 1281, 720],
-        [0, 0, 100, 1001],
     ],
 )
-def test_invalid_geometry_never_emits_a_bbox_stage(google: bool, coordinates: object) -> None:
+def test_invalid_coordinate_structure_never_emits_a_bbox_stage(
+    google: bool, coordinates: object
+) -> None:
     parser = PhotoBlockParser(google=google)
     block = _block(google=google)
     block["box_2d" if google else "bbox"] = coordinates
@@ -228,7 +216,7 @@ def test_wrong_provider_coordinate_field_is_rejected(google: bool) -> None:
 
 def test_valid_blocks_are_delivered_even_when_same_delta_later_becomes_invalid() -> None:
     parser = PhotoBlockParser()
-    text = _response(_block())[:-2] + ',{"bbox":[0,0,0,1]}]}'
+    text = _response(_block())[:-2] + ',{"bbox":[0,0,false,1]}]}'
     events = parser.feed(text)
     assert len(events) == 3
     assert isinstance(events[-1], BlockComplete)
@@ -335,5 +323,3 @@ def test_google_adapter_requests_provider_coordinate_field_in_strict_schema() ->
 def test_invalid_image_dimensions_are_explicitly_rejected(width: object, height: object) -> None:
     with pytest.raises(ValueError):
         render_photo_prompt("ko", width, height)
-    with pytest.raises(ValueError):
-        PhotoBlockParser(width=width, height=height)

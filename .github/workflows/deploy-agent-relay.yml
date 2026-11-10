@@ -36,13 +36,15 @@ jobs:
       REVIEWED_COMMIT: ${{ inputs.reviewed_commit }}
       CONFIRM_PRODUCTION_DEPLOY: ${{ inputs.confirm_production_deploy }}
       AGENT_SERVICE_ENABLED: ${{ vars.AGENT_SERVICE_ENABLED }}
+      PHOTO_SERVICE_ENABLED: ${{ vars.PHOTO_SERVICE_ENABLED }}
+      PHOTO_POLICY: ${{ vars.PHOTO_POLICY }}
       SUPPORT_REPORTS_ENABLED: ${{ vars.SUPPORT_REPORTS_ENABLED }}
       APPLY_MIGRATIONS: ${{ inputs.apply_migrations }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: ${{ secrets.AGENT_USAGE_D1_DATABASE_ID_PRODUCTION }}
       BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
-      RELAY_SCHEMA_QUERY: SELECT 'migration' AS kind, name, '' AS table_name FROM d1_migrations UNION ALL SELECT 'column', p.name, s.name FROM sqlite_schema AS s JOIN pragma_table_info(s.name) AS p WHERE s.type = 'table' AND s.name IN ('usage_daily', 'support_daily', 'prompt_turns', 'request_slots', 'protocol_daily');
+      RELAY_SCHEMA_QUERY: SELECT 'migration' AS kind, name, '' AS table_name FROM d1_migrations UNION ALL SELECT 'column', p.name, s.name FROM sqlite_schema AS s JOIN pragma_table_info(s.name) AS p WHERE s.type = 'table' AND s.name IN ('usage_daily', 'support_daily', 'prompt_turns', 'request_slots', 'protocol_daily', 'photo_admissions');
       WRANGLER_SEND_METRICS: 'false'
       CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false'
     steps:

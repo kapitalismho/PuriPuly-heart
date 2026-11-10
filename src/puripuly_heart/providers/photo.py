@@ -6,8 +6,10 @@ import json
 import logging
 import time
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
+from urllib.parse import urlsplit
+from uuid import uuid4
 
 import httpx
 from websockets.exceptions import ConnectionClosed, InvalidStatus
@@ -128,6 +130,37 @@ async def _settle(task: asyncio.Task[Any]) -> None:
         task.result()
 
 
+def _luna_payload(image: PreparedPhoto, target_language: str) -> dict:
+    prompt = render_photo_prompt(target_language)
+    return {
+        "model": "gpt-6-luna",
+        "store": False,
+        "reasoning": {"effort": "none"},
+        "instructions": prompt.instructions,
+        "input": [
+            {
+                "type": "message",
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_image",
+                        "image_url": f"data:image/jpeg;base64,{image.jpeg_base64}",
+                    },
+                    {"type": "input_text", "text": prompt.user_message},
+                ],
+            }
+        ],
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "blocks",
+                "schema": prompt.schema,
+                "strict": True,
+            }
+        },
+    }
+
+
 class _PhotoConnection(ABC):
     google: bool
     model: str
@@ -163,8 +196,9 @@ class _PhotoConnection(ABC):
 
         async def produce() -> None:
             try:
-                async for event in self._exchange(image, target_language):
-                    await queue.put(event)
+                async with contextlib.aclosing(self._exchange(image, target_language)) as exchange:
+                    async for event in exchange:
+                        await queue.put(event)
             except Exception as exc:
                 error = _classified(exc)
                 _report(error)
@@ -274,37 +308,7 @@ class LunaPhotoConnection(_PhotoConnection):
         self, image: PreparedPhoto, target_language: str
     ) -> AsyncIterator[PhotoStreamEvent]:
         await self.preopen()
-        prompt = render_photo_prompt(target_language)
-        payload = json.dumps(
-            {
-                "type": "response.create",
-                "model": self.model,
-                "store": False,
-                "reasoning": {"effort": "none"},
-                "instructions": prompt.instructions,
-                "input": [
-                    {
-                        "type": "message",
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "input_image",
-                                "image_url": f"data:image/jpeg;base64,{image.jpeg_base64}",
-                            },
-                            {"type": "input_text", "text": prompt.user_message},
-                        ],
-                    }
-                ],
-                "text": {
-                    "format": {
-                        "type": "json_schema",
-                        "name": "blocks",
-                        "schema": prompt.schema,
-                        "strict": True,
-                    }
-                },
-            }
-        )
+        payload = json.dumps({"type": "response.create", **_luna_payload(image, target_language)})
         async with asyncio.timeout(self._timeout):
             self._sent()
             await self._socket.send(payload)
@@ -507,6 +511,223 @@ class GooglePhotoConnection(_PhotoConnection):
         if self._http is not None:
             await self._http.aclose()
             self._http = None
+
+
+class OpenAIPhotoConnection(_PhotoConnection):
+    google = False
+    model = "gpt-6-luna"
+    endpoint = "https://api.openai.com/v1/responses"
+
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        client: httpx.AsyncClient | None = None,
+        timeout: float = 240.0,
+    ) -> None:
+        super().__init__()
+        self._api_key = api_key
+        self._http = client
+        self._owns_http = client is None
+        self._timeout = timeout
+        self.request_bytes = 0
+        self._invalidate: Callable[[str], None] | None = None
+
+    async def preopen(self) -> None:
+        async with self._preopen_lock:
+            if self._closed:
+                raise PhotoProviderError("photo_connection_closed", retryable=False)
+            if not self._api_key:
+                raise PhotoProviderError("photo_authentication_failed", retryable=False)
+            if self._http is None:
+                self._http = network_clients.external_async_client(
+                    timeout=httpx.Timeout(self._timeout, connect=20),
+                    follow_redirects=False,
+                    limits=httpx.Limits(max_connections=1, max_keepalive_connections=1),
+                )
+
+    def _body(self, image: PreparedPhoto, target_language: str) -> dict:
+        return {
+            **_luna_payload(image, target_language),
+            "stream": True,
+            "max_output_tokens": 8192,
+        }
+
+    async def _exchange(
+        self, image: PreparedPhoto, target_language: str
+    ) -> AsyncIterator[PhotoStreamEvent]:
+        await self.preopen()
+        body = json.dumps(self._body(image, target_language), separators=(",", ":")).encode()
+        self.request_bytes = len(body)
+        sent = False
+
+        async def trace(name: str, info: dict) -> None:
+            nonlocal sent
+            if name.endswith("send_request_headers.started") and not sent:
+                sent = True
+                self._sent()
+
+        try:
+            async with asyncio.timeout(self._timeout):
+                assert self._http is not None
+                async with self._http.stream(
+                    "POST",
+                    self.endpoint,
+                    headers={
+                        "Authorization": f"Bearer {self._api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    content=body,
+                    extensions={"trace": trace},
+                ) as response:
+                    if response.status_code != 200:
+                        if response.status_code == 401 and self._invalidate is not None:
+                            self._invalidate(self._api_key)
+                        raise await _http_error(response)
+                    if (
+                        response.headers.get("content-type", "").split(";")[0]
+                        != "text/event-stream"
+                    ):
+                        raise PhotoProviderError("photo_stream_invalid", retryable=False)
+                    data: list[str] = []
+                    completed = False
+                    async for line in response.aiter_lines():
+                        if completed:
+                            continue
+                        if line.startswith("data:"):
+                            data.append(line[5:].lstrip(" "))
+                        elif not line and data:
+                            event = json.loads("\n".join(data))
+                            data.clear()
+                            if not isinstance(event, dict):
+                                raise PhotoProviderError("photo_stream_invalid", retryable=False)
+                            kind = event.get("type")
+                            if kind in ("response.output_text.delta", "text_delta"):
+                                delta = event.get(
+                                    "delta" if kind == "response.output_text.delta" else "text"
+                                )
+                                if not isinstance(delta, str):
+                                    raise PhotoProviderError(
+                                        "photo_stream_invalid", retryable=False
+                                    )
+                                if delta:
+                                    yield PhotoTextDelta(delta)
+                            elif kind in ("response.completed", "completed"):
+                                result = event.get("response")
+                                if (
+                                    not isinstance(result, dict)
+                                    or result.get("status") != "completed"
+                                ):
+                                    raise PhotoProviderError("photo_stream_incomplete")
+                                for output in result.get("output") or []:
+                                    for part in output.get("content") or []:
+                                        if part.get("type") == "refusal":
+                                            raise PhotoProviderError(
+                                                "photo_content_rejected", retryable=False
+                                            )
+                                yield PhotoStreamCompleted(
+                                    usage=result.get("usage") or {},
+                                    model=result.get("model") or self.model,
+                                )
+                                completed = True
+                            elif kind in ("response.failed", "response.incomplete", "error"):
+                                result = event.get("response") or {}
+                                raise _event_error(
+                                    event.get("error") or result.get("error"),
+                                    incomplete=kind == "response.incomplete",
+                                )
+                            elif kind in ("response.refusal.delta", "response.refusal.done"):
+                                raise PhotoProviderError("photo_content_rejected", retryable=False)
+                    if not completed:
+                        raise PhotoProviderError("photo_stream_incomplete")
+        except Exception as exc:
+            error = _classified(exc)
+            if sent:
+                error.retryable = False
+            raise error from None
+
+    async def _close_transport(self) -> None:
+        if self._http is not None and self._owns_http:
+            await self._http.aclose()
+        self._http = None
+
+
+class OpenRouterPhotoConnection(OpenAIPhotoConnection):
+    model = "openai/gpt-6-luna"
+    endpoint = "https://openrouter.ai/api/v1/responses"
+
+    def __init__(
+        self,
+        credential: Callable[[], Awaitable[str]],
+        *,
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
+        super().__init__("", client=client)
+        self._credential = credential
+
+    async def preopen(self) -> None:
+        if self._closed:
+            raise PhotoProviderError("photo_connection_closed", retryable=False)
+        self._api_key = await self._credential()
+        await super().preopen()
+
+    def _body(self, image: PreparedPhoto, target_language: str) -> dict:
+        return {
+            **super()._body(image, target_language),
+            "model": self.model,
+            "provider": {
+                "only": ["openai"],
+                "allow_fallbacks": False,
+                "require_parameters": True,
+            },
+        }
+
+
+class RelayPhotoConnection(OpenAIPhotoConnection):
+    def __init__(
+        self,
+        endpoint: str,
+        token: Callable[[], Awaitable[str]],
+        *,
+        client: httpx.AsyncClient | None = None,
+        allow_loopback_http: bool = False,
+        invalidate: Callable[[str], None] | None = None,
+    ) -> None:
+        parsed = urlsplit(endpoint)
+        if (
+            not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or parsed.path != "/v1/photo"
+            or not (
+                parsed.scheme == "https"
+                or allow_loopback_http
+                and parsed.scheme == "http"
+                and parsed.hostname in {"127.0.0.1", "::1"}
+            )
+        ):
+            raise ValueError("Photo Relay requires HTTPS or explicit source loopback HTTP")
+        super().__init__("", client=client)
+        self.endpoint = endpoint
+        self._token = token
+        self._request_id = uuid4().hex
+        self._invalidate = invalidate
+
+    async def preopen(self) -> None:
+        if self._closed:
+            raise PhotoProviderError("photo_connection_closed", retryable=False)
+        self._api_key = await self._token()
+        await super().preopen()
+
+    def _body(self, image: PreparedPhoto, target_language: str) -> dict:
+        return {
+            "photo_protocol": 1,
+            "request_id": self._request_id,
+            "image_base64": image.jpeg_base64,
+            "target_language": target_language,
+        }
 
 
 def make_photo_connection(

@@ -6,6 +6,7 @@ import json
 import time
 from pathlib import Path
 
+import httpx
 import pytest
 from websockets.asyncio.server import serve
 
@@ -17,7 +18,12 @@ from puripuly_heart.core.photo.protocol import (
     PhotoStreamCompleted,
     PhotoTextDelta,
 )
-from puripuly_heart.providers.photo import GooglePhotoConnection, LunaPhotoConnection
+from puripuly_heart.providers.photo import (
+    GooglePhotoConnection,
+    LunaPhotoConnection,
+    OpenAIPhotoConnection,
+    RelayPhotoConnection,
+)
 
 
 class SyntheticSession:
@@ -58,7 +64,7 @@ async def synthetic_photo(tmp_path: Path):
 
 
 class ControlledGoogle:
-    def __init__(self, chunks: list[dict], *, status: int = 200, metadata_status: int = 200):
+    def __init__(self, chunks: list[dict | str], *, status: int = 200, metadata_status: int = 200):
         self.chunks = chunks
         self.status = status
         self.metadata_status = metadata_status
@@ -129,7 +135,9 @@ class ControlledGoogle:
                 for index, chunk in enumerate(self.chunks):
                     if index == self.pause_after:
                         await self.gate.wait()
-                    data = ("data: " + json.dumps(chunk) + "\n\n").encode()
+                    data = (
+                        "data: " + (chunk if isinstance(chunk, str) else json.dumps(chunk)) + "\n\n"
+                    ).encode()
                     writer.write(f"{len(data):x}\r\n".encode() + data + b"\r\n")
                     await writer.drain()
                 writer.write(b"0\r\n\r\n")
@@ -550,3 +558,164 @@ async def test_luna_primary_failure_survives_sanitized_cleanup_failure(tmp_path,
             task.get_name() in {"photo-provider-stream", "photo-provider-close"}
             for task in asyncio.all_tasks()
         )
+
+
+async def test_api_baseline_streams_partial_blocks_without_setup_requests_or_paid_replay(tmp_path):
+    photo = await synthetic_photo(tmp_path)
+    events = [
+        {
+            "type": "response.output_text.delta",
+            "delta": '{"blocks":[{"bbox":[0,0,100,100],"source":"one","translation":"하나"}',
+        },
+        {"type": "response.output_text.delta", "delta": "]}"},
+        {
+            "type": "response.completed",
+            "response": {
+                "status": "completed",
+                "model": "gpt-6-luna",
+                "usage": {"output_tokens": 30},
+            },
+        },
+    ]
+    async with ControlledGoogle(events) as server:
+        server.pause_after = 1
+        connection = OpenAIPhotoConnection("synthetic-api-key")
+        connection.endpoint = server.base_url.removesuffix("/v1beta/models") + "/v1/responses"
+        await connection.preopen()
+        assert server.requests == []
+        stream = connection.stream(photo, "ko")
+        assert isinstance(await anext(stream), PhotoRequestSent)
+        first = await anext(stream)
+        assert isinstance(first, PhotoTextDelta)
+        parsed = PhotoBlockParser().feed(first.text)
+        assert any(event.kind == "block_complete" for event in parsed)
+        assert not server.gate.is_set()
+        server.gate.set()
+        remaining = [event async for event in stream]
+        assert remaining[-1] == PhotoStreamCompleted({"output_tokens": 30}, "gpt-6-luna")
+        assert len(server.requests) == 1
+        assert server.requests[0][2]["model"] == "gpt-6-luna"
+        assert server.requests[0][3]["authorization"] == "Bearer synthetic-api-key"
+
+
+@pytest.mark.parametrize(
+    "terminal",
+    [
+        {"type": "response.incomplete", "response": {"status": "incomplete"}},
+        {"type": "response.refusal.delta", "delta": "private refusal"},
+        {"type": "response.output_text.delta", "delta": '{"blocks":['},
+    ],
+)
+async def test_api_uncertain_or_unusable_output_never_authorizes_automatic_retry(
+    tmp_path, terminal
+):
+    photo = await synthetic_photo(tmp_path)
+    async with ControlledGoogle([terminal]) as server:
+        connection = OpenAIPhotoConnection("synthetic-api-key")
+        connection.endpoint = server.base_url.removesuffix("/v1beta/models") + "/v1/responses"
+        events = []
+        with pytest.raises(PhotoProviderError) as failure:
+            async for event in connection.stream(photo, "ko"):
+                events.append(event)
+        assert failure.value.retryable is False
+        assert not any(isinstance(event, PhotoStreamCompleted) for event in events)
+        assert len(server.requests) == 1
+
+
+async def test_relay_uses_dedicated_photo_contract_without_per_photo_coordination(tmp_path):
+    photo = await synthetic_photo(tmp_path)
+    tokens = []
+
+    async def token():
+        tokens.append(True)
+        return "synthetic-puri-token"
+
+    events = [
+        {"type": "text_delta", "text": '{"blocks":[]}'},
+        {
+            "type": "completed",
+            "response": {"status": "completed", "model": "gpt-6-luna", "usage": {}},
+        },
+    ]
+    async with ControlledGoogle(events) as server:
+        endpoint = server.base_url.removesuffix("/v1beta/models") + "/v1/photo"
+        connection = RelayPhotoConnection(endpoint, token, allow_loopback_http=True)
+        await connection.preopen()
+        assert server.requests == []
+        result = [event async for event in connection.stream(photo, "ko")]
+        assert isinstance(result[-1], PhotoStreamCompleted)
+        assert len(server.requests) == 1
+        sent = server.requests[0][2]
+        assert set(sent) == {"photo_protocol", "request_id", "image_base64", "target_language"}
+        assert sent["image_base64"] == photo.jpeg_base64
+        assert sent["target_language"] == "ko"
+        assert server.requests[0][3]["authorization"] == "Bearer synthetic-puri-token"
+
+
+async def test_api_completion_drains_sse_terminator_and_reuses_the_connection(tmp_path):
+    photo = await synthetic_photo(tmp_path)
+    events = [
+        {"type": "response.output_text.delta", "delta": '{"blocks":[]}'},
+        {"type": "response.completed", "response": {"status": "completed", "model": "gpt-6-luna"}},
+        "[DONE]",
+    ]
+    async with (
+        ControlledGoogle(events) as server,
+        httpx.AsyncClient(
+            trust_env=False,
+            limits=httpx.Limits(max_connections=1),
+            timeout=2,
+        ) as client,
+    ):
+        server.pause_after = 2
+        endpoint = server.base_url.removesuffix("/v1beta/models") + "/v1/responses"
+        connection = OpenAIPhotoConnection("synthetic-api-key", client=client)
+        connection.endpoint = endpoint
+        async with contextlib.aclosing(connection.stream(photo, "ko")) as stream:
+            assert isinstance(await anext(stream), PhotoRequestSent)
+            assert isinstance(await anext(stream), PhotoTextDelta)
+            assert isinstance(await anext(stream), PhotoStreamCompleted)
+            assert not server.gate.is_set()
+            server.gate.set()
+            assert [event async for event in stream] == []
+        following = OpenAIPhotoConnection("synthetic-api-key", client=client)
+        following.endpoint = endpoint
+        result = [event async for event in following.stream(photo, "ko")]
+        assert isinstance(result[-1], PhotoStreamCompleted)
+        assert len(server.requests) == 2
+        assert server.connections == 1
+
+
+async def test_api_consumer_failure_releases_single_connection_pool_for_next_photo(tmp_path):
+    photo = await synthetic_photo(tmp_path)
+    events = [
+        {"type": "response.output_text.delta", "delta": "invalid photo JSON"} for _ in range(80)
+    ] + [
+        {"type": "response.completed", "response": {"status": "completed", "model": "gpt-6-luna"}},
+    ]
+    async with (
+        ControlledGoogle(events) as server,
+        httpx.AsyncClient(
+            trust_env=False,
+            limits=httpx.Limits(max_connections=1),
+            timeout=2,
+        ) as client,
+    ):
+        endpoint = server.base_url.removesuffix("/v1beta/models") + "/v1/responses"
+        connection = OpenAIPhotoConnection("synthetic-api-key", client=client)
+        connection.endpoint = endpoint
+        async with contextlib.aclosing(connection.stream(photo, "ko")) as stream:
+            assert isinstance(await anext(stream), PhotoRequestSent)
+            assert isinstance(await anext(stream), PhotoTextDelta)
+        server.chunks = [
+            {"type": "response.output_text.delta", "delta": '{"blocks":[]}'},
+            {
+                "type": "response.completed",
+                "response": {"status": "completed", "model": "gpt-6-luna"},
+            },
+        ]
+        following = OpenAIPhotoConnection("synthetic-api-key", client=client)
+        following.endpoint = endpoint
+        result = [event async for event in following.stream(photo, "ko")]
+        assert isinstance(result[-1], PhotoStreamCompleted)
+        assert len(server.requests) == 2

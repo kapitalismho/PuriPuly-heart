@@ -30,21 +30,23 @@ export type Accounting = {
 type AdmissionError = 'service_allowance_exhausted' | 'service_turn_exhausted' | 'service_busy';
 export type Admission = { accounting: Accounting } | { error: AdmissionError };
 
+function usageRates(env: UsageEnv): Rates {
+  if (env.AGENT_USAGE_RATES === undefined) return defaultRates;
+  const configured: unknown = JSON.parse(env.AGENT_USAGE_RATES);
+  if (!isRecord(configured) || Object.keys(configured).length !== Object.keys(defaultRates).length
+    || typeof configured.as_of !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(configured.as_of)
+    || !['input', 'cache_read', 'cache_write', 'responses_output', 'decisions_output'].every((key) =>
+      typeof configured[key] === 'number' && Number.isFinite(configured[key]) && configured[key] >= 0)) {
+    throw new Error('accounting_unavailable');
+  }
+  return configured as Rates;
+}
+
 export async function checkAllowance(
   env: UsageEnv, installation: string, turnId: string, classification: boolean, now = new Date(),
 ): Promise<Admission> {
   if (!env.AGENT_USAGE_DB) throw new Error('accounting_unavailable');
-  let rates = defaultRates;
-  if (env.AGENT_USAGE_RATES !== undefined) {
-    const configured: unknown = JSON.parse(env.AGENT_USAGE_RATES);
-    if (!isRecord(configured) || Object.keys(configured).length !== Object.keys(defaultRates).length
-      || typeof configured.as_of !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(configured.as_of)
-      || !['input', 'cache_read', 'cache_write', 'responses_output', 'decisions_output'].every((key) =>
-        typeof configured[key] === 'number' && Number.isFinite(configured[key]) && configured[key] >= 0)) {
-      throw new Error('accounting_unavailable');
-    }
-    rates = configured as Rates;
-  }
+  const rates = usageRates(env);
   const db = env.AGENT_USAGE_DB;
   const day = now.toISOString().slice(0, 10);
   const timestamp = now.getTime();
@@ -120,7 +122,7 @@ export function usageRecorder(accounting: Accounting, classification: boolean, c
   };
 }
 
-export async function recordUsage(accounting: Accounting, result: unknown, classification: boolean): Promise<void> {
+function responseUsage(result: unknown): Usage {
   let usage: Usage = { uncached: 0, read: 0, write: 0, output: 0, missing: 1 };
   const returned = isRecord(result) ? result.usage : undefined;
   if (isRecord(returned)) {
@@ -135,6 +137,11 @@ export async function recordUsage(accounting: Accounting, result: unknown, class
         read: read as number, write: write as number, output: output as number, missing: 0 };
     }
   }
+  return usage;
+}
+
+export async function recordUsage(accounting: Accounting, result: unknown, classification: boolean): Promise<void> {
+  const usage = responseUsage(result);
   const { rates } = accounting;
   const cost = (usage.uncached * rates.input + usage.read * rates.cache_read + usage.write * rates.cache_write
     + usage.output * (classification ? rates.decisions_output : rates.responses_output)) / 1_000_000;
@@ -166,4 +173,96 @@ export async function recordUsage(accounting: Accounting, result: unknown, class
     .bind(accounting.installation, accounting.owner));
   const written = await accounting.db.batch(statements);
   if (written.length !== statements.length || written.some((result) => !result.success)) throw new Error('accounting_unavailable');
+}
+
+export type PhotoPolicy = {
+  maxBodyBytes: number;
+  maxOutputTokens: number;
+  concurrency: number;
+  allowance: number;
+  periodMs: number;
+  deadlineMs: number;
+};
+
+export function photoPolicy(raw?: string): PhotoPolicy {
+  const defaults: PhotoPolicy = {
+    maxBodyBytes: 4 * 1024 * 1024,
+    maxOutputTokens: 8192,
+    concurrency: 1,
+    allowance: 50,
+    periodMs: 86_400_000,
+    deadlineMs: 240_000,
+  };
+  if (raw === undefined) return defaults;
+  const configured: unknown = JSON.parse(raw);
+  if (!isRecord(configured) || Object.keys(configured).some((key) => !(key in defaults))) {
+    throw new Error('photo_policy_invalid');
+  }
+  const policy = { ...defaults, ...configured };
+  if (Object.values(policy).some((value) => !Number.isSafeInteger(value) || value < 1)
+    || policy.maxBodyBytes > 20 * 1024 * 1024 || policy.maxOutputTokens > 32768
+    || policy.concurrency > 8 || policy.deadlineMs > 300_000
+    || policy.periodMs < 60_000) throw new Error('photo_policy_invalid');
+  return policy;
+}
+
+export async function checkPhotoAllowance(
+  env: UsageEnv, installation: string, requestId: string, policy: PhotoPolicy, now = Date.now(),
+): Promise<{ settle: (result: unknown) => Promise<void>; deadline: number } | { error: string }> {
+  if (!env.AGENT_USAGE_DB) throw new Error('accounting_unavailable');
+  const db = env.AGENT_USAGE_DB;
+  const rates = usageRates(env);
+  const owner = crypto.randomUUID();
+  const period = Math.floor(now / policy.periodMs) * policy.periodMs;
+  const admitted = await db.prepare(`
+    INSERT INTO photo_admissions (installation_hash, request_id, period_start, owner, expires_at)
+    SELECT ?, ?, ?, ?, ?
+    WHERE NOT EXISTS (SELECT 1 FROM photo_admissions WHERE installation_hash = ? AND request_id = ?)
+      AND (SELECT COUNT(*) FROM photo_admissions WHERE installation_hash = ? AND period_start = ?) < ?
+      AND (SELECT COUNT(*) FROM photo_admissions
+        WHERE installation_hash = ? AND settled = 0 AND expires_at > ?) < ?
+    ON CONFLICT(installation_hash, request_id) DO NOTHING
+    RETURNING owner
+  `).bind(installation, requestId, period, owner, now + policy.deadlineMs + 60_000,
+    installation, requestId, installation, period, policy.allowance,
+    installation, now, policy.concurrency).all<{ owner: string }>();
+  if (!admitted.success) throw new Error('accounting_unavailable');
+  if (!admitted.results.length) {
+    const reason = await db.prepare(`
+      SELECT CASE
+        WHEN EXISTS (SELECT 1 FROM photo_admissions WHERE installation_hash = ? AND request_id = ?)
+          THEN 'photo_request_already_admitted'
+        WHEN (SELECT COUNT(*) FROM photo_admissions WHERE installation_hash = ? AND period_start = ?) >= ?
+          THEN 'service_allowance_exhausted'
+        ELSE 'service_busy' END AS code
+    `).bind(installation, requestId, installation, period, policy.allowance).first<{ code: string }>();
+    if (!reason) throw new Error('accounting_unavailable');
+    return { error: reason.code };
+  }
+  if (admitted.results.length !== 1 || admitted.results[0].owner !== owner) {
+    throw new Error('accounting_unavailable');
+  }
+  let settlement: Promise<void> | undefined;
+  return {
+    deadline: now + policy.deadlineMs,
+    settle(result: unknown) {
+      if (!settlement) settlement = (async () => {
+        const usage = responseUsage(result);
+        const cost = (usage.uncached * rates.input + usage.read * rates.cache_read
+          + usage.write * rates.cache_write + usage.output * rates.responses_output) / 1_000_000;
+        if (!Number.isFinite(cost)) throw new Error('accounting_unavailable');
+        const written = await db.prepare(`
+          UPDATE photo_admissions SET settled = 1, uncached_input_tokens = ?, cache_read_tokens = ?,
+            cache_write_tokens = ?, output_tokens = ?, missing_usage = ?, cost_usd = ?
+          WHERE installation_hash = ? AND request_id = ? AND owner = ? AND settled = 0
+          RETURNING owner
+        `).bind(usage.uncached, usage.read, usage.write, usage.output, usage.missing, cost,
+          installation, requestId, owner).all<{ owner: string }>();
+        if (!written.success || written.results.length !== 1 || written.results[0].owner !== owner) {
+          throw new Error('accounting_unavailable');
+        }
+      })();
+      return settlement;
+    },
+  };
 }

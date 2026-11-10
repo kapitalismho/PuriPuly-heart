@@ -19,13 +19,18 @@ from .protocol import PhotoProviderError
 
 _IMAGE_TIMING_STAGES = frozenset({"mask", "erase", "typeset", "roi_upload", "compose_gpu"})
 
+
 def valid_wrist_calibration(value: object) -> bool:
     def rigid(matrix):
         if not isinstance(matrix, list) or len(matrix) != 3:
             return False
         if any(not isinstance(row, list) or len(row) != 4 for row in matrix):
             return False
-        if any(type(v) not in (int, float) or not -3.402823466e38 <= v <= 3.402823466e38 for row in matrix for v in row):
+        if any(
+            type(v) not in (int, float) or not -3.402823466e38 <= v <= 3.402823466e38
+            for row in matrix
+            for v in row
+        ):
             return False
         for i in range(3):
             for j in range(3):
@@ -33,8 +38,11 @@ def valid_wrist_calibration(value: object) -> bool:
                 if abs(dot - int(i == j)) >= 0.01:
                     return False
         determinant = sum(
-            matrix[0][i] * (matrix[1][(i + 1) % 3] * matrix[2][(i + 2) % 3]
-                            - matrix[1][(i + 2) % 3] * matrix[2][(i + 1) % 3])
+            matrix[0][i]
+            * (
+                matrix[1][(i + 1) % 3] * matrix[2][(i + 2) % 3]
+                - matrix[1][(i + 2) % 3] * matrix[2][(i + 1) % 3]
+            )
             for i in range(3)
         )
         return determinant > 0.99
@@ -54,7 +62,6 @@ def valid_wrist_calibration(value: object) -> bool:
             for key in ("model", "serial")
         )
     )
-
 
 
 class PhotoBridge:
@@ -114,7 +121,7 @@ class PhotoBridge:
         self.shutdown_complete.clear()
         self._commands.clear()
         return {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "role": "photo",
             "bridge_url": self._url,
             "session_token": self._token,
@@ -220,7 +227,7 @@ class PhotoBridge:
         token = value.get("session_token")
         return (
             value.get("type") == "photo_auth"
-            and value.get("protocol_version") == 2
+            and value.get("protocol_version") == 3
             and type(value.get("protocol_version")) is int
             and value.get("role") == "photo"
             and isinstance(token, str)
