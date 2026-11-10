@@ -2,7 +2,7 @@
 
 Measured on 2026-11-10 for [#389](https://github.com/kapitalismho/PuriPuly-heart/issues/389). All numerical evidence was collected anew; no #383–#386 performance results were reused. [Structured observations](broker-relay-efficiency.json) retain every measured sample, exclusions, source identities, platform meters, and cleanup results. Repeated per-block diagnostics are summarized by count and first/last event.
 
-**Decision:** retain two small optimizations and recommend Workers Paid. Neither a general latency improvement nor complete #389 closure is established. Actual first display, visual usability, and the prerequisite comparison gaps below remain unverified. No production deployment, subscription change, push, merge, or issue closure was performed.
+**Initial decision:** retain two small optimizations and recommend Workers Paid. Neither a general latency improvement nor complete #389 closure is established. Actual first display, visual usability, and the prerequisite comparison gaps below remain unverified. No production deployment, subscription change, push, merge, or issue closure was performed. A separately approved Broker maintenance follow-up is recorded at the end; its new measurements do not relabel this initial baseline.
 
 ## Pinned implementation and boundaries
 
@@ -26,7 +26,7 @@ Measured on 2026-11-10 for [#389](https://github.com/kapitalismho/PuriPuly-heart
 | Demand-driven pump/backpressure rewrite | Reject here. It can put slow readers on the upstream deadline and alter cancellation/settlement. Keep the existing eager pump; remove duplication without delaying deltas. |
 | Token/HMAC caching or admission write consolidation | Reject here. Existing token reuse/singleflight already works. Fresh token probes showed bounded work; caching or merging failure boundaries adds isolation, revocation, or durability risk without a demonstrated material gain. |
 | Additional photo pooling | No change. Actual cold/warm observations show existing connection reuse. Do not count that reuse as new savings or infer Worker-to-provider pooling. |
-| Delete replay/history rows or run cleanup less often | Reject. These would change replay protection, retention, reporting, or recovery timing. |
+| Delete replay/history rows or run cleanup less often | Initially deferred because cadence changes affect physical retention or recovery timing. The owner subsequently approved hourly garbage collection only; see the follow-up below. Earlier deletion, weaker replay checks, and slower active recovery remain excluded. |
 | More indexes, support streaming, placement, broad accounting rewrite | Defer. No isolated evidence establishes an equivalent worthwhile change. Support traffic is included only in account aggregates; detailed attribution and peak concurrency remain unknown. These are not claimed optimized. |
 
 User-visible behavior: no intended UI, capability, image-quality, allowance, or response-timing change. Wire consumers no longer receive the two unused terminal echo fields. This is not a claim that headset appearance was observed.
@@ -160,3 +160,65 @@ Verification was deliberately limited to changed contracts and their consumers; 
 - The direct photo probe initially left a Pillow handle open, causing cleanup failure after measurements. Process exit released it and the owned runtime was deleted. Its initial native shutdown acknowledgement is unknown; eight other runtime groups recorded acknowledgement. No native probe process remains.
 - All four temporary Workers and three temporary D1 databases were deleted. Authenticated follow-up reads returned Worker 404/code 10007 and D1 404/code 7404. Trace collectors stopped, no owned trace process remained, and temporary app/runtime/secret state was removed. Broker and Relay cleanup evidence is in JSON. Only aggregate read-only queries touched existing resources.
 - Protected documentation was intentionally unchanged. Pre-existing drift remains in `docs/architecture.md` (personal-Luna-only photo description), `agent-relay/README.md` (missing hosted photo endpoint), and `PRIVACY.md` (missing hosted-image path); these arose from the integrated photo work, not this optimization. No new architecture/privacy behavior was introduced.
+
+## Approved maintenance follow-up — 2026-11-10
+
+The owner approved separating housekeeping from urgent recovery: retain minute-resolution key recovery/revocation, permit approximately one extra hour before physical deletion under a normal schedule, avoid report aggregation without a delivery claim, and skip completed identity-transition scans. This amends the initial cadence deferral, not #286's active-recovery contract.
+
+Implementation: `a55e1b44075bb844ba85217cfcd0e592d58dabc8`. New baseline: `99e3a19ed2958277d9655bc6ac75389c0454603a`, already containing the initial #389 improvements. All follow-up measurements were collected anew. [Follow-up structured evidence](broker-maintenance-efficiency.json) contains source/bundle hashes, every deployed sample, setup meters, simulated-day results, and cleanup proof. Unrelated existing edits to `agent-relay/src/usage.ts` and `docs/photo-managed-comparison.md` were left untouched.
+
+### Implemented behavior
+
+- `handleScheduled` still runs every minute. Stale key-delivery reconciliation and managed-operation recovery retain their budgets, ownership, ACK/auth expiry, six-hour unattended retry eligibility, and sixteen-minute abandoned claims. No cron, quota, concurrency, or request-lifetime setting changed.
+- `applyScheduledRetention` now runs only when the **scheduled UTC minute is zero**. It retains all current deletion predicates and pending-report preservation. This covers abuse/request/audit retention, app-active days, abandoned preflight installations, proof nonces, token-rate state, and enrollment records. Logical expiry and request-time window enforcement remain independent of physical deletion. Replay tombstones can remain longer, not become valid again.
+- A missed/failed housekeeping run waits for a later hourly opportunity. The approximately one-hour extra residence bound assumes normal successful scheduling; it is not an outage guarantee. No new persistent scheduler/cache or schema was introduced.
+- `runDailyReport` acquires the existing report-date lease before aggregation. Without a claim it returns `{ ok: true, sent: false, payload: null }`. No production consumer needs a skipped report preview. Aggregation and webhook failures release the owned lease for the next eligible minute; successful delivery still requires durable completion. Pending-date catchup and overlapping claims remain protected.
+- `runNetworkIdentityBackfill` reads authoritative mode first. Confirmed keyed-only mode returns completed/no-work without legacy hook/event scans. Ongoing legacy/dual transition and finalization barriers remain. Raw hooks manually introduced after a completed transition are no longer automatically converted; current operator hooks must use the supported keyed representation.
+
+### New complete-day local execution
+
+The existing SQLite D1 fixture and frozen actual handlers ran all 1,440 scheduled minutes of one synthetic UTC day per arm. Seed: 20 active subjects across 40 dates (800 rows), 300 key-issuance events, 80 delivered report dates, current 33-migration schema, completed identity transition. The next daily report was initially due, not pre-skipped.
+
+| Simulated day metric | Before | After |
+| --- | ---: | ---: |
+| Scheduled invocations | 1,440 | 1,440 |
+| Executed SQL statements | 44,611 | 13,219 |
+| Report aggregate SELECTs | 5,740 | 4 |
+| SQLite logical row changes | 112 | 112 |
+| Successful synthetic report sends | 1 | 1 |
+
+Both arms delivered the identical payload at 00:05 UTC and finished with identical business state: 700 active-day rows, 290 issuance events, and 81 delivered dates. The four retained aggregates are the required once-daily key count and DAU/WAU/MAU. These statement/change counts are **not D1 billing meters**, and the simulated clock is not a 24-hour production soak.
+
+### New deployed D1 and CPU measurements
+
+One temporary Worker/version (`a4004ada-ae03-4511-9f2d-1a818b6345d2`) contained both frozen handlers and used one isolated D1 database, compatibility date `2026-04-08`. Fixture: 600 active-day rows, 300 issuance events, 80 delivered dates, completed identity transition. Ordinary/hourly samples alternated arm order; each arm/case ran three times. Two additional due-report calls, one per arm, restored eligibility before each call.
+
+| Scheduled case | D1 rows read before → after | D1 rows written before → after | Samples per arm |
+| --- | --- | --- | ---: |
+| Ordinary minute, report already delivered | 1,394 → 20 | 0 → 0 | 3 |
+| Hour boundary, report already delivered | 1,394 → 330 | 0 → 0 | 3 |
+| Report actually due | 1,394 → 1,080 | 5 → 5 | 1 |
+
+All 14 invocations returned HTTP 200 with platform outcome `ok`; all 14 CPU traces were captured. Quiet-period database snapshots were unchanged. Both due-report calls performed four aggregates, produced the same webhook payload, and persisted `delivered`. External/provider requests were blocked; webhook transport was synthetic, with zero paid model calls.
+
+| Scheduled case | Baseline CPU samples, ms | Candidate CPU samples, ms |
+| --- | --- | --- |
+| Ordinary minute | 37, 24, 29 | 12, 10, 8 |
+| Hour boundary | 27, 24, 32 | 18, 20, 16 |
+| Report actually due | 39 | 15 |
+
+CPU is actual platform CPU for an authenticated HTTP wrapper invoking the scheduled handler, including D1 metadata capture, serialization/logging, and synthetic webhook handling. It is **not exact native production cron CPU**. Small samples and shared-runtime warmup do not establish tail confidence or a general latency percentage. SQL duration, network wall time, CPU, and row billing remain separate.
+
+Setup was excluded from workload comparisons: 33 migrations/495 statements read 34,108 rows and wrote 1,248; three synthetic seed statements read 1,076 and wrote 3,841. Eligibility resets and snapshot reads are recorded separately. The product change requires no new migration/index or data deletion beyond the existing housekeeping predicates.
+
+These fixture savings do not establish the same percentage reduction in the previously observed account-wide reads. Production has not received this change, and its full query mix was not newly attributed. Minute Worker invocation count remains unchanged. The Broker-only change does not resolve the earlier OCR CPU, actual-display, or route-comparison gaps, nor independently establish that Free is sufficient.
+
+### Focused verification and operational record
+
+- Passed once after integration: `pnpm exec vitest run broker/tests/daily-report.spec.ts broker/tests/managed-key-delivery.spec.ts broker/tests/puri-token.spec.ts broker/tests/managed-issuance-durability.spec.ts` — **four files, 121 tests**.
+- Passed: scoped TypeScript API check using root compiler options with only Broker source/tests included — 112 files, zero diagnostics. Unrelated Relay edits were not included in the check.
+- Covered hour/off-hour deletion with fresh state retained, ordinary-minute key recovery, logical expiry/replay boundaries, unavailable aggregation for delivered/in-flight reports, aggregation failure and next-minute retry, pending report preservation, and ongoing/completed identity transition behavior. Removed incidental SQL-count/source-inventory assertions rather than preserving implementation-pinning tests.
+- Existing Vite native-config-loader compatibility and Node experimental-SQLite warnings remain. No invoked follow-up check or measurement failed. Full repository/app/native/GUI suites and a new concurrency/peak-memory campaign were not run.
+- No production deployment, existing-database mutation, provider invocation, billing change, push, merge, or issue closure. The temporary Worker and D1 database were deleted; authenticated follow-up reads returned 404/code 10007 and 404/code 7404. Trace collector/process and temporary bundle/config/probe state were removed.
+- User-visible change is maintenance timing, not UI or photo processing: expired records can remain until the next hourly cleanup, while active recovery remains minutely. Protected documents were not edited. `broker/README.md` still groups scheduled work without describing the new hourly housekeeping distinction; this record supplies that operational detail. `PRIVACY.md` retains the same cutoff rules and “remain until cleanup” wording; physical deletion cadence is clarified here. Existing photo-documentation drift above remains separate.
+

@@ -1,0 +1,4140 @@
+{
+  "format_version": 1,
+  "issue": 389,
+  "phase": "owner-approved hourly housekeeping and completed-work suppression",
+  "measured_on_utc": "2026-11-10",
+  "baseline_commit": "99e3a19ed2958277d9655bc6ac75389c0454603a",
+  "candidate_commit": "a55e1b44075bb844ba85217cfcd0e592d58dabc8",
+  "historical_numeric_results_reused": false,
+  "approval": {
+    "active_recovery_minute_resolution_retained": true,
+    "hourly_physical_housekeeping_approved": true,
+    "logical_expiration_and_retention_cutoffs_unchanged": true,
+    "cleanup_delay_limit_applies_only_to_normal_schedule": true,
+    "production_deployment": false,
+    "existing_database_mutation": false,
+    "billing_change": false,
+    "model_calls": 0
+  },
+  "baseline_bundle": {
+    "arm": "baseline",
+    "sha256": "a23d132c17779ca0f05128c70f2c9bdc2b524dcdb2474d1cae8c0ef4244f0f6c",
+    "source_hashes": {
+      "broker/src/network-identity.ts": "1824952304121845e6781a45f8aec236be44cf5a3d9039225515b5d41007f94f",
+      "broker/src/persistence.ts": "14a128290599917d6d238c167df16161af06a6a3d8bc3416dfe5e402b70cfb59",
+      "broker/src/abuse-controls.ts": "6caa58822935278ca0e65a54339521f971c716869145e208bb9153288c4ee60a",
+      "broker/src/discord-alerts.ts": "e5a979f6bf5d685d630e041bf8db1f8bfc3f992499be1d58b9119fc12f34d434",
+      "broker/src/abuse-monitoring.ts": "55d7eaf1a5c21cec161697345d6ae1a93dee8880751248394e6beb2901ddb800",
+      "broker/src/managed-cleanup.ts": "9017fb1abb747a49aa379cc2f0ca579c852cda7deffa5c6ac66fe86bae5b448d",
+      "broker/src/crypto.ts": "cf8440ec5a95cc4014347eade07a450dcab817585cd8558437f54d46193f9497",
+      "broker/src/public-input.ts": "f3ae0580e01da7dc3c08c927fbd1c8aa0bd3139319db0ca983814f25a36a70c5",
+      "broker/src/trial-policy.ts": "f161557203cfaea9dc40190c67cbba3488c769b7edfe4ac74e2832c186e6cc2e",
+      "broker/src/managed-state.ts": "092aba7583f22351a64b3678b6d636815c51b40e7e0ce651fec859f14533b094",
+      "broker/src/broker-error.ts": "0743c95d0837320eb1bb9a5e8efb16d03d2c17ce46133d45691b751e59cefce9",
+      "broker/src/contract.ts": "a8ea9c1d7fa3dbd2d04bf9b6a8f25761c0ef1ccd4e4ba3242eaa4d4a9fd0a0bd",
+      "broker/src/openrouter-management.ts": "483ad51328cd2893e48686f8cae78eb981152721e4003e09562b016ee753eb1b",
+      "broker/src/managed-operation.ts": "17841d1edd25cdc7a66891fa7fa8f0781fa7625e90549ce05ce3a04c0f0e599c",
+      "broker/src/discord-oauth.ts": "39016d0674609d975f1b3b7268c21b10aa61c509b3dd1898d83a4f9d29e9bd3b",
+      "broker/src/fingerprint-salt.ts": "826c0a3b0e4a769cdd68c19a2f349a5e81d459e1163de9df00dc339b81c8391b",
+      "broker/src/openrouter-user-id.ts": "019670f3e41309b321b73b6dfdd0e0e035d9e92fcd447802bead6ce443c2eadd",
+      "broker/src/discord-managed-issue.ts": "0be29d67c7d51a4e69596c733f5c5fe8a8f7a7a996cb05dfba306eb0a3481fc6",
+      "broker/src/managed-issuance.ts": "72d7ca02161951acf9ab76209f327ae9a3ef5ffc6b82fbc8b129962386fc95b8",
+      "broker/src/qq-managed-issue.ts": "9586e27387c1180fc44e97f8cff512534e69ecbcecb07586b1437fed2184a8f3",
+      "broker/src/managed-key-delivery.ts": "57cbc8ce95d22d161ed6369b71b9d610facd2296580cc62759b11a730a903aa5",
+      "broker/src/network-identity-migration.ts": "38f48971af6264de2b3ef7b028d70416f17e1b47a2cb12beaae287da5367f4f8",
+      "broker/src/preflight-retention.ts": "720962c07f4cf0dcc96ade09b8a13191487ffbd3be80e19fe595c3a5efc11352",
+      "broker/src/puri-token.ts": "225f3f686e4f1537022e3d0542402375a7b4eb69cf36f02927d356ddb95b7a7c",
+      "broker/src/telemetry.ts": "31ee2dd7ad83f45d28ef84316fb2f62222af4ed065abe96eb79df30a1d0df6c5",
+      "broker/src/scheduled.ts": "4dda8c03c07974b1b4ee2ef3689bd3878fe285f1c4ef19e64b20a717d89eea1b"
+    }
+  },
+  "candidate_bundle": {
+    "arm": "candidate",
+    "sha256": "468832f741608e4553af6bf9e4c5809122eff8484f60e3d0f6b9f5c9f80cd12a",
+    "source_hashes": {
+      "broker/src/network-identity.ts": "1824952304121845e6781a45f8aec236be44cf5a3d9039225515b5d41007f94f",
+      "broker/src/persistence.ts": "14a128290599917d6d238c167df16161af06a6a3d8bc3416dfe5e402b70cfb59",
+      "broker/src/abuse-controls.ts": "6caa58822935278ca0e65a54339521f971c716869145e208bb9153288c4ee60a",
+      "broker/src/discord-alerts.ts": "e5a979f6bf5d685d630e041bf8db1f8bfc3f992499be1d58b9119fc12f34d434",
+      "broker/src/abuse-monitoring.ts": "55d7eaf1a5c21cec161697345d6ae1a93dee8880751248394e6beb2901ddb800",
+      "broker/src/managed-cleanup.ts": "9017fb1abb747a49aa379cc2f0ca579c852cda7deffa5c6ac66fe86bae5b448d",
+      "broker/src/crypto.ts": "cf8440ec5a95cc4014347eade07a450dcab817585cd8558437f54d46193f9497",
+      "broker/src/public-input.ts": "f3ae0580e01da7dc3c08c927fbd1c8aa0bd3139319db0ca983814f25a36a70c5",
+      "broker/src/trial-policy.ts": "f161557203cfaea9dc40190c67cbba3488c769b7edfe4ac74e2832c186e6cc2e",
+      "broker/src/managed-state.ts": "092aba7583f22351a64b3678b6d636815c51b40e7e0ce651fec859f14533b094",
+      "broker/src/broker-error.ts": "0743c95d0837320eb1bb9a5e8efb16d03d2c17ce46133d45691b751e59cefce9",
+      "broker/src/contract.ts": "a8ea9c1d7fa3dbd2d04bf9b6a8f25761c0ef1ccd4e4ba3242eaa4d4a9fd0a0bd",
+      "broker/src/openrouter-management.ts": "483ad51328cd2893e48686f8cae78eb981152721e4003e09562b016ee753eb1b",
+      "broker/src/managed-operation.ts": "17841d1edd25cdc7a66891fa7fa8f0781fa7625e90549ce05ce3a04c0f0e599c",
+      "broker/src/discord-oauth.ts": "39016d0674609d975f1b3b7268c21b10aa61c509b3dd1898d83a4f9d29e9bd3b",
+      "broker/src/fingerprint-salt.ts": "826c0a3b0e4a769cdd68c19a2f349a5e81d459e1163de9df00dc339b81c8391b",
+      "broker/src/openrouter-user-id.ts": "019670f3e41309b321b73b6dfdd0e0e035d9e92fcd447802bead6ce443c2eadd",
+      "broker/src/discord-managed-issue.ts": "0be29d67c7d51a4e69596c733f5c5fe8a8f7a7a996cb05dfba306eb0a3481fc6",
+      "broker/src/managed-issuance.ts": "72d7ca02161951acf9ab76209f327ae9a3ef5ffc6b82fbc8b129962386fc95b8",
+      "broker/src/qq-managed-issue.ts": "9586e27387c1180fc44e97f8cff512534e69ecbcecb07586b1437fed2184a8f3",
+      "broker/src/managed-key-delivery.ts": "57cbc8ce95d22d161ed6369b71b9d610facd2296580cc62759b11a730a903aa5",
+      "broker/src/network-identity-migration.ts": "b10867d7a2ea03c90a8644217c76660f38a9d97d1253b865c4c2392d6e857d49",
+      "broker/src/preflight-retention.ts": "720962c07f4cf0dcc96ade09b8a13191487ffbd3be80e19fe595c3a5efc11352",
+      "broker/src/puri-token.ts": "225f3f686e4f1537022e3d0542402375a7b4eb69cf36f02927d356ddb95b7a7c",
+      "broker/src/telemetry.ts": "31ee2dd7ad83f45d28ef84316fb2f62222af4ed065abe96eb79df30a1d0df6c5",
+      "broker/src/scheduled.ts": "29933c37387e42ef89371369c577136bce86f3a2a415ff44256f77d7084ab11b"
+    }
+  },
+  "temporary_harness_sha256": {
+    "local-probe.mjs": "0cfbcb59fc022cc0f6b1f309f3151ae80cd1059943b431c8c2d25a43c1846ba1",
+    "worker.mjs": "6a0e137160066cacdeab9d1fdcedaa63ad892b1df27a94239b557dbaec1c63ac",
+    "trace.mjs": "f157294476ce7d6f9ee57578601b28a47429b45677764fdb91d36b2caafb7a70"
+  },
+  "local_day": {
+    "baseline": {
+      "arm": "baseline",
+      "executedTicks": 1440,
+      "fixture": {
+        "activeSubjects": 20,
+        "initialActiveDays": 800,
+        "initialIssueEvents": 300,
+        "initialDeliveredReports": 80,
+        "currentSchema": true,
+        "networkMigration": "keyed_only"
+      },
+      "totals": {
+        "statements": 44611,
+        "selects": 30215,
+        "mutations": 14396,
+        "reportAggregates": 5740,
+        "returnedRows": 17255,
+        "logicalChanges": 112
+      },
+      "categories": {
+        "hour_boundary": {
+          "ticks": 24,
+          "statements": {
+            "min": 25,
+            "max": 31,
+            "sum": 738
+          },
+          "aggregates": {
+            "min": 0,
+            "max": 4,
+            "sum": 92
+          }
+        },
+        "before_report_time": {
+          "ticks": 4,
+          "statements": {
+            "min": 25,
+            "max": 25,
+            "sum": 100
+          },
+          "aggregates": {
+            "min": 0,
+            "max": 0,
+            "sum": 0
+          }
+        },
+        "report_due": {
+          "ticks": 1,
+          "statements": {
+            "min": 32,
+            "max": 32,
+            "sum": 32
+          },
+          "aggregates": {
+            "min": 4,
+            "max": 4,
+            "sum": 4
+          }
+        },
+        "ordinary": {
+          "ticks": 1411,
+          "statements": {
+            "min": 31,
+            "max": 31,
+            "sum": 43741
+          },
+          "aggregates": {
+            "min": 4,
+            "max": 4,
+            "sum": 5644
+          }
+        }
+      },
+      "finalPopulations": {
+        "activeDays": 700,
+        "issueEvents": 290,
+        "deliveredReports": 81
+      },
+      "finalDelivery": {
+        "report_date_utc": "2026-11-09",
+        "status": "delivered",
+        "attempted_at": "2026-11-10T00:05:00.000Z",
+        "delivered_at": "2026-11-10T00:05:00.000Z"
+      },
+      "webhookPayloads": [
+        {
+          "content": "```json\n{\"schema_version\":\"puripuly_daily_summary.v2\",\"report_date_utc\":\"2026-11-09\",\"window_start\":\"2026-11-09T00:00:00.000Z\",\"window_end\":\"2026-11-10T00:00:00.000Z\",\"summary\":{\"keys_delivered_total\":10,\"keys_delivered_discord\":0,\"keys_delivered_qq\":10,\"app_dau\":20,\"app_wau\":20,\"app_mau\":20}}\n```",
+          "embeds": [
+            {
+              "title": "PuriPuly daily summary — 2026-11-09 UTC",
+              "color": 16705372,
+              "description": "2026-11-09T00:00:00.000Z ≤ observed_at < 2026-11-10T00:00:00.000Z",
+              "fields": [
+                {
+                  "name": "Managed key issuance",
+                  "value": "keys_delivered=10\ndiscord=0\nqq=10",
+                  "inline": true
+                },
+                {
+                  "name": "App usage",
+                  "value": "dau=20\nwau=20\nmau=20",
+                  "inline": true
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "wallMs": 1204.3443,
+      "localProcessCpuMs": 1171,
+      "clock": "1440 simulated scheduled minutes; local wall/CPU are not Worker CPU; logical changes/returned rows are not D1 meters",
+      "providerCalls": 0
+    },
+    "candidate": {
+      "arm": "candidate",
+      "executedTicks": 1440,
+      "fixture": {
+        "activeSubjects": 20,
+        "initialActiveDays": 800,
+        "initialIssueEvents": 300,
+        "initialDeliveredReports": 80,
+        "currentSchema": true,
+        "networkMigration": "keyed_only"
+      },
+      "totals": {
+        "statements": 13219,
+        "selects": 10151,
+        "mutations": 3068,
+        "reportAggregates": 4,
+        "returnedRows": 4391,
+        "logicalChanges": 112
+      },
+      "categories": {
+        "hour_boundary": {
+          "ticks": 24,
+          "statements": {
+            "min": 18,
+            "max": 20,
+            "sum": 478
+          },
+          "aggregates": {
+            "min": 0,
+            "max": 0,
+            "sum": 0
+          }
+        },
+        "before_report_time": {
+          "ticks": 4,
+          "statements": {
+            "min": 7,
+            "max": 7,
+            "sum": 28
+          },
+          "aggregates": {
+            "min": 0,
+            "max": 0,
+            "sum": 0
+          }
+        },
+        "report_due": {
+          "ticks": 1,
+          "statements": {
+            "min": 14,
+            "max": 14,
+            "sum": 14
+          },
+          "aggregates": {
+            "min": 4,
+            "max": 4,
+            "sum": 4
+          }
+        },
+        "ordinary": {
+          "ticks": 1411,
+          "statements": {
+            "min": 9,
+            "max": 9,
+            "sum": 12699
+          },
+          "aggregates": {
+            "min": 0,
+            "max": 0,
+            "sum": 0
+          }
+        }
+      },
+      "finalPopulations": {
+        "activeDays": 700,
+        "issueEvents": 290,
+        "deliveredReports": 81
+      },
+      "finalDelivery": {
+        "report_date_utc": "2026-11-09",
+        "status": "delivered",
+        "attempted_at": "2026-11-10T00:05:00.000Z",
+        "delivered_at": "2026-11-10T00:05:00.000Z"
+      },
+      "webhookPayloads": [
+        {
+          "content": "```json\n{\"schema_version\":\"puripuly_daily_summary.v2\",\"report_date_utc\":\"2026-11-09\",\"window_start\":\"2026-11-09T00:00:00.000Z\",\"window_end\":\"2026-11-10T00:00:00.000Z\",\"summary\":{\"keys_delivered_total\":10,\"keys_delivered_discord\":0,\"keys_delivered_qq\":10,\"app_dau\":20,\"app_wau\":20,\"app_mau\":20}}\n```",
+          "embeds": [
+            {
+              "title": "PuriPuly daily summary — 2026-11-09 UTC",
+              "color": 16705372,
+              "description": "2026-11-09T00:00:00.000Z ≤ observed_at < 2026-11-10T00:00:00.000Z",
+              "fields": [
+                {
+                  "name": "Managed key issuance",
+                  "value": "keys_delivered=10\ndiscord=0\nqq=10",
+                  "inline": true
+                },
+                {
+                  "name": "App usage",
+                  "value": "dau=20\nwau=20\nmau=20",
+                  "inline": true
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "wallMs": 611.2735,
+      "localProcessCpuMs": 609,
+      "clock": "1440 simulated scheduled minutes; local wall/CPU are not Worker CPU; logical changes/returned rows are not D1 meters",
+      "providerCalls": 0
+    },
+    "same_webhook_payload": true,
+    "same_final_business_state": true,
+    "d1_metered_rows": false,
+    "platform_cpu": false,
+    "limitations": "One sequential 1,440-minute simulation per arm. UTC scheduled time advanced, not wall time; no production traffic or concurrency load. Local fixture seeded 800 active-day rows, 300 key events, 80 delivered dates; final expired-row deletion and report state match."
+  },
+  "deployed": {
+    "worker_version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+    "compatibility_date": "2026-04-08",
+    "actual_cron_trigger": false,
+    "same_worker_and_database_for_both_arms": true,
+    "started_at_utc": "2026-11-10T10:13:33Z",
+    "finished_at_utc": "2026-11-10T10:14:55Z",
+    "ordinary_and_hour_repetitions_per_arm": 3,
+    "report_due_repetitions_per_arm": 1,
+    "requests": 14,
+    "http_200": 14,
+    "platform_trace_count": 14,
+    "fixture": {
+      "app_active_day_rows": 600,
+      "issue_success_rows": 300,
+      "delivered_report_dates": 80,
+      "network_mode": "keyed_only",
+      "migration_files": 33
+    },
+    "order": "ordinary/hour interleaved, baseline/candidate order alternated by repetition and case; due-report baseline then candidate after restoring eligibility",
+    "snapshot_before_quiet": {
+      "sha256": "7ea61b498653e1c1643bedb9d3a1db4a1b3d5b86c52425d27f4fdeadf12e5219",
+      "rows": 980,
+      "meta": {
+        "served_by": "v3-prod",
+        "served_by_region": "APAC",
+        "served_by_colo": "ICN",
+        "served_by_primary": true,
+        "timings": {
+          "sql_duration_ms": 3.4939
+        },
+        "duration": 3.4939,
+        "changes": 0,
+        "last_row_id": 0,
+        "changed_db": false,
+        "size_after": 700416,
+        "rows_read": 1960,
+        "rows_written": 0,
+        "total_attempts": 1
+      }
+    },
+    "snapshot_after_quiet": {
+      "sha256": "7ea61b498653e1c1643bedb9d3a1db4a1b3d5b86c52425d27f4fdeadf12e5219",
+      "rows": 980,
+      "meta": {
+        "served_by": "v3-prod",
+        "served_by_region": "APAC",
+        "served_by_colo": "ICN",
+        "served_by_primary": true,
+        "timings": {
+          "sql_duration_ms": 2.0755
+        },
+        "duration": 2.0755,
+        "changes": 0,
+        "last_row_id": 0,
+        "changed_db": false,
+        "size_after": 700416,
+        "rows_read": 1960,
+        "rows_written": 0,
+        "total_attempts": 1
+      }
+    },
+    "quiet_business_snapshot_unchanged": true,
+    "samples": [
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-baseline-ordinary-0",
+        "arm": "baseline",
+        "case": "ordinary",
+        "scheduled_time": "2026-11-10T00:12:00.000Z",
+        "worker_wall_ms": 1337,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.5393,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3764,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2073,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1489,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.666,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2419,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2001,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1648,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1248,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1636,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1282,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1988,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3545,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1374,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1527,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 20,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1834,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 600,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3066,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.5398,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 140,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1064,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2603,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1305,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1321,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1684,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1113,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2206,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.0969,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1577,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3246,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1431,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.0488,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1251,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 0,
+        "webhook_payloads": [],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 1987.8709000004164,
+        "repetition": 0,
+        "received_at_utc": "2026-11-10T10:13:35Z",
+        "platform": {
+          "probe_id": "maint-baseline-ordinary-0",
+          "cpu_ms": 37,
+          "wall_ms": 1409,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305617008
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-candidate-ordinary-0",
+        "arm": "candidate",
+        "case": "ordinary",
+        "scheduled_time": "2026-11-10T00:12:00.000Z",
+        "worker_wall_ms": 418,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.4492,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2911,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1741,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1496,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.4892,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1394,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1056,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1538,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2368,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 0,
+        "webhook_payloads": [],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 649.5500999990327,
+        "repetition": 0,
+        "received_at_utc": "2026-11-10T10:13:36Z",
+        "platform": {
+          "probe_id": "maint-candidate-ordinary-0",
+          "cpu_ms": 12,
+          "wall_ms": 454,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305618612
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-candidate-hour-0",
+        "arm": "candidate",
+        "case": "hour",
+        "scheduled_time": "2026-11-10T01:00:00.000Z",
+        "worker_wall_ms": 888,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3872,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2742,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.169,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1465,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3743,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1316,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1123,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2051,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2989,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2092,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1214,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1304,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1331,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2094,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1089,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1396,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.5071,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1589,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.0391,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.0937,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 0,
+        "webhook_payloads": [],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 1118.2383000013942,
+        "repetition": 0,
+        "received_at_utc": "2026-11-10T10:13:37Z",
+        "platform": {
+          "probe_id": "maint-candidate-hour-0",
+          "cpu_ms": 18,
+          "wall_ms": 937,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305619247
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-baseline-hour-0",
+        "arm": "baseline",
+        "case": "hour",
+        "scheduled_time": "2026-11-10T01:00:00.000Z",
+        "worker_wall_ms": 1312,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3193,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2167,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2032,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.168,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.4916,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1838,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1465,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.144,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1163,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1889,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1221,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1379,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1205,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1429,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2038,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2449,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 20,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.0859,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 600,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2566,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 140,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1311,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3489,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1398,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.137,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1292,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1261,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.166,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1196,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1061,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2382,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.131,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.0567,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1348,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 0,
+        "webhook_payloads": [],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 1552.5157999982184,
+        "repetition": 0,
+        "received_at_utc": "2026-11-10T10:13:38Z",
+        "platform": {
+          "probe_id": "maint-baseline-hour-0",
+          "cpu_ms": 27,
+          "wall_ms": 1384,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305620352
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-candidate-ordinary-1",
+        "arm": "candidate",
+        "case": "ordinary",
+        "scheduled_time": "2026-11-10T00:12:00.000Z",
+        "worker_wall_ms": 420,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3534,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2683,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1382,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.153,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.411,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1081,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1385,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1446,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3545,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 0,
+        "webhook_payloads": [],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 631.8503999973473,
+        "repetition": 1,
+        "received_at_utc": "2026-11-10T10:13:39Z",
+        "platform": {
+          "probe_id": "maint-candidate-ordinary-1",
+          "cpu_ms": 10,
+          "wall_ms": 451,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305621919
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-baseline-ordinary-1",
+        "arm": "baseline",
+        "case": "ordinary",
+        "scheduled_time": "2026-11-10T00:12:00.000Z",
+        "worker_wall_ms": 1288,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3616,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3099,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.4195,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1914,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.5358,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1767,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1582,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1641,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1347,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1657,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1499,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.131,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1504,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1243,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1579,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 20,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1413,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 140,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1105,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 600,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2145,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.167,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2925,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1363,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1434,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1769,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1058,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1452,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1059,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1224,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3299,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1079,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.051,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1244,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 0,
+        "webhook_payloads": [],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 1516.1045000022568,
+        "repetition": 1,
+        "received_at_utc": "2026-11-10T10:13:40Z",
+        "platform": {
+          "probe_id": "maint-baseline-ordinary-1",
+          "cpu_ms": 24,
+          "wall_ms": 1347,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305622538
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-baseline-hour-1",
+        "arm": "baseline",
+        "case": "hour",
+        "scheduled_time": "2026-11-10T01:00:00.000Z",
+        "worker_wall_ms": 1289,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.359,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2656,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1533,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.234,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.5468,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3244,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2921,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1451,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1313,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.143,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1738,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1232,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.0969,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.114,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1559,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 20,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2003,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 600,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2495,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 140,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1534,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1989,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2228,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1382,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1597,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1691,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1218,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1874,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.0941,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1002,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.242,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 1.9876,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.0502,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1248,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 0,
+        "webhook_payloads": [],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 1541.3090999973065,
+        "repetition": 1,
+        "received_at_utc": "2026-11-10T10:13:42Z",
+        "platform": {
+          "probe_id": "maint-baseline-hour-1",
+          "cpu_ms": 24,
+          "wall_ms": 1357,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305624070
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-candidate-hour-1",
+        "arm": "candidate",
+        "case": "hour",
+        "scheduled_time": "2026-11-10T01:00:00.000Z",
+        "worker_wall_ms": 903,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3256,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2467,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2764,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1775,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3986,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1102,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1173,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1585,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.225,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1435,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1306,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1367,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1274,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.189,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.141,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1541,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2877,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1511,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.059,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1098,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 0,
+        "webhook_payloads": [],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 1250.1386999974784,
+        "repetition": 1,
+        "received_at_utc": "2026-11-10T10:13:43Z",
+        "platform": {
+          "probe_id": "maint-candidate-hour-1",
+          "cpu_ms": 20,
+          "wall_ms": 963,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305625714
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-baseline-ordinary-2",
+        "arm": "baseline",
+        "case": "ordinary",
+        "scheduled_time": "2026-11-10T00:12:00.000Z",
+        "worker_wall_ms": 1302,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3236,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2789,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1865,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1465,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.4713,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1481,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1574,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1795,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1164,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1497,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1676,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1941,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1031,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1849,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1509,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 140,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1594,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 20,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.099,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1763,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 600,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2543,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3326,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1733,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1134,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1872,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1318,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1971,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1059,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.084,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3466,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1663,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.0649,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1142,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 0,
+        "webhook_payloads": [],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 1555.9254999971017,
+        "repetition": 2,
+        "received_at_utc": "2026-11-10T10:13:45Z",
+        "platform": {
+          "probe_id": "maint-baseline-ordinary-2",
+          "cpu_ms": 29,
+          "wall_ms": 1371,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305626862
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-candidate-ordinary-2",
+        "arm": "candidate",
+        "case": "ordinary",
+        "scheduled_time": "2026-11-10T00:12:00.000Z",
+        "worker_wall_ms": 445,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.4046,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3071,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1377,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1592,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.4925,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2081,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.157,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1374,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3175,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 0,
+        "webhook_payloads": [],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 652.2353999971529,
+        "repetition": 2,
+        "received_at_utc": "2026-11-10T10:13:45Z",
+        "platform": {
+          "probe_id": "maint-candidate-ordinary-2",
+          "cpu_ms": 8,
+          "wall_ms": 470,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305628415
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-candidate-hour-2",
+        "arm": "candidate",
+        "case": "hour",
+        "scheduled_time": "2026-11-10T01:00:00.000Z",
+        "worker_wall_ms": 910,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.423,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2598,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1764,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2148,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.421,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1284,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1222,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2128,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3275,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1777,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1608,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2342,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1383,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.225,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1332,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1044,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.292,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1326,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.0546,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1475,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 0,
+        "webhook_payloads": [],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 1142.894200002047,
+        "repetition": 2,
+        "received_at_utc": "2026-11-10T10:13:47Z",
+        "platform": {
+          "probe_id": "maint-candidate-hour-2",
+          "cpu_ms": 16,
+          "wall_ms": 960,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305629068
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-baseline-hour-2",
+        "arm": "baseline",
+        "case": "hour",
+        "scheduled_time": "2026-11-10T01:00:00.000Z",
+        "worker_wall_ms": 1321,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.4537,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2976,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1784,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1845,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.5063,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1805,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2331,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2129,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1288,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1409,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1655,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1385,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1512,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1109,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1374,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 20,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1279,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 140,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1228,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1824,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 600,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.218,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.344,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1378,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1122,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1465,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1053,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.226,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1241,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1272,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2385,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1283,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.038,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1039,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 0,
+        "webhook_payloads": [],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 1571.677700001601,
+        "repetition": 2,
+        "received_at_utc": "2026-11-10T10:13:48Z",
+        "platform": {
+          "probe_id": "maint-baseline-hour-2",
+          "cpu_ms": 32,
+          "wall_ms": 1405,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305630196
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-baseline-report_due-0",
+        "arm": "baseline",
+        "case": "report_due",
+        "scheduled_time": "2026-11-10T00:05:00.000Z",
+        "worker_wall_ms": 1424,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.4709,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3703,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1199,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1511,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.6656,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.18,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1919,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1861,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.11,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2074,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1612,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1914,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1126,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1196,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1286,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 20,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.158,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2629,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 140,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1381,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 600,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3539,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 3,
+            "changes": 1,
+            "duration_ms": 0.2165,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 2,
+            "changes": 1,
+            "duration_ms": 0.1858,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.162,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1628,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1564,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1225,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1968,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1263,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1561,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2912,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1179,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3351,
+            "size_after": 700416
+          },
+          {
+            "operation": "DELETE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1435,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 1,
+        "webhook_payloads": [
+          {
+            "content": "```json\n{\"schema_version\":\"puripuly_daily_summary.v2\",\"report_date_utc\":\"2026-11-09\",\"window_start\":\"2026-11-09T00:00:00.000Z\",\"window_end\":\"2026-11-10T00:00:00.000Z\",\"summary\":{\"keys_delivered_total\":10,\"keys_delivered_discord\":0,\"keys_delivered_qq\":10,\"app_dau\":20,\"app_wau\":20,\"app_mau\":20}}\n```",
+            "embeds": [
+              {
+                "title": "PuriPuly daily summary — 2026-11-09 UTC",
+                "color": 16705372,
+                "description": "2026-11-09T00:00:00.000Z ≤ observed_at < 2026-11-10T00:00:00.000Z",
+                "fields": [
+                  {
+                    "name": "Managed key issuance",
+                    "value": "keys_delivered=10\ndiscord=0\nqq=10",
+                    "inline": true
+                  },
+                  {
+                    "name": "App usage",
+                    "value": "dau=20\nwau=20\nmau=20",
+                    "inline": true
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 2061.4857000000484,
+        "repetition": 0,
+        "received_at_utc": "2026-11-10T10:14:54Z",
+        "platform": {
+          "probe_id": "maint-baseline-report_due-0",
+          "cpu_ms": 39,
+          "wall_ms": 1491,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305696056
+        }
+      },
+      {
+        "kind": "maintenance389",
+        "probe_id": "maint-candidate-report_due-0",
+        "arm": "candidate",
+        "case": "report_due",
+        "scheduled_time": "2026-11-10T00:05:00.000Z",
+        "worker_wall_ms": 578,
+        "spans": [
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.3312,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 3,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2297,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1507,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1164,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 8,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.5648,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1036,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1305,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": false,
+            "rows_read": 2,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.153,
+            "size_after": 700416
+          },
+          {
+            "operation": "INSERT",
+            "aggregate": false,
+            "rows_read": 0,
+            "rows_written": 3,
+            "changes": 1,
+            "duration_ms": 0.294,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 300,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2806,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 20,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.0952,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 600,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.2577,
+            "size_after": 700416
+          },
+          {
+            "operation": "SELECT",
+            "aggregate": true,
+            "rows_read": 140,
+            "rows_written": 0,
+            "changes": 0,
+            "duration_ms": 0.1424,
+            "size_after": 700416
+          },
+          {
+            "operation": "UPDATE",
+            "aggregate": false,
+            "rows_read": 1,
+            "rows_written": 2,
+            "changes": 1,
+            "duration_ms": 0.1419,
+            "size_after": 700416
+          }
+        ],
+        "webhook_count": 1,
+        "webhook_payloads": [
+          {
+            "content": "```json\n{\"schema_version\":\"puripuly_daily_summary.v2\",\"report_date_utc\":\"2026-11-09\",\"window_start\":\"2026-11-09T00:00:00.000Z\",\"window_end\":\"2026-11-10T00:00:00.000Z\",\"summary\":{\"keys_delivered_total\":10,\"keys_delivered_discord\":0,\"keys_delivered_qq\":10,\"app_dau\":20,\"app_wau\":20,\"app_mau\":20}}\n```",
+            "embeds": [
+              {
+                "title": "PuriPuly daily summary — 2026-11-09 UTC",
+                "color": 16705372,
+                "description": "2026-11-09T00:00:00.000Z ≤ observed_at < 2026-11-10T00:00:00.000Z",
+                "fields": [
+                  {
+                    "name": "Managed key issuance",
+                    "value": "keys_delivered=10\ndiscord=0\nqq=10",
+                    "inline": true
+                  },
+                  {
+                    "name": "App usage",
+                    "value": "dau=20\nwau=20\nmau=20",
+                    "inline": true
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "external_requests": 0,
+        "error": null,
+        "http_status": 200,
+        "client_wall_ms": 813.7845999990532,
+        "repetition": 0,
+        "received_at_utc": "2026-11-10T10:14:55Z",
+        "platform": {
+          "probe_id": "maint-candidate-report_due-0",
+          "cpu_ms": 15,
+          "wall_ms": 614,
+          "outcome": "ok",
+          "version": "a4004ada-ae03-4511-9f2d-1a818b6345d2",
+          "timestamp_ms": 1794305697858
+        }
+      }
+    ],
+    "report_eligibility_resets": [
+      {
+        "arm": "baseline",
+        "meta": {
+          "served_by": "v3-prod",
+          "served_by_region": "APAC",
+          "served_by_colo": "ICN",
+          "served_by_primary": true,
+          "timings": {
+            "sql_duration_ms": 1.601
+          },
+          "duration": 1.601,
+          "changes": 1,
+          "last_row_id": 0,
+          "changed_db": true,
+          "size_after": 700416,
+          "rows_read": 1,
+          "rows_written": 1,
+          "total_attempts": 1
+        }
+      },
+      {
+        "arm": "candidate",
+        "meta": {
+          "served_by": "v3-prod",
+          "served_by_region": "APAC",
+          "served_by_colo": "ICN",
+          "served_by_primary": true,
+          "timings": {
+            "sql_duration_ms": 0.2481
+          },
+          "duration": 0.2481,
+          "changes": 1,
+          "last_row_id": 81,
+          "changed_db": true,
+          "size_after": 700416,
+          "rows_read": 1,
+          "rows_written": 1,
+          "total_attempts": 1
+        }
+      }
+    ],
+    "final_delivery": [
+      {
+        "report_date_utc": "2026-11-09",
+        "status": "delivered",
+        "attempted_at": "2026-11-10T00:05:00.000Z",
+        "delivered_at": "2026-11-10T00:05:00.000Z"
+      }
+    ],
+    "external_requests": 0,
+    "provider_calls": 0,
+    "peak_memory_measured": false,
+    "instrumentation": "Authenticated HTTP wrapper invokes exact frozen scheduled handler; first() maps to all()+first to expose numeric D1 meta; SQL metadata capture, probe serialization/logging and mock webhook handling are included in platform CPU. No measured subtraction of probe overhead; CPU is not an exact native production cron measurement."
+  },
+  "database_setup": {
+    "migrations": [
+      {
+        "name": "0000_define_broker_persistent_state.sql",
+        "sha256": "b602a340ed86c40a45bb2e77dab1080f6fc6f11f2d2d91ac37ce0eda4ca3b77b",
+        "statements": 12,
+        "rows_read": 17,
+        "rows_written": 22,
+        "sql_duration_ms": 1.8749,
+        "size_after": 73728
+      },
+      {
+        "name": "0001_add_abuse_hook_state.sql",
+        "sha256": "4b0e10369667ec514e9a6c4a293be91d59e226516ad865bfc1396d0a7d7eb5fe",
+        "statements": 9,
+        "rows_read": 16,
+        "rows_written": 14,
+        "sql_duration_ms": 0.9546,
+        "size_after": 122880
+      },
+      {
+        "name": "0001_harden_installation_public_inputs.sql",
+        "sha256": "8fdb72597f1a7921ddeeca16a109d8354ecedec3f88fa995037be2715b3e4e49",
+        "statements": 17,
+        "rows_read": 556,
+        "rows_written": 48,
+        "sql_duration_ms": 7.991,
+        "size_after": 139264
+      },
+      {
+        "name": "0002_add_entitlement_verified_hardware_snapshot.sql",
+        "sha256": "eca562ab70d53d2f9dd855e8c3f3123961a75a5f29123a93c231a6a08b9804ff",
+        "statements": 2,
+        "rows_read": 58,
+        "rows_written": 2,
+        "sql_duration_ms": 2.4905,
+        "size_after": 139264
+      },
+      {
+        "name": "0003_add_abuse_runtime_state_and_issue_success_events.sql",
+        "sha256": "4b3f8766045cd90618a10170b07d299c66f00c5b1c981c7c341078e6fcd90c41",
+        "statements": 16,
+        "rows_read": 210,
+        "rows_written": 33,
+        "sql_duration_ms": 4.5157,
+        "size_after": 180224
+      },
+      {
+        "name": "0004_add_discord_oauth_managed_issue.sql",
+        "sha256": "43186b118068c30a9418d009d0dad1a928cb3d163ad5d57d32944c5b16663278",
+        "statements": 11,
+        "rows_read": 191,
+        "rows_written": 15,
+        "sql_duration_ms": 6.1274,
+        "size_after": 212992
+      },
+      {
+        "name": "0005_add_referral_persistence_foundation.sql",
+        "sha256": "0d4f9e05938f1cb4d848aa0f14f4f8bc1ea30d20471c83ef6e452528ec662fb3",
+        "statements": 11,
+        "rows_read": 65,
+        "rows_written": 14,
+        "sql_duration_ms": 3.3833,
+        "size_after": 266240
+      },
+      {
+        "name": "0006_harden_referral_reward_operations.sql",
+        "sha256": "54d0ca5157e668487618d0f41202987293e63d5f37c77df382cb5bd658d96dc2",
+        "statements": 9,
+        "rows_read": 241,
+        "rows_written": 9,
+        "sql_duration_ms": 5.8512,
+        "size_after": 282624
+      },
+      {
+        "name": "0007_simplify_referral_id_checks.sql",
+        "sha256": "1d771ab05cd31366af1b7fc3fc80c19c2642e3a8258f68952f3e0c3f25d556a4",
+        "statements": 33,
+        "rows_read": 2000,
+        "rows_written": 92,
+        "sql_duration_ms": 13.3526,
+        "size_after": 282624
+      },
+      {
+        "name": "0008_add_qq_auth_assertions.sql",
+        "sha256": "a70c7d118ed74e2ff7a7b6f9ce9e976b1797b27cad8633bf6fc072576de8607e",
+        "statements": 2,
+        "rows_read": 2,
+        "rows_written": 4,
+        "sql_duration_ms": 0.36579999999999996,
+        "size_after": 290816
+      },
+      {
+        "name": "0009_add_qq_managed_entitlements.sql",
+        "sha256": "c92cef5c14c7e09de04763938e93c4a045915b001b65dacbc824a2067c46eae0",
+        "statements": 5,
+        "rows_read": 9,
+        "rows_written": 7,
+        "sql_duration_ms": 0.6315000000000001,
+        "size_after": 315392
+      },
+      {
+        "name": "0010_source_aware_issue_success_events.sql",
+        "sha256": "8184ea54fa4c72d0fe79cf625ec5e4943f2c960c2c9a227133d2aac092b3bef4",
+        "statements": 21,
+        "rows_read": 1072,
+        "rows_written": 44,
+        "sql_duration_ms": 6.360499999999999,
+        "size_after": 323584
+      },
+      {
+        "name": "0011_add_telemetry_active_days.sql",
+        "sha256": "9e059effd4fff02614f6904c09adffd438135b733550f5dabf4279916651986c",
+        "statements": 4,
+        "rows_read": 6,
+        "rows_written": 6,
+        "sql_duration_ms": 0.5735,
+        "size_after": 339968
+      },
+      {
+        "name": "0012_add_managed_key_delivery_ack.sql",
+        "sha256": "458bd8c737fcd3fd33d4f9d382cdc0eb14257e076ac0257720914cc90a8fd6bd",
+        "statements": 24,
+        "rows_read": 1653,
+        "rows_written": 75,
+        "sql_duration_ms": 10.7773,
+        "size_after": 376832
+      },
+      {
+        "name": "0013_add_telemetry_subjects_and_daily_summary_v2.sql",
+        "sha256": "5b4e76888a37870f24a4e1e76d70307b45bca0c83458d14cbd94b47c161ffe8f",
+        "statements": 7,
+        "rows_read": 8,
+        "rows_written": 10,
+        "sql_duration_ms": 0.9759,
+        "size_after": 401408
+      },
+      {
+        "name": "0014_simplify_abuse_incidents.sql",
+        "sha256": "b4e327d38fd6bbdc9a7755929294fe372bcbf2c1cb6f666c237eb59d086518d4",
+        "statements": 3,
+        "rows_read": 91,
+        "rows_written": 3,
+        "sql_duration_ms": 2.3915,
+        "size_after": 401408
+      },
+      {
+        "name": "0015_add_app_active_days.sql",
+        "sha256": "5db0afc024e3519cbdbd52b2999dfee09b6d798c4190cbcbeb3f7c59e12305c4",
+        "statements": 2,
+        "rows_read": 3,
+        "rows_written": 4,
+        "sql_duration_ms": 0.40149999999999997,
+        "size_after": 413696
+      },
+      {
+        "name": "0016_make_referrals_source_aware.sql",
+        "sha256": "795768ca66fbe4c03e613ca701587b14bb844d6b868ef86ca6db576b54e66747",
+        "statements": 39,
+        "rows_read": 2887,
+        "rows_written": 129,
+        "sql_duration_ms": 17.7675,
+        "size_after": 442368
+      },
+      {
+        "name": "0017_add_qq_pass_settlement_jobs.sql",
+        "sha256": "79c9e4e79e232db4f1a886f833c7c391b7f8cf93d065f0f86546acb2d2d70fa8",
+        "statements": 4,
+        "rows_read": 7,
+        "rows_written": 7,
+        "sql_duration_ms": 0.6874,
+        "size_after": 462848
+      },
+      {
+        "name": "0018_managed_operations.sql",
+        "sha256": "615f9759ed2990b71a3800d4ec94ae395451d88b5ea52225e0c5f2504ec09dc1",
+        "statements": 42,
+        "rows_read": 3508,
+        "rows_written": 117,
+        "sql_duration_ms": 17.5137,
+        "size_after": 503808
+      },
+      {
+        "name": "0019_managed_referral_settlement.sql",
+        "sha256": "e9086d6a23cfc77b1ef8e5d3bec6759d6cc58f14f0662d4c1faea6758d649fb1",
+        "statements": 9,
+        "rows_read": 690,
+        "rows_written": 12,
+        "sql_duration_ms": 1.6176,
+        "size_after": 503808
+      },
+      {
+        "name": "0020_network_identity_hmac.sql",
+        "sha256": "3b358dd24cb4ae3437367b6377dd7fdf1d41e92f9ba0e556b4116c302711661e",
+        "statements": 31,
+        "rows_read": 2830,
+        "rows_written": 97,
+        "sql_duration_ms": 21.1399,
+        "size_after": 524288
+      },
+      {
+        "name": "0021_network_identity_purge.sql",
+        "sha256": "ab0799e07c2428da691bad0644cc65c5113ac006cdf86ea15485644c88d47183",
+        "statements": 47,
+        "rows_read": 4892,
+        "rows_written": 154,
+        "sql_duration_ms": 18.0644,
+        "size_after": 512000
+      },
+      {
+        "name": "0022_managed_operation_issuance_context.sql",
+        "sha256": "4cacdd2393eab0da36d3211a47a552877871b408b8b0cb65341b70d4d8c56a94",
+        "statements": 5,
+        "rows_read": 337,
+        "rows_written": 3,
+        "sql_duration_ms": 6.8858999999999995,
+        "size_after": 512000
+      },
+      {
+        "name": "0023_backfill_operation_route_rate_limits.sql",
+        "sha256": "b5bbce36456f0684ce041f31a6450161515eea68e61e4ea7f2e84723bfc7e7ec",
+        "statements": 1,
+        "rows_read": 1,
+        "rows_written": 1,
+        "sql_duration_ms": 0.2022,
+        "size_after": 512000
+      },
+      {
+        "name": "0024_allow_unattributed_request_events.sql",
+        "sha256": "b6fd6fac63dac2c96b9b7f7ccdcaf94a769b36f25a1516481a9b1a094f5621bc",
+        "statements": 13,
+        "rows_read": 1141,
+        "rows_written": 42,
+        "sql_duration_ms": 6.3649,
+        "size_after": 516096
+      },
+      {
+        "name": "0025_drop_legacy_translation_telemetry.sql",
+        "sha256": "615d20c3c1e6041e96cc61353fc95242f60a3aca314d0c9fac86b10897ea6902",
+        "statements": 6,
+        "rows_read": 1365,
+        "rows_written": 7,
+        "sql_duration_ms": 0.9018,
+        "size_after": 487424
+      },
+      {
+        "name": "0026_managed_attempt_cleanup_ownership.sql",
+        "sha256": "f3f825b33eb0f00e4cf543f4b69e7a05b95df8b56ef62d3e3c897c655d1e437f",
+        "statements": 13,
+        "rows_read": 625,
+        "rows_written": 12,
+        "sql_duration_ms": 10.2015,
+        "size_after": 503808
+      },
+      {
+        "name": "0027_remove_managed_referrals.sql",
+        "sha256": "9e79ffab27fd2cf73e03948423db0dbfe36170f7e356786594d7599d511539c2",
+        "statements": 46,
+        "rows_read": 6398,
+        "rows_written": 186,
+        "sql_duration_ms": 15.3847,
+        "size_after": 389120
+      },
+      {
+        "name": "0028_add_puri_identity_proofs.sql",
+        "sha256": "9d6ba8c3c07d0572e57dfad3c64b0c9431a03ce131ef8602c52d22f69e9d0055",
+        "statements": 4,
+        "rows_read": 89,
+        "rows_written": 6,
+        "sql_duration_ms": 4.0089,
+        "size_after": 401408
+      },
+      {
+        "name": "0029_puri_token_admission_limits.sql",
+        "sha256": "836ccec9bc4932794bda44f5e56522f8a1688351840199c1e2e191fff0bc9f68",
+        "statements": 3,
+        "rows_read": 4,
+        "rows_written": 5,
+        "sql_duration_ms": 0.5963,
+        "size_after": 413696
+      },
+      {
+        "name": "0030_puri_first_enrollment_limits.sql",
+        "sha256": "3bab7d1b5254541e41523e8d41a69d640a3b7ffe0f2d3d62cfbcb08cb6a41fd1",
+        "statements": 4,
+        "rows_read": 6,
+        "rows_written": 5,
+        "sql_duration_ms": 0.7176,
+        "size_after": 425984
+      },
+      {
+        "name": "0031_photo_managed_access.sql",
+        "sha256": "e3a2c17fb6603ee90340672af5b0629bbd18511c8285a856e8f6545260fdde18",
+        "statements": 40,
+        "rows_read": 3130,
+        "rows_written": 63,
+        "sql_duration_ms": 10.2427,
+        "size_after": 434176
+      }
+    ],
+    "seed_sql": "\nWITH RECURSIVE days(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM days WHERE n<30), subjects(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM subjects WHERE n<20)\nINSERT INTO app_active_days(subject_ref,active_date_utc) SELECT 'ph-app-subject-v1_' || printf('%064x',subjects.n), date('2026-11-10','-' || days.n || ' days') FROM days CROSS JOIN subjects;\nWITH RECURSIVE days(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM days WHERE n<30), events(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM events WHERE n<10)\nINSERT INTO broker_issue_success_events(issue_source,subject_ref,managed_credential_ref,observed_at) SELECT 'qq','ph-qq-subject-v1_synthetic-' || events.n,'synthetic-' || days.n || '-' || events.n,date('2026-11-10','-' || days.n || ' days') || 'T12:00:00.000Z' FROM days CROSS JOIN events;\nWITH RECURSIVE days(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM days WHERE n<80)\nINSERT INTO broker_daily_summary_deliveries(report_date_utc,status,lease_token,lease_expires_at,attempted_at,delivered_at) SELECT date('2026-11-10','-' || n || ' days'),'delivered','00000000-0000-0000-0000-000000000000',date('2026-11-10','-' || (n-1) || ' days') || 'T00:20:00.000Z',date('2026-11-10','-' || (n-1) || ' days') || 'T00:05:00.000Z',date('2026-11-10','-' || (n-1) || ' days') || 'T00:05:00.000Z' FROM days;\n",
+    "seed_metadata": [
+      {
+        "served_by": "v3-prod",
+        "served_by_region": "APAC",
+        "served_by_colo": "ICN",
+        "served_by_primary": true,
+        "timings": {
+          "sql_duration_ms": 2.1066
+        },
+        "duration": 2.1066,
+        "changes": 600,
+        "last_row_id": 600,
+        "changed_db": true,
+        "size_after": 573440,
+        "rows_read": 652,
+        "rows_written": 1800,
+        "total_attempts": 1
+      },
+      {
+        "served_by": "v3-prod",
+        "served_by_region": "APAC",
+        "served_by_colo": "ICN",
+        "served_by_primary": true,
+        "timings": {
+          "sql_duration_ms": 0.9594
+        },
+        "duration": 0.9594,
+        "changes": 300,
+        "last_row_id": 300,
+        "changed_db": true,
+        "size_after": 679936,
+        "rows_read": 343,
+        "rows_written": 1801,
+        "total_attempts": 1
+      },
+      {
+        "served_by": "v3-prod",
+        "served_by_region": "APAC",
+        "served_by_colo": "ICN",
+        "served_by_primary": true,
+        "timings": {
+          "sql_duration_ms": 0.6506
+        },
+        "duration": 0.6506,
+        "changes": 80,
+        "last_row_id": 80,
+        "changed_db": true,
+        "size_after": 700416,
+        "rows_read": 81,
+        "rows_written": 240,
+        "total_attempts": 1
+      }
+    ],
+    "setup_separate_from_measured_workload": true
+  },
+  "checks": {
+    "vitest_command": "pnpm exec vitest run broker/tests/daily-report.spec.ts broker/tests/managed-key-delivery.spec.ts broker/tests/puri-token.spec.ts broker/tests/managed-issuance-durability.spec.ts",
+    "vitest_test_files_passed": 4,
+    "vitest_tests_passed": 121,
+    "typecheck": "TypeScript API: root tsconfig options, include only broker/src/**/*.ts and broker/tests/**/*.ts, no emit",
+    "typecheck_files": 112,
+    "typecheck_diagnostics": 0,
+    "warnings": [
+      "Existing Vite native-config-loader compatibility warning",
+      "Node experimental SQLite warning"
+    ],
+    "failed_checks": [],
+    "unrun": [
+      "full repository suite",
+      "unrelated Relay/app/native/GUI checks",
+      "production deployment and post-deploy account usage",
+      "production native cron CPU",
+      "mixed-concurrency/peak-memory load test"
+    ]
+  },
+  "operational_changes": [
+    "Expired housekeeping state is physically deleted on scheduled UTC minute zero rather than every minute; a missed/failed cleanup waits for a later hourly opportunity.",
+    "Fresh key cleanup, operation recovery, ACK/auth expiry, retry cooldown, claim ownership and report retry cadence are unchanged.",
+    "No-claim daily report result now has payload:null; aggregation failures release the owned report lease before propagating the failure.",
+    "Confirmed keyed-only migration state is authoritative: subsequent out-of-contract raw-hook writes are not automatically reconverted. Legacy/dual conversion and finalization barriers remain."
+  ],
+  "limits": [
+    "These fixture row savings are not a measured percentage reduction of production/account D1 usage.",
+    "Minute Worker invocation count is unchanged. SQL statement counts, SQLite changes, D1 rows, Worker CPU and wall time remain separate metrics.",
+    "Hourly cadence alone does not guarantee a one-hour deletion bound across outages.",
+    "Earlier OCR CPU, display and route-comparison evidence gaps are not resolved by this Broker-only follow-up.",
+    "No memory or general end-to-end latency improvement is claimed."
+  ],
+  "cleanup": {
+    "remote": [
+      {
+        "kind": "worker",
+        "name": "puri389-maint-00a1d9e0",
+        "delete_status": 200,
+        "delete_success": true,
+        "verified_status": 404,
+        "verified_codes": [
+          10007
+        ],
+        "verified_at_utc": "2026-11-10T10:17:00Z"
+      },
+      {
+        "kind": "d1",
+        "name": "puri389-maint-00a1d9e0",
+        "delete_status": 200,
+        "delete_success": true,
+        "verified_status": 404,
+        "verified_codes": [
+          7404
+        ],
+        "verified_at_utc": "2026-11-10T10:17:02Z"
+      }
+    ],
+    "trace_collector_stopped": true,
+    "owned_trace_processes_remaining": 0,
+    "local_probe_directory_removed": true
+  }
+}
