@@ -77,8 +77,11 @@ async def test_read_action_read_observes_order_and_proposal_stops_effects(catalo
         ),
         batch(
             call(
-                "proposal", "propose_app", "settings",
-                changes={"overlay.background_alpha": 0.4}, summary="Adjust overlay transparency",
+                "proposal",
+                "propose_app",
+                "settings",
+                changes={"overlay.background_alpha": 0.4},
+                summary="Adjust overlay transparency",
             ),
             call("blocked", "execute_app", "overlay.set", enabled=False),
         ),
@@ -210,7 +213,8 @@ async def test_flat_approval_requests_ignore_other_actions_without_extra_effects
                 {
                     "command": action,
                     "arguments": {
-                        key: value for key, value in arguments.items()
+                        key: value
+                        for key, value in arguments.items()
                         if key != "changes" and action != "overlay.position.reset"
                     },
                     "revision": 11,
