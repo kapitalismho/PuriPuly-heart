@@ -59,9 +59,9 @@ interface DailyReportDeliveryClaim {
   leaseToken: string;
 }
 
-interface DailyReportDeliveryRow {
-  report_date_utc: string;
-  status: 'pending' | 'delivered';
+interface DailyReportProgressRow {
+  pending_date_utc: string | null;
+  last_delivered_date_utc: string | null;
 }
 
 export async function handleScheduled(
@@ -667,21 +667,26 @@ async function resolveNextDailyReportDate(
   now: Date,
 ): Promise<string> {
   const latestCompletedDateUtc = resolveDailyReportWindow(now).reportDateUtc;
-  const rows = await db
+  const progress = await db
     .prepare(
-      `SELECT report_date_utc, status
-         FROM broker_daily_summary_deliveries
-        WHERE report_date_utc <= ?
-        ORDER BY report_date_utc`,
+      `SELECT (
+         SELECT report_date_utc
+           FROM broker_daily_summary_deliveries
+          WHERE status = 'pending' AND report_date_utc <= ?
+          ORDER BY report_date_utc
+          LIMIT 1
+       ) AS pending_date_utc, (
+         SELECT report_date_utc
+           FROM broker_daily_summary_deliveries
+          WHERE status = 'delivered' AND report_date_utc <= ?
+          ORDER BY report_date_utc DESC
+          LIMIT 1
+       ) AS last_delivered_date_utc`,
     )
-    .bind(latestCompletedDateUtc)
-    .all<DailyReportDeliveryRow>();
-  const pendingDateUtc = rows.results.find(
-    (row) => row.status === 'pending',
-  )?.report_date_utc;
-  const lastDeliveredDateUtc = rows.results
-    .filter((row) => row.status === 'delivered')
-    .at(-1)?.report_date_utc;
+    .bind(latestCompletedDateUtc, latestCompletedDateUtc)
+    .first<DailyReportProgressRow>();
+  const pendingDateUtc = progress?.pending_date_utc;
+  const lastDeliveredDateUtc = progress?.last_delivered_date_utc;
   const nextAfterDeliveredUtc = lastDeliveredDateUtc
     ? addUtcDays(lastDeliveredDateUtc, 1)
     : null;

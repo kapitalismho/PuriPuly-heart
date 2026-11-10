@@ -186,27 +186,54 @@ describe('PuriPuly daily summary v2', () => {
     });
   });
 
-  it('recovers an expired report-date lease after an interrupted attempt', async () => {
+  it.each([
+    {
+      pendingDates: ['2026-04-19'],
+      deliveredDates: [],
+      expectedDate: '2026-04-19',
+    },
+    {
+      pendingDates: ['2026-04-19', '2026-04-18', '2026-04-21'],
+      deliveredDates: ['2026-04-17', '2026-04-22'],
+      expectedDate: '2026-04-18',
+    },
+    {
+      pendingDates: ['2026-04-19', '2026-04-21'],
+      deliveredDates: ['2026-04-17', '2026-04-22'],
+      expectedDate: '2026-04-18',
+    },
+  ])('recovers the next completed report date $expectedDate after an interrupted attempt', async ({
+    pendingDates, deliveredDates, expectedDate,
+  }) => {
     const env = createTestBrokerEnv();
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
-    env.__db
-      .prepare(
-        `INSERT INTO broker_daily_summary_deliveries (
-            report_date_utc,
+    for (const [status, dates] of [
+      ['pending', pendingDates],
+      ['delivered', deliveredDates],
+    ] as const) {
+      for (const date of dates) {
+        env.__db
+          .prepare(
+            `INSERT INTO broker_daily_summary_deliveries (
+                report_date_utc,
+                status,
+                lease_token,
+                lease_expires_at,
+                attempted_at,
+                delivered_at
+              ) VALUES (?, ?, ?, ?, ?, ?)`,
+          )
+          .run(
+            date,
             status,
-            lease_token,
-            lease_expires_at,
-            attempted_at,
-            delivered_at
-          ) VALUES (?, 'pending', ?, ?, ?, NULL)`,
-      )
-      .run(
-        '2026-04-19',
-        '00000000-0000-0000-0000-000000000000',
-        '2026-04-20T00:04:59.999Z',
-        '2026-04-20T00:00:00.000Z',
-      );
+            '00000000-0000-0000-0000-000000000000',
+            '2026-04-20T00:04:59.999Z',
+            '2026-04-20T00:00:00.000Z',
+            status === 'delivered' ? '2026-04-20T00:00:00.000Z' : null,
+          );
+      }
+    }
 
     const result = await runDailyReport(
       env,
@@ -214,9 +241,12 @@ describe('PuriPuly daily summary v2', () => {
     );
 
     expect(result.sent).toBe(true);
+    expect(result.payload.report_date_utc).toBe(expectedDate);
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(readDailySummaryDeliveries(env)[0]).toMatchObject({
-      report_date_utc: '2026-04-19',
+    expect(readDailySummaryDeliveries(env).find(
+      (row) => row.report_date_utc === expectedDate,
+    )).toMatchObject({
+      report_date_utc: expectedDate,
       status: 'delivered',
       attempted_at: '2026-04-20T00:05:00.000Z',
     });
