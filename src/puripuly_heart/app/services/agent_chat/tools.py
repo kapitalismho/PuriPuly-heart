@@ -569,6 +569,16 @@ def project_operation_receipt(receipt: dict, tool: str) -> dict:
             ),
         )
     )
+    if isinstance(receipt.get("target_languages"), list):
+        result["target_languages"] = [
+            target for target in receipt["target_languages"][:2] if isinstance(target, str)
+        ]
+    if isinstance(receipt.get("target_results"), list):
+        result["target_results"] = [
+            _pick(target, ("target_language", "translation_result"))
+            for target in receipt["target_results"][:2]
+            if isinstance(target, Mapping)
+        ]
     return result
 
 
@@ -742,10 +752,6 @@ class AgentTools:
                 del changes["languages"]
         if not changes:
             return _rejected("invalid_arguments", "Provide at least one supported change.")
-        if bool("translation.model" in changes) != bool("translation.connection" in changes):
-            return _rejected(
-                "invalid_arguments", "Provide translation model and connection together."
-            )
         context = deepcopy(self._context)
         if type(context.get("revision")) is not int:
             return _rejected("context_required", "Read current settings before changing them.")
@@ -756,6 +762,10 @@ class AgentTools:
         except Exception:
             return _rejected("settings_unavailable", "Settings choices are unavailable.")
         try:
+            if changes.keys() & {"translation.model", "translation.connection"}:
+                for field in ("translation.model", "translation.connection"):
+                    if field not in changes:
+                        changes[field] = context["settings"][SETTINGS_FIELD_PATHS[field]]
             for key, value in changes.items():
                 _validate(value, schema["properties"][key])
             if "translation.model" in changes:

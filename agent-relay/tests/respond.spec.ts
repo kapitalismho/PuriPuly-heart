@@ -50,7 +50,8 @@ afterEach(() => {
 describe('authenticated agent relay', () => {
   it('publishes OSC retry as an execute_app action and admits its owned tool history', () => {
     const execute = appTools.find((tool) => tool.name === 'execute_app');
-    expect((execute?.parameters as { properties: { action: { enum: string[] } } }).properties.action.enum)
+    const properties = execute?.parameters.properties;
+    expect(properties && 'action' in properties ? properties.action?.enum : [])
       .toContain('osc.discovery.retry');
     const history = {
       ...body,
@@ -77,11 +78,12 @@ describe('authenticated agent relay', () => {
 
   it('publishes exact-card withdrawal without model approval or undo authority', () => {
     const execute = appTools.find((tool) => tool.name === 'execute_app');
-    const { properties } = execute?.parameters as unknown as { properties: Record<string, { enum?: string[] }> };
-    expect(properties.action.enum).toContain('confirmation.withdraw');
-    expect(properties.card_id).toEqual({ type: 'string', minLength: 1, maxLength: 64 });
+    const properties = execute?.parameters.properties;
+    expect(properties && 'action' in properties ? properties.action?.enum : [])
+      .toContain('confirmation.withdraw');
+    expect(properties).toHaveProperty('card_id', { type: 'string', minLength: 1, maxLength: 64 });
     const actions = appTools.flatMap((tool) =>
-      (tool.parameters as { properties: { action?: { enum: string[] } } }).properties.action?.enum ?? []);
+      'action' in tool.parameters.properties ? tool.parameters.properties.action?.enum ?? [] : []);
     expect(actions.filter((action) => /(^|\.)(confirm|approve|undo)$/.test(action))).toEqual([]);
     expect(isRespondRequest({
       ...body,

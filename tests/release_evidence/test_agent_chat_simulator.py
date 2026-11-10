@@ -133,6 +133,42 @@ async def test_probe_never_repairs_state_and_start_produces_normal_events():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("scenario_id", "status"),
+    [("fixture-first-run", "applied"), ("debug-translation-auth", "failed")],
+)
+async def test_translation_probe_reports_configured_self_targets_without_publishing(
+    scenario_id, status
+):
+    app = ScenarioApp(scenario(scenario_id))
+    app.intent["languages"].update(
+        source_language="es", target_language="fr", secondary_target_language="de"
+    )
+    before = deepcopy(app.intent)
+    capture = dict(app.capture_active)
+    enabled = app.translation_enabled
+    accepted = await app.submit("translation.probe", {}, request_id="direction-probe")
+    result = await app.wait(accepted["operation_id"])
+    assert result["status"] == status
+    assert result["source_language"] == "es"
+    assert result["target_language"] == "fr"
+    assert result["target_languages"] == ["fr", "de"]
+    assert result["target_results"] == [
+        {
+            "target_language": target,
+            "translation_result": "succeeded" if status == "applied" else "failed",
+        }
+        for target in ("fr", "de")
+    ]
+    assert result["output_delivery"] == result["display"] == "not_exercised"
+    assert not {"text", "translation", "prompt", "context"} & result.keys()
+    assert app.intent == before
+    assert app.capture_active == capture
+    assert app.translation_enabled == enabled
+    assert app.normal_recognition == app.normal_translation == 0
+
+
+@pytest.mark.asyncio
 async def test_real_owner_adapters_visibility_notice_receipt_and_report_boundaries():
     results = {}
     for identity in (

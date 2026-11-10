@@ -73,6 +73,7 @@ from puripuly_heart.app.services.recognition_probe import (
 from puripuly_heart.app.services.translation_probe import (
     TRANSLATION_PROBE_METADATA,
     run_translation_probe,
+    translation_probe_direction,
 )
 from puripuly_heart.config.provider_values import (
     QwenRegion,
@@ -2046,7 +2047,33 @@ class ApplicationControlOwner:
                             _validate_command_args(
                                 command, arguments, locale_choices=self.locale_choices
                             )
-                            deferred = ("probe", None)
+                            configuration = getattr(
+                                self.pipeline, "translation_runtime_configuration", None
+                            )
+                            if configuration is not None:
+                                languages = configuration.snapshot().value
+                                source_language = languages.source_language
+                                target_languages = languages.self_target_languages
+                            else:
+                                canonical = self.application.compatibility_settings()
+                                languages = canonical.intent.languages if canonical else None
+                                source_language = languages.source_language if languages else None
+                                target_languages = (
+                                    tuple(
+                                        language
+                                        for language in (
+                                            languages.target_language,
+                                            languages.secondary_target_language,
+                                        )
+                                        if language
+                                    )
+                                    if languages
+                                    else ()
+                                )
+                            operation.receipt.update(
+                                translation_probe_direction(source_language, target_languages)
+                            )
+                            deferred = ("probe", (source_language, target_languages))
                         elif command == "recognition.probe":
                             _validate_command_args(
                                 command, arguments, locale_choices=self.locale_choices
@@ -2119,7 +2146,9 @@ class ApplicationControlOwner:
                             self._retain_audio_diagnosis(result)
                         elif deferred[0] == "probe":
                             result = await run_translation_probe(
-                                lambda: getattr(self.pipeline, "llm_runtime", None)
+                                lambda: getattr(self.pipeline, "llm_runtime", None),
+                                source_language=deferred[1][0],
+                                target_languages=deferred[1][1],
                             )
                         elif deferred[0] == "recognition_probe":
                             result = await run_recognition_probe(

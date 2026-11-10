@@ -38,7 +38,7 @@ async def test_three_topic_reads_keep_independent_results_on_partial_failure(cat
     transport = Responses(
         batch(
             call("output", "read_app", "output"),
-            call("gpu", "read_app", "gpu"),
+            call("gpu", "read_app", "gpu", provider="soniox"),
             call("diagnostics", "read_app", "diagnostics"),
         ),
         answer(),
@@ -72,11 +72,14 @@ async def test_read_action_read_observes_order_and_proposal_stops_effects(catalo
     transport = Responses(
         batch(
             call("before", "read_app", "general"),
-            call("execute", "execute_app", "overlay.set", enabled=True),
+            call("execute", "execute_app", "overlay.set", enabled=True, channel="self"),
             call("after", "read_app", "general"),
         ),
         batch(
-            call("proposal", "propose_app", "settings", changes={"overlay.background_alpha": 0.4}),
+            call(
+                "proposal", "propose_app", "settings",
+                changes={"overlay.background_alpha": 0.4}, summary="Adjust overlay transparency",
+            ),
             call("blocked", "execute_app", "overlay.set", enabled=False),
         ),
         answer(),
@@ -125,15 +128,13 @@ async def test_pure_provider_read_does_not_replace_staged_secure_entry(catalog):
 
 
 @pytest.mark.asyncio
-async def test_flat_requests_reject_unknown_null_foreign_and_missing_values(catalog):
+async def test_flat_requests_reject_unknown_null_invalid_and_missing_values(catalog):
     for family, request in (
         ("propose_app", {"action": "settings", "changes": {"overlay.background_alpha": None}}),
         ("propose_app", {"action": "settings", "changes": {"private": "value"}}),
         ("execute_app", {"action": "capture.set", "channel": "self"}),
         ("execute_app", {"action": "recognition.probe", "channel": "both"}),
         ("execute_app", {"action": "auth.login", "provider": "chatgpt"}),
-        ("execute_app", {"action": "translation.set", "enabled": True, "channel": "self"}),
-        ("read_app", {"topic": "gpu", "after": 1}),
         ("read_app", {"topic": "settings.current"}),
         ("read_app", {"topic": "provider_setup"}),
         ("read_app", {"request": {"topic": "overview"}}),
@@ -154,6 +155,69 @@ async def test_flat_requests_reject_unknown_null_foreign_and_missing_values(cata
     assert validate_app_request(
         "execute_app", {"action": "ui.settings", "section": "api", "provider": None}, catalog
     ) == {"action": "ui.settings", "section": "api"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("action", "arguments", "expected"),
+    [
+        (
+            "settings",
+            {"changes": {"translation.qwen.region": "singapore"}},
+            {"translation.qwen.region": "singapore"},
+        ),
+        (
+            "secrets.delete",
+            {"name": "deepgram_api_key", "changes": {"clipboard.enabled": True}},
+            {"secrets.deepgram_api_key": False},
+        ),
+        (
+            "auth.logout",
+            {"provider": "chatgpt", "changes": {"clipboard.enabled": True}},
+            {"accounts.chatgpt": False},
+        ),
+        (
+            "overlay.position.reset",
+            {"provider": "chatgpt", "changes": {"clipboard.enabled": True}},
+            {"overlay.desktop_position": "default"},
+        ),
+    ],
+)
+async def test_flat_approval_requests_ignore_other_actions_without_extra_effects(
+    catalog, action, arguments, expected
+):
+    control = ExecutionControl(catalog)
+    control.accounts = {"chatgpt": {"signed_in": True}}
+    transport = Responses(
+        batch(call("proposal", "propose_app", action, summary="Requested change", **arguments)),
+        answer(),
+        answer(),
+    )
+    owner = AgentChatOwner(control, transport, localize=str)
+    await owner.start()
+    try:
+        result = await owner.send("Apply the requested change.")
+        assert [item.status for item in result.tool_results] == ["needs_confirmation"]
+        card = owner.snapshot.confirmation
+        assert card["changes"] == expected
+        assert not control.submissions
+        applied = await owner.confirm(card["id"], True)
+        assert applied["status"] == "applied"
+        if action == "settings":
+            assert control.submissions == [{"changes": expected, "expected_revision": 11}]
+        else:
+            assert control.submissions == [
+                {
+                    "command": action,
+                    "arguments": {
+                        key: value for key, value in arguments.items()
+                        if key != "changes" and action != "overlay.position.reset"
+                    },
+                    "revision": 11,
+                }
+            ]
+    finally:
+        await owner.close()
 
 
 @pytest.mark.asyncio

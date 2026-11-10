@@ -331,7 +331,8 @@ describe('user-authorized opaque support storage', () => {
     const tool = appTools.find((value) => value.name === 'propose_app');
     expect(tool).toMatchObject({ type: 'function', parameters: { type: 'object', additionalProperties: false,
       properties: { summary: { type: 'string', minLength: 1, maxLength: 2000 } } } });
-    expect((tool?.parameters as { properties: { action: { enum: string[] } } }).properties.action.enum).toContain('report');
+    const properties = tool?.parameters.properties;
+    expect(properties && 'action' in properties ? properties.action?.enum : []).toContain('report');
     expect(appTools.filter((value) => /report|support|send/.test(value.name))).toHaveLength(0);
   });
 });
