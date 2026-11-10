@@ -8,6 +8,7 @@ import { encodeBase64Url, randomBase64Url } from '../src/crypto';
 import {
   deriveStableNetworkIdentityDigest,
   resolveNetworkIdentitySecrets,
+  resolveRequestNetworkIdentityCandidates,
 } from '../src/network-identity';
 import { DEFAULT_BROKER_ABUSE_CONTROLS } from '../src/persistence';
 import { deleteExpiredPuriProofNonces } from '../src/puri-token';
@@ -51,8 +52,33 @@ function post(env: TestBrokerEnv, request: unknown, ip = '203.0.113.33') {
 }
 
 function registeredInstallation(env: TestBrokerEnv, id: string, key: DeviceKeyPair) {
-  env.__db.prepare(`INSERT INTO installations (installation_id, device_public_key, app_version)
-    VALUES (?, ?, '1.2.3')`).run(id, key.devicePublicKey);
+  env.__db.prepare(`INSERT INTO installations (installation_id, device_public_key, app_version, puri_bound_at)
+    VALUES (?, ?, '1.2.3', '2026-10-29T12:00:00.000Z')`).run(id, key.devicePublicKey);
+}
+
+function installationIdAt(index: number) {
+  return `019a3544-3380-7000-8000-${(4096 + index).toString(16).padStart(12, '0')}`;
+}
+
+function preEnroll(env: TestBrokerEnv, id: string, key: DeviceKeyPair, ip = '203.0.113.33') {
+  return app.request('http://broker.test/v1/trial/challenge', {
+    method: 'POST', headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
+    body: JSON.stringify({ installation_id: id, device_public_key: key.devicePublicKey, app_version: '1.2.3' }),
+  }, env);
+}
+
+function enrollments(env: TestBrokerEnv) {
+  return env.__db.prepare('SELECT COUNT(*) AS count FROM puri_enrollment_admissions').get();
+}
+
+async function networkSubject(env: TestBrokerEnv, ip = '203.0.113.33') {
+  const now = new Date();
+  const [identity] = await resolveRequestNetworkIdentityCandidates(ip, resolveNetworkIdentitySecrets(env), now, now);
+  return identity!.digest;
+}
+
+function storedControls(env: TestBrokerEnv) {
+  return readAbuseControls(env) as unknown as Record<string, Record<string, unknown>>;
 }
 
 describe('Puri installation token boundary', () => {
@@ -184,7 +210,7 @@ describe('Puri installation token boundary', () => {
       if (sql.includes('INSERT INTO puri_proof_nonces') && failNonce) throw new Error('synthetic D1 failure');
     } });
     env.__db.prepare(`UPDATE broker_config SET value = json_set(value,
-      '$.puriTokenRegistrationIp.maxRequests', 1, '$.puriTokenInstallation.maxRequests', 1)
+      '$.puriEnrollmentShortIp.maxRequests', 1, '$.puriTokenInstallation.maxRequests', 1)
       WHERE key = 'abuse_controls'`).run();
     const request = await proof(await createDeviceKeyPair());
     expect((await post(env, request)).status).toBe(500);
@@ -192,8 +218,32 @@ describe('Puri installation token boundary', () => {
     expect(env.__db.prepare('SELECT policy, request_count FROM puri_token_rate_limits').all()).toEqual([
       { policy: 'ip_flood', request_count: 1 },
     ]);
+    expect(enrollments(env)).toEqual({ count: 0 });
     failNonce = false;
     expect((await post(env, request)).status).toBe(200);
+    expect(enrollments(env)).toEqual({ count: 1 });
+  });
+
+  it('rolls back a first binding together with its enrollment charge and recovers on retry', async () => {
+    let failCharge = true;
+    const env = environment({ beforeRun: ({ sql }) => {
+      if (sql.includes('INSERT INTO puri_enrollment_admissions') && failCharge) throw new Error('synthetic D1 failure');
+    } });
+    const key = await createDeviceKeyPair();
+    expect((await preEnroll(env, installationId, key)).status).toBe(200);
+    const request = await proof(key);
+    expect((await post(env, request)).status).toBe(500);
+    expect(env.__db.prepare('SELECT puri_bound_at FROM installations').get()).toEqual({ puri_bound_at: null });
+    expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_proof_nonces').get()).toEqual({ count: 0 });
+    expect(env.__db.prepare("SELECT COUNT(*) AS count FROM puri_token_rate_limits WHERE policy = 'installation'").get())
+      .toEqual({ count: 0 });
+    expect(enrollments(env)).toEqual({ count: 0 });
+    failCharge = false;
+    expect((await post(env, request)).status).toBe(200);
+    expect((await post(env, request)).status).toBe(401);
+    expect((await post(env, await proof(key))).status).toBe(200);
+    expect(env.__db.prepare('SELECT puri_bound_at FROM installations').get()).toEqual({ puri_bound_at: new Date().toISOString() });
+    expect(enrollments(env)).toEqual({ count: 1 });
   });
 
   it('fails closed for unavailable configuration without disabling existing broker routes', async () => {
@@ -273,35 +323,120 @@ describe('Puri installation token boundary', () => {
     expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_proof_nonces').get()).toEqual({ count: 0 });
   });
 
-  it('lets dozens of proven existing installations refresh behind a NAT with exhausted new-registration allowance', async () => {
+  it('lets dozens of established installations renew behind a NAT with exhausted first-enrollment allowance', async () => {
     const env = environment();
-    env.__db.prepare(`UPDATE broker_config SET value = json_set(value, '$.puriTokenRegistrationIp.maxRequests', 1)
+    env.__db.prepare(`UPDATE broker_config SET value = json_set(value, '$.puriEnrollmentShortIp.maxRequests', 1)
       WHERE key = 'abuse_controls'`).run();
     expect((await post(env, await proof(await createDeviceKeyPair()))).status).toBe(200);
     const waitingKey = await createDeviceKeyPair();
     const rejected = await post(env, await proof(waitingKey, { installation_id: otherId }));
     expect(rejected.status).toBe(429);
     expect(await rejected.json()).toMatchObject({
-      error: { code: 'rate_limited', subcode: 'ip_rate_limited', retry_after_ms: 899877 },
+      error: { code: 'rate_limited', class: 'retryable', subcode: 'ip_rate_limited', retry_after_ms: 3600000 },
     });
     for (let index = 0; index < 40; index += 1) {
-      const id = `019a3544-3380-7000-8000-${(4096 + index).toString(16).padStart(12, '0')}`;
       const key = await createDeviceKeyPair();
-      registeredInstallation(env, id, key);
-      expect((await post(env, await proof(key, { installation_id: id }))).status).toBe(200);
+      registeredInstallation(env, installationIdAt(index), key);
+      expect((await post(env, await proof(key, { installation_id: installationIdAt(index) }))).status).toBe(200);
     }
-    expect(env.__db.prepare("SELECT request_count FROM puri_token_rate_limits WHERE policy = 'ip_registration'").get())
-      .toEqual({ request_count: 1 });
+    expect(enrollments(env)).toEqual({ count: 1 });
     expect(env.__db.prepare("SELECT request_count FROM puri_token_rate_limits WHERE policy = 'ip_flood'").get())
       .toEqual({ request_count: 42 });
     expect(env.__db.prepare('SELECT COUNT(*) AS count FROM installations').get()).toEqual({ count: 41 });
-    vi.setSystemTime(new Date('2026-10-30T12:15:00.000Z'));
+    vi.setSystemTime(new Date('2026-10-30T13:00:00.122Z'));
+    const atBoundary = await post(env, await proof(waitingKey, { installation_id: otherId }));
+    expect(atBoundary.status).toBe(429);
+    expect(await atBoundary.json()).toMatchObject({ error: { retry_after_ms: 1 } });
+    vi.setSystemTime(new Date('2026-10-30T13:00:00.123Z'));
     expect((await post(env, await proof(waitingKey, { installation_id: otherId }))).status).toBe(200);
   });
 
-  it('does not give forged or mismatched installation identities the registered-installation allowance', async () => {
+  it('charges the first Puri binding of trial pre-enrolled installations and keeps unrelated admissions usable', async () => {
     const env = environment();
-    env.__db.prepare(`UPDATE broker_config SET value = json_set(value, '$.puriTokenRegistrationIp.maxRequests', 1)
+    const keys = await Promise.all(Array.from({ length: 7 }, () => createDeviceKeyPair()));
+    for (let index = 0; index < 6; index += 1) {
+      expect((await preEnroll(env, installationIdAt(index), keys[index])).status).toBe(200);
+    }
+    expect(env.__db.prepare('SELECT COUNT(*) AS count FROM installations WHERE puri_bound_at IS NULL').get())
+      .toEqual({ count: 6 });
+    const forged = await proof(keys[0], { installation_id: installationIdAt(0) });
+    expect((await post(env, { ...forged, app_version: 'tampered' })).status).toBe(401);
+    for (let index = 0; index < 5; index += 1) {
+      expect((await post(env, await proof(keys[index], { installation_id: installationIdAt(index) }))).status).toBe(200);
+    }
+    for (const index of [5, 6]) {
+      const rejected = await post(env, await proof(keys[index], { installation_id: installationIdAt(index) }));
+      expect(rejected.status).toBe(429);
+      expect(await rejected.json()).toMatchObject({
+        error: { code: 'rate_limited', class: 'retryable', subcode: 'ip_rate_limited', retry_after_ms: 3600000 },
+      });
+    }
+    expect(env.__db.prepare('SELECT puri_bound_at FROM installations WHERE installation_id = ?').get(installationIdAt(5)))
+      .toEqual({ puri_bound_at: null });
+    expect(env.__db.prepare('SELECT COUNT(*) AS count FROM installations WHERE installation_id = ?').get(installationIdAt(6)))
+      .toEqual({ count: 0 });
+    expect(env.__db.prepare("SELECT COUNT(*) AS count FROM puri_token_rate_limits WHERE policy = 'installation' AND subject_key IN (?, ?)")
+      .get(installationIdAt(5), installationIdAt(6))).toEqual({ count: 0 });
+    expect(enrollments(env)).toEqual({ count: 5 });
+    expect((await post(env, await proof(keys[0], { installation_id: installationIdAt(0) }))).status).toBe(200);
+    expect((await post(env, await proof(keys[6], { installation_id: installationIdAt(6) }), '198.51.100.7')).status).toBe(200);
+    expect(enrollments(env)).toEqual({ count: 6 });
+  });
+
+  it('enforces both rolling first-enrollment horizons across midnight without boundary resets', async () => {
+    vi.setSystemTime(new Date('2026-10-30T23:30:00.000Z'));
+    const env = environment();
+    let next = 0;
+    const enroll = async () => post(env, await proof(await createDeviceKeyPair(), { installation_id: installationIdAt(next++) }));
+    const expectRejected = async (retryAfterMs: number) => {
+      const response = await enroll();
+      expect(response.status).toBe(429);
+      expect(await response.json()).toMatchObject({
+        error: { code: 'rate_limited', class: 'retryable', retry_after_ms: retryAfterMs },
+      });
+    };
+    for (let index = 0; index < 5; index += 1) expect((await enroll()).status).toBe(200);
+    await expectRejected(3_600_000);
+    vi.setSystemTime(new Date('2026-10-31T00:00:00.000Z'));
+    await expectRejected(1_800_000);
+    vi.setSystemTime(new Date('2026-10-31T00:29:59.999Z'));
+    await expectRejected(1);
+    vi.setSystemTime(new Date('2026-10-31T00:30:00.000Z'));
+    for (let index = 0; index < 5; index += 1) expect((await enroll()).status).toBe(200);
+    vi.setSystemTime(new Date('2026-10-31T01:30:00.000Z'));
+    await expectRejected(22 * 3_600_000);
+    vi.setSystemTime(new Date('2026-10-31T23:29:59.999Z'));
+    await expectRejected(1);
+    vi.setSystemTime(new Date('2026-10-31T23:30:00.000Z'));
+    expect((await enroll()).status).toBe(200);
+    expect(env.__db.prepare('SELECT ip_epoch, COUNT(*) AS count FROM puri_enrollment_admissions GROUP BY ip_epoch ORDER BY ip_epoch').all())
+      .toEqual([{ ip_epoch: '2026-10-30', count: 5 }, { ip_epoch: '2026-10-31', count: 6 }]);
+    expect(env.__db.prepare('SELECT COUNT(*) AS count FROM installations').get()).toEqual({ count: 11 });
+  });
+
+  it('keeps first-enrollment accounting across a configured network HMAC key rotation', async () => {
+    const env = environment();
+    env.__db.prepare(`UPDATE broker_config SET value = json_set(value, '$.puriEnrollmentShortIp.maxRequests', 1)
+      WHERE key = 'abuse_controls'`).run();
+    const established = await createDeviceKeyPair();
+    expect((await post(env, await proof(established))).status).toBe(200);
+    env.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS = env.NETWORK_IDENTITY_HMAC_SECRET;
+    env.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS = '1';
+    env.NETWORK_IDENTITY_HMAC_SECRET = 'new-network-identity-hmac-secret';
+    env.NETWORK_IDENTITY_HMAC_KEY_VERSION = '2';
+    const rejected = await post(env, await proof(await createDeviceKeyPair(), { installation_id: otherId }));
+    expect(rejected.status).toBe(429);
+    expect(await rejected.json()).toMatchObject({ error: { code: 'rate_limited', retry_after_ms: 3600000 } });
+    expect((await post(env, await proof(established))).status).toBe(200);
+    vi.setSystemTime(new Date('2026-10-30T13:00:00.123Z'));
+    expect((await post(env, await proof(await createDeviceKeyPair(), { installation_id: otherId }))).status).toBe(200);
+    expect(env.__db.prepare('SELECT ip_key_version FROM puri_enrollment_admissions ORDER BY admission_id').all())
+      .toEqual([{ ip_key_version: 1 }, { ip_key_version: 2 }]);
+  });
+
+  it('does not give forged or mismatched installation identities the established-installation allowance', async () => {
+    const env = environment();
+    env.__db.prepare(`UPDATE broker_config SET value = json_set(value, '$.puriEnrollmentShortIp.maxRequests', 1)
       WHERE key = 'abuse_controls'`).run();
     const registered = await createDeviceKeyPair();
     const attacker = await createDeviceKeyPair();
@@ -314,9 +449,9 @@ describe('Puri installation token boundary', () => {
     }))).status).toBe(409);
     expect(env.__db.prepare("SELECT COUNT(*) AS count FROM puri_token_rate_limits WHERE policy = 'installation' AND subject_key = ?")
       .get(installationId)).toEqual({ count: 0 });
-    expect(env.__db.prepare("SELECT request_count FROM puri_token_rate_limits WHERE policy = 'ip_registration'").get())
-      .toEqual({ request_count: 1 });
+    expect(enrollments(env)).toEqual({ count: 1 });
     expect((await post(env, await proof(registered))).status).toBe(200);
+    expect(enrollments(env)).toEqual({ count: 1 });
   });
 
   it('caps verified installation issuance across network changes and reopens only at the next window', async () => {
@@ -343,32 +478,61 @@ describe('Puri installation token boundary', () => {
     expect((await post(env, await proof(key))).status).toBe(200);
   });
 
-  it.each(['ip_registration', 'installation'] as const)('honors another isolate winning the final %s admission before its atomic update', async (policy) => {
+  it('honors another isolate winning the final installation admission before its atomic update', async () => {
     let race = true;
     const env = environment({ beforeRun: ({ sql, params }) => {
-      if (race && sql.includes('INSERT INTO puri_token_rate_limits') && params[0] === policy) {
+      if (race && sql.includes('INSERT INTO puri_token_rate_limits') && params[0] === 'installation') {
         race = false;
         env.__db.prepare(`INSERT INTO puri_token_rate_limits
           (policy, subject_key, window_started_at, expires_at, request_count, ip_key_version, ip_epoch)
           VALUES (?, ?, ?, ?, 1, ?, ?)`).run(...params.slice(0, 6));
       }
     } });
-    env.__db.prepare(`UPDATE broker_config SET value = json_set(value,
-      '$.puriTokenRegistrationIp.maxRequests', 1, '$.puriTokenInstallation.maxRequests', 1)
+    env.__db.prepare(`UPDATE broker_config SET value = json_set(value, '$.puriTokenInstallation.maxRequests', 1)
       WHERE key = 'abuse_controls'`).run();
     const key = await createDeviceKeyPair();
-    if (policy === 'installation') registeredInstallation(env, installationId, key);
+    registeredInstallation(env, installationId, key);
     const response = await post(env, await proof(key));
     expect(response.status).toBe(429);
-    expect(await response.json()).toMatchObject({
-      error: { subcode: policy === 'installation' ? 'installation_rate_limited' : 'ip_rate_limited' },
-    });
-    expect(env.__db.prepare('SELECT request_count FROM puri_token_rate_limits WHERE policy = ?').get(policy))
+    expect(await response.json()).toMatchObject({ error: { subcode: 'installation_rate_limited' } });
+    expect(env.__db.prepare("SELECT request_count FROM puri_token_rate_limits WHERE policy = 'installation'").get())
       .toEqual({ request_count: 1 });
     expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_proof_nonces').get()).toEqual({ count: 0 });
-    expect(env.__db.prepare('SELECT COUNT(*) AS count FROM installations').get())
-      .toEqual({ count: policy === 'installation' ? 1 : 0 });
   });
+
+  it.each(['another installation', 'the same installation'] as const)(
+    'charges one first enrollment when %s wins the final allowance before the atomic update', async (winner) => {
+      let race = false;
+      const env = environment({ beforeRun: ({ sql }) => {
+        if (race && sql.includes('INSERT INTO installations')) {
+          race = false;
+          if (winner === 'the same installation') {
+            env.__db.prepare('UPDATE installations SET puri_bound_at = ? WHERE installation_id = ?')
+              .run(new Date().toISOString(), installationId);
+          }
+          env.__db.prepare(`INSERT INTO puri_enrollment_admissions (subject_key, admitted_at, ip_key_version, ip_epoch)
+            VALUES (?, ?, 1, '2026-10-30')`).run(subject, new Date().toISOString());
+        }
+      } });
+      env.__db.prepare(`UPDATE broker_config SET value = json_set(value, '$.puriEnrollmentShortIp.maxRequests', 1)
+        WHERE key = 'abuse_controls'`).run();
+      const subject = await networkSubject(env);
+      const key = await createDeviceKeyPair();
+      expect((await preEnroll(env, installationId, key)).status).toBe(200);
+      race = true;
+      const response = await post(env, await proof(key));
+      if (winner === 'the same installation') {
+        expect(response.status).toBe(200);
+      } else {
+        expect(response.status).toBe(429);
+        expect(await response.json()).toMatchObject({
+          error: { code: 'rate_limited', subcode: 'ip_rate_limited', retry_after_ms: 3600000 },
+        });
+        expect(env.__db.prepare('SELECT puri_bound_at FROM installations').get()).toEqual({ puri_bound_at: null });
+        expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_proof_nonces').get()).toEqual({ count: 0 });
+      }
+      expect(enrollments(env)).toEqual({ count: 1 });
+    });
 
   it('keeps IP flood limits and keyed subject hooks effective across configured HMAC key rotation', async () => {
     const env = environment();
@@ -403,22 +567,29 @@ describe('Puri installation token boundary', () => {
       .toEqual({ subject_key: 'unattributed', request_count: 1 });
   });
 
+  it('shares one bounded unattributed first-enrollment allowance when a trusted IP is absent', async () => {
+    const env = environment();
+    env.__db.prepare(`UPDATE broker_config SET value = json_set(value, '$.puriEnrollmentShortIp.maxRequests', 1)
+      WHERE key = 'abuse_controls'`).run();
+    const enroll = async (id: string) => app.request('http://broker.test/v1/puri/token', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(await proof(await createDeviceKeyPair(), { installation_id: id })),
+    }, env);
+    expect((await enroll(installationId)).status).toBe(200);
+    expect((await enroll(otherId)).status).toBe(429);
+    expect(env.__db.prepare('SELECT subject_key, ip_key_version, ip_epoch FROM puri_enrollment_admissions').all())
+      .toEqual([{ subject_key: 'unattributed', ip_key_version: null, ip_epoch: null }]);
+  });
+
   it('does not apply Puri admission limits to managed challenge requests sharing the same IP', async () => {
     const env = environment();
     env.__db.prepare(`UPDATE broker_config SET value = json_set(value,
-      '$.puriTokenIp.maxRequests', 1, '$.puriTokenRegistrationIp.maxRequests', 1,
-      '$.puriTokenInstallation.maxRequests', 1) WHERE key = 'abuse_controls'`).run();
+      '$.puriTokenIp.maxRequests', 1, '$.puriEnrollmentShortIp.maxRequests', 1,
+      '$.puriEnrollmentLongIp.maxRequests', 1, '$.puriTokenInstallation.maxRequests', 1) WHERE key = 'abuse_controls'`).run();
     expect((await post(env, {})).status).toBe(400);
     expect((await post(env, {})).status).toBe(429);
     for (let index = 0; index <= 10; index += 1) {
-      const key = await createDeviceKeyPair();
-      const response = await app.request('http://broker.test/v1/trial/challenge', {
-        method: 'POST', headers: { 'content-type': 'application/json', 'cf-connecting-ip': '203.0.113.33' },
-        body: JSON.stringify({
-          installation_id: `019a3544-3380-7000-8000-${(4096 + index).toString(16).padStart(12, '0')}`,
-          device_public_key: key.devicePublicKey, app_version: '1.2.3',
-        }),
-      }, env);
+      const response = await preEnroll(env, installationIdAt(index), await createDeviceKeyPair());
       expect(response.status).toBe(index < 10 ? 200 : 429);
     }
   });
@@ -431,27 +602,80 @@ describe('Puri installation token boundary', () => {
           '$.puriTokenIp.maxRequests', ?, '$.trialChallenge.maxRequests', 17) WHERE key = 'abuse_controls'`)
           .run(override);
       }
-      const { puriTokenIp: beforeIp, ...beforeOtherLimits } = readAbuseControls(env);
+      const { puriTokenIp: beforeIp, ...beforeOtherLimits } = storedControls(env);
       env.__db.exec(readBrokerMigrationSql('0029_puri_token_admission_limits.sql'));
       const {
         puriTokenIp: afterIp, puriTokenRegistrationIp, puriTokenInstallation, ...afterOtherLimits
-      } = readAbuseControls(env);
+      } = storedControls(env);
       expect(beforeIp.maxRequests).toBe(override ?? 30);
       expect(afterIp.maxRequests).toBe(override ?? 600);
-      expect(puriTokenRegistrationIp).toEqual(DEFAULT_BROKER_ABUSE_CONTROLS.puriTokenRegistrationIp);
+      expect(puriTokenRegistrationIp).toEqual({
+        endpoint: 'POST /v1/puri/token', scope: 'ip', maxRequests: 20, windowMinutes: 15,
+      });
       expect(puriTokenInstallation).toEqual(DEFAULT_BROKER_ABUSE_CONTROLS.puriTokenInstallation);
       expect(afterOtherLimits).toEqual(beforeOtherLimits);
     }
   });
 
+  it('replaces the row-based registration knob with first-enrollment limits while preserving bindings and tuned limits', async () => {
+    const operatorShort = { endpoint: 'POST /v1/puri/token', scope: 'ip', maxRequests: 3, windowMinutes: 30 };
+    for (const [preset, operatorFlood] of [[null, null], [operatorShort, 47]] as const) {
+      const env = environment({ throughMigration: '0029_puri_token_admission_limits.sql' });
+      env.__db.prepare(`UPDATE broker_config SET value = json_set(value,
+        '$.puriTokenRegistrationIp.maxRequests', 33, '$.puriTokenInstallation.maxRequests', 9,
+        '$.trialChallenge.maxRequests', 17) WHERE key = 'abuse_controls'`).run();
+      if (preset) {
+        env.__db.prepare(`UPDATE broker_config SET value = json_set(value, '$.puriEnrollmentShortIp', json(?),
+          '$.puriTokenIp.maxRequests', ?) WHERE key = 'abuse_controls'`).run(JSON.stringify(preset), operatorFlood);
+      }
+      const established = await createDeviceKeyPair();
+      const pending = await createDeviceKeyPair();
+      registeredInstallation(env, installationId, established);
+      expect((await preEnroll(env, otherId, pending)).status).toBe(200);
+      env.__db.prepare(`INSERT INTO puri_proof_nonces (installation_id, nonce, expires_at)
+        VALUES (?, 'retained-nonce', '2026-10-30T12:05:00.000Z')`).run(installationId);
+      env.__db.prepare(`INSERT INTO puri_token_rate_limits
+        (policy, subject_key, window_started_at, expires_at, request_count, ip_key_version, ip_epoch)
+        VALUES ('ip_registration', 'retained-subject', '2026-10-30T12:00:00.000Z', '2026-10-30T12:15:00.000Z', 2, 1, '2026-10-30')`).run();
+      const tables = ['installations', 'puri_proof_nonces', 'puri_token_rate_limits']
+        .map((table) => env.__db.prepare(`SELECT * FROM ${table} ORDER BY 1, 2`).all());
+      const {
+        puriTokenRegistrationIp, puriEnrollmentShortIp: presetBefore, puriTokenIp: floodBefore, ...beforeOtherLimits
+      } = storedControls(env);
+      expect(puriTokenRegistrationIp.maxRequests).toBe(33);
+      expect(presetBefore).toEqual(preset ?? undefined);
+      expect(floodBefore.maxRequests).toBe(operatorFlood ?? 600);
+      env.__db.exec(readBrokerMigrationSql('0030_puri_first_enrollment_limits.sql'));
+      const { puriEnrollmentShortIp, puriEnrollmentLongIp, puriTokenIp, ...afterOtherLimits } = storedControls(env);
+      expect(afterOtherLimits).toEqual(beforeOtherLimits);
+      expect(puriTokenIp).toEqual(operatorFlood === null
+        ? DEFAULT_BROKER_ABUSE_CONTROLS.puriTokenIp
+        : { ...DEFAULT_BROKER_ABUSE_CONTROLS.puriTokenIp, maxRequests: operatorFlood });
+      expect(puriEnrollmentShortIp).toEqual(preset ?? DEFAULT_BROKER_ABUSE_CONTROLS.puriEnrollmentShortIp);
+      expect(puriEnrollmentLongIp).toEqual(DEFAULT_BROKER_ABUSE_CONTROLS.puriEnrollmentLongIp);
+      expect(await getBrokerAbuseControlsConfig(env.BROKER_DB)).toMatchObject({
+        puriTokenIp: { maxRequests: operatorFlood ?? 200 }, puriTokenInstallation: { maxRequests: 9 },
+        trialChallenge: { maxRequests: 17 },
+        puriEnrollmentShortIp: preset ?? DEFAULT_BROKER_ABUSE_CONTROLS.puriEnrollmentShortIp,
+      });
+      expect(['installations', 'puri_proof_nonces', 'puri_token_rate_limits']
+        .map((table) => env.__db.prepare(`SELECT * FROM ${table} ORDER BY 1, 2`).all())).toEqual(tables);
+      expect((await post(env, await proof(established))).status).toBe(200);
+      expect(enrollments(env)).toEqual({ count: 0 });
+      expect((await post(env, await proof(pending, { installation_id: otherId }))).status).toBe(200);
+      expect(enrollments(env)).toEqual({ count: 1 });
+    }
+  });
+
   it.each([
     ['puriTokenIp', 'maxRequests', 0],
-    ['puriTokenRegistrationIp', 'maxRequests', 1.5],
+    ['puriEnrollmentShortIp', 'maxRequests', 1.5],
     ['puriTokenInstallation', 'maxRequests', Number.MAX_SAFE_INTEGER + 1],
     ['puriTokenIp', 'windowMinutes', 1441],
-    ['puriTokenRegistrationIp', 'windowMinutes', -1],
+    ['puriEnrollmentLongIp', 'windowMinutes', 1441],
+    ['puriEnrollmentShortIp', 'windowMinutes', -1],
     ['puriTokenInstallation', 'scope', 'ip'],
-    ['puriTokenRegistrationIp', 'endpoint', 'POST /v1/trial/challenge'],
+    ['puriEnrollmentLongIp', 'endpoint', 'POST /v1/trial/challenge'],
   ])('validates the %s %s knob before using configured admission policies', async (key, field, value) => {
     const env = environment();
     env.__db.prepare(`UPDATE broker_config SET value = json_set(value, ?, json(?)) WHERE key = 'abuse_controls'`)
@@ -459,21 +683,31 @@ describe('Puri installation token boundary', () => {
     expect(await getBrokerAbuseControlsConfig(env.BROKER_DB)).toEqual(DEFAULT_BROKER_ABUSE_CONTROLS);
   });
 
-  it('expires indexed counters without extending their fixed windows or keeping raw IP data', async () => {
+  it('expires indexed counters and enrollment history without extending their windows or keeping raw IP data', async () => {
     const env = environment();
+    const subject = await networkSubject(env);
     const key = await createDeviceKeyPair();
     expect((await post(env, await proof(key))).status).toBe(200);
     vi.setSystemTime(new Date('2026-10-30T12:14:00.000Z'));
     expect((await post(env, await proof(key))).status).toBe(200);
     const rows = env.__db.prepare('SELECT * FROM puri_token_rate_limits ORDER BY policy').all();
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(2);
     expect(rows.every((row) => row.expires_at === '2026-10-30T12:15:00.000Z')).toBe(true);
-    expect(JSON.stringify(rows)).not.toContain('203.0.113.33');
+    const history = env.__db.prepare('SELECT * FROM puri_enrollment_admissions').all();
+    expect(history).toEqual([{
+      admission_id: 1, subject_key: subject, admitted_at: '2026-10-30T12:00:00.123Z', ip_key_version: 1, ip_epoch: '2026-10-30',
+    }]);
+    expect(JSON.stringify([rows, history])).not.toContain('203.0.113.33');
     await deleteExpiredPuriProofNonces(env.BROKER_DB, new Date('2026-10-30T12:14:59.999Z'));
-    expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_token_rate_limits').get()).toEqual({ count: 3 });
+    expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_token_rate_limits').get()).toEqual({ count: 2 });
     await deleteExpiredPuriProofNonces(env.BROKER_DB, new Date('2026-10-30T12:15:00.000Z'));
     expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_token_rate_limits').get()).toEqual({ count: 0 });
-    expect(env.__db.prepare('SELECT installation_id FROM installations').get()).toEqual({ installation_id: installationId });
+    await deleteExpiredPuriProofNonces(env.BROKER_DB, new Date('2026-10-31T12:00:00.122Z'));
+    expect(enrollments(env)).toEqual({ count: 1 });
+    await deleteExpiredPuriProofNonces(env.BROKER_DB, new Date('2026-10-31T12:00:00.123Z'));
+    expect(enrollments(env)).toEqual({ count: 0 });
+    expect(env.__db.prepare('SELECT installation_id, puri_bound_at FROM installations').get())
+      .toEqual({ installation_id: installationId, puri_bound_at: '2026-10-30T12:00:00.123Z' });
   });
 
   it('retains established Puri binding in request-time and scheduled preflight cleanup, and expires only old nonces', async () => {

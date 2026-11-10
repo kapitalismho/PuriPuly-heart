@@ -10,7 +10,7 @@ This guide covers service boundaries and development/deployment entry points. Re
 - Classification selects scope, effort, and app-context modules from conversation summaries, not app records. Work responses receive allowlisted app context; brief routes have no tools, and off-topic requests exclude prior work context.
 - Relay owns the model, endpoint, trusted instructions, cache configuration, and tool schemas. Clients cannot supply trusted instructions or expand tool permissions.
 - Responses stream provisional text. Only a completed response admits tool calls and reasoning continuation; Python fences interrupted text and late results.
-- App tools reuse existing application owners. Every settings change requires approval of its exact values. Credentials use secure app controls; account actions and support uploads remain user actions.
+- App tools separate reads, immediate actions, and approval proposals, and reuse existing application owners. Batched calls run in order; approval, required user action, or pending work stops later effects. Every settings change requires approval of its exact values. Credentials use secure app controls, staged only by explicit actions; account actions and support uploads remain user actions.
 - Cancellation stops future agent actions, not accepted application operations or saved changes. Active model history is bounded separately from the in-memory app-run report archive.
 
 ## Authored Content
@@ -19,7 +19,7 @@ This guide covers service boundaries and development/deployment entry points. Re
 
 All user-facing language, register, length and formatting guidance lives in the system's `Identity and voice` section. Its style examples are grouped in English, Korean, Chinese and Japanese order, with Chinese kept as one group of the existing Simplified Chinese examples. Work, social and out-of-scope requests share that complete section; the user's requested response language and writing system, or their current message, choose the reply language and script rather than examples, UI settings or earlier conversation.
 
-The relay bundle contains the authoritative English sources; Python does not fetch or duplicate them. Prompt changes require rebuilding and restarting or deploying the Worker. Relay serves every app protocol in its [contract registry](src/contracts.ts); a contract holds tool definitions, context modules, and the app-context format. Shared prompt and policy changes apply to all supported protocols. A contract change adds a protocol, deployed to Relay before the app release; older protocols remain until retired.
+The relay bundle contains the authoritative English sources; Python does not fetch or duplicate them. Prompt changes require rebuilding and restarting or deploying the Worker. Relay serves every app protocol in its [contract registry](src/contracts.ts); a contract holds tool definitions, context modules, the app-context format, and setup-control guidance. Shared prompt and policy changes apply to all supported protocols. A contract change adds a protocol, deployed to Relay before the app release; older protocols remain until retired.
 
 ## Authentication, Usage and Stop Control
 
@@ -119,19 +119,19 @@ uv run --no-sync python -m puripuly_heart.release_evidence.agent_chat_simulator 
 uv run --no-sync python -m puripuly_heart.release_evidence.agent_chat_simulator render-html --report C:\private\puri-run.json --output C:\private\puri-run.html
 ```
 
-`smoke` uses controlled model responses. Live evaluation requires an isolated Relay/Broker and a context manifest from the [exact emitted Worker](operations/export-context.mjs). Freeze source, context, cases, and judge; preserve failed/blocked attempts and historical reports. Benchmark authentication is separate from the app's account. HTML export reads saved results without model calls or rejudgment.
+`smoke` uses controlled model responses. Live evaluation requires an isolated Relay/Broker and a context manifest from the [exact emitted Worker](operations/export-context.mjs). Freeze source, context, cases, and judge; preserve failed/blocked attempts and historical reports. Paired comparisons apply the same declared criteria to both versions. Recorded latency describes accepted outcomes only and does not replace the usefulness judgment. Benchmark authentication is separate from the app's account. HTML export reads saved results without model calls or rejudgment.
 
-[Evaluation scope](https://github.com/kapitalismho/PuriPuly-heart/issues/332) defines the cases and accepted limits. Human calibration remains tracked in [#365](https://github.com/kapitalismho/PuriPuly-heart/issues/365); final GUI verification belongs to [#333](https://github.com/kapitalismho/PuriPuly-heart/issues/333).
+The [#332 closure](https://github.com/kapitalismho/PuriPuly-heart/issues/332#issuecomment-6702068939) and [#333 closure](https://github.com/kapitalismho/PuriPuly-heart/issues/333#issuecomment-6702069184) preserve historical evaluation/UI decisions and discard the remaining work, rather than certify it as passed or defer it. [#365](https://github.com/kapitalismho/PuriPuly-heart/issues/365#issuecomment-6701890465) records calibration completed during #332, with no separate follow-up or reported agreement counts. [#367](https://github.com/kapitalismho/PuriPuly-heart/issues/367#issuecomment-6703215301) records separate bounded Windows/hosted checks, not a full final-GUI acceptance pass. The [#383/#384 record](https://github.com/kapitalismho/PuriPuly-heart/issues/384#issuecomment-6740918645) preserves the protocol-6 tool consolidation and recommendation comparison with its failed and blocked attempts; their owner-requested closures do not certify acceptance.
 
 ## Source Map
 
 | Question | Read |
 | --- | --- |
 | Requests, upstream errors, streaming | [Handler](src/index.ts), [request contract](src/requests.ts), [stream](src/stream.ts) |
-| Trusted instructions and tool definitions | [Loader](src/instructions.ts), [contracts](src/contracts.ts), [scope](src/scope.ts), [bundle](src/bundle.ts), [tool generator](generate-tools.py), [module generator](generate-context.py) |
+| Trusted instructions and tool definitions | [Loader](src/instructions.ts), [contracts](src/contracts.ts), [scope](src/scope.ts), [app tools](src/app-tools.ts), [tool generator](generate-tools.py), [module generator](generate-context.py) |
 | Authentication, admission, usage | [Token verification](src/auth.ts), [accounting](src/usage.ts), [migrations](migrations/) |
 | Support bundles, storage, retention | [App bundle](../src/puripuly_heart/app/services/agent_chat/report.py), [receiver](src/support.ts), [storage operations](operations/support-storage.mjs) |
 | Deployment and schema readiness | [Preparation](operations/prepare-deployment.mjs), [smoke](operations/smoke-deployment.mjs), [deployment checks](tests/deployment.spec.ts) |
-| App context, permissions, conversation lifetime | [Chat owner](../src/puripuly_heart/app/services/agent_chat/owner.py), [context](../src/puripuly_heart/app/services/agent_chat/context.py), [modules](../src/puripuly_heart/app/services/agent_chat/modules.py), [tools](../src/puripuly_heart/app/services/agent_chat/tools.py) |
+| App context, permissions, conversation lifetime | [Chat owner](../src/puripuly_heart/app/services/agent_chat/owner.py), [context](../src/puripuly_heart/app/services/agent_chat/context.py), [modules](../src/puripuly_heart/app/services/agent_chat/modules.py), [tools](../src/puripuly_heart/app/services/agent_chat/tools.py), [execution](../src/puripuly_heart/app/services/agent_chat/execution.py) |
 | App transport and presentation | [Transport](../src/puripuly_heart/app/adapters/agent_relay_transport.py), [presentation](../src/puripuly_heart/app/services/agent_chat/presentation.py) |
 | Behavior checks | [Relay tests](tests/), [recorded app requests](tests/app-requests/), [app-owner tests](../tests/app/test_agent_chat.py) |

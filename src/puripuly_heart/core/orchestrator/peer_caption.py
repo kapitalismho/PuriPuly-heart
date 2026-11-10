@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import re
 from collections import OrderedDict
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 from uuid import UUID
@@ -43,7 +43,6 @@ from puripuly_heart.domain.models import (
     Transcript,
 )
 
-CLOUD_PEER_PROVIDERS = frozenset({"soniox", "deepgram", "gemini_transcribe", "qwen_audio"})
 PeerRequestKind = Literal["final", "preview", "repair", "continuation"]
 _OPEN_WORDS = frozenset(
     "a about am an and are as at because but can could for from had has have her his how if in "
@@ -169,6 +168,7 @@ class PeerCaptionOwner:
     speaker_identities: PeerSpeakerIdentityAllocator = field(
         default_factory=PeerSpeakerIdentityAllocator
     )
+    speaker_diarization: Callable[[str], bool] = lambda _provider_id: False
     max_source_chars: int = 65536
     max_requests: int = 32
     request_timeout_s: float = 30.0
@@ -311,7 +311,7 @@ class PeerCaptionOwner:
                 transcript.created_at if transcript.created_at is not None else self.clock.now()
             )
             caption = self._new_caption(transcript, provider_id, scope)
-            if provider_id == "qwen_audio":
+            if not self.speaker_diarization(provider_id):
                 caption.speaker_assignment = SpeakerAssignment(
                     SpeakerAttribution("non_diarized"),
                     scope_order=(caption.generation, caption.source_order, 0),
@@ -334,7 +334,12 @@ class PeerCaptionOwner:
             await asyncio.sleep(max(0.0, segment.next_check_at - self.clock.now()))
             await self.check_previews()
 
+    def _translation_active(self) -> bool:
+        return self.requests.provider_available and self.requests.translation_enabled_for("peer")
+
     async def check_previews(self) -> None:
+        if not self._translation_active():
+            return
         for segment in tuple(self._segments.values()):
             if segment.closed or self.clock.now() < segment.next_check_at:
                 continue
@@ -354,6 +359,9 @@ class PeerCaptionOwner:
 
     async def _previews(self, segment: _Segment) -> None:
         while segment.pending is not None and not segment.closed:
+            if not self._translation_active():
+                segment.pending = None
+                return
             source, segment.pending = segment.pending, None
             segment.caption.revision += 1
             revision = segment.caption.revision
@@ -382,6 +390,13 @@ class PeerCaptionOwner:
         for task in (segment.timer, segment.preview_task):
             if task is not None:
                 task.cancel()
+
+    async def withdraw(self, utterance_id: UUID) -> None:
+        self._complete(utterance_id)
+        if utterance_id not in self._segments:
+            return
+        self.abandon(utterance_id)
+        await self.output.supersede_peer_caption_previews((utterance_id,))
 
     def _complete(self, utterance_id: UUID) -> None:
         self._completed[utterance_id] = None

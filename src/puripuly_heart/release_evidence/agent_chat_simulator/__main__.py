@@ -344,7 +344,7 @@ async def execute(args) -> int:
             context_calls = {
                 item["call_id"]
                 for item in result["archive"]
-                if item.get("type") == "function_call" and item.get("name") == "get_app_context"
+                if item.get("type") == "function_call" and item.get("name") == "read_app"
             }
             wired = (
                 "classify" in methods

@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.10.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.10.2-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
   <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
@@ -25,7 +25,7 @@
 
 ## 演示
 
-![PuriPuly（Deepgram + Qwen 3.8 Flash）与 VRCT（Google Web Speech + Google Translate）的翻译对比。PuriPuly 语音识别：“집에굴러다니는게손잡이빠진것까지합치면열개는넘을걸.”，翻译：“（家里散落的伞，加上那把没把手的，估计都超过十把了呢。）” | VRCT 语音识别：“집에 굴러다니는게 손잡이 빠진 것까지 합치면 10개는 넘을 걸”，翻译：“房子周围肯定有超过 10 个，包括那些没有把手的。”](../images/performance/2.png)
+![PuriPuly（Deepgram + Qwen 3.8 Flash）与 VRCT（Google Web Speech + Google Translate）的翻译对比。PuriPuly 语音识别：“집에굴러다니는게손잡이빠진것까지합치면열개는넘을걸.”，翻译：“（家里散落的伞，加上那把没把手的，估计都超过十把了呢。）” | VRCT 语音识别：“집에 굴러다니는게 손잡이 빠진 것까지 합치면 10개는 넘을 걸”，翻译：“房子周围肯定有超过 10 个，包括那些没有把手的。”](../images/demo/ko-cn_screenshot.png)
 
 ---
 
@@ -84,11 +84,11 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 ---
 
 ## 翻译比较
-![语音识别与翻译完整流程的每句平均错误惩罚图表。韩语→英语/日语/中文（简体），216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是基准测试时的 PuriPuly 配置：Gemini Transcribe → GPT-6 Luna (0.676)、Soniox STT → GPT-6 Luna (0.942)、Qwen ASR 1.7B → Gemma 26B (1.024)、Gemini Transcribe → Gemma 26B (1.084)、Soniox STT → Gemma 26B (1.293)、Qwen ASR 0.6B → Gemma 26B (2.374)。橙色柱状图是外部基线：Qwen 3.8 Live Translate (2.108)、Gemini 3.5 Live Translate (3.754)、Soniox Translate (4.989)。评估模型：Gemini 3.7 Flash。](../images/performance/1.png)
+![每句平均错误惩罚图表。韩语→英语/日语/中文（简体），216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是 PuriPuly 中可用的模型：GPT 6 Luna (0.189)、DeepSeek V4.1 Flash (0.452)、Gemma 4 26B A4B (0.639)、Index-Translate 35B (1.090)、Gemma 4 E4B QAT Q4 (1.927)。橙色柱状图是外部基线：Qwen 3.8 Live Translate (1.168)、Papago (2.784)、Gemini 3.5 Translate (2.969)、Soniox Translate (3.501)、DeepL (3.938)、Google Translation (4.477)。Qwen 3.8、Gemini 3.5 和 Soniox 仅选取字符错误率（CER）不超过 5% 的结果。评估模型：GPT-6 Astra (high reasoning effort)。](../images/performance/1.png)
 
-![每句平均错误惩罚图表。韩语→英语/日语/中文（简体），216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是 PuriPuly 中可用的模型：GPT-6 Luna (0.130)、Gemma 4 26B A4B (0.387)、DeepSeek-V4 Flash 0731 (0.571)、Gemma 4 E4B QAT Q4 (1.577)。橙色柱状图是外部基线：Qwen 3.8 Live Translate (1.392)、Papago (2.699)、Gemini 3.5 Translate (2.991)、Soniox Translate (3.473)、DeepL (3.914)、Google Translation (5.731)。Qwen 3.8、Gemini 3.5 和 Soniox 仅选取字符错误率（CER）不超过 5% 的结果。评估模型：Gemini 3.7 Flash。](../images/performance/2.png)
+![语音识别与翻译完整流程的每句平均错误惩罚图表。韩语→英语/日语/中文（简体），216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是基准测试时的 PuriPuly 配置：Gemini Transcribe → Luna (0.608)、Gemini Transcribe → Gemma 26B (1.083)、Soniox STT → Gemma 26B (1.317)、Qwen ASR 1.7B → Gemma 26B (1.320)、Fun ASR Nano MLT → Gemma 26B (1.494)、Gemini Transcribe → Index (1.567)、Fun ASR Nano MLT → Index (2.154)。橙色柱状图是外部基线：Qwen 3.8 Translate (1.858)、Gemini 3.5 Live Translate (3.526)、Soniox Translate (4.665)。评估模型：GPT-6 Astra (high reasoning effort)。](../images/performance/2.png)
 
-- 蓝色柱状图代表基准测试时的 PuriPuly 配置。CPU Qwen3-ASR 0.6B 此后已移除；其结果不代表下方替代模型的性能。
+- 蓝色柱状图代表基准测试时的 PuriPuly 配置。
 - 我们使用微软的 Gemba MQM 框架进行实验。
 - 为贴近真实对话环境，采用了多轮对话设置。
 - 完整实验结果请参阅[此处](https://github.com/kapitalismho/korean-llm-context-translation-benchmark)。
@@ -181,7 +181,7 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 
 ---
 
-# 如果遇到问题，请通过 [Twitter/X](https://x.com/kapitalismho) 发 DM 联系我。
+# 想知道的事，问问内置智能体 Puri 吧！
 
 ## 使用方法
 

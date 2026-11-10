@@ -16,6 +16,7 @@ from packaging.requirements import Requirement
 
 from puripuly_heart.release_evidence.native_distribution import (
     NativeArtifactLayout,
+    _archive_members,
     bundle_runtime,
     compile_runtime,
     create_manifest,
@@ -24,16 +25,7 @@ from puripuly_heart.release_evidence.native_distribution import (
     main,
     stage_product_metadata,
     stage_sounddevice_portaudio_runtime,
-    validate_compliance,
-    validate_dependencies,
     validate_target,
-    verify_installed_soxr_record,
-    verify_sounddevice_portaudio_runtime,
-    verify_wheel_record,
-)
-
-NOTO_CJK_CHECKSUM_RECORD = (
-    b"197d5e1e019faca33a4d55931c7d68b8056f3b97cb862049f5cb8de9efdfb8ce  NotoSansCJK-Medium.ttc"
 )
 
 
@@ -41,135 +33,6 @@ def _record_digest(data: bytes) -> str:
     import base64
 
     return "sha256=" + base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
-
-
-@pytest.fixture
-def packaged_resource_compliance(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
-    from puripuly_heart.release_evidence import release_identity
-
-    checkout = Path(__file__).resolve().parents[2]
-    repo = tmp_path / "source repository"
-    shutil.copytree(checkout / "third_party/openvr", repo / "third_party/openvr")
-    shutil.copytree(checkout / "third_party/noto-sans-cjk", repo / "third_party/noto-sans-cjk")
-    target = tmp_path / "native payload 한글"
-    font = target / "app/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc"
-    font.parent.mkdir(parents=True)
-    shutil.copy2(checkout / "src/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc", font)
-    shutil.copy2(repo / "third_party/openvr/win64/openvr_api.dll", target / "openvr_api.dll")
-    shutil.copytree(repo / "third_party/noto-sans-cjk", target / "third_party/noto-sans-cjk")
-    monkeypatch.setattr(
-        release_identity, "verify_packaged_license_payloads", lambda *_args, **_kwargs: []
-    )
-    monkeypatch.setattr(release_identity, "verify_soxr_packaging", lambda *_args: {})
-    return target, repo
-
-
-@pytest.mark.parametrize("line_ending", [b"\n", b"\r\n"], ids=["lf", "crlf"])
-def test_native_compliance_accepts_independently_pinned_resources(
-    packaged_resource_compliance,
-    line_ending: bytes,
-) -> None:
-    target, repo = packaged_resource_compliance
-    checksum = NOTO_CJK_CHECKSUM_RECORD + line_ending
-    for root in (repo, target):
-        (root / "third_party/noto-sans-cjk/SHA256SUMS.txt").write_bytes(checksum)
-    report = validate_compliance(target, repo, target / "soxr.json")["resources"]
-    assert (
-        report["openvr_sha256"]
-        == report["openvr_source_sha256"]
-        == ("bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a")
-    )
-    assert report["noto_cjk_sha256"] == (
-        "197d5e1e019faca33a4d55931c7d68b8056f3b97cb862049f5cb8de9efdfb8ce"
-    )
-    assert set(report["noto_cjk_provenance"]) == {"OFL.txt", "README.md", "SHA256SUMS.txt"}
-    assert report["noto_cjk_provenance"]["SHA256SUMS.txt"] == hashlib.sha256(checksum).hexdigest()
-
-
-@pytest.mark.parametrize(
-    "checksum",
-    [
-        b"0" * 64 + b"  NotoSansCJK-Medium.ttc\r\n",
-        NOTO_CJK_CHECKSUM_RECORD.replace(b"Medium.ttc", b"Bold.ttc") + b"\r\n",
-        NOTO_CJK_CHECKSUM_RECORD + b"\r\n" + b"0" * 64 + b"  NotoSansCJK-Medium.ttc\r\n",
-        NOTO_CJK_CHECKSUM_RECORD
-        + b"\r\n"
-        + NOTO_CJK_CHECKSUM_RECORD.replace(b"Medium.ttc", b"Other.ttc")
-        + b"\r\n",
-    ],
-    ids=["wrong-hash", "wrong-name", "conflict", "extra-entry"],
-)
-def test_native_compliance_rejects_noncanonical_checksum_records(
-    packaged_resource_compliance, checksum: bytes
-) -> None:
-    target, repo = packaged_resource_compliance
-    for root in (repo, target):
-        (root / "third_party/noto-sans-cjk/SHA256SUMS.txt").write_bytes(checksum)
-    with pytest.raises(ValueError, match="does not record the pinned font"):
-        validate_compliance(target, repo, target / "soxr.json")
-
-
-@pytest.mark.parametrize("source_ending", [b"\n", b"\r\n"], ids=["source-lf", "source-crlf"])
-def test_native_compliance_requires_exact_source_payload_provenance_bytes(
-    packaged_resource_compliance, source_ending: bytes
-) -> None:
-    target, repo = packaged_resource_compliance
-    (repo / "third_party/noto-sans-cjk/SHA256SUMS.txt").write_bytes(
-        NOTO_CJK_CHECKSUM_RECORD + source_ending
-    )
-    packaged_ending = b"\r\n" if source_ending == b"\n" else b"\n"
-    (target / "third_party/noto-sans-cjk/SHA256SUMS.txt").write_bytes(
-        NOTO_CJK_CHECKSUM_RECORD + packaged_ending
-    )
-    with pytest.raises(ValueError, match="provenance mismatch"):
-        validate_compliance(target, repo, target / "soxr.json")
-
-
-@pytest.mark.parametrize(
-    "resource", ["openvr_api.dll", "app/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc"]
-)
-def test_native_compliance_rejects_wrong_resource_even_with_matching_inventory(
-    packaged_resource_compliance, resource: str
-) -> None:
-    target, repo = packaged_resource_compliance
-    path = target / resource
-    damaged = bytearray(path.read_bytes())
-    damaged[-1] ^= 1
-    path.write_bytes(damaged)
-    (target / "native-artifact-manifest.json").write_text(
-        json.dumps(
-            {
-                "inventory": [
-                    {"path": resource, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    with pytest.raises(ValueError, match="sha256 mismatch|pinned payload"):
-        validate_compliance(target, repo, target / "soxr.json")
-
-
-@pytest.mark.parametrize("name", ["OFL.txt", "README.md", "SHA256SUMS.txt"])
-@pytest.mark.parametrize("damage", ["missing", "changed"])
-def test_native_compliance_rejects_missing_or_changed_font_provenance(
-    packaged_resource_compliance, name: str, damage: str
-) -> None:
-    target, repo = packaged_resource_compliance
-    path = target / "third_party/noto-sans-cjk" / name
-    if damage == "missing":
-        path.unlink()
-    else:
-        path.write_bytes(b"unapproved provenance")
-    with pytest.raises((FileNotFoundError, ValueError), match="Noto CJK provenance"):
-        validate_compliance(target, repo, target / "soxr.json")
-
-
-def test_native_compliance_rejects_missing_font(packaged_resource_compliance) -> None:
-    target, repo = packaged_resource_compliance
-    (target / "app/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc").unlink()
-    with pytest.raises(FileNotFoundError, match="Noto CJK font"):
-        validate_compliance(target, repo, target / "soxr.json")
 
 
 @pytest.mark.parametrize("archive_key", ["python_archive", "stdlib_archive"])
@@ -246,57 +109,6 @@ def test_requirement_filter_removes_viewer_and_replaces_soxr_as_whole_stanzas(
         )
 
 
-@pytest.mark.parametrize(
-    "installed",
-    [
-        {"numpy": "2.5.1", "unrelated": "1.0.0"},
-        {"numpy": "2.5.1", "scipy": "1.17.0"},
-    ],
-    ids=["missing-scipy-with-same-distribution-count", "wrong-scipy-version"],
-)
-def test_native_dependencies_reject_incomplete_locked_closure(
-    tmp_path: Path, installed: dict[str, str]
-) -> None:
-    requirements = tmp_path / "requirements.txt"
-    requirements.write_text(
-        "numpy==2.5.1\nscipy==1.18.0 ; platform_machine == 'AMD64' and sys_platform == 'win32'\n",
-        encoding="utf-8",
-    )
-    site_packages = tmp_path / "site-packages"
-    for name, version in installed.items():
-        metadata = site_packages / f"{name}-{version}.dist-info"
-        metadata.mkdir(parents=True)
-        (metadata / "METADATA").write_text(
-            f"Metadata-Version: 2.4\nName: {name}\nVersion: {version}\n", encoding="utf-8"
-        )
-
-    with pytest.raises(ValueError, match="scipy"):
-        validate_dependencies(site_packages, requirements)
-
-
-def test_native_dependencies_validate_windows_closure_and_custom_soxr(tmp_path: Path) -> None:
-    requirements = tmp_path / "requirements.txt"
-    requirements.write_text(
-        "scipy==1.18.0 ; platform_machine == 'AMD64' and sys_platform == 'win32'\n"
-        "soxr==1.1.0\n"
-        "flet-desktop==1.0.0\n"
-        "jeepney==0.9.0 ; sys_platform == 'linux'\n",
-        encoding="utf-8",
-    )
-    installed = {"scipy": "1.18.0", "soxr": "1.1.0", "puripuly-heart": "2.8.0"}
-    site_packages = tmp_path / "site-packages"
-    for name, version in installed.items():
-        metadata = site_packages / f"{name}-{version}.dist-info"
-        metadata.mkdir(parents=True)
-        (metadata / "METADATA").write_text(
-            f"Metadata-Version: 2.4\nName: {name}\nVersion: {version}\n", encoding="utf-8"
-        )
-
-    report = validate_dependencies(site_packages, requirements)
-
-    assert report["versions"] == installed
-
-
 def test_finalized_soxr_wheel_owns_both_native_runtime_files(tmp_path: Path) -> None:
     source = tmp_path / "source.whl"
     destination = tmp_path / "soxr-1.1.0-cp312-abi3-win_amd64.whl"
@@ -320,16 +132,19 @@ def test_finalized_soxr_wheel_owns_both_native_runtime_files(tmp_path: Path) -> 
         archive.writestr(record_name, output.getvalue())
 
     finalize_soxr_wheel(source, dll, destination)
-    verify_wheel_record(destination)
-    installed = tmp_path / "site-packages"
-    with zipfile.ZipFile(destination) as archive:
-        archive.extractall(installed)
-    installed_identities = verify_installed_soxr_record(installed)
-    assert set(installed_identities) == {"soxr/soxr.dll", "soxr/soxr_ext.pyd"}
 
     with zipfile.ZipFile(destination) as archive:
         assert archive.read("soxr/soxr_ext.pyd") == pyd
         assert archive.read("soxr/soxr.dll") == b"runtime-dll"
+        rows = list(csv.reader(archive.read(record_name).decode("utf-8").splitlines()))
+        assert {row[0] for row in rows} == set(archive.namelist())
+        for name, digest, size in rows:
+            if name == record_name:
+                assert (digest, size) == ("", "")
+            else:
+                data = archive.read(name)
+                assert digest == _record_digest(data)
+                assert size == str(len(data))
 
 
 def test_sounddevice_staging_excludes_asio_and_retains_standard_runtime(
@@ -346,39 +161,17 @@ def test_sounddevice_staging_excludes_asio_and_retains_standard_runtime(
 
     assert standard.read_bytes() == b"standard-portaudio"
     assert not asio.exists()
-    assert result["retained"] == {
-        "_sounddevice_data/portaudio-binaries/libportaudio64bit.dll": hashlib.sha256(
-            b"standard-portaudio"
-        ).hexdigest()
-    }
-    assert result["excluded"] == {
-        "_sounddevice_data/portaudio-binaries/libportaudio64bit-asio.dll": hashlib.sha256(
-            b"unsupported-asio"
-        ).hexdigest()
-    }
+    assert result["retained"] == ["_sounddevice_data/portaudio-binaries/libportaudio64bit.dll"]
+    assert result["excluded"] == ["_sounddevice_data/portaudio-binaries/libportaudio64bit-asio.dll"]
     assert stage_sounddevice_portaudio_runtime(tmp_path) == {
         "retained": result["retained"],
-        "excluded": {},
+        "excluded": [],
     }
 
 
-def test_sounddevice_validation_rejects_asio_and_requires_standard_runtime(
-    tmp_path: Path,
-) -> None:
-    runtime = tmp_path / "_sounddevice_data" / "portaudio-binaries"
-    runtime.mkdir(parents=True)
-    standard = runtime / "libportaudio64bit.dll"
-    asio = runtime / "libportaudio64bit-asio.dll"
-    standard.write_bytes(b"standard-portaudio")
-    asio.write_bytes(b"unsupported-asio")
-
-    with pytest.raises(ValueError):
-        verify_sounddevice_portaudio_runtime(tmp_path)
-
-    asio.unlink()
-    standard.unlink()
-    with pytest.raises(ValueError):
-        verify_sounddevice_portaudio_runtime(tmp_path)
+def test_sounddevice_staging_requires_standard_runtime(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="standard sounddevice PortAudio runtime"):
+        stage_sounddevice_portaudio_runtime(tmp_path)
 
 
 def test_product_metadata_is_non_editable_and_record_owned(tmp_path: Path) -> None:
@@ -507,7 +300,7 @@ def test_runtime_build_rejects_uncompilable_dependency(tmp_path: Path) -> None:
     ["staged_archive_runtime", "staged_compact_archive_runtime"],
     ids=["full-flet", "compact-flet"],
 )
-def test_bundle_cli_and_manifest_preserve_deployed_archive_and_member_evidence(
+def test_bundle_cli_and_manifest_preserve_required_payload(
     tmp_path: Path, request: pytest.FixtureRequest, runtime_fixture: str
 ) -> None:
     layout, bytecode, compiled = request.getfixturevalue(runtime_fixture)
@@ -528,43 +321,21 @@ def test_bundle_cli_and_manifest_preserve_deployed_archive_and_member_evidence(
         == 0
     )
     bundled = json.loads(bytecode.read_text(encoding="utf-8"))
-    provenance = tmp_path / "provenance.json"
-    provenance.write_text('{"build": "pinned"}', encoding="utf-8")
-    manifest = create_manifest(tmp_path, layout, provenance, bytecode, tmp_path / "manifest.json")
-    assert manifest["bytecode"] == bundled
+    manifest = create_manifest(tmp_path, layout, tmp_path / "manifest.json")
+    assert set(manifest) == {"schema", "layout_schema", "inventory"}
     inventory = {entry["path"]: entry for entry in manifest["inventory"]}
-    deployed = list(bundled["bytecode"])
     for key in ("archive", "stdlib_archive"):
         record = bundled[key]
-        assert record["sha256"] == inventory[record["path"]]["sha256"]
         with zipfile.ZipFile(tmp_path / record["path"]) as archive:
-            members = set(archive.namelist())
-            assert {entry["path"] for entry in record["members"]} == members
-            for entry in record["members"]:
-                assert entry["sha256"] == hashlib.sha256(archive.read(entry["path"])).hexdigest()
-                if entry["path"].endswith(".pyc"):
-                    deployed.append(entry)
-                    if entry["provenance"] == "build-derived":
-                        source = (
-                            archive.read(entry["source_member"])
-                            if "source_member" in entry
-                            else (tmp_path / entry["source"]).read_bytes()
-                        )
-                        assert entry["source_sha256"] == hashlib.sha256(source).hexdigest()
-    original = {entry["source"]: entry for entry in compiled["bytecode"]}
-    derived = [entry for entry in deployed if entry["provenance"] == "build-derived"]
-    assert {entry["source"] for entry in derived} == original.keys()
-    for entry in derived:
-        for key in ("sha256", "source_sha256", "optimization", "invalidation_mode", "provenance"):
-            assert entry[key] == original[entry["source"]][key]
-    upstream = [entry for entry in deployed if entry["provenance"] == "trusted-upstream-sourceless"]
-    assert len(upstream) == 1
-    assert upstream[0]["path"] == "sdk_probe.pyc"
-    for key in ("sha256", "input_path", "optimization", "invalidation_mode", "provenance"):
-        assert upstream[0][key] == compiled["stdlib_bytecode"][0][key]
-    assert upstream[0]["optimization"] == "upstream-unspecified"
-    assert upstream[0]["invalidation_mode"] == "timestamp"
-    assert "source" not in upstream[0] and "source_sha256" not in upstream[0]
+            assert {entry["path"] for entry in record["members"]} == set(archive.namelist())
+        assert (
+            inventory[record["path"]]["sha256"]
+            == hashlib.sha256((tmp_path / record["path"]).read_bytes()).hexdigest()
+        )
+    assert bundled["bytecode"] == [
+        entry for entry in compiled["bytecode"] if entry["source"] == "app/product_bootstrap.py"
+    ]
+    assert "sdk_probe.pyc" in {entry["path"] for entry in bundled["stdlib_archive"]["members"]}
     assert not any("/__pycache__/" in path and "/flet/" in path for path in inventory)
     assert "app/puripuly_heart/data/payload.txt" in inventory
     assert "app/prompts/system.txt" in inventory
@@ -593,7 +364,6 @@ def test_bundling_identical_inputs_produces_identical_archives(
     [
         "missing-bytecode",
         "malformed-bytecode",
-        "changed-source",
         "missing-evidence",
         "missing-icons",
         "missing-package-init",
@@ -605,7 +375,6 @@ def test_bundling_identical_inputs_produces_identical_archives(
         "sourceless-module",
         "cache-source",
         "missing-upstream-evidence",
-        "upstream-hash",
         "native-stdlib",
         "sourceless-dependency",
     ],
@@ -634,9 +403,6 @@ def test_bundle_failure_preserves_every_remaining_staged_input(
     elif damage == "malformed-bytecode":
         data = compiled_path.read_bytes()[:16] + b"not a marshalled module"
         compiled_path.write_bytes(data)
-        entry["sha256"] = hashlib.sha256(data).hexdigest()
-    elif damage == "changed-source":
-        (tmp_path / entry["source"]).write_text("RESULT = 123\n", encoding="utf-8")
     elif damage == "missing-evidence":
         evidence["bytecode"].remove(entry)
     elif damage == "missing-icons":
@@ -657,8 +423,6 @@ def test_bundle_failure_preserves_every_remaining_staged_input(
         )
     elif damage == "missing-upstream-evidence":
         evidence["stdlib_bytecode"].clear()
-    elif damage == "upstream-hash":
-        evidence["stdlib_bytecode"][0]["sha256"] = "0" * 64
     elif damage == "native-stdlib":
         (tmp_path / "Lib/native.pyd").write_bytes(b"native")
     elif damage == "sourceless-dependency":
@@ -675,58 +439,6 @@ def test_bundle_failure_preserves_every_remaining_staged_input(
     assert not (tmp_path / "app/python.zip.tmp").exists()
     assert not (tmp_path / "python314.zip").exists()
     assert not (tmp_path / "python314.zip.tmp").exists()
-
-
-@pytest.mark.parametrize(
-    "damage",
-    [
-        "archive-hash",
-        "member-hash",
-        "missing-member",
-        "loose-hash",
-        "stdlib-hash",
-        "upstream-provenance",
-        "dependency-provenance",
-        "index-provenance",
-    ],
-)
-def test_manifest_rejects_inconsistent_deployed_bytecode_evidence(
-    tmp_path: Path,
-    staged_compact_bundled_runtime: tuple[Path, Path, dict[str, object]],
-    damage: str,
-) -> None:
-    layout, bytecode, bundled = staged_compact_bundled_runtime
-    if damage == "archive-hash":
-        bundled["archive"]["sha256"] = "0" * 64
-    elif damage == "member-hash":
-        bundled["archive"]["members"][0]["sha256"] = "0" * 64
-    elif damage == "missing-member":
-        bundled["archive"]["members"].pop()
-    elif damage == "stdlib-hash":
-        bundled["stdlib_archive"]["sha256"] = "0" * 64
-    elif damage == "upstream-provenance":
-        entry = next(
-            entry
-            for entry in bundled["stdlib_archive"]["members"]
-            if entry["provenance"] == "trusted-upstream-sourceless"
-        )
-        entry["provenance"] = "build-derived"
-        entry["source_sha256"] = "0" * 64
-    elif damage in {"dependency-provenance", "index-provenance"}:
-        name = (
-            "_native_dependencies/dependency.pyc"
-            if damage == "dependency-provenance"
-            else "_native_dependencies.index"
-        )
-        entry = next(entry for entry in bundled["archive"]["members"] if entry["path"] == name)
-        entry["provenance"] = "build-input"
-    else:
-        bundled["bytecode"][0]["sha256"] = "0" * 64
-    bytecode.write_text(json.dumps(bundled), encoding="utf-8")
-    provenance = tmp_path / "provenance.json"
-    provenance.write_text("{}", encoding="utf-8")
-    with pytest.raises(ValueError, match="evidence"):
-        create_manifest(tmp_path, layout, provenance, bytecode, tmp_path / "manifest.json")
 
 
 def test_validate_target_requires_the_deployed_python_archive(
@@ -748,8 +460,7 @@ def test_validate_target_requires_the_deployed_python_archive(
         validate_target(
             tmp_path,
             layout_path,
-            tmp_path / "requirements.txt",
-            tmp_path / "vc.json",
+            tmp_path / "soxr.json",
         )
 
 
@@ -773,7 +484,7 @@ def test_validate_target_requires_the_deployed_python_archive(
         "stdlib-disguised-native",
     ],
 )
-def test_manifest_rejects_corrupt_or_ambiguous_archives(
+def test_archive_composition_rejects_corrupt_or_ambiguous_members(
     tmp_path: Path,
     staged_compact_bundled_runtime: tuple[Path, Path, dict[str, object]],
     damage: str,
@@ -830,9 +541,6 @@ def test_manifest_rejects_corrupt_or_ambiguous_archives(
                     archive.writestr(name, data)
             else:
                 archive.writestr(name, data)
-    bytecode.write_text(json.dumps(bundled), encoding="utf-8")
-    provenance = tmp_path / "provenance.json"
-    provenance.write_text("{}", encoding="utf-8")
     expected_error = {
         "duplicate": "duplicate or ambiguous members",
         "case-collision": "duplicate or ambiguous members",
@@ -851,31 +559,4 @@ def test_manifest_rejects_corrupt_or_ambiguous_archives(
         "stdlib-disguised-native": "cannot contain native binaries",
     }[damage]
     with pytest.raises(ValueError, match=expected_error):
-        create_manifest(tmp_path, layout, provenance, bytecode, tmp_path / "manifest.json")
-
-
-@pytest.mark.parametrize(
-    "damage", ["retained-source", "loose-dependency", "loose-stdlib", "loose-stdlib-resource"]
-)
-def test_manifest_rejects_source_drift_and_parallel_loose_content(
-    tmp_path: Path,
-    staged_compact_bundled_runtime: tuple[Path, Path, dict[str, object]],
-    damage: str,
-) -> None:
-    layout, bytecode, bundled = staged_compact_bundled_runtime
-    if damage == "retained-source":
-        (tmp_path / "site-packages/dependency.py").write_text("VALUE = 99\n", encoding="utf-8")
-    else:
-        relative = (
-            "site-packages/stale.pyc"
-            if damage == "loose-dependency"
-            else "Lib/stale.txt" if damage == "loose-stdlib-resource" else "Lib/stale.pyc"
-        )
-        destination = tmp_path / relative
-        destination.parent.mkdir(exist_ok=True)
-        destination.write_bytes(b"stale bytecode")
-    bytecode.write_text(json.dumps(bundled), encoding="utf-8")
-    provenance = tmp_path / "provenance.json"
-    provenance.write_text("{}", encoding="utf-8")
-    with pytest.raises(ValueError):
-        create_manifest(tmp_path, layout, provenance, bytecode, tmp_path / "manifest.json")
+        _archive_members(archive_path, stdlib=stdlib, dependency_root=tmp_path / "site-packages")

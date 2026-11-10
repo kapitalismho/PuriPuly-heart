@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.10.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.10.2-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
   <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
@@ -84,11 +84,11 @@ It works in many environments, including VRChat and Discord.
 ---
 
 ## Translation Comparison
-![Mean error penalty per sentence for the full speech recognition and translation pipeline. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are the benchmarked PuriPuly configurations: Gemini Transcribe → GPT-6 Luna (0.676), Soniox STT → GPT-6 Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). Orange bars are external baselines: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). Judge model: Gemini 3.7 Flash.](docs/images/performance/1.png)
+![Mean error penalty per sentence. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are models available in PuriPuly: GPT 6 Luna (0.189), DeepSeek V4.1 Flash (0.452), Gemma 4 26B A4B (0.639), Index-Translate 35B (1.090), Gemma 4 E4B QAT Q4 (1.927). Orange bars are external baselines: Qwen 3.8 Live Translate (1.168), Papago (2.784), Gemini 3.5 Translate (2.969), Soniox Translate (3.501), DeepL (3.938), Google Translation (4.477). Only results with a character error rate (CER) of 5% or less were selected for Qwen 3.8, Gemini 3.5, and Soniox. Judge model: GPT-6 Astra (high reasoning effort).](docs/images/performance/1.png)
 
-![Mean error penalty per sentence. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are models available in PuriPuly: GPT-6 Luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). Orange bars are external baselines: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Only results with a character error rate (CER) of 5% or less were selected for Qwen 3.8, Gemini 3.5, and Soniox. Judge model: Gemini 3.7 Flash.](docs/images/performance/2.png)
+![Mean error penalty per sentence for the full speech recognition and translation pipeline. Korean to EN / JA / ZH-Hans, 216 multi-turn samples, Gemba MQM evaluation; lower is better. Blue bars are the benchmarked PuriPuly configurations: Gemini Transcribe → Luna (0.608), Gemini Transcribe → Gemma 26B (1.083), Soniox STT → Gemma 26B (1.317), Qwen ASR 1.7B → Gemma 26B (1.320), Fun ASR Nano MLT → Gemma 26B (1.494), Gemini Transcribe → Index (1.567), Fun ASR Nano MLT → Index (2.154). Orange bars are external baselines: Qwen 3.8 Translate (1.858), Gemini 3.5 Live Translate (3.526), Soniox Translate (4.665). Judge model: GPT-6 Astra (high reasoning effort).](docs/images/performance/2.png)
 
-- Blue bars show PuriPuly configurations at the time of the benchmark. CPU Qwen3-ASR 0.6B has since been retired; its result does not measure the replacement models below.
+- Blue bars show PuriPuly configurations at the time of the benchmark.
 - We ran the experiment using Microsoft's Gemba MQM framework.
 - It was set up as a multi-turn environment to better resemble real conversation.
 - For the full results, see [here](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
@@ -180,7 +180,7 @@ GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Ar
 
 ---
 
-# If you run into problems, please DM me on [Twitter/X](https://x.com/kapitalismho).
+# Ask the built-in agent Puri anything you're curious about!
 
 ## Usage
 
@@ -199,7 +199,7 @@ For bidirectional control setup and the stable parameter ABI, see [VRChat OSC co
 
 SELF translations can appear in the chatbox while a speech turn is still in progress and update as more speech arrives. The app marks previews separately from completed turns. See [progressive Self chatbox translations](docs/vrchat-osc.md#progressive-self-chatbox-translations) for correction, ordering, and pagination behavior.
 
-SELF overlay captions keep one caption per speech turn. On the merged speech route, the original appears at a speech-end boundary, when a translation completes, or when the source closes—not on every stable recognition update. Resumed speech grows that caption in place, keeping its previous same-turn translation until the new one arrives. Late translations update retained captions without taking focus from newer speech; expired or displaced captions are not revived. Chatbox progression and PEER captions keep their existing policies.
+On the merged SELF speech route, captions advance with closed-source units or sentence-complete cumulative source whose matching translation is ready. During ongoing speech, source and translation appear together; stable recognition updates, grace restarts, and speculative completions alone are not display boundaries. Existing translated coverage is retained while newer coverage is pending; closed source still has a source-only fallback when translation is disabled, unavailable, or fails. An untranslated successor is staged only when ordinary shared-window selection would evict translated SELF. Eligible late results update retained captions without refocusing newer speech; expired or displaced captions are not revived. Chatbox progression and PEER policy remain independent. Punctuation-free continuous speech can wait for closure, and finite shared slots do not guarantee a minimum reading interval.
 
 Cloud PEER captions do not publish late preview translations after recognition fully retracts the provisional text. Qwen's empty partial updates deliberately retain the last nonempty hypothesis instead. Retraction does not prevent a later valid replacement or authoritative final from being translated.
 

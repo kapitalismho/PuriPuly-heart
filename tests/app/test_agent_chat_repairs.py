@@ -6,6 +6,7 @@ from copy import deepcopy
 import pytest
 
 from puripuly_heart.app.ports.agent_chat import AgentServiceError
+from puripuly_heart.app.services.agent_chat.modules import operation_header
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from tests.app.test_agent_chat import Records, Responses, answer, context_of
 from tests.app.test_agent_chat_lifecycle import notices_done, watch
@@ -186,6 +187,8 @@ async def test_noop_preserves_five_real_changes_and_approved_revert(catalog, noo
         assert retained[-1]["tool"] == "change_settings"
         assert retained[-1]["result"]["changes"] == {"overlay.background_alpha": 0.4}
         await owner.send("What actually changed?")
-        assert context_of(owner._transport.requests[-1])["core"]["recent_actions"] == retained
+        assert context_of(owner._transport.requests[-1])["core"]["recent_actions"] == [
+            operation_header(action) for action in retained
+        ]
     finally:
         await owner.close()

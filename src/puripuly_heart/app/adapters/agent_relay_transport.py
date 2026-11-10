@@ -121,7 +121,7 @@ class AgentRelayTransport:
         route: AgentRoute,
         allow_tools: bool,
     ) -> AsyncGenerator[AgentResponseEvent, None]:
-        if effort not in ("low", "high", "xhigh"):
+        if effort not in ("low", "medium", "high"):
             raise AgentTransportError("invalid_effort")
         content = self._json_body(
             {

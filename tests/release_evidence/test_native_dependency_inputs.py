@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -64,3 +67,58 @@ def test_python_cache_derivation_replaces_the_whole_runtime_without_old_inputs(
         "standalone_release_date": "20261026",
     }
     assert manifest["dart_bridge_version"] == "reviewed-bridge"
+
+
+@pytest.mark.skipif(
+    sys.platform != "win32" or shutil.which("pwsh") is None,
+    reason="Windows PowerShell 7 is required",
+)
+def test_native_input_preparation_reuses_pinned_cache_without_checksum_metadata(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repository"
+    scripts = repo / "scripts/ci"
+    scripts.mkdir(parents=True)
+    script = scripts / "prepare-native-release-inputs.ps1"
+    shutil.copy2(
+        Path(__file__).resolve().parents[2] / "scripts/ci/prepare-native-release-inputs.ps1",
+        script,
+    )
+    spec = repo / "native/windows_host/upstream-inputs.json"
+    spec.parent.mkdir(parents=True)
+    spec.write_text(
+        json.dumps(
+            {
+                "inputs": {
+                    "runtime-v1.zip": {
+                        "url": "https://example.invalid/v1/runtime-v1.zip",
+                        "cache_path": "runtime/v1/runtime-v1.zip",
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    inputs = tmp_path / "pinned inputs"
+    inputs.mkdir()
+    payload = b"cached pinned version"
+    (inputs / "runtime-v1.zip").write_bytes(payload)
+    completed = subprocess.run(
+        [
+            str(shutil.which("pwsh")),
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            str(script),
+            "-PinnedInputRoot",
+            str(inputs),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert (inputs / "cache/runtime/v1/runtime-v1.zip").read_bytes() == payload
+    assert not list(inputs.glob("*.download"))
+    assert not (inputs / "verified-inputs.json").exists()

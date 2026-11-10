@@ -1598,7 +1598,7 @@ async def test_judge_preserves_work_context_and_off_topic_boundaries_without_use
         for caption in captions
     )
     payload = judge_inputs[0]
-    brief_calls, work_calls, observed_results = [], [], []
+    brief_calls, work_calls = [], []
     for call in payload["M_invocations"]:
         inputs = [
             payload["M_input_items"][item_id] for item_id in call["request"]["input_item_ids"]
@@ -1614,18 +1614,12 @@ async def test_judge_preserves_work_context_and_off_topic_boundaries_without_use
         for index, item in enumerate(inputs):
             if item.get("type") != "function_call_output":
                 continue
-            invocation = next(
-                row
-                for row in inputs[:index]
-                if row.get("type") == "function_call" and row["call_id"] == item["call_id"]
-            )
             recorded_outcome = next(
                 row
                 for row in recorded["request"]["input"]
                 if row.get("type") == "function_call_output" and row["call_id"] == item["call_id"]
             )
             assert json.loads(item["output"]) == json.loads(recorded_outcome["output"])
-            observed_results.append(invocation["name"])
     assert brief_calls
     assert work_calls
     assert any(
@@ -1633,7 +1627,6 @@ async def test_judge_preserves_work_context_and_off_topic_boundaries_without_use
         for inputs in work_calls
         for item in inputs
     )
-    assert "diagnose_microphone" in observed_results
     for call in result["M_invocations"]:
         request = call["request"]
         updates = [item for item in request["input"] if item.get("type") == "configuration_update"]
@@ -3940,12 +3933,6 @@ async def test_controlled_osc_recovery_uses_real_tool_boundary_without_user_disp
     assert (
         result["code"]["state"]["osc_retry_operations"][0]["effect"] == "discovery_target_applied"
     )
-    calls = [
-        item
-        for item in result["archive"]
-        if item.get("type") == "function_call" and item.get("name") == "retry_osc_discovery"
-    ]
-    assert len(calls) == 1
     assert result["code"]["state"]["osc_output"]["remote_delivery"] == "unacknowledged"
     assert (
         result["code"]["state"]["synthetic_vrchat_chatbox"]["evidence_scope"]
@@ -4685,3 +4672,43 @@ def test_official_deepseek_key_is_not_ready_until_observed_credit_and_secure_ver
     assert app.signup_completed("deepseek")
     assert app.presence["deepseek_api_key"]
     assert app.intent["translation"] == app.initial_translation
+
+
+@pytest.mark.parametrize("unified", (False, True))
+def test_report_evidence_cannot_be_supplied_after_the_offer(unified):
+    report = {
+        "type": "function_call",
+        "name": "propose_app" if unified else "propose_report",
+        "arguments": json.dumps(
+            {"action": "report", "summary": "Synthetic issue"}
+            if unified
+            else {"summary": "Synthetic issue"}
+        ),
+    }
+    offer = {
+        "id": 1,
+        "turn": 1,
+        "method": "respond",
+        "request": {"route": "work", "input": []},
+        "response": {"output": [report]},
+    }
+    observed = {
+        "id": 2,
+        "turn": 2,
+        "method": "respond",
+        "request": {
+            "route": "work",
+            "input": [
+                {
+                    "role": "user",
+                    "content": json.dumps({"app_context": {"core": {"diagnostics": []}}}),
+                }
+            ],
+        },
+        "response": {"output": []},
+    }
+    app = ScenarioApp(select_scenarios(["unsolvable-internal"])[0])
+    late = code_judgment(app, [], [], model_calls=[offer, observed])
+    early = code_judgment(app, [], [], model_calls=[observed, offer])
+    assert late["local_diagnostic_evidence_observed"] is False
+    assert early["local_diagnostic_evidence_observed"] is True

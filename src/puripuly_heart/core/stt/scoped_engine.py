@@ -328,6 +328,9 @@ class ScopedRecognitionEngine:
     )
     _event_dispatching: bool = field(init=False, default=False, repr=False)
     _event_delivery_failed: bool = field(init=False, default=False, repr=False)
+    _epoch_providers: OrderedDict[str, object] = field(
+        init=False, default_factory=OrderedDict, repr=False
+    )
     _event_drained: asyncio.Event = field(init=False, repr=False)
     _backend_closed: bool = field(init=False, default=False, repr=False)
     _backend_close_task: asyncio.Task[None] | None = field(
@@ -481,7 +484,11 @@ class ScopedRecognitionEngine:
                         self._retire_current_session(watchdogs)
                         self._stream_recovery = None
                         return
-                    stream = replace(recovery.stream, provider_epoch_id=self._provider_epoch_id)
+                    stream = replace(
+                        recovery.stream,
+                        provider_epoch_id=self._provider_epoch_id,
+                        recognizer_id=self._recognizer_id(session),
+                    )
                     if not await self._run_stream_write(
                         session,
                         session.begin_stream(stream),
@@ -1085,6 +1092,7 @@ class ScopedRecognitionEngine:
             provider_epoch_id=epoch_id,
             provider_turn_id=uuid4().hex,
             settings_scope=self._settings_scope(settings),
+            recognizer_id=self._recognizer_id(session),
         )
         loop = asyncio.get_running_loop()
         independent = isinstance(session, STTIndependentRecognitionSession) and (
@@ -1152,6 +1160,7 @@ class ScopedRecognitionEngine:
                 identity.segment.capture_epoch,
                 identity.provider_epoch_id,
                 identity.settings_scope,
+                identity.recognizer_id,
             )
             self._register_recognition_stream(stream, settings)
             if startup_last_speech_at is not None:
@@ -1509,6 +1518,9 @@ class ScopedRecognitionEngine:
                     self._session_initial_readiness_pending = settings.provider_id == "qwen_audio"
                     self._provider_epoch_id = epoch_id
                     self._session_scope = scope
+                    self._epoch_providers[epoch_id] = scope[0]
+                    while len(self._epoch_providers) > 64:
+                        self._epoch_providers.popitem(last=False)
                     self._session_opened_at_s = self.monotonic_clock()
                     self._session_watchdogs = watchdogs
                     provider_max_age = getattr(session, "max_session_age_s", None)
@@ -2843,18 +2855,21 @@ class ScopedRecognitionEngine:
                     ),
                 )
                 emit_failure(logger, diagnostics, stage="event_loop")
-                self._event_delivery_failed = True
-                self._event_buffer.wake_admission()
                 failed_soniox = (
                     isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal)
                     and bool(event.identity.settings_scope)
                     and event.identity.settings_scope[0] == "soniox"
                 )
+                soniox_session = (
+                    self._session_scope is not None and self._session_scope[0] == "soniox"
+                )
+                if not (failed_soniox or soniox_session or self._event_provider(event) == "soniox"):
+                    continue
+                self._event_delivery_failed = True
+                self._event_buffer.wake_admission()
                 if failed_soniox:
                     self._event_buffer.discard_updates(epoch_id=event.identity.provider_epoch_id)
-                if (self._session_scope is not None and self._session_scope[0] == "soniox") or (
-                    failed_soniox and self._session_scope is None
-                ):
+                if soniox_session or (failed_soniox and self._session_scope is None):
                     self._revoke_soniox_admission()
                     await self.abort(
                         reason="provider_event_delivery_failed", failure_diagnostics=diagnostics
@@ -2899,7 +2914,7 @@ class ScopedRecognitionEngine:
         closed = await self._bounded_cleanup_call(session.close(), watchdogs.drain_timeout_s)
         if closed and self._quarantined_session is session:
             self._quarantined_session = None
-        elif not closed and not getattr(session, "readiness_retry_safe", True):
+        elif not closed:
             self._quarantined_session = session
         if consumer is not None and not consumer.done():
             consumer.cancel()
@@ -2950,7 +2965,7 @@ class ScopedRecognitionEngine:
         self._record_cleanup_failure(TimeoutError(), "provider_cleanup_timeout")
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
-        return False
+        return not task.cancelled() and task.exception() is None
 
     def _schedule_late_factory_reclaim(
         self,
@@ -3154,6 +3169,25 @@ class ScopedRecognitionEngine:
         if inspect.isawaitable(result):
             task = asyncio.create_task(result)
             task.add_done_callback(self._notification_done)
+
+    def _event_provider(self, event: object) -> object | None:
+        if isinstance(event, STTRecognitionUnitTerminal):
+            event = event.unit
+        if isinstance(event, STTRecognitionUnit):
+            scope = event.identity.stream.settings_scope
+            return scope[0] if scope else None
+        if isinstance(event, STTProviderEpochEnded):
+            return self._epoch_providers.get(event.provider_epoch_id)
+        identity = getattr(event, "identity", None)
+        scope = getattr(identity, "settings_scope", ())
+        if scope:
+            return scope[0]
+        return self._epoch_providers.get(getattr(identity, "provider_epoch_id", None))
+
+    @staticmethod
+    def _recognizer_id(session: object | None) -> str | None:
+        recognizer_id = getattr(session, "recognizer_id", None)
+        return recognizer_id if isinstance(recognizer_id, str) else None
 
     @staticmethod
     def _settings_scope(settings: AudioSegmentSettingsSnapshot) -> tuple[object, ...]:

@@ -49,7 +49,7 @@ def test_independent_context_choices_allow_cross_area_tasks_without_a_two_module
     ["missing", "duplicate", "invalid", "unclear", "refusal", "relation", "structured"],
 )
 def test_invalid_context_selection_keeps_valid_work_route_without_a_partial_subset(failure):
-    result = selected_decision("translation", "accounts", effort="xhigh")
+    result = selected_decision("translation", "accounts", effort="medium")
     answer = next(item for item in result["answers"] if item["name"] == "context_audio")
     if failure == "missing":
         result["answers"].remove(answer)
@@ -62,13 +62,13 @@ def test_invalid_context_selection_keeps_valid_work_route_without_a_partial_subs
     else:
         answer["choice"] = {"invalid": True} if failure == "structured" else failure
     extracted = extract_decision(result)
-    assert extracted.route == "work" and extracted.effort == "xhigh"
+    assert extracted.route == "work" and extracted.effort == "medium"
     assert extracted.context_modules is None
     assert extracted.context_reason is not None
 
 
 @pytest.mark.parametrize("route", ["work", "unclear", "social", "out_of_scope"])
-@pytest.mark.parametrize("effort", ["low", "high", "xhigh"])
+@pytest.mark.parametrize("effort", ["low", "medium", "high"])
 def test_extracts_native_choices_by_name_and_forces_brief_routes_low(route, effort):
     result = decision(route, effort)
     result["answers"][0].update(confidence=0.01, probabilities=[])
@@ -93,7 +93,7 @@ def test_unusable_route_falls_back_to_unclear_high(result):
 
 
 @pytest.mark.parametrize("route", ["work", "unclear", "social", "out_of_scope"])
-@pytest.mark.parametrize("effort", [None, {"invalid": "structured"}, "medium", "max"])
+@pytest.mark.parametrize("effort", [None, {"invalid": "structured"}, "xhigh", "max"])
 def test_only_malformed_effort_keeps_the_route(route, effort):
     extracted = extract_decision(decision(route, effort))
     assert extracted == AgentDecision(
@@ -112,7 +112,7 @@ def test_missing_effort_keeps_valid_route():
 @pytest.mark.parametrize("name", ["route", "effort", "context_unknown", None])
 @pytest.mark.parametrize("duplicate", [False, True])
 def test_any_refusal_overrides_other_choices_with_isolated_brief_route(name, duplicate):
-    result = decision("work", "xhigh")
+    result = decision("work", "medium")
     refusal = {"type": "refusal"}
     if name is not None:
         refusal["name"] = name

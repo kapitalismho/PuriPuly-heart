@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.10.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.10.2-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
   <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
@@ -85,11 +85,11 @@ PuriPuly — двусторонний голосовой переводчик д
 
 ## Сравнение перевода
 
-![Средний штраф за предложение для полного конвейера распознавания речи и перевода. С корейского на английский / японский / китайский (упрощённый), 216 многоходовых примеров, оценка Gemba MQM; чем ниже, тем лучше. Синие столбцы — конфигурации PuriPuly на момент тестирования: Gemini Transcribe → GPT-6 Luna (0.676), Soniox STT → GPT-6 Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). Оранжевые столбцы — внешние решения для сравнения: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). Модель-оценщик: Gemini 3.7 Flash.](../images/performance/1.png)
+![Средний штраф за предложение. С корейского на английский / японский / китайский (упрощённый), 216 многоходовых примеров, оценка Gemba MQM; чем ниже, тем лучше. Синие столбцы — модели, доступные в PuriPuly: GPT 6 Luna (0.189), DeepSeek V4.1 Flash (0.452), Gemma 4 26B A4B (0.639), Index-Translate 35B (1.090), Gemma 4 E4B QAT Q4 (1.927). Оранжевые столбцы — внешние решения для сравнения: Qwen 3.8 Live Translate (1.168), Papago (2.784), Gemini 3.5 Translate (2.969), Soniox Translate (3.501), DeepL (3.938), Google Translation (4.477). Для Qwen 3.8, Gemini 3.5 и Soniox отобраны только результаты с долей ошибочных символов (CER) не выше 5%. Модель-оценщик: GPT-6 Astra (high reasoning effort).](../images/performance/1.png)
 
-![Средний штраф за предложение. С корейского на английский / японский / китайский (упрощённый), 216 многоходовых примеров, оценка Gemba MQM; чем ниже, тем лучше. Синие столбцы — модели, доступные в PuriPuly: GPT-6 Luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). Оранжевые столбцы — внешние решения для сравнения: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Для Qwen 3.8, Gemini 3.5 и Soniox отобраны только результаты с долей ошибочных символов (CER) не выше 5%. Модель-оценщик: Gemini 3.7 Flash.](../images/performance/2.png)
+![Средний штраф за предложение для полного конвейера распознавания речи и перевода. С корейского на английский / японский / китайский (упрощённый), 216 многоходовых примеров, оценка Gemba MQM; чем ниже, тем лучше. Синие столбцы — конфигурации PuriPuly на момент тестирования: Gemini Transcribe → Luna (0.608), Gemini Transcribe → Gemma 26B (1.083), Soniox STT → Gemma 26B (1.317), Qwen ASR 1.7B → Gemma 26B (1.320), Fun ASR Nano MLT → Gemma 26B (1.494), Gemini Transcribe → Index (1.567), Fun ASR Nano MLT → Index (2.154). Оранжевые столбцы — внешние решения для сравнения: Qwen 3.8 Translate (1.858), Gemini 3.5 Live Translate (3.526), Soniox Translate (4.665). Модель-оценщик: GPT-6 Astra (high reasoning effort).](../images/performance/2.png)
 
-- Синие столбцы показывают конфигурации PuriPuly на момент тестирования. CPU Qwen3-ASR 0.6B с тех пор удалён; его результат не измеряет новые модели ниже.
+- Синие столбцы показывают конфигурации PuriPuly на момент тестирования.
 - Для эксперимента использован фреймворк Microsoft Gemba MQM.
 - Тесты шли в диалоговом формате — ближе к реальному разговору.
 - Полные результаты — [здесь](https://github.com/kapitalismho/korean-llm-context-translation-benchmark).
@@ -181,7 +181,7 @@ GPU-инференс работает на Vulkan. Подходит для лю�
 
 ---
 
-# Если возникнут проблемы, напишите в [Twitter/X](https://x.com/kapitalismho).
+# Спросите встроенного агента Puri обо всём, что хотите узнать!
 
 ## Использование
 

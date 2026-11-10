@@ -21,6 +21,7 @@ from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.i18n import get_locale, provider_label, set_locale
 from puripuly_heart.ui.views import agent_chat
 from puripuly_heart.ui.views.agent_chat import AgentChatHooks, AgentChatView
+from tests.helpers.flet_page import attach_dummy_page
 
 
 @pytest.fixture(autouse=True)
@@ -359,6 +360,33 @@ class Dictation:
 
     def ensure_capture(self):
         return lambda: setattr(self, "restored", self.restored + 1)
+
+
+@pytest.mark.asyncio
+async def test_sending_from_the_input_keeps_it_focused(monkeypatch):
+    owner = Owner(snapshot())
+    view, tasks = view_for(owner)
+    focus_calls = []
+
+    async def focus(_self):
+        focus_calls.append("focus")
+
+    def run_task(func, *args):
+        task = asyncio.get_running_loop().create_task(func(*args))
+        tasks.append(task)
+        return task
+
+    monkeypatch.setattr(type(view._input), "focus", focus)
+    attach_dummy_page(
+        monkeypatch, view._input, SimpleNamespace(run_task=run_task, update=lambda *_: None)
+    )
+    view._input.value = "상대 목소리가 안 들려요"
+    await view._submit()
+    await asyncio.gather(*tasks)
+
+    assert ("send", "상대 목소리가 안 들려요") in owner.calls
+    assert view._input.value == ""
+    assert focus_calls == ["focus"]
 
 
 @pytest.mark.asyncio

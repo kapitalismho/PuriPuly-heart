@@ -10,7 +10,7 @@
 
 <p align="center">
 
-  <img src="https://img.shields.io/badge/version-2.10.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.10.2-blue" alt="Version" />
 
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
 
@@ -92,11 +92,11 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 
 ## 번역 품질 비교
 
-![음성 인식과 번역을 결합한 전체 파이프라인의 문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 벤치마크 당시 PuriPuly의 구성: Gemini Transcribe → GPT-6 Luna (0.676), Soniox STT → GPT-6 Luna (0.942), Qwen ASR 1.7B → Gemma 26B (1.024), Gemini Transcribe → Gemma 26B (1.084), Soniox STT → Gemma 26B (1.293), Qwen ASR 0.6B → Gemma 26B (2.374). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (2.108), Gemini 3.5 Live Translate (3.754), Soniox Translate (4.989). 평가 모델: Gemini 3.7 Flash.](../images/performance/1.png)
+![문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 PuriPuly에서 사용할 수 있는 모델: GPT 6 Luna (0.189), DeepSeek V4.1 Flash (0.452), Gemma 4 26B A4B (0.639), Index-Translate 35B (1.090), Gemma 4 E4B QAT Q4 (1.927). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (1.168), Papago (2.784), Gemini 3.5 Translate (2.969), Soniox Translate (3.501), DeepL (3.938), Google Translation (4.477). Qwen 3.8, Gemini 3.5, Soniox는 문자 오류율(CER) 5% 이하인 결과만 선별. 평가 모델: GPT-6 Astra (high reasoning effort).](../images/performance/1.png)
 
-![문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 PuriPuly에서 사용할 수 있는 모델: GPT-6 Luna (0.130), Gemma 4 26B A4B (0.387), DeepSeek-V4 Flash 0731 (0.571), Gemma 4 E4B QAT Q4 (1.577). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (1.392), Papago (2.699), Gemini 3.5 Translate (2.991), Soniox Translate (3.473), DeepL (3.914), Google Translation (5.731). Qwen 3.8, Gemini 3.5, Soniox는 문자 오류율(CER) 5% 이하인 결과만 선별. 평가 모델: Gemini 3.7 Flash.](../images/performance/2.png)
+![음성 인식과 번역을 결합한 전체 파이프라인의 문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 벤치마크 당시 PuriPuly의 구성: Gemini Transcribe → Luna (0.608), Gemini Transcribe → Gemma 26B (1.083), Soniox STT → Gemma 26B (1.317), Qwen ASR 1.7B → Gemma 26B (1.320), Fun ASR Nano MLT → Gemma 26B (1.494), Gemini Transcribe → Index (1.567), Fun ASR Nano MLT → Index (2.154). 주황색 막대는 외부 비교 대상: Qwen 3.8 Translate (1.858), Gemini 3.5 Live Translate (3.526), Soniox Translate (4.665). 평가 모델: GPT-6 Astra (high reasoning effort).](../images/performance/2.png)
 
-- 파란색 막대는 벤치마크 당시 PuriPuly의 구성이에요. CPU Qwen3-ASR 0.6B는 이후 제거되었으며, 해당 수치는 아래의 새 모델을 측정한 결과가 아니에요.
+- 파란색 막대는 벤치마크 당시 PuriPuly의 구성이에요.
 - 마이크로소프트의 Gemba MQM 프레임워크를 사용해서 실험했어요.
 - 실제 대화 환경과 가깝게 맥락을 포함한 멀티턴 환경으로 구성했어요.
 - 전체 실험 결과는 [여기](https://github.com/kapitalismho/korean-llm-context-translation-benchmark)를 참조해주세요.
@@ -201,7 +201,7 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 
 ---
 
-# 문제가 생기면 [트위터](https://x.com/kapitalismho)로 DM을 보내주세요.
+# 내장 에이전트 Puri에게 궁금한걸 물어보세요!
 
 ## 사용법
 

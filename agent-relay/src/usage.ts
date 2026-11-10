@@ -59,7 +59,7 @@ export async function checkAllowance(
       AND (EXISTS (SELECT 1 FROM prompt_turns WHERE installation_hash = ? AND turn_id = ?
         AND expires_at > ? AND model_admissions < ? AND (? = 0 OR classifier_admitted = 0))
         OR (NOT EXISTS (SELECT 1 FROM prompt_turns WHERE installation_hash = ? AND turn_id = ?)
-          AND (SELECT COUNT(*) FROM prompt_turns WHERE installation_hash = ? AND utc_date = ?) < 50))
+          AND (SELECT COUNT(*) FROM prompt_turns WHERE installation_hash = ? AND utc_date = ?) < 30))
     ORDER BY available.slot LIMIT 1
     ON CONFLICT(installation_hash, slot) DO UPDATE SET owner = excluded.owner, turn_id = excluded.turn_id,
       classification = excluded.classification, expires_at = excluded.expires_at
@@ -91,7 +91,7 @@ export async function checkAllowance(
           AND (expires_at <= ? OR model_admissions >= ? OR (? = 1 AND classifier_admitted = 1)))
           THEN 'service_turn_exhausted'
         WHEN NOT EXISTS (SELECT 1 FROM prompt_turns WHERE installation_hash = ? AND turn_id = ?)
-          AND (SELECT COUNT(*) FROM prompt_turns WHERE installation_hash = ? AND utc_date = ?) >= 50
+          AND (SELECT COUNT(*) FROM prompt_turns WHERE installation_hash = ? AND utc_date = ?) >= 30
           THEN 'service_allowance_exhausted'
         ELSE 'service_busy' END AS code
     `).bind(installation, turnId, timestamp, maxTurnAdmissions, classification ? 1 : 0,

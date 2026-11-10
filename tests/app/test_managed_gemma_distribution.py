@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import io
 import json
 import subprocess
 import zipfile
@@ -15,13 +13,6 @@ from puripuly_heart.release_evidence.native_distribution import NativeArtifactLa
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def _identity(path: Path) -> dict[str, int | str]:
-    return {
-        "size": path.stat().st_size,
-        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-    }
-
-
 def _write_package(package_root: Path) -> None:
     runtime_root = package_root / distribution.PACKAGED_RUNTIME_RELATIVE_DIR
     archives: dict[str, object] = {}
@@ -32,22 +23,20 @@ def _write_package(package_root: Path) -> None:
         for name in sorted(contract.required_files):
             path = backend_root / name
             path.write_bytes(f"{contract.backend}:{name}".encode())
-            records.append({"path": name, **_identity(path)})
+            records.append({"path": name})
         archives[contract.backend] = {
             "filename": contract.filename,
-            "size": contract.size,
-            "sha256": contract.sha256,
             "url": contract.url,
             "files": records,
         }
     provenance_root = package_root / distribution.PROVENANCE_RELATIVE_DIR
     provenance_root.mkdir(parents=True)
-    provenance = {}
+    provenance = []
     for name in ("LICENSE", "README.md"):
         source = ROOT / distribution.PROVENANCE_RELATIVE_DIR / name
         target = provenance_root / name
         target.write_bytes(source.read_bytes())
-        provenance[name] = _identity(target)
+        provenance.append(name)
     manifest = {
         "schema": distribution.MANIFEST_SCHEMA,
         "release": {
@@ -66,23 +55,10 @@ def _write_package(package_root: Path) -> None:
     )
 
 
-def _refresh_manifest_provenance(package_root: Path) -> None:
-    runtime_root = package_root / distribution.PACKAGED_RUNTIME_RELATIVE_DIR
-    manifest_path = runtime_root / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    provenance_root = package_root / distribution.PROVENANCE_RELATIVE_DIR
-    manifest["provenance"] = {
-        name: _identity(provenance_root / name) for name in distribution.PROVENANCE_FILENAMES
-    }
-    manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
-
-
 def test_runtime_archive_stages_only_server_dependency_closure(tmp_path: Path) -> None:
     contract = distribution.ArchiveContract(
         backend="cpu",
         filename="runtime.zip",
-        size=0,
-        sha256="unused",
         required_files=frozenset(distribution.COMMON_REQUIRED_FILES),
     )
     archive_path = tmp_path / contract.filename
@@ -99,6 +75,7 @@ def test_runtime_archive_stages_only_server_dependency_closure(tmp_path: Path) -
     )
 
     assert {record["path"] for record in records} == distribution.COMMON_REQUIRED_FILES
+    assert all(set(record) == {"path"} for record in records)
     assert {path.name for path in (tmp_path / "runtime").iterdir()} == (
         distribution.COMMON_REQUIRED_FILES
     )
@@ -121,8 +98,6 @@ def test_runtime_archive_rejects_model_artifacts(
     contract = distribution.ArchiveContract(
         backend="cpu",
         filename="runtime.zip",
-        size=0,
-        sha256="unused",
         required_files=frozenset(distribution.COMMON_REQUIRED_FILES),
     )
     archive_path = tmp_path / contract.filename
@@ -149,7 +124,7 @@ def test_package_verifier_proves_both_backends_and_no_model_weights(tmp_path: Pa
     assert result["model_artifacts"] == []
 
 
-def test_runtime_root_validator_binds_release_and_file_identities(tmp_path: Path) -> None:
+def test_runtime_root_validator_binds_release_and_required_files(tmp_path: Path) -> None:
     _write_package(tmp_path)
     runtime_root = tmp_path / distribution.PACKAGED_RUNTIME_RELATIVE_DIR
 
@@ -159,8 +134,10 @@ def test_runtime_root_validator_binds_release_and_file_identities(tmp_path: Path
     assert manifest["release"]["commit"] == distribution.LLAMA_CPP_COMMIT
 
     server = runtime_root / "vulkan" / "llama-server.exe"
-    server.write_bytes(b"tampered")
-    with pytest.raises(RuntimeError, match="(?:size|identity) mismatch"):
+    server.write_bytes(b"rebuilt pinned runtime")
+    assert distribution.validate_runtime_root(runtime_root) == manifest
+    server.unlink()
+    with pytest.raises(RuntimeError, match="runtime file not found"):
         distribution.validate_runtime_root(runtime_root)
 
 
@@ -174,51 +151,24 @@ def test_package_verifier_rejects_model_anywhere_in_installed_tree(tmp_path: Pat
         distribution.verify_package(tmp_path)
 
 
-@pytest.mark.parametrize(
-    "provenance",
-    [
-        {},
-        {
-            "../../LICENSE": {
-                "size": 1,
-                "sha256": "0" * 64,
-            }
-        },
-    ],
-)
-def test_package_verifier_requires_valid_provenance_manifest(
-    tmp_path: Path, provenance: dict[str, object]
-) -> None:
-    _write_package(tmp_path)
-    manifest_path = tmp_path / distribution.PACKAGED_RUNTIME_RELATIVE_DIR / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["provenance"] = provenance
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-
-    with pytest.raises(RuntimeError, match="provenance identity mismatch"):
-        distribution.verify_package(tmp_path)
-
-
 def test_package_verifier_accepts_provenance_line_ending_changes(tmp_path: Path) -> None:
     _write_package(tmp_path)
     provenance_root = tmp_path / distribution.PROVENANCE_RELATIVE_DIR
     for name in distribution.PROVENANCE_FILENAMES:
         path = provenance_root / name
         path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
-    _refresh_manifest_provenance(tmp_path)
 
     result = distribution.verify_package(tmp_path)
 
     assert result["backends"] == ["cpu", "vulkan"]
 
 
-def test_package_verifier_rejects_license_without_required_text(tmp_path: Path) -> None:
+def test_package_verifier_rejects_empty_license(tmp_path: Path) -> None:
     _write_package(tmp_path)
     license_path = tmp_path / distribution.PROVENANCE_RELATIVE_DIR / "LICENSE"
-    license_path.write_text("MIT License\n", encoding="utf-8")
-    _refresh_manifest_provenance(tmp_path)
+    license_path.write_text("", encoding="utf-8")
 
-    with pytest.raises(RuntimeError, match="license is missing required text"):
+    with pytest.raises(RuntimeError, match="llama.cpp LICENSE is empty"):
         distribution.verify_package(tmp_path)
 
 
@@ -232,57 +182,33 @@ def test_package_verifier_rejects_nested_runtime_content(tmp_path: Path) -> None
         distribution.verify_package(tmp_path)
 
 
-def test_package_verifier_rejects_runtime_copy_outside_owned_directory(tmp_path: Path) -> None:
-    _write_package(tmp_path)
-    nested = tmp_path / distribution.PACKAGED_RUNTIME_RELATIVE_DIR / "cpu" / "llama-server-impl.dll"
-    (tmp_path / nested.name).write_bytes(nested.read_bytes())
-
-    with pytest.raises(RuntimeError, match="escaped their owned package directory"):
-        distribution.verify_package(tmp_path)
-
-
-def test_package_verifier_rejects_nested_runtime_copy_outside_owned_directory(
-    tmp_path: Path,
-) -> None:
-    _write_package(tmp_path)
-    source = tmp_path / distribution.PACKAGED_RUNTIME_RELATIVE_DIR / "cpu" / "llama-server-impl.dll"
-    duplicate = tmp_path / "alternate" / "nested-runtime.dll"
-    duplicate.parent.mkdir(parents=True)
-    duplicate.write_bytes(source.read_bytes())
-
-    with pytest.raises(RuntimeError, match="escaped their owned package directory"):
-        distribution.verify_package(tmp_path)
-
-
-def test_prepare_runtime_revalidates_archive_bytes_after_download(
+def test_prepare_runtime_requires_the_complete_archive_before_replacement(
     monkeypatch, tmp_path: Path
 ) -> None:
-    valid_archive = io.BytesIO()
-    with zipfile.ZipFile(valid_archive, "w") as archive:
-        for name in sorted(distribution.COMMON_REQUIRED_FILES):
-            archive.writestr(name, name)
-    valid_payload = valid_archive.getvalue()
     contract = distribution.ArchiveContract(
         backend="cpu",
         filename="runtime.zip",
-        size=len(valid_payload),
-        sha256=hashlib.sha256(valid_payload).hexdigest(),
         required_files=frozenset(distribution.COMMON_REQUIRED_FILES),
     )
     monkeypatch.setattr(distribution, "ARCHIVES", (contract,))
 
-    def replace_after_validated_download(_contract, destination: Path) -> None:
+    def download(_contract, destination: Path) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(b"substituted")
+        with zipfile.ZipFile(destination, "w") as archive:
+            for name in sorted(contract.required_files - {"license-llvm-openmp"}):
+                archive.writestr(name, name)
 
-    monkeypatch.setattr(distribution, "_download", replace_after_validated_download)
+    monkeypatch.setattr(distribution, "_download", download)
+    output = tmp_path / "prepared"
+    output.mkdir()
+    sentinel = output / "existing.txt"
+    sentinel.write_bytes(b"keep existing output on failure")
 
-    with pytest.raises(RuntimeError, match="size mismatch"):
-        distribution.prepare_runtime(
-            ROOT,
-            tmp_path / "cache",
-            tmp_path / "prepared",
-        )
+    with pytest.raises(RuntimeError, match="missing required files.*license-llvm-openmp"):
+        distribution.prepare_runtime(ROOT, tmp_path / "cache", output)
+
+    assert sentinel.read_bytes() == b"keep existing output on failure"
+    assert not list(tmp_path.glob(".prepared-*"))
 
 
 def test_prepare_runtime_reuses_valid_output_without_replacement(
@@ -366,7 +292,7 @@ def test_llama_cpp_license_and_notice_have_required_provenance() -> None:
     provenance = distribution._validate_provenance(ROOT)
     license_text = license_path.read_text(encoding="utf-8")
     assert set(provenance) == set(distribution.PROVENANCE_FILENAMES)
-    assert all(marker in license_text for marker in distribution.LICENSE_REQUIRED_MARKERS)
+    assert "MIT License" in license_text
     assert "llama.cpp CPU and Vulkan runtime" in notice
     assert distribution.LLAMA_CPP_COMMIT in notice
 

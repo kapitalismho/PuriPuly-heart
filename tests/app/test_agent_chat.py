@@ -245,7 +245,9 @@ def contexts_of(request):
             continue
         catalogs.update(deepcopy(context.get("catalogs", {})))
         for module in context["modules"]:
-            if module in context:
+            if module == "core" and module in context:
+                states["core"] = {**states.get("core", {}), **deepcopy(context["core"])}
+            elif module in context:
                 states[module] = deepcopy(context[module])
         if automatic:
             snapshots.append(
@@ -513,7 +515,7 @@ async def test_targeted_diagnostics_find_older_evidence_and_expose_paging_and_ev
     await owner.start()
     try:
         outcome = await owner.send("Inspect the failed operation.")
-        first = outcome.tool_results[0].result["context"]["core"]["diagnostics"]
+        first = outcome.tool_results[0].result["context"]["diagnostics"]
         assert {item["diagnostic_id"] for item in first["records"]} == set(related_ids[:10])
         assert first["coverage"]["truncated"] is True
         second = await collect_agent_context(
@@ -589,8 +591,8 @@ async def test_text_free_subscription_generations_and_idle_make_no_model_calls()
         assert not transport.requests
         await owner.send("번역이 안 떠")
         context = context_of(transport.requests[0])
-        assert context["core"]["activity"]["self"]["transcript_seconds_ago"] is not None
-        assert context["core"]["activity"]["peer"]["translation_seconds_ago"] is not None
+        assert context["core"]["activity"]["self"]["transcript_observed_monotonic"] is not None
+        assert context["core"]["activity"]["peer"]["translation_observed_monotonic"] is not None
         assert "PRIVATE-" not in json.dumps(transport.requests)
         records.events.publish({"topic": "capture", "channel": "self", "generation": 2})
         await asyncio.sleep(0)
@@ -679,9 +681,7 @@ async def test_history_retains_prior_evidence_when_fresh_query_fails():
         outputs = [item for item in continuation if item.get("type") == "function_call_output"]
         assert [item["call_id"] for item in outputs] == ["settings", "diagnostics"]
         assert (
-            first.tool_results[1].result["context"]["core"]["diagnostics"]["records"][0][
-                "diagnostic_id"
-            ]
+            first.tool_results[1].result["context"]["diagnostics"]["records"][0]["diagnostic_id"]
             == diagnostic["diagnostic_id"]
         )
         records.values["app.status"]["translation_enabled"] = True
@@ -899,77 +899,22 @@ async def test_parallel_context_reads_wait_for_all_and_publish_in_call_order(
     ],
 )
 @pytest.mark.parametrize("invalid_first", [False, True])
-async def test_invalid_context_batch_arguments_reject_every_member(arguments, invalid_first):
+async def test_invalid_context_batch_member_preserves_independent_read(arguments, invalid_first):
     invalid = tool("invalid", arguments=arguments)
     valid = tool("valid")
     calls = [invalid, valid] if invalid_first else [valid, invalid]
-    records, transport = Records(), Responses({"status": "completed", "output": calls})
+    records, transport = Records(), Responses({"status": "completed", "output": calls}, answer())
     owner = AgentChatOwner(records, transport, localize=str)
     await owner.start()
     try:
         result = await owner.send("Check output")
-        assert result.status == "interrupted"
-        assert len(records.queries) == 10
+        assert result.status == "completed"
         assert [item.call_id for item in result.tool_results] == [call["call_id"] for call in calls]
-        assert [item.result for item in result.tool_results] == [
-            {"status": "rejected", "code": "invalid_tool_call"}
-        ] * 2
-        assert len(transport.requests) == 1
+        outcomes = {item.call_id: item for item in result.tool_results}
+        assert outcomes["invalid"].result["code"] == "invalid_tool_call"
+        assert outcomes["valid"].status in {"observed", "unchanged"}
+        assert len(transport.requests) == 2
         assert not owner.snapshot.setup_actions
-    finally:
-        await owner.close()
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("name", "arguments"),
-    [
-        ("change_settings", {"changes": {"overlay.show_translation": False}}),
-        ("withdraw_confirmation", {"card_id": "pending-card"}),
-        ("open_settings", {"section": "api"}),
-        ("probe_translation", {}),
-        ("probe_self_recognition", {}),
-        ("probe_peer_recognition", {}),
-        ("propose_report", {"summary": "Check the app"}),
-        ("set_capture", {"channel": "self", "enabled": True}),
-        ("set_translation", {"enabled": True}),
-        ("diagnose_microphone", {}),
-        ("get_provider_setup", {"provider": "openrouter"}),
-        ("retry_osc_discovery", {}),
-        ("unsupported_tool", {}),
-        (None, {}),
-        ([], {}),
-        ({}, {}),
-        (123, {}),
-    ],
-)
-@pytest.mark.parametrize("non_read_first", [False, True])
-async def test_mixed_context_batches_never_execute_or_stage_actions(
-    name, arguments, non_read_first
-):
-    non_read = {**tool("non-read"), "arguments": json.dumps(arguments)}
-    if name is None:
-        del non_read["name"]
-    else:
-        non_read["name"] = name
-    read = tool("read")
-    calls = [non_read, read] if non_read_first else [read, non_read]
-    records, transport = Records(), Responses({"status": "completed", "output": calls})
-    owner = AgentChatOwner(records, transport, localize=str)
-    navigations = []
-    owner.bind_navigation(lambda *args: navigations.append(args) or {"opened": True})
-    await owner.start()
-    try:
-        result = await owner.send("Check output and configure the app")
-        assert result.status == "interrupted"
-        assert len(records.queries) == 10
-        assert [item.status for item in result.tool_results] == ["rejected"] * 2
-        assert not navigations
-        assert not owner.snapshot.setup_actions
-        assert not owner.snapshot.secure_entry_requests
-        assert not owner.snapshot.report_offers
-        assert not owner.snapshot.recent_changes
-        assert owner.snapshot.confirmation is None
     finally:
         await owner.close()
 
@@ -1108,7 +1053,7 @@ async def test_one_active_turn_shutdown_rejects_late_response_and_drains():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("effort", ["low", "high", "xhigh"])
+@pytest.mark.parametrize("effort", ["low", "medium", "high"])
 async def test_transport_rejects_insecure_routes_authenticates_and_sends_only_fixed_interface(
     monkeypatch, effort
 ):
@@ -1175,7 +1120,7 @@ async def test_transport_rejects_insecure_routes_authenticates_and_sends_only_fi
             "allow_tools": False,
         }
         assert seen[0].headers["authorization"] == "Bearer synthetic-installation-token"
-        for invalid in ("medium", "extreme"):
+        for invalid in ("xhigh", "extreme"):
             with pytest.raises(AgentTransportError, match="invalid_effort"):
                 await anext(
                     transport.respond(

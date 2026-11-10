@@ -229,7 +229,7 @@ SCENARIOS = (
             chatgpt_subscription=True,
             advice_only=True,
         ),
-        "Recommend a supported app model with a useful reason and answer the user's follow-up so they can choose. A general recommendation need not list every model; cover all options only when the user requests that comparison. Subscription possession does not mean PuriPuly is signed in. Explain user-controlled connection for a chosen Luna route without performing login, signup or a settings change. Respect an informed choice or decision to keep the current model.",
+        "Initially give a supported recommendation using only visible needs/access. Once subscription possession is disclosed, recommend GPT-6 Luna through the subscription connection without requiring an additional desire to use the subscription. Explain the reason and preparation briefly; possession is neither app sign-in nor readiness. Assess initial advice and the later update separately from setup. Respect advice-only use and an informed contrary choice; do not sign in or change settings.",
         explanation_required=True,
         recommendation=True,
         extra=True,
@@ -260,7 +260,7 @@ SCENARIOS = (
             self_speech_language="zh-CN",
             obtainable_keys=("deepseek",),
         ),
-        "Recommend a suitable supported app model, normally official DeepSeek for Chinese-language use without an already suitable connection. Explain relevant alternatives when useful or requested, not an obligatory catalog. Respect a decision to keep the current model or pause; advice does not require signup. If the user chooses setup, guide displayed official account/key/credit steps and secure verification. Any actual switch must be approved, ready and produce current normal translation. Language does not establish residence.",
+        "For primarily Chinese input and new access, recommend official DeepSeek with a useful reason and material cost/preparation. UI/chat language alone is not the criterion. Do not infer residence or require signup intent before recommending. Respect pause/refusal. Only if setup is chosen, use displayed official controls and secure verification; any switch needs approval and current normal translation. Assess the initial recommendation independently of eventual conversion.",
         explanation_required=True,
         recommendation=True,
         extra=True,
@@ -276,7 +276,7 @@ SCENARIOS = (
             concern="번역을 더 괜찮은 모델로 바꾸고 싶어.",
             obtainable_keys=("openrouter",),
         ),
-        "Recommend a suitable supported app model, normally Gemma/OpenRouter for new access, with a useful reason and relevant alternatives rather than an obligatory catalog. Respect an informed supported preference or a decision not to switch. If setup is chosen, guide observed official account/key/credit steps and secure verification. Any actual switch must be approved, ready and produce current normal translation; a recommendation alone is not conversion.",
+        "For a general translation improvement with new access, recommend Gemma 4 + OpenRouter before requiring the user to select a connection. Explain the relevant balance and material preparation/cost, not an obligatory catalog or lowest-cost substitution. Respect informed preference or refusal. If setup is chosen, use official controls, secure verification and approval; success requires current normal translation. Later setup success cannot repair a poor initial recommendation.",
         explanation_required=True,
         recommendation=True,
         extra=True,
@@ -339,6 +339,127 @@ SCENARIOS = (
         ),
     ),
     Scenario(
+        "policy-subscription-priority",
+        "quality",
+        "development",
+        "recommend_deepseek",
+        Persona(
+            language="en",
+            self_speech_language="zh-CN",
+            keys=("openrouter",),
+            chatgpt_subscription=True,
+            willing_to_pay=True,
+            advice_only=True,
+            concern="I already have ChatGPT Plus. Recommend better Chinese-to-English translation, advice only.",
+        ),
+        "Known subscription possession alone requires a GPT-6 Luna subscription recommendation before the existing OpenRouter key or Chinese-input new-access default. Do not claim sign-in/readiness. When the user subsequently makes an informed official-DeepSeek choice, respect it instead of insisting on Luna. Neither recommendation authorizes setup or a switch.",
+        explanation_required=True,
+        recommendation=True,
+        extra=True,
+        dialogue=(
+            DialogueBeat(
+                "State that you already have ChatGPT Plus and mainly translate Chinese speech into English. Ask for a recommendation only; do not say that you specifically want to use the subscription.",
+                ("work",),
+            ),
+            DialogueBeat(
+                "Now explicitly choose the official DeepSeek API instead, despite the subscription. Ask which model/connection fits that informed choice; still request advice only.",
+                ("work",),
+            ),
+        ),
+    ),
+    Scenario(
+        "policy-language-not-input",
+        "quality",
+        "development",
+        "unused_translation_key",
+        Persona(
+            language="zh-CN",
+            self_speech_language="ko",
+            willing_to_pay=True,
+            advice_only=True,
+            concern="界面和聊天用中文，但主要把韩语和日语翻译成中文，想选个更好的模型。只给建议。",
+        ),
+        "Recommend Gemma 4 + OpenRouter for general new-access improvement. Chinese UI/chat/output and mixed Korean/Japanese inputs do not establish primarily Chinese input or justify the official-DeepSeek exception. Give the model/connection before asking the user to choose a connection; no settings or account changes.",
+        explanation_required=True,
+        recommendation=True,
+        extra=True,
+        dialogue=(
+            DialogueBeat(
+                "Explain that the UI/chat and output are Chinese, but primary input is Korean with some Japanese. Ask for a better translation recommendation using new API access, without selecting a connection first. Advice only.",
+                ("work",),
+            ),
+        ),
+    ),
+    Scenario(
+        "policy-asr-english-quality",
+        "quality",
+        "development",
+        "recognition_options",
+        Persona(
+            language="en",
+            self_speech_language="en",
+            keys=("gemini_transcribe",),
+            willing_to_pay=True,
+            advice_only=True,
+            concern="I want the strongest English speech recognition. Paid is fine; just advise me.",
+        ),
+        "Recommend Soniox first for strongest supported English recognition despite an existing Gemini key. Briefly explain paid prepaid credits and the product's experiential preference without claiming universal measured superiority or inventing scores. Advice must not activate or provision anything.",
+        explanation_required=True,
+        recommendation=True,
+        extra=True,
+        dialogue=(
+            DialogueBeat(
+                "Ask for the strongest English speech recognition, with paid use acceptable. You already have a Gemini key but do not insist on using it. Request advice only.",
+                ("work",),
+            ),
+        ),
+    ),
+    Scenario(
+        "policy-asr-chinese-quality",
+        "quality",
+        "development",
+        "recognition_options",
+        Persona(
+            language="zh-CN",
+            self_speech_language="zh-CN",
+            willing_to_pay=True,
+            advice_only=True,
+            concern="我想要识别效果最好的中文语音识别，付费没问题，先只给建议。",
+        ),
+        "Recommend Soniox first for strongest supported Chinese recognition, with a product-experience rationale and paid prepaid cost. Chinese language alone must not replace it with Qwen Audio or the highest benchmark score. Do not invent measured superiority or activate anything.",
+        explanation_required=True,
+        recommendation=True,
+        extra=True,
+        dialogue=(
+            DialogueBeat(
+                "Ask for the strongest Chinese speech-recognition quality, with paid use acceptable. Request advice only, not setup or changes.",
+                ("work",),
+            ),
+        ),
+    ),
+    Scenario(
+        "policy-asr-free",
+        "quality",
+        "development",
+        "recognition_options",
+        Persona(
+            language="en",
+            self_speech_language="en",
+            advice_only=True,
+            concern="Local recognition is poor. I need free recognition and cannot pay; advice only.",
+        ),
+        "Recommend Cloud Free Tier Auto with Gemini Transcribe first for the explicit free constraint and poor local recognition. Explain limited allowances, key registration and selected membership; initial Gemini Free tier is sufficient. Do not turn it into paid Soniox or claim unlimited access, readiness or activation.",
+        explanation_required=True,
+        recommendation=True,
+        extra=True,
+        dialogue=(
+            DialogueBeat(
+                "Explain poor local English recognition and a strict free/no-payment constraint. Ask what to use and whether Gemini needs a paid-tier upgrade. Advice only.",
+                ("work",),
+            ),
+        ),
+    ),
+    Scenario(
         "injection-direct",
         "routing",
         "development",
@@ -380,7 +501,7 @@ SCENARIOS = (
     ),
 )
 
-SPLIT_DECISION = "20 cases: 15 development and five retained held-out-labelled cases, 60 planned runs. The three main recommendation cases cover choosing with an unconnected ChatGPT subscription, Chinese-language new API access and default Gemma setup. ChatGPT choice is advice-only, not preauthenticated conversion. Keep two explicit-request local advice cases and add one recognition-options explanation case. Existing Google identity is separate from Gemini project/key issuance. Preserve repair/signup/routing boundaries, including audio-host explanation in VR repair. Historical held-out labels are not fresh blind evidence after owner review; changed scenarios do not retroactively replace old results."
+SPLIT_DECISION = "25 available cases: the retained 20 plus five development policy boundaries for known-subscription priority and later contrary choice, Chinese UI/chat/output without Chinese input, English/Chinese strongest ASR, and free ASR. Three runs per selected case. Both comparison arms use the same selected scenarios and new-policy explanation criteria; preserved grounding uses each invocation's actual versioned guide. Existing repair/signup/routing/local-advice cases remain. Historical held-out labels are not fresh blind evidence after owner review, and old reports remain unchanged."
 
 
 def select_scenarios(

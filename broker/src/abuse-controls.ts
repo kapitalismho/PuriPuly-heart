@@ -1181,8 +1181,12 @@ function validateBrokerAbuseControlsConfig(
     value.puriTokenIp ?? DEFAULT_BROKER_ABUSE_CONTROLS.puriTokenIp,
     'ip',
   );
-  const puriTokenRegistrationIp = validatePuriTokenRateLimitConfig(
-    value.puriTokenRegistrationIp ?? DEFAULT_BROKER_ABUSE_CONTROLS.puriTokenRegistrationIp,
+  const puriEnrollmentShortIp = validatePuriTokenRateLimitConfig(
+    value.puriEnrollmentShortIp ?? DEFAULT_BROKER_ABUSE_CONTROLS.puriEnrollmentShortIp,
+    'ip',
+  );
+  const puriEnrollmentLongIp = validatePuriTokenRateLimitConfig(
+    value.puriEnrollmentLongIp ?? DEFAULT_BROKER_ABUSE_CONTROLS.puriEnrollmentLongIp,
     'ip',
   );
   const puriTokenInstallation = validatePuriTokenRateLimitConfig(
@@ -1215,7 +1219,8 @@ function validateBrokerAbuseControlsConfig(
     !managedOperationResumeInstallation ||
     !managedKeyDeliveryAckIp ||
     !puriTokenIp ||
-    !puriTokenRegistrationIp ||
+    !puriEnrollmentShortIp ||
+    !puriEnrollmentLongIp ||
     !puriTokenInstallation ||
     !pendingDiscordOAuthSessions ||
     !newActiveEntitlementsPerDay ||
@@ -1242,7 +1247,8 @@ function validateBrokerAbuseControlsConfig(
     managedOperationResumeInstallation,
     managedKeyDeliveryAckIp,
     puriTokenIp,
-    puriTokenRegistrationIp,
+    puriEnrollmentShortIp,
+    puriEnrollmentLongIp,
     puriTokenInstallation,
     pendingDiscordOAuthSessions,
     newActiveEntitlementsPerDay,

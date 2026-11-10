@@ -12,7 +12,6 @@ const migrationsDefault = fileURLToPath(new URL('../migrations/', import.meta.ur
 const tokenSecret = 'puri-context-export-synthetic-token-secret-only';
 const installation = createHash('sha256').update('puri-context-export-synthetic-installation').digest('hex');
 const dummyKey = 'synthetic-context-export-no-provider-access';
-const agentProtocol = 6;
 const staticFields = new Set(['model', 'instructions', 'tools', 'questions', 'reasoning',
   'prompt_cache_options', 'store', 'stream', 'parallel_tool_calls', 'max_output_tokens', 'include']);
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -86,7 +85,7 @@ function samples() {
 }
 
 export async function exportRelayContext({ emitted, relayBuild, migrations = migrationsDefault,
-  compatibilityDate, compatibilityFlags = [] }) {
+  compatibilityDate, compatibilityFlags = [], protocol = 6 }) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(compatibilityDate ?? '')
     || !Array.isArray(compatibilityFlags) || compatibilityFlags.some((flag) => typeof flag !== 'string')) {
     throw new Error('Supply the measured Worker compatibility date and flags explicitly.');
@@ -141,7 +140,7 @@ export async function exportRelayContext({ emitted, relayBuild, migrations = mig
     for (const [number, sample] of samples().entries()) {
       pending = { sample, bodies: [] };
       const classification = sample.id === 'classify';
-      const request = { agent_protocol: agentProtocol, turn_id: (number + 1).toString(16).padStart(32, '0'), input: sample.input,
+      const request = { agent_protocol: protocol, turn_id: (number + 1).toString(16).padStart(32, '0'), input: sample.input,
         ...(classification ? {} : { route: sample.route, effort: sample.effort, allow_tools: sample.allow_tools }) };
       const response = await runtime.dispatchFetch(`http://context-export.invalid/v1/${classification ? 'classify' : 'respond'}`, {
         method: 'POST', headers: { authorization: `Bearer ${signedToken()}`, 'content-type': 'application/json' },
@@ -169,7 +168,7 @@ export async function exportRelayContext({ emitted, relayBuild, migrations = mig
     await runtime.dispose();
   }
   return {
-    format: 'puri-agent-relay-context-1', agent_protocol: agentProtocol, relay_build: build, bundle_hashes: hashes, contexts,
+    format: 'puri-agent-relay-context-1', agent_protocol: protocol, relay_build: build, bundle_hashes: hashes, contexts,
     export_provenance: {
       mode: 'controlled_no_network', diagnostic_only: true, external_model_calls: 0,
       source: 'observed_emitted_worker_outbound_requests', entry_module: relative(root, entry).replaceAll('\\', '/'),
@@ -186,10 +185,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       emitted: { type: 'string' }, output: { type: 'string' }, 'relay-build': { type: 'string' },
       migrations: { type: 'string' }, 'compatibility-date': { type: 'string' },
       'compatibility-flag': { type: 'string', multiple: true },
+      protocol: { type: 'string', default: '6' },
     } });
     if (!values.emitted || !values.output) throw new Error('Use --emitted <Wrangler index.js> --output <new manifest.json> --compatibility-date <date> [--compatibility-flag <flag>] [--relay-build <expected entry SHA256>] [--migrations <directory>].');
     const manifest = await exportRelayContext({ emitted: values.emitted, relayBuild: values['relay-build'],
-      migrations: values.migrations, compatibilityDate: values['compatibility-date'], compatibilityFlags: values['compatibility-flag'] });
+      migrations: values.migrations, compatibilityDate: values['compatibility-date'], compatibilityFlags: values['compatibility-flag'],
+      protocol: Number(values.protocol) });
     await writeFile(values.output, `${JSON.stringify(manifest, null, 2)}\n`, { flag: 'wx' });
     console.log(JSON.stringify({ status: 'controlled_context_exported', diagnostic_only: true,
       external_model_calls: 0, relay_build: manifest.relay_build, output: values.output }));

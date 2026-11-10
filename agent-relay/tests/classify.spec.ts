@@ -4,7 +4,7 @@ import relay from '../src/index';
 import { authHeaders, installationHash, responseEvents, testEnv, turnId } from './fixtures';
 
 const env = testEnv();
-const body = { agent_protocol: 5, turn_id: turnId, input: [{ role: 'user', content: '{"current_message":"synthetic request","recent_messages":[],"active_task":null,"previous_modules":[],"last_puri_action":null}' }] };
+const body = { agent_protocol: 6, turn_id: turnId, input: [{ role: 'user', content: '{"current_message":"synthetic request","recent_messages":[],"active_task":null,"previous_modules":[],"last_puri_action":null}' }] };
 
 function request(value: unknown = body, path = '/v1/classify', host = 'http://127.0.0.1'): Request {
   return new Request(`${host}${path}`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(value) });
@@ -15,7 +15,7 @@ afterEach(() => vi.restoreAllMocks());
 describe('entry classification relay', () => {
   it('makes one native Decisions request with server-owned route, effort and context questions and passes native answers through', async () => {
     const returned = { model: 'gpt-6-luna', answers: [
-      { type: 'choice', name: 'effort', choice: 'xhigh' },
+      { type: 'choice', name: 'effort', choice: 'medium' },
       { type: 'choice', name: 'route', choice: 'work' },
     ], usage: { input_tokens: 120, output_tokens: 0 } };
     const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(returned));
@@ -52,7 +52,7 @@ describe('entry classification relay', () => {
       { name: 'context_general', type: 'choice' }, { name: 'context_relation', type: 'choice' },
     ]);
     expect(sent.questions[0].choices.map(({ value }: { value: string }) => value)).toEqual(['work', 'social', 'out_of_scope', 'unclear']);
-    expect(sent.questions[1].choices.map(({ value }: { value: string }) => value)).toEqual(['low', 'high', 'xhigh']);
+    expect(sent.questions[1].choices.map(({ value }: { value: string }) => value)).toEqual(['low', 'medium', 'high']);
     for (const question of sent.questions.slice(2, -1)) {
       expect(question.choices.map(({ value }: { value: string }) => value)).toEqual(['include', 'omit', 'unclear']);
     }
@@ -103,9 +103,9 @@ describe('entry classification relay', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['social', 'out_of_scope'])('rejects retired medium on %s rather than silently converting it to low', async (route) => {
+  it.each(['social', 'out_of_scope'])('rejects retired xhigh on %s rather than silently converting it to low', async (route) => {
     const fetch = vi.spyOn(globalThis, 'fetch');
-    const response = await relay.fetch(request({ ...body, route, effort: 'medium', allow_tools: false }, '/v1/respond'), env);
+    const response = await relay.fetch(request({ ...body, route, effort: 'xhigh', allow_tools: false }, '/v1/respond'), env);
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ error: { code: 'invalid_request' } });
     expect(fetch).not.toHaveBeenCalled();

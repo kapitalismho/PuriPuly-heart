@@ -144,6 +144,7 @@ class ProviderRuntimeChannelSnapshot:
     pending_handoff: bool
     has_resources: bool
     provider_live: bool = True
+    speaker_diarization: bool = False
 
 
 @dataclass(frozen=True, slots=True)

@@ -884,6 +884,9 @@ async def test_multispeaker_final_settles_preview_and_keeps_every_attributed_spa
         overlay_sink=overlay,
         clock=clock,
     )
+    harness.peer_owner.cloud_captions.speaker_diarization = lambda provider_id: (
+        provider_id == "soniox"
+    )
     session = _soniox_session()
     await harness.start()
     try:

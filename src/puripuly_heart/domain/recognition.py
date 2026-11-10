@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Literal
 from uuid import UUID
 
@@ -12,6 +12,7 @@ class RecognitionStreamIdentity:
     capture_epoch: int
     provider_epoch_id: str
     settings_scope: tuple[object, ...]
+    recognizer_id: str | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True, slots=True)

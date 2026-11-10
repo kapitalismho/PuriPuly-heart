@@ -553,6 +553,91 @@ async def test_generic_handoff_waits_for_channel_boundary_commit() -> None:
 
 
 @pytest.mark.asyncio
+async def test_snapshot_reports_speaker_diarization_of_the_committed_provider() -> None:
+    owner, _provisioning, _gpu_factory, provider_factory = _owner()
+
+    def soniox(enabled: bool) -> ProviderRuntimeBuildRequest:
+        return ProviderRuntimeBuildRequest(
+            config=replace(
+                _resolved_config("peer", "soniox"),
+                provider_options={"enable_speaker_diarization": enabled},
+            )
+        )
+
+    await owner.replace_provider(soniox(True), start=False)
+    assert owner.snapshot.channel_for("peer").speaker_diarization is True
+
+    provider_factory.providers[0].is_at_utterance_boundary = False
+    handoff = asyncio.create_task(owner.handoff_provider(soniox(False), start=False))
+    await _wait_until(lambda: owner.snapshot.channel_for("peer").pending_handoff)
+    assert owner.snapshot.channel_for("peer").speaker_diarization is True
+    await owner.commit_handoff("peer")
+    assert owner.snapshot.channel_for("peer").speaker_diarization is False
+    await handoff
+
+    await owner.replace_provider(soniox(True), start=False)
+    await owner.replace_provider(
+        ProviderRuntimeBuildRequest(config=_resolved_config("peer", "deepgram")), start=False
+    )
+    assert owner.snapshot.channel_for("peer").speaker_diarization is False
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_handoff_preserves_committed_diarization_during_discard(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner, _provisioning, _gpu_factory, provider_factory = _owner()
+    discard_started = asyncio.Event()
+    finish_discard = asyncio.Event()
+    handoff = None
+
+    def soniox(enabled: bool) -> ProviderRuntimeBuildRequest:
+        return ProviderRuntimeBuildRequest(
+            config=replace(
+                _resolved_config("peer", "soniox"),
+                provider_options={"enable_speaker_diarization": enabled},
+            )
+        )
+
+    async def close_backend() -> None:
+        discard_started.set()
+        await finish_discard.wait()
+
+    try:
+        await owner.replace_provider(soniox(True), start=False)
+        provider_factory.providers[0].is_at_utterance_boundary = False
+        handoff = asyncio.create_task(owner.handoff_provider(soniox(False), start=False))
+        await _wait_until(lambda: owner.snapshot.channel_for("peer").pending_handoff)
+        monkeypatch.setattr(provider_factory.providers[-1], "close_backend", close_backend)
+
+        handoff.cancel()
+        await asyncio.wait_for(discard_started.wait(), timeout=1.0)
+        assert owner.snapshot.channel_for("peer").pending_handoff is False
+
+        await owner.commit_handoff("peer")
+        assert owner.snapshot.channel_for("peer").speaker_diarization is True
+
+        finish_discard.set()
+        with pytest.raises(asyncio.CancelledError):
+            await handoff
+        await owner.commit_handoff("peer")
+        assert owner.snapshot.channel_for("peer").speaker_diarization is True
+
+        handoff = asyncio.create_task(owner.handoff_provider(soniox(False), start=False))
+        await _wait_until(lambda: owner.snapshot.channel_for("peer").pending_handoff)
+        await owner.commit_handoff("peer")
+        assert owner.snapshot.channel_for("peer").speaker_diarization is False
+        assert (await handoff).status == "applied"
+    finally:
+        finish_discard.set()
+        if handoff is not None:
+            handoff.cancel()
+            await asyncio.gather(handoff, return_exceptions=True)
+        await owner.close()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("provider_id", "model_id", "language"),
     [

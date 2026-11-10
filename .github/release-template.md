@@ -20,6 +20,7 @@ Download `{{INSTALLER_EXE}}` from the Assets section below, then run it.
 - From the second launch, the message input shows a randomly selected prompt or usage tip. Changing the interface language keeps the selected tip.
 - Local translation models now share one Local section in the model picker. The GPT-6 luna description also clarifies that it can use a ChatGPT plan.
 - ASR logs identify applied provider and model selections, final latency remains visible when an already-sent preview becomes final, and routine Output success messages no longer flood the logs.
+- Windows installer release builds use Windows Server 2025 and essential version, package, and startup checks instead of repeated checksum/provenance gates or device-dependent capture checks. CMake selects the installed Visual Studio toolchain instead of requiring Visual Studio 2022. Model-download integrity and safe upgrade cleanup remain enforced.
 
 ---
 **If PuriPuly has made your world a bit wider,

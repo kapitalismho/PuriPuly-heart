@@ -22,7 +22,7 @@ afterEach(() => vi.restoreAllMocks());
 describe('app protocol contracts', () => {
   it('keeps a recorded app request fixture for exactly the supported protocols, including the current one', () => {
     expect(currentProtocol).toBe(6);
-    expect(supportedProtocols).toEqual([5, 6]);
+    expect(supportedProtocols).toEqual([6]);
     expect([...recorded.keys()].sort((a, b) => a - b)).toEqual(supportedProtocols);
   });
 
@@ -44,32 +44,22 @@ describe('app protocol contracts', () => {
         expect(sent.questions.map(({ name }: { name: string }) => name))
           .toEqual(expect.arrayContaining(contract.contextModules.map(({ name }) => `context_${name}`)));
       } else if (body.route === 'work' || body.route === 'unclear') {
-        expect(sent.tools).toEqual(contract.tools);
-        expect(sent.input[0].content[0].text).toContain(contract.appContext.trim());
         const tool = (name: string) => sent.tools.find((value: { name: string }) => value.name === name);
         const providers = ['alibaba_beijing', 'alibaba_singapore', 'deepgram', 'deepseek',
-          'elevenlabs_scribe', 'openai', 'openrouter', 'soniox',
-          ...(protocol === 5 ? ['gemini_transcribe', 'google'] : ['gemini'])].sort();
-        expect(tool('get_provider_setup').parameters.properties.provider.enum).toEqual(providers);
-        expect(tool('open_settings').parameters.properties.provider.enum).toEqual([...providers, null]);
-        const deletion = tool('control_app').parameters.properties.request.anyOf.find(
-          (schema: { properties: { action: { enum: string[] } } }) =>
-            schema.properties.action.enum.includes('secrets.delete'));
+          'elevenlabs_scribe', 'gemini', 'openai', 'openrouter', 'soniox'].sort();
+        expect(tool('read_app').parameters.properties.provider.enum).toEqual(providers);
+        expect(tool('execute_app').parameters.properties.provider.enum).toEqual(providers);
+        const proposal = tool('propose_app').parameters;
         const secrets = ['openrouter_api_key', 'openai_api_key', 'deepseek_api_key', 'deepgram_api_key',
           'elevenlabs_scribe_api_key', 'soniox_api_key', 'local_llm_api_key', 'custom_stt_api_key',
-          'alibaba_api_key_beijing', 'alibaba_api_key_singapore',
-          ...(protocol === 5 ? ['google_api_key', 'gemini_transcribe_api_key'] : ['gemini_api_key'])];
-        expect([...deletion.properties.name.enum].sort()).toEqual(secrets.sort());
-        const settings = tool('change_settings').parameters.properties.changes.properties;
-        for (const field of ['translation.model', 'translation.previous_llm_model']) {
-          expect(settings[field].anyOf[0].enum.includes('gemini_flash')).toBe(protocol === 5);
-        }
-        const history = settings['translation.connection_history'].anyOf[0];
-        expect(Object.hasOwn(history.properties, 'gemini_flash')).toBe(protocol === 5);
-        expect(history.required.includes('gemini_flash')).toBe(protocol === 5);
-        for (const field of ['stt.provider', 'peer_stt.provider']) {
-          expect(settings[field].anyOf[0].enum).toContain('gemini_transcribe');
-        }
+          'alibaba_api_key_beijing', 'alibaba_api_key_singapore', 'gemini_api_key'];
+        expect([...proposal.properties.name.enum].sort()).toEqual(secrets.sort());
+        expect(proposal.$defs.translation_model.enum).not.toContain('gemini_flash');
+        const settings = proposal.properties.changes.properties;
+        expect(Object.hasOwn(settings['translation.connection_history'].properties, 'gemini_flash')).toBe(false);
+        expect(proposal.$defs.stt_provider.enum).toContain('gemini_transcribe');
+        expect(sent.tools.map(({ name }: { name: string }) => name)).toEqual(names);
+        expect(sent.input[0].content[0].text).toContain(contract.appContext.replaceAll('\r\n', '\n').trim());
       }
       for (const item of body.input) {
         if (item.type === 'function_call') expect(names).toContain(item.name);

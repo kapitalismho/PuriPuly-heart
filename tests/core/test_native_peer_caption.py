@@ -16,10 +16,18 @@ from tests.core.test_peer_caption_lifecycle import (
     final,
     idle,
     partial,
-    setup,
     transcript,
     turn_loop,
 )
+from tests.core.test_peer_caption_lifecycle import setup as lifecycle_setup
+
+
+def setup():
+    harness, backend, events, clock = lifecycle_setup()
+    harness.peer_owner.cloud_captions.speaker_diarization = lambda provider_id: (
+        provider_id == "soniox"
+    )
+    return harness, backend, events, clock
 
 
 def native(texts, order=1, *, session="session", states=None, languages=None, identity=None):

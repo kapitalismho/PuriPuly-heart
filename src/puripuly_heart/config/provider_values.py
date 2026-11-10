@@ -125,6 +125,25 @@ def display_stt_provider(
     return provider
 
 
+_CLOUD_FINAL_STT_PROVIDER_VALUES = frozenset(
+    {
+        STTProviderName.SONIOX.value,
+        STTProviderName.DEEPGRAM.value,
+        STTProviderName.GEMINI_TRANSCRIBE.value,
+        STTProviderName.QWEN_AUDIO.value,
+        STTProviderName.ELEVENLABS_SCRIBE.value,
+        STTProviderName.ROLLING_FREE.value,
+    }
+)
+
+
+def is_cloud_final_stt_provider(provider: STTProviderName | str | None) -> bool:
+    if provider is None:
+        return False
+    value = provider.value if isinstance(provider, STTProviderName) else str(provider)
+    return value in _CLOUD_FINAL_STT_PROVIDER_VALUES
+
+
 def is_qwen_cloud_stt_provider(provider: STTProviderName | str | None) -> bool:
     if provider is None:
         return False

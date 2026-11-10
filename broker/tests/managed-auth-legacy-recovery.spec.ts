@@ -49,6 +49,7 @@ function migrate(env: TestBrokerEnv) {
   env.__db.exec('BEGIN'); env.__db.exec(readBrokerMigrationSql('0027_remove_managed_referrals.sql')); env.__db.exec('COMMIT');
   env.__db.exec(readBrokerMigrationSql('0028_add_puri_identity_proofs.sql'));
   env.__db.exec(readBrokerMigrationSql('0029_puri_token_admission_limits.sql'));
+  env.__db.exec(readBrokerMigrationSql('0030_puri_first_enrollment_limits.sql'));
 }
 
 function retained(env: TestBrokerEnv, seeded: Awaited<ReturnType<typeof seedOriginalFailure>>) {
