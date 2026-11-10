@@ -224,7 +224,8 @@ async def test_replaced_backend_completion_is_stale_and_resources_drain(failure)
         assert result["captured_generation"] == 0
         assert result["current_generation"] == 1
         assert [item["translation_result"] for item in result["target_results"]] == [
-            "stale", "not_started"
+            "stale",
+            "not_started",
         ]
         assert len(backend.requests) == 1
         assert backend.closed is True
@@ -264,7 +265,8 @@ async def test_cancellation_and_shutdown_reject_late_success_and_drain_owned_wor
     assert result["status"] == ("interrupted" if shutdown else "cancelled")
     assert result["translation_result"] == result["status"]
     assert [item["translation_result"] for item in result["target_results"]] == [
-        "cancelled", "not_started"
+        "cancelled",
+        "not_started",
     ]
     assert len(backend.requests) == 1
     assert backend.closed is True

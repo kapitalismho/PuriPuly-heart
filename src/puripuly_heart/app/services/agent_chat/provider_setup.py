@@ -11,7 +11,7 @@ RECOGNITION_ALLOWANCES = MappingProxyType(
     {
         "deepgram": "trial_credit",
         "elevenlabs_scribe": "recurring_free_allowance",
-        "gemini_transcribe": "recurring_free_allowance",
+        "gemini_transcribe": "ample_free_tier",
     }
 )
 
