@@ -11,6 +11,7 @@ from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.prompts import get_default_prompt
 from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.orchestrator.channel_runtime import ContextEntry
 from puripuly_heart.core.orchestrator.peer_caption import join_action, preview_source
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
@@ -18,6 +19,7 @@ from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
 )
 from puripuly_heart.core.overlay.peer_caption_layout import estimate_peer_translation_lines
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
+from puripuly_heart.core.runtime.local_asr_provider_runtime import LocalASRProviderRuntimeOwner
 from puripuly_heart.core.stt.backend import (
     STTProviderEpochEnded,
     STTProviderTurnIdentity,
@@ -30,6 +32,13 @@ from puripuly_heart.core.translation_backend import TranslationBackend
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun, Transcript, Translation
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity
+from tests.core.runtime.test_local_asr_provider_runtime import (
+    FakeGpuRuntimeFactory,
+    FakeProviderFactory,
+    FakeProvisioningPort,
+    _resolved_config,
+    _wait_until,
+)
 from tests.core.test_peer_overlay_policy import Timeline
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness, owned_peer_speech_end
@@ -65,7 +74,7 @@ async def turn_loop():
         await asyncio.sleep(0)
 
 
-def setup(*, overlay_sink=None, clock=None):
+def setup(*, overlay_sink=None, clock=None, local_asr_provider_runtime_factory=None):
     backend = ControlledBackend()
     events = []
 
@@ -84,8 +93,37 @@ def setup(*, overlay_sink=None, clock=None):
         target_language="ko",
         system_prompt=get_default_prompt(),
         peer_translation_enabled=True,
+        local_asr_provider_runtime_factory=local_asr_provider_runtime_factory,
     )
     return harness, backend, events, clock
+
+
+class CommittedProviderRuntimeFactory:
+    def __init__(self):
+        self.providers = FakeProviderFactory()
+        self.owner = None
+
+    def create(self, callbacks):
+        self.owner = LocalASRProviderRuntimeOwner(
+            provider_factory=self.providers,
+            gpu_runtime_factory=FakeGpuRuntimeFactory(),
+            provisioning=FakeProvisioningPort(),
+            self_event_handler=callbacks.self_event_handler,
+            peer_event_handler=callbacks.peer_event_handler,
+            retired_event_handler=callbacks.retired_event_handler,
+            self_exception_handler=callbacks.self_exception_handler,
+            peer_exception_handler=callbacks.peer_exception_handler,
+        )
+        return self.owner
+
+
+def soniox_request(speaker_diarization):
+    return ProviderRuntimeBuildRequest(
+        config=replace(
+            _resolved_config("peer", "soniox"),
+            provider_options={"enable_speaker_diarization": speaker_diarization},
+        )
+    )
 
 
 def transcript(text, order, *, identity=None, final=False):
@@ -921,6 +959,180 @@ async def test_native_empty_or_epoch_retirement_closes_preview_and_unblocks_succ
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("recognizer_id", [None, "gemini_transcribe"], ids=["alias", "member"])
+async def test_rolling_free_partials_and_finals_share_the_caption_route(recognizer_id):
+    harness, backend, events, clock = setup()
+    callbacks = TranslationChannelOwnerCallbacks(harness.stt_sessions)
+    callbacks.bind_peer(harness.peer_owner)
+    stream = RecognitionStreamIdentity(
+        "peer", 1, 0, "rolling-epoch", ("rolling_free",), recognizer_id
+    )
+    callbacks._peer_capture = SimpleNamespace(
+        is_current_recognition_stream=lambda identity: identity == stream
+    )
+    harness.peer_owner.local_asr_runtime = SimpleNamespace(
+        snapshot=harness.peer_owner.local_asr_runtime.snapshot,
+        is_current_recognition_stream=lambda _channel, identity: identity == stream,
+    )
+    sources = [f"Sentence number {order}." for order in range(1, 6)]
+    try:
+        await harness.start()
+        for order, source in enumerate(sources, start=1):
+            unit_id = uuid4()
+            await callbacks.peer_event_handler(
+                STTRecognitionUnit(
+                    RecognitionUnitIdentity(stream, unit_id, order * 2 - 1),
+                    source[:8],
+                    is_final=False,
+                    observed_at=clock.now(),
+                )
+            )
+            await callbacks.peer_event_handler(
+                STTRecognitionUnitTerminal(
+                    STTRecognitionUnit(RecognitionUnitIdentity(stream, unit_id, order * 2), source),
+                    "final",
+                )
+            )
+            await asyncio.wait_for(idle(harness), 1)
+            assert harness.peer_owner.cloud_captions._segments == {}
+        finals = [event for event in events if event.type == "translation_final"]
+        assert [event.source_text for event in finals] == sources
+        assert all(event.peer_caption_revision >= 1 for event in finals)
+        assert [request.text for request in backend.calls] == sources
+    finally:
+        await asyncio.wait_for(harness.stop(), 1)
+
+
+def rolling_peer(harness, stream):
+    callbacks = TranslationChannelOwnerCallbacks(harness.stt_sessions)
+    callbacks.bind_peer(harness.peer_owner)
+    callbacks._peer_capture = SimpleNamespace(
+        is_current_recognition_stream=lambda identity: identity == stream
+    )
+    harness.peer_owner.local_asr_runtime = SimpleNamespace(
+        snapshot=harness.peer_owner.local_asr_runtime.snapshot,
+        is_current_recognition_stream=lambda _channel, identity: identity == stream,
+    )
+    return callbacks
+
+
+@pytest.mark.asyncio
+async def test_rolling_member_switch_keeps_turn_partial_and_final_on_one_publication_order():
+    harness, backend, events, clock = setup()
+    harness.output_runtime.activate_peer_generation(1)
+    gemini = RecognitionStreamIdentity(
+        "peer", 1, 0, "gemini-epoch", ("rolling_free",), "gemini_transcribe"
+    )
+    callbacks = rolling_peer(harness, gemini)
+    gemini_sources = [f"Gemini sentence {order}." for order in range(1, 6)]
+    scribe_sources = ["Scribe sentence one.", "Scribe sentence two."]
+    try:
+        await harness.start()
+        for order, source in enumerate(gemini_sources):
+            unit_id = uuid4()
+            await callbacks.peer_event_handler(
+                STTRecognitionUnit(
+                    RecognitionUnitIdentity(gemini, unit_id, order * 2 + 1),
+                    source[:8],
+                    is_final=False,
+                    observed_at=clock.now(),
+                )
+            )
+            await callbacks.peer_event_handler(
+                STTRecognitionUnitTerminal(
+                    STTRecognitionUnit(
+                        RecognitionUnitIdentity(gemini, unit_id, order * 2 + 2), source
+                    ),
+                    "final",
+                )
+            )
+            await asyncio.wait_for(idle(harness), 1)
+        for segment_order, source in enumerate(scribe_sources, start=2):
+            owned = owned_peer_speech_end(uuid4(), speech_end_at=20.0 + segment_order)
+            segment = replace(
+                owned.segment,
+                identity=replace(owned.segment.identity, segment_order=segment_order),
+            )
+            identity = STTProviderTurnIdentity(
+                segment.identity,
+                "scribe-epoch",
+                f"turn-{segment_order}",
+                ("rolling_free",),
+                "elevenlabs_scribe",
+            )
+            await harness.peer_owner.handle_provider_update(
+                STTProviderTurnUpdate(
+                    identity, 1, "provisional", "replace", source[:13], observed_at=clock.now()
+                )
+            )
+            clock.advance(5)
+            await harness.peer_owner.cloud_captions.check_previews()
+            await asyncio.wait_for(idle(harness), 1)
+            await harness.peer_owner.handle_provider_turn_terminal(
+                AudioSegmentTerminalReceipt(segment.identity, "final", segment, clock.now()),
+                STTProviderTurnTerminal(identity, "final", source, text_authority="authoritative"),
+            )
+            await asyncio.wait_for(idle(harness), 1)
+        finals = [event.source_text for event in events if event.type == "translation_final"]
+        assert finals == [*gemini_sources, *scribe_sources]
+        assert harness.peer_owner.cloud_captions._segments == {}
+    finally:
+        await asyncio.wait_for(harness.stop(), 1)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("disabled", ["translation", "provider"])
+async def test_final_after_translation_stops_closes_its_open_caption(disabled, monkeypatch):
+    harness, backend, events, clock = setup()
+    stream = RecognitionStreamIdentity(
+        "peer", 1, 0, "rolling-epoch", ("rolling_free",), "gemini_transcribe"
+    )
+    callbacks = rolling_peer(harness, stream)
+    available = [True]
+    monkeypatch.setattr(
+        type(harness.peer_owner.translation_requests),
+        "provider_available",
+        property(lambda _owner: available[0]),
+    )
+    try:
+        await harness.start()
+        for order in range(1, 5):
+            unit_id = uuid4()
+            await callbacks.peer_event_handler(
+                STTRecognitionUnit(
+                    RecognitionUnitIdentity(stream, unit_id, order * 2 - 1),
+                    f"partial {order}",
+                    is_final=False,
+                    observed_at=clock.now(),
+                )
+            )
+            if disabled == "translation":
+                harness.replace_configuration(translation_enabled=False)
+            else:
+                available[0] = False
+            calls_before = len(backend.calls)
+            await callbacks.peer_event_handler(
+                STTRecognitionUnitTerminal(
+                    STTRecognitionUnit(
+                        RecognitionUnitIdentity(stream, unit_id, order * 2), f"Final {order}."
+                    ),
+                    "final",
+                )
+            )
+            clock.advance(6)
+            await harness.peer_owner.cloud_captions.check_previews()
+            await asyncio.wait_for(idle(harness), 1)
+            assert harness.peer_owner.cloud_captions._segments == {}
+            assert not any(
+                request.text.startswith("partial") for request in backend.calls[calls_before:]
+            )
+            harness.replace_configuration(translation_enabled=True)
+            available[0] = True
+    finally:
+        await asyncio.wait_for(harness.stop(), 1)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("failure", ["error", "timeout"])
 @pytest.mark.parametrize("repair", [False, True], ids=["settlement", "repair-absorption"])
 async def test_failed_or_timed_out_version_clears_preview_and_preserves_authoritative_source(
@@ -1056,6 +1268,77 @@ async def test_long_speech_preview_keeps_non_diarized_peer_caption_gold(
         await idle(harness)
         assert [block.speaker_style for block in presenter.snapshot().blocks] == [final_style]
     finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("committed", "candidate", "preview_style"),
+    [
+        (True, None, "gray"),
+        (False, None, "gold"),
+        (True, "pending", "gray"),
+        (True, "cancelled", "gray"),
+    ],
+)
+async def test_peer_preview_style_follows_committed_provider_diarization(
+    committed, candidate, preview_style
+):
+    clock = FakeClock()
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    runtime_factory = CommittedProviderRuntimeFactory()
+    harness, backend, _, clock = setup(
+        overlay_sink=presenter,
+        clock=clock,
+        local_asr_provider_runtime_factory=runtime_factory,
+    )
+    owner = runtime_factory.owner
+    handoff = None
+    try:
+        await harness.start()
+        await owner.replace_provider(soniox_request(committed), start=False)
+        if candidate is not None:
+            runtime_factory.providers.providers[-1].is_at_utterance_boundary = False
+            handoff = asyncio.create_task(
+                owner.handoff_provider(soniox_request(not committed), start=False)
+            )
+            await _wait_until(lambda: owner.snapshot.channel_for("peer").pending_handoff)
+        if candidate == "cancelled":
+            handoff.cancel()
+            await asyncio.wait_for(asyncio.gather(handoff, return_exceptions=True), 1)
+            await owner.commit_handoff("peer")
+        item = transcript("We are going to meet at the station later today", 1)
+        await partial(harness, item)
+        clock.advance(5)
+        await harness.peer_owner.cloud_captions.check_previews()
+        await asyncio.wait_for(idle(harness), 1)
+        assert [request.text for request in backend.calls] == [item.text]
+        assert [block.speaker_style for block in presenter.snapshot().blocks] == [preview_style]
+        if committed:
+            item = replace(
+                item,
+                is_final=True,
+                final_speaker_runs=(
+                    FinalSpeakerRun(
+                        item.text,
+                        "1",
+                        "soniox-scope",
+                        source="soniox",
+                        attribution_state="identified",
+                    ),
+                ),
+            )
+        await final(harness, item)
+        await asyncio.wait_for(idle(harness), 1)
+        assert len(backend.calls) == 2
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [item.text]
+        assert [block.speaker_style for block in presenter.snapshot().blocks] == ["gold"]
+        assert harness.osc.messages == []
+    finally:
+        if handoff is not None:
+            handoff.cancel()
+            await asyncio.gather(handoff, return_exceptions=True)
         await harness.stop()
         await presenter.close()
 
