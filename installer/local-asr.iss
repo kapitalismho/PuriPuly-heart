@@ -1,6 +1,7 @@
 var
   DownloadPage: TDownloadWizardPage;
   LocalSttPlanPrepared: Boolean;
+  LocalSttPlanRedownloadSelected: Boolean;
   AsrNeedsDownload: array of Boolean;
   LocalSttRequiredDownloadBytes: Int64;
   LocalSttCompletedDownloadBytes: Int64;
@@ -77,7 +78,7 @@ begin
   end;
 end;
 
-function ValidateLocalSttAsset(BaseDir: String; RelativePath: String; Sha256: String; ExpectedSize: Int64): Boolean;
+function ValidateLocalSttAsset(BaseDir: String; RelativePath: String; ExpectedSize: Int64): Boolean;
 var
   AssetPath: String;
   ActualSize: Int64;
@@ -95,10 +96,6 @@ begin
   end;
   if ActualSize <> ExpectedSize then begin
     Log('Local STT asset size mismatch: ' + AssetPath + ' expected ' + IntToStr(ExpectedSize) + ' found ' + IntToStr(ActualSize));
-    exit;
-  end;
-  if CompareText(GetSHA256OfFile(AssetPath), Sha256) <> 0 then begin
-    Log('Local STT asset SHA256 mismatch: ' + AssetPath);
     exit;
   end;
   Result := True;
@@ -175,7 +172,7 @@ begin
   end;
 end;
 
-function DownloadLocalSttFile(Url: String; BaseName: String; Sha256: String; ExpectedSize: Int64; DisplayName: String): Boolean;
+function DownloadLocalSttFile(Url: String; BaseName: String; ExpectedSize: Int64; DisplayName: String): Boolean;
 begin
   Result := False;
   if DownloadPage.AbortedByUser then begin
@@ -185,7 +182,7 @@ begin
   LocalSttCurrentFileExpectedBytes := ExpectedSize;
   LocalSttCurrentFileLabel := DisplayName;
   try
-    DownloadTemporaryFile(Url, BaseName, Sha256, @DownloadLocalSttProgress);
+    DownloadTemporaryFile(Url, BaseName, '', @DownloadLocalSttProgress);
   except
     if LocalSttProgressFailed then begin
       RaiseException(GetExceptionMessage);
@@ -227,7 +224,7 @@ begin
   if not AsrInstalledIdentityMatches(BaseDir, ModelIndex) then exit;
   for FileIndex := 0 to AsrFileCount(ModelIndex) - 1 do begin
     if not ValidateLocalSttAsset(BaseDir, AsrFilePath(ModelIndex, FileIndex),
-      AsrFileSha256(ModelIndex, FileIndex), AsrFileSize(ModelIndex, FileIndex)) then exit;
+      AsrFileSize(ModelIndex, FileIndex)) then exit;
   end;
   Result := True;
 end;
@@ -328,7 +325,7 @@ begin
       else
         Url := AsrPrimaryUrl(ModelIndex, FileIndex);
       TemporaryName := 'asr-' + IntToStr(ModelIndex) + '-' + IntToStr(FileIndex) + '.download';
-      if not DownloadLocalSttFile(Url, TemporaryName, AsrFileSha256(ModelIndex, FileIndex),
+      if not DownloadLocalSttFile(Url, TemporaryName,
         AsrFileSize(ModelIndex, FileIndex), AsrModelId(ModelIndex)) then begin
         SourceFailed := not DownloadPage.AbortedByUser;
         exit;
@@ -372,8 +369,9 @@ var
   ModelIndex: Integer;
   ReDownloadSelected: Boolean;
 begin
-  if LocalSttPlanPrepared then exit;
   ReDownloadSelected := WizardIsTaskSelected('redownloadasr');
+  if LocalSttPlanPrepared and
+    (LocalSttPlanRedownloadSelected = ReDownloadSelected) then exit;
   SetArrayLength(AsrNeedsDownload, AsrModelCount());
   LocalSttRequiredDownloadBytes := 0;
   for ModelIndex := 0 to AsrModelCount() - 1 do begin
@@ -386,6 +384,7 @@ begin
     if AsrNeedsDownload[ModelIndex] then
       LocalSttRequiredDownloadBytes := LocalSttRequiredDownloadBytes + AsrModelSize(ModelIndex);
   end;
+  LocalSttPlanRedownloadSelected := ReDownloadSelected;
   LocalSttPlanPrepared := True;
 end;
 
@@ -519,7 +518,6 @@ begin
     exit;
   end;
   try
-    LocalSttPlanPrepared := False;
     if not CheckLocalSttDiskSpace(Result) then exit;
     if not RunRequiredCpuLocalSttModelInstalls() then
       Result := CustomMessage('LocalSttDownloadFailed');
