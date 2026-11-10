@@ -106,7 +106,7 @@ async def recognize_probe_audio(
                         source_ranges=ranges,
                         context_only=False,
                     )
-        async with asyncio.timeout(watchdogs.final_timeout_s):
+        async with asyncio.timeout(watchdogs.write_timeout_s + watchdogs.drain_timeout_s):
             if independent is not None:
                 await independent.end_stream(reason="source_eof")
             else:
@@ -116,6 +116,7 @@ async def recognize_probe_audio(
                     seal_reason="source_eof",
                     observed_trailing_silence_ms=None,
                 )
+        async with asyncio.timeout(watchdogs.final_timeout_s):
             async for raw_event in session.turn_events():
                 event = scoped_event_for_delivery(raw_event)
                 if (

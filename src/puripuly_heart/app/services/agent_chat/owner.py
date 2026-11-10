@@ -203,7 +203,7 @@ class AgentChatOwner:
                 return {"status": report.status, "offer_id": report.id}
         identity = f"support-{len(self._reports) + 1}"
         self._reports[identity] = SupportReport(identity, generation, summary)
-        return {"status": "pending", "offer_id": identity, "displayed": False}
+        return {"status": "pending", "offer_id": identity}
 
     def mark_report_displayed(self, offer_id: str) -> dict:
         report = self._reports.get(offer_id)

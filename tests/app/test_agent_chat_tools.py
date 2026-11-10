@@ -1944,9 +1944,10 @@ async def test_recognition_cost_and_readiness_follow_observed_credential(
         }
         if cost == "free_credit_or_allowance":
             expected.update(
-                allowance_kind=(
-                    "trial_credit" if provider == "deepgram" else "recurring_free_allowance"
-                ),
+                allowance_kind={
+                    "deepgram": "trial_credit",
+                    "gemini_transcribe": "ample_free_tier",
+                }.get(provider, "recurring_free_allowance"),
                 allowance_remaining=None,
             )
         assert details["route_effects"] == [expected]
