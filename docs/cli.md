@@ -293,6 +293,8 @@ Saving an active BYOK translation key applies it to subsequent work without enab
 
 Gemini speech recognition and photo translation share `gemini_api_key`, displayed as **Gemini API Key** in settings regardless of the selected speech provider. At secret-store initialization, the former `gemini_transcribe_api_key` is moved to that identifier unless a canonical value already exists. The retired `google_api_key` is deleted, never imported; both former identifiers are rejected by control commands. Existing keys are not verified automatically. The shared verification action probes API authentication, not model readiness, free-tier eligibility, or remaining quota.
 
+The OCR checkout keeps Relay source and its published protocol-6 schema identical to upstream `dev`. At the app boundary only, Puri's `google` and `gemini_transcribe` provider identifiers resolve to the shared Gemini setup. Proposals to delete `google_api_key` or `gemini_transcribe_api_key` require approval for deleting the actual shared `gemini_api_key`; direct control commands still reject the retired identifiers. The current settings catalog continues to reject Gemini Flash proposals even though that model remains in upstream's schema. Do not regenerate the published Relay schema from OCR-local settings choices under the same protocol number; the catalogs intentionally differ. Photo requests remain separate from the chatbot contract, as required by [#386](https://github.com/kapitalismho/PuriPuly-heart/issues/386).
+
 Gemini 3.8 Flash is no longer a speech/text translation choice, through either the official API or OpenRouter. Saved selections migrate to the current managed Gemma default; unrelated selections and credentials are retained.
 
 ### Authentication and Recovery

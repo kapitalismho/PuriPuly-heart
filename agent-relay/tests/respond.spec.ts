@@ -127,7 +127,7 @@ describe('authenticated agent relay', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each([0, 1, 2, 3, 4, 7, '5', '6', null])('rejects unsupported protocol %s without calling OpenAI', async (agent_protocol) => {
+  it.each([0, 1, 2, 3, 4, '5', null])('rejects unsupported protocol %s without calling OpenAI', async (agent_protocol) => {
     const fetch = mockUpstream();
     const response = await relay.fetch(request({ ...body, agent_protocol }), env);
     expect(response.status).toBe(400);

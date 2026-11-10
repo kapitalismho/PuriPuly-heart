@@ -8,7 +8,6 @@ export function exportRelayContext(options: {
   compatibilityFlags?: string[];
 }): Promise<{
   format: 'puri-agent-relay-context-1';
-  agent_protocol: 6;
   relay_build: string;
   bundle_hashes: Record<string, string>;
   contexts: Record<string, Record<string, unknown>>;

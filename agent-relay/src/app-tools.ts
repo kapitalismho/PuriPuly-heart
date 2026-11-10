@@ -49,7 +49,8 @@ export const appTools = [
             "deepgram",
             "deepseek",
             "elevenlabs_scribe",
-            "gemini",
+            "gemini_transcribe",
+            "google",
             "openai",
             "openrouter",
             "soniox"
@@ -112,7 +113,8 @@ export const appTools = [
             "deepgram",
             "deepseek",
             "elevenlabs_scribe",
-            "gemini",
+            "gemini_transcribe",
+            "google",
             "openai",
             "openrouter",
             "soniox"
@@ -371,6 +373,13 @@ export const appTools = [
                     "official_byok"
                   ]
                 },
+                "gemini_flash": {
+                  "type": "string",
+                  "enum": [
+                    "official_byok",
+                    "openrouter"
+                  ]
+                },
                 "gpt_6_luna": {
                   "type": "string",
                   "enum": [
@@ -457,11 +466,12 @@ export const appTools = [
         "name": {
           "type": "string",
           "enum": [
+            "google_api_key",
             "openrouter_api_key",
             "openai_api_key",
             "deepseek_api_key",
             "deepgram_api_key",
-            "gemini_api_key",
+            "gemini_transcribe_api_key",
             "elevenlabs_scribe_api_key",
             "soniox_api_key",
             "local_llm_api_key",
@@ -585,6 +595,7 @@ export const appTools = [
             "gemma4_26b_31b",
             "deepseek_v4_flash",
             "deepseek_v4_flash_41",
+            "gemini_flash",
             "gpt_6_luna",
             "qwen38_flash",
             "managed_gemma",

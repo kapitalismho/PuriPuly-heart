@@ -4,6 +4,7 @@ import math
 from collections.abc import Mapping
 
 from puripuly_heart.app.control_presentation import SETTINGS_PRESENTATION, setting_catalog
+from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
 from puripuly_heart.app.services.application_audio_devices import safe_audio_device_label
 from puripuly_heart.app.services.application_control import COMMANDS, QUERIES, SETTINGS_FIELDS
 from puripuly_heart.core.diagnostic_validation import contains_known_secret_pattern
@@ -329,6 +330,17 @@ def app_tool_schemas(catalog: dict, *, family: str | None = None) -> dict[str, d
 
 def validate_app_request(family: str, arguments: dict, catalog: dict) -> dict:
     request = {key: value for key, value in arguments.items() if value is not None}
+    if family in {"read_app", "execute_app"} and request.get("provider") in (
+        "google",
+        "gemini_transcribe",
+    ):
+        request["provider"] = "gemini"
+    if (
+        family == "propose_app"
+        and request.get("action") == "secrets.delete"
+        and request.get("name") in ("google_api_key", "gemini_transcribe_api_key")
+    ):
+        request["name"] = SettingsSecretKey.GEMINI_API_KEY.value
     key = "topic" if family == "read_app" else "action"
     variant = next(
         (

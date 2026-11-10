@@ -51,7 +51,6 @@ from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, Secret
 from puripuly_heart.config.settings_vnext.serialization import to_dict
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
-from puripuly_heart.release_evidence.agent_chat_simulator.app import choice_catalog
 from tests.app.test_agent_chat import Records, Responses
 from tests.app.test_osc_control_runtime import (
     FakeReceiverOwner,
@@ -1766,16 +1765,6 @@ async def test_generator_omits_enumerated_local_audio_values(catalog, tmp_path, 
     )
     runpy.run_path(str(generator), run_name="__main__")
     assert "PRIVATE-" not in output_path.read_text(encoding="utf-8")
-
-
-@pytest.mark.asyncio
-async def test_committed_relay_tools_match_generator_output():
-    root = Path(__file__).resolve().parents[2]
-    generator = runpy.run_path(str(root / "agent-relay/generate-tools.py"))
-    committed = (root / "agent-relay/src/app-tools.ts").read_text(encoding="utf-8")
-    assert json.loads(
-        committed.removeprefix("export const appTools = ").removesuffix(";\n")
-    ) == generator["app_tools"](await choice_catalog())
 
 
 def test_diagnosis_projection_preserves_measured_ranges_and_bounds_numeric_samples():

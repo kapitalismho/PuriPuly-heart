@@ -1436,6 +1436,7 @@ class AgentChatOwner:
             result = {"status": "rejected", "code": "invalid_tool_call"}
             self._record_result(call, None, result)
             return result
+        requested_provider = arguments.get("provider")
         if family is not None:
             try:
                 catalog = (
@@ -1531,6 +1532,11 @@ class AgentChatOwner:
                     result = {**result, "controls_staged": True}
                 if isinstance(result.get("context"), dict):
                     self._tools.observe_context(result["context"])
+                if result.get("provider") == "gemini" and requested_provider in (
+                    "google",
+                    "gemini_transcribe",
+                ):
+                    result = {**result, "provider": requested_provider}
         except Exception:
             result = {"status": "unavailable", "code": "tool_unavailable"}
         self._require_current(generation)
