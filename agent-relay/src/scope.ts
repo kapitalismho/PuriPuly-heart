@@ -5,7 +5,7 @@ const choices = (...values: string[]) => values.map((value) => ({ value }));
 export function classifierQuestions(contract: Contract) {
   return [
     { type: 'choice', name: 'route', instructions: 'Classify current_message by the Route section.', choices: choices('work', 'social', 'out_of_scope', 'unclear') },
-    { type: 'choice', name: 'effort', instructions: 'Choose the reply effort by the Effort section.', choices: choices('low', 'high', 'xhigh') },
+    { type: 'choice', name: 'effort', instructions: 'Choose the reply effort by the Effort section.', choices: choices('low', 'medium', 'high') },
     ...contract.contextModules.map(({ name }) => ({
       type: 'choice',
       name: `context_${name}`,

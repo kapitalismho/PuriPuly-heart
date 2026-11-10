@@ -43,7 +43,11 @@ async def _app_requests() -> list[dict]:
                     "encrypted_content": "synthetic",
                     "summary": [],
                 },
-                tool(),
+                {
+                    **tool(),
+                    "name": "read_app",
+                    "arguments": json.dumps({"topic": "output"}),
+                },
             ],
         },
         answer(),

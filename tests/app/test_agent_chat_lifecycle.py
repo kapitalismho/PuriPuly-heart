@@ -13,6 +13,7 @@ import pytest
 
 from puripuly_heart.app.ports.agent_chat import AgentServiceError
 from puripuly_heart.app.services.agent_chat.conversation import AgentConversation
+from puripuly_heart.app.services.agent_chat.modules import operation_header
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, SecretsIntent
 from puripuly_heart.config.settings_vnext.serialization import to_dict
@@ -136,7 +137,7 @@ async def test_unobservable_provider_and_ordinary_events_never_resume_model():
         assert (await watch(owner, "soniox"))["completion_observable"] is False
         owner.key_verification_completed("soniox", True)
         owner.key_verification_completed("openai", True)
-        owner.archive_support_report("[app notice] key_verification provider=openai result=success")
+        owner.archive_support_report("[app notice] support_report sent ticket=synthetic")
         owner._tool_event({"kind": "ordinary_app_event"})
         await asyncio.sleep(0)
         assert not transport.requests and not transport.classifications
@@ -250,7 +251,6 @@ async def test_batch_recovery_preserves_confirmation_gate_until_user_approval(ca
     change = call("change_settings", {"changes": {"stt.provider": "deepgram"}})
     transport = Responses(
         {"status": "completed", "output": [tool("read"), *change["output"]]},
-        call("change_settings", {"changes": {"stt.provider": "deepgram"}}, "corrected"),
         call("open_settings", {"section": "api"}, "blocked"),
         answer("The approved setting is saved."),
     )
@@ -264,8 +264,7 @@ async def test_batch_recovery_preserves_confirmation_gate_until_user_approval(ca
         assert not control.submissions
         assert not navigations
         assert [item.status for item in result.tool_results] == [
-            "rejected",
-            "rejected",
+            "observed",
             "needs_confirmation",
             "not_executed",
         ]
@@ -618,14 +617,14 @@ async def test_last_five_actual_changes_exclude_queries_proposals_noops_and_dupl
         await owner.send("query")
         changes = context_of(owner._transport.requests[-1])["core"]["recent_actions"]
         assert len(changes) == 5
-        assert [row["result"]["changes"]["overlay.background_alpha"] for row in changes] == [
+        assert [row["changes"]["overlay.background_alpha"] for row in changes] == [
             0.2,
             0.3,
             0.4,
             0.5,
             0.6,
         ]
-        assert [row["result"]["status"] for row in changes] == [
+        assert [row["status"] for row in changes] == [
             "applied",
             "applied",
             "applied",
@@ -633,7 +632,7 @@ async def test_last_five_actual_changes_exclude_queries_proposals_noops_and_dupl
             "applied",
         ]
         owner.new_conversation()
-        assert list(owner._actions) == changes
+        assert [operation_header(action) for action in owner._actions] == changes
     finally:
         await owner.close()
 
@@ -940,8 +939,7 @@ async def test_composed_runtime_notices_mutations_reset_and_restart(tmp_path, mo
         assert len(transport.classifications) == 1 and len(transport.requests) == 5
         assert navigations == [("api", "openai")]
         assert (
-            context_of(transport.requests[-1])["core"]["recent_actions"][0]["result"]["status"]
-            == "applied"
+            context_of(transport.requests[-1])["core"]["recent_actions"][0]["status"] == "applied"
         )
         owner.new_conversation()
         await owner.send("Fresh request")

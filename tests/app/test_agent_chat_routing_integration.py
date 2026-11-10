@@ -8,7 +8,11 @@ import httpx
 import pytest
 
 from puripuly_heart.app.adapters.agent_relay_transport import AgentRelayTransport
-from puripuly_heart.app.ports.agent_chat import AgentServiceError, AgentTransportError
+from puripuly_heart.app.ports.agent_chat import (
+    AGENT_CHAT_PROTOCOL,
+    AgentServiceError,
+    AgentTransportError,
+)
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.ui.i18n import available_locales, t_for_locale
 from tests.app.test_agent_chat import Records, Responses, Tokens, answer, context_of, tool
@@ -41,11 +45,11 @@ def owner_for(transport, records=None, **kwargs):
     ("route", "effort", "effective"),
     [
         ("work", "high", "high"),
-        ("work", "xhigh", "xhigh"),
+        ("work", "medium", "medium"),
         ("work", "low", "low"),
         ("unclear", "high", "high"),
-        ("social", "xhigh", "low"),
-        ("out_of_scope", "xhigh", "low"),
+        ("social", "medium", "low"),
+        ("out_of_scope", "medium", "low"),
     ],
 )
 async def test_route_controls_model_invocation_and_whole_turn_effort(route, effort, effective):
@@ -109,7 +113,7 @@ async def test_effective_effort_history_survives_social_and_tool_continuations()
         return observed
 
     transport = RoutedResponses(
-        decision("work", "xhigh"),
+        decision("work", "medium"),
         {"status": "completed", "output": [tool("capture")]},
         answer("Capture checked."),
         answer("You're welcome."),
@@ -121,13 +125,13 @@ async def test_effective_effort_history_survives_social_and_tool_continuations()
     await owner.start()
     try:
         await owner.send("Inspect capture.")
-        xhigh = [
-            ("app_context", "xhigh"),
-            ("Inspect capture.", "xhigh"),
-            ("capture", "xhigh"),
+        medium = [
+            ("app_context", "medium"),
+            ("Inspect capture.", "medium"),
+            ("capture", "medium"),
         ]
-        assert effective_inputs(transport.requests[0]["input"]) == xhigh[:-1]
-        assert effective_inputs(transport.requests[1]["input"]) == xhigh
+        assert effective_inputs(transport.requests[0]["input"]) == medium[:-1]
+        assert effective_inputs(transport.requests[1]["input"]) == medium
         transport.routing = decision("social", "high")
         await owner.send("Thanks!")
         assert transport.requests[-1]["input"] == [
@@ -137,8 +141,8 @@ async def test_effective_effort_history_survives_social_and_tool_continuations()
         ]
         transport.routing = decision("unclear", "high")
         await owner.send("Inspect output.")
-        high = xhigh + [
-            ("Thanks!", "xhigh"),
+        high = medium + [
+            ("Thanks!", "medium"),
             ("app_context", "high"),
             ("Inspect output.", "high"),
             ("output", "high"),
@@ -152,8 +156,8 @@ async def test_effective_effort_history_survives_social_and_tool_continuations()
             ("Inspect settings.", "low"),
         ]
         assert [request["effort"] for request in transport.requests] == [
-            "xhigh",
-            "xhigh",
+            "medium",
+            "medium",
             "low",
             "high",
             "high",
@@ -334,13 +338,21 @@ async def test_brief_routes_never_execute_unexpected_tool_calls(route, name, arg
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("arguments", ["{}", '{"text":"not allowed"}', "null", "[]"])
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        '{"action":"translation.probe"}',
+        '{"action":"translation.probe","text":"not allowed"}',
+        "null",
+        "[]",
+    ],
+)
 async def test_probe_tool_requires_empty_arguments_before_owner_dispatch(monkeypatch, arguments):
     transport = RoutedResponses(
         decision("work", "high"),
         {
             "status": "completed",
-            "output": [tool(arguments=arguments) | {"name": "probe_translation"}],
+            "output": [tool(arguments=arguments) | {"name": "execute_app"}],
         },
         answer("Observed the tool result."),
     )
@@ -348,7 +360,7 @@ async def test_probe_tool_requires_empty_arguments_before_owner_dispatch(monkeyp
     dispatched = []
     receipt = {"status": "applied", "receipt": {"terminal": True, "status": "applied"}}
 
-    async def execute(name, values, *, require_current):
+    async def execute(name, values, *, require_current, request_id=None):
         require_current()
         dispatched.append((name, values))
         return receipt
@@ -367,7 +379,7 @@ async def test_probe_tool_requires_empty_arguments_before_owner_dispatch(monkeyp
                 if item.get("type") == "function_call_output"
             )
         )
-        if arguments == "{}":
+        if arguments == '{"action":"translation.probe"}':
             assert dispatched == [("probe_translation", {})]
             assert output == receipt
         else:
@@ -489,7 +501,7 @@ async def test_classification_and_local_records_start_together():
         (AgentTransportError(), "unclear"),
         (decision("invalid", "high"), "unclear"),
         (decision("work", "max"), "work"),
-        (decision("work", "medium"), "work"),
+        (decision("work", "xhigh"), "work"),
         (decision("unclear", None), "unclear"),
     ],
 )
@@ -521,7 +533,7 @@ async def test_timeout_late_decision_cannot_override_model_or_next_generation():
                     await release.wait()
                 late_finished.set()
                 return decision("out_of_scope", "low")
-            return decision("work", "xhigh")
+            return decision("work", "medium")
 
         async def respond(self, **request):
             async for event in super().respond(**request):
@@ -539,7 +551,7 @@ async def test_timeout_late_decision_cannot_override_model_or_next_generation():
         assert transport.requests[0]["effort"] == "high"
         second = await owner.send("second synthetic request")
         assert second.text == "Second answer"
-        assert [request["effort"] for request in transport.requests] == ["high", "xhigh"]
+        assert [request["effort"] for request in transport.requests] == ["high", "medium"]
         assert len(transport.classifications) == 2
         assert owner.snapshot.messages[-1].text == "Second answer"
     finally:
@@ -576,7 +588,7 @@ async def test_error_and_notice_entries_bypass_classifier_and_reuse_effort():
 @pytest.mark.asyncio
 @pytest.mark.parametrize("reset", [False, True])
 async def test_initial_and_reset_notice_defaults_are_high_after_a_brief_route(reset):
-    transport = RoutedResponses(decision("work", "xhigh"), answer(), answer(), answer())
+    transport = RoutedResponses(decision("work", "medium"), answer(), answer(), answer())
     owner = owner_for(transport)
     owner.bind_verification_providers(frozenset({"openai"}))
     await owner.start()
@@ -584,13 +596,13 @@ async def test_initial_and_reset_notice_defaults_are_high_after_a_brief_route(re
         if reset:
             assert (await owner.send("Inspect the previous app problem.")).status == "completed"
             owner.new_conversation()
-        transport.routing = decision("out_of_scope", "xhigh")
+        transport.routing = decision("out_of_scope", "medium")
         assert (await owner.send("Give me a pasta recipe.")).status == "completed"
         await owner._tools.execute("open_settings", {"section": "api", "provider": "openai"})
         owner.key_verification_completed("openai", True)
         await owner._notice_task
         assert [request["effort"] for request in transport.requests] == (
-            (["xhigh"] if reset else []) + ["low", "high"]
+            (["medium"] if reset else []) + ["low", "high"]
         )
         assert len(transport.classifications) == (2 if reset else 1)
         assert [
@@ -604,7 +616,7 @@ async def test_initial_and_reset_notice_defaults_are_high_after_a_brief_route(re
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("effort", ["low", "high", "xhigh"])
+@pytest.mark.parametrize("effort", ["low", "medium", "high"])
 async def test_notice_continuation_preserves_the_selected_work_effort(effort):
     transport = RoutedResponses(decision("work", effort), answer(), answer())
     owner = owner_for(transport)
@@ -662,7 +674,7 @@ async def test_service_terminal_transport_outcomes_never_fall_back_to_model(code
         assert result.status == "service_unavailable"
         assert result.text == t_for_locale("ko", f"agent_chat.{code}")
         assert [request.url.path for request in seen] == ["/v1/classify"]
-        assert json.loads(seen[0].content)["agent_protocol"] == 5
+        assert json.loads(seen[0].content)["agent_protocol"] == AGENT_CHAT_PROTOCOL
         assert seen[0].headers["authorization"] == "Bearer synthetic-installation-token"
     finally:
         await owner.close()

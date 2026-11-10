@@ -204,6 +204,21 @@ class AgentActivity:
             for channel, received in self._received.items()
         }
 
+    def event_facts(self) -> dict:
+        return {
+            channel: {
+                "generation": self._generations.get(channel),
+                **{
+                    f"{kind}_observed_monotonic": received.get(kind)
+                    for kind in ("transcript", "translation")
+                },
+            }
+            for channel, received in self._received.items()
+        }
+
+    def observed_monotonic(self) -> float:
+        return self._clock()
+
 
 async def collect_agent_context(
     control: ApplicationControl,
@@ -229,6 +244,8 @@ async def collect_agent_context(
     result = {
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "last_activity": activity.snapshot(),
+        "activity_events": activity.event_facts(),
+        "observed_monotonic": activity.observed_monotonic(),
         "activity_availability": activity.availability,
         "recent_agent_actions": list(recent_agent_actions),
         "missing": missing,
@@ -265,6 +282,10 @@ async def collect_agent_context(
                     "overlay_target",
                     "stopping",
                 ),
+            )
+            result["audio_test"] = _pick(
+                app.get("audio_test"),
+                ("state", "ready", "active", "failure_code", "cleanup_complete"),
             )
             result["channels"] = {}
             for channel in ("self", "peer"):
@@ -347,7 +368,11 @@ async def collect_agent_context(
         overlay = await query("overlay.status")
         osc = await query("osc.status")
         result["output"] = {
-            "overlay": _pick(overlay.get("output"), OVERLAY_FIELDS) if overlay else None,
+            "overlay": (
+                {**_pick(overlay.get("output"), OVERLAY_FIELDS), **_pick(overlay, ("locked",))}
+                if overlay
+                else None
+            ),
             "osc": project_osc_output(osc.get("output")) if osc else None,
         }
     if "diagnostics" in queries:

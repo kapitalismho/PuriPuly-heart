@@ -122,6 +122,69 @@ async def test_authentication_rate_limit_blocks_new_requests_until_server_cooldo
 
 
 @pytest.mark.asyncio
+async def test_first_enrollment_throttle_is_temporary_and_not_daily_exhaustion():
+    now = [0.0]
+    issued, relayed = [], []
+
+    def issue(request):
+        issued.append(request)
+        if len(issued) == 1:
+            return httpx.Response(
+                429,
+                json={
+                    "error": {
+                        "code": "rate_limited",
+                        "class": "retryable",
+                        "subcode": "ip_rate_limited",
+                        "retry_after_ms": 1_800_000,
+                        "message": "Puri first-enrollment limit exceeded",
+                    }
+                },
+            )
+        return token_response()
+
+    def handle(request):
+        relayed.append(request)
+        if request.url.path == "/v1/classify":
+            return httpx.Response(
+                200,
+                json={
+                    "answers": [
+                        {"type": "choice", "name": "route", "choice": "work"},
+                        {"type": "choice", "name": "effort", "choice": "high"},
+                    ]
+                },
+            )
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content="data: " + json.dumps({"type": "completed", "response": answer()}) + "\n\n",
+        )
+
+    relay = AgentRelayTransport(
+        "https://relay.example/v1/respond", token_owner(issue, clock=lambda: now[0])
+    )
+    await relay._client.aclose()
+    relay._client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
+    owner = AgentChatOwner(Records(), relay, localize=str)
+    await owner.start()
+    try:
+        for instant in (0.0, 60.0, 1799.0):
+            now[0] = instant
+            assert (await owner.send("Synthetic request.")).status == "service_unavailable"
+            assert owner.snapshot.messages[-1].text == "agent_chat.service_rate_limited"
+            assert not owner._allowance_exhausted
+        assert len(issued) == 1
+        assert relayed == []
+        now[0] = 1800.0
+        assert (await owner.send("Synthetic request.")).status == "completed"
+        assert len(issued) == 2
+        assert [request.url.path for request in relayed] == ["/v1/classify", "/v1/respond"]
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_concurrent_401s_do_not_invalidate_a_newer_token_or_duplicate_refresh():
     issued = []
     old_requests = []

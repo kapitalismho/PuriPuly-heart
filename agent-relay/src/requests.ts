@@ -5,7 +5,7 @@ export type RespondRequest = {
   agent_protocol: number;
   turn_id: string;
   input: Record<string, unknown>[];
-  effort: 'low' | 'high' | 'xhigh';
+  effort: 'low' | 'medium' | 'high';
   allow_tools: boolean;
   route: 'work' | 'social' | 'out_of_scope' | 'unclear';
 };
@@ -21,7 +21,7 @@ function only(value: Record<string, unknown>, keys: string[]): boolean {
 }
 
 function effort(value: unknown): value is RespondRequest['effort'] {
-  return value === 'low' || value === 'high' || value === 'xhigh';
+  return value === 'low' || value === 'medium' || value === 'high';
 }
 
 function optionalString(value: unknown): boolean {

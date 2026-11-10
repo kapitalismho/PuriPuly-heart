@@ -218,7 +218,7 @@ class ScenarioApp:
             intent["audio"]["input_device"] = INJECTION_DEVICE_LABEL
         if scenario.cause == "english_mismatch":
             intent["languages"]["source_language"] = "ja"
-        if scenario.cause == "recommend_deepseek":
+        if scenario.recommendation:
             intent["languages"]["source_language"] = self.speech_language
         if scenario.cause == "clipped_speech":
             intent["stt"]["vad_speech_threshold"] = 0.95

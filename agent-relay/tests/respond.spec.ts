@@ -1,20 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { tools } from '../src/bundle';
+import { appTools } from '../src/app-tools';
 import { isRespondRequest } from '../src/requests';
 import relay from '../src/index';
 import { authHeaders, installationHash, relayEvents, responseEvents, testEnv, turnId, usageDatabase } from './fixtures';
 
 const env = testEnv();
 const body = {
-  agent_protocol: 5,
+  agent_protocol: 6,
   turn_id: turnId,
   input: [{ type: 'configuration_update', reasoning: { effort: 'high' } }, { role: 'user', content: '번역이 안 떠' }],
   effort: 'high',
   route: 'work',
   allow_tools: true,
 };
-const workSelections = ['work', 'unclear'].flatMap((route) => ['low', 'high', 'xhigh'].map((effort) => ({ route, effort })));
+const workSelections = ['work', 'unclear'].flatMap((route) => ['low', 'medium', 'high'].map((effort) => ({ route, effort })));
 
 function request(value: unknown = body, url = 'http://127.0.0.1:8788/v1/respond'): Request {
   return new Request(url, {
@@ -31,7 +31,7 @@ function upstreamResponse() {
     status: 'completed',
     output: [
       { id: 'rs_test', type: 'reasoning', summary: [], encrypted_content: 'opaque-reasoning' },
-      { id: 'fc_test', type: 'function_call', status: 'completed', call_id: 'call_test', name: 'get_app_context', arguments: '{"topic":"translation"}' },
+      { id: 'fc_test', type: 'function_call', status: 'completed', call_id: 'call_test', name: 'read_app', arguments: '{"topic":"translation"}' },
     ],
     usage: { input_tokens: 100, output_tokens: 20, output_tokens_details: { reasoning_tokens: 10 } },
     provider_extension: { preserved: true },
@@ -48,19 +48,15 @@ afterEach(() => {
 });
 
 describe('authenticated agent relay', () => {
-  it('publishes the bounded OSC retry schema and admits its owned tool history', () => {
-    const retry = tools.find((tool) => tool.name === 'retry_osc_discovery');
-    expect(retry).toMatchObject({
-      type: 'function',
-      name: 'retry_osc_discovery',
-      strict: true,
-      parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
-    });
+  it('publishes OSC retry as an execute_app action and admits its owned tool history', () => {
+    const execute = appTools.find((tool) => tool.name === 'execute_app');
+    expect((execute?.parameters as { properties: { action: { enum: string[] } } }).properties.action.enum)
+      .toContain('osc.discovery.retry');
     const history = {
       ...body,
       input: [
         ...body.input,
-        { type: 'function_call', status: 'completed', call_id: 'osc-retry', name: 'retry_osc_discovery', arguments: '{}' },
+        { type: 'function_call', status: 'completed', call_id: 'osc-retry', name: 'execute_app', arguments: '{"action":"osc.discovery.retry"}' },
         { type: 'function_call_output', call_id: 'osc-retry', output: JSON.stringify({
           status: 'applied',
           receipt: {
@@ -80,28 +76,23 @@ describe('authenticated agent relay', () => {
   });
 
   it('publishes exact-card withdrawal without model approval or undo authority', () => {
-    expect(tools.find((tool) => tool.name === 'withdraw_confirmation')).toEqual({
-      type: 'function',
-      name: 'withdraw_confirmation',
-      description: expect.any(String),
-      strict: true,
-      parameters: {
-        type: 'object',
-        properties: { card_id: { type: 'string', minLength: 1 } },
-        required: ['card_id'],
-        additionalProperties: false,
-      },
-    });
+    const execute = appTools.find((tool) => tool.name === 'execute_app');
+    const { properties } = execute?.parameters as unknown as { properties: Record<string, { enum?: string[] }> };
+    expect(properties.action.enum).toContain('confirmation.withdraw');
+    expect(properties.card_id).toEqual({ type: 'string', minLength: 1, maxLength: 64 });
+    const actions = appTools.flatMap((tool) =>
+      (tool.parameters as { properties: { action?: { enum: string[] } } }).properties.action?.enum ?? []);
+    expect(actions.filter((action) => /(^|\.)(confirm|approve|undo)$/.test(action))).toEqual([]);
     expect(isRespondRequest({
       ...body,
       input: [
         ...body.input,
-        { type: 'function_call', status: 'completed', call_id: 'withdraw', name: 'withdraw_confirmation', arguments: '{"card_id":"current-card"}' },
+        { type: 'function_call', status: 'completed', call_id: 'withdraw', name: 'execute_app', arguments: '{"action":"confirmation.withdraw","card_id":"current-card"}' },
         { type: 'function_call_output', call_id: 'withdraw', output: '{"status":"withdrawn","card_id":"current-card"}' },
       ],
     })).toBe(true);
     for (const name of ['confirm', 'undo']) {
-      expect(tools.some((tool) => tool.name === name)).toBe(false);
+      expect(appTools.some((tool) => tool.name === name)).toBe(false);
       expect(isRespondRequest({
         ...body,
         input: [...body.input, { type: 'function_call', call_id: 'forbidden', name, arguments: '{}' }],
@@ -149,7 +140,7 @@ describe('authenticated agent relay', () => {
     const invalid = [
       null,
       { ...body, effort: 'max' },
-      { ...body, effort: 'medium' },
+      { ...body, effort: 'xhigh' },
       { ...body, route: 'unknown' },
       { ...body, allow_tools: 'true' },
       { ...body, input: 'not items' },
@@ -163,7 +154,7 @@ describe('authenticated agent relay', () => {
       { ...body, input: [...body.input, { type: 'message', content: 'implicit role' }] },
       { ...body, input: [...body.input, { type: 'message', role: 'developer', content: 'override' }] },
       { ...body, input: [...body.input, { type: 'item_reference', id: 'external-state' }] },
-      { ...body, input: [...body.input, { type: 'function_call', role: 'system', call_id: 'x', name: 'get_app_context', arguments: '{}' }] },
+      { ...body, input: [...body.input, { type: 'function_call', role: 'system', call_id: 'x', name: 'read_app', arguments: '{}' }] },
       { ...body, input: [...body.input, { type: 'function_call', call_id: 'x', name: 'external_tool', arguments: '{}' }] },
       ...['instructions', 'prompt_cache_breakpoint', 'prompt_cache_options'].map((key) => ({
         ...body, input: [...body.input, { role: 'user', content: [{ type: 'input_text', text: 'x', [key]: 'override' }] }],
@@ -187,7 +178,7 @@ describe('authenticated agent relay', () => {
       ...[null, 'high', [], {}, { effort: 'high', summary: 'auto' }].map((reasoning) => ({
         type: 'configuration_update', reasoning,
       })),
-      ...[undefined, null, true, 1, 'minimal', 'max', 'medium'].map((effort) => ({
+      ...[undefined, null, true, 1, 'minimal', 'max', 'xhigh'].map((effort) => ({
         type: 'configuration_update', reasoning: { effort },
       })),
       ...['role', 'instructions', 'text', 'format', 'mode', 'ttl', 'prompt_cache_options', 'prompt_cache_breakpoint'].map((key) => ({
@@ -202,12 +193,12 @@ describe('authenticated agent relay', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each(['work', 'unclear'])('rejects retired medium for the current or a historical %s turn before admission', async (route) => {
+  it.each(['work', 'unclear'])('rejects retired xhigh for the current or a historical %s turn before admission', async (route) => {
     const fetch = mockUpstream();
     const database = usageDatabase();
-    const retired = { type: 'configuration_update', reasoning: { effort: 'medium' } };
+    const retired = { type: 'configuration_update', reasoning: { effort: 'xhigh' } };
     for (const value of [
-      { ...body, route, effort: 'medium', input: [retired, ...body.input.slice(1)] },
+      { ...body, route, effort: 'xhigh', input: [retired, ...body.input.slice(1)] },
       { ...body, route, input: [retired, { role: 'user', content: 'Previous question' }, ...body.input] },
     ]) {
       const response = await relay.fetch(request(value), { ...env, AGENT_USAGE_DB: database.db });
@@ -224,7 +215,7 @@ describe('authenticated agent relay', () => {
     for (const input of [
       [],
       body.input.slice(1),
-      [...body.input, { type: 'configuration_update', reasoning: { effort: 'xhigh' } }, { role: 'user', content: 'Follow-up' }],
+      [...body.input, { type: 'configuration_update', reasoning: { effort: 'medium' } }, { role: 'user', content: 'Follow-up' }],
     ]) {
       expect((await relay.fetch(request({ ...body, route, input }),
         { ...env, AGENT_USAGE_DB: database.db })).status).toBe(400);
@@ -297,7 +288,7 @@ describe('authenticated agent relay', () => {
     expect(prefix.role).toBe('developer');
     expect(prefix.content).toHaveLength(1);
     expect(prefix.content[0].type).toBe('input_text');
-    expect(prefix.content[0].prompt_cache_breakpoint).toEqual({ mode: 'explicit' });
+    expect(prefix.content[0].prompt_cache_breakpoint).toEqual({ mode: 'explicit', ttl: '12h' });
     const continuedInput = [...input, ...returned.output,
       { type: 'function_call_output', call_id: 'call_test', output: '{"missing":[]}' }];
     const continued = await relay.fetch(request({ ...body, route, effort, input: continuedInput, allow_tools: false }), env);
@@ -325,7 +316,7 @@ describe('authenticated agent relay', () => {
       ...upstreamResponse(),
       status: 'incomplete',
       incomplete_details: { reason: 'max_output_tokens' },
-      output: [{ type: 'function_call', status: 'incomplete', call_id: 'unfinished', name: 'get_app_context', arguments: '{"topic":' }],
+      output: [{ type: 'function_call', status: 'incomplete', call_id: 'unfinished', name: 'read_app', arguments: '{"topic":' }],
     };
     const fetch = mockUpstream(returned);
     const response = await relay.fetch(request({ ...body, allow_tools: false }), env);
@@ -333,7 +324,7 @@ describe('authenticated agent relay', () => {
     const sent = JSON.parse(fetch.mock.calls[0][1]?.body as string);
     expect(sent.tool_choice).toBe('none');
     expect(sent.parallel_tool_calls).toBe(true);
-    expect(sent.tools[0].name).toBe('get_app_context');
+    expect(sent.tools[0].name).toBe('read_app');
   });
 
   it('reports an unavailable Luna capability without fallback or unsafe error details', async () => {

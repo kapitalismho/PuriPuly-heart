@@ -105,7 +105,7 @@ Behavior: [output runtime](../tests/core/runtime/test_output_runtime.py), [Self 
 
 ### Agent conversation
 
-- Python owns conversation lifetime and tool execution. The relay owns model requests, trusted instructions, and tool definitions; Broker supplies installation authentication. The relay keeps serving supported app protocols; a contract change adds a protocol and reaches the relay before the app release.
+- Python owns conversation lifetime and tool execution. The relay owns model requests, trusted instructions, and tool definitions; Broker supplies installation authentication. The relay serves only the app protocols in its contract registry. A contract change adds a protocol that reaches the relay before the app release; a retired protocol is rejected rather than translated.
 - App context is an allowlisted projection through the application control boundary. Tools use existing application owners and the current settings catalog; model output cannot expand their permissions.
 - Every settings change requires approval of the proposed values. The settings-tool owner queues coupled changes and advances after successful application. Cancellation discards unapproved work without undoing saved changes or cancelling accepted operations.
 - Only completed model responses admit tool calls. Generation fences reject interrupted text and late results. UI renders owner snapshots; active model context is bounded separately from the chat archive.

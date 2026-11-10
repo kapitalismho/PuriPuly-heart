@@ -49,7 +49,7 @@ def test_manifest_preserves_emitted_prefix_cache_questions_and_options(
         ),
         lambda value: value["contexts"]["work"].update(tool_choice="auto"),
         lambda value: value["contexts"]["work"].update(reasoning={"effort": "unknown"}),
-        lambda value: value["contexts"]["work"].update(reasoning={"effort": "medium"}),
+        lambda value: value["contexts"]["work"].update(reasoning={"effort": "xhigh"}),
         lambda value: value["contexts"]["work"].update(reasoning={"effort": []}),
         lambda value: value["contexts"]["work"].update(stream="true"),
         lambda value: value["contexts"]["social"].update(tools=[{"type": "function"}]),
@@ -63,7 +63,7 @@ def test_manifest_rejects_missing_wrong_or_per_call_fields(relay_context_manifes
         validate_relay_context(relay_context_manifest, relay_build=build)
 
 
-@pytest.mark.parametrize("effort", ["low", "high", "xhigh"])
+@pytest.mark.parametrize("effort", ["low", "medium", "high"])
 def test_manifest_accepts_current_response_efforts(relay_context_manifest, effort):
     relay_context_manifest["contexts"]["work"]["reasoning"]["effort"] = effort
     assert (

@@ -9,6 +9,7 @@ from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
+from time import monotonic
 
 import httpx
 
@@ -98,11 +99,16 @@ class RecordingTransport:
         self.support_offer: str | None = None
         self.last_error: str | None = None
         self.classification_call_id: int | None = None
+        self.started_monotonic: float | None = None
+        self.first_response_seconds: float | None = None
 
     async def prepare(self) -> None:
         await self.transport.prepare()
 
     async def _call(self, method: str, arguments: dict) -> dict:
+        started = monotonic()
+        if self.started_monotonic is None:
+            self.started_monotonic = started
         record = {
             "id": len(self.calls) + 1,
             "turn": self.turn,
@@ -111,6 +117,7 @@ class RecordingTransport:
             "request": deepcopy(arguments),
             "upstream_context_id": upstream_context_id(method, arguments),
             "state_before": self.app.state(),
+            "started_seconds": started - self.started_monotonic,
         }
         self.calls.append(record)
         if method == "classify":
@@ -127,11 +134,16 @@ class RecordingTransport:
                 code=self.last_error,
             )
             raise
+        finally:
+            record["elapsed_seconds"] = monotonic() - started
 
     async def classify(self, **arguments) -> dict:
         return await self._call("classify", arguments)
 
     async def respond(self, **arguments):
+        started = monotonic()
+        if self.started_monotonic is None:
+            self.started_monotonic = started
         record = {
             "id": len(self.calls) + 1,
             "turn": self.turn,
@@ -141,6 +153,7 @@ class RecordingTransport:
             "upstream_context_id": upstream_context_id("respond", arguments),
             "state_before": self.app.state(),
             "events": [],
+            "started_seconds": started - self.started_monotonic,
         }
         self.calls.append(record)
         self.app.observe_model_input(record["id"], arguments.get("input", []))
@@ -165,6 +178,8 @@ class RecordingTransport:
                 code=self.last_error,
             )
             raise
+        finally:
+            record["elapsed_seconds"] = monotonic() - started
 
     async def upload_support(self, *, bundle: bytes, **arguments) -> dict:
         upload = {
@@ -220,12 +235,20 @@ class ConversationRecorder:
                 {"turn": self.transport.turn, "role": message.role, "text": message.text}
             )
             if message.role == "assistant":
+                if (
+                    message.text.strip()
+                    and self.transport.started_monotonic is not None
+                    and self.transport.first_response_seconds is None
+                ):
+                    self.transport.first_response_seconds = (
+                        monotonic() - self.transport.started_monotonic
+                    )
                 self.assistant_indices[index] = len(self.transport.app.assistant_messages)
                 self.transport.app.observe_assistant(message.text)
         self.seen_messages = len(snapshot.messages)
         for item in snapshot.tool_results:
             if (
-                item.tool == "get_provider_setup"
+                (item.tool == "get_provider_setup" or item.result.get("controls_staged") is True)
                 and item.status == "available"
                 and item.result.get("provider") in KEY_FIELDS
             ):
@@ -373,7 +396,9 @@ async def run_attempt(
         transport,
         context_mode=context_mode,
         localize=lambda key: t_for_locale(scenario.persona.language, key),
-        support_log_snapshot=lambda: b"Synthetic simulator log only. No microphone, private logs, or real providers.\n",
+        support_log_snapshot=lambda: (
+            b"Synthetic simulator log only. No microphone, private logs, or real providers.\n"
+        ),
     )
     owner.bind_navigation(app.navigate)
     owner.bind_verification_providers(frozenset(KEY_FIELDS))
@@ -637,6 +662,15 @@ async def run_attempt(
                 status="harness_error",
                 error="User repeatedly pressed controls without ending; safety stop, not additional chat turns",
             )
+        result["timing"] = {
+            "first_response_seconds": transport.first_response_seconds,
+            "dialogue_seconds": (
+                monotonic() - transport.started_monotonic
+                if transport.started_monotonic is not None
+                else None
+            ),
+            "basis": "First response: first nonempty displayed assistant message after first D/M dispatch, excluding greetings. Dialogue: first D/M dispatch through dialogue end, before judging; includes intervening simulated-user and control time. Use completion latency only when the task outcome is accepted. Helpfulness is judged separately.",
+        }
         archive = list(owner.report_archive)
         code = code_judgment(
             app,
@@ -1046,15 +1080,42 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
         }
 
     def tool(name: str, arguments: dict) -> dict:
+        identity = f"smoke-{len(app.operations)}-{name}"
+        if name == "get_app_context":
+            family, request = "read_app", dict(arguments)
+        elif name == "control_app":
+            family, request = "execute_app", dict(arguments["request"])
+        elif name in {"change_settings", "propose_report"}:
+            family = "propose_app"
+            request = {"action": "settings" if name == "change_settings" else "report", **arguments}
+        else:
+            actions = {
+                "set_capture": "capture.set",
+                "set_translation": "translation.set",
+                "diagnose_microphone": "audio.diagnose",
+                "retry_osc_discovery": "osc.discovery.retry",
+                "probe_translation": "translation.probe",
+                "open_settings": "ui.settings",
+                "get_provider_setup": "ui.provider_setup",
+                "withdraw_confirmation": "confirmation.withdraw",
+            }
+            family = "execute_app"
+            if name in {"probe_self_recognition", "probe_peer_recognition"}:
+                request = {"action": "recognition.probe", "channel": name.split("_")[1]}
+            else:
+                request = {
+                    "action": actions[name],
+                    **{key: value for key, value in arguments.items() if value is not None},
+                }
         return {
             "status": "completed",
             "output": [
                 {
                     "type": "function_call",
                     "status": "completed",
-                    "call_id": f"smoke-{len(app.operations)}-{name}",
-                    "name": name,
-                    "arguments": json.dumps(arguments),
+                    "call_id": identity,
+                    "name": family,
+                    "arguments": json.dumps(request),
                 }
             ],
         }
@@ -1149,9 +1210,7 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 else answer("유료 변경은 적용하지 않았어. 원래 구성을 유지하려면 카드를 거절해 줘.")
             )
         elif app.scenario.category == "unsolvable":
-            if not any(
-                "diagnostics" in item.get("context", {}).get("core", {}) for item in outputs
-            ):
+            if not any(item.get("context", {}).get("view") == "diagnostics" for item in outputs):
                 result = tool("get_app_context", {"topic": "diagnostics"})
             elif any(item.get("status") in {"pending", "offered"} for item in outputs):
                 result = answer(
@@ -1290,8 +1349,12 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 result = answer("구성 요소 검사를 마쳤어. 실제 화면 결과와는 구분해서 볼게.")
             else:
                 result = tool(
-                    "probe_recognition" if cause == "recognition_auth" else "probe_translation",
-                    {"channel": "self"} if cause == "recognition_auth" else {},
+                    (
+                        "probe_self_recognition"
+                        if cause == "recognition_auth"
+                        else "probe_translation"
+                    ),
+                    {},
                 )
         elif cause in {"slow_luna", "slow_gemma"}:
             replacement = "deepseek_v4_flash_41"

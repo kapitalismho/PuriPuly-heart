@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { tools } from '../src/bundle';
+import { appTools } from '../src/app-tools';
 import relay from '../src/index';
 import { requestDeadlineMs, requestLeaseMs } from '../src/lifetime';
 import { maxSupportBytes } from '../src/support';
@@ -327,11 +327,11 @@ describe('user-authorized opaque support storage', () => {
     expect((await relay.fetch(request(), env())).status).toBe(429);
   });
 
-  it('publishes one strict bounded nonblank proposal tool without a send tool', () => {
-    const tool = tools.find((value) => value.name === 'propose_report');
-    expect(tool).toMatchObject({ type: 'function', strict: true, parameters: { type: 'object',
-      required: ['summary'], additionalProperties: false,
-      properties: { summary: { type: 'string', minLength: 1, maxLength: 2000, pattern: '\\S' } } } });
-    expect(tools.filter((value) => /report|support/.test(value.name))).toHaveLength(1);
+  it('publishes a bounded report proposal without a send tool', () => {
+    const tool = appTools.find((value) => value.name === 'propose_app');
+    expect(tool).toMatchObject({ type: 'function', parameters: { type: 'object', additionalProperties: false,
+      properties: { summary: { type: 'string', minLength: 1, maxLength: 2000 } } } });
+    expect((tool?.parameters as { properties: { action: { enum: string[] } } }).properties.action.enum).toContain('report');
+    expect(appTools.filter((value) => /report|support|send/.test(value.name))).toHaveLength(0);
   });
 });

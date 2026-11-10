@@ -4,8 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import relay from '../src/index';
 import { accountingDatabase, authHeaders, installationHash, responseEvents, signToken, testEnv, tokenSecret, turnId, usageDatabase } from './fixtures';
 
-const classify = { agent_protocol: 5, turn_id: turnId, input: [{ role: 'user', content: 'Synthetic request' }] };
-const respond = { agent_protocol: 5, turn_id: turnId, input: [
+const classify = { agent_protocol: 6, turn_id: turnId, input: [{ role: 'user', content: 'Synthetic request' }] };
+const respond = { agent_protocol: 6, turn_id: turnId, input: [
   { type: 'configuration_update', reasoning: { effort: 'high' } }, ...classify.input,
 ], route: 'work', effort: 'high', allow_tools: true };
 
@@ -209,7 +209,7 @@ describe('bounded relay service', () => {
           missing_usage_count: 0 });
         expect(row?.cost_usd).toBeCloseTo(2.0000269, 12);
         expect(sqlite.prepare('SELECT agent_protocol, requests FROM protocol_daily WHERE installation_hash = ? AND utc_date = ?')
-          .all(installationHash, '2026-10-30')).toEqual([{ agent_protocol: 5, requests: 2 }]);
+          .all(installationHash, '2026-10-30')).toEqual([{ agent_protocol: 6, requests: 2 }]);
         sqlite.prepare('UPDATE usage_daily SET cost_usd = 0.5 WHERE installation_hash = ? AND utc_date = ?')
           .run(installationHash, '2026-10-30');
         const exhausted = storedUsage.get(installationHash, '2026-10-30');
@@ -224,7 +224,7 @@ describe('bounded relay service', () => {
         expect(duplicateClassifier.status).toBe(429);
         expect(await duplicateClassifier.json()).toMatchObject({ error: { code: 'service_turn_exhausted' } });
         const input = [...respond.input,
-          { type: 'function_call', call_id: 'tool1', name: 'get_app_context', arguments: '{}' },
+          { type: 'function_call', call_id: 'tool1', name: 'read_app', arguments: '{"topic":"overview"}' },
           { type: 'function_call_output', call_id: 'tool1', output: '{}' },
           { role: 'user', content: '[app notice] Synthetic state change' }];
         expect((await settled(request('/v1/respond', { ...respond, input }), env)).status).toBe(200);

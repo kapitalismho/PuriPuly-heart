@@ -60,6 +60,8 @@ def test_projection_preserves_values_labels_units_and_nested_static_choices():
         "settings.subtab.general": "General",
         "settings.presentation.languages.source": "Source language",
         "settings.description.languages.source": "Language spoken by Self.",
+        "settings.presentation.languages.target": "Target language",
+        "settings.description.languages.target": "Target language",
         "language.ko": "Korean",
         "language.en": "English",
         "dashboard.language.secondary_target.none": "No secondary language",
@@ -103,6 +105,10 @@ def test_projection_preserves_values_labels_units_and_nested_static_choices():
     source = view["catalogs"]["languages"]["General"]["languages.source"]
     assert source["label"] == "Source language"
     assert source["description"] == "Language spoken by Self."
+    assert _catalog(view, "languages", "languages.target") == {
+        "label": "Target language",
+        "options_from": "languages.source",
+    }
     assert _choices(view, "languages", "languages.source") == {"ko": "Korean", "en": "English"}
     assert _catalog(view, "languages", "languages.secondary_target")["empty_label"] == (
         "No secondary language"
@@ -432,17 +438,15 @@ async def test_filtered_diagnostics_are_a_marked_query_view_not_an_ordinary_core
 
     assert "view" not in baseline
     assert filtered["view"] == "diagnostics"
-    assert filtered["modules"] == ["core"]
-    assert "output" not in filtered and "catalogs" not in filtered
+    assert filtered["modules"] == []
+    assert not {"core", "output", "catalogs"} & filtered.keys()
     assert {item["diagnostic_id"] for item in baseline["core"]["diagnostics"]["records"]} == {
         item["diagnostic_id"] for item in retained
     }
-    assert [item["diagnostic_id"] for item in filtered["core"]["diagnostics"]["records"]] == [
+    assert [item["diagnostic_id"] for item in filtered["diagnostics"]["records"]] == [
         retained[2]["diagnostic_id"]
     ]
-    assert filtered["core"]["diagnostics"]["coverage"]["filters"] == {
+    assert filtered["diagnostics"]["coverage"]["filters"] == {
         "operation_id": operation_id,
         "after": cursor,
     }
-    assert filtered["core"]["app"] == baseline["core"]["app"]
-    assert filtered["core"]["revision"] == baseline["core"]["revision"]
