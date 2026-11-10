@@ -167,18 +167,29 @@ describe('PuriPuly daily summary v2', () => {
     ]);
   });
 
-  it('uses one report-date lease across overlapping cron executions', async () => {
+  it('uses one report-date lease without aggregating across overlapping cron executions', async () => {
     const env = createTestBrokerEnv();
-    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    const { promise: sendStarted, resolve: notifySendStarted } = Promise.withResolvers<void>();
+    const { promise: sendResponse, resolve: finishSend } = Promise.withResolvers<Response>();
+    const fetchMock = vi.fn(() => {
+      notifySendStarted();
+      return sendResponse;
+    });
     vi.stubGlobal('fetch', fetchMock);
     const scheduledTime = Date.parse('2026-04-20T00:05:00.000Z');
 
-    await Promise.all([
-      handleScheduled({ scheduledTime }, env, {}),
-      handleScheduled({ scheduledTime }, env, {}),
-    ]);
+    const firstExecution = handleScheduled({ scheduledTime }, env, {});
+    await sendStarted;
+    env.__db.exec('ALTER TABLE app_active_days RENAME TO unavailable_app_active_days');
+    try {
+      await handleScheduled({ scheduledTime }, env, {});
+      expect(fetchMock).toHaveBeenCalledOnce();
+    } finally {
+      env.__db.exec('ALTER TABLE unavailable_app_active_days RENAME TO app_active_days');
+      finishSend(new Response(null, { status: 204 }));
+      await firstExecution;
+    }
 
-    expect(fetchMock).toHaveBeenCalledOnce();
     expect(readDailySummaryDeliveries(env)).toHaveLength(1);
     expect(readDailySummaryDeliveries(env)[0]).toMatchObject({
       report_date_utc: '2026-04-19',
@@ -241,7 +252,7 @@ describe('PuriPuly daily summary v2', () => {
     );
 
     expect(result.sent).toBe(true);
-    expect(result.payload.report_date_utc).toBe(expectedDate);
+    expect(result.payload?.report_date_utc).toBe(expectedDate);
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(readDailySummaryDeliveries(env).find(
       (row) => row.report_date_utc === expectedDate,
@@ -250,6 +261,61 @@ describe('PuriPuly daily summary v2', () => {
       status: 'delivered',
       attempted_at: '2026-04-20T00:05:00.000Z',
     });
+  });
+
+  it('releases a failed aggregation claim so the next minute can deliver', async () => {
+    const env = createTestBrokerEnv();
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    insertIssueSuccessEvent(env, {
+      source: 'discord',
+      label: 'aggregation-retry',
+      observedAt: '2026-04-19T12:00:00.000Z',
+    });
+    await recordActiveDay(env, 'aggregation-retry', '2026-04-19');
+    env.__db.exec('ALTER TABLE app_active_days RENAME TO unavailable_app_active_days');
+
+    await expect(
+      handleScheduled(
+        { scheduledTime: Date.parse('2026-04-20T00:05:00.000Z') },
+        env,
+        {},
+      ),
+    ).rejects.toThrow(Error);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(readDailySummaryDeliveries(env)).toEqual([
+      expect.objectContaining({
+        report_date_utc: '2026-04-19',
+        status: 'pending',
+        attempted_at: '2026-04-20T00:05:00.000Z',
+        lease_expires_at: '2026-04-20T00:05:00.000Z',
+        delivered_at: null,
+      }),
+    ]);
+
+    env.__db.exec('ALTER TABLE unavailable_app_active_days RENAME TO app_active_days');
+    await handleScheduled(
+      { scheduledTime: Date.parse('2026-04-20T00:06:00.000Z') },
+      env,
+      {},
+    );
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(readDailySummaryDeliveries(env)).toEqual([
+      expect.objectContaining({
+        report_date_utc: '2026-04-19',
+        status: 'delivered',
+        attempted_at: '2026-04-20T00:06:00.000Z',
+        delivered_at: '2026-04-20T00:06:00.000Z',
+      }),
+    ]);
+    const request = (fetchMock.mock.calls as unknown as Array<[
+      string | URL,
+      RequestInit,
+    ]>)[0]?.[1];
+    const body = JSON.parse(String(request?.body)) as { content: string };
+    expect(body.content).toContain('"keys_delivered_total":1');
+    expect(body.content).toContain('"app_dau":1');
   });
 
   it('preserves a failed report across midnight and catches up completed dates in order', async () => {
@@ -280,7 +346,7 @@ describe('PuriPuly daily summary v2', () => {
     await recordActiveDay(env, 'late-received-report-day', '2026-04-19');
 
     await handleScheduled(
-      { scheduledTime: Date.parse('2026-04-21T00:04:00.000Z') },
+      { scheduledTime: Date.parse('2026-04-21T00:00:00.000Z') },
       env,
       {},
     );
@@ -353,6 +419,68 @@ describe('PuriPuly daily summary v2', () => {
     ]);
   });
 
+  it('defers expired-row deletion to the scheduled UTC hour and retains fresh state', async () => {
+    const env = createTestBrokerEnv();
+    updateAbuseControls(env, (controls) => {
+      controls.dailyReport.enabled = false;
+    });
+    for (const [label, observedAt, activeDate] of [
+      ['expired-hourly-state', '2025-01-01T12:00:00.000Z', '2025-01-01'],
+      ['fresh-hourly-state', '2026-04-20T12:00:00.000Z', '2026-04-20'],
+    ] as const) {
+      insertIssueSuccessEvent(env, {
+        source: 'discord',
+        label,
+        observedAt,
+      });
+      await seedRequestEvent(env, {
+        endpoint: 'POST /v1/trial/challenge',
+        ip: '203.0.113.10',
+        installationId: label,
+        observedAt,
+      });
+      env.__db
+        .prepare(
+          `INSERT INTO broker_abuse_runtime_audit (
+              event_kind, reason, payload_json, created_at
+            ) VALUES ('state_observation', NULL, '{}', ?)`,
+        )
+        .run(observedAt);
+      await recordActiveDay(env, label, activeDate);
+    }
+
+    await handleScheduled(
+      { scheduledTime: Date.parse('2026-04-20T23:59:00.000Z') },
+      env,
+      {},
+    );
+
+    for (const table of [
+      'broker_request_events',
+      'broker_issue_success_events',
+      'broker_abuse_runtime_audit',
+      'app_active_days',
+    ]) {
+      expect(env.__db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get())
+        .toEqual({ count: 2 });
+    }
+
+    await handleScheduled(
+      { scheduledTime: Date.parse('2026-04-21T00:00:00.000Z') },
+      env,
+      {},
+    );
+
+    expect(env.__db.prepare('SELECT installation_id FROM broker_request_events').all())
+      .toEqual([{ installation_id: 'fresh-hourly-state' }]);
+    expect(env.__db.prepare('SELECT managed_credential_ref FROM broker_issue_success_events').all())
+      .toEqual([{ managed_credential_ref: 'managed-fresh-hourly-state' }]);
+    expect(env.__db.prepare('SELECT created_at FROM broker_abuse_runtime_audit').all())
+      .toEqual([{ created_at: '2026-04-20T12:00:00.000Z' }]);
+    expect(env.__db.prepare('SELECT active_date_utc FROM app_active_days').all())
+      .toEqual([{ active_date_utc: '2026-04-20' }]);
+  });
+
   it('runs retention during a persistent webhook failure without deleting the pending report window', async () => {
     const env = createTestBrokerEnv();
     vi.stubGlobal(
@@ -384,7 +512,7 @@ describe('PuriPuly daily summary v2', () => {
 
     await expect(
       handleScheduled(
-        { scheduledTime: Date.parse('2026-04-21T00:05:00.000Z') },
+        { scheduledTime: Date.parse('2026-04-21T01:00:00.000Z') },
         env,
         {},
       ),
@@ -428,6 +556,8 @@ describe('PuriPuly daily summary v2', () => {
     vi.stubGlobal('fetch', fetchMock);
     updateAbuseControls(env, (controls) => {
       controls.retention.issueSuccessDays = 1;
+      controls.dailyReport.hourUtc = 1;
+      controls.dailyReport.minuteUtc = 0;
     });
     insertIssueSuccessEvent(env, {
       source: 'discord',
@@ -436,7 +566,13 @@ describe('PuriPuly daily summary v2', () => {
     });
 
     await handleScheduled(
-      { scheduledTime: Date.parse('2026-04-20T00:05:00.000Z') },
+      { scheduledTime: Date.parse('2026-04-20T00:00:00.000Z') },
+      env,
+      {},
+    );
+
+    await handleScheduled(
+      { scheduledTime: Date.parse('2026-04-20T01:00:00.000Z') },
       env,
       {},
     );
@@ -460,7 +596,7 @@ describe('PuriPuly daily summary v2', () => {
     ).toEqual({ count: 1 });
   });
 
-  it('anchors retries to one fixed completed-day window', async () => {
+  it('skips unavailable aggregation for an already delivered completed-day window', async () => {
     const env = createTestBrokerEnv();
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -469,14 +605,19 @@ describe('PuriPuly daily summary v2', () => {
       env,
       new Date('2026-04-20T00:05:00.000Z'),
     );
+    env.__db.exec('DROP TABLE app_active_days; DROP TABLE broker_issue_success_events');
     const late = await runDailyReport(
       env,
       new Date('2026-04-20T23:59:59.999Z'),
     );
 
-    expect(early.payload).toEqual(late.payload);
+    expect(early.payload).toMatchObject({
+      report_date_utc: '2026-04-19',
+      window_start: '2026-04-19T00:00:00.000Z',
+      window_end: '2026-04-20T00:00:00.000Z',
+    });
     expect(early.sent).toBe(true);
-    expect(late.sent).toBe(false);
+    expect(late).toEqual({ ok: true, payload: null, sent: false });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(resolveDailyReportWindow(new Date('2026-04-20T12:00:00.000Z'))).toEqual({
       reportDateUtc: '2026-04-19',
@@ -529,6 +670,9 @@ describe('PuriPuly daily summary v2', () => {
       env,
       new Date('2026-04-20T00:05:00.000Z'),
     );
+    if (!packet) {
+      throw new Error('expected a delivered daily summary');
+    }
 
     expect(packet.summary).toMatchObject({
       keys_delivered_total: 4,
@@ -560,6 +704,9 @@ describe('PuriPuly daily summary v2', () => {
       env,
       new Date('2026-04-20T00:05:00.000Z'),
     );
+    if (!packet) {
+      throw new Error('expected a delivered daily summary');
+    }
 
     expect(packet.summary).toMatchObject({
       app_dau: 2,

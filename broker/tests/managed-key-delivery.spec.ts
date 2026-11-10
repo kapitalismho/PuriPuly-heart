@@ -952,7 +952,12 @@ describe('managed key delivery ACK foundation', () => {
     expect(cleanupIncidentBody).toContain('stale_delivery');
   });
 
-  it('notifies a stale cleanup state failure while scheduled reporting and retention still progress', async () => {
+  it.each([
+    { scheduledAt: '2026-07-06T00:05:00.000Z', retainedRequestEvents: 1 },
+    { scheduledAt: '2026-07-06T01:00:00.000Z', retainedRequestEvents: 0 },
+  ])('notifies a stale cleanup state failure while reporting and hourly retention progress at $scheduledAt', async ({
+    scheduledAt, retainedRequestEvents,
+  }) => {
     const env = createTestBrokerEnv({
       beforeRun: ({ sql }) => {
         if (
@@ -994,7 +999,7 @@ describe('managed key delivery ACK foundation', () => {
 
     await expect(
       handleScheduled(
-        { scheduledTime: Date.parse('2026-07-06T00:05:00.000Z') },
+        { scheduledTime: Date.parse(scheduledAt) },
         env,
         {},
       ),
@@ -1018,7 +1023,7 @@ describe('managed key delivery ACK foundation', () => {
         )
         .get(),
     ).toEqual({ status: 'delivered' });
-    expect(selectScalar(env, 'SELECT COUNT(*) FROM broker_request_events')).toBe(0);
+    expect(selectScalar(env, 'SELECT COUNT(*) FROM broker_request_events')).toBe(retainedRequestEvents);
     expect(selectQqEntitlement(env, 'hash_qq_stale_state_failure')).toMatchObject({
       status: 'delivery_pending',
     });

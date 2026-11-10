@@ -102,7 +102,9 @@ export async function handleScheduled(
     await runScheduledPhase(failures, () => runDailyReport(env, now));
   }
 
-  await runScheduledPhase(failures, () => applyScheduledRetention(env.BROKER_DB, now));
+  if (now.getUTCMinutes() === 0) {
+    await runScheduledPhase(failures, () => applyScheduledRetention(env.BROKER_DB, now));
+  }
   throwFirstScheduledFailure(failures);
 }
 
@@ -584,22 +586,23 @@ function isDailyReportScheduleDue(
 export async function runDailyReport(
   env: Pick<BrokerBindings, 'BROKER_DB' | 'DISCORD_DAILY_REPORT_WEBHOOK_URL'>,
   now: Date,
-): Promise<{ ok: true; payload: DailyReportPayload; sent: boolean }> {
+): Promise<
+  | { ok: true; payload: DailyReportPayload; sent: true }
+  | { ok: true; payload: null; sent: false }
+> {
   const reportDateUtc = await resolveNextDailyReportDate(env.BROKER_DB, now);
-  const payload = await buildDailySummaryPacketForDate(
-    env.BROKER_DB,
-    reportDateUtc,
-  );
   const claim = await claimDailyReportDelivery(
     env.BROKER_DB,
-    payload.report_date_utc,
+    reportDateUtc,
     now,
   );
   if (!claim) {
-    return { ok: true, payload, sent: false };
+    return { ok: true, payload: null, sent: false };
   }
 
+  let payload: DailyReportPayload;
   try {
+    payload = await buildDailySummaryPacketForDate(env.BROKER_DB, reportDateUtc);
     await sendDailyReport(env.DISCORD_DAILY_REPORT_WEBHOOK_URL, payload);
   } catch (error) {
     await releaseDailyReportDelivery(env.BROKER_DB, claim, now);

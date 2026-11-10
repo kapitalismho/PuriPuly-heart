@@ -729,6 +729,9 @@ describe('Puri installation token boundary', () => {
     await deleteExpiredPuriProofNonces(env.BROKER_DB, new Date(Date.now() + 299_999));
     expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_proof_nonces').get()).toEqual({ count: 1 });
     await app.scheduled({ scheduledTime: Date.now() + 300_000 }, env, {});
+    expect(env.__db.prepare('SELECT COUNT(*) AS count FROM installations').get()).toEqual({ count: 2 });
+    expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_proof_nonces').get()).toEqual({ count: 1 });
+    await app.scheduled({ scheduledTime: Date.parse('2026-10-30T13:00:00.000Z') }, env, {});
     expect(env.__db.prepare('SELECT installation_id, device_public_key FROM installations').all()).toEqual([
       { installation_id: installationId, device_public_key: key.devicePublicKey },
     ]);
