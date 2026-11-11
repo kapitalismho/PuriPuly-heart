@@ -40,22 +40,34 @@ afterEach(() => {
 
 describe('bounded relay service', () => {
   it('requires a signed short-lived broker identity on every content endpoint', async () => {
-    const upstream = vi.spyOn(globalThis, 'fetch');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-01T00:00:00.900Z'));
+    const upstream = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected upstream request'));
     const env = testEnv();
     const now = Math.floor(Date.now() / 1000);
-    const invalid = ['', 'Bearer raw-installation-id', `Bearer ${signToken({}, { alg: 'none', typ: 'JWT' })}`,
-      `Bearer ${signToken({}, { alg: 'HS256', typ: 'JWT', kid: 'untrusted' })}`,
-      `Bearer ${signToken({}, { alg: 'HS256', typ: 'not-JWT' })}`,
-      `Bearer ${signToken({}, undefined, 'different-synthetic-secret-at-least32bytes')}`,
-      ...[{ iss: 'other' }, { aud: ['puripuly-agent-relay'] }, { sub: 'raw-installation-id' }, { sub: 'A'.repeat(64) },
-        { iat: now + 1 }, { exp: now }, { exp: now + 3601 }, { iat: now + 0.5 }, { exp: String(now + 3600) }]
-        .map((claims) => `Bearer ${signToken(claims)}`)];
+    const invalid = [
+      ['missing token', ''],
+      ['raw installation identity', 'Bearer raw-installation-id'],
+      ['unsigned algorithm', `Bearer ${signToken({}, { alg: 'none', typ: 'JWT' })}`],
+      ['untrusted key header', `Bearer ${signToken({}, { alg: 'HS256', typ: 'JWT', kid: 'untrusted' })}`],
+      ['wrong token type', `Bearer ${signToken({}, { alg: 'HS256', typ: 'not-JWT' })}`],
+      ['wrong signature', `Bearer ${signToken({}, undefined, 'different-synthetic-secret-at-least32bytes')}`],
+      ['wrong issuer', `Bearer ${signToken({ iss: 'other' })}`],
+      ['array audience', `Bearer ${signToken({ aud: ['puripuly-agent-relay'] })}`],
+      ['raw subject', `Bearer ${signToken({ sub: 'raw-installation-id' })}`],
+      ['uppercase subject', `Bearer ${signToken({ sub: 'A'.repeat(64) })}`],
+      ['future-issued token', `Bearer ${signToken({ iat: now + 1 })}`],
+      ['expired token', `Bearer ${signToken({ exp: now })}`],
+      ['overlong token lifetime', `Bearer ${signToken({ exp: now + 3601 })}`],
+      ['fractional issued time', `Bearer ${signToken({ iat: now + 0.5 })}`],
+      ['string expiry', `Bearer ${signToken({ exp: String(now + 3600) })}`],
+    ] as const;
     for (const [path, body] of [['/v1/respond', respond], ['/v1/classify', classify],
       ['/v1/support', { private: 'must not be read' }]] as const) {
-      for (const authorization of invalid) {
+      for (const [name, authorization] of invalid) {
         const response = await relay.fetch(request(path, body, authorization), env);
-        expect(response.status).toBe(401);
-        expect(await response.json()).toMatchObject({ error: { code: 'service_authentication_failed' } });
+        expect(response.status, `${path}: ${name}`).toBe(401);
+        expect(await response.json(), `${path}: ${name}`).toMatchObject({ error: { code: 'service_authentication_failed' } });
       }
     }
     for (const secret of [undefined, '', 'short']) {
