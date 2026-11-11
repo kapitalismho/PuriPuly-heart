@@ -150,6 +150,8 @@ An explicit SteamVR runtime shutdown turns CAPTIONS off after native cleanup, wi
 
 Matching `translation set off` or `capture set <channel> off` can revoke pending startup. Shared model demand may keep resources alive for another channel. Runtime stops are distinct from cancelling an explicit model download/import.
 
+Open cloud Peer captions check for previews on the existing four-second cadence while translation is disabled or its provider is unavailable, without issuing new preview requests or continuously waking the event loop. After recovery, valid pending previews can resume at the next check; finals still settle without waiting for that check. Active first-preview and refresh timing is unchanged.
+
 `osc discovery retry` performs one bounded automatic-discovery attempt using the saved connection. It refreshes/reapplies target information for a running discovery service or restarts failed discovery resources; it does not rebuild a healthy receiver or change saved destinations. Manual/off, in-flight, changed connections and stopped lifecycles are rejected. The terminal receipt distinguishes `applied` with `discovery_target_applied` from `degraded` with `discovery_unavailable`; acceptance or scheduling alone is not recovery. `osc status` exposes the current destination source and a retained, timestamped local-listener observation. Unknown ownership/access remains unknown; the narrow local probe is not applicable to non-loopback destinations. Finding/applying a target or matching a listener does not prove VRChat health, receipt or display. Remote delivery remains unacknowledged; the operation submits no chatbox text and replays no old translations.
 
 ### Independent Component Checks
