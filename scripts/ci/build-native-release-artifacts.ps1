@@ -467,6 +467,10 @@ try {
             "-OutputDir", $OutputDir
         )
     }
+    $packagingPruning = Join-Path $evidenceRoot "native-packaging-pruning.json"
+    if (-not (Test-Path -LiteralPath $packagingPruning -PathType Leaf)) {
+        throw "Native release cleanup requires matching packaging evidence: $packagingPruning. With -SkipNativeBuild, retain the candidate build's evidence under -BuildRoot."
+    }
     $nativeModule = "puripuly_heart.release_evidence.native_distribution"
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(
         "-m", $nativeModule, "validate-target",
@@ -488,6 +492,7 @@ try {
         "-m", "puripuly_heart.release_evidence.native_installer_cleanup",
         "--legacy-manifest", (Join-Path $repoRoot "native\windows_host\legacy-pyinstaller-v2.7.0.json"),
         "--native-manifest", (Join-Path $OutputDir "native-artifact-manifest.json"),
+        "--packaging-pruning", $packagingPruning,
         "--output", $cleanupInclude
     )
     Invoke-Checked -FilePath $ToolPython -ArgumentList @(

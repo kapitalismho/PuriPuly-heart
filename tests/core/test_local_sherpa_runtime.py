@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import os
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,16 @@ def test_resolve_local_sherpa_runtime_dir_uses_declared_native_layout(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    import builtins
+
+    original_import = builtins.__import__
+
+    def reject_onnx_import(name, *args, **kwargs):
+        if name == "onnxruntime":
+            pytest.fail("packaged preload resolution must not import ONNX Runtime")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", reject_onnx_import)
     runtime_module = _load_runtime_module()
     runtime_root = tmp_path / "installed runtime"
     runtime_root.mkdir()
@@ -32,7 +43,22 @@ def test_resolve_local_sherpa_runtime_dir_uses_declared_native_layout(
     monkeypatch.setenv("PURIPULY_HEART_NATIVE_RUNTIME_ROOT", str(runtime_root))
 
     assert runtime_module.resolve_local_sherpa_runtime_dir() == (
-        runtime_root / runtime_module.LOCAL_SHERPA_PACKAGED_RUNTIME_RELATIVE_DIR
+        runtime_root / "site-packages/onnxruntime/capi"
+    )
+
+
+def test_source_runtime_resolution_keeps_the_developer_onnx_package(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime_module = _load_runtime_module()
+    monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
+    package = types.ModuleType("onnxruntime")
+    package.__file__ = str(tmp_path / "developer-onnx/onnxruntime/__init__.py")
+    monkeypatch.setitem(sys.modules, "onnxruntime", package)
+    monkeypatch.setattr(runtime_module.sys, "platform", "win32")
+
+    assert runtime_module.resolve_local_sherpa_runtime_dir() == (
+        tmp_path / "developer-onnx/onnxruntime/capi"
     )
 
 
@@ -73,14 +99,17 @@ def test_ensure_local_sherpa_windows_runtime_registers_directory_only_once_and_p
 
     calls: list[str] = []
     loaded_libraries: list[str] = []
+    directory_handle = object()
+    library_handle = object()
 
     def fake_add_dll_directory(path: str) -> object:
         calls.append(path)
-        return object()
+        return directory_handle
 
     def fake_win_dll(path: str) -> object:
+        assert calls == [str(runtime_dir)]
         loaded_libraries.append(path)
-        return object()
+        return library_handle
 
     monkeypatch.setattr(runtime_module.sys, "platform", "win32")
     monkeypatch.setattr(runtime_module, "resolve_local_sherpa_runtime_dir", lambda: runtime_dir)
@@ -100,6 +129,8 @@ def test_ensure_local_sherpa_windows_runtime_registers_directory_only_once_and_p
     assert second == runtime_dir
     assert calls == [str(runtime_dir)]
     assert loaded_libraries == [str(runtime_dir / "onnxruntime.dll")]
+    assert runtime_module._REGISTERED_LOCAL_SHERPA_RUNTIME_HANDLE is directory_handle
+    assert runtime_module._REGISTERED_LOCAL_SHERPA_RUNTIME_LIBRARY is library_handle
 
     path_entries = os.environ["PATH"].split(os.pathsep)
     assert path_entries[0] == str(runtime_dir)

@@ -177,18 +177,32 @@ public static class NativeLegacyCleanup
     public static bool File(string root, string relative, long bytes, string sha256)
     {
         if (bytes < 0) throw new IOException("Invalid owned file size");
-        return RemoveFile(root, relative, bytes, true, sha256);
+        return RemoveFile(root, relative, bytes, true, sha256, null, null);
+    }
+
+    public static bool FileWithAlternatives(string root, string relative, long bytes, string sha256, long[] alternativeBytes, string[] alternativeHashes)
+    {
+        if (bytes < 0) throw new IOException("Invalid owned file size");
+        return RemoveFile(root, relative, bytes, true, sha256, alternativeBytes, alternativeHashes);
     }
 
     public static bool FileByHash(string root, string relative, string sha256)
     {
-        return RemoveFile(root, relative, 0, false, sha256);
+        return RemoveFile(root, relative, 0, false, sha256, null, null);
     }
 
-    static bool RemoveFile(string root, string relative, long bytes, bool checkSize, string sha256)
+    static bool RemoveFile(string root, string relative, long bytes, bool checkSize, string sha256, long[] alternativeBytes, string[] alternativeHashes)
     {
         relative = Relative(relative);
         if (!Regex.IsMatch(sha256, "^[0-9a-f]{64}$")) throw new IOException("Invalid owned file identity");
+        if (alternativeBytes != null)
+        {
+            if (alternativeHashes == null || alternativeBytes.Length != alternativeHashes.Length)
+                throw new IOException("Invalid alternative owned identities");
+            for (int i = 0; i < alternativeBytes.Length; i++)
+                if (alternativeBytes[i] < 0 || !Regex.IsMatch(alternativeHashes[i], "^[0-9a-f]{64}$"))
+                    throw new IOException("Invalid alternative owned identity");
+        }
         string path = Path.Combine(root, relative);
         var locks = new List<SafeFileHandle>();
         try
@@ -201,9 +215,18 @@ public static class NativeLegacyCleanup
                 using (var stream = new FileStream(handle, FileAccess.Read))
                 using (var hash = SHA256.Create())
                 {
-                    if (checkSize && stream.Length != bytes) throw new IOException("Modified legacy file (size differs): " + path);
+                    bool sizeMatches = !checkSize || stream.Length == bytes;
+                    if (!sizeMatches && alternativeBytes != null)
+                        for (int i = 0; i < alternativeBytes.Length; i++)
+                            if (stream.Length == alternativeBytes[i]) { sizeMatches = true; break; }
+                    if (!sizeMatches) throw new IOException("Modified legacy file (size differs): " + path);
                     string actual = BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
-                    if (!String.Equals(actual, sha256, StringComparison.Ordinal)) throw new IOException("Modified legacy file (SHA256 differs): " + path);
+                    bool matches = (!checkSize || stream.Length == bytes) && String.Equals(actual, sha256, StringComparison.Ordinal);
+                    if (!matches && alternativeBytes != null)
+                        for (int i = 0; i < alternativeBytes.Length; i++)
+                            if (stream.Length == alternativeBytes[i] && String.Equals(actual, alternativeHashes[i], StringComparison.Ordinal))
+                            { matches = true; break; }
+                    if (!matches) throw new IOException("Modified legacy file (SHA256 differs): " + path);
                     var disposition = new Disposition { Delete = true };
                     if (!SetFileInformationByHandle(handle, 4, ref disposition, 1))
                         throw new IOException(path + ": " + new Win32Exception(Marshal.GetLastWin32Error()).Message);
@@ -238,7 +261,7 @@ public static class NativeLegacyCleanup
 }
 '@
     $document = Get-Content -LiteralPath $Plan -Raw -Encoding UTF8 | ConvertFrom-Json
-    if (($document.schema -ne 'puripuly-heart/native-installer-cleanup/v1') -or
+    if (($document.schema -ne 'puripuly-heart/native-installer-cleanup/v2') -or
         ($document.inventory -isnot [Array]) -or
         ([string]$document.native_manifest_sha256 -cnotmatch '^[0-9a-f]{64}$') -or
         ([string]$document.legacy_manifest_sha256 -cnotmatch '^[0-9a-f]{64}$')) {
@@ -253,6 +276,22 @@ public static class NativeLegacyCleanup
         if (!$seen.Add($relative)) { throw "Duplicate owned path: $relative" }
         if (($item.bytes -isnot [int]) -and ($item.bytes -isnot [long])) { throw "Invalid owned size: $relative" }
         if (($item.bytes -lt 0) -or ([string]$item.sha256 -cnotmatch '^[0-9a-f]{64}$')) { throw "Invalid owned identity: $relative" }
+        if ($null -ne $item.PSObject.Properties['alternative_identities']) {
+            if (($item.alternative_identities -isnot [Array]) -or ($item.alternative_identities.Count -eq 0)) {
+                throw "Invalid alternative owned identities: $relative"
+            }
+            $identities = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+            [void]$identities.Add("$($item.bytes):$($item.sha256)")
+            foreach ($identity in $item.alternative_identities) {
+                $fields = @($identity.PSObject.Properties.Name)
+                if (($fields.Count -ne 2) -or ('bytes' -notin $fields) -or ('sha256' -notin $fields) -or
+                    (($identity.bytes -isnot [int]) -and ($identity.bytes -isnot [long])) -or
+                    ($identity.bytes -lt 0) -or ([string]$identity.sha256 -cnotmatch '^[0-9a-f]{64}$') -or
+                    !$identities.Add("$($identity.bytes):$($identity.sha256)")) {
+                    throw "Invalid or duplicate alternative owned identity: $relative"
+                }
+            }
+        }
         $ancestor = [IO.Path]::GetDirectoryName($relative)
         while ($ancestor) {
             [void]$expectedDirectories.Add($ancestor)
@@ -302,7 +341,13 @@ public static class NativeLegacyCleanup
     $preserved = New-Object 'System.Collections.Generic.List[string]'
     foreach ($item in $document.inventory) {
         try {
-            if ([NativeLegacyCleanup]::File($target, [string]$item.path, [long]$item.bytes, [string]$item.sha256)) { $removed++ }
+            if ($null -ne $item.PSObject.Properties['alternative_identities']) {
+                $sizes = [long[]]@($item.alternative_identities | ForEach-Object { $_.bytes })
+                $hashes = [string[]]@($item.alternative_identities | ForEach-Object { $_.sha256 })
+                if ([NativeLegacyCleanup]::FileWithAlternatives($target, [string]$item.path, [long]$item.bytes, [string]$item.sha256, $sizes, $hashes)) { $removed++ }
+            } elseif ([NativeLegacyCleanup]::File($target, [string]$item.path, [long]$item.bytes, [string]$item.sha256)) {
+                $removed++
+            }
         } catch {
             $preserved.Add($_.Exception.GetBaseException().Message)
         }
