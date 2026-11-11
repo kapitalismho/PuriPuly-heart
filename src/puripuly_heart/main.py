@@ -218,6 +218,39 @@ def _run_gui(
     debug_ui_preview: bool,
     runtime_logging_sinks: RuntimeLoggingSinks,
 ) -> int:
+    from puripuly_heart.core.control_instance import InstanceAlreadyRunning, acquire
+
+    try:
+        lease = acquire(config_path)
+    except InstanceAlreadyRunning:
+        from puripuly_heart.core.runtime_logging import emit_basic_log
+        from puripuly_heart.ui.running_instance import notify_running_instance
+
+        outcome = notify_running_instance()
+        emit_basic_log(
+            logger,
+            "Another application window already owns these settings · Outcome %s",
+            outcome,
+        )
+        return 0
+    try:
+        return _run_gui_with_lease(
+            config_path,
+            lease,
+            debug_ui_preview=debug_ui_preview,
+            runtime_logging_sinks=runtime_logging_sinks,
+        )
+    finally:
+        lease.close()
+
+
+def _run_gui_with_lease(
+    config_path: Path,
+    lease: Any,
+    *,
+    debug_ui_preview: bool,
+    runtime_logging_sinks: RuntimeLoggingSinks,
+) -> int:
     ft, vrchat_osc_presence_adapter, compose_ui_application, main_gui, assets_dir = (
         _load_gui_runtime()
     )
@@ -243,7 +276,7 @@ def _run_gui(
             return await main_gui(
                 page,
                 config_path=config_path,
-                application_factory=gui_control_factory(compose_ui_application),
+                application_factory=gui_control_factory(compose_ui_application, lease),
                 debug_ui_preview=debug_ui_preview,
                 runtime_logging_sinks=runtime_logging_sinks,
                 vrchat_osc_presence=vrchat_osc_presence,

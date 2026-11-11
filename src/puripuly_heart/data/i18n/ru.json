@@ -35,6 +35,7 @@
   "messages.index_api_fallback_openrouter": "Бесплатный API Index, возможно, завершил работу. Выбран Gemma 4 · OpenRouter.",
   "app.title": "PuriPuly <3",
   "desktop_overlay.window.title": "PuriPuly Оверлей",
+  "app.already_running": "PuriPuly уже запущен. Если окно не появится в ближайшее время, подождите немного и запустите снова.",
   "dashboard.stt_label": "TALK",
   "dashboard.peer_label": "LISTEN",
   "dashboard.trans_label": "TRANS",
