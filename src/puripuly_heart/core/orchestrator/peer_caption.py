@@ -338,21 +338,22 @@ class PeerCaptionOwner:
         return self.requests.provider_available and self.requests.translation_enabled_for("peer")
 
     async def check_previews(self) -> None:
-        if not self._translation_active():
-            return
         for segment in tuple(self._segments.values()):
             if segment.closed or self.clock.now() < segment.next_check_at:
                 continue
             segment.next_check_at = self.clock.now() + 4.0
+            if not self._translation_active():
+                continue
             source = preview_source(segment.partial)
-            if len(segment.partial) <= segment.last_partial_length or len(source) <= len(
+            if len(segment.partial) > segment.last_partial_length and len(source) > len(
                 segment.last_preview_source
             ):
-                continue
-            segment.last_partial_length = len(segment.partial)
-            segment.last_preview_source = source
-            segment.pending = source
-            if segment.preview_task is None or segment.preview_task.done():
+                segment.last_partial_length = len(segment.partial)
+                segment.last_preview_source = source
+                segment.pending = source
+            if segment.pending is not None and (
+                segment.preview_task is None or segment.preview_task.done()
+            ):
                 segment.preview_task = self._start(
                     self._previews(segment), f"peer:preview:{segment.caption.utterance_id}"
                 )
@@ -360,13 +361,19 @@ class PeerCaptionOwner:
     async def _previews(self, segment: _Segment) -> None:
         while segment.pending is not None and not segment.closed:
             if not self._translation_active():
-                segment.pending = None
                 return
             source, segment.pending = segment.pending, None
-            segment.caption.revision += 1
-            revision = segment.caption.revision
             prepared = self._prepare(segment.caption, source, "preview", segment.config)
             await self._slots.acquire()
+            if not self._translation_active():
+                self._slots.release()
+                if segment.pending is None:
+                    segment.pending = source
+                return
+            if prepared is not None:
+                prepared = replace(prepared, provider_generation=self.requests.provider_generation)
+            segment.caption.revision += 1
+            revision = segment.caption.revision
             await self._execute(
                 segment.caption,
                 source,
