@@ -38,7 +38,3 @@ Report these measurements separately:
 The compressed sizes of selected ZIP members are candidate contributions, not exact rebuilt ZIP or installer savings. Duplicate logical bytes may already compress well. An existing upgraded directory is not a clean-install baseline, and matching file lengths are not a complete integrity audit.
 
 Size results require affected packaged behavior evidence: startup, scientific audio conversion, VAD/turn inference, Japanese CTC decoding and DLL provenance in both initialization orders, and isolated installation/update/uninstall outcomes. A smaller directory or successful build is insufficient.
-
-## System-map drift
-
-`docs/architecture.md` still describes `_runtime/local_qwen` as current ONNX preload storage. That statement is superseded by the canonical `site-packages/onnxruntime/capi` layout above. The system map is intentionally unchanged under the repository rule requiring an explicit request to edit it. Its installer description also does not yet mention the selected packaging-pruning ownership evidence.
