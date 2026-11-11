@@ -18,6 +18,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from puripuly_heart.core.local_asr import local_stt_runtime_installer
 from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     InstalledLocalSTTManifest,
@@ -273,13 +274,34 @@ class _HeldHttpDownload:
         self.payload = payload
         self.release = threading.Event()
         self.finished = threading.Event()
+        self.allow_handler_finish = threading.Event()
+        self.allow_handler_finish.set()
+        self.worker_exiting = threading.Event()
+        self.allow_worker_finish = threading.Event()
+        self.allow_worker_finish.set()
+        self.worker_finished = threading.Event()
         self.requests: list[str] = []
         self.truncate = False
 
 
 @pytest.fixture()
-def held_http_download():
+def held_http_download(monkeypatch: pytest.MonkeyPatch):
     held = _HeldHttpDownload(b"synthetic-model")
+    original_download = local_stt_runtime_installer._download_source_into_staging
+
+    def download_into_staging(**kwargs):
+        held.worker_exiting.clear()
+        held.worker_finished.clear()
+        try:
+            return original_download(**kwargs)
+        finally:
+            held.worker_exiting.set()
+            held.allow_worker_finish.wait()
+            held.worker_finished.set()
+
+    monkeypatch.setattr(
+        local_stt_runtime_installer, "_download_source_into_staging", download_into_staging
+    )
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
@@ -295,6 +317,7 @@ def held_http_download():
                     self.wfile.write(held.payload[1:])
                     self.wfile.flush()
             finally:
+                held.allow_handler_finish.wait()
                 held.finished.set()
 
         def log_message(self, format, *args):
@@ -309,6 +332,8 @@ def held_http_download():
         yield held, f"http://127.0.0.1:{server.server_address[1]}"
     finally:
         held.release.set()
+        held.allow_handler_finish.set()
+        held.allow_worker_finish.set()
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
@@ -369,6 +394,9 @@ async def test_status_failure_keeps_download_staging_and_lease_until_settled_the
     downloader = _HeldDownloader(held.payload) if port else None
     if port:
         held.release.set()
+    else:
+        held.allow_handler_finish.clear()
+        held.allow_worker_finish.clear()
     release = downloader.release if port else held.release
     requests = downloader.requests if port else held.requests
     manifest = _held_manifest(base_url, port=port)
@@ -414,7 +442,7 @@ async def test_status_failure_keeps_download_staging_and_lease_until_settled_the
             await asyncio.wait_for(downloader.cancellation_requested.wait(), timeout=5)
             assert downloader.pending == 1
         else:
-            assert not held.finished.is_set()
+            assert not held.worker_finished.is_set()
         if cancel_during_settlement:
             for _ in range(2):
                 installation.cancel()
@@ -435,6 +463,19 @@ async def test_status_failure_keeps_download_staging_and_lease_until_settled_the
             assert held.requests == []
         assert {update.status for update in statuses} == {"downloading"}
         release.set()
+        if not port:
+            await _wait_until(held.worker_exiting.is_set)
+            assert not held.worker_finished.is_set()
+            assert not installation.done()
+            assert staging[0].exists()
+            assert (
+                cleanup_local_stt_install_residue(
+                    model_root=model_root, install_dirnames=(manifest.install_dirname,)
+                )
+                is None
+            )
+            assert staging[0].exists()
+            held.allow_worker_finish.set()
         with pytest.raises(LocalSTTRuntimeInstallError) as caught:
             await asyncio.wait_for(installation, timeout=5)
         assert caught.value.failure_code == "status_callback_failed"
@@ -445,8 +486,12 @@ async def test_status_failure_keeps_download_staging_and_lease_until_settled_the
         assert {update.status for update in statuses} == {"downloading"}
         assert not staging[0].exists()
         assert not (model_root / manifest.install_dirname).exists()
-        assert downloader.pending == 0 if port else held.finished.is_set()
+        assert downloader.pending == 0 if port else held.worker_finished.is_set()
         _assert_lease_available(model_root)
+        if not port:
+            assert not held.finished.is_set()
+            held.allow_handler_finish.set()
+            await _wait_until(held.finished.is_set)
 
         retry_statuses = []
         installed = await ensure_local_stt_installed(
@@ -471,6 +516,8 @@ async def test_status_failure_keeps_download_staging_and_lease_until_settled_the
         _assert_lease_available(model_root)
     finally:
         release.set()
+        held.allow_handler_finish.set()
+        held.allow_worker_finish.set()
         await asyncio.gather(installation, return_exceptions=True)
 
 
@@ -522,7 +569,7 @@ async def test_status_failure_preserves_initiating_and_download_cleanup_errors(
             assert downloader.pending == 0
         else:
             assert isinstance(secondary, httpx.RemoteProtocolError)
-            assert held.finished.is_set()
+            assert held.worker_finished.is_set()
         assert not list(model_root.glob(f"{manifest.install_dirname}.staging-*"))
         assert not (model_root / manifest.install_dirname).exists()
         _assert_lease_available(model_root)
@@ -571,7 +618,7 @@ async def test_cancellation_drains_admitted_work_before_cleanup_and_retry(
         if port:
             await asyncio.wait_for(downloader.cancellation_requested.wait(), timeout=5)
         else:
-            assert not held.finished.is_set()
+            assert not held.worker_finished.is_set()
         assert not installation.done()
         staging = list(model_root.glob(f"{manifest.install_dirname}.staging-*"))
         assert len(staging) == 1
@@ -590,7 +637,7 @@ async def test_cancellation_drains_admitted_work_before_cleanup_and_retry(
         expected = asyncio.CancelledError if task_cancel else LocalSTTRuntimeInstallCancelled
         with pytest.raises(expected):
             await asyncio.wait_for(installation, timeout=5)
-        assert downloader.pending == 0 if port else held.finished.is_set()
+        assert downloader.pending == 0 if port else held.worker_finished.is_set()
         assert not staging[0].exists()
         _assert_lease_available(model_root)
         await ensure_local_stt_installed(
@@ -800,7 +847,7 @@ async def test_http_task_cancellation_preserves_thread_cleanup_failure(
         installation.cancel()
         await _wait_until(cancellation.is_set)
         assert not installation.done()
-        assert not held.finished.is_set()
+        assert not held.worker_finished.is_set()
         held.release.set()
         with pytest.raises(BaseExceptionGroup) as caught:
             await asyncio.wait_for(installation, timeout=5)
