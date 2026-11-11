@@ -370,6 +370,8 @@ class PeerCaptionOwner:
                 if segment.pending is None:
                     segment.pending = source
                 return
+            if prepared is not None:
+                prepared = replace(prepared, provider_generation=self.requests.provider_generation)
             segment.caption.revision += 1
             revision = segment.caption.revision
             await self._execute(

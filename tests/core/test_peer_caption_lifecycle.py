@@ -387,6 +387,82 @@ async def test_preview_waiting_for_capacity_stays_inactive_and_recovers(
 
 
 @pytest.mark.asyncio
+async def test_provider_recovery_before_capacity_release_admits_current_preview(preview_timeline):
+    from puripuly_heart.core.orchestrator.peer_caption import PeerCaptionOwner
+
+    initial_tasks = asyncio.all_tasks()
+    harness, backend, events, clock = setup(clock=preview_timeline.clock)
+    current = harness.peer_owner.cloud_captions
+    owner = harness.peer_owner.cloud_captions = PeerCaptionOwner(
+        current.runtime, current.requests, current.output, clock, max_requests=1
+    )
+    item = transcript("Queued preview source", 2)
+    try:
+        await harness.start()
+        backend.block = True
+        await final(harness, transcript("Earlier final.", 1))
+        await turn_loop()
+        await partial(harness, item)
+        await turn_loop()
+        await preview_timeline.advance(5)
+        assert [request.text for request in backend.calls] == ["Earlier final."]
+        harness.peer_runtime.translation_history.append(
+            ContextEntry("Later context.", "en", "ko", clock.now(), "peer")
+        )
+        await harness.replace_llm_provider(None)
+        await preview_timeline.advance(4)
+        await harness.replace_llm_provider(backend)
+        await preview_timeline.advance(4)
+        assert [request.text for request in backend.calls] == ["Earlier final."]
+        backend.block = False
+        backend.completions[0].set_result(None)
+        await asyncio.wait_for(idle(harness), 1)
+        assert [request.text for request in backend.calls] == ["Earlier final.", item.text]
+        assert backend.calls[-1].context == '- [peer] "Earlier final."'
+        assert [(event.type, event.source_text) for event in events] == [
+            ("translation_stream_update", item.text)
+        ]
+        assert events[-1].utterance_id == item.utterance_id
+        assert events[-1].peer_caption_revision == 1
+        assert any(
+            decision.publication_id == events[-1].event_id
+            and decision.metadata.get("publication_generation") == item.publication_generation
+            and decision.metadata.get("source_order") == item.source_order
+            for decision in harness.output_runtime.routing_decisions
+        )
+        for _ in range(3):
+            await preview_timeline.advance(4)
+            await idle(harness)
+        assert len(backend.calls) == 2
+        assert owner.request_counts["preview"] == 1
+        settled = replace(item, text="Recovered final.")
+        await final(harness, settled)
+        await asyncio.wait_for(idle(harness), 1)
+        await final(harness, settled)
+        await partial(harness, item)
+        await preview_timeline.advance(4)
+        await idle(harness)
+        assert [request.text for request in backend.calls] == [
+            "Earlier final.",
+            item.text,
+            settled.text,
+        ]
+        assert [(event.type, event.source_text) for event in events] == [
+            ("translation_stream_update", item.text),
+            ("translation_final", settled.text),
+        ]
+        assert events[-1].utterance_id == item.utterance_id
+        assert events[-1].peer_caption_revision == 2
+        assert harness.osc.messages == []
+    finally:
+        await asyncio.wait_for(harness.stop(), 1)
+        await turn_loop()
+        assert owner._tasks == set()
+        assert all(future.done() for _, future in preview_timeline.sleepers)
+        assert not {task for task in asyncio.all_tasks() - initial_tasks if not task.done()}
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("disabled", ["translation", "provider"])
 @pytest.mark.parametrize("closing", ["retire", "reset", "stop"])
 async def test_closing_inactive_caption_releases_timer_and_running_preview(
