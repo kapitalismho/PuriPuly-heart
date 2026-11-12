@@ -253,7 +253,7 @@ async def test_native_terminal_error_is_not_readiness_or_completion():
 async def test_native_interaction_notes_keep_attempt_diagnostics_only():
     stream = asyncio.StreamReader()
     stream.feed_data(
-        b'{"type":"photo_interaction","event":"grip_ignored","reason":"out_of_range",'
+        b'{"type":"photo_interaction","interaction":"grip_ignored","reason":"out_of_range",'
         b'"distance_m":0.13,"facing_deg":12.5,"forward_deg":30.0,"photo_id":"p","attempt_id":0,'
         b'"serial":"discard"}\n'
     )
@@ -263,8 +263,15 @@ async def test_native_interaction_notes_keep_attempt_diagnostics_only():
     await probe.drain(stream, evidence, signals)
     assert signals == {"decoded": False, "composed": False, "error": None}
     evidence.event.assert_called_once_with(
-        "native", type="photo_interaction", interaction="grip_ignored", reason="out_of_range",
-        distance_m=0.13, facing_deg=12.5, forward_deg=30.0, photo_id="p", attempt_id=0,
+        "native",
+        type="photo_interaction",
+        interaction="grip_ignored",
+        reason="out_of_range",
+        distance_m=0.13,
+        facing_deg=12.5,
+        forward_deg=30.0,
+        photo_id="p",
+        attempt_id=0,
     )
 
 
@@ -390,7 +397,11 @@ def test_repeat_schedule_preserves_full_windows_fresh_ids_and_released_boundarie
     assert schedule.tick(160, 160000)
     assert schedule.tick(190, 190000)
     assert state.photo["photo_id"] == second
-    offers = [snapshot["photo"] for snapshot in snapshots if snapshot["photo"] and snapshot["photo"]["offer_open"]]
+    offers = [
+        snapshot["photo"]
+        for snapshot in snapshots
+        if snapshot["photo"] and snapshot["photo"]["offer_open"]
+    ]
     assert {photo["photo_id"] for photo in offers} == {first, second}
 
 
@@ -437,8 +448,17 @@ def repeat_launch(tmp_path, monkeypatch):
 
     clock = SimpleNamespace(now=0.0)
     harness = SimpleNamespace(
-        manifests=[], processes=[], bridges=[], events=[], active=None, pending=[],
-        ack_delay=0, cleanup_delay=0, fail_at=None, cancel_at=None, shutdown_ack=True,
+        manifests=[],
+        processes=[],
+        bridges=[],
+        events=[],
+        active=None,
+        pending=[],
+        ack_delay=0,
+        cleanup_delay=0,
+        fail_at=None,
+        cancel_at=None,
+        shutdown_ack=True,
     )
     real_sleep = asyncio.sleep
 
@@ -512,8 +532,11 @@ def repeat_launch(tmp_path, monkeypatch):
         harness.manifests.append(manifest)
         harness.events.append(("spawn", clock.now))
         process = SimpleNamespace(
-            pid=100 + len(harness.manifests), returncode=None, exited=asyncio.Event(),
-            stdout=asyncio.StreamReader(), stderr=asyncio.StreamReader(),
+            pid=100 + len(harness.manifests),
+            returncode=None,
+            exited=asyncio.Event(),
+            stdout=asyncio.StreamReader(),
+            stderr=asyncio.StreamReader(),
         )
 
         async def wait():
@@ -530,16 +553,31 @@ def repeat_launch(tmp_path, monkeypatch):
     executable = tmp_path / "trusted.exe"
     executable.write_bytes(b"synthetic executable, never run")
     harness.args = probe.parser().parse_args(
-        ["--image", str(image), "--executable", str(executable), "--backend", "offscreen",
-         "--repeat-offers", "--seconds", "12", "--offer-delay", "1"]
+        [
+            "--image",
+            str(image),
+            "--executable",
+            str(executable),
+            "--backend",
+            "offscreen",
+            "--repeat-offers",
+            "--seconds",
+            "12",
+            "--offer-delay",
+            "1",
+        ]
+    )
+    monkeypatch.setattr("puripuly_heart.core.photo.bridge.PhotoBridge", new_bridge)
+    monkeypatch.setattr(
+        probe, "time", SimpleNamespace(monotonic=lambda: clock.now, time=lambda: clock.now)
     )
     monkeypatch.setattr(
-        "puripuly_heart.core.photo.bridge.PhotoBridge", new_bridge
-    )
-    monkeypatch.setattr(probe, "time", SimpleNamespace(monotonic=lambda: clock.now, time=lambda: clock.now))
-    monkeypatch.setattr(
-        probe, "asyncio",
-        SimpleNamespace(**{name: getattr(asyncio, name) for name in dir(asyncio) if name != "sleep"}, sleep=sleep),
+        probe,
+        "asyncio",
+        SimpleNamespace(
+            **{name: getattr(asyncio, name) for name in dir(asyncio) if name != "sleep"},
+            sleep=sleep,
+        ),
     )
     monkeypatch.setattr(probe.asyncio, "create_subprocess_exec", spawn)
     harness.evidence = probe.Evidence(tmp_path / "evidence")
@@ -555,7 +593,11 @@ async def test_repeat_launch_uses_one_default_watch_candidate_and_waits_for_clea
     assert await probe.run(harness.args, harness.evidence) == 0
     assert len(harness.manifests) == 1
     assert [kind for kind, _ in harness.events] == [
-        "spawn", "photo_debug_quiesce", "quiescent", "shutdown", "closed"
+        "spawn",
+        "photo_debug_quiesce",
+        "quiescent",
+        "shutdown",
+        "closed",
     ]
     assert harness.events[-1][1] >= 18
     assert harness.evidence.summary["mode"] == "repeat_offers"
@@ -590,10 +632,17 @@ async def test_repeat_failure_or_interruption_cleans_owned_child(repeat_launch, 
 
 def test_repeat_rejects_live_watch_directory_before_launch(tmp_path):
     with pytest.raises(SystemExit) as result:
-        probe.main([
-            "--image", "unused.png", "--executable", "unused.exe",
-            "--repeat-offers", "--watch-dir", str(tmp_path),
-        ])
+        probe.main(
+            [
+                "--image",
+                "unused.png",
+                "--executable",
+                "unused.exe",
+                "--repeat-offers",
+                "--watch-dir",
+                str(tmp_path),
+            ]
+        )
     assert result.value.code == 2
 
 
@@ -606,7 +655,9 @@ async def test_repeat_offers_keep_full_windows_in_one_native_session(repeat_laun
     assert len(harness.manifests) == 1
     records = [
         json.loads(line)
-        for line in (harness.evidence.path / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        for line in (harness.evidence.path / "events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
     offers = [record for record in records if record["event"] == "synthetic_offer"]
     assert len(offers) == 4
@@ -616,13 +667,10 @@ async def test_repeat_offers_keep_full_windows_in_one_native_session(repeat_laun
         later["elapsed_s"] - earlier["elapsed_s"] >= 15
         for earlier, later in zip(offers, offers[1:])
     )
-    acknowledgements = [
-        record for record in records if record["event"] == "boundary_acknowledged"
-    ]
+    acknowledgements = [record for record in records if record["event"] == "boundary_acknowledged"]
     assert len(acknowledgements) == 4
     assert all(
-        ack["elapsed_s"] <= offer["elapsed_s"]
-        for ack, offer in zip(acknowledgements, offers[1:])
+        ack["elapsed_s"] <= offer["elapsed_s"] for ack, offer in zip(acknowledgements, offers[1:])
     )
 
 
@@ -649,10 +697,13 @@ async def test_offscreen_repeat_smoke_finishes_early_after_quiescence(repeat_lau
     assert kinds.index("photo_debug_export") < kinds.index("photo_probe_pull")
     records = [
         json.loads(line)
-        for line in (harness.evidence.path / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        for line in (harness.evidence.path / "events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
     pre_pull_export = next(
-        index for index, record in enumerate(records)
+        index
+        for index, record in enumerate(records)
         if record["event"] == "offscreen_exported" and record["label"] == "pre-pull"
     )
     assert not any(record["event"] == "preview_opened" for record in records[:pre_pull_export])
@@ -686,7 +737,9 @@ async def test_ordinary_preview_remains_single_offer_without_candidate_overrides
     assert len(harness.manifests) == 1
     records = [
         json.loads(line)
-        for line in (harness.evidence.path / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        for line in (harness.evidence.path / "events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
     assert sum(record["event"] == "preview_offer" for record in records) == 1
     assert not any(record["event"] == "boundary_requested" for record in records)
@@ -710,7 +763,9 @@ async def test_repeat_preserves_native_failure_drained_during_shutdown(repeat_la
 
 
 @pytest.mark.asyncio
-async def test_offscreen_smoke_never_authorizes_without_local_source_readiness(repeat_launch, monkeypatch):
+async def test_offscreen_smoke_never_authorizes_without_local_source_readiness(
+    repeat_launch, monkeypatch
+):
     harness = repeat_launch
     harness.args.software_pull_after = 0.2
 
@@ -731,7 +786,11 @@ def calibration_value():
     identity = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]]
     return {
         "transform": [[0.0, -1.0, 0.0, 0.03], [1.0, 0.0, 0.0, 0.08], [0.0, 0.0, 1.0, 0.02]],
-        "reference": {"model": "synthetic-right", "serial": "fixture", "handgrip_transform": identity},
+        "reference": {
+            "model": "synthetic-right",
+            "serial": "fixture",
+            "handgrip_transform": identity,
+        },
     }
 
 
@@ -779,7 +838,9 @@ async def test_repeat_run_reuses_saved_wrist_without_selecting_an_emergence(repe
 
 
 @pytest.mark.asyncio
-async def test_calibration_wait_never_offers_photos_or_consumes_preview_time(repeat_launch, monkeypatch):
+async def test_calibration_wait_never_offers_photos_or_consumes_preview_time(
+    repeat_launch, monkeypatch
+):
     harness = repeat_launch
     harness.args.backend = "openvr"
     harness.args.calibrate_wrist = True
@@ -800,8 +861,13 @@ async def test_calibration_wait_never_offers_photos_or_consumes_preview_time(rep
 
     monkeypatch.setattr(probe.asyncio, "sleep", sleep)
     assert await probe.run(harness.args, harness.evidence) == 0
-    records = [json.loads(line) for line in (harness.evidence.path / "events.jsonl").read_text().splitlines()]
-    saved = next(record["elapsed_s"] for record in records if record["event"] == "wrist_calibration_saved")
+    records = [
+        json.loads(line)
+        for line in (harness.evidence.path / "events.jsonl").read_text().splitlines()
+    ]
+    saved = next(
+        record["elapsed_s"] for record in records if record["event"] == "wrist_calibration_saved"
+    )
     offer = next(record["elapsed_s"] for record in records if record["event"] == "preview_offer")
     assert saved >= 25
     assert offer >= saved + harness.args.offer_delay

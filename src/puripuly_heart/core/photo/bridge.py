@@ -64,6 +64,53 @@ def valid_wrist_calibration(value: object) -> bool:
     )
 
 
+_INTERACTION_EVENTS = frozenset(
+    {
+        "icon_shown",
+        "icon_hidden",
+        "icon_near_miss",
+        "grip_ignored",
+        "grab",
+        "grab_released",
+        "pull",
+        "hold_released",
+        "photo_regrab",
+        "photo_placed",
+        "photo_faded",
+    }
+)
+_INTERACTION_LABELS = {
+    "reason": frozenset({"icon_hidden", "not_ready", "out_of_range"}),
+    "hand": frozenset({"left", "right"}),
+}
+_INTERACTION_NUMBERS = frozenset({"facing_deg", "forward_deg", "distance_m", "progress"})
+
+
+def _valid_interaction(value: dict) -> bool:
+    required = {"type", "interaction", "photo_id", "attempt_id"}
+    if not required <= set(value) <= required | set(_INTERACTION_LABELS) | _INTERACTION_NUMBERS:
+        return False
+    photo_id, attempt_id = value["photo_id"], value["attempt_id"]
+    if (
+        value["interaction"] not in _INTERACTION_EVENTS
+        or type(photo_id) is not str
+        or not 0 < len(photo_id) <= 128
+        or type(attempt_id) is not int
+        or attempt_id < 0
+    ):
+        return False
+    for key, allowed in _INTERACTION_LABELS.items():
+        if key in value and value[key] not in allowed:
+            return False
+    for key in _INTERACTION_NUMBERS & set(value):
+        number = value[key]
+        if number is None:
+            continue
+        if type(number) not in (int, float) or not math.isfinite(number) or abs(number) > 1000:
+            return False
+    return True
+
+
 class PhotoBridge:
     def __init__(self, *, control: Callable[[dict, int], dict | None]) -> None:
         self._control = control
@@ -244,6 +291,8 @@ class PhotoBridge:
         kind = value.get("type")
         if not isinstance(kind, str):
             return False
+        if kind == "photo_interaction":
+            return _valid_interaction(value)
         fields = {
             "photo_pull": {"photo_id": str, "event_id": str},
             "photo_hidden": {"photo_id": str},

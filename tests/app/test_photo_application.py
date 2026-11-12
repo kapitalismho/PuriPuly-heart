@@ -59,3 +59,32 @@ async def test_native_prepare_timings_keep_identity_and_ignore_invalid_values(
         assert reader.await_count == 2
     finally:
         await owner.close()
+
+
+def test_interaction_notes_reach_photo_diagnostics_without_changing_state(tmp_path):
+    observations = []
+
+    async def no_route():
+        return None
+
+    owner = PhotoApplicationOwner(
+        resolve_route=no_route,
+        target_language=lambda: "ko",
+        diagnostic=lambda stage, fields: observations.append((stage, fields)),
+        watcher=PhotoCaptureWatcher(tmp_path / "photos", tmp_path / "logs"),
+        temporary_root=tmp_path,
+    )
+    before = owner.lifecycle.snapshot
+    note = {
+        "type": "photo_interaction",
+        "interaction": "icon_near_miss",
+        "photo_id": "p",
+        "attempt_id": 0,
+        "facing_deg": 50.0,
+        "forward_deg": 41.5,
+    }
+    assert owner._control(note, 1) is None
+    assert observations == [
+        ("interaction", {key: value for key, value in note.items() if key != "type"})
+    ]
+    assert owner.lifecycle.snapshot == before

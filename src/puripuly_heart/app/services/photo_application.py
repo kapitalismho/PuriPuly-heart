@@ -115,6 +115,10 @@ class PhotoApplicationOwner:
             return self.lifecycle.first_block_drawn(
                 value["photo_id"], value["attempt_id"], value["block_id"], generation
             )
+        elif kind == "photo_interaction":
+            self._diagnostic(
+                "interaction", {key: item for key, item in value.items() if key != "type"}
+            )
         elif kind == "photo_image_timing":
             self._diagnostic(
                 f"image_{value['stage']}",

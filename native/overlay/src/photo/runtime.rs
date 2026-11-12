@@ -934,14 +934,18 @@ impl PhotoRuntime {
             self.interaction.photo_pixels = pixels;
         }
         let frame = self.interaction.step(self.state.photo(), input, now);
-        if let Some(photo) = self.state.photo() {
-            for note in &self.interaction.notes {
+        let records: Vec<_> = self.state.photo().map(|photo| {
+            self.interaction.notes.iter().map(|note| {
                 let mut record = json!(note);
                 record["type"] = json!("photo_interaction");
                 record["photo_id"] = json!(photo.photo_id);
                 record["attempt_id"] = json!(photo.attempt_id);
-                println!("{record}");
-            }
+                record
+            }).collect()
+        }).unwrap_or_default();
+        for record in records {
+            println!("{record}");
+            bridge.send(record).await?;
         }
         if frame.grab {
             self.enqueue_preview_source();

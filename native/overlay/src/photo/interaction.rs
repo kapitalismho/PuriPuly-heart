@@ -304,7 +304,7 @@ pub enum GripIgnored {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-#[serde(tag = "event", rename_all = "snake_case")]
+#[serde(tag = "interaction", rename_all = "snake_case")]
 pub enum InteractionNote {
     IconShown { facing_deg: f32, forward_deg: f32 },
     IconHidden { facing_deg: Option<f32>, forward_deg: Option<f32> },

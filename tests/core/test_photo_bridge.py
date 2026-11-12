@@ -371,3 +371,49 @@ async def test_calibration_rejects_invalid_reference_or_nonrigid_pose(invalid):
         assert controls == []
     finally:
         await bridge.close()
+
+
+def test_interaction_notes_accept_only_bounded_attempt_diagnostics():
+    bridge = PhotoBridge(control=lambda value, generation: None)
+    note = {
+        "type": "photo_interaction",
+        "interaction": "grip_ignored",
+        "photo_id": "p",
+        "attempt_id": 0,
+        "reason": "out_of_range",
+        "distance_m": 0.13,
+        "facing_deg": 12.5,
+        "forward_deg": 30,
+    }
+    assert bridge._valid_control(note)
+    assert bridge._valid_control(
+        {
+            "type": "photo_interaction",
+            "interaction": "icon_hidden",
+            "photo_id": "p",
+            "attempt_id": 1,
+            "facing_deg": None,
+            "forward_deg": None,
+        }
+    )
+    assert bridge._valid_control(
+        {
+            "type": "photo_interaction",
+            "interaction": "photo_regrab",
+            "photo_id": "p",
+            "attempt_id": 1,
+            "hand": "right",
+        }
+    )
+    for change in (
+        {"interaction": "unknown"},
+        {"reason": "elsewhere"},
+        {"hand": "both"},
+        {"distance_m": float("nan")},
+        {"distance_m": 1e9},
+        {"facing_deg": True},
+        {"attempt_id": -1},
+        {"photo_id": ""},
+        {"serial": "private"},
+    ):
+        assert not bridge._valid_control({**note, **change}), change

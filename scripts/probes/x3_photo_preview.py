@@ -39,7 +39,9 @@ class Quiescence:
             or self.request_id is None
             or value["request_id"] != self.request_id
         ):
-            self.event("boundary_ack_rejected", request_id=value["request_id"], generation=generation)
+            self.event(
+                "boundary_ack_rejected", request_id=value["request_id"], generation=generation
+            )
             return
         if not self.acknowledged.is_set():
             self.acknowledged.set()
@@ -168,6 +170,8 @@ class PreviewState:
     def control(self, value, generation, now):
         self.tick(now)
         kind = value["type"]
+        if kind == "photo_interaction":
+            return
         photo = self.photo
         if (
             generation != self.generation
@@ -283,6 +287,7 @@ async def drain(stream, evidence, signals):
                 "submitted",
                 "recovered",
                 "elapsed_ms",
+                "interaction",
                 "reason",
                 "facing_deg",
                 "forward_deg",
@@ -294,8 +299,6 @@ async def drain(stream, evidence, signals):
             )
             if key in value
         }
-        if value.get("type") == "photo_interaction" and "event" in value:
-            fields["interaction"] = value["event"]
         evidence.event("native", **fields)
         if value.get("type") in ("photo_runtime_error", "photo_image_failed"):
             signals["error"] = value.get("code", "native_error")
@@ -393,7 +396,11 @@ class WristCalibrationStore:
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temporary, self.path)
-            self.event("wrist_calibration_saved", path=str(self.path), source="authenticated_native_release")
+            self.event(
+                "wrist_calibration_saved",
+                path=str(self.path),
+                source="authenticated_native_release",
+            )
             self.completed.set()
         except OSError as exc:
             self.error = type(exc).__name__
@@ -450,7 +457,8 @@ async def run(args, evidence):
         raise ValueError("wrist calibration does not exist; calibrate explicitly first")
     calibration_store = (
         WristCalibrationStore(args.wrist_calibration, generation, evidence.event)
-        if args.calibrate_wrist else None
+        if args.calibrate_wrist
+        else None
     )
     barrier = None
 
@@ -550,17 +558,28 @@ async def run(args, evidence):
         if calibration_store is not None:
             evidence.event("wrist_calibration_waiting", photo_offered=False)
             while not calibration_store.completed.is_set():
-                if exit_task.done() or bridge.disconnected.is_set() or signals["error"] or calibration_store.error:
+                if (
+                    exit_task.done()
+                    or bridge.disconnected.is_set()
+                    or signals["error"]
+                    or calibration_store.error
+                ):
                     evidence.summary["status"] = "wrist_calibration_failed"
                     return 2
                 await asyncio.sleep(0.05)
         started = time.monotonic()
         schedule = (
             RepeatOfferSchedule(
-                state, barrier, started, args.seconds, args.offer_delay, evidence.event,
+                state,
+                barrier,
+                started,
+                args.seconds,
+                args.offer_delay,
+                evidence.event,
                 repeat=args.software_pull_after is None,
             )
-            if args.repeat_offers else None
+            if args.repeat_offers
+            else None
         )
         offered_at = None
         smoke_stage = 0
@@ -575,7 +594,8 @@ async def run(args, evidence):
                 if schedule.tick(now, int(time.time() * 1000)):
                     smoke_complete = args.software_pull_after is None or schedule.early_finish
                     evidence.summary["status"] = (
-                        "offscreen_preview_exported" if schedule.early_finish
+                        "offscreen_preview_exported"
+                        if schedule.early_finish
                         else "duration_completed" if smoke_complete else "smoke_incomplete"
                     )
                     result = 0 if smoke_complete else 2
@@ -659,7 +679,8 @@ async def run(args, evidence):
                             list(dimensions) != expected
                             or data["blocks"]
                             or data["original_uploads"] != 1
-                            or smoke_stage == -1 and (
+                            or smoke_stage == -1
+                            and (
                                 photo["attempt_id"] != 0
                                 or photo["image"] is not None
                                 or photo["visible"]
@@ -805,7 +826,9 @@ def parser():
         help="Seconds after native ready for the first synthetic offer without --watch-dir",
     )
     command.add_argument(
-        "--seconds", type=float, default=60,
+        "--seconds",
+        type=float,
+        default=60,
         help="Target duration after native ready (default 60s); repeat mode may extend for first offer/release",
     )
     command.add_argument("--startup-timeout", type=float, default=10)
@@ -819,18 +842,28 @@ def parser():
         type=float,
         help="OFFSCREEN ONLY: delay to local pre-pull export, then pull/export/hide/reopen/export and exit",
     )
-    command.add_argument("--calibrate-wrist", action="store_true",
-                         help="OPENVR ONLY: move the wrist icon with left grip and release to save before offering photos")
-    command.add_argument("--wrist-calibration", type=Path,
-                         help="Explicit local wrist calibration JSON to save or reuse")
+    command.add_argument(
+        "--calibrate-wrist",
+        action="store_true",
+        help="OPENVR ONLY: move the wrist icon with left grip and release to save before offering photos",
+    )
+    command.add_argument(
+        "--wrist-calibration",
+        type=Path,
+        help="Explicit local wrist calibration JSON to save or reuse",
+    )
     return command
 
 
 def main(argv=None):
     command = parser()
     args = command.parse_args(argv)
-    if args.calibrate_wrist and (args.backend != "openvr" or not args.wrist_calibration or args.watch_dir):
-        command.error("--calibrate-wrist requires OpenVR, --wrist-calibration PATH and no --watch-dir")
+    if args.calibrate_wrist and (
+        args.backend != "openvr" or not args.wrist_calibration or args.watch_dir
+    ):
+        command.error(
+            "--calibrate-wrist requires OpenVR, --wrist-calibration PATH and no --watch-dir"
+        )
     for name in ("offer_delay", "seconds", "startup_timeout", "software_pull_after"):
         value = getattr(args, name)
         if value is not None and (

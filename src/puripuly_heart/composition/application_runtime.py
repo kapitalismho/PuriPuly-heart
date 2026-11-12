@@ -1896,6 +1896,13 @@ def compose_application_runtime(
                 "failure_code",
                 "generation",
                 "pid",
+                "interaction",
+                "reason",
+                "hand",
+                "facing_deg",
+                "forward_deg",
+                "distance_m",
+                "progress",
             }
             and isinstance(value, (str, int, float))
         )

@@ -812,6 +812,21 @@ async fn quiescent_bridge_ack_waits_for_interaction_and_release_or_loss() {
 }
 
 #[cfg(windows)]
+async fn next_photo_message(
+    socket: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+    wait_ms: u64,
+) -> Option<serde_json::Value> {
+    use futures_util::StreamExt;
+    loop {
+        let message = tokio::time::timeout(Duration::from_millis(wait_ms), socket.next()).await.ok()??.ok()?;
+        let value: serde_json::Value = serde_json::from_str(message.to_text().ok()?).ok()?;
+        if value["type"] != "photo_interaction" {
+            return Some(value);
+        }
+    }
+}
+
+#[cfg(windows)]
 #[tokio::test]
 async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() {
     use super::super::interaction::compose;
@@ -850,7 +865,7 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     let (mut bridge, first) = connection.unwrap();
     let (mut runtime, _worker) = PhotoRuntime::new(&manifest).unwrap();
     runtime.receive(first, &mut bridge).await.unwrap();
-    socket.next().await.unwrap().unwrap();
+    assert_eq!(next_photo_message(&mut socket,2000).await.unwrap()["type"],"photo_state_received");
     let clock = Instant::now();
     let sample = |grip: bool, separation: f32| {
         let right = [[1.0,0.0,0.0,0.3],[0.0,0.0,-1.0,-0.2],[0.0,1.0,0.0,-0.4]];
@@ -908,7 +923,7 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     assert_eq!(partial.photo.unwrap().alpha,1.0);
     assert!((partial.photo.unwrap().width-0.1875).abs()<0.00001);
     assert_eq!(runtime.pull_sequence,0);
-    assert!(tokio::time::timeout(Duration::from_millis(20),socket.next()).await.is_err());
+    assert!(next_photo_message(&mut socket,20).await.is_none());
     assert!(!runtime.drawn_reported);
     assert!(runtime.live_drawn_block.is_none());
     assert!(!runtime.take_haptic_grant());
@@ -929,22 +944,21 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
         })).unwrap()).unwrap();
     }
     runtime.interaction_input(Some(sample(true,0.121)),clock+Duration::from_millis(3250),&mut bridge).await.unwrap();
-    let pull = socket.next().await.unwrap().unwrap();
-    assert_eq!(serde_json::from_str::<serde_json::Value>(pull.to_text().unwrap()).unwrap()["type"],"photo_pull");
+    assert_eq!(next_photo_message(&mut socket,2000).await.unwrap()["type"],"photo_pull");
     assert_eq!(runtime.interaction.frame.photo.unwrap().alpha,1.0);
-    assert!(tokio::time::timeout(Duration::from_millis(20),socket.next()).await.is_err());
+    assert!(next_photo_message(&mut socket,20).await.is_none());
     photo.attempt_id=1;
     photo.phase=PhotoPhase::Preparing;
     photo.offer_open=false;
     photo.visible=true;
     runtime.receive(PhotoIncoming::Snapshot { revision:2,photo:Some(photo.clone()) },&mut bridge).await.unwrap();
-    socket.next().await.unwrap().unwrap();
+    assert_eq!(next_photo_message(&mut socket,2000).await.unwrap()["type"],"photo_state_received");
     runtime.interaction_input(Some(sample(true,0.0)),clock+Duration::from_millis(3270),&mut bridge).await.unwrap();
     assert_eq!(runtime.interaction.frame.photo.unwrap().width,0.375);
     assert_eq!(runtime.pull_sequence,1);
     assert_eq!(runtime.compositor.as_ref().unwrap().original_uploads,1);
     runtime.interaction_input(None,clock+Duration::from_millis(3290),&mut bridge).await.unwrap();
-    socket.next().await.unwrap().unwrap();
+    assert_eq!(next_photo_message(&mut socket,2000).await.unwrap()["type"],"photo_hidden");
     assert!(runtime.interaction.frame.photo.is_none());
     runtime.preparation.start_source(runtime.source_request.clone().unwrap()).unwrap();
     let PreparationCompletion::Source(late) = runtime.preparation.next_result().await.unwrap() else { panic!("Cached local result required") };
@@ -964,7 +978,7 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     replacement.offer_open=true;
     replacement.visible=false;
     runtime.receive(PhotoIncoming::Snapshot { revision:3,photo:Some(replacement.clone()) },&mut bridge).await.unwrap();
-    socket.next().await.unwrap().unwrap();
+    assert_eq!(next_photo_message(&mut socket,2000).await.unwrap()["type"],"photo_state_received");
     runtime.preview_source(stale_a,&mut bridge).await.unwrap();
     assert!(runtime.texture.is_none());
     assert_eq!(runtime.compositor.as_ref().unwrap().metadata()["width"],serde_json::Value::Null);
@@ -973,7 +987,7 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     replacement.phase=PhotoPhase::Expired;
     replacement.offer_open=false;
     runtime.receive(PhotoIncoming::Snapshot { revision:4,photo:Some(replacement) },&mut bridge).await.unwrap();
-    socket.next().await.unwrap().unwrap();
+    assert_eq!(next_photo_message(&mut socket,2000).await.unwrap()["type"],"photo_state_received");
     runtime.preview_source(stale_b,&mut bridge).await.unwrap();
     assert!(runtime.texture.is_none());
     assert!(runtime.interaction.frame.photo.is_none());
@@ -985,7 +999,7 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     photo.visible=false;
     photo.shutter_unix_ms=unix_ms();
     runtime.receive(PhotoIncoming::Snapshot { revision:5,photo:Some(photo) },&mut bridge).await.unwrap();
-    socket.next().await.unwrap().unwrap();
+    assert_eq!(next_photo_message(&mut socket,2000).await.unwrap()["type"],"photo_state_received");
     runtime.enqueue_preview_source();
     let PreparationCompletion::Source(failed) = runtime.preparation.next_result().await.unwrap() else { panic!("Actual incomplete-source failure required") };
     assert_eq!(failed.result.as_ref().err().copied(),Some("source_incomplete"));
@@ -994,7 +1008,7 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     assert!(runtime.texture.is_none());
     assert!(!runtime.preparation_started);
     assert_eq!(runtime.pull_sequence,1);
-    assert!(tokio::time::timeout(Duration::from_millis(20),socket.next()).await.is_err());
+    assert!(next_photo_message(&mut socket,20).await.is_none());
     pixels.save(&source).unwrap();
     runtime.enqueue_preview_source();
     let PreparationCompletion::Source(recovered) = runtime.preparation.next_result().await.unwrap() else { panic!("Explicit source recovery required") };
