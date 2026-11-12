@@ -432,6 +432,12 @@ class ChatboxPaginator:
     def _start_message(self, message: OSCMessage) -> None:
         text = message.text.strip()
         if not text:
+            self._notify_delivery(message, "output_empty")
+            self._record_stage(
+                "message_terminal",
+                utterance_id=str(message.utterance_id),
+                status="output_empty",
+            )
             return
 
         parts = self._split_text(

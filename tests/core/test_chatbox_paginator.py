@@ -924,3 +924,69 @@ def test_self_speech_waiting_ttl_expires_speech_but_preserves_manual() -> None:
     paginator.process_due()
 
     assert sender.sent == ["a", "b", "m"]
+
+
+def test_empty_self_turn_settles_delivery_once_without_sending() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    deliveries: list[tuple[uuid.UUID, str]] = []
+    paginator = ChatboxPaginator(sender=sender, clock=clock, page_interval_s=3.0)
+    paginator.bind_delivery_observer(
+        lambda message, status: deliveries.append((message.utterance_id, status))
+    )
+
+    empty = _message(
+        "",
+        clock,
+        turn_generation=1,
+        turn_order=0,
+        presentation_revision=0,
+        self_speech=True,
+    )
+    paginator.enqueue_self_turn(empty, final=True)
+
+    assert sender.sent == []
+    assert deliveries == [(empty.utterance_id, "output_empty")]
+    assert paginator._stream_final_revisions == {}
+
+
+def test_empty_self_turns_do_not_accumulate_bookkeeping() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(sender=sender, clock=clock, page_interval_s=3.0)
+
+    for order in range(20):
+        paginator.enqueue_self_turn(
+            _message("", clock, turn_generation=1, turn_order=order, self_speech=True),
+            final=True,
+        )
+    assert paginator._stream_final_revisions == {}
+
+    paginator.enqueue_self_turn(
+        _message("hello", clock, turn_generation=1, turn_order=21, self_speech=True),
+        final=True,
+    )
+    assert sender.sent == ["hello"]
+    assert paginator._stream_final_revisions == {}
+
+
+def test_empty_self_turn_settles_after_older_pagination_drains() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    deliveries: list[tuple[uuid.UUID, str]] = []
+    paginator = ChatboxPaginator(sender=sender, clock=clock, max_chars=5, page_interval_s=3.0)
+    paginator.bind_delivery_observer(
+        lambda message, status: deliveries.append((message.utterance_id, status))
+    )
+
+    paginator.enqueue(_message("abcde fghij", clock))
+    empty = _message("", clock, turn_generation=1, turn_order=0, self_speech=True)
+    paginator.enqueue_self_turn(empty, final=True)
+    assert (empty.utterance_id, "output_empty") not in deliveries
+
+    clock.advance(3.0)
+    paginator.process_due()
+
+    assert (empty.utterance_id, "output_empty") in deliveries
+    assert sender.sent == ["abcde", "fghij"]
+    assert paginator._stream_final_revisions == {}
