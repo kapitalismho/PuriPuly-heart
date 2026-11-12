@@ -351,7 +351,7 @@ async def test_repeated_proposal_has_one_action_and_rejection_never_uploads():
     try:
         assert len(owner.snapshot.report_offers) == 1
         results = owner.snapshot.tool_results
-        assert results[0].result["offer_id"] == offer.id
+        assert results[0].result == {"status": "pending", "offer_id": offer.id}
         assert results[1].status == "not_executed"
         assert owner.reject_report(offer.id) == {"status": "rejected", "offer_id": offer.id}
         assert (await owner.send_report(offer.id))["status"] == "rejected"

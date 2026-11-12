@@ -35,6 +35,7 @@
   "messages.index_api_fallback_openrouter": "Index 免费 API 可能已结束。已切换至 Gemma 4 · OpenRouter。",
   "app.title": "PuriPuly <3",
   "desktop_overlay.window.title": "PuriPuly Overlay",
+  "app.already_running": "PuriPuly 已在运行。如果窗口没有很快出现，请稍后再试。",
   "dashboard.stt_label": "TALK",
   "dashboard.peer_label": "LISTEN",
   "dashboard.trans_label": "TRANS",

@@ -22,6 +22,11 @@ from typing import Any
 
 from packaging.requirements import Requirement
 
+from puripuly_heart.release_evidence.native_packaging_pruning import (
+    ONNX_CAPI_RELATIVE_DIR,
+    ONNX_PRELOAD_DLLS,
+    prune_runtime_dependencies,
+)
 from puripuly_heart.release_evidence.native_pe import stage_vc_runtime
 
 _LAYOUT_SCHEMA = "puripuly-heart/native-artifact-layout/v1"
@@ -121,6 +126,10 @@ class NativeArtifactLayout:
             raise ValueError("native Python executable must be python.exe")
         if values["stdlib_archive"] != "python314.zip":
             raise ValueError("native standard library archive must be python314.zip")
+        if values["local_sherpa_runtime_root"] != str(ONNX_CAPI_RELATIVE_DIR):
+            raise ValueError(
+                "native sherpa preload must use the canonical ONNX Runtime capi directory"
+            )
         if values["python_archive"] != str(
             PurePosixPath(values["application_root"]) / "python.zip"
         ):
@@ -391,8 +400,10 @@ def validate_target(target_root: Path, layout_path: Path, soxr_manifest: Path) -
         target_root / "app/puripuly_heart/data/fonts/NotoSansCJK-Medium.ttc",
         target_root / "site-packages/soxr/soxr.dll",
         target_root.joinpath("site-packages", *_SOUNDDEVICE_STANDARD_DLL.parts),
-        target_root / "_runtime/local_qwen/onnxruntime.dll",
-        target_root / "_runtime/local_qwen/onnxruntime_providers_shared.dll",
+        *(
+            layout.resolve(target_root, "local_sherpa_runtime_root") / name
+            for name in ONNX_PRELOAD_DLLS
+        ),
         *(
             target_root / name
             for name in (
@@ -1246,6 +1257,9 @@ def _parser() -> argparse.ArgumentParser:
     sounddevice = commands.add_parser("stage-sounddevice-runtime")
     sounddevice.add_argument("--site-packages", type=Path, required=True)
     sounddevice.add_argument("--output", type=Path)
+    pruning = commands.add_parser("prune-runtime")
+    pruning.add_argument("--target-root", type=Path, required=True)
+    pruning.add_argument("--output", type=Path, required=True)
     vc_runtime = commands.add_parser("stage-vc-runtime")
     vc_runtime.add_argument("--target-root", type=Path, required=True)
     vc_runtime.add_argument("--cmake-build-dir", type=Path, required=True)
@@ -1297,6 +1311,8 @@ def main(argv: list[str] | None = None) -> int:
             args.output,
             stage_sounddevice_portaudio_runtime(args.site_packages),
         )
+    elif args.command == "prune-runtime":
+        _write_json(args.output, prune_runtime_dependencies(args.target_root))
     elif args.command == "stage-vc-runtime":
         _write_json(args.output, stage_vc_runtime(args.target_root, args.cmake_build_dir))
     elif args.command == "finalize-soxr-wheel":

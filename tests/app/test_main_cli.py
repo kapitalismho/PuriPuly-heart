@@ -5,6 +5,7 @@ import contextlib
 import importlib
 import json
 import logging
+import os
 import sys
 from logging.handlers import QueueHandler
 from pathlib import Path
@@ -300,6 +301,82 @@ def test_run_gui_debug_preview_constructs_vrchat_presence(monkeypatch, tmp_path)
     assert result == 0
     assert calls["debug_ui_preview"] is True
     assert calls["vrchat_osc_presence"] is not None
+
+
+def _install_fake_gui(monkeypatch, tmp_path, run) -> None:
+    fake_flet = ModuleType("flet")
+    fake_flet.run = run
+    fake_flet.AppView = FAKE_APP_VIEW
+    monkeypatch.setitem(sys.modules, "flet", fake_flet)
+    fake_ui_app = ModuleType("puripuly_heart.ui.app")
+
+    async def main_gui(*_args, **_kwargs):
+        return None
+
+    fake_ui_app.main_gui = main_gui
+    monkeypatch.setitem(sys.modules, "puripuly_heart.ui.app", fake_ui_app)
+    fake_fonts = ModuleType("puripuly_heart.ui.fonts")
+    fake_fonts.assets_dir = lambda: tmp_path
+    monkeypatch.setitem(sys.modules, "puripuly_heart.ui.fonts", fake_fonts)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows instance ownership contract")
+def test_run_gui_owns_settings_before_window_and_releases_after(monkeypatch, tmp_path) -> None:
+    from puripuly_heart.core.control_instance import InstanceAlreadyRunning, acquire
+
+    config_path = tmp_path / "settings.json"
+    observed: list[str] = []
+    handed: list[object] = []
+
+    def fake_run(*, main, **_kwargs):
+        with pytest.raises(InstanceAlreadyRunning):
+            acquire(config_path)
+        observed.append("owned-while-window-runs")
+        asyncio.run(main(object()))
+
+    def fake_factory(factory, lease=None):
+        handed.append(lease)
+        return factory
+
+    _install_fake_gui(monkeypatch, tmp_path, fake_run)
+    monkeypatch.setattr("puripuly_heart.cli.host.gui_control_factory", fake_factory)
+
+    assert (
+        main_module._run_gui(config_path, debug_ui_preview=False, runtime_logging_sinks=object())
+        == 0
+    )
+
+    assert observed == ["owned-while-window-runs"]
+    assert len(handed) == 1 and handed[0] is not None
+    with acquire(config_path):
+        pass
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows instance ownership contract")
+def test_run_gui_second_launch_notifies_without_starting_window(monkeypatch, tmp_path) -> None:
+    from puripuly_heart.core.control_instance import acquire
+
+    config_path = tmp_path / "settings.json"
+    notified: list[str] = []
+
+    def forbidden_run(**_kwargs):
+        raise AssertionError("a second launch must not start another window")
+
+    _install_fake_gui(monkeypatch, tmp_path, forbidden_run)
+    monkeypatch.setattr(
+        "puripuly_heart.ui.running_instance.notify_running_instance",
+        lambda: notified.append("notified") or "notified",
+    )
+
+    with acquire(config_path):
+        assert (
+            main_module._run_gui(
+                config_path, debug_ui_preview=False, runtime_logging_sinks=object()
+            )
+            == 0
+        )
+
+    assert notified == ["notified"]
 
 
 def test_main_run_gui_force_closes_logging_when_gui_runtime_logging_leaks(

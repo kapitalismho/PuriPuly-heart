@@ -116,7 +116,7 @@ async def test_native_stream_waits_for_final_unit_not_input_submission(
     backend = gemini.GeminiTranscribeSTTBackend(
         "offline-controlled",
         live_connect_factory=_RecordingFactory(transport),
-        drain_timeout_s=0.01,
+        drain_timeout_s=WATCHDOGS.final_timeout_s * 2,
     )
     config = gemini._build_live_config_sync(backend.language_codes, backend.custom_vocabulary)
 

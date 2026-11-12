@@ -31,6 +31,7 @@ from puripuly_heart.providers.stt.qwen_audio import (
 )
 from puripuly_heart.providers.stt.soniox import _FinalizeRequest, _SonioxSession
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
+from tests.core.test_peer_overlay_policy import Timeline
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
 
@@ -538,13 +539,11 @@ async def test_provider_speaker_availability_is_visible_on_peer_output(
 
 @pytest.mark.asyncio
 async def test_soniox_segments_preserve_attribution_through_output_and_presenter() -> None:
-    clock = FakeClock(_now=100.0)
-
-    async def advance(seconds: float) -> None:
-        await asyncio.sleep(seconds)
-        clock.advance(seconds)
-
-    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock, sleep=advance)
+    timeline = Timeline(clock=FakeClock(_now=100.0))
+    clock = timeline.clock
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=clock, sleep=timeline.sleep
+    )
     provider = _SegmentTranslationProvider()
     provider.release["Alice "] = asyncio.Event()
     provider.release["Beto "] = asyncio.Event()
@@ -613,32 +612,52 @@ async def test_soniox_segments_preserve_attribution_through_output_and_presenter
             if getattr(event, "type", None) == "translation_final"
         ] == ["Alice "]
         provider.release["Alice"].set()
-        await asyncio.sleep(0)
+        async with asyncio.timeout(2):
+            while not any(
+                getattr(event, "type", None) == "translation_final" and event.source_text == "Alice"
+                for event in overlay.events
+            ):
+                await asyncio.sleep(0)
         assert [
             event.source_text
             for event in overlay.events
             if getattr(event, "type", None) == "translation_final"
-        ] == ["Alice "]
+        ] == ["Alice ", "Alice"]
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+            "Alice ",
+            "Beto ",
+            "Alice",
+        ]
         provider.release["Beto "].set()
         await _wait_for_peer_idle(harness)
         assert provider.calls == ["Alice ", "Beto ", "Alice"]
         events = [
             event for event in overlay.events if getattr(event, "type", None) == "translation_final"
         ]
-        assert [event.source_text for event in events] == ["Alice ", "Beto ", "Alice"]
-        assert [event.text for event in events] == ["Hello", "World", "Again"]
-        assert [event.speaker_assignment.palette_index for event in events] == [0, 1, 0]
+        assert [event.source_text for event in events] == ["Alice ", "Alice", "Beto "]
+        assert [event.text for event in events] == ["Hello", "Again", "World"]
+        assert [event.speaker_assignment.palette_index for event in events] == [0, 0, 1]
         assert [event.speaker_assignment.source_text_range for event in events] == [
             (0, 6),
-            (6, 11),
             (11, 16),
+            (6, 11),
+        ]
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+            "Alice ",
+            "Beto ",
+            "Alice",
         ]
         revisions = {event.speaker_assignment.source_text_revision for event in events}
         assert len(revisions) == 1 and None not in revisions
+        assert presenter.peer_fragment_state(events[-1].utterance_id, 0).pending
+        await timeline.advance(0)
+        await timeline.advance(1)
         latest = presenter.snapshot().blocks
-        assert latest[-1].speaker_style == "gold"
-        assert latest[-1].primary_text == "Again"
-        assert latest[-1].secondary_text == "Alice"
+        assert [(block.primary_text, block.speaker_style) for block in latest] == [
+            ("Again", "gold"),
+            ("World", "cyan"),
+        ]
+        assert latest[-1].secondary_text == "Beto"
     finally:
         provider.release["Alice "].set()
         provider.release["Alice"].set()
@@ -860,9 +879,14 @@ async def test_stalled_peer_child_times_out_without_losing_siblings_or_successor
             if getattr(event, "type", None) == "translation_final"
         ]
         assert events == [
-            ("source_only", "alpha "),
             ("translation_final", "Second"),
             ("translation_final", "Later"),
+            ("source_only", "alpha "),
+        ]
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+            "alpha ",
+            "beta",
+            "Cora",
         ]
     finally:
         provider.release["alpha "].set()

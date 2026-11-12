@@ -89,7 +89,8 @@ def join_action(
         return "independent"
     previous = previous.rstrip()
     incoming = incoming.lstrip()
-    last_word = previous.rstrip(".!?。？！,，、:;\"'“”‘’").split()[-1].lower() if previous else ""
+    previous_words = previous.rstrip(".!?。？！,，、:;\"'“”‘’").split()
+    last_word = previous_words[-1].lower() if previous_words else ""
     r0 = (
         previous.endswith(("—", "-", "...", "…", ",", "，", "、"))
         or not previous.endswith((".", "?", "!", "。", "？", "！"))
@@ -131,6 +132,7 @@ class _Caption:
     source: str = ""
     revision: int = 0
     shown_revision: int = 0
+    displayed_revision: int = 0
     context: tuple[str, ...] | None = None
     last_final_at: float | None = None
     sealed: AudioSegmentSnapshot | None = None
@@ -197,12 +199,12 @@ class PeerCaptionOwner:
         self._epoch += 1
         for segment in self._segments.values():
             segment.closed = True
+        await self.output.reset_peer_caption_admission()
         tasks = tuple(self._tasks)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await self._scope.close()
-        await self.output.reset_peer_caption_admission()
         self._scope = LifecycleScope("PeerCaptionOwner")
         self._segments.clear()
         self._last = None
@@ -338,21 +340,22 @@ class PeerCaptionOwner:
         return self.requests.provider_available and self.requests.translation_enabled_for("peer")
 
     async def check_previews(self) -> None:
-        if not self._translation_active():
-            return
         for segment in tuple(self._segments.values()):
             if segment.closed or self.clock.now() < segment.next_check_at:
                 continue
             segment.next_check_at = self.clock.now() + 4.0
+            if not self._translation_active():
+                continue
             source = preview_source(segment.partial)
-            if len(segment.partial) <= segment.last_partial_length or len(source) <= len(
+            if len(segment.partial) > segment.last_partial_length and len(source) > len(
                 segment.last_preview_source
             ):
-                continue
-            segment.last_partial_length = len(segment.partial)
-            segment.last_preview_source = source
-            segment.pending = source
-            if segment.preview_task is None or segment.preview_task.done():
+                segment.last_partial_length = len(segment.partial)
+                segment.last_preview_source = source
+                segment.pending = source
+            if segment.pending is not None and (
+                segment.preview_task is None or segment.preview_task.done()
+            ):
                 segment.preview_task = self._start(
                     self._previews(segment), f"peer:preview:{segment.caption.utterance_id}"
                 )
@@ -360,13 +363,19 @@ class PeerCaptionOwner:
     async def _previews(self, segment: _Segment) -> None:
         while segment.pending is not None and not segment.closed:
             if not self._translation_active():
-                segment.pending = None
                 return
             source, segment.pending = segment.pending, None
-            segment.caption.revision += 1
-            revision = segment.caption.revision
             prepared = self._prepare(segment.caption, source, "preview", segment.config)
             await self._slots.acquire()
+            if not self._translation_active():
+                self._slots.release()
+                if segment.pending is None:
+                    segment.pending = source
+                return
+            if prepared is not None:
+                prepared = replace(prepared, provider_generation=self.requests.provider_generation)
+            segment.caption.revision += 1
+            revision = segment.caption.revision
             await self._execute(
                 segment.caption,
                 source,
@@ -807,27 +816,35 @@ class PeerCaptionOwner:
             if (
                 epoch != self._epoch
                 or (segment is not None and segment.closed)
-                or revision < caption.shown_revision
+                or revision < caption.displayed_revision
             ):
                 return
             if kind == "preview" and (
                 submission.translation is None or revision < caption.revision
             ):
                 return
+            if not self.output.output_runtime.register_peer_caption_identity(
+                caption.utterance_id, caption.generation, caption.source_order
+            ):
+                return
+            caption.displayed_revision = revision
+            await self.output.project_peer_overlay(submission)
             if predecessor is not None and not admitted.is_set():
                 await predecessor.wait()
             if (
                 epoch != self._epoch
-                or revision < caption.shown_revision
+                or revision < caption.displayed_revision
                 or not self.output.output_runtime.peer_publication_is_authorized(
                     caption.generation, caption.source_order
                 )
             ):
                 return
             caption.shown_revision = revision
-            await self.output.project_peer_caption(submission)
+            await self.output.project_peer_caption(submission, overlay_projected=True)
         finally:
-            if kind != "preview" or caption.shown_revision:
+            if (
+                kind != "preview" and revision >= caption.displayed_revision
+            ) or caption.shown_revision:
                 admitted.set()
                 caption.admitted.set()
                 for utterance_id in superseded:

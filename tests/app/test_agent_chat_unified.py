@@ -60,6 +60,80 @@ async def test_three_topic_reads_keep_independent_results_on_partial_failure(cat
 
 
 @pytest.mark.asyncio
+async def test_failed_read_blocks_later_action_and_recovers_on_next_turn(catalog):
+    class RecoveringGpu(ExecutionControl):
+        gpu_available = False
+
+        async def query(self, name, arguments):
+            if name == "gpu.status":
+                if not self.gpu_available:
+                    raise RuntimeError("GPU query unavailable")
+                return {"state": "ready"}
+            return await super().query(name, arguments)
+
+    control = RecoveringGpu(catalog)
+    control.settings["intent"]["ui"]["locale"] = "ko"
+    transport = Responses(
+        batch(
+            call("failed-gpu", "read_app", "gpu"),
+            call("independent-before", "read_app", "general"),
+            call("blocked-overlay", "execute_app", "overlay.set", enabled=True),
+            call("independent-after", "read_app", "general"),
+        ),
+        answer(),
+        batch(
+            call("recovered-gpu", "read_app", "gpu"),
+            call("allowed-overlay", "execute_app", "overlay.set", enabled=True),
+        ),
+        answer(),
+    )
+    owner = AgentChatOwner(control, transport, localize=str)
+    try:
+        await asyncio.wait_for(owner.start(), 3)
+        failed = await asyncio.wait_for(owner.send("Inspect GPU and enable the overlay."), 3)
+        assert failed.status == "completed"
+        assert control.submissions == []
+        assert [(item.call_id, item.status) for item in failed.tool_results] == [
+            ("failed-gpu", "unavailable"),
+            ("independent-before", "observed"),
+            ("blocked-overlay", "not_executed"),
+            ("independent-after", "observed"),
+        ]
+        assert failed.tool_results[0].result["code"] == "query_unavailable"
+        assert failed.tool_results[2].result["code"] == "read_failed"
+        for item in (failed.tool_results[1], failed.tool_results[3]):
+            assert item.result["context"]["general"]["settings"]["locale"] == "ko"
+
+        control.gpu_available = True
+        recovered = await asyncio.wait_for(owner.send("Recheck GPU and enable the overlay."), 3)
+        assert recovered.status == "completed"
+        assert [(item.call_id, item.status) for item in recovered.tool_results] == [
+            ("recovered-gpu", "observed"),
+            ("allowed-overlay", "applied"),
+        ]
+        assert recovered.tool_results[0].result["result"]["state"] == "ready"
+        assert control.submissions == [
+            {"command": "overlay.set", "arguments": {"enabled": True}, "revision": None}
+        ]
+        outputs = [
+            (item["call_id"], json.loads(item["output"])["status"])
+            for item in owner.report_archive
+            if item.get("type") == "function_call_output"
+        ]
+        assert outputs == [
+            ("failed-gpu", "unavailable"),
+            ("independent-before", "observed"),
+            ("blocked-overlay", "not_executed"),
+            ("independent-after", "observed"),
+            ("recovered-gpu", "observed"),
+            ("allowed-overlay", "applied"),
+        ]
+        assert len(transport.requests) == 4
+    finally:
+        await asyncio.wait_for(owner.close(), 3)
+
+
+@pytest.mark.asyncio
 async def test_read_action_read_observes_order_and_proposal_stops_effects(catalog):
     class Ordered(ExecutionControl):
         async def submit(self, command, arguments, **kwargs):
@@ -77,8 +151,11 @@ async def test_read_action_read_observes_order_and_proposal_stops_effects(catalo
         ),
         batch(
             call(
-                "proposal", "propose_app", "settings",
-                changes={"overlay.background_alpha": 0.4}, summary="Adjust overlay transparency",
+                "proposal",
+                "propose_app",
+                "settings",
+                changes={"overlay.background_alpha": 0.4},
+                summary="Adjust overlay transparency",
             ),
             call("blocked", "execute_app", "overlay.set", enabled=False),
         ),
@@ -239,7 +316,8 @@ async def test_flat_approval_requests_ignore_other_actions_without_extra_effects
                 {
                     "command": action,
                     "arguments": {
-                        key: value for key, value in arguments.items()
+                        key: value
+                        for key, value in arguments.items()
                         if key != "changes" and action != "overlay.position.reset"
                     },
                     "revision": 11,

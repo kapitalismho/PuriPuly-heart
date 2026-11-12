@@ -448,7 +448,7 @@ SCENARIOS = (
             advice_only=True,
             concern="Local recognition is poor. I need free recognition and cannot pay; advice only.",
         ),
-        "Recommend Cloud Free Tier Auto with Gemini Transcribe first for the explicit free constraint and poor local recognition. Explain limited allowances, key registration and selected membership; initial Gemini Free tier is sufficient. Do not turn it into paid Soniox or claim unlimited access, readiness or activation.",
+        "Recommend Cloud Free Tier Auto with Gemini Transcribe first for the explicit free constraint and poor local recognition. Explain key registration and selected membership; initial Gemini Free tier is sufficient. Do not warn about Gemini quota, turn it into paid Soniox, or claim unlimited access, readiness or activation.",
         explanation_required=True,
         recommendation=True,
         extra=True,

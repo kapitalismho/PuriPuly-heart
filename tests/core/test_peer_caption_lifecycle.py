@@ -39,7 +39,7 @@ from tests.core.runtime.test_local_asr_provider_runtime import (
     _resolved_config,
     _wait_until,
 )
-from tests.core.test_peer_overlay_policy import Timeline
+from tests.core.test_peer_overlay_policy import Surface, Timeline, caption
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness, owned_peer_speech_end
 
@@ -72,6 +72,22 @@ class ControlledBackend(TranslationBackend):
 async def turn_loop():
     for _ in range(12):
         await asyncio.sleep(0)
+
+
+@pytest.fixture
+def preview_timeline(monkeypatch):
+    timeline = Timeline()
+    original_sleep = asyncio.sleep
+
+    async def sleep(delay):
+        task = asyncio.current_task()
+        if task is not None and task.get_name().startswith("PeerCaptionOwner:peer:timer:"):
+            await timeline.sleep(delay)
+        else:
+            await original_sleep(delay)
+
+    monkeypatch.setattr(asyncio, "sleep", sleep)
+    return timeline
 
 
 def setup(*, overlay_sink=None, clock=None, local_asr_provider_runtime_factory=None):
@@ -198,6 +214,300 @@ async def test_preview_first_refresh_growth_gate_and_final_settlement():
         assert harness.osc.messages == []
     finally:
         await harness.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("disabled", ["translation", "provider"])
+@pytest.mark.parametrize("show_preview", [False, True], ids=["before-preview", "shown-preview"])
+async def test_inactive_timer_waits_and_recovers_without_duplicate_previews(
+    disabled, show_preview, preview_timeline
+):
+    initial_tasks = asyncio.all_tasks()
+    harness, backend, events, clock = setup(clock=preview_timeline.clock)
+    item = transcript("The observed beginning", 1)
+    try:
+        await harness.start()
+        await partial(harness, item)
+        await turn_loop()
+        await preview_timeline.advance(4.99)
+        assert backend.calls == []
+        if show_preview:
+            await preview_timeline.advance(0.01)
+            await idle(harness)
+            assert [request.text for request in backend.calls] == [item.text]
+            item = replace(item, text="The observed beginning and later content")
+            await partial(harness, item)
+        calls_before = len(backend.calls)
+        events_before = len(events)
+        if disabled == "translation":
+            harness.replace_configuration(translation_enabled=False)
+        else:
+            await harness.replace_llm_provider(None)
+        await preview_timeline.advance(4 if show_preview else 0.01)
+        for _ in range(3):
+            waits = [
+                deadline - clock.now()
+                for deadline, future in preview_timeline.sleepers
+                if not future.done()
+            ]
+            assert waits == pytest.approx([4.0])
+            sleep_count = len(preview_timeline.sleepers)
+            await turn_loop()
+            assert len(preview_timeline.sleepers) == sleep_count
+            assert len(backend.calls) == calls_before
+            assert len(events) == events_before
+            await preview_timeline.advance(4)
+        if disabled == "translation":
+            harness.replace_configuration(translation_enabled=True)
+        else:
+            await harness.replace_llm_provider(backend)
+        await preview_timeline.advance(3.99)
+        assert len(backend.calls) == calls_before
+        await preview_timeline.advance(0.01)
+        await idle(harness)
+        assert len(backend.calls) == calls_before + 1
+        assert events[-1].type == "translation_stream_update"
+        assert events[-1].source_text == item.text
+        assert events[-1].utterance_id == item.utterance_id
+        assert any(
+            decision.publication_id == events[-1].event_id
+            and decision.metadata.get("publication_generation") == item.publication_generation
+            and decision.metadata.get("source_order") == item.source_order
+            for decision in harness.output_runtime.routing_decisions
+        )
+        assert events[-1].peer_caption_revision == calls_before + 1
+        await preview_timeline.advance(4)
+        await idle(harness)
+        assert len(backend.calls) == calls_before + 1
+        settled = replace(item, text="The authoritative final sentence.")
+        await final(harness, settled)
+        await idle(harness)
+        assert len(backend.calls) == calls_before + 2
+        assert events[-1].type == "translation_final"
+        assert events[-1].source_text == settled.text
+        assert events[-1].utterance_id == item.utterance_id
+        assert any(
+            decision.publication_id == events[-1].event_id
+            and decision.metadata.get("source_order") == item.source_order
+            for decision in harness.output_runtime.routing_decisions
+        )
+        await final(harness, settled)
+        await partial(harness, item)
+        await preview_timeline.advance(8)
+        await idle(harness)
+        assert len(backend.calls) == calls_before + 2
+        assert [event.type for event in events] == [
+            *(["translation_stream_update"] if show_preview else []),
+            "translation_stream_update",
+            "translation_final",
+        ]
+        assert harness.osc.messages == []
+    finally:
+        await asyncio.wait_for(harness.stop(), 1)
+        await turn_loop()
+        assert harness.peer_owner.cloud_captions._tasks == set()
+        assert all(future.done() for _, future in preview_timeline.sleepers)
+        assert not {task for task in asyncio.all_tasks() - initial_tasks if not task.done()}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("disabled", ["translation", "provider"])
+@pytest.mark.parametrize("queued_growth", [False, True], ids=["same-source", "latest-source"])
+async def test_preview_waiting_for_capacity_stays_inactive_and_recovers(
+    disabled, queued_growth, preview_timeline
+):
+    from puripuly_heart.core.orchestrator.peer_caption import PeerCaptionOwner
+
+    harness, backend, events, clock = setup(clock=preview_timeline.clock)
+    current = harness.peer_owner.cloud_captions
+    harness.peer_owner.cloud_captions = PeerCaptionOwner(
+        current.runtime, current.requests, current.output, clock, max_requests=1
+    )
+    item = transcript("Queued preview source", 2)
+    try:
+        await harness.start()
+        backend.block = True
+        await final(harness, transcript("Earlier final.", 1))
+        await turn_loop()
+        await partial(harness, item)
+        await turn_loop()
+        await preview_timeline.advance(5)
+        assert [request.text for request in backend.calls] == ["Earlier final."]
+        if queued_growth:
+            item = replace(item, text="Queued preview source with newer observed content")
+            await partial(harness, item)
+            await preview_timeline.advance(4)
+        if disabled == "translation":
+            harness.replace_configuration(translation_enabled=False)
+        else:
+            await harness.replace_llm_provider(None)
+        backend.block = False
+        backend.completions[0].set_result(None)
+        await idle(harness)
+        assert [request.text for request in backend.calls] == ["Earlier final."]
+        assert [event.source_text for event in events] == (
+            ["Earlier final."] if disabled == "translation" else []
+        )
+        await preview_timeline.advance(4)
+        assert len(backend.calls) == 1
+        if disabled == "translation":
+            harness.replace_configuration(translation_enabled=True)
+        else:
+            await harness.replace_llm_provider(backend)
+        await preview_timeline.advance(4)
+        await idle(harness)
+        assert [request.text for request in backend.calls] == ["Earlier final.", item.text]
+        assert events[-1].type == "translation_stream_update"
+        assert events[-1].source_text == item.text
+        assert events[-1].utterance_id == item.utterance_id
+        assert any(
+            decision.publication_id == events[-1].event_id
+            and decision.metadata.get("source_order") == item.source_order
+            for decision in harness.output_runtime.routing_decisions
+        )
+        assert events[-1].peer_caption_revision == 1
+        await preview_timeline.advance(4)
+        await idle(harness)
+        assert len(backend.calls) == 2
+        await final(harness, replace(item, text="Recovered final."))
+        await idle(harness)
+        assert [request.text for request in backend.calls] == [
+            "Earlier final.",
+            item.text,
+            "Recovered final.",
+        ]
+        assert events[-1].type == "translation_final"
+        assert events[-1].utterance_id == item.utterance_id
+        assert harness.osc.messages == []
+    finally:
+        await asyncio.wait_for(harness.stop(), 1)
+        await turn_loop()
+        assert harness.peer_owner.cloud_captions._tasks == set()
+        assert all(future.done() for _, future in preview_timeline.sleepers)
+
+
+@pytest.mark.asyncio
+async def test_provider_recovery_before_capacity_release_admits_current_preview(preview_timeline):
+    from puripuly_heart.core.orchestrator.peer_caption import PeerCaptionOwner
+
+    initial_tasks = asyncio.all_tasks()
+    harness, backend, events, clock = setup(clock=preview_timeline.clock)
+    current = harness.peer_owner.cloud_captions
+    owner = harness.peer_owner.cloud_captions = PeerCaptionOwner(
+        current.runtime, current.requests, current.output, clock, max_requests=1
+    )
+    item = transcript("Queued preview source", 2)
+    try:
+        await harness.start()
+        backend.block = True
+        await final(harness, transcript("Earlier final.", 1))
+        await turn_loop()
+        await partial(harness, item)
+        await turn_loop()
+        await preview_timeline.advance(5)
+        assert [request.text for request in backend.calls] == ["Earlier final."]
+        harness.peer_runtime.translation_history.append(
+            ContextEntry("Later context.", "en", "ko", clock.now(), "peer")
+        )
+        await harness.replace_llm_provider(None)
+        await preview_timeline.advance(4)
+        await harness.replace_llm_provider(backend)
+        await preview_timeline.advance(4)
+        assert [request.text for request in backend.calls] == ["Earlier final."]
+        backend.block = False
+        backend.completions[0].set_result(None)
+        await asyncio.wait_for(idle(harness), 1)
+        assert [request.text for request in backend.calls] == ["Earlier final.", item.text]
+        assert backend.calls[-1].context == '- [peer] "Earlier final."'
+        assert [(event.type, event.source_text) for event in events] == [
+            ("translation_stream_update", item.text)
+        ]
+        assert events[-1].utterance_id == item.utterance_id
+        assert events[-1].peer_caption_revision == 1
+        assert any(
+            decision.publication_id == events[-1].event_id
+            and decision.metadata.get("publication_generation") == item.publication_generation
+            and decision.metadata.get("source_order") == item.source_order
+            for decision in harness.output_runtime.routing_decisions
+        )
+        for _ in range(3):
+            await preview_timeline.advance(4)
+            await idle(harness)
+        assert len(backend.calls) == 2
+        assert owner.request_counts["preview"] == 1
+        settled = replace(item, text="Recovered final.")
+        await final(harness, settled)
+        await asyncio.wait_for(idle(harness), 1)
+        await final(harness, settled)
+        await partial(harness, item)
+        await preview_timeline.advance(4)
+        await idle(harness)
+        assert [request.text for request in backend.calls] == [
+            "Earlier final.",
+            item.text,
+            settled.text,
+        ]
+        assert [(event.type, event.source_text) for event in events] == [
+            ("translation_stream_update", item.text),
+            ("translation_final", settled.text),
+        ]
+        assert events[-1].utterance_id == item.utterance_id
+        assert events[-1].peer_caption_revision == 2
+        assert harness.osc.messages == []
+    finally:
+        await asyncio.wait_for(harness.stop(), 1)
+        await turn_loop()
+        assert owner._tasks == set()
+        assert all(future.done() for _, future in preview_timeline.sleepers)
+        assert not {task for task in asyncio.all_tasks() - initial_tasks if not task.done()}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("disabled", ["translation", "provider"])
+@pytest.mark.parametrize("closing", ["retire", "reset", "stop"])
+async def test_closing_inactive_caption_releases_timer_and_running_preview(
+    disabled, closing, preview_timeline
+):
+    initial_tasks = asyncio.all_tasks()
+    harness, backend, events, clock = setup(clock=preview_timeline.clock)
+    item = transcript("Unsettled observed source", 1)
+    owner = harness.peer_owner.cloud_captions
+    try:
+        await harness.start()
+        backend.block = True
+        await partial(harness, item)
+        await turn_loop()
+        await preview_timeline.advance(5)
+        await turn_loop()
+        assert len(backend.calls) == 1
+        if disabled == "translation":
+            harness.replace_configuration(translation_enabled=False)
+        else:
+            await harness.replace_llm_provider(None)
+        await preview_timeline.advance(4)
+        assert [
+            deadline - clock.now()
+            for deadline, future in preview_timeline.sleepers
+            if not future.done()
+        ] == pytest.approx([4])
+        if closing == "retire":
+            await owner.retire(item.utterance_id)
+            await idle(harness)
+        elif closing == "reset":
+            await owner.reset()
+        else:
+            await harness.stop()
+        await turn_loop()
+        assert owner._segments == {}
+        assert owner._tasks == set()
+        assert backend.completions[0].cancelled()
+        assert all(future.done() for _, future in preview_timeline.sleepers)
+        assert not any(event.type == "translation_stream_update" for event in events)
+        assert harness.osc.messages == []
+    finally:
+        await asyncio.wait_for(harness.stop(), 1)
+        await turn_loop()
+        assert not {task for task in asyncio.all_tasks() - initial_tasks if not task.done()}
 
 
 @pytest.mark.asyncio
@@ -515,7 +825,7 @@ async def test_continuation_caption_can_merge_and_continue_with_its_original_con
 
 
 @pytest.mark.asyncio
-async def test_independent_finals_finishing_reverse_preserve_source_order_and_repetition():
+async def test_independent_finals_finishing_reverse_keep_repetition_and_ordered_source_history():
     harness, backend, events, clock = setup()
     try:
         await harness.start()
@@ -527,10 +837,23 @@ async def test_independent_finals_finishing_reverse_preserve_source_order_and_re
         await turn_loop()
         backend.completions[1].set_result(None)
         await turn_loop()
-        assert events == []
+        assert [event.utterance_id for event in events] == [second.utterance_id]
         backend.completions[0].set_result(None)
         await idle(harness)
-        assert [event.utterance_id for event in events] == [first.utterance_id, second.utterance_id]
+        assert [event.utterance_id for event in events] == [second.utterance_id, first.utterance_id]
+        assert [call.utterance_id for call in backend.calls] == [
+            first.utterance_id,
+            second.utterance_id,
+        ]
+        ui_events = []
+        while not harness.ui_events.empty():
+            ui_events.append(harness.ui_events.get_nowait())
+        assert [
+            event.utterance_id for event in ui_events if event.type is UIEventType.TRANSLATION_DONE
+        ] == [
+            first.utterance_id,
+            second.utterance_id,
+        ]
         assert [entry.text for entry in harness.peer_runtime.translation_history] == [
             first.text,
             second.text,
@@ -833,9 +1156,9 @@ async def test_unsupported_final_fragment_settles_source_and_releases_sibling_an
     projection = harness.peer_owner.output_projection
     original = type(projection).project_peer_caption
 
-    async def record(owner, submission):
+    async def record(owner, submission, **kwargs):
         submissions.append(submission)
-        await original(owner, submission)
+        await original(owner, submission, **kwargs)
 
     monkeypatch.setattr(type(projection), "project_peer_caption", record)
     try:
@@ -1082,8 +1405,11 @@ async def test_rolling_member_switch_keeps_turn_partial_and_final_on_one_publica
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("disabled", ["translation", "provider"])
-async def test_final_after_translation_stops_closes_its_open_caption(disabled, monkeypatch):
-    harness, backend, events, clock = setup()
+@pytest.mark.parametrize("show_preview", [False, True], ids=["before-preview", "shown-preview"])
+async def test_final_after_translation_stops_closes_its_open_caption(
+    disabled, show_preview, monkeypatch, preview_timeline
+):
+    harness, backend, events, clock = setup(clock=preview_timeline.clock)
     stream = RecognitionStreamIdentity(
         "peer", 1, 0, "rolling-epoch", ("rolling_free",), "gemini_transcribe"
     )
@@ -1106,11 +1432,18 @@ async def test_final_after_translation_stops_closes_its_open_caption(disabled, m
                     observed_at=clock.now(),
                 )
             )
+            await turn_loop()
+            if show_preview:
+                await preview_timeline.advance(5)
+                await idle(harness)
+                assert events[-1].type == "translation_stream_update"
+            timer = harness.peer_owner.cloud_captions._segments[unit_id].timer
             if disabled == "translation":
                 harness.replace_configuration(translation_enabled=False)
             else:
                 available[0] = False
             calls_before = len(backend.calls)
+            await preview_timeline.advance(6)
             await callbacks.peer_event_handler(
                 STTRecognitionUnitTerminal(
                     STTRecognitionUnit(
@@ -1119,10 +1452,10 @@ async def test_final_after_translation_stops_closes_its_open_caption(disabled, m
                     "final",
                 )
             )
-            clock.advance(6)
-            await harness.peer_owner.cloud_captions.check_previews()
+            await preview_timeline.advance(6)
             await asyncio.wait_for(idle(harness), 1)
             assert harness.peer_owner.cloud_captions._segments == {}
+            assert timer.done()
             assert not any(
                 request.text.startswith("partial") for request in backend.calls[calls_before:]
             )
@@ -1147,9 +1480,9 @@ async def test_failed_or_timed_out_version_clears_preview_and_preserves_authorit
     projection = harness.peer_owner.output_projection
     original = type(projection).project_peer_caption
 
-    async def record(owner, submission):
+    async def record(owner, submission, **kwargs):
         submissions.append(submission)
-        await original(owner, submission)
+        await original(owner, submission, **kwargs)
 
     monkeypatch.setattr(type(projection), "project_peer_caption", record)
     try:
@@ -1454,6 +1787,7 @@ async def test_join_uses_supported_effective_calibration_scale_without_estimator
             "We will continue with this information and share the next details with everyone who",
             1,
         )
+        backend.translations[first.text] = "short prior translation"
         await final(harness, first)
         await idle(harness)
         clock.advance(0.3)
@@ -1480,7 +1814,7 @@ async def test_ready_repair_cancels_absorbed_preview_at_real_protected_upper_gat
     upper = transcript("Upper ended.", 1)
     lower = transcript("The preceding,", 2)
     incoming = transcript("second", 3)
-    backend.translations[upper.text] = "가" * 56 + "나" * 56 + "다" * 56 + "라" * 40
+    backend.translations[upper.text] = "가" * 40
     try:
         await harness.start()
         await final(harness, upper)
@@ -1490,7 +1824,9 @@ async def test_ready_repair_cancels_absorbed_preview_at_real_protected_upper_gat
         await idle(harness)
         await timeline.advance(0.1)
         await partial(harness, incoming)
-        await timeline.advance(5)
+        await timeline.advance(4.9)
+        await presenter.emit(caption(100, upper.utterance_id, "나" * 40, revision=2))
+        await timeline.advance(0.1)
         await harness.peer_owner.cloud_captions.check_previews()
         await harness.peer_owner.cloud_captions.wait_for_idle()
         async with asyncio.timeout(1):
@@ -1511,8 +1847,15 @@ async def test_ready_repair_cancels_absorbed_preview_at_real_protected_upper_gat
             "translated:The preceding, second"
         )
         assert any(
-            decision.reason == "peer_caption_superseded"
+            decision.reason == "application_registered"
+            and decision.metadata.get("utterance_id") == str(incoming.utterance_id)
+            and decision.metadata["scene_revision"] is None
             for decision in harness.output_runtime.routing_decisions
+        )
+        assert presenter.peer_fragment_state(incoming.utterance_id, 0) is None
+        assert (
+            presenter._acceptance.terminal_reason(("peer", incoming.utterance_id))
+            == "absorbed_by_repair"
         )
         await timeline.advance(1.1)
         assert all(
@@ -1538,9 +1881,9 @@ async def test_failed_chained_repair_forwards_every_absorbed_identity(failure, m
     projection = harness.peer_owner.output_projection
     original = type(projection).project_peer_caption
 
-    async def record(owner, submission):
+    async def record(owner, submission, **kwargs):
         submissions.append(submission)
-        await original(owner, submission)
+        await original(owner, submission, **kwargs)
 
     monkeypatch.setattr(type(projection), "project_peer_caption", record)
     first, second, third = transcript("A,", 1), transcript("second", 2), transcript("third", 3)
@@ -1591,7 +1934,7 @@ async def test_final_settlement_keeps_waiting_preview_original_one_second_budget
     upper = transcript("Upper ended.", 1)
     lower = transcript("A closed sentence.", 2)
     incoming = transcript("Independent final.", 3)
-    backend.translations[upper.text] = "가" * 56 + "나" * 56 + "다" * 56 + "라" * 40
+    backend.translations[upper.text] = "가" * 40
     try:
         await harness.start()
         await final(harness, upper)
@@ -1599,7 +1942,9 @@ async def test_final_settlement_keeps_waiting_preview_original_one_second_budget
         await final(harness, lower)
         await idle(harness)
         await partial(harness, incoming)
-        await timeline.advance(5)
+        await timeline.advance(4.9)
+        await presenter.emit(caption(100, upper.utterance_id, "나" * 40, revision=2))
+        await timeline.advance(0.1)
         await harness.peer_owner.cloud_captions.check_previews()
         await harness.peer_owner.cloud_captions.wait_for_idle()
         async with asyncio.timeout(1):
@@ -1609,13 +1954,19 @@ async def test_final_settlement_keeps_waiting_preview_original_one_second_budget
             ):
                 await asyncio.sleep(0)
         original_admission_at = clock.now()
+        registration = presenter.peer_fragment_state(incoming.utterance_id, 0)
         await timeline.advance(0.6)
         await final(harness, incoming)
         await harness.peer_owner.cloud_captions.wait_for_idle()
         await turn_loop()
         assert (
-            harness.output_runtime._peer_caption_admission_started_at[incoming.utterance_id]
+            presenter.peer_fragment_state(incoming.utterance_id, 0).registered_at
             == original_admission_at
+            == registration.registered_at
+        )
+        assert (
+            presenter.peer_fragment_state(incoming.utterance_id, 0).registration_order
+            == registration.registration_order
         )
         assert all(
             block.id != f"peer:{incoming.utterance_id}" for block in presenter.snapshot().blocks
@@ -1651,9 +2002,9 @@ async def test_zero_fragment_final_retires_segment_and_preserves_successor(
     projection = harness.peer_owner.output_projection
     original = type(projection).project_peer_caption
 
-    async def record(owner, submission):
+    async def record(owner, submission, **kwargs):
         submissions.append(submission)
-        await original(owner, submission)
+        await original(owner, submission, **kwargs)
 
     monkeypatch.setattr(type(projection), "project_peer_caption", record)
     retired_ids = []
@@ -1823,4 +2174,531 @@ async def test_join_estimate_uses_preceding_detected_language_or_configured_fall
         ]
     finally:
         await asyncio.wait_for(harness.stop(), 1)
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_local_revision_zero_owner_output_presenter_keeps_history_and_upper_idle_ttl(
+    monkeypatch,
+):
+    from puripuly_heart.core.overlay.sink import TranslationFinal, UtteranceClosed
+    from puripuly_heart.domain.events import STTPartialEvent
+
+    timeline, surface = Timeline(), Surface()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=timeline.clock,
+        sleep=timeline.sleep,
+        bridge=surface,
+        native_retry_enabled=True,
+    )
+    harness, backend, _, clock = setup(overlay_sink=presenter, clock=timeline.clock)
+    monkeypatch.setattr(
+        type(harness.peer_owner), "_current_provider_id", lambda _: "local_cpu_auto"
+    )
+    observed = []
+    original_emit = OverlayPresenter.emit
+
+    async def observe(owner, event):
+        observed.append(event)
+        return await original_emit(owner, event)
+
+    monkeypatch.setattr(OverlayPresenter, "emit", observe)
+    first = transcript("An incomplete local clause,", 1)
+    second = transcript("continues as a separate local final.", 2)
+    backend.translations.update({first.text: "short A", second.text: "short B"})
+    try:
+        await harness.start()
+        await harness.peer_owner.handle_stt_event(STTPartialEvent(first.utterance_id, first))
+        await timeline.advance(10)
+        await harness.peer_owner.cloud_captions.check_previews()
+        assert backend.calls == []
+        assert not presenter.snapshot().blocks
+        origin = clock.now()
+        await harness.peer_owner.handle_stt_event(
+            STTFinalEvent(first.utterance_id, replace(first, is_final=True))
+        )
+        await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
+        first_child = backend.calls[0].utterance_id
+        assert first_child != first.utterance_id
+        assert surface.expirations[f"peer:{first_child}"] - origin == 8
+        await timeline.advance(1.5)
+        await harness.peer_owner.handle_stt_event(
+            STTFinalEvent(second.utterance_id, replace(second, is_final=True))
+        )
+        await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
+        second_child = backend.calls[1].utterance_id
+        assert second_child != second.utterance_id
+        assert [block.id for block in presenter.snapshot().blocks] == [
+            f"peer:{first_child}",
+            f"peer:{second_child}",
+        ]
+        assert [block.primary_text for block in presenter.snapshot().blocks] == [
+            "short A",
+            "short B",
+        ]
+        assert surface.expirations[f"peer:{first_child}"] - origin == 8
+        assert surface.expirations[f"peer:{second_child}"] - origin == 9.5
+        for parent, child in ((first, first_child), (second, second_child)):
+            publications = [event for event in observed if event.utterance_id == child]
+            assert [type(event) for event in publications] == [TranslationFinal, UtteranceClosed]
+            assert publications[0].peer_caption_revision == 0
+            assert publications[0].parent_utterance_id == parent.utterance_id
+            assert publications[1].is_final is True
+            assert presenter._entries[("peer", child)].closed_seq is not None
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+            first.text,
+            second.text,
+        ]
+        assert harness.peer_owner.cloud_captions.request_counts == dict.fromkeys(
+            ("preview", "final", "repair", "continuation"), 0
+        )
+        await timeline.advance(2.1)
+        assert [block.primary_text for block in presenter.snapshot().blocks] == [
+            "short A",
+            "short B",
+        ]
+        await timeline.advance(4.4)
+        assert [block.primary_text for block in presenter.snapshot().blocks] == ["short B"]
+        await timeline.advance(1.5)
+        assert not presenter.snapshot().blocks
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("self_contention", [False, True])
+async def test_local_revision_zero_overflow_enters_fragments_without_extra_requests_or_history(
+    monkeypatch, self_contention
+):
+    from puripuly_heart.core.overlay.peer_caption_layout import peer_translation_fragments
+    from tests.core.test_peer_caption_fragments import own_speech
+
+    timeline, surface = Timeline(), Surface()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=timeline.clock,
+        sleep=timeline.sleep,
+        bridge=surface,
+        native_retry_enabled=True,
+    )
+    harness, backend, _, _ = setup(overlay_sink=presenter, clock=timeline.clock)
+    monkeypatch.setattr(
+        type(harness.peer_owner), "_current_provider_id", lambda _: "local_cpu_auto"
+    )
+    source = transcript("A local final with an overflowing translation.", 1)
+    text = "가" * 56 + "나" * 20
+    backend.translations[source.text] = text
+    try:
+        await harness.start()
+        if self_contention:
+            await presenter.emit(own_speech())
+        await harness.peer_owner.handle_stt_event(
+            STTFinalEvent(source.utterance_id, replace(source, is_final=True))
+        )
+        await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
+        await timeline.advance(0)
+        child = backend.calls[0].utterance_id
+        assert child != source.utterance_id
+        blocks = [block for block in presenter.snapshot().blocks if block.channel == "peer"]
+        if self_contention:
+            assert [block.id for block in blocks] == [f"peer:{child}"]
+            first = presenter.peer_fragment_state(child, 0)
+            tail = presenter.peer_fragment_state(child, 1)
+            assert first.visible_since == 0
+            assert tail.pending and tail.visible_since is None
+            await timeline.advance(0.9)
+            assert [
+                block.id for block in presenter.snapshot().blocks if block.channel == "peer"
+            ] == [f"peer:{child}"]
+            await timeline.advance(0.1)
+            blocks = [block for block in presenter.snapshot().blocks if block.channel == "peer"]
+            first = presenter.peer_fragment_state(child, 0)
+            tail = presenter.peer_fragment_state(child, 1)
+            assert first.departed and first.visible_since == 0
+            assert not tail.pending and tail.visible_since == 1
+            assert surface.expirations[tail.id] == 9
+            assert [block.primary_text for block in blocks] == [peer_translation_fragments(text)[1]]
+        else:
+            assert [block.primary_text for block in blocks] == list(
+                peer_translation_fragments(text)
+            )
+            assert len(blocks) == 2
+        assert all(
+            entry.peer_caption_revision == 0
+            for entry in presenter._entries.values()
+            if entry.channel == "peer"
+        )
+        assert presenter.snapshot().native_fresh_render_targets.peer in {
+            block.id for block in blocks
+        }
+        episode = presenter.snapshot().native_quiet_tail_episodes.peer
+        assert episode.phase == "final" and episode.generation == 2
+        await timeline.advance(3)
+        assert [block for block in presenter.snapshot().blocks if block.channel == "peer"] == blocks
+        assert presenter.snapshot().native_quiet_tail_episodes.peer == episode
+        assert len(backend.calls) == 1
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [source.text]
+        assert harness.peer_owner.cloud_captions.request_counts == dict.fromkeys(
+            ("preview", "final", "repair", "continuation"), 0
+        )
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("later_first_delay", [0.2, 8.1])
+async def test_local_finals_enter_shared_display_in_translation_ready_order(
+    monkeypatch, later_first_delay
+):
+    timeline = Timeline()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=timeline.clock, sleep=timeline.sleep
+    )
+    harness, backend, _, _ = setup(overlay_sink=presenter, clock=timeline.clock)
+    monkeypatch.setattr(
+        type(harness.peer_owner), "_current_provider_id", lambda _: "local_cpu_auto"
+    )
+    first, second = transcript("First local final.", 1), transcript("Second local final.", 2)
+    backend.block = True
+    try:
+        await harness.start()
+        for source in (first, second):
+            await harness.peer_owner.handle_stt_event(
+                STTFinalEvent(source.utterance_id, replace(source, is_final=True))
+            )
+        async with asyncio.timeout(1):
+            while len(backend.completions) < 2:
+                await asyncio.sleep(0)
+        backend.completions[1].set_result(None)
+        async with asyncio.timeout(1):
+            while not presenter.snapshot().blocks:
+                await asyncio.sleep(0)
+        ready_child = backend.calls[1].utterance_id
+        assert presenter.snapshot().blocks[0].id == f"peer:{ready_child}"
+        await timeline.advance(later_first_delay)
+        backend.completions[0].set_result(None)
+        await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
+        await timeline.advance(0)
+        expected = [f"peer:{backend.calls[0].utterance_id}"]
+        if later_first_delay < 8:
+            expected.insert(0, f"peer:{ready_child}")
+        assert [block.id for block in presenter.snapshot().blocks] == expected
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+            first.text,
+            second.text,
+        ]
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_l3_preview_to_ordinary_overflow_is_one_caption_and_one_history_entry():
+    from puripuly_heart.core.overlay.peer_caption_layout import peer_translation_fragments
+
+    timeline = Timeline()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=timeline.clock,
+        sleep=timeline.sleep,
+        native_retry_enabled=True,
+    )
+    harness, backend, _, _ = setup(overlay_sink=presenter, clock=timeline.clock)
+    preview = transcript("A preview source", 1)
+    settled = replace(preview, text="A preview source becomes a complete final.")
+    text = "가" * 56 + "나" * 20
+    backend.translations.update({preview.text: "short preview", settled.text: text})
+    try:
+        await harness.start()
+        await partial(harness, preview)
+        await timeline.advance(5)
+        await harness.peer_owner.cloud_captions.check_previews()
+        await idle(harness)
+        assert [block.primary_text for block in presenter.snapshot().blocks] == ["short preview"]
+        await timeline.advance(0.2)
+        await final(harness, settled)
+        await idle(harness)
+        await timeline.advance(0)
+        assert [block.primary_text for block in presenter.snapshot().blocks] == list(
+            peer_translation_fragments(text)
+        )
+        assert all(entry.peer_caption_revision == 2 for entry in presenter._entries.values())
+        assert len(backend.calls) == 2
+        assert backend.calls[0].utterance_id == backend.calls[1].utterance_id
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [settled.text]
+        assert harness.peer_owner.cloud_captions.request_counts == {
+            "preview": 1,
+            "final": 1,
+            "repair": 0,
+            "continuation": 0,
+        }
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("predecessor_ending", ["failed", "cancelled"])
+async def test_early_local_overlay_is_not_republished_after_predecessor_recovery(
+    monkeypatch, predecessor_ending
+):
+    timeline, surface = Timeline(), Surface()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=timeline.clock,
+        sleep=timeline.sleep,
+        bridge=surface,
+        native_retry_enabled=True,
+    )
+    harness, backend, _, _ = setup(overlay_sink=presenter, clock=timeline.clock)
+    monkeypatch.setattr(
+        type(harness.peer_owner), "_current_provider_id", lambda _: "local_cpu_auto"
+    )
+    first, second = transcript("A pending predecessor.", 1), transcript("A ready successor.", 2)
+    backend.block = True
+    if predecessor_ending == "failed":
+        backend.failures.add(first.text)
+    try:
+        await harness.start()
+        for source in (first, second):
+            await harness.peer_owner.handle_stt_event(
+                STTFinalEvent(source.utterance_id, replace(source, is_final=True))
+            )
+        async with asyncio.timeout(1):
+            while len(backend.completions) != 2:
+                await asyncio.sleep(0)
+        backend.completions[1].set_result(None)
+        async with asyncio.timeout(1):
+            while not presenter.snapshot().blocks:
+                await asyncio.sleep(0)
+        child = backend.calls[1].utterance_id
+        deadline = surface.expirations[f"peer:{child}"]
+        episode = presenter.snapshot().native_quiet_tail_episodes.peer
+        await timeline.advance(0.2)
+        if predecessor_ending == "failed":
+            backend.completions[0].set_result(None)
+        else:
+            harness.peer_runtime.translation_tasks[backend.calls[0].utterance_id].cancel()
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), 1)
+        await asyncio.wait_for(harness.output_runtime.wait_for_peer_output_idle(), 1)
+        events = []
+        while not harness.ui_events.empty():
+            events.append(harness.ui_events.get_nowait())
+        assert (
+            sum(
+                event.type is UIEventType.TRANSLATION_DONE and event.utterance_id == child
+                for event in events
+            )
+            == 1
+        )
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+            first.text,
+            second.text,
+        ]
+        assert surface.expirations[f"peer:{child}"] == deadline == 8
+        assert presenter.snapshot().native_quiet_tail_episodes.peer == episode
+        assert harness.peer_owner.output_projection._early_peer_overlays == set()
+        assert len(backend.calls) == 2
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_g4_owner_full_revisions_keep_one_logical_history_contribution():
+    from tests.core.test_peer_caption_fragments import own_speech
+
+    timeline = Timeline()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=timeline.clock, sleep=timeline.sleep
+    )
+    harness, backend, _, _ = setup(overlay_sink=presenter, clock=timeline.clock)
+    first = transcript("Initial", 1)
+    settled = replace(first, text="Initial source,")
+    repair = transcript("ends.", 2)
+    unrelated = uuid4()
+    backend.translations.update(
+        {
+            first.text: "가" * 64,
+            settled.text: "나" * 128,
+            "Initial source, ends.": "다" * 24,
+        }
+    )
+    try:
+        await harness.start()
+        await presenter.emit(own_speech())
+        await partial(harness, first)
+        await timeline.advance(5)
+        await harness.peer_owner.cloud_captions.check_previews()
+        await idle(harness)
+        unit = backend.calls[0].utterance_id
+        tail = presenter.peer_fragment_state(unit, 1)
+        registration = tail.registered_at, tail.registration_order
+        await timeline.advance(0.1)
+        await presenter.emit(caption(101, unrelated, "B"))
+        await timeline.advance(0.1)
+        await final(harness, settled)
+        await harness.peer_owner.cloud_captions.wait_for_idle()
+        await timeline.advance(0)
+        pending = sorted(
+            (entry for entry in presenter.peer_fragment_states() if entry.pending),
+            key=lambda entry: entry.registration_order,
+        )
+        assert [(entry.logical_id, entry.index) for entry in pending] == [
+            (unit, 1),
+            (unrelated, 0),
+            (unit, 2),
+        ]
+        assert (pending[0].registered_at, pending[0].registration_order) == registration
+        assert all(entry.revision == 2 for entry in presenter.peer_fragment_states(unit))
+        await timeline.advance(0.1)
+        await partial(harness, repair)
+        await final(harness, repair)
+        await harness.peer_owner.cloud_captions.wait_for_idle()
+        await timeline.advance(0)
+        assert [entry.index for entry in presenter.peer_fragment_states(unit)] == [0]
+        assert presenter._entries[("peer", unit)].peer_caption_revision == 3
+        assert presenter._entries[("peer", unrelated)].peer_pending
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+            "Initial source, ends."
+        ]
+        assert len(backend.calls) == 3
+        assert len({request.utterance_id for request in backend.calls}) == 1
+        assert harness.peer_owner.cloud_captions.request_counts == {
+            "preview": 1,
+            "final": 1,
+            "repair": 1,
+            "continuation": 0,
+        }
+        await timeline.advance(
+            presenter._entries[("peer", unrelated)].peer_registered_at + 1 - timeline.clock.now()
+        )
+        await harness.output_runtime.wait_for_peer_output_idle()
+        assert ("peer", unit) not in presenter._entries
+        assert any(block.id == f"peer:{unrelated}" for block in presenter.snapshot().blocks)
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("later_first_delay", [0.2, 8.1])
+async def test_cloud_first_finals_display_by_readiness_not_ordered_history(later_first_delay):
+    timeline, surface = Timeline(), Surface()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=timeline.clock,
+        sleep=timeline.sleep,
+        bridge=surface,
+        native_retry_enabled=True,
+    )
+    harness, backend, _, _ = setup(overlay_sink=presenter, clock=timeline.clock)
+    first, second = transcript("Earlier cloud final.", 1), transcript("Later cloud final.", 2)
+    backend.translations.update({first.text: "short A", second.text: "short B"})
+    backend.block = True
+    try:
+        await harness.start()
+        await final(harness, first)
+        await final(harness, second)
+        async with asyncio.timeout(1):
+            while len(backend.completions) != 2:
+                await asyncio.sleep(0)
+        backend.completions[1].set_result(None)
+        async with asyncio.timeout(1):
+            while not presenter.snapshot().blocks:
+                await asyncio.sleep(0)
+        assert [block.primary_text for block in presenter.snapshot().blocks] == ["short B"]
+        b_order = presenter.snapshot().blocks[0].publication_order
+        assert b_order == 1
+        assert surface.expirations[f"peer:{second.utterance_id}"] == 8
+        assert harness.ui_events.empty()
+        await timeline.advance(later_first_delay)
+        if later_first_delay > 8:
+            assert not presenter.snapshot().blocks
+        backend.completions[0].set_result(None)
+        await asyncio.wait_for(idle(harness), 1)
+        blocks = presenter.snapshot().blocks
+        assert [block.primary_text for block in blocks] == (
+            ["short B", "short A"] if later_first_delay < 8 else ["short A"]
+        )
+        assert blocks[-1].publication_order == 2
+        assert presenter.snapshot().native_fresh_render_generations.peer == 2
+        assert presenter.snapshot().native_fresh_render_targets.peer == f"peer:{first.utterance_id}"
+        assert surface.expirations[f"peer:{first.utterance_id}"] == later_first_delay + 8
+        assert [call.utterance_id for call in backend.calls] == [
+            first.utterance_id,
+            second.utterance_id,
+        ]
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+            first.text,
+            second.text,
+        ]
+        events = []
+        while not harness.ui_events.empty():
+            events.append(harness.ui_events.get_nowait())
+        assert [
+            event.utterance_id for event in events if event.type is UIEventType.TRANSLATION_DONE
+        ] == [
+            first.utterance_id,
+            second.utterance_id,
+        ]
+        assert harness.peer_owner.cloud_captions.request_counts == {
+            "preview": 0,
+            "final": 2,
+            "repair": 0,
+            "continuation": 0,
+        }
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_expired_cloud_caption_cannot_get_fresh_display_order_after_terminal_cache_rollover():
+    from puripuly_heart.core.overlay.presenter_acceptance import CLOSED_TOMBSTONE_LIMIT
+    from tests.core.runtime.test_output_runtime import _publish_peer_overlay
+
+    timeline = Timeline()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=timeline.clock, sleep=timeline.sleep
+    )
+    harness, backend, _, _ = setup(overlay_sink=presenter, clock=timeline.clock)
+    original = transcript("An expired cloud caption.", 1)
+    backend.translations[original.text] = "expired"
+    try:
+        await harness.start()
+        await final(harness, original)
+        await idle(harness)
+        await timeline.advance(8.1)
+        for index in range(CLOSED_TOMBSTONE_LIMIT + 3):
+            await _publish_peer_overlay(
+                harness.output_runtime,
+                caption(index + 10, uuid4(), f"bounded {index}"),
+                source_order=index + 2,
+            )
+            await timeline.advance(0)
+            await timeline.advance(1)
+            await asyncio.wait_for(harness.output_runtime.wait_for_peer_output_idle(), 1)
+        key = ("peer", original.utterance_id)
+        assert key not in presenter._acceptance.scene_terminal_keys
+        assert key not in presenter._acceptance.terminal_registry
+        before = presenter.snapshot()
+        await _publish_peer_overlay(
+            harness.output_runtime,
+            caption(9999, original.utterance_id, "expired", source=original.text),
+            source_order=1,
+        )
+        await harness.output_runtime.wait_for_peer_output_idle()
+        assert presenter.snapshot() == before
+        assert harness.output_runtime.routing_decisions[-1].reason == "stale"
+        assert len(backend.calls) == 1
+    finally:
+        await harness.stop()
         await presenter.close()

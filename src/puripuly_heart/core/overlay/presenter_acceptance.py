@@ -5,6 +5,7 @@ from dataclasses import dataclass, field, replace
 from typing import Mapping
 from uuid import UUID
 
+from .protocol import U64_MAX
 from .sink import (
     OverlayApplicationReceipt,
     OverlayEventUnion,
@@ -17,7 +18,12 @@ from .sink import (
     TranslationStreamUpdate,
     UtteranceClosed,
 )
-from .state import OverlayLogicalTurnEntry
+from .state import (
+    PEER_FRAGMENT_DEPARTURE_BYTES,
+    PEER_FRAGMENT_REGISTRATION_BYTES,
+    OverlayLogicalTurnEntry,
+    PeerFragmentPlan,
+)
 
 CLOSED_TOMBSTONE_LIMIT = 64
 PRESENTER_ENTRY_LIMIT = 64
@@ -41,6 +47,7 @@ class PresenterAcceptanceLedger:
     entry_ordering: dict[EntryKey, tuple[str, int, int, int]] = field(default_factory=dict)
     sequence_namespaces: dict[EntryKey, tuple[int, int]] = field(default_factory=dict)
     retired_turn_frontiers: dict[tuple[str, int], tuple[int, int]] = field(default_factory=dict)
+    peer_retired_highwaters: dict[tuple[str, int], tuple[int, int]] = field(default_factory=dict)
 
     def reset(self) -> None:
         self.terminal_registry.clear()
@@ -50,6 +57,7 @@ class PresenterAcceptanceLedger:
         self.entry_ordering.clear()
         self.sequence_namespaces.clear()
         self.retired_turn_frontiers.clear()
+        self.peer_retired_highwaters.clear()
 
     def receipt(self, publication_id: str) -> OverlayApplicationReceipt | None:
         return self.receipts_by_id.get(publication_id)
@@ -97,6 +105,7 @@ class PresenterAcceptanceLedger:
         entries: Mapping[EntryKey, OverlayLogicalTurnEntry],
         *,
         closed: bool,
+        peer_fragments: PeerFragmentPlan | None = None,
     ) -> str | None:
         if closed:
             return "closed"
@@ -155,7 +164,7 @@ class PresenterAcceptanceLedger:
         current_payload_bytes = sum(
             self.entry_payload_bytes(candidate) for candidate in entries.values()
         )
-        projected = self.projected_entry_payload_bytes(entry, event)
+        projected = self.projected_entry_payload_bytes(entry, event, peer_fragments=peer_fragments)
         previous = self.entry_payload_bytes(entry) if entry is not None else 0
         if current_payload_bytes - previous + projected > PRESENTER_AGGREGATE_BYTE_LIMIT:
             return "presenter_payload_exhausted"
@@ -189,9 +198,19 @@ class PresenterAcceptanceLedger:
             return
         scope, generation, order, index = ordering
         frontier_key = (scope, generation)
-        self.retired_turn_frontiers[frontier_key] = max(
-            (order, index), self.retired_turn_frontiers.get(frontier_key, (-1, -1))
-        )
+        retired = max((order, index), self.retired_turn_frontiers.get(frontier_key, (-1, -1)))
+        if scope == "peer":
+            retired = max(retired, self.peer_retired_highwaters.get(frontier_key, (-1, -1)))
+            self.peer_retired_highwaters[frontier_key] = retired
+            for live_scope, live_generation, live_order, live_index in self.entry_ordering.values():
+                if (live_scope, live_generation) != frontier_key:
+                    continue
+                before_live = (
+                    (live_order, live_index - 1) if live_index > 0 else (live_order - 1, U64_MAX)
+                )
+                retired = min(retired, before_live)
+        if retired[0] >= 0:
+            self.retired_turn_frontiers[frontier_key] = retired
 
     def terminal_reason(self, key: EntryKey) -> str | None:
         reason = self.scene_terminal_keys.get(key)
@@ -234,8 +253,8 @@ class PresenterAcceptanceLedger:
             getattr(event, "peer_superseded_unit_ids", None),
         )
 
-    @staticmethod
-    def entry_payload_bytes(entry: OverlayLogicalTurnEntry | None) -> int:
+    @classmethod
+    def entry_payload_bytes(cls, entry: OverlayLogicalTurnEntry | None) -> int:
         if entry is None:
             return 0
         total = 256
@@ -261,8 +280,20 @@ class PresenterAcceptanceLedger:
             value = getattr(entry, field_name)
             if isinstance(value, str):
                 total += len(value.encode("utf-8"))
-        total += sum(len(page.encode("utf-8")) for page in entry.peer_pages)
-        return total
+        return total + cls.peer_fragment_payload_bytes(entry)
+
+    @staticmethod
+    def peer_fragment_payload_bytes(entry: OverlayLogicalTurnEntry) -> int:
+        return (
+            sum(len(fragment.encode("utf-8")) for fragment in entry.peer_fragments)
+            + entry.peer_registration_count * PEER_FRAGMENT_REGISTRATION_BYTES
+            + (
+                len(entry.peer_departed_indices)
+                + len(entry.peer_source_departed_indices)
+                + len(entry.peer_translation_departed_indices)
+            )
+            * PEER_FRAGMENT_DEPARTURE_BYTES
+        )
 
     @staticmethod
     def event_payload_bytes(event: OverlayEventUnion) -> int:
@@ -287,10 +318,29 @@ class PresenterAcceptanceLedger:
         return total
 
     @classmethod
+    def peer_repartition_rejection_reason(
+        cls,
+        entry: OverlayLogicalTurnEntry,
+        fragments: PeerFragmentPlan,
+        *,
+        retained_payload_bytes: int,
+    ) -> str | None:
+        projected = (
+            retained_payload_bytes
+            - cls.peer_fragment_payload_bytes(entry)
+            + fragments.retained_bytes
+        )
+        if projected > PRESENTER_AGGREGATE_BYTE_LIMIT:
+            return "presenter_payload_exhausted"
+        return None
+
+    @classmethod
     def projected_entry_payload_bytes(
         cls,
         entry: OverlayLogicalTurnEntry | None,
         event: OverlayEventUnion,
+        *,
+        peer_fragments: PeerFragmentPlan | None = None,
     ) -> int:
         if (
             event.channel == "peer"
@@ -300,26 +350,17 @@ class PresenterAcceptanceLedger:
             and not event.source_text.strip()
         ):
             return 0
-        if event.channel == "peer" and isinstance(
-            event, (TranslationStreamUpdate, TranslationFinal)
-        ):
-            page_text = (
-                event.source_text
-                if isinstance(event, TranslationFinal)
-                and event.peer_caption_revision > 0
-                and not event.text.strip()
-                else event.text
-            )
-        else:
-            page_text = ""
-        page_bytes = len(page_text.encode("utf-8")) + len(page_text)
+        partition_bytes = 0
+        if peer_fragments is not None:
+            partition_bytes = peer_fragments.retained_bytes
         if entry is None:
-            return cls.event_payload_bytes(event) + page_bytes
-        current = cls.entry_payload_bytes(entry) + page_bytes
-        if event.channel == "peer" and isinstance(
-            event, (TranslationStreamUpdate, TranslationFinal)
-        ):
-            current -= sum(len(page.encode("utf-8")) for page in entry.peer_pages)
+            identity_bytes = (
+                len(f"peer:{event.utterance_id}".encode("utf-8")) if event.channel == "peer" else 0
+            )
+            return cls.event_payload_bytes(event) + partition_bytes + identity_bytes
+        current = cls.entry_payload_bytes(entry)
+        if peer_fragments is not None:
+            current += partition_bytes - cls.peer_fragment_payload_bytes(entry)
         replacements: tuple[tuple[str, str | None], ...] = ()
         if isinstance(event, (SelfTranscriptFinal, PeerTranscriptFinal)):
             replacements = (

@@ -137,7 +137,7 @@ async def test_mixed_self_peer_admission_and_late_translation_preserve_shared_wi
         initial = presenter.snapshot().blocks[0]
         clock.advance(0.1)
         for peer in peers:
-            await presenter.emit_peer_when_admissible(
+            await presenter.register_peer_caption(
                 adapter.transcript_final(
                     Transcript(
                         utterance_id=peer,
@@ -148,9 +148,10 @@ async def test_mixed_self_peer_admission_and_late_translation_preserve_shared_wi
                     ),
                     source_language="en",
                     target_language="ko",
-                )
+                ),
+                publication_generation=1,
             )
-            receipt = await presenter.emit_peer_when_admissible(
+            receipt = await presenter.register_peer_caption(
                 adapter.translation_final(
                     utterance_id=peer,
                     channel="peer",
@@ -158,9 +159,14 @@ async def test_mixed_self_peer_admission_and_late_translation_preserve_shared_wi
                     source_language="en",
                     target_language="ko",
                     applied_context_mode=None,
-                )
+                ),
+                publication_generation=1,
             )
-            assert receipt.outcome == "applied"
+            assert receipt.outcome == ("registered" if active and peer == peers[1] else "applied")
+            if receipt.outcome == "registered":
+                assert receipt.scene_revision is None
+                for _ in range(12):
+                    await asyncio.sleep(0)
             current = presenter.snapshot()
             assert len(current.blocks) <= 2
             assert any(

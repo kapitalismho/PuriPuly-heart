@@ -346,11 +346,7 @@ def validate_app_request(family: str, arguments: dict, catalog: dict) -> dict:
     if request.keys() - {field for item in variants for field in item["properties"]}:
         raise ValueError("invalid_control_fields")
     variant = next(
-        (
-            item
-            for item in variants
-            if request.get(key) in item["properties"][key]["enum"]
-        ),
+        (item for item in variants if request.get(key) in item["properties"][key]["enum"]),
         None,
     )
     if variant is None:

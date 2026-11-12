@@ -161,11 +161,13 @@ class GuiControlBoundary:
         await self._close_host()
 
 
-def gui_control_factory(factory: Any) -> Any:
+def gui_control_factory(factory: Any, lease: Any | None = None) -> Any:
+    pending = [] if lease is None else [lease]
+
     def compose(*, config_path: Path, **kwargs: Any) -> GuiControlBoundary:
         from puripuly_heart.core.control_instance import acquire
 
-        lease = acquire(config_path)
+        lease = pending.pop() if pending else acquire(config_path)
         try:
             boundary = factory(config_path=config_path, **kwargs)
             return GuiControlBoundary(boundary, lease)

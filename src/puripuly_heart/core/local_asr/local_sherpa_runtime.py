@@ -10,7 +10,7 @@ from puripuly_heart.runtime_layout import current_runtime_layout
 
 logger = logging.getLogger(__name__)
 
-LOCAL_SHERPA_PACKAGED_RUNTIME_RELATIVE_DIR = Path("_runtime") / "local_qwen"
+LOCAL_SHERPA_PACKAGED_RUNTIME_RELATIVE_DIR = Path("site-packages") / "onnxruntime" / "capi"
 REQUIRED_LOCAL_SHERPA_RUNTIME_DLLS = (
     "onnxruntime.dll",
     "onnxruntime_providers_shared.dll",

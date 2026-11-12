@@ -320,6 +320,11 @@ company = "salee"
         "--target", (Join-Path $artifactRoot "site-packages"),
         $soxrWheel
     ) -WorkingDirectory $repoRoot
+    Invoke-Checked -FilePath $ToolPython -ArgumentList @(
+        "-m", "puripuly_heart.release_evidence.native_distribution", "prune-runtime",
+        "--target-root", $artifactRoot,
+        "--output", (Join-Path $evidenceRoot "native-packaging-pruning.json")
+    ) -WorkingDirectory $repoRoot
 
     Copy-Tree -Source (Join-Path $repoRoot "src\puripuly_heart") -Destination (Join-Path $artifactRoot "app\puripuly_heart")
     Copy-Tree -Source (Join-Path $repoRoot "prompts") -Destination (Join-Path $artifactRoot "app\prompts")
@@ -361,12 +366,6 @@ company = "salee"
     ) -WorkingDirectory $repoRoot
     Copy-Tree -Source $llamaRoot -Destination (Join-Path $artifactRoot "_runtime\llama.cpp-b11537")
     Copy-Tree -Source (Join-Path $repoRoot "third_party\llama.cpp") -Destination (Join-Path $artifactRoot "third_party\llama.cpp")
-    $localSherpaRoot = Join-Path $artifactRoot "_runtime\local_qwen"
-    New-Item -ItemType Directory -Path $localSherpaRoot -Force | Out-Null
-    foreach ($dll in @("onnxruntime.dll", "onnxruntime_providers_shared.dll")) {
-        $source = Resolve-OneFile -Root (Join-Path $artifactRoot "site-packages\onnxruntime") -Name $dll
-        Copy-Item -LiteralPath $source -Destination $localSherpaRoot -Force
-    }
 
     Copy-Tree -Source (Join-Path $soxrRoot "source-bundle") -Destination (Join-Path $artifactRoot "third_party\soxr")
     Copy-Item -LiteralPath (Join-Path $soxrRoot "PuriPulyHeart-soxr-third-party-source-bundle.zip") -Destination (Join-Path $artifactRoot "third_party\soxr") -Force

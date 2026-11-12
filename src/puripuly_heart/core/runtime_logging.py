@@ -1516,6 +1516,7 @@ class SessionRuntimeLoggingService:
             "stale_retired",
             "stale",
             "preview_superseded",
+            "output_empty",
             "output_superseded",
             "destination_replaced",
             "cancelled_local",

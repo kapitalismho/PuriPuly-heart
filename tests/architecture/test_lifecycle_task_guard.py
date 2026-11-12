@@ -251,7 +251,7 @@ TASK_CREATION_REVIEWS = (
     ),
     *_reviews(
         "core/overlay/presenter.py",
-        {"OverlayPresenter.emit_peer_when_admissible": 2},
+        {"OverlayPresenter._wait_peer_admission": 2},
         "OverlayPresenter locally owns replacement wake and deadline waiters and cancels plus gathers both in finally",
     ),
     *_reviews(
@@ -395,7 +395,7 @@ TASK_CREATION_REVIEWS = (
         {
             "ScopedRecognitionEngine.bind_event_sink": 1,
             "ScopedRecognitionEngine._run_stream_write": 1,
-            "ScopedRecognitionEngine.abort": 1,
+            "ScopedRecognitionEngine._cancel_turn": 1,
             "ScopedRecognitionEngine.close_backend": 1,
             "ScopedRecognitionEngine._handle_end": 1,
             "ScopedRecognitionEngine._ensure_session": 2,
