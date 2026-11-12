@@ -48,7 +48,11 @@ pub struct WorkingPhoto {
 
 impl WorkingPhoto {
     pub fn new(original: Arc<RgbImage>, max_dimensions: [u32; 2]) -> Result<Self, String> {
-        let [max_width, max_height] = max_dimensions;
+        let [max_width, max_height] = if (original.height() > original.width()) == (max_dimensions[0] > max_dimensions[1]) {
+            [max_dimensions[1], max_dimensions[0]]
+        } else {
+            max_dimensions
+        };
         if original.width() == 0 || original.height() == 0 || max_width == 0 || max_height == 0 {
             return Err("photo_invalid_dimensions".into());
         }
@@ -76,7 +80,7 @@ impl WorkingPhoto {
             pixels,
             scale_x,
             scale_y,
-            reference_scale: height as f32 / 1440.0,
+            reference_scale: width.min(height) as f32 / 1440.0,
         })
     }
 

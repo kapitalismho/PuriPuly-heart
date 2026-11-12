@@ -48,6 +48,33 @@ describe('photo-only Relay admission', () => {
     sqlite.close();
   });
 
+  it('states the client image size to the model and accepts only the two upright send canvases', async () => {
+    const { db, sqlite } = accountingDatabase();
+    const upstream = vi.fn().mockImplementation(async () => responseEvents(result, [
+      { type: 'response.output_text.delta', delta: '{"blocks":[]}' },
+    ]));
+    vi.stubGlobal('fetch', upstream);
+    const sized = (size: unknown, id: string) => ({ ...body, photo_protocol: 2, request_id: id.repeat(32), image_size: size });
+    for (const [size, id, text] of [[[720, 1280], '2', '720x1280'], [[1280, 720], '3', '1280x720']] as const) {
+      const response = await relay.fetch(request(sized(size, id)), environment(db));
+      expect(response.status).toBe(200);
+      await relayEvents(response);
+      const sent = JSON.parse(upstream.mock.calls.at(-1)![1].body);
+      expect(sent.input[0].content[1].text).toBe(`Target language: Korean.
+The image is ${text} pixels.`);
+    }
+    const legacy = await relay.fetch(request(), environment(db));
+    expect(legacy.status).toBe(200);
+    await relayEvents(legacy);
+    expect(JSON.parse(upstream.mock.calls.at(-1)![1].body).input[0].content[1].text).toContain('1280x720');
+    const calls = upstream.mock.calls.length;
+    for (const invalid of [sized([1920, 1080], '4'), sized('720x1280', '5'), { ...body, image_size: [720, 1280] }, sized(undefined, '6')]) {
+      expect((await relay.fetch(request(invalid), environment(db))).status).toBe(400);
+    }
+    expect(upstream.mock.calls.length).toBe(calls);
+    sqlite.close();
+  });
+
   it('rejects model, endpoint, nested config and invalid tokens before admission or upstream work', async () => {
     const { db, sqlite } = accountingDatabase();
     const upstream = vi.fn(); vi.stubGlobal('fetch', upstream);

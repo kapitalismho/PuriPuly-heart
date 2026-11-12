@@ -139,7 +139,7 @@ impl PhotoTypesetter {
         self.metrics.cache.clear();
         self.metrics.formats.clear();
         self.metrics.layouts.clear();
-        let height = photo.pixels.height() as f32;
+        let height = photo.pixels.width().min(photo.pixels.height()) as f32;
         let scale = height / 1440.0;
         let floor = (8.0 * scale).max(0.015 * height);
         let measured = measure_source(

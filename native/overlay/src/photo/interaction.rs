@@ -12,13 +12,8 @@ pub const IDENTITY: Transform = [
     [0.0, 0.0, 1.0, 0.0],
 ];
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PhotoEmergence {
-    #[default]
-    Opacity,
-    Reveal,
-}
+pub const PULL_FADE_M: f32 = 0.03;
+const PULL_M: f32 = 0.12;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -36,7 +31,6 @@ pub struct TemporaryInteractionConfig {
     pub debug_grab_volume: bool,
     pub debug_case_label: Option<String>,
     pub photo_transform: Option<Transform>,
-    pub photo_emergence: PhotoEmergence,
     pub wrist_calibration: Option<super::calibration::WristCalibration>,
     pub debug_calibrate_wrist: bool,
 }
@@ -57,7 +51,6 @@ impl Default for TemporaryInteractionConfig {
             debug_grab_volume: false,
             debug_case_label: None,
             photo_transform: None,
-            photo_emergence: PhotoEmergence::Opacity,
             wrist_calibration: None,
             debug_calibrate_wrist: false,
         }
@@ -174,9 +167,60 @@ fn within(a: [f32; 3], b: [f32; 3], degrees: f32) -> bool {
     norm > 0.000001 && dot(a, b) >= norm * degrees.to_radians().cos()
 }
 
+fn angle_deg(a: [f32; 3], b: [f32; 3]) -> f32 {
+    let norm = (dot(a, a) * dot(b, b)).sqrt();
+    if norm > 0.000001 { (dot(a, b) / norm).clamp(-1.0, 1.0).acos().to_degrees() } else { 180.0 }
+}
+
 fn normalized(vector: [f32; 3]) -> [f32; 3] {
     let length = dot(vector, vector).sqrt();
     vector.map(|value| value / length)
+}
+
+fn quaternion(t: Transform) -> [f32; 4] {
+    let trace = t[0][0] + t[1][1] + t[2][2];
+    let q = if trace > 0.0 {
+        let s = (trace + 1.0).sqrt() * 2.0;
+        [0.25 * s, (t[2][1] - t[1][2]) / s, (t[0][2] - t[2][0]) / s, (t[1][0] - t[0][1]) / s]
+    } else if t[0][0] > t[1][1] && t[0][0] > t[2][2] {
+        let s = (1.0 + t[0][0] - t[1][1] - t[2][2]).sqrt() * 2.0;
+        [(t[2][1] - t[1][2]) / s, 0.25 * s, (t[0][1] + t[1][0]) / s, (t[0][2] + t[2][0]) / s]
+    } else if t[1][1] > t[2][2] {
+        let s = (1.0 + t[1][1] - t[0][0] - t[2][2]).sqrt() * 2.0;
+        [(t[0][2] - t[2][0]) / s, (t[0][1] + t[1][0]) / s, 0.25 * s, (t[1][2] + t[2][1]) / s]
+    } else {
+        let s = (1.0 + t[2][2] - t[0][0] - t[1][1]).sqrt() * 2.0;
+        [(t[1][0] - t[0][1]) / s, (t[0][2] + t[2][0]) / s, (t[1][2] + t[2][1]) / s, 0.25 * s]
+    };
+    let length = q.iter().map(|v| v * v).sum::<f32>().sqrt();
+    q.map(|v| v / length)
+}
+
+fn slerp(a: [f32; 4], b: [f32; 4], t: f32) -> [f32; 4] {
+    let mut cosine: f32 = (0..4).map(|i| a[i] * b[i]).sum();
+    let b = if cosine < 0.0 {
+        cosine = -cosine;
+        b.map(|v| -v)
+    } else {
+        b
+    };
+    let (wa, wb) = if cosine > 0.9995 {
+        (1.0 - t, t)
+    } else {
+        let angle = cosine.min(1.0).acos();
+        ((angle * (1.0 - t)).sin() / angle.sin(), (angle * t).sin() / angle.sin())
+    };
+    let q: [f32; 4] = std::array::from_fn(|i| a[i] * wa + b[i] * wb);
+    let length = q.iter().map(|v| v * v).sum::<f32>().sqrt();
+    q.map(|v| v / length)
+}
+
+fn rotation([w, x, y, z]: [f32; 4]) -> Transform {
+    [
+        [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - w * z), 2.0 * (x * z + w * y), 0.0],
+        [2.0 * (x * y + w * z), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - w * x), 0.0],
+        [2.0 * (x * z - w * y), 2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y), 0.0],
+    ]
 }
 
 fn photo_edge_anchor(input: LegacyVrInput) -> Transform {
@@ -251,6 +295,44 @@ pub fn grab_ring_transforms(wrist: Transform, right: Transform, head: Transform)
     ].map(|plane| face_head(compose(wrist, plane), right, head))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GripIgnored {
+    IconHidden,
+    NotReady,
+    OutOfRange,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(tag = "event", rename_all = "snake_case")]
+pub enum InteractionNote {
+    IconShown { facing_deg: f32, forward_deg: f32 },
+    IconHidden { facing_deg: Option<f32>, forward_deg: Option<f32> },
+    IconNearMiss { facing_deg: f32, forward_deg: f32 },
+    GripIgnored { reason: GripIgnored, distance_m: f32, facing_deg: f32, forward_deg: f32 },
+    Grab { distance_m: f32 },
+    GrabReleased { progress: f32 },
+    Pull,
+    HoldReleased,
+    PhotoRegrab { hand: Hand },
+    PhotoPlaced,
+    PhotoFaded,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Hand {
+    Left,
+    Right,
+}
+
+pub const PHOTO_LINGER: Duration = Duration::from_millis(2500);
+pub const TOUCH_EDGE_M: f32 = 0.05;
+pub const TOUCH_DEPTH_M: f32 = 0.08;
+
+pub const NEAR_MISS_MARGIN_DEG: f32 = 20.0;
+const NEAR_MISS_INTERVAL: Duration = Duration::from_millis(500);
+
 #[derive(Debug, Default, Clone, Copy, Serialize)]
 pub struct InteractionFrame {
     pub icon: Option<Placement>,
@@ -280,12 +362,22 @@ struct PhotoRelease {
     world: Transform,
 }
 
+struct PhotoMove {
+    hand: Hand,
+    device: u32,
+    relative: Transform,
+    alpha: f32,
+}
+
 pub struct PhotoInteraction {
     pub config: TemporaryInteractionConfig,
     key: Option<String>,
     roles: Option<(u32, u32, u64)>,
     grip: bool,
     armed: bool,
+    right_grip: bool,
+    right_armed: bool,
+    shown: bool,
     change_since: Option<Instant>,
     gaze: bool,
     shown_at: Option<Instant>,
@@ -297,12 +389,16 @@ pub struct PhotoInteraction {
     photo_extent: f32,
     photo_anchor: Option<Transform>,
     photo_release: Option<PhotoRelease>,
+    moving: Option<PhotoMove>,
     last: Option<Instant>,
     deadline: Option<Instant>,
     offer_deadline: Option<Instant>,
     offer_pulled: bool,
     quiescing: bool,
     input_released: bool,
+    last_near_miss: Option<Instant>,
+    pub photo_pixels: [u32; 2],
+    pub notes: Vec<InteractionNote>,
     pub frame: InteractionFrame,
 }
 
@@ -314,6 +410,9 @@ impl PhotoInteraction {
             roles: None,
             grip: false,
             armed: false,
+            right_grip: false,
+            right_armed: false,
+            shown: false,
             change_since: None,
             gaze: false,
             shown_at: None,
@@ -325,12 +424,16 @@ impl PhotoInteraction {
             photo_extent: 1.0,
             photo_anchor: None,
             photo_release: None,
+            moving: None,
             last: None,
             deadline: None,
             offer_deadline: None,
             offer_pulled: false,
             quiescing: false,
             input_released: true,
+            last_near_miss: None,
+            photo_pixels: [16, 9],
+            notes: Vec::new(),
             frame: InteractionFrame::default(),
         }
     }
@@ -385,14 +488,27 @@ impl PhotoInteraction {
             && self.grab.is_none()
             && self.returning.is_none()
             && !self.held
+            && self.moving.is_none()
             && self.photo_alpha == 0.0
+    }
+
+    fn touches(&self, world: Transform, point: [f32; 3]) -> bool {
+        let offset = subtract(point, column(world, 3));
+        let [width, height] = self.card_size();
+        dot(column(world, 0), offset).abs() <= width * self.photo_extent * 0.5 + TOUCH_EDGE_M
+            && dot(column(world, 1), offset).abs() <= height * 0.5 + TOUCH_EDGE_M
+            && dot(column(world, 2), offset).abs() <= TOUCH_DEPTH_M
+    }
+
+    pub fn card_size(&self) -> [f32; 2] {
+        super::card::card_size(self.config.photo_width_m, self.photo_pixels)
     }
 
     fn photo_transform(&self) -> Transform {
         self.config.photo_transform.unwrap_or_else(|| {
             let mut transform = self.photo_anchor.unwrap();
             for row in &mut transform {
-                row[3] += row[0] * self.config.photo_width_m * self.photo_extent * 0.5;
+                row[3] += row[0] * self.card_size()[0] * self.photo_extent * 0.5;
             }
             transform
         })
@@ -418,41 +534,53 @@ impl PhotoInteraction {
             .last
             .replace(now)
             .map_or(0.0, |old| now.saturating_duration_since(old).as_secs_f32());
-        let prior_held = self.held;
+        self.notes.clear();
         let active = photo.is_some_and(|p| self.active(p, now));
         self.input_released = input.is_none_or(|input| !input.grip);
         let Some(input) = input.filter(|_| active) else {
             if input.is_none() {
                 self.input_released = true;
             }
+            if self.gaze {
+                self.notes.push(InteractionNote::IconHidden { facing_deg: None, forward_deg: None });
+            }
             self.armed = false;
             self.grip = true;
+            self.right_armed = false;
+            self.right_grip = true;
             self.grab = None;
             self.returning = None;
             self.held = false;
             self.photo_alpha = 0.0;
             self.photo_anchor = None;
             self.photo_release = None;
+            self.moving = None;
             self.gaze = false;
             self.change_since = None;
             self.shown_at = None;
             self.icon_alpha = 0.0;
             self.frame = InteractionFrame {
-                hidden: prior_held,
+                hidden: std::mem::take(&mut self.shown),
                 ..Default::default()
             };
             return self.frame;
         };
         let roles = (input.left_index, input.right_index, input.reference_epoch);
         if self.roles != Some(roles) {
+            if self.gaze {
+                self.notes.push(InteractionNote::IconHidden { facing_deg: None, forward_deg: None });
+            }
             self.roles = Some(roles);
             self.armed = false;
             self.grip = true;
+            self.right_armed = false;
+            self.right_grip = true;
             self.grab = None;
             self.held = false;
             self.photo_alpha = 0.0;
             self.photo_anchor = None;
             self.photo_release = None;
+            self.moving = None;
             self.returning = None;
             self.gaze = false;
             self.change_since = None;
@@ -464,11 +592,18 @@ impl PhotoInteraction {
         }
         let pressed = self.armed && input.grip && !self.grip;
         self.grip = input.grip;
+        if !input.right_grip {
+            self.right_armed = true;
+        }
+        let right_pressed = self.right_armed && input.right_grip && !self.right_grip;
+        self.right_grip = input.right_grip;
         let wrist_local = self.config.effective_wrist_transform(input.right_handgrip);
         let wrist = compose(input.right, wrist_local);
         let head_to_icon = subtract(column(wrist, 3), column(input.head, 3));
         let facing = subtract(column(input.head, 3), column(wrist, 3));
         let forward = column(input.head, 2).map(|v| -v);
+        let facing_deg = angle_deg(column(wrist, 2), facing);
+        let forward_deg = angle_deg(forward, head_to_icon);
         let looking = within(
             column(wrist, 2),
             facing,
@@ -503,6 +638,12 @@ impl PhotoInteraction {
                 self.change_since = None;
                 if want {
                     self.shown_at = Some(now);
+                    self.notes.push(InteractionNote::IconShown { facing_deg, forward_deg });
+                } else {
+                    self.notes.push(InteractionNote::IconHidden {
+                        facing_deg: Some(facing_deg),
+                        forward_deg: Some(forward_deg),
+                    });
                 }
             }
         }
@@ -518,12 +659,48 @@ impl PhotoInteraction {
         let photo = photo.unwrap();
         let current_distance = distance(compose(input.left, input.left_handgrip), wrist);
         let near = current_distance <= self.config.grab_m;
+        if !self.gaze
+            && !looking
+            && photo.can_pull()
+            && facing_deg <= self.config.facing_show_deg + NEAR_MISS_MARGIN_DEG
+            && forward_deg <= self.config.forward_show_deg + NEAR_MISS_MARGIN_DEG
+            && self.last_near_miss.is_none_or(|last| now.saturating_duration_since(last) >= NEAR_MISS_INTERVAL)
+        {
+            self.last_near_miss = Some(now);
+            self.notes.push(InteractionNote::IconNearMiss { facing_deg, forward_deg });
+        }
         let mut out = InteractionFrame {
             glow: near && interactive && photo.can_pull() && !self.quiescing,
-            hidden: prior_held && !self.held,
             ..Default::default()
         };
+        let regrab = self.photo_release.as_ref().filter(|_| {
+            !self.quiescing && self.grab.is_none() && !self.held && self.moving.is_none()
+        }).and_then(|release| {
+            [
+                (Hand::Left, pressed, input.left, input.left_index, input.left_handgrip),
+                (Hand::Right, right_pressed, input.right, input.right_index, input.right_handgrip),
+            ]
+            .into_iter()
+            .find(|(_, pressed, device, _, handgrip)| {
+                *pressed && self.touches(release.world, column(compose(*device, *handgrip), 3))
+            })
+            .map(|(hand, _, device, index, _)| PhotoMove {
+                hand,
+                device: index,
+                relative: compose(inverse(device), release.world),
+                alpha: release.from,
+            })
+        });
+        let regrabbed = regrab.is_some();
+        if let Some(regrab) = regrab {
+            self.notes.push(InteractionNote::PhotoRegrab { hand: regrab.hand });
+            self.photo_alpha = regrab.alpha;
+            self.photo_release = None;
+            self.moving = Some(regrab);
+        }
         if pressed
+            && !regrabbed
+            && self.moving.is_none()
             && !self.quiescing
             && near
             && interactive
@@ -542,20 +719,39 @@ impl PhotoInteraction {
             self.photo_alpha = 0.0;
             self.photo_extent = 1.0;
             out.grab = true;
+            self.notes.push(InteractionNote::Grab { distance_m: current_distance });
+        } else if pressed
+            && !regrabbed
+            && self.moving.is_none()
+            && !self.quiescing
+            && photo.can_pull()
+            && (photo.attempt_id > 0 || !self.offer_pulled)
+            && self.grab.is_none()
+            && !self.held
+            && self.returning.is_none()
+        {
+            let reason = if !self.gaze {
+                GripIgnored::IconHidden
+            } else if !interactive {
+                GripIgnored::NotReady
+            } else {
+                GripIgnored::OutOfRange
+            };
+            self.notes.push(InteractionNote::GripIgnored {
+                reason,
+                distance_m: current_distance,
+                facing_deg,
+                forward_deg,
+            });
         }
         if let Some(grab) = &self.grab {
             let icon = compose(input.left, grab.relative);
-            let progress = ((current_distance - grab.start_distance) / 0.12).clamp(0.0, 1.0);
+            let pulled = (current_distance - grab.start_distance).max(0.0);
+            let progress = (pulled / PULL_M).min(1.0);
             let triggered = input.grip && photo.can_pull() && progress >= 1.0;
             if input.grip && photo.can_pull() {
-                self.photo_alpha = match self.config.photo_emergence {
-                    PhotoEmergence::Opacity => progress,
-                    PhotoEmergence::Reveal => if progress > 0.0 { 1.0 } else { 0.0 },
-                };
-                self.photo_extent = match self.config.photo_emergence {
-                    PhotoEmergence::Opacity => 1.0,
-                    PhotoEmergence::Reveal => progress,
-                };
+                self.photo_alpha = 1.0 - (1.0 - (pulled / PULL_FADE_M).min(1.0)).powi(2);
+                self.photo_extent = progress;
             }
             if !input.grip || !photo.can_pull() || triggered {
                 self.returning = Some(Return {
@@ -565,38 +761,61 @@ impl PhotoInteraction {
                 self.grab = None;
                 if triggered {
                     out.pull = true;
+                    self.shown = true;
+                    self.notes.push(InteractionNote::Pull);
                     self.offer_pulled |= photo.attempt_id == 0;
                     self.held = true;
                     self.photo_alpha = 1.0;
                     self.photo_extent = 1.0;
                 } else {
+                    self.notes.push(InteractionNote::GrabReleased { progress });
                     self.release_photo(input, now);
                 }
             }
         }
         if self.held && (!input.grip || !photo.can_pull()) {
             self.held = false;
-            out.hidden = true;
+            self.notes.push(InteractionNote::HoldReleased);
             self.release_photo(input, now);
         }
+        if let Some(moving) = &self.moving {
+            let (device, grip) = match moving.hand {
+                Hand::Left => (input.left, input.grip),
+                Hand::Right => (input.right, input.right_grip),
+            };
+            if !grip || !photo.can_pull() {
+                self.photo_release = Some(PhotoRelease {
+                    started: now,
+                    from: moving.alpha,
+                    world: compose(device, moving.relative),
+                });
+                self.moving = None;
+                self.notes.push(InteractionNote::PhotoPlaced);
+            }
+        }
         if let Some(release) = &self.photo_release {
-            let progress = now.saturating_duration_since(release.started).as_secs_f32() / 0.15;
+            let fading = now.saturating_duration_since(release.started).saturating_sub(PHOTO_LINGER);
+            let progress = fading.as_secs_f32() / 0.15;
             self.photo_alpha = release.from * (1.0 - progress).max(0.0);
             if progress >= 1.0 {
                 self.photo_release = None;
                 self.photo_anchor = None;
+                self.notes.push(InteractionNote::PhotoFaded);
             }
         }
         if self.photo_alpha > 0.0 {
-            let width = self.config.photo_width_m * self.photo_extent;
-            let transform = self.photo_release.as_ref().map_or_else(
-                || self.photo_transform(),
-                |release| release.world,
-            );
-            out.photo_world = self.photo_release.is_some();
+            let width = self.card_size()[0] * self.photo_extent;
+            let (device, transform) = if let Some(moving) = &self.moving {
+                (moving.device, moving.relative)
+            } else if let Some(release) = &self.photo_release {
+                (input.left_index, release.world)
+            } else {
+                (input.left_index, self.photo_transform())
+            };
+            out.photo_world = self.moving.is_none() && self.photo_release.is_some();
             out.photo_extent = self.photo_extent;
             out.photo = Some(Placement {
-                device: input.left_index,
+                device,
                 transform,
                 width,
                 alpha: self.photo_alpha,
@@ -612,10 +831,10 @@ impl PhotoInteraction {
                     / 0.225)
                     .min(1.0);
                 let ease = 1.0 - (1.0 - t) * (1.0 - t);
-                let mut transform = wrist_local;
+                let mut transform = rotation(slerp(quaternion(returning.from), quaternion(wrist_local), ease));
                 for i in 0..3 {
                     transform[i][3] =
-                        returning.from[i][3] + (transform[i][3] - returning.from[i][3]) * ease;
+                        returning.from[i][3] + (wrist_local[i][3] - returning.from[i][3]) * ease;
                 }
                 if t >= 1.0 {
                     self.returning = None;
@@ -654,6 +873,10 @@ impl PhotoInteraction {
             .is_some_and(|r| now.saturating_duration_since(r.started) >= Duration::from_millis(225))
         {
             self.returning = None;
+        }
+        if self.shown && self.photo_alpha <= 0.0 && !self.held && self.moving.is_none() && self.grab.is_none() {
+            self.shown = false;
+            out.hidden = true;
         }
         self.frame = out;
         out

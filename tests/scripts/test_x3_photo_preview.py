@@ -250,6 +250,25 @@ async def test_native_terminal_error_is_not_readiness_or_completion():
 
 
 @pytest.mark.asyncio
+async def test_native_interaction_notes_keep_attempt_diagnostics_only():
+    stream = asyncio.StreamReader()
+    stream.feed_data(
+        b'{"type":"photo_interaction","event":"grip_ignored","reason":"out_of_range",'
+        b'"distance_m":0.13,"facing_deg":12.5,"forward_deg":30.0,"photo_id":"p","attempt_id":0,'
+        b'"serial":"discard"}\n'
+    )
+    stream.feed_eof()
+    evidence = SimpleNamespace(event=Mock())
+    signals = {"decoded": False, "composed": False, "error": None}
+    await probe.drain(stream, evidence, signals)
+    assert signals == {"decoded": False, "composed": False, "error": None}
+    evidence.event.assert_called_once_with(
+        "native", type="photo_interaction", interaction="grip_ignored", reason="out_of_range",
+        distance_m=0.13, facing_deg=12.5, forward_deg=30.0, photo_id="p", attempt_id=0,
+    )
+
+
+@pytest.mark.asyncio
 async def test_runtime_absence_does_not_start_native_or_steamvr(tmp_path):
     image = make_png_header(tmp_path / "selected.png")
     executable = tmp_path / "trusted.exe"
@@ -742,22 +761,25 @@ def test_manual_wrist_save_survives_fresh_load_and_failed_replacement(tmp_path, 
 
 
 @pytest.mark.asyncio
-async def test_emergence_comparison_reuses_saved_wrist_and_cleans_between_candidates(repeat_launch):
+async def test_repeat_run_reuses_saved_wrist_without_selecting_an_emergence(repeat_launch):
     harness = repeat_launch
     path = harness.evidence.path / "wrist.json"
     value = calibration_value()
     path.write_text(json.dumps(value), encoding="utf-8")
     harness.args.wrist_calibration = path
-    assert await probe.run_comparison(harness.args, harness.evidence) == 0
-    assert [case["interaction"]["photo_emergence"] for case in harness.manifests] == ["opacity", "reveal"]
-    assert all(case["interaction"]["wrist_calibration"] == value for case in harness.manifests)
+    assert await probe.run(harness.args, harness.evidence) == 0
+    interaction = harness.manifests[0]["interaction"]
+    assert interaction["wrist_calibration"] == value
+    assert "photo_emergence" not in interaction
+    assert "debug_calibrate_wrist" not in interaction
+    assert probe.load_wrist_calibration(path) == value
     lifecycle = [kind for kind, _ in harness.events if kind in ("spawn", "closed")]
-    assert lifecycle == ["spawn", "closed", "spawn", "closed"]
+    assert lifecycle == ["spawn", "closed"]
     assert all(process.returncode == 0 for process in harness.processes)
 
 
 @pytest.mark.asyncio
-async def test_calibration_wait_never_offers_photos_or_consumes_comparison_time(repeat_launch, monkeypatch):
+async def test_calibration_wait_never_offers_photos_or_consumes_preview_time(repeat_launch, monkeypatch):
     harness = repeat_launch
     harness.args.backend = "openvr"
     harness.args.calibrate_wrist = True

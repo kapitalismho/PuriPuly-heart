@@ -28,6 +28,10 @@ pub struct SourceRequest {
     pub max_size: [u32; 2],
 }
 
+pub fn send_size(width: u32, height: u32) -> [u32; 2] {
+    if height > width { [720, 1280] } else { [1280, 720] }
+}
+
 #[derive(PartialEq, Eq)]
 struct SourceSignature {
     length: u64,
@@ -388,25 +392,26 @@ fn prepare_loaded(
         source_file.write_all(&source.bytes).map_err(|_| "output_unavailable")?;
         drop(source_file);
         let resize_start = Instant::now();
-        let scale =
-            (1280.0 / f64::from(original.width())).min(720.0 / f64::from(original.height()));
+        let [send_width, send_height] = send_size(original.width(), original.height());
+        let scale = (f64::from(send_width) / f64::from(original.width()))
+            .min(f64::from(send_height) / f64::from(original.height()));
         let width = (f64::from(original.width()) * scale)
             .round_ties_even()
-            .clamp(1.0, 1280.0) as u32;
+            .clamp(1.0, f64::from(send_width)) as u32;
         let height = (f64::from(original.height()) * scale)
             .round_ties_even()
-            .clamp(1.0, 720.0) as u32;
-        let offset_x = (1280 - width) / 2;
-        let offset_y = (720 - height) / 2;
-        let canvas = if original.width() == 1280 && original.height() == 720 {
+            .clamp(1.0, f64::from(send_height)) as u32;
+        let offset_x = (send_width - width) / 2;
+        let offset_y = (send_height - height) / 2;
+        let canvas = if original.width() == send_width && original.height() == send_height {
             None
         } else {
             let resized =
                 imageops::resize(original.as_ref(), width, height, imageops::FilterType::Lanczos3);
-            if width == 1280 && height == 720 {
+            if width == send_width && height == send_height {
                 Some(resized)
             } else {
-                let mut canvas = RgbImage::from_pixel(1280, 720, Rgb([16, 18, 24]));
+                let mut canvas = RgbImage::from_pixel(send_width, send_height, Rgb([16, 18, 24]));
                 imageops::replace(
                     &mut canvas,
                     &resized,

@@ -77,7 +77,6 @@ pub struct PhotoCompositor {
     blocks: Vec<BlockVisual>,
     pub original_uploads: u64,
     pub adapter: AdapterIdentity,
-    pub original_view: bool,
     dirty: bool,
     fade_until: Option<Instant>,
     readiness: ID3D11Query,
@@ -153,7 +152,6 @@ impl PhotoCompositor {
             blocks: Vec::new(),
             original_uploads: 0,
             adapter: identity,
-            original_view: false,
             dirty: false,
             fade_until: None,
             readiness,
@@ -296,7 +294,6 @@ impl PhotoCompositor {
         self.texture = Some(texture);
         self.working = Some(working);
         self.blocks.clear();
-        self.original_view = false;
         self.fade_until = None;
         self.original_uploads += 1;
         self.dirty = true;
@@ -307,7 +304,6 @@ impl PhotoCompositor {
         self.blocks.clear();
         self.font = None;
         self.timings.clear();
-        self.original_view = false;
         self.fade_until = None;
         self.dirty = self.original.is_some();
     }
@@ -324,20 +320,12 @@ impl PhotoCompositor {
         self.working = None;
         self.font = None;
         self.timings.clear();
-        self.original_view = false;
         self.dirty = false;
         self.fade_until = None;
     }
 
     pub fn invalidate(&mut self) {
         self.dirty = self.original.is_some();
-    }
-
-    pub fn view_original(&mut self, enabled: bool) {
-        if self.original_view != enabled {
-            self.original_view = enabled;
-            self.dirty = true;
-        }
     }
 
     pub fn set_font(&mut self, font: super::image::PhotoFont) {
@@ -501,13 +489,13 @@ impl PhotoCompositor {
         self.working.as_ref().map(|photo| [photo.pixels.width(), photo.pixels.height()])
     }
 
-    pub fn first_visible_block_in_extent(&self, now: Instant, extent: f32) -> Option<u64> {
-        let [width, height] = self.dimensions()?;
-        let right = width as f32 * extent;
+    pub fn first_visible_block_in(&self, now: Instant, shown: [f32; 4]) -> Option<u64> {
+        let [width, height] = self.dimensions()?.map(|value| value as f32);
+        let [left, top, right, bottom] = [shown[0] * width, shown[1] * height, shown[2] * width, shown[3] * height];
         self.blocks.iter().find(|block| {
             !block.runs.is_empty() && fade_opacity(block.start, now) > 0.0
                 && block.typeset.as_ref().is_some_and(|text| text.collision_boxes.iter().any(|bounds| {
-                    bounds.left < right && bounds.right > 0.0 && bounds.top < height as f32 && bounds.bottom > 0.0
+                    bounds.left < right && bounds.right > left && bounds.top < bottom && bounds.bottom > top
                 }))
         }).map(|block| block.id)
     }
@@ -552,68 +540,66 @@ impl PhotoCompositor {
                 None,
                 None,
             );
-            if !self.original_view {
-                for block in &self.blocks {
-                    let opacity = fade_opacity(block.start, now);
-                    if let Some((bitmap, rect)) = &block.erase {
-                        let destination = D2D_RECT_F {
-                            left: rect.x as f32,
-                            top: rect.y as f32,
-                            right: (rect.x + rect.width) as f32,
-                            bottom: (rect.y + rect.height) as f32,
-                        };
-                        self.d2d.DrawBitmap(
-                            bitmap,
-                            Some(&destination),
-                            opacity,
-                            D2D1_INTERPOLATION_MODE_LINEAR,
-                            None,
-                            None,
-                        );
-                    }
-                    if let Some((brush, rect)) = &block.plate {
-                        brush.SetOpacity(opacity);
-                        self.d2d.FillRectangle(&d2d_rect(*rect), brush);
-                    }
+            for block in &self.blocks {
+                let opacity = fade_opacity(block.start, now);
+                if let Some((bitmap, rect)) = &block.erase {
+                    let destination = D2D_RECT_F {
+                        left: rect.x as f32,
+                        top: rect.y as f32,
+                        right: (rect.x + rect.width) as f32,
+                        bottom: (rect.y + rect.height) as f32,
+                    };
+                    self.d2d.DrawBitmap(
+                        bitmap,
+                        Some(&destination),
+                        opacity,
+                        D2D1_INTERPOLATION_MODE_LINEAR,
+                        None,
+                        None,
+                    );
                 }
-                if !erased_only {
-                    for block in &self.blocks {
-                        let Some(typeset) = &block.typeset else {
-                            continue;
-                        };
-                        let opacity = fade_opacity(block.start, now);
-                        if opacity <= 0.0 {
-                            continue;
-                        }
-                        self.d2d.PushLayer(
-                            &D2D1_LAYER_PARAMETERS1 {
-                                contentBounds: bounds,
-                                geometricMask: ManuallyDrop::new(None),
-                                maskAntialiasMode: D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
-                                maskTransform: Matrix3x2::identity(),
-                                opacity,
-                                opacityBrush: ManuallyDrop::new(None),
-                                layerOptions: D2D1_LAYER_OPTIONS1_NONE,
-                            },
-                            &self.opacity_layer,
-                        );
-                        for run in &block.runs {
-                            self.d2d.SetTransform(&run_transform(
-                                run.origin,
-                                typeset.center,
-                                typeset.angle_degrees,
-                            ));
-                            self.d2d.DrawImage(
-                                &run.commands,
-                                None,
-                                None,
-                                D2D1_INTERPOLATION_MODE_LINEAR,
-                                D2D1_COMPOSITE_MODE_SOURCE_OVER,
-                            );
-                        }
-                        self.d2d.SetTransform(&Matrix3x2::identity());
-                        self.d2d.PopLayer();
+                if let Some((brush, rect)) = &block.plate {
+                    brush.SetOpacity(opacity);
+                    self.d2d.FillRectangle(&d2d_rect(*rect), brush);
+                }
+            }
+            if !erased_only {
+                for block in &self.blocks {
+                    let Some(typeset) = &block.typeset else {
+                        continue;
+                    };
+                    let opacity = fade_opacity(block.start, now);
+                    if opacity <= 0.0 {
+                        continue;
                     }
+                    self.d2d.PushLayer(
+                        &D2D1_LAYER_PARAMETERS1 {
+                            contentBounds: bounds,
+                            geometricMask: ManuallyDrop::new(None),
+                            maskAntialiasMode: D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                            maskTransform: Matrix3x2::identity(),
+                            opacity,
+                            opacityBrush: ManuallyDrop::new(None),
+                            layerOptions: D2D1_LAYER_OPTIONS1_NONE,
+                        },
+                        &self.opacity_layer,
+                    );
+                    for run in &block.runs {
+                        self.d2d.SetTransform(&run_transform(
+                            run.origin,
+                            typeset.center,
+                            typeset.angle_degrees,
+                        ));
+                        self.d2d.DrawImage(
+                            &run.commands,
+                            None,
+                            None,
+                            D2D1_INTERPOLATION_MODE_LINEAR,
+                            D2D1_COMPOSITE_MODE_SOURCE_OVER,
+                        );
+                    }
+                    self.d2d.SetTransform(&Matrix3x2::identity());
+                    self.d2d.PopLayer();
                 }
             }
             self.d2d

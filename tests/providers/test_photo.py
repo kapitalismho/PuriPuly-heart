@@ -646,7 +646,15 @@ async def test_relay_uses_dedicated_photo_contract_without_per_photo_coordinatio
         assert isinstance(result[-1], PhotoStreamCompleted)
         assert len(server.requests) == 1
         sent = server.requests[0][2]
-        assert set(sent) == {"photo_protocol", "request_id", "image_base64", "target_language"}
+        assert set(sent) == {
+            "photo_protocol",
+            "request_id",
+            "image_base64",
+            "image_size",
+            "target_language",
+        }
+        assert sent["photo_protocol"] == 2
+        assert sent["image_size"] == [1280, 720]
         assert sent["image_base64"] == photo.jpeg_base64
         assert sent["target_language"] == "ko"
         assert server.requests[0][3]["authorization"] == "Bearer synthetic-puri-token"
@@ -719,3 +727,31 @@ async def test_api_consumer_failure_releases_single_connection_pool_for_next_pho
         result = [event async for event in following.stream(photo, "ko")]
         assert isinstance(result[-1], PhotoStreamCompleted)
         assert len(server.requests) == 2
+
+
+async def test_portrait_preparation_maps_boxes_and_prompts_in_its_upright_canvas(tmp_path):
+    from puripuly_heart.providers.photo import _luna_payload
+
+    source = tmp_path / "source.png"
+    jpeg = tmp_path / "send.jpg"
+    fixtures = Path(__file__).parents[1] / "core" / "photo" / "fixtures"
+    source.write_bytes((fixtures / "synthetic.png").read_bytes())
+    jpeg.write_bytes((fixtures / "synthetic.jpg").read_bytes())
+    photo = await load_prepared_photo(
+        {
+            "source_path": str(source),
+            "jpeg_path": str(jpeg),
+            "width": 2160,
+            "height": 3840,
+            "scale": 1 / 3,
+            "offset_x": 0,
+            "offset_y": 0,
+            "preparation_ms": 1.0,
+        },
+        directory=tmp_path,
+    )
+    assert photo.send_size == (720, 1280)
+    assert photo.map_box((0, 640, 720, 1280), google=False).bbox == (0.0, 1920.0, 2160.0, 3840.0)
+    assert photo.map_box((500, 0, 1000, 1000), google=True).bbox == (0.0, 1920.0, 2160.0, 3840.0)
+    text = _luna_payload(photo, "ko")["input"][0]["content"][1]["text"]
+    assert text.endswith("The image is 720x1280 pixels.")

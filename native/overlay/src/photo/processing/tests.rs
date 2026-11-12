@@ -246,14 +246,14 @@ fn wider_erase_preserves_core_fill_and_coverage_but_can_reduce_leftover_plate() 
 fn refreshed_erase_uses_actual_height_radius_and_preserves_prepared_measurements() {
     for (height, extra) in [(719, 1), (1068, 1), (1080, 1), (1440, 1), (2160, 2)] {
         let work = WorkingPhoto::new(
-            Arc::new(RgbImage::from_fn(100, height, |x, y| {
+            Arc::new(RgbImage::from_fn(height, height, |x, y| {
                 Rgb([
                     (x * 17 % 251) as u8,
                     (y * 23 % 251) as u8,
                     (x * y % 251) as u8,
                 ])
             })),
-            [1920, height],
+            [height, height],
         )
         .unwrap();
         let roi = PixelRect {
@@ -741,4 +741,13 @@ fn sequential_telea_reference_and_wider_refresh_preserve_committed_context() {
     eprintln!("Sequential overlapping erase: {differences} differing channels");
     assert_eq!(differences, 0);
     assert_eq!(original.as_raw(), work.pixels.as_raw());
+}
+
+#[test]
+fn portrait_photos_fit_the_default_bounds_turned_upright_with_short_side_scale() {
+    for (source, expected) in [([3840, 2160], [1920, 1080]), ([2160, 3840], [1080, 1920]), ([1440, 2048], [1080, 1536])] {
+        let work = WorkingPhoto::new(Arc::new(RgbImage::new(source[0], source[1])), [1920, 1080]).unwrap();
+        assert_eq!(work.pixels.dimensions(), (expected[0], expected[1]));
+        assert!((work.reference_scale - expected[0].min(expected[1]) as f32 / 1440.0).abs() < 0.00001);
+    }
 }

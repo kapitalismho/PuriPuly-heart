@@ -1,6 +1,6 @@
 # Temporary photo interaction: wristwatch and held photo
 
-This records the bounded temporary interaction work for [#341](https://github.com/kapitalismho/PuriPuly-heart/issues/341), under [#338](https://github.com/kapitalismho/PuriPuly-heart/issues/338). It is not final UI, complete physical X3 acceptance or issue closure. On November 10, after the wristwatch/edge-held candidate, the owner reported that 10 cm admission was sufficient and holding the photo was quite good. The owner requested direct wrist placement, slight card thickness, full-size emergence instead of whole-image scaling, and a release that freezes in space and quickly fades. The owner explicitly requested both opacity and clipped-reveal candidates for comparison.
+This records the bounded temporary interaction work for [#341](https://github.com/kapitalismho/PuriPuly-heart/issues/341), under [#338](https://github.com/kapitalismho/PuriPuly-heart/issues/338). It is not final UI, complete physical X3 acceptance or issue closure. On November 10, after the wristwatch/edge-held candidate, the owner reported that 10 cm admission was sufficient and holding the photo was quite good. The owner requested direct wrist placement, slight card thickness, full-size emergence instead of whole-image scaling, and a release that freezes in space and quickly fades. The owner explicitly requested both opacity and clipped-reveal candidates for comparison. On November 12, after a manual wrist setup and sequential A/B run, the owner confirmed the saved wrist position, selected B (clipped reveal), and rejected the 1 mm thickness and edge planes. The final backface presentation remains open; showing the same image on both sides is one provisional candidate only.
 
 ## Selected reference and provenance
 
@@ -69,16 +69,23 @@ Resolution is photo-input-only. Caption startup and caption process lifetime do 
 
 An accepted left grip captures a photo orientation facing the HMD, using projected HMD up. It then locks that orientation relative to the left controller; it does not keep aiming at the head or use a ray. While held, the photo's **left-edge midpoint** stays at the actual left handgrip.
 
-`progress = clamp((current separation - grab separation) / 0.12, 0, 1)`. `interaction.photo_emergence` selects two temporary candidates:
+`progress = clamp((current separation - grab separation) / 0.12, 0, 1)`. The photo uses the owner-selected clipped reveal (B): the leftmost `progress` fraction of the image is shown with unchanged physical texel/text scale and full height. Width and UV extent change together; the whole image is not squeezed into a smaller card. The former full-size opacity candidate (A) and its `interaction.photo_emergence` selector are removed.
 
-- `opacity` (A, default): full 37.5 cm width and full source-aspect height from the start; alpha equals progress.
-- `reveal` (B): alpha is one while a positive area is revealed. The leftmost `progress` fraction of the image is shown with unchanged physical texel/text scale and full height. Width and UV extent change together; the whole image is not squeezed into a smaller card.
+Alpha eases in over the first 3 cm of pull, `1 - (1 - min(pull / 0.03, 1))^2`, then stays one. Moving back below 3 cm fades it again; zero pull shows nothing. This replaces the earlier instant full-opacity appearance and is a temporary curve, not a physically observed result.
 
 At 12 cm, the full photo latches until release, even if the hands move closer. The first continuous grip stays held across request authorization and the attempt-0-to-1 snapshot. Reopening retained/in-progress state makes no new request.
 
-On release, capture the current world position, rotation and revealed dimensions. Detach from the controller and fade only alpha to zero over 150 ms. Moving the hand no longer moves the released photo; nothing shrinks. Early release authorizes nothing; release after authorization does not cancel the request. Photo invalidation and tracking/reference loss retain their immediate cancellation behavior.
+On release, capture the current world position, rotation, revealed dimensions and alpha. Detach from the controller, keep the photo fixed in space for **2.5 s**, then fade only alpha to zero over 150 ms. Moving the hand no longer moves the released photo; nothing shrinks. Early release authorizes nothing; release after authorization does not cancel the request. Photo invalidation and tracking/reference loss retain their immediate cancellation behavior.
 
-The temporary card is **1 mm thick**: the existing photo front plus neutral back and four edge planes share the same OpenVR session. The front keeps its original aspect and no border is added. Head-center-facing planes are selected to avoid hidden faces bleeding through the fade. This is a thin overlay card, not game-world collision, scene-depth occlusion or a per-eye solid-mesh renderer; edge appearance needs headset observation.
+Until the fade completes, a fresh side-grip press of **either hand** whose actual `handgrip` point lies within 5 cm of the photo's visible rectangle and 8 cm of its plane picks the photo up without moving it, restoring its release alpha. It then follows that controller with the preserved offset. Releasing places it again and restarts the 2.5 s linger. A photo regrab takes precedence over a wrist-icon grab on the same left press. Quiescing blocks regrabs. These distances are temporary values (2026-11-13 owner request), not observed ergonomics.
+
+Native reports `photo_hidden` when the photo actually disappears after the linger and fade, not when the hand releases it.
+
+Original-photo viewing is removed (2026-11-13 owner decision): the `photo_debug_original` control, its compositor state and the offline `original_view.png` output no longer exist.
+
+Portrait sources (height greater than width) stay upright throughout. Display content fits within 1080×1920 instead of 1920×1080, the send JPEG uses a 720×1280 canvas instead of 1280×720, and the 1440 reference scale uses the short side. The card keeps its long side at the selected length, so a 9:16 portrait card is 21.09375 × 37.5 cm, revealed from the held left edge like a landscape card. Python derives the same send canvas from the source dimensions; the Relay request carries it as `image_size` under photo protocol 2. Landscape files whose content was shot with a tilted camera are not detected or rotated.
+
+The card has **no thickness**: the photo front and one flat neutral back occupy the same plane in the same OpenVR session, with no edge planes. The back mirrors the front's revealed width, full height, placement and alpha; only the head-facing side is shown, so the hidden side cannot bleed through the fade. The front keeps its original aspect and no border is added. The neutral back is an interim presentation, not a backface decision; same-image front/back remains a provisional candidate. This is an overlay card, not game-world collision, scene-depth occlusion or a per-eye mesh renderer.
 
 `photo_transform` defaults to omitted/null for this edge-pinned placement. An explicit rigid matrix preserves the complete raw-left-relative **center** override; it is not reinterpreted as an edge anchor.
 
@@ -90,7 +97,7 @@ The first stable read retains immutable encoded bytes and shared decoded/display
 
 Real pixels may finish after a fast pull. Presentation then uses the current progress/held pose, not a placeholder or second gesture. A late completion cannot recreate a released, expired, replaced or reference-lost placement. Current-photo source data may be reused after an early release; retention does not imply visibility.
 
-Photo protocol **2** requires `expected_file_id` as two decimal strings in ordinary snapshots, immutable with path and shutter time. Offers remain attempt 0 with `image: null`. Native and Python must be updated together; version 1 is rejected without a compatibility shim. Caption protocol and provider authority are unchanged.
+Photo protocol **3** requires `expected_file_id` as two decimal strings in ordinary snapshots, immutable with path and shutter time, and carries `excluded_blocks` for bounded block recovery. Offers remain attempt 0 with `image: null`. Native and Python must be updated together; older versions are rejected without a compatibility shim, so an IPC-2 executable cannot run with current Python. Caption protocol and provider authority are unchanged.
 
 For isolated offscreen verification only, `photo_debug_preview_source {photo_id}` requires `image.debug_controls` and the offscreen backend. It invokes the same source enqueue path as a real grab without injecting grip, hold, authorization or haptics. Existing exports observe actual pre-pull GPU pixels; this is not physical interaction evidence.
 
@@ -99,20 +106,20 @@ For isolated offscreen verification only, `photo_debug_preview_source {photo_id}
 The correction leaves these contracts unchanged:
 
 - VRCT forward angles 40°/45°, face angles 45°/55°, 50 ms default show dwell, 300 ms hide dwell, 100 ms icon fade and 200 ms new-grab readiness, with a fresh grip.
-- 37.5 cm full width and source aspect; 150 ms release and 225 ms icon return. Full-size opacity/clipped emergence and world-fixed alpha-only release supersede whole-image scaling and shrinking/controller-following release.
+- 37.5 cm long side and source aspect; 150 ms release fade after the 2.5 s linger and 225 ms ease-out icon return. Clipped reveal and world-fixed alpha-only release supersede whole-image scaling and shrinking/controller-following release. The icon return now interpolates rotation (quaternion slerp) with the same ease as position instead of snapping to the wrist orientation.
 - Silent grab start, left-controller valid-pull pulse and the application-authorized right-controller first-actually-drawn-block feedback once per request attempt.
 - The 10-second offer, 600-second latest-photo retention, no pre-pull photo transmission, retained-result reopening without another request and separate photo/caption process ownership.
 - No Python product OCR UI, input suppression, ray fallback, provider-policy change or new retry/telemetry framework.
 
 An authorized retained photo can display translated content during a partial pull, before another 12 cm crossing. Its first translated draw uses the existing native presentation report, not Python's `visible` intent, to request the right-hand feedback grant. A back-facing photo or translated runs outside the revealed horizontal area cannot qualify. Current photo/attempt/block/renderer identity, draw eligibility and once-per-attempt/recovery fences still apply. This neither authorizes another provider request nor changes visibility intent; original-only preview cannot produce translated-block feedback.
 
-Prior live component evidence used Quest Pro controllers, not physical Quest 3, PICO 4 or Ultra tests. The owner rejected A/B/C anatomical placement and the former remotely bound photo behavior, then accepted the range and reported improved holding on the November 10 candidate. That observation does not qualify the new manual setup, thickness, A/B emergence or world-fixed release. Their headset appearance, comfort, legibility and felt haptics remain separate observations.
+Prior live component evidence used Quest Pro controllers, not physical Quest 3, PICO 4 or Ultra tests. The owner rejected A/B/C anatomical placement and the former remotely bound photo behavior, then accepted the range and reported improved holding on the November 10 candidate. That observation does not qualify the new manual setup, thickness, A/B emergence or world-fixed release. The November 12 run confirmed only the saved wrist position and the B preference; the release was not observed, and the owner asked not to repeat it. The flat card, 3 cm pull fade-in and rotated icon return have not been seen in a headset. Headset appearance, comfort, legibility and felt haptics remain separate observations.
 
 PICO Connect, Steam Link, Virtual Desktop and ALVR may expose different or emulated model identities. Inspecting one transport's assets is not a guarantee for every transport/version. Legacy Streaming Assistant `9.5.6.1` was not extractable with the available archive tools; current Connect findings are not relabeled as historical support.
 
-## Calibrate, then compare emergence
+## Calibrated repeat preview
 
-The former six-case position/radius comparison is retired. The next standalone comparison adjusts the wrist once, then runs A opacity and B reveal sequentially with the same saved wrist and visible 10 cm admission range. Each candidate owns one native child; the first must finish and clean up before the second starts. Repeated offers use the same recorded image with fresh photo IDs; no capture or provider request is needed. Single-candidate `--repeat-offers --emergence ...` remains available.
+The former six-case position/radius comparison and the November 12 A/B comparison are complete and retired. A standalone `--repeat-offers` run reuses the saved wrist calibration and the visible 10 cm admission range with one native child. Repeated offers use the same recorded image with fresh photo IDs; no capture or provider request is needed. `--calibrate-wrist` remains available for explicit recalibration.
 
 `interaction.debug_case_label` identifies the candidate. It accepts at most 128 printable ASCII characters in one or two nonempty lines. `interaction.debug_grab_volume` enables three orthogonal, thin, transparent great-circle planes. Both diagnostic fields require `image.debug_controls`; they are absent/disabled by default.
 

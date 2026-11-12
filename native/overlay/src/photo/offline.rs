@@ -181,15 +181,10 @@ pub async fn run(path: &Path) -> Result<(), PhotoError> {
     compositor.ready().await?;
     let composite_gpu_ms = compositor.frame_gpu_ms;
     compositor.save(&output_dir.join("composite.png"))?;
-    compositor.view_original(true);
-    compositor.render(final_time, false)?;
-    compositor.ready().await?;
-    compositor.save(&output_dir.join("original_view.png"))?;
     let mut metadata = compositor.metadata();
     metadata["erased_gpu_ms"] = json!(erased_gpu_ms);
     metadata["composition_gpu_ms"] = json!(composite_gpu_ms);
     metadata["gpu_timing_valid"] = json!(composite_gpu_ms.is_some());
-    metadata["original_view_gpu_ms"] = json!(compositor.frame_gpu_ms);
     metadata["offline_artifact_wall_ms"] = json!(start.elapsed().as_secs_f64() * 1000.0);
     std::fs::write(
         output_dir.join("metadata.json"),

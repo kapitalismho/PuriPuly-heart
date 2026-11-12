@@ -8,8 +8,12 @@ from pathlib import Path
 
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 
-_SEND_WIDTH = 1280
-_SEND_HEIGHT = 720
+_SEND_LONG = 1280
+_SEND_SHORT = 720
+
+
+def send_size(width: int, height: int) -> tuple[int, int]:
+    return (_SEND_SHORT, _SEND_LONG) if height > width else (_SEND_LONG, _SEND_SHORT)
 
 
 class PhotoImageError(ValueError):
@@ -35,17 +39,22 @@ class PreparedPhoto:
     offset_y: int
     preparation_ms: float
 
+    @property
+    def send_size(self) -> tuple[int, int]:
+        return send_size(self.source_width, self.source_height)
+
     def map_box(self, box: tuple[int, int, int, int], *, google: bool) -> MappedPhotoBox:
         if len(box) != 4 or any(type(value) is not int for value in box):
             raise PhotoImageError("photo_box_invalid")
+        send_width, send_height = self.send_size
         if google:
             y0, x0, y1, x1 = box
             try:
                 left, top, right, bottom = (
-                    x0 * _SEND_WIDTH / 1000,
-                    y0 * _SEND_HEIGHT / 1000,
-                    x1 * _SEND_WIDTH / 1000,
-                    y1 * _SEND_HEIGHT / 1000,
+                    x0 * send_width / 1000,
+                    y0 * send_height / 1000,
+                    x1 * send_width / 1000,
+                    y1 * send_height / 1000,
                 )
             except OverflowError:
                 raise PhotoImageError("photo_box_invalid") from None
@@ -56,8 +65,8 @@ class PreparedPhoto:
         clipped = (
             max(left, self.offset_x),
             max(top, self.offset_y),
-            min(right, _SEND_WIDTH, self.offset_x + self.source_width * self.scale),
-            min(bottom, _SEND_HEIGHT, self.offset_y + self.source_height * self.scale),
+            min(right, send_width, self.offset_x + self.source_width * self.scale),
+            min(bottom, send_height, self.offset_y + self.source_height * self.scale),
         )
         if clipped[0] >= clipped[2] or clipped[1] >= clipped[3]:
             raise PhotoImageError("photo_box_outside_image")
@@ -109,9 +118,9 @@ def _load_prepared_photo(result: Mapping[str, object], directory: Path) -> Prepa
             and math.isfinite(scale)
             and scale > 0
             and type(offset_x) is int
-            and 0 <= offset_x < _SEND_WIDTH
+            and 0 <= offset_x < send_size(width, height)[0]
             and type(offset_y) is int
-            and 0 <= offset_y < _SEND_HEIGHT
+            and 0 <= offset_y < send_size(width, height)[1]
             and type(preparation_ms) in (int, float)
             and math.isfinite(preparation_ms)
             and preparation_ms >= 0

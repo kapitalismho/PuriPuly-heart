@@ -28,6 +28,7 @@ fn input(grip: bool, distance: f32) -> LegacyVrInput {
         left_index: 1,
         right_index: 2,
         grip,
+        right_grip: false,
     }
 }
 
@@ -297,29 +298,32 @@ fn retained_pull_progress_and_release_keep_width_without_snapshot_reopen() {
     f.look();
     f.step(360, Some(input(true, 0.0)));
     let half = f.step(380, Some(input(true, 0.06))).photo.unwrap();
-    assert!((half.alpha - 0.5).abs() < 0.0001);
-    assert!((half.width - 0.64).abs() < 0.0001);
+    assert_eq!(half.alpha, 1.0);
+    assert!((half.width - 0.32).abs() < 0.0001);
     assert!(f.step(455, Some(input(true, 0.12))).pull);
     let full = f.step(530, Some(input(true, 0.12))).photo.unwrap();
     assert_eq!(full.width, 0.64);
     assert_eq!(full.alpha, 1.0);
     let release = f.step(550, Some(input(false, 0.12)));
-    assert!(release.hidden);
+    assert!(!release.hidden);
     assert_eq!(release.photo.unwrap().alpha, 1.0);
     f.interaction
         .snapshot(Some(&f.photo), f.start + Duration::from_millis(560), 1560);
     let mut moved = input(false, 1.2);
     moved.left[1][3] = 0.7;
-    let fading = f.step(625, Some(moved));
-    assert!(fading.photo_world);
+    let lingering = f.step(3049, Some(moved));
+    assert!(lingering.photo_world && !lingering.hidden);
+    assert_eq!(lingering.photo.unwrap().alpha, 1.0);
+    let fading = f.step(3125, Some(moved));
     let half = fading.photo.unwrap();
     assert!((half.alpha - 0.5).abs() < 0.0001);
     assert_eq!(half.width, 0.64);
     assert_transform_close(half.transform, release.photo.unwrap().transform);
-    assert!(f.step(700, Some(input(false, 0.12))).photo.is_none());
-    assert!(f.step(900, Some(input(false, 0.12))).photo.is_none());
-    f.step(920, Some(input(true, 0.0)));
-    assert!(f.step(940, Some(input(true, 0.12))).pull);
+    let gone = f.step(3200, Some(input(false, 0.12)));
+    assert!(gone.photo.is_none() && gone.hidden);
+    assert!(!f.step(3400, Some(input(false, 0.12))).hidden);
+    f.step(3420, Some(input(true, 0.0)));
+    assert!(f.step(3440, Some(input(true, 0.12))).pull);
 }
 
 #[test]
@@ -553,6 +557,7 @@ fn referenced_input(grip: bool, separation: f32) -> LegacyVrInput {
         right_index: 8,
         reference_epoch: 7,
         grip,
+        right_grip: false,
     }
 }
 
@@ -700,8 +705,8 @@ fn explicit_photo_center_override_keeps_its_complete_raw_left_contract() {
     f.step(360, Some(referenced_input(true, 0.04)));
     let half = f.step(380, Some(referenced_input(true, 0.10))).photo.unwrap();
     assert_transform_close(half.transform, explicit);
-    assert!((half.alpha - 0.5).abs() < 0.00001);
-    assert!((half.width - 0.375).abs() < 0.00001);
+    assert_eq!(half.alpha, 1.0);
+    assert!((half.width - 0.1875).abs() < 0.00001);
     assert!(f.step(400, Some(referenced_input(true, 0.161))).pull);
     let mut sample = referenced_input(true, 0.161);
     sample.left[0][3] += 0.2;
@@ -710,12 +715,12 @@ fn explicit_photo_center_override_keeps_its_complete_raw_left_contract() {
     assert_eq!(full.alpha, 1.0);
     assert_transform_close(full.transform, explicit);
     sample.grip = false;
-    assert!(f.step(540, Some(sample)).hidden);
-    let half = f.step(615, Some(sample)).photo.unwrap();
+    assert!(!f.step(540, Some(sample)).hidden);
+    let half = f.step(3115, Some(sample)).photo.unwrap();
     assert!((half.alpha - 0.5).abs() < 0.00001);
     assert!((half.width - 0.375).abs() < 0.00001);
     assert_transform_close(half.transform, compose(sample.left, explicit));
-    assert!(f.step(690, Some(sample)).photo.is_none());
+    assert!(f.step(3190, Some(sample)).hidden);
 }
 
 #[test]
@@ -862,21 +867,23 @@ fn quiesce_drains_grab_return_hold_and_release_without_admitting_new_grabs() {
         assert!(!f.interaction.quiescent());
         f.step(674, Some(input(false, 0.12)));
         assert!(!f.interaction.quiescent());
-        f.step(825, Some(input(false, 0.0)));
+        f.step(2000, Some(input(false, 0.0)));
+        assert!(!f.interaction.quiescent(), "{phase}");
+        f.step(3325, Some(input(false, 0.0)));
         assert!(f.interaction.quiescent());
-        assert!(!f.step(840, Some(input(true, 0.0))).grab);
+        assert!(!f.step(3340, Some(input(true, 0.0))).grab);
         assert!(!f.interaction.quiescent());
-        f.step(850, None);
+        f.step(3350, None);
         assert!(f.interaction.quiescent());
-        f.interaction.snapshot(Some(&f.photo), f.start + Duration::from_millis(860), 1860);
+        f.interaction.snapshot(Some(&f.photo), f.start + Duration::from_millis(3360), 4360);
         assert!(f.interaction.quiescing());
         f.photo.photo_id = "new-case-repeat".into();
-        f.interaction.snapshot(Some(&f.photo), f.start + Duration::from_millis(870), 1870);
+        f.interaction.snapshot(Some(&f.photo), f.start + Duration::from_millis(3370), 4370);
         assert!(!f.interaction.quiescing());
-        for ms in [880, 930, 1030, 1230] {
+        for ms in [3380, 3430, 3530, 3730] {
             f.step(ms, Some(input(false, 0.0)));
         }
-        assert!(f.step(1240, Some(input(true, 0.0))).grab);
+        assert!(f.step(3740, Some(input(true, 0.0))).grab);
     }
 }
 
@@ -927,9 +934,9 @@ fn first_continuous_grip_unfolds_by_distance_and_remains_held_across_authorizati
     assert!(f.step(360, Some(input(true, 0.0))).grab);
     let half = f.step(380, Some(input(true, 0.06)));
     assert!(!half.pull);
-    assert!((half.photo.unwrap().alpha - 0.5).abs() < 0.00001);
-    assert!((half.photo.unwrap().width - 0.375).abs() < 0.00001);
-    assert_eq!(f.step(5000, Some(input(true, 0.06))).photo.unwrap().alpha, half.photo.unwrap().alpha);
+    assert_eq!(half.photo.unwrap().alpha, 1.0);
+    assert!((half.photo.unwrap().width - 0.1875).abs() < 0.00001);
+    assert_eq!(f.step(5000, Some(input(true, 0.06))).photo.unwrap().width, half.photo.unwrap().width);
     let full = f.step(9500, Some(input(true, 0.12)));
     assert!(full.pull);
     assert!(!full.hidden);
@@ -944,29 +951,32 @@ fn first_continuous_grip_unfolds_by_distance_and_remains_held_across_authorizati
     let prepared = f.step(10020, Some(input(true, 0.0)));
     assert!(!prepared.pull);
     assert_eq!(prepared.photo.unwrap().alpha, 1.0);
-    assert!(f.step(10030, Some(input(false, 0.0))).hidden);
-    assert!((f.step(10105, Some(input(false, 0.0))).photo.unwrap().alpha - 0.5).abs() < 0.00001);
-    assert!(f.step(10180, Some(input(false, 0.0))).photo.is_none());
+    assert!(!f.step(10030, Some(input(false, 0.0))).hidden);
+    assert!((f.step(12605, Some(input(false, 0.0))).photo.unwrap().alpha - 0.5).abs() < 0.00001);
+    let gone = f.step(12680, Some(input(false, 0.0)));
+    assert!(gone.photo.is_none() && gone.hidden);
 }
 
 #[test]
-fn partial_release_has_no_authorization_and_takes_150ms_from_its_current_progress() {
-    for progress in [0.25, 0.5, 0.99] {
+fn partial_release_has_no_authorization_and_lingers_before_fading_from_its_current_progress() {
+    for progress in [0.1, 0.25, 0.5, 0.99] {
         let mut f = Fixture::new(0);
         f.look();
         f.step(360, Some(input(true, 0.0)));
         let distance = 0.12 * progress;
-        let unfolded = f.step(380, Some(input(true, distance)));
-        assert!(!unfolded.pull);
-        assert!((unfolded.photo.unwrap().alpha - progress).abs() < 0.00001);
+        let unfolded = f.step(380, Some(input(true, distance))).photo.unwrap();
+        assert!(unfolded.alpha > 0.0);
+        assert!((unfolded.width - 0.375 * progress).abs() < 0.00001);
         assert!(!f.step(5000, Some(input(true, distance))).pull);
         let released = f.step(5010, Some(input(false, distance)));
         assert!(!released.pull);
-        assert!((released.photo.unwrap().alpha - progress).abs() < 0.00001);
-        let half = f.step(5085, Some(input(false, distance))).photo.unwrap();
-        assert!((half.alpha - progress * 0.5).abs() < 0.00001);
-        assert!((half.width - 0.375).abs() < 0.00001);
-        assert!(f.step(5160, Some(input(false, distance))).photo.is_none());
+        assert_eq!(released.photo.unwrap().alpha, unfolded.alpha);
+        assert_eq!(f.step(7509, Some(input(false, distance))).photo.unwrap().alpha, unfolded.alpha);
+        let half = f.step(7585, Some(input(false, distance))).photo.unwrap();
+        assert!((half.alpha - unfolded.alpha * 0.5).abs() < 0.00001);
+        assert_eq!(half.width, unfolded.width);
+        let gone = f.step(7660, Some(input(false, distance)));
+        assert!(gone.photo.is_none() && !gone.hidden);
         assert!(!f.interaction.offer_pulled);
     }
 }
@@ -1003,8 +1013,8 @@ fn left_edge_stays_at_actual_handgrip_through_rotation_growth_and_release() {
             pull_count += usize::from(frame.pull);
             let placement = frame.photo.unwrap();
             let expected_progress = if index >= 3 { 1.0 } else { progress };
-            assert!((placement.alpha - expected_progress).abs() < 0.00001);
-            assert!((placement.width - 0.375).abs() < 0.00001);
+            assert_eq!(placement.alpha, 1.0);
+            assert!((placement.width - 0.375 * expected_progress).abs() < 0.00001);
             let world = compose(sample.left, placement.transform);
             let grip = compose(sample.left, sample.left_handgrip);
             for i in 0..3 {
@@ -1035,11 +1045,11 @@ fn left_edge_stays_at_actual_handgrip_through_rotation_growth_and_release() {
         let frozen_world = frozen.photo.unwrap().transform;
         sample.left[0][3] += 0.8;
         sample.left[2][3] -= 0.4;
-        let release = f.step(975, Some(sample)).photo.unwrap();
+        let release = f.step(3475, Some(sample)).photo.unwrap();
         assert!((release.alpha - 0.5).abs() < 0.00001);
         assert_eq!(release.width, 0.375);
         assert_transform_close(release.transform, frozen_world);
-        assert!(f.step(1050, Some(sample)).photo.is_none());
+        assert!(f.step(3550, Some(sample)).photo.is_none());
     }
     if let Some(directory) = std::env::var_os("PURIPULY_PHOTO341_EVIDENCE") {
         let directory = std::path::PathBuf::from(directory);
@@ -1051,7 +1061,6 @@ fn left_edge_stays_at_actual_handgrip_through_rotation_growth_and_release() {
 #[test]
 fn revealed_photo_keeps_scale_and_freezes_partial_geometry_at_release() {
     let mut f = Fixture::new(0);
-    f.interaction.config.photo_emergence = PhotoEmergence::Reveal;
     f.look();
     assert!(f.step(360, Some(input(true, 0.0))).grab);
     let half = f.step(380, Some(input(true, 0.06)));
@@ -1063,18 +1072,234 @@ fn revealed_photo_keeps_scale_and_freezes_partial_geometry_at_release() {
     let frozen = f.step(400, Some(input(false, 0.06)));
     assert!(frozen.photo_world);
     assert!(!frozen.pull);
-    let fading = f.step(475, Some(input(false, 1.0)));
+    let fading = f.step(2975, Some(input(false, 1.0)));
     assert_eq!(fading.photo_extent, frozen.photo_extent);
     assert_eq!(fading.photo.unwrap().width, frozen.photo.unwrap().width);
     assert_transform_close(fading.photo.unwrap().transform, frozen.photo.unwrap().transform);
     assert!((fading.photo.unwrap().alpha - 0.5).abs() < 0.00001);
-    assert!(f.step(550, Some(input(false, 0.0))).photo.is_none());
+    assert!(f.step(3050, Some(input(false, 0.0))).photo.is_none());
     assert!(!f.interaction.offer_pulled);
-    f.step(640, Some(input(false, 0.0)));
-    assert!(f.step(650, Some(input(true, 0.0))).grab);
-    let full = f.step(700, Some(input(true, 0.12)));
+    f.step(3140, Some(input(false, 0.0)));
+    assert!(f.step(3150, Some(input(true, 0.0))).grab);
+    let full = f.step(3200, Some(input(true, 0.12)));
     assert!(full.pull);
     assert_eq!(full.photo_extent, 1.0);
     assert_eq!(full.photo.unwrap().width, 0.375);
-    assert_eq!(f.step(710, Some(input(true, 0.0))).photo_extent, 1.0);
+    assert_eq!(f.step(3210, Some(input(true, 0.0))).photo_extent, 1.0);
+}
+
+#[test]
+fn pull_fades_in_over_the_first_three_centimetres_at_constant_scale() {
+    let mut f = Fixture::new(0);
+    f.look();
+    assert!(f.step(360, Some(input(true, 0.0))).grab);
+    let mut previous = 0.0;
+    for (ms, distance) in [(370, 0.005), (380, 0.015), (390, 0.025)] {
+        let frame = f.step(ms, Some(input(true, distance)));
+        let placement = frame.photo.unwrap();
+        assert!(placement.alpha > previous && placement.alpha < 1.0);
+        assert!((frame.photo_extent - distance / 0.12).abs() < 0.00001);
+        assert!((placement.width - 0.375 * frame.photo_extent).abs() < 0.00001);
+        previous = placement.alpha;
+    }
+    assert_eq!(f.step(400, Some(input(true, PULL_FADE_M + 0.001))).photo.unwrap().alpha, 1.0);
+    assert_eq!(f.step(410, Some(input(true, 0.09))).photo.unwrap().alpha, 1.0);
+    let back = f.step(420, Some(input(true, 0.01))).photo.unwrap();
+    assert!(back.alpha > 0.0 && back.alpha < 1.0);
+    assert!(f.step(430, Some(input(true, 0.0))).photo.is_none());
+    assert!(!f.interaction.offer_pulled);
+}
+
+#[test]
+fn early_return_turns_the_icon_back_to_the_wrist_orientation() {
+    let mut f = Fixture::new(0);
+    f.look();
+    let mut grabbed = input(true, 0.0);
+    assert!(f.step(360, Some(grabbed)).grab);
+    let angle = 1.2_f32;
+    grabbed.left = [
+        [angle.cos(), -angle.sin(), 0.0, 0.05],
+        [angle.sin(), angle.cos(), 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+    ];
+    f.step(380, Some(grabbed));
+    grabbed.grip = false;
+    let start = f.step(400, Some(grabbed)).icon.unwrap();
+    assert_transform_close(start.transform, compose(grabbed.left, IDENTITY));
+    let samples = [430, 512, 590, 625].map(|ms| f.step(ms, Some(input(false, 0.0))).icon.unwrap().transform);
+    let turned = |t: Transform| t[1][0].atan2(t[0][0]);
+    let mut previous = turned(start.transform);
+    for transform in samples {
+        assert!(valid_transform(transform));
+        let current = turned(transform);
+        assert!(current < previous + 0.00001);
+        previous = current;
+    }
+    assert!(turned(samples[0]) > 0.0 && turned(samples[2]) < angle);
+    assert_transform_close(samples[3], IDENTITY);
+}
+
+#[test]
+fn interaction_notes_explain_each_attempt_outcome() {
+    let mut f = Fixture::new(0);
+    f.step(0, Some(input(false, 0.0)));
+    f.step(50, Some(input(false, 0.0)));
+    assert_eq!(f.interaction.notes, [InteractionNote::IconShown { facing_deg: 0.0, forward_deg: 0.0 }]);
+    f.step(100, Some(input(true, 0.0)));
+    assert!(matches!(f.interaction.notes[..], [InteractionNote::GripIgnored { reason: GripIgnored::NotReady, .. }]));
+    f.step(110, Some(input(false, 0.0)));
+    f.step(360, Some(input(true, 0.15)));
+    let [InteractionNote::GripIgnored { reason: GripIgnored::OutOfRange, distance_m, .. }] = f.interaction.notes[..] else {
+        panic!("{:?}", f.interaction.notes)
+    };
+    assert!((distance_m - 0.15).abs() < 0.0001);
+    f.step(370, Some(input(false, 0.0)));
+    f.step(380, Some(input(true, 0.0)));
+    assert_eq!(f.interaction.notes, [InteractionNote::Grab { distance_m: 0.0 }]);
+    f.step(390, Some(input(true, 0.06)));
+    assert!(f.interaction.notes.is_empty());
+    f.step(400, Some(input(false, 0.06)));
+    let [InteractionNote::GrabReleased { progress }] = f.interaction.notes[..] else {
+        panic!("{:?}", f.interaction.notes)
+    };
+    assert!((progress - 0.5).abs() < 0.0001);
+    f.step(650, Some(input(false, 0.0)));
+    f.step(700, Some(input(true, 0.0)));
+    f.step(710, Some(input(true, 0.12)));
+    assert_eq!(f.interaction.notes, [InteractionNote::Pull]);
+    f.step(720, Some(input(false, 0.12)));
+    assert_eq!(f.interaction.notes, [InteractionNote::HoldReleased]);
+    f.step(730, None);
+    assert_eq!(f.interaction.notes, [InteractionNote::IconHidden { facing_deg: None, forward_deg: None }]);
+}
+
+#[test]
+fn near_misses_are_rate_limited_and_hidden_gaze_records_its_angles() {
+    let mut f = Fixture::new(0);
+    f.step(0, Some(angled_input(false, 0.0, 70.0, 0.0)));
+    assert!(f.interaction.notes.is_empty());
+    let close = angled_input(false, 0.0, 50.0, 10.0);
+    f.step(10, Some(close));
+    let [InteractionNote::IconNearMiss { facing_deg, forward_deg }] = f.interaction.notes[..] else {
+        panic!("{:?}", f.interaction.notes)
+    };
+    assert!((forward_deg - 50.0).abs() < 0.01 && (facing_deg - 10.0).abs() < 0.01);
+    f.step(400, Some(close));
+    assert!(f.interaction.notes.is_empty());
+    f.step(510, Some(close));
+    assert_eq!(f.interaction.notes.len(), 1);
+    f.step(520, Some(input(false, 0.0)));
+    f.step(570, Some(input(false, 0.0)));
+    assert!(matches!(f.interaction.notes[..], [InteractionNote::IconShown { .. }]));
+    let away = angled_input(false, 0.0, 60.0, 0.0);
+    f.step(580, Some(away));
+    f.step(880, Some(away));
+    let [InteractionNote::IconHidden { forward_deg: Some(forward_deg), facing_deg: Some(_) }] = f.interaction.notes[..] else {
+        panic!("{:?}", f.interaction.notes)
+    };
+    assert!((forward_deg - 60.0).abs() < 0.01);
+}
+
+#[test]
+fn portrait_photos_reveal_their_own_upright_width_from_the_held_edge() {
+    let mut f = Fixture::new(0);
+    f.interaction.photo_pixels = [1080, 1920];
+    assert_eq!(f.interaction.card_size(), [0.2109375, 0.375]);
+    f.look();
+    assert!(f.step(360, Some(input(true, 0.0))).grab);
+    let half = f.step(380, Some(input(true, 0.06))).photo.unwrap();
+    assert!((half.width - 0.2109375 * 0.5).abs() < 0.00001);
+    let world = compose(input(true, 0.06).left, half.transform);
+    assert!((world[0][3] - world[0][0] * half.width * 0.5 - 0.06).abs() < 0.00001);
+    assert!(f.step(400, Some(input(true, 0.12))).pull);
+    assert!((f.step(410, Some(input(true, 0.12))).photo.unwrap().width - 0.2109375).abs() < 0.00001);
+}
+
+fn placed_photo(f: &mut Fixture) -> Transform {
+    f.look();
+    f.step(360, Some(input(true, 0.0)));
+    assert!(f.step(380, Some(input(true, 0.12))).pull);
+    let placed = f.step(400, Some(input(false, 0.12)));
+    assert!(placed.photo_world && !placed.hidden);
+    placed.photo.unwrap().transform
+}
+
+fn hand_at(world: Transform) -> LegacyVrInput {
+    let mut sample = input(false, 0.12);
+    for i in 0..3 {
+        sample.right[i][3] = world[i][3];
+    }
+    sample
+}
+
+#[test]
+fn either_hand_can_regrab_a_lingering_photo_and_each_placement_restarts_its_linger() {
+    let mut f = Fixture::new(1);
+    let world = placed_photo(&mut f);
+    let mut reach = hand_at(world);
+    f.step(1000, Some(reach));
+    reach.right_grip = true;
+    let grabbed = f.step(1010, Some(reach));
+    assert!(f.interaction.notes.contains(&InteractionNote::PhotoRegrab { hand: Hand::Right }));
+    let held = grabbed.photo.unwrap();
+    assert_eq!((held.device, held.alpha, grabbed.photo_world), (2, 1.0, false));
+    assert_transform_close(compose(reach.right, held.transform), world);
+    let mut moved = reach;
+    moved.right[1][3] += 0.3;
+    let carried = f.step(2900, Some(moved));
+    let mut expected = world;
+    expected[1][3] += 0.3;
+    assert_transform_close(compose(moved.right, carried.photo.unwrap().transform), expected);
+    assert_eq!(carried.photo.unwrap().alpha, 1.0);
+    moved.right_grip = false;
+    let dropped = f.step(3000, Some(moved));
+    assert!(f.interaction.notes.contains(&InteractionNote::PhotoPlaced));
+    assert!(dropped.photo_world && !dropped.hidden);
+    assert_transform_close(dropped.photo.unwrap().transform, expected);
+    assert_eq!(f.step(5499, Some(moved)).photo.unwrap().alpha, 1.0);
+    assert!((f.step(5575, Some(moved)).photo.unwrap().alpha - 0.5).abs() < 0.00001);
+    let gone = f.step(5650, Some(moved));
+    assert!(gone.photo.is_none() && gone.hidden);
+    assert!(f.interaction.notes.contains(&InteractionNote::PhotoFaded));
+    assert!(!f.step(5700, Some(moved)).hidden);
+}
+
+#[test]
+fn regrab_during_fade_restores_opacity_and_the_left_hand_can_regrab_too() {
+    let mut f = Fixture::new(1);
+    let world = placed_photo(&mut f);
+    let mut reach = input(false, 0.0);
+    for i in 0..3 {
+        reach.left[i][3] = world[i][3];
+    }
+    assert!((f.step(2975, Some(reach)).photo.unwrap().alpha - 0.5).abs() < 0.00001);
+    reach.grip = true;
+    let grabbed = f.step(2980, Some(reach));
+    assert!(f.interaction.notes.contains(&InteractionNote::PhotoRegrab { hand: Hand::Left }));
+    assert!(!grabbed.grab);
+    assert_eq!(grabbed.photo.unwrap().alpha, 1.0);
+    assert_eq!(grabbed.photo.unwrap().device, 1);
+}
+
+#[test]
+fn presses_away_from_the_photo_or_while_quiescing_never_regrab() {
+    let mut f = Fixture::new(1);
+    let world = placed_photo(&mut f);
+    let mut far = world;
+    far[2][3] += TOUCH_DEPTH_M + 0.02;
+    let mut away = hand_at(far);
+    f.step(1000, Some(away));
+    away.right_grip = true;
+    assert!(f.step(1010, Some(away)).photo_world);
+    assert!(f.interaction.notes.iter().all(|note| !matches!(note, InteractionNote::PhotoRegrab { .. })));
+    let mut reach = hand_at(world);
+    f.step(1020, Some(reach));
+    f.interaction.quiesce();
+    reach.right_grip = true;
+    assert!(f.step(1030, Some(reach)).photo_world);
+    assert!(f.interaction.notes.iter().all(|note| !matches!(note, InteractionNote::PhotoRegrab { .. })));
+    assert!(!f.interaction.quiescent());
+    reach.right_grip = false;
+    f.step(3100, Some(reach));
+    assert!(f.interaction.quiescent());
 }

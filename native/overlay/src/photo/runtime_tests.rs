@@ -169,7 +169,7 @@ async fn windows_graphics_photo341_icons_and_held_preview_readback() {
     compositor
         .add_block(1, Some(region), Some(text), 0.0, now)
         .unwrap();
-    assert!(compositor.first_visible_block_in_extent(now, 1.0).is_none());
+    assert!(compositor.first_visible_block_in(now, [0.0, 0.0, 1.0, 1.0]).is_none());
     compositor
         .render(now + Duration::from_millis(50), false)
         .unwrap();
@@ -185,7 +185,7 @@ async fn windows_graphics_photo341_icons_and_held_preview_readback() {
         .save(&directory.join("held-translated.png"))
         .unwrap();
     assert!(!compositor.needs_frame(now + Duration::from_millis(150)));
-    let visible = compositor.first_visible_block_in_extent(now + Duration::from_millis(150), 1.0);
+    let visible = compositor.first_visible_block_in(now + Duration::from_millis(150), [0.0, 0.0, 1.0, 1.0]);
     assert_eq!(visible, Some(1));
     let original = image::open(directory.join("held-original.png")).unwrap();
     let translated = image::open(directory.join("held-translated.png")).unwrap();
@@ -455,6 +455,7 @@ impl PhotoRuntime {
                     left_index: 1,
                     right_index: 2,
                     grip,
+                    right_grip: false,
                 };
                 runtime.input = Some(input);
                 runtime.interaction.step(Some(photo), Some(input), clock + Duration::from_millis(ms));
@@ -495,16 +496,13 @@ impl PhotoRuntime {
         let (mut bridge, first) = connected.unwrap();
         let (mut runtime, _worker) = Self::new(&manifest).unwrap();
         runtime.compositor.as_mut().unwrap().ready().await.unwrap();
-        let mut card = std::array::from_fn(|_| None);
-        for (index, surface) in card.iter_mut().enumerate() {
-            *surface = Some(OpenVrOverlay::in_session(&session, &format!("controlled-card-{index}")).unwrap());
-        }
+        let back = Some(OpenVrOverlay::in_session(&session, "controlled-card-back").unwrap());
         runtime.backend = Backend::OpenVr(PhotoOpenVrSurfaces {
             icon: Some(icon),
             photo: Some(photo_surface),
             grab_volume: [None, None, None],
             case_label: None,
-            card,
+            back,
             _session: session,
         });
         runtime.receive(first, &mut bridge).await.unwrap();
@@ -548,25 +546,16 @@ impl PhotoRuntime {
         assert!(!runtime.interaction.frame.pull);
         assert_pulses(&[]);
         let partial = runtime.interaction.frame.photo.unwrap();
-        assert!(partial.alpha > 0.0 && partial.alpha < 1.0);
-        assert!((partial.width - photo_width_m.unwrap_or(0.375)).abs() < 0.00001);
+        assert_eq!(partial.alpha, 1.0);
+        assert!((partial.width - photo_width_m.unwrap_or(0.375) * 0.119 / 0.12).abs() < 0.0001);
         assert!(!runtime.state.photo().unwrap().visible);
         assert_eq!(runtime.pull_sequence, 0);
-        runtime.compositor.as_mut().unwrap().view_original(true);
-        runtime.render_frame(&mut bridge).await.unwrap();
-        no_report(&mut socket).await;
-        assert!(!runtime.drawn_reported);
         let supplied = std::env::var_os("PURIPULY_PHOTO341_EVIDENCE");
         let directory = supplied.clone().map(std::path::PathBuf::from).unwrap_or_else(|| {
             std::env::temp_dir().join(format!("puri341-first-draw-{}", std::process::id()))
         });
         std::fs::create_dir_all(&directory).unwrap();
         let case = if photo_width_m.is_some() { "override" } else { "default" };
-        let original_path = directory.join(format!("hidden-partial-{case}-original.png"));
-        runtime.compositor.as_ref().unwrap().save(&original_path).unwrap();
-        let original = image::open(&original_path).unwrap().into_rgba8();
-        assert!(original.pixels().all(|pixel| pixel.0 == [35, 45, 60, 255]));
-        runtime.compositor.as_mut().unwrap().view_original(false);
         if let Backend::OpenVr(surfaces) = &mut runtime.backend {
             surfaces.photo.as_mut().unwrap().set_overlay_visible(false).unwrap();
         }
@@ -593,7 +582,7 @@ impl PhotoRuntime {
         assert!(glyph_pixels > 100);
         assert!(erased_pixels > 100);
         for (x, y) in [(0, 0), (319, 0), (0, 179), (319, 179)] {
-            assert_eq!(translated.get_pixel(x, y), original.get_pixel(x, y));
+            assert_eq!(translated.get_pixel(x, y).0, [35, 45, 60, 255]);
         }
         std::fs::write(directory.join(format!("hidden-partial-{case}-presentation.json")), serde_json::to_vec_pretty(&json!({
             "photo":runtime.state.photo(), "placement":partial, "observed_overlay_visible":visible,
@@ -648,6 +637,7 @@ impl PhotoRuntime {
                     left_index: 1,
                     right_index: 2,
                     grip: false,
+                    right_grip: false,
                 }),
                 clock + Duration::from_millis(ms),
             );
@@ -790,7 +780,7 @@ async fn quiescent_bridge_ack_waits_for_interaction_and_release_or_loss() {
             left[0][3] = separation;
             runtime.interaction.step(runtime.state.photo(), Some(crate::openvr::LegacyVrInput {
                 head, left, right: IDENTITY, left_handgrip: IDENTITY, right_handgrip: IDENTITY,
-                reference_epoch:1, left_index:1, right_index:2, grip,
+                reference_epoch:1, left_index:1, right_index:2, grip, right_grip:false,
             }), clock + Duration::from_millis(ms))
         };
         for ms in [0, 50, 150, 350] { step(&mut runtime, ms, false, 0.0); }
@@ -809,13 +799,13 @@ async fn quiescent_bridge_ack_waits_for_interaction_and_release_or_loss() {
             step(&mut runtime, 600, false, 0.12);
             runtime.ack_quiescent(&mut bridge).await.unwrap();
             assert!(tokio::time::timeout(Duration::from_millis(20), socket.next()).await.is_err());
-            step(&mut runtime, 825, false, 0.0);
+            step(&mut runtime, 3300, false, 0.0);
         }
         runtime.ack_quiescent(&mut bridge).await.unwrap();
         let ack = socket.next().await.unwrap().unwrap();
         assert_eq!(serde_json::from_str::<serde_json::Value>(ack.to_text().unwrap()).unwrap(),
             json!({"type":"photo_debug_quiescent","request_id":"bounded-request"}));
-        assert!(!step(&mut runtime, 840, true, 0.0).grab);
+        assert!(!step(&mut runtime, 3340, true, 0.0).grab);
         runtime.ack_quiescent(&mut bridge).await.unwrap();
         assert!(tokio::time::timeout(Duration::from_millis(20), socket.next()).await.is_err());
     }
@@ -875,7 +865,7 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
             head[i][3] = wrist[i][3] + if i == 2 { 0.5 } else { 0.0 };
         }
         crate::openvr::LegacyVrInput {
-            head,left,right,left_handgrip,right_handgrip,reference_epoch:7,left_index:3,right_index:8,grip,
+            head,left,right,left_handgrip,right_handgrip,reference_epoch:7,left_index:3,right_index:8,grip,right_grip:false,
         }
     };
     for ms in [0,50,150,350] {
@@ -888,7 +878,8 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     runtime.interaction_input(Some(sample(true,0.06)),clock+Duration::from_millis(380),&mut bridge).await.unwrap();
     let PreparationCompletion::Source(completion) = runtime.preparation.next_result().await.unwrap() else { panic!("Real local decode required") };
     runtime.preview_source(completion,&mut bridge).await.unwrap();
-    assert!((runtime.interaction.frame.photo.unwrap().alpha-0.5).abs()<0.00001);
+    assert_eq!(runtime.interaction.frame.photo.unwrap().alpha,1.0);
+    assert!((runtime.interaction.frame.photo.unwrap().width-0.1875).abs()<0.00001);
     assert_eq!(runtime.pull_sequence,0);
     assert!(!runtime.preparation_started);
     let first_directory = std::env::var_os("PURIPULY_PHOTO341_EVIDENCE").map(std::path::PathBuf::from).unwrap_or_else(||directory.clone());
@@ -902,18 +893,20 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     let PreparationCompletion::Source(late_release) = runtime.preparation.next_result().await.unwrap() else { panic!("Actual late release result required") };
     runtime.interaction_input(Some(sample(false,0.06)),clock+Duration::from_millis(400),&mut bridge).await.unwrap();
     runtime.interaction_input(Some(sample(false,0.0)),clock+Duration::from_millis(550),&mut bridge).await.unwrap();
+    assert!(runtime.interaction.frame.photo.is_some());
+    runtime.interaction_input(Some(sample(false,0.0)),clock+Duration::from_millis(3100),&mut bridge).await.unwrap();
     assert!(runtime.interaction.frame.photo.is_none());
     runtime.preview_source(late_release,&mut bridge).await.unwrap();
     assert!(runtime.texture.is_some());
     assert!(runtime.interaction.frame.photo.is_none());
     assert_eq!(runtime.pull_sequence,0);
     assert!(!runtime.preparation_started);
-    for (ms,grip,separation) in [(625,false,0.0),(650,false,0.0),(660,true,0.0),(680,true,0.06)] {
+    for (ms,grip,separation) in [(3175,false,0.0),(3200,false,0.0),(3210,true,0.0),(3230,true,0.06)] {
         runtime.interaction_input(Some(sample(grip,separation)),clock+Duration::from_millis(ms),&mut bridge).await.unwrap();
     }
     let partial = runtime.interaction.frame;
-    assert!((partial.photo.unwrap().alpha-0.5).abs()<0.00001);
-    assert!((partial.photo.unwrap().width-0.375).abs()<0.00001);
+    assert_eq!(partial.photo.unwrap().alpha,1.0);
+    assert!((partial.photo.unwrap().width-0.1875).abs()<0.00001);
     assert_eq!(runtime.pull_sequence,0);
     assert!(tokio::time::timeout(Duration::from_millis(20),socket.next()).await.is_err());
     assert!(!runtime.drawn_reported);
@@ -935,7 +928,7 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
             "input_boundary":"Synthetic nonidentity native poses through the production interaction_input function; not OpenVR/HMD input",
         })).unwrap()).unwrap();
     }
-    runtime.interaction_input(Some(sample(true,0.121)),clock+Duration::from_millis(700),&mut bridge).await.unwrap();
+    runtime.interaction_input(Some(sample(true,0.121)),clock+Duration::from_millis(3250),&mut bridge).await.unwrap();
     let pull = socket.next().await.unwrap().unwrap();
     assert_eq!(serde_json::from_str::<serde_json::Value>(pull.to_text().unwrap()).unwrap()["type"],"photo_pull");
     assert_eq!(runtime.interaction.frame.photo.unwrap().alpha,1.0);
@@ -946,11 +939,11 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     photo.visible=true;
     runtime.receive(PhotoIncoming::Snapshot { revision:2,photo:Some(photo.clone()) },&mut bridge).await.unwrap();
     socket.next().await.unwrap().unwrap();
-    runtime.interaction_input(Some(sample(true,0.0)),clock+Duration::from_millis(720),&mut bridge).await.unwrap();
+    runtime.interaction_input(Some(sample(true,0.0)),clock+Duration::from_millis(3270),&mut bridge).await.unwrap();
     assert_eq!(runtime.interaction.frame.photo.unwrap().width,0.375);
     assert_eq!(runtime.pull_sequence,1);
     assert_eq!(runtime.compositor.as_ref().unwrap().original_uploads,1);
-    runtime.interaction_input(None,clock+Duration::from_millis(740),&mut bridge).await.unwrap();
+    runtime.interaction_input(None,clock+Duration::from_millis(3290),&mut bridge).await.unwrap();
     socket.next().await.unwrap().unwrap();
     assert!(runtime.interaction.frame.photo.is_none());
     runtime.preparation.start_source(runtime.source_request.clone().unwrap()).unwrap();
@@ -1054,7 +1047,7 @@ async fn windows_graphics_card_crop_preserves_physical_texel_scale() {
     }
     let mut records = Vec::new();
     for extent in [1.0, 0.5, 0.25] {
-        surface.set_card_presentation(None, IDENTITY, 0.375 * extent, 0.0, 1.0, extent).unwrap();
+        surface.set_card_presentation(None, IDENTITY, 0.375 * extent, 0.0, 1.0, [0.0, 0.0, extent, 1.0]).unwrap();
         surface.set_overlay_visible(true).unwrap();
         tokio::time::sleep(Duration::from_millis(40)).await;
         for (y, expected) in [(0.08, true), (0.10, false)] {

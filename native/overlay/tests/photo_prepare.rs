@@ -41,14 +41,15 @@ impl Drop for Directory {
 
 #[test]
 fn native_preparation_preserves_original_and_maps_supported_sizes_and_aspects() {
-    for (name, width, height, scale, offset_x, offset_y) in [
-        ("720", 1280, 720, 1.0, 0, 0),
-        ("1080", 1920, 1080, 2.0 / 3.0, 0, 0),
-        ("1440", 2560, 1440, 0.5, 0, 0),
-        ("2160", 3840, 2160, 1.0 / 3.0, 0, 0),
-        ("portrait", 360, 720, 1.0, 460, 0),
-        ("wide", 1920, 480, 2.0 / 3.0, 0, 200),
-        ("custom", 853, 601, 720.0 / 601.0, 129, 0),
+    for (name, width, height, scale, offset_x, offset_y, canvas) in [
+        ("720", 1280, 720, 1.0, 0, 0, (1280, 720)),
+        ("1080", 1920, 1080, 2.0 / 3.0, 0, 0, (1280, 720)),
+        ("1440", 2560, 1440, 0.5, 0, 0, (1280, 720)),
+        ("2160", 3840, 2160, 1.0 / 3.0, 0, 0, (1280, 720)),
+        ("portrait", 360, 720, 1280.0 / 720.0, 40, 0, (720, 1280)),
+        ("portrait-2160", 2160, 3840, 1.0 / 3.0, 0, 0, (720, 1280)),
+        ("wide", 1920, 480, 2.0 / 3.0, 0, 200, (1280, 720)),
+        ("custom", 853, 601, 720.0 / 601.0, 129, 0, (1280, 720)),
     ] {
         let directory = Directory::new(name);
         let request = directory.request(width, height);
@@ -61,8 +62,8 @@ fn native_preparation_preserves_original_and_maps_supported_sizes_and_aspects() 
             std::fs::read(&request.source_path).unwrap()
         );
         let jpeg = image::open(&prepared.jpeg_path).unwrap().into_rgb8();
-        assert_eq!(jpeg.dimensions(), (1280, 720));
-        let center = jpeg.get_pixel(640, 360);
+        assert_eq!(jpeg.dimensions(), canvas);
+        let center = jpeg.get_pixel(canvas.0 / 2, canvas.1 / 2);
         for (actual, expected) in center.0.iter().zip([200i16, 90, 35]) {
             assert!((*actual as i16 - expected).abs() <= 3);
         }

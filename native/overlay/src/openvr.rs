@@ -677,12 +677,12 @@ impl OpenVrOverlay {
         width: f32,
         alpha: f32,
         texel_aspect: f32,
-        extent: f32,
+        bounds: [f32; 4],
     ) -> Result<(), OpenVrError> {
         #[cfg(windows)]
         {
             let OpenVrBackend::Windows(overlay) = &mut self.backend;
-            let presentation = (device, transform, width, alpha, texel_aspect, extent);
+            let presentation = (device, transform, width, alpha, texel_aspect, bounds);
             if overlay.card_presentation == Some(presentation) {
                 return Ok(());
             }
@@ -703,7 +703,8 @@ impl OpenVrOverlay {
                 }
             };
             map_overlay_submit_error(api, "photo transform", error)?;
-            let mut bounds = openvr_sys::VRTextureBounds_t { uMin: 0.0, vMin: 0.0, uMax: extent, vMax: 1.0 };
+            let [uMin, vMin, uMax, vMax] = bounds;
+            let mut bounds = openvr_sys::VRTextureBounds_t { uMin, vMin, uMax, vMax };
             for (name, error) in unsafe {
                 [
                     ("SetOverlayWidthInMeters", api.SetOverlayWidthInMeters.ok_or_else(missing_overlay_method("SetOverlayWidthInMeters"))?(overlay.overlay_handle, width)),
@@ -795,6 +796,7 @@ pub struct LegacyVrInput {
     pub left_index: u32,
     pub right_index: u32,
     pub grip: bool,
+    pub right_grip: bool,
 }
 
 pub struct OpenVrSession {
@@ -1122,6 +1124,7 @@ impl WindowsOpenVrSession {
             left_index,
             right_index,
             grip: states[0].ulButtonPressed & (1u64 << openvr_sys::EVRButtonId_k_EButton_Grip) != 0,
+            right_grip: states[1].ulButtonPressed & (1u64 << openvr_sys::EVRButtonId_k_EButton_Grip) != 0,
         })
     }
 }
@@ -1302,7 +1305,7 @@ struct WindowsOpenVrOverlay {
     placement_policy: OverlayPlacementPolicy,
     applied_placement_policy: Option<OverlayPlacementPolicy>,
     tracked_presentation: Option<(u32, [[f32; 4]; 3], f32, f32)>,
-    card_presentation: Option<(Option<u32>, [[f32; 4]; 3], f32, f32, f32, f32)>,
+    card_presentation: Option<(Option<u32>, [[f32; 4]; 3], f32, f32, f32, [f32; 4])>,
     visible: bool,
     output_adapter: OpenVrOutputAdapter,
     _session: Rc<WindowsOpenVrSession>,

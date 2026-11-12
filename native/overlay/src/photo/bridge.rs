@@ -23,8 +23,6 @@ pub enum PhotoIncoming {
     ProbePull { photo_id: String, event_id: String },
     #[serde(rename = "photo_probe_hide")]
     ProbeHide { photo_id: String },
-    #[serde(rename = "photo_debug_original")]
-    DebugOriginal { photo_id: String, enabled: bool },
     #[serde(rename = "photo_debug_export")]
     DebugExport { photo_id: String, label: String },
     #[serde(rename = "photo_debug_quiesce")]

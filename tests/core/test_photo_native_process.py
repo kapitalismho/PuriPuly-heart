@@ -250,3 +250,59 @@ async def test_actual_native_death_during_prepare_fails_without_resuming_job(tmp
     finally:
         await owner.close()
     assert list(owned.iterdir()) == []
+
+
+def jpeg_size(data: bytes) -> tuple[int, int]:
+    index = 2
+    while index < len(data):
+        marker, length = data[index + 1], struct.unpack(">H", data[index + 2 : index + 4])[0]
+        if marker in (0xC0, 0xC2):
+            height, width = struct.unpack(">HH", data[index + 5 : index + 9])
+            return width, height
+        index += 2 + length
+    raise AssertionError("JPEG frame header missing")
+
+
+async def test_actual_native_portrait_photo_is_sent_upright_in_portrait_canvas(tmp_path):
+    executable = Path(os.environ["PHOTO_NATIVE_EXECUTABLE"]).resolve(strict=True)
+    photos = tmp_path / "photos"
+    photos.mkdir()
+    temporary = tmp_path / "owned"
+    temporary.mkdir()
+    records = {"preopened": 0, "starts": 0, "closed": 0}
+    route = PhotoRoute("controlled", lambda model: ControlledConnection(records))
+
+    async def resolve():
+        return route
+
+    owner = PhotoApplicationOwner(
+        resolve_route=resolve,
+        target_language=lambda: "ko",
+        diagnostic=lambda stage, fields: None,
+        watcher=PhotoCaptureWatcher(photos, tmp_path / "isolated-logs"),
+        runner=PhotoProcessRunner(executable),
+        backend="probe",
+        temporary_root=temporary,
+        poll_interval=0.01,
+    )
+    try:
+        await owner.start()
+        (photos / "portrait.png").write_bytes(png(540, 960))
+        await until(
+            lambda: owner.lifecycle.snapshot["photo"] is not None and owner.bridge.ready.is_set()
+        )
+        photo_id = owner.lifecycle.snapshot["photo"]["photo_id"]
+        assert owner.bridge.send(
+            {"type": "photo_probe_pull", "photo_id": photo_id, "event_id": "portrait"}
+        )
+        await until(lambda: owner.lifecycle.snapshot["photo"]["phase"] in ("completed", "failed"))
+        assert owner.lifecycle.snapshot["photo"]["phase"] == "completed"
+        prepared = records["prepared"]
+        assert prepared.send_size == (720, 1280)
+        assert jpeg_size(base64.b64decode(prepared.jpeg_base64)) == (720, 1280)
+        assert (prepared.offset_x, prepared.offset_y) == (0, 0)
+        boxes = [b["bbox"] for b in owner.lifecycle.snapshot["photo"]["blocks"]]
+        assert boxes == [[0.0, 0.0, 75.0, 75.0], [75.0, 75.0, 150.0, 150.0]]
+    finally:
+        await owner.close()
+    assert owner.supervisor.last_exit_code == 0

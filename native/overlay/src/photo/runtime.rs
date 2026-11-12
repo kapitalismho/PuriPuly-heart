@@ -37,7 +37,7 @@ pub struct PhotoOpenVrSurfaces {
     photo: Option<OpenVrOverlay>,
     grab_volume: [Option<OpenVrOverlay>; 3],
     case_label: Option<OpenVrOverlay>,
-    card: [Option<OpenVrOverlay>; 5],
+    back: Option<OpenVrOverlay>,
     _session: OpenVrSession,
 }
 
@@ -68,17 +68,14 @@ impl PhotoOpenVrSurfaces {
         } else {
             None
         };
-        let mut card = std::array::from_fn(|_| None);
-        for (index, name) in ["back", "left", "right", "top", "bottom"].into_iter().enumerate() {
-            card[index] = Some(OpenVrOverlay::in_session(&session, &surface_identity(manifest, name))
-                .map_err(|_| PhotoError::OpenVr)?);
-        }
+        let back = OpenVrOverlay::in_session(&session, &surface_identity(manifest, "back"))
+            .map_err(|_| PhotoError::OpenVr)?;
         Ok(Self {
             icon: Some(icon),
             photo: Some(photo),
             grab_volume,
             case_label,
-            card,
+            back: Some(back),
             _session: session,
         })
     }
@@ -88,7 +85,7 @@ impl PhotoOpenVrSurfaces {
     }
     pub fn close_photo(&mut self) {
         self.photo.take();
-        for surface in &mut self.card { surface.take(); }
+        self.back.take();
     }
     pub fn icon(&mut self) -> Option<&mut OpenVrOverlay> {
         self.icon.as_mut()
@@ -99,7 +96,7 @@ impl PhotoOpenVrSurfaces {
 
     fn surfaces(&mut self) -> impl Iterator<Item = &mut OpenVrOverlay> {
         [&mut self.icon, &mut self.photo].into_iter()
-            .chain(self.card.iter_mut()).chain(self.grab_volume.iter_mut()).chain([&mut self.case_label]).flatten()
+            .chain([&mut self.back]).chain(self.grab_volume.iter_mut()).chain([&mut self.case_label]).flatten()
     }
 
     fn close_diagnostics(&mut self) {
@@ -512,22 +509,6 @@ impl PhotoRuntime {
                 self.grant_haptic(&photo_id, attempt_id, block_id);
                 if self.take_haptic_grant() {
                     self.haptic(HapticCue::FirstBlock);
-                }
-            }
-            PhotoIncoming::DebugOriginal { photo_id, enabled } => {
-                if !self.debug_controls {
-                    return Err(PhotoError::Protocol);
-                }
-                if self
-                    .state
-                    .photo()
-                    .is_some_and(|photo| photo.photo_id == photo_id)
-                {
-                    #[cfg(windows)]
-                    if let Some(compositor) = &mut self.compositor {
-                        compositor.view_original(enabled);
-                        self.render_frame(bridge).await?;
-                    }
                 }
             }
             PhotoIncoming::DebugExport { photo_id, label } => {
@@ -948,7 +929,20 @@ impl PhotoRuntime {
         bridge: &mut PhotoBridge,
     ) -> Result<(), PhotoError> {
         self.input = input;
+        #[cfg(windows)]
+        if let Some(pixels) = self.compositor.as_ref().and_then(|compositor| compositor.dimensions()) {
+            self.interaction.photo_pixels = pixels;
+        }
         let frame = self.interaction.step(self.state.photo(), input, now);
+        if let Some(photo) = self.state.photo() {
+            for note in &self.interaction.notes {
+                let mut record = json!(note);
+                record["type"] = json!("photo_interaction");
+                record["photo_id"] = json!(photo.photo_id);
+                record["attempt_id"] = json!(photo.attempt_id);
+                println!("{record}");
+            }
+        }
         if frame.grab {
             self.enqueue_preview_source();
         }
@@ -1073,32 +1067,30 @@ impl PhotoRuntime {
                 if updated {
                     if let Some(texture) = &self.texture { compositor.submit_texture(surface, texture)?; }
                 }
-                if let (Some(placement), Some(_), Some(input), Some([pixels_w, pixels_h])) =
+                if let (Some(placement), Some(_), Some(input), Some(pixels)) =
                     (frame.photo.filter(|_| active), &self.texture, self.input, compositor.dimensions())
                 {
                     let device = (!frame.photo_world).then_some(placement.device);
-                    let world = if frame.photo_world { placement.transform } else { compose(input.left, placement.transform) };
+                    let holder = if placement.device == input.right_index { input.right } else { input.left };
+                    let world = if frame.photo_world { placement.transform } else { compose(holder, placement.transform) };
                     let front_visible = super::card::front_facing(world, input.head);
-                    surface.set_card_presentation(device, placement.transform, placement.width, placement.alpha, 1.0, frame.photo_extent)
+                    surface.set_card_presentation(device, placement.transform, placement.width, placement.alpha, 1.0, [0.0, 0.0, frame.photo_extent, 1.0])
                         .map_err(|_| PhotoError::OpenVr)?;
                     surface.set_overlay_visible(front_visible).map_err(|_| PhotoError::OpenVr)?;
-                    let height = self.interaction.config.photo_width_m * pixels_h as f32 / pixels_w as f32;
-                    for (surface, face) in surfaces.card.iter_mut().zip(super::card::faces(placement.transform, placement.width, height)) {
-                        let surface = surface.as_mut().ok_or(PhotoError::OpenVr)?;
-                        if !self.card_submitted {
-                            compositor.submit_texture(surface, self.card_material.as_ref().ok_or(PhotoError::Graphics)?)?;
-                        }
-                        let face_world = if frame.photo_world { face.transform } else { compose(input.left, face.transform) };
-                        surface.set_card_presentation(device, face.transform, face.width, placement.alpha, face.width / face.height, 1.0)
-                            .map_err(|_| PhotoError::OpenVr)?;
-                        surface.set_overlay_visible(super::card::front_facing(face_world, input.head)).map_err(|_| PhotoError::OpenVr)?;
+                    let height = super::card::card_size(self.interaction.config.photo_width_m, pixels)[1];
+                    let back = surfaces.back.as_mut().ok_or(PhotoError::OpenVr)?;
+                    if !self.card_submitted {
+                        compositor.submit_texture(back, self.card_material.as_ref().ok_or(PhotoError::Graphics)?)?;
+                        self.card_submitted = true;
                     }
-                    self.card_submitted = true;
-                    drawn = front_visible && placement.alpha > 0.0 && !compositor.original_view;
+                    back.set_card_presentation(device, super::card::back(placement.transform), placement.width, placement.alpha, placement.width / height, [0.0, 0.0, 1.0, 1.0])
+                        .map_err(|_| PhotoError::OpenVr)?;
+                    back.set_overlay_visible(!front_visible).map_err(|_| PhotoError::OpenVr)?;
+                    drawn = front_visible && placement.alpha > 0.0;
                 } else {
                     surface.set_overlay_visible(false).map_err(|_| PhotoError::OpenVr)?;
-                    for surface in surfaces.card.iter_mut().flatten() {
-                        surface.set_overlay_visible(false).map_err(|_| PhotoError::OpenVr)?;
+                    if let Some(back) = &mut surfaces.back {
+                        back.set_overlay_visible(false).map_err(|_| PhotoError::OpenVr)?;
                     }
                 }
             }
@@ -1131,7 +1123,7 @@ impl PhotoRuntime {
                 }
             }
             let visible_block = if drawn && !self.drawn_reported && !photo.first_block_drawn {
-                compositor.first_visible_block_in_extent(now, self.interaction.frame.photo_extent)
+                compositor.first_visible_block_in(now, [0.0, 0.0, self.interaction.frame.photo_extent, 1.0])
             } else {
                 None
             };

@@ -65,7 +65,7 @@ async fn real_gpu_joint_fade_original_toggle_and_retry_preserve_original_upload(
     let now = Instant::now();
     let original = capture(&mut compositor, now, &directory.join("original.png")).await;
     compositor.add_block(0, None, None, 0.0, now).unwrap();
-    assert!(compositor.first_visible_block_in_extent(now + BLOCK_FADE, 1.0).is_none());
+    assert!(compositor.first_visible_block_in(now + BLOCK_FADE, [0.0, 0.0, 1.0, 1.0]).is_none());
     let region = region();
     let mut typesetter = PhotoTypesetter::new().unwrap();
     let text = typesetter.typeset(&working, &region, "Translated").unwrap();
@@ -73,7 +73,7 @@ async fn real_gpu_joint_fade_original_toggle_and_retry_preserve_original_upload(
     compositor
         .add_block(1, Some(region), Some(text), 0.0, now)
         .unwrap();
-    assert!(compositor.first_visible_block_in_extent(now, 1.0).is_none());
+    assert!(compositor.first_visible_block_in(now, [0.0, 0.0, 1.0, 1.0]).is_none());
     let zero = capture(&mut compositor, now, &directory.join("zero.png")).await;
     assert_eq!(zero, original);
     let half = capture(
@@ -90,7 +90,7 @@ async fn real_gpu_joint_fade_original_toggle_and_retry_preserve_original_upload(
     )
     .await;
     assert!(!compositor.needs_frame(now + Duration::from_millis(150)));
-    assert_eq!(compositor.first_visible_block_in_extent(now + BLOCK_FADE, 1.0), Some(1));
+    assert_eq!(compositor.first_visible_block_in(now + BLOCK_FADE, [0.0, 0.0, 1.0, 1.0]), Some(1));
     assert_eq!(full.get_pixel(3, 3).0, [0, 255, 0, 255]);
     let middle = half.get_pixel(3, 3).0;
     assert!((i16::from(middle[0]) - 127).abs() <= 1);
@@ -106,22 +106,6 @@ async fn real_gpu_joint_fade_original_toggle_and_retry_preserve_original_upload(
             (u16::from(original.get_pixel(x, y)[channel]) + u16::from(full_text[channel])) / 2;
         assert!((i32::from(half_text[channel]) - i32::from(expected)).abs() <= 2);
     }
-    compositor.view_original(true);
-    let peek = capture(
-        &mut compositor,
-        now + BLOCK_FADE,
-        &directory.join("peek.png"),
-    )
-    .await;
-    assert_eq!(peek, original);
-    compositor.view_original(false);
-    let restored = capture(
-        &mut compositor,
-        now + BLOCK_FADE,
-        &directory.join("restored.png"),
-    )
-    .await;
-    assert_eq!(restored, full);
     compositor.clear_attempt();
     compositor.set_original(working).unwrap();
     assert_eq!(compositor.original_uploads, 1);
@@ -303,6 +287,6 @@ async fn clipped_out_translated_block_cannot_report_first_draw() {
     compositor.add_block(1, Some(region), Some(text), 0.0, now).unwrap();
     compositor.render(now + BLOCK_FADE, false).unwrap();
     compositor.ready().await.unwrap();
-    assert!(compositor.first_visible_block_in_extent(now + BLOCK_FADE, 0.1).is_none());
-    assert_eq!(compositor.first_visible_block_in_extent(now + BLOCK_FADE, 1.0), Some(1));
+    assert!(compositor.first_visible_block_in(now + BLOCK_FADE, [0.0, 0.0, 0.1, 1.0]).is_none());
+    assert_eq!(compositor.first_visible_block_in(now + BLOCK_FADE, [0.0, 0.0, 1.0, 1.0]), Some(1));
 }

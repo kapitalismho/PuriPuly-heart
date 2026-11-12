@@ -131,7 +131,7 @@ async def _settle(task: asyncio.Task[Any]) -> None:
 
 
 def _luna_payload(image: PreparedPhoto, target_language: str) -> dict:
-    prompt = render_photo_prompt(target_language)
+    prompt = render_photo_prompt(target_language, *image.send_size)
     return {
         "model": "gpt-6-luna",
         "store": False,
@@ -412,7 +412,7 @@ class GooglePhotoConnection(_PhotoConnection):
         self, image: PreparedPhoto, target_language: str
     ) -> AsyncIterator[PhotoStreamEvent]:
         await self.preopen()
-        prompt = render_photo_prompt(target_language, google=True)
+        prompt = render_photo_prompt(target_language, *image.send_size, google=True)
         body = {
             "systemInstruction": {"parts": [{"text": prompt.instructions}]},
             "contents": [
@@ -723,9 +723,10 @@ class RelayPhotoConnection(OpenAIPhotoConnection):
 
     def _body(self, image: PreparedPhoto, target_language: str) -> dict:
         return {
-            "photo_protocol": 1,
+            "photo_protocol": 2,
             "request_id": self._request_id,
             "image_base64": image.jpeg_base64,
+            "image_size": list(image.send_size),
             "target_language": target_language,
         }
 

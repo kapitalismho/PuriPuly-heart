@@ -90,7 +90,7 @@ mod tests {
         LegacyVrInput {
             head: IDENTITY, left: IDENTITY, right: IDENTITY,
             left_handgrip: IDENTITY, right_handgrip: IDENTITY,
-            reference_epoch: 1, left_index: 1, right_index: 2, grip,
+            reference_epoch: 1, left_index: 1, right_index: 2, grip, right_grip: false,
         }
     }
 

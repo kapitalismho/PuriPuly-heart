@@ -237,7 +237,7 @@ fn diagnostic_surfaces_share_session_and_partial_creation_cleans_every_owned_han
         "generation":1, "backend":"openvr", "image":{"debug_controls":true},
         "interaction":{"debug_grab_volume":true,"debug_case_label":"Radius 12 cm\nPosition B fixed"}
     })).unwrap();
-    for fail_at in [None, Some(4), Some(6), Some(9)] {
+    for fail_at in [None, Some(4), Some(6), Some(7)] {
         CALLS.with(|calls| *calls.borrow_mut() = Calls { fail_create_at: fail_at, ..Default::default() });
         let mut api = api();
         let session = session(&mut api);
