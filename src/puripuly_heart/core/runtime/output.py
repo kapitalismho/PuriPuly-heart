@@ -133,6 +133,10 @@ class _PeerOverlayBatch:
             DestinationBatch,
         ]
     ] = field(default_factory=list)
+    task: asyncio.Task[None] | None = None
+    delivery_task: asyncio.Task[Any] | None = None
+    delivery_event: OverlayEventUnion | None = None
+    delivery_superseded: bool = False
 
 
 @dataclass(slots=True)
@@ -186,12 +190,12 @@ class OutputRuntime:
     _peer_identity_by_utterance: dict[UUID, tuple[int, int]] = field(default_factory=dict)
     _peer_identity_order: deque[UUID] = field(default_factory=deque)
     _peer_caption_admission_started_at: dict[UUID, float] = field(default_factory=dict)
+    _peer_display_orders: dict[UUID, int] = field(default_factory=dict)
+    _peer_display_order: int = 0
     _peer_overlay_batches: deque[_PeerOverlayBatch] = field(default_factory=deque)
-    _peer_active_batch: _PeerOverlayBatch | None = None
+    _peer_active_batches: list[_PeerOverlayBatch] = field(default_factory=list)
+    _peer_batches_changed: asyncio.Event = field(default_factory=asyncio.Event)
     _peer_overlay_worker: asyncio.Task[None] | None = None
-    _peer_delivery_task: asyncio.Task[Any] | None = None
-    _peer_delivery_event: OverlayEventUnion | None = None
-    _peer_delivery_superseded: bool = False
     _peer_writer_cancel_reason: str | None = None
     _ui_delivery: UiDeliveryLifecyclePort | None = None
     _peer_overlay_delivery_observer: Callable[[OutputRoutingDecision], None] | None = None
@@ -378,15 +382,16 @@ class OutputRuntime:
         unit_ids: tuple[UUID, ...],
         replacement: TranslationStreamUpdate | None = None,
     ) -> None:
-        batches = tuple(self._peer_overlay_batches)
-        if self._peer_active_batch is not None:
-            batches = (self._peer_active_batch, *batches)
+        batches = (*self._peer_active_batches, *self._peer_overlay_batches)
         for batch in batches:
             for event, key, scope, destination in batch.events:
                 if (
                     key not in self._publications_in_flight
                     or not isinstance(event, TranslationStreamUpdate)
-                    or isinstance(event, TranslationFinal)
+                    or (
+                        isinstance(event, TranslationFinal)
+                        and (replacement is None or event.utterance_id != replacement.utterance_id)
+                    )
                     or event.peer_caption_revision < 1
                     or event.utterance_id not in unit_ids
                     or (
@@ -396,9 +401,9 @@ class OutputRuntime:
                     )
                 ):
                     continue
-                if self._peer_delivery_event is event:
-                    self._peer_delivery_superseded = True
-                    task = self._peer_delivery_task
+                if batch.delivery_event is event:
+                    batch.delivery_superseded = True
+                    task = batch.delivery_task
                     if task is not None:
                         task.cancel()
                 else:
@@ -406,16 +411,11 @@ class OutputRuntime:
                         event, key, scope, destination, reason="peer_caption_superseded"
                     )
 
-    async def _await_peer_delivery(self, coroutine: Coroutine[Any, Any, Any]) -> Any:
-        event = self._peer_delivery_event
-        if (
-            not isinstance(event, TranslationStreamUpdate)
-            or isinstance(event, TranslationFinal)
-            or event.peer_caption_revision < 1
-        ):
-            return await coroutine
+    async def _await_peer_delivery(
+        self, batch: _PeerOverlayBatch, coroutine: Coroutine[Any, Any, Any]
+    ) -> Any:
         task = self._create_task(coroutine, task_name="peer-overlay-delivery")
-        self._peer_delivery_task = task
+        batch.delivery_task = task
         self._tasks_being_collected.add(task)
         try:
             return await task
@@ -424,7 +424,7 @@ class OutputRuntime:
                 task.cancel()
             await asyncio.gather(task, return_exceptions=True)
             self._tasks_being_collected.discard(task)
-            self._peer_delivery_task = None
+            batch.delivery_task = None
 
     async def _emit_peer_unpaced(
         self, sink: OverlaySink, event: OverlayEventUnion
@@ -546,6 +546,17 @@ class OutputRuntime:
             and source_order is not None
             and publication_generation == self._peer_generation
         )
+
+    def register_peer_caption_identity(
+        self, utterance_id: UUID, publication_generation: int, source_order: int
+    ) -> bool:
+        if not self.peer_publication_is_authorized(publication_generation, source_order):
+            return False
+        existing = self._peer_identity_by_utterance.get(utterance_id)
+        if existing is not None and existing != (publication_generation, source_order):
+            return False
+        self._remember_peer_identity(utterance_id, publication_generation, source_order)
+        return True
 
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
@@ -1536,6 +1547,11 @@ class OutputRuntime:
                 isinstance(event, TranslationStreamUpdate)
                 and event.peer_caption_revision > 0
                 and parent_id in self._peer_identity_by_utterance
+                or (
+                    event.parent_utterance_id is not None
+                    and event.turn_generation is not None
+                    and isinstance(self.overlay_sink, PeerCaptionAdmissionPort)
+                )
             ):
                 return self._overlay_failure_result(event, "stale_source_order")
             if (
@@ -1583,6 +1599,11 @@ class OutputRuntime:
                 self._supersede_peer_previews((parent_id, *event.peer_superseded_unit_ids), event)
             self._remember_peer_identity(parent_id, generation, order)
             self._latest_peer_source_order = max(self._latest_peer_source_order, order)
+            if parent_id not in self._peer_display_orders and (
+                getattr(event, "text", "").strip() or getattr(event, "source_text", "").strip()
+            ):
+                self._peer_display_order += 1
+                self._peer_display_orders[parent_id] = self._peer_display_order
             batch = self._find_peer_batch(generation, order, parent_id)
             if batch is None:
                 if len(self._peer_overlay_batches) >= OUTPUT_BATCH_MAX_UNSENT:
@@ -1594,6 +1615,7 @@ class OutputRuntime:
                 self._peer_overlay_batches.append(batch)
             batch.events.append((event, publication_key, publication_scope, destination_batch))
             self._publications_in_flight.add(publication_key)
+            self._peer_batches_changed.set()
             worker = self._peer_overlay_worker
             if worker is None or worker.done():
                 self._peer_overlay_worker = asyncio.create_task(
@@ -1619,183 +1641,82 @@ class OutputRuntime:
         )
 
     async def _run_peer_overlay_writer(self) -> None:
+        wake_task = None
         try:
-            while self._peer_overlay_batches:
-                batch = self._peer_overlay_batches.popleft()
-                self._peer_active_batch = batch
-                index = 0
-                while index < len(batch.events):
-                    event, publication_key, publication_scope, destination_batch = batch.events[
-                        index
-                    ]
-                    index += 1
-                    if publication_key not in self._publications_in_flight:
-                        continue
-                    self._peer_delivery_event = event
-                    self._peer_delivery_superseded = False
-                    if batch.publication_generation != self._peer_generation:
-                        self._reject_peer_event(
-                            event,
-                            publication_key,
-                            publication_scope,
-                            destination_batch,
-                            reason="publication_generation_retired",
-                        )
-                        continue
-                    if not destination_batch.active:
-                        try:
-                            await self._await_peer_delivery(destination_batch.ready.wait())
-                        except asyncio.CancelledError:
-                            if self._peer_delivery_superseded and not (
-                                asyncio.current_task().cancelling()
-                            ):
-                                self._reject_peer_event(
-                                    event,
-                                    publication_key,
-                                    publication_scope,
-                                    destination_batch,
-                                    reason="peer_caption_superseded",
-                                )
-                                continue
-                            cancel_reason = self._peer_writer_cancel_reason or (
-                                "publication_generation_retired"
-                                if batch.publication_generation != self._peer_generation
-                                else "output_runtime_closing"
-                            )
-                            self._reject_peer_event(
-                                event,
-                                publication_key,
-                                publication_scope,
-                                destination_batch,
-                                reason=cancel_reason,
-                            )
-                            for (
-                                pending_event,
-                                pending_key,
-                                pending_scope,
-                                pending_batch,
-                            ) in batch.events[index:]:
-                                self._reject_peer_event(
-                                    pending_event,
-                                    pending_key,
-                                    pending_scope,
-                                    pending_batch,
-                                    reason=cancel_reason,
-                                )
-                            raise
-                        if destination_batch.disposition is not None:
-                            self._reject_peer_event(
-                                event,
-                                publication_key,
-                                publication_scope,
-                                destination_batch,
-                                reason=destination_batch.disposition,
-                            )
-                            continue
-                    if self._peer_delivery_superseded:
-                        self._reject_peer_event(
-                            event,
-                            publication_key,
-                            publication_scope,
-                            destination_batch,
-                            reason="peer_caption_superseded",
-                        )
-                        continue
-                    sink = self.overlay_sink
-                    if sink is None:
-                        self._reject_peer_event(
-                            event,
-                            publication_key,
-                            publication_scope,
-                            destination_batch,
-                            reason="destination_unconfigured",
-                        )
-                        continue
-                    receipt: OverlayApplicationReceipt | None = None
-                    pacing_started_at: float | None = None
-                    pacing_wait_reason: str | None = None
+            while self._peer_overlay_batches or self._peer_active_batches:
+                self._peer_batches_changed.clear()
+                while (
+                    self._peer_overlay_batches
+                    and len(self._peer_active_batches) < OUTPUT_BATCH_MAX_UNSENT + 1
+                ):
+                    batch = self._peer_overlay_batches.popleft()
+                    self._peer_active_batches.append(batch)
+                    batch.task = self._create_task(
+                        self._deliver_peer_batch(batch), task_name="peer-overlay-batch"
+                    )
+                wake_task = asyncio.create_task(self._peer_batches_changed.wait())
+                tasks = [batch.task for batch in self._peer_active_batches]
+                done, _ = await asyncio.wait(
+                    [wake_task, *tasks], return_when=asyncio.FIRST_COMPLETED
+                )
+                wake_task.cancel()
+                await asyncio.gather(wake_task, return_exceptions=True)
+                wake_task = None
+                for batch in tuple(self._peer_active_batches):
+                    if batch.task in done:
+                        await batch.task
+                        self._peer_active_batches.remove(batch)
+        finally:
+            if wake_task is not None:
+                wake_task.cancel()
+                await asyncio.gather(wake_task, return_exceptions=True)
+            tasks = [batch.task for batch in self._peer_active_batches if batch.task is not None]
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            for batch in self._peer_active_batches:
+                self._reject_peer_batch(
+                    batch,
+                    reason=self._peer_writer_cancel_reason or "publication_generation_retired",
+                )
+            self._peer_active_batches.clear()
+            if self._peer_overlay_worker is asyncio.current_task():
+                self._peer_overlay_worker = None
 
-                    def observe_pacing_wait(wait_reason: str) -> None:
-                        nonlocal pacing_started_at, pacing_wait_reason
-                        if pacing_started_at is not None or wait_reason not in {
-                            "replacement_gate",
-                            "protected_rows",
-                        }:
-                            return
-                        pacing_started_at = self.clock.now()
-                        pacing_wait_reason = wait_reason
-                        self._observe_decision(
-                            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
-                            route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-                            publication_id=event.event_id,
-                            publication_kind=PUBLICATION_KIND_PEER_SUBTITLE,
-                            reason="logical_pacing_wait",
-                            metadata={
-                                "channel": "peer",
-                                "publication_generation": batch.publication_generation,
-                                "source_order": batch.source_order,
-                                "physical_ack": False,
-                                "stage": "logical_pacing",
-                                "outcome": "waiting",
-                                "pending_batches": len(self._peer_overlay_batches),
-                                "wait_reason": wait_reason,
-                            },
-                        )
-
-                    def pacing_outcome() -> dict[str, str | int | float | bool | None]:
-                        metadata: dict[str, str | int | float | bool | None] = {
-                            "pending_batches": len(self._peer_overlay_batches)
-                        }
-                        if pacing_started_at is not None:
-                            metadata["handoff_wait_ms"] = int(
-                                max(0.0, self.clock.now() - pacing_started_at) * 1000
-                            )
-                        if pacing_wait_reason is not None:
-                            metadata["wait_reason"] = pacing_wait_reason
-                        return metadata
-
+    async def _deliver_peer_batch(self, batch: _PeerOverlayBatch) -> None:
+        try:
+            index = 0
+            while index < len(batch.events):
+                event, publication_key, publication_scope, destination_batch = batch.events[index]
+                index += 1
+                if publication_key not in self._publications_in_flight:
+                    continue
+                batch.delivery_event = event
+                batch.delivery_superseded = False
+                if batch.publication_generation != self._peer_generation:
+                    self._reject_peer_event(
+                        event,
+                        publication_key,
+                        publication_scope,
+                        destination_batch,
+                        reason="publication_generation_retired",
+                    )
+                    continue
+                if not destination_batch.active and not (
+                    isinstance(event, TranslationStreamUpdate)
+                    and (event.text.strip() or event.peer_caption_revision > 0)
+                    and isinstance(self.overlay_sink, PeerCaptionAdmissionPort)
+                ):
                     try:
-                        if isinstance(sink, PeerCaptionAdmissionPort):
-                            started = None
-                            if (
-                                isinstance(event, TranslationStreamUpdate)
-                                and event.peer_caption_revision > 0
-                                and event.utterance_id is not None
-                            ):
-                                started = self._peer_caption_admission_started_at.setdefault(
-                                    event.utterance_id, self.clock.now()
-                                )
-                            receipt = await self._await_peer_delivery(
-                                sink.emit_peer_when_admissible(
-                                    event,
-                                    on_wait=observe_pacing_wait,
-                                    admission_started_at=started,
-                                )
-                            )
-                        else:
-                            receipt = await self._await_peer_delivery(
-                                self._emit_peer_unpaced(sink, event)
-                            )
-                    except TimeoutError:
-                        self._reject_peer_event(
-                            event,
-                            publication_key,
-                            publication_scope,
-                            destination_batch,
-                            reason="destination_write_timeout",
-                            pacing_metadata=pacing_outcome(),
-                        )
+                        await self._await_peer_delivery(batch, destination_batch.ready.wait())
                     except asyncio.CancelledError:
-                        if self._peer_delivery_superseded and not (
-                            asyncio.current_task().cancelling()
-                        ):
+                        if batch.delivery_superseded and not (asyncio.current_task().cancelling()):
                             self._reject_peer_event(
                                 event,
                                 publication_key,
                                 publication_scope,
                                 destination_batch,
                                 reason="peer_caption_superseded",
-                                pacing_metadata=pacing_outcome(),
                             )
                             continue
                         cancel_reason = self._peer_writer_cancel_reason or (
@@ -1803,28 +1724,13 @@ class OutputRuntime:
                             if batch.publication_generation != self._peer_generation
                             else "output_runtime_closing"
                         )
-                        receipt_lookup = getattr(sink, "application_receipt", None)
-                        if callable(receipt_lookup):
-                            receipt = receipt_lookup(event.event_id)
-                        if receipt is not None and receipt.outcome == "applied":
-                            self._complete_peer_event(
-                                event,
-                                publication_key,
-                                publication_scope,
-                                destination_batch,
-                                batch,
-                                receipt,
-                                pacing_metadata=pacing_outcome(),
-                            )
-                        else:
-                            self._reject_peer_event(
-                                event,
-                                publication_key,
-                                publication_scope,
-                                destination_batch,
-                                reason=cancel_reason,
-                                pacing_metadata=pacing_outcome(),
-                            )
+                        self._reject_peer_event(
+                            event,
+                            publication_key,
+                            publication_scope,
+                            destination_batch,
+                            reason=cancel_reason,
+                        )
                         for (
                             pending_event,
                             pending_key,
@@ -1839,49 +1745,214 @@ class OutputRuntime:
                                 reason=cancel_reason,
                             )
                         raise
-                    except Exception as exc:
+                    if destination_batch.disposition is not None:
                         self._reject_peer_event(
                             event,
                             publication_key,
                             publication_scope,
                             destination_batch,
-                            reason="destination_publish_failed",
-                            error_type=safe_exception_fields(exc)["exception_class"],
-                            pacing_metadata={**pacing_outcome(), **safe_exception_fields(exc)},
+                            reason=destination_batch.disposition,
+                        )
+                        continue
+                if batch.delivery_superseded:
+                    self._reject_peer_event(
+                        event,
+                        publication_key,
+                        publication_scope,
+                        destination_batch,
+                        reason="peer_caption_superseded",
+                    )
+                    continue
+                sink = self.overlay_sink
+                if sink is None:
+                    self._reject_peer_event(
+                        event,
+                        publication_key,
+                        publication_scope,
+                        destination_batch,
+                        reason="destination_unconfigured",
+                    )
+                    continue
+                presentation_event = event
+                if isinstance(sink, PeerCaptionAdmissionPort):
+                    display_order = self._peer_display_orders.get(event.utterance_id)
+                    if display_order is not None:
+                        presentation_event = replace(
+                            event,
+                            turn_kind="peer",
+                            turn_generation=(
+                                event.turn_generation
+                                if event.turn_generation is not None
+                                else batch.publication_generation
+                            ),
+                            turn_order=display_order,
+                        )
+                receipt: OverlayApplicationReceipt | None = None
+                pacing_started_at: float | None = None
+                pacing_wait_reason: str | None = None
+
+                def observe_pacing_wait(wait_reason: str) -> None:
+                    nonlocal pacing_started_at, pacing_wait_reason
+                    if pacing_started_at is not None or wait_reason not in {
+                        "replacement_gate",
+                        "protected_rows",
+                    }:
+                        return
+                    pacing_started_at = self.clock.now()
+                    pacing_wait_reason = wait_reason
+                    self._observe_decision(
+                        status=OUTPUT_ROUTING_DECISION_PUBLISHED,
+                        route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
+                        publication_id=event.event_id,
+                        publication_kind=PUBLICATION_KIND_PEER_SUBTITLE,
+                        reason="logical_pacing_wait",
+                        metadata={
+                            "channel": "peer",
+                            "publication_generation": batch.publication_generation,
+                            "source_order": batch.source_order,
+                            "physical_ack": False,
+                            "stage": "logical_pacing",
+                            "outcome": "waiting",
+                            "pending_batches": len(self._peer_overlay_batches),
+                            "wait_reason": wait_reason,
+                        },
+                    )
+
+                def pacing_outcome() -> dict[str, str | int | float | bool | None]:
+                    metadata: dict[str, str | int | float | bool | None] = {
+                        "pending_batches": len(self._peer_overlay_batches)
+                    }
+                    if pacing_started_at is not None:
+                        metadata["handoff_wait_ms"] = int(
+                            max(0.0, self.clock.now() - pacing_started_at) * 1000
+                        )
+                    if pacing_wait_reason is not None:
+                        metadata["wait_reason"] = pacing_wait_reason
+                    return metadata
+
+                try:
+                    if isinstance(sink, PeerCaptionAdmissionPort):
+                        started = None
+                        if (
+                            isinstance(event, TranslationStreamUpdate)
+                            and event.peer_caption_revision > 0
+                            and event.utterance_id is not None
+                        ):
+                            started = self._peer_caption_admission_started_at.setdefault(
+                                event.utterance_id, self.clock.now()
+                            )
+                        receipt = await self._await_peer_delivery(
+                            batch,
+                            sink.emit_peer_when_admissible(
+                                presentation_event,
+                                on_wait=observe_pacing_wait,
+                                admission_started_at=started,
+                            ),
                         )
                     else:
-                        resolved_receipt = receipt or OverlayApplicationReceipt(
-                            stage="application_accepted",
-                            outcome="applied",
-                            publication_id=event.event_id,
-                            scene_revision=None,
+                        receipt = await self._await_peer_delivery(
+                            batch, self._emit_peer_unpaced(sink, event)
                         )
-                        if resolved_receipt.outcome == "applied":
-                            self._complete_peer_event(
-                                event,
-                                publication_key,
-                                publication_scope,
-                                destination_batch,
-                                batch,
-                                resolved_receipt,
-                                pacing_metadata=pacing_outcome(),
-                            )
-                        else:
-                            self._reject_peer_event(
-                                event,
-                                publication_key,
-                                publication_scope,
-                                destination_batch,
-                                reason=resolved_receipt.cause or resolved_receipt.outcome,
-                                scene_revision=resolved_receipt.scene_revision,
-                                pacing_metadata=pacing_outcome(),
-                            )
-                self._peer_active_batch = None
+                except TimeoutError:
+                    self._reject_peer_event(
+                        event,
+                        publication_key,
+                        publication_scope,
+                        destination_batch,
+                        reason="destination_write_timeout",
+                        pacing_metadata=pacing_outcome(),
+                    )
+                except asyncio.CancelledError:
+                    if batch.delivery_superseded and not (asyncio.current_task().cancelling()):
+                        self._reject_peer_event(
+                            event,
+                            publication_key,
+                            publication_scope,
+                            destination_batch,
+                            reason="peer_caption_superseded",
+                            pacing_metadata=pacing_outcome(),
+                        )
+                        continue
+                    cancel_reason = self._peer_writer_cancel_reason or (
+                        "publication_generation_retired"
+                        if batch.publication_generation != self._peer_generation
+                        else "output_runtime_closing"
+                    )
+                    receipt_lookup = getattr(sink, "application_receipt", None)
+                    if callable(receipt_lookup):
+                        receipt = receipt_lookup(event.event_id)
+                    if receipt is not None and receipt.outcome == "applied":
+                        self._complete_peer_event(
+                            event,
+                            publication_key,
+                            publication_scope,
+                            destination_batch,
+                            batch,
+                            receipt,
+                            pacing_metadata=pacing_outcome(),
+                        )
+                    else:
+                        self._reject_peer_event(
+                            event,
+                            publication_key,
+                            publication_scope,
+                            destination_batch,
+                            reason=cancel_reason,
+                            pacing_metadata=pacing_outcome(),
+                        )
+                    for (
+                        pending_event,
+                        pending_key,
+                        pending_scope,
+                        pending_batch,
+                    ) in batch.events[index:]:
+                        self._reject_peer_event(
+                            pending_event,
+                            pending_key,
+                            pending_scope,
+                            pending_batch,
+                            reason=cancel_reason,
+                        )
+                    raise
+                except Exception as exc:
+                    self._reject_peer_event(
+                        event,
+                        publication_key,
+                        publication_scope,
+                        destination_batch,
+                        reason="destination_publish_failed",
+                        error_type=safe_exception_fields(exc)["exception_class"],
+                        pacing_metadata={**pacing_outcome(), **safe_exception_fields(exc)},
+                    )
+                else:
+                    resolved_receipt = receipt or OverlayApplicationReceipt(
+                        stage="application_accepted",
+                        outcome="applied",
+                        publication_id=event.event_id,
+                        scene_revision=None,
+                    )
+                    if resolved_receipt.outcome == "applied":
+                        self._complete_peer_event(
+                            event,
+                            publication_key,
+                            publication_scope,
+                            destination_batch,
+                            batch,
+                            resolved_receipt,
+                            pacing_metadata=pacing_outcome(),
+                        )
+                    else:
+                        self._reject_peer_event(
+                            event,
+                            publication_key,
+                            publication_scope,
+                            destination_batch,
+                            reason=resolved_receipt.cause or resolved_receipt.outcome,
+                            scene_revision=resolved_receipt.scene_revision,
+                            pacing_metadata=pacing_outcome(),
+                        )
         finally:
-            self._peer_delivery_event = None
-            self._peer_active_batch = None
-            if self._peer_overlay_worker is asyncio.current_task():
-                self._peer_overlay_worker = None
+            batch.delivery_event = None
 
     def _complete_peer_event(
         self,
@@ -1953,6 +2024,7 @@ class OutputRuntime:
             evicted = self._peer_identity_order.popleft()
             self._peer_identity_by_utterance.pop(evicted, None)
             self._peer_caption_admission_started_at.pop(evicted, None)
+            self._peer_display_orders.pop(evicted, None)
 
     def _find_peer_batch(
         self,
@@ -1960,17 +2032,10 @@ class OutputRuntime:
         order: int,
         parent_id: UUID,
     ) -> _PeerOverlayBatch | None:
-        active = self._peer_active_batch
-        if active is not None and (
-            active.publication_generation,
-            active.source_order,
-            active.parent_id,
-        ) == (generation, order, parent_id):
-            return active
         return next(
             (
                 batch
-                for batch in self._peer_overlay_batches
+                for batch in (*self._peer_active_batches, *self._peer_overlay_batches)
                 if (
                     batch.publication_generation,
                     batch.source_order,
@@ -2267,15 +2332,9 @@ class OutputRuntime:
             "destination_replaced" if replacement else "output_runtime_closing"
         )
         self._peer_caption_admission_started_at.clear()
-        active_peer_batch = self._peer_active_batch
         if peer_worker is not None and not peer_worker.done():
             peer_worker.cancel()
             await asyncio.gather(peer_worker, return_exceptions=True)
-        if active_peer_batch is not None:
-            self._reject_peer_batch(
-                active_peer_batch,
-                reason=self._peer_writer_cancel_reason or "output_runtime_closing",
-            )
         self._peer_writer_cancel_reason = None
         self._peer_overlay_worker = None
         peer_reason = "destination_replaced" if replacement else "output_runtime_closing"

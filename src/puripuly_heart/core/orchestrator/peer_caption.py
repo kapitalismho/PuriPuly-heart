@@ -132,6 +132,7 @@ class _Caption:
     source: str = ""
     revision: int = 0
     shown_revision: int = 0
+    displayed_revision: int = 0
     context: tuple[str, ...] | None = None
     last_final_at: float | None = None
     sealed: AudioSegmentSnapshot | None = None
@@ -815,27 +816,35 @@ class PeerCaptionOwner:
             if (
                 epoch != self._epoch
                 or (segment is not None and segment.closed)
-                or revision < caption.shown_revision
+                or revision < caption.displayed_revision
             ):
                 return
             if kind == "preview" and (
                 submission.translation is None or revision < caption.revision
             ):
                 return
+            if not self.output.output_runtime.register_peer_caption_identity(
+                caption.utterance_id, caption.generation, caption.source_order
+            ):
+                return
+            caption.displayed_revision = revision
+            await self.output.project_peer_overlay(submission)
             if predecessor is not None and not admitted.is_set():
                 await predecessor.wait()
             if (
                 epoch != self._epoch
-                or revision < caption.shown_revision
+                or revision < caption.displayed_revision
                 or not self.output.output_runtime.peer_publication_is_authorized(
                     caption.generation, caption.source_order
                 )
             ):
                 return
             caption.shown_revision = revision
-            await self.output.project_peer_caption(submission)
+            await self.output.project_peer_caption(submission, overlay_projected=True)
         finally:
-            if kind != "preview" or caption.shown_revision:
+            if (
+                kind != "preview" and revision >= caption.displayed_revision
+            ) or caption.shown_revision:
                 admitted.set()
                 caption.admitted.set()
                 for utterance_id in superseded:

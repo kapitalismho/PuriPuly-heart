@@ -10,7 +10,7 @@ from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.overlay.peer_caption_layout import (
     estimate_peer_translation_lines,
-    peer_translation_pages,
+    peer_translation_fragments,
 )
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.protocol import OverlayPresentationSnapshot
@@ -94,29 +94,29 @@ def presenter_for(timeline: Timeline, surface: Surface | None = None) -> Overlay
 
 
 @pytest.mark.asyncio
-async def test_pages_turn_on_timer_and_upper_protection_follows_actual_page_change() -> None:
+async def test_continuations_use_ordinary_slots_and_wait_instead_of_page_timer() -> None:
     timeline, surface = Timeline(), Surface()
     presenter = presenter_for(timeline, surface)
     first, second = uuid4(), uuid4()
-    text = "가" * 56 + "나" * 56 + "다" * 20
-    pages = peer_translation_pages(text)
+    text = "가" * 64
+    fragments = peer_translation_fragments(text)
     try:
         await presenter.emit(caption(1, first, text))
-        await timeline.advance(1.5)
-        await presenter.emit(caption(2, second, "lower"))
-        assert [block.id for block in presenter.snapshot().blocks] == [
-            f"peer:{first}",
-            f"peer:{second}",
-        ]
-        assert surface.expirations[f"peer:{first}"] == pytest.approx(3.5)
-        await timeline.advance(1.5)
-        assert presenter.snapshot().blocks[0].primary_text == pages[1]
-        assert surface.expirations[f"peer:{first}"] == pytest.approx(6.0)
-        await timeline.advance(0.5)
-        assert presenter.snapshot().blocks[0].id == f"peer:{first}"
-        await timeline.advance(2.5)
-        assert presenter.snapshot().blocks[0].primary_text == pages[2]
-        assert surface.expirations[f"peer:{first}"] > 6.0
+        await timeline.advance(0)
+        assert [block.primary_text for block in presenter.snapshot().blocks] == list(fragments)
+        assert set(surface.expirations.values()) == {8.0}
+        await timeline.advance(0.1)
+        pending = asyncio.create_task(
+            presenter.emit_peer_when_admissible(caption(2, second, "next"))
+        )
+        await timeline.advance(0)
+        assert not pending.done()
+        await timeline.advance(1)
+        assert (await pending).outcome == "applied"
+        assert presenter.snapshot().blocks[-1].primary_text == "next"
+        assert all(block.id != f"peer:{first}" for block in presenter.snapshot().blocks)
+        await timeline.advance(3)
+        assert presenter.snapshot().blocks[-1].primary_text == "next"
     finally:
         await presenter.close()
 
@@ -130,18 +130,18 @@ async def test_correction_extends_expiry_and_obsolete_timer_cannot_remove_curren
         await presenter.emit(caption(1, upper, "short"))
         await presenter.emit(caption(2, lower, "lower"))
         old_revision = presenter._entries[("peer", upper)].expiration_revision
-        assert surface.expirations[f"peer:{upper}"] == 2.0
+        assert surface.expirations[f"peer:{upper}"] == 8.0
         await timeline.advance(1.7)
         receipt = await presenter.emit_peer_when_admissible(
             caption(3, upper, "정" * 40, revision=2)
         )
         assert receipt.outcome == "applied"
         assert timeline.clock.now() == 1.7
-        assert surface.expirations[f"peer:{upper}"] == pytest.approx(4.7)
+        assert surface.expirations[f"peer:{upper}"] == pytest.approx(9.7)
         await presenter._expire_entry_after_ttl(("peer", upper), old_revision)
         await timeline.advance(0.4)
         assert presenter.snapshot().blocks[0].primary_text == "정" * 28 + "\n" + "정" * 12
-        await timeline.advance(2.6)
+        await timeline.advance(7.6)
         assert all(block.id != f"peer:{upper}" for block in presenter.snapshot().blocks)
     finally:
         await presenter.close()
@@ -180,24 +180,28 @@ async def test_new_preview_waits_at_most_one_second_then_evicts_protected_upper(
 
 
 @pytest.mark.asyncio
-async def test_new_version_restarts_pages_and_settlement_is_immediate() -> None:
+async def test_new_full_revision_reconciles_fragments_and_settlement_is_immediate() -> None:
     timeline = Timeline()
     presenter = presenter_for(timeline)
     unit = uuid4()
-    text = "가" * 56 + "나" * 56
+    text = "가" * 64
     try:
         await presenter.emit_peer_when_admissible(caption(1, unit, text, final=False))
-        await timeline.advance(3.0)
-        assert presenter.snapshot().blocks[0].primary_text == peer_translation_pages(text)[1]
+        await timeline.advance(0)
+        original_ids = [block.id for block in presenter.snapshot().blocks]
+        await timeline.advance(0.2)
         await presenter.emit_peer_when_admissible(
-            caption(2, unit, text + "다", revision=2, final=False)
+            caption(2, unit, "나" * 64, revision=2, final=False)
         )
-        assert presenter.snapshot().blocks[0].primary_text == peer_translation_pages(text)[0]
+        assert [block.id for block in presenter.snapshot().blocks] == original_ids
+        assert [block.primary_text for block in presenter.snapshot().blocks] == list(
+            peer_translation_fragments("나" * 64)
+        )
         await timeline.advance(0.2)
         await presenter.emit_peer_when_admissible(caption(3, unit, "settled", revision=3))
-        assert timeline.clock.now() == 3.2
-        assert presenter.snapshot().blocks[0].primary_text == "settled"
-        await timeline.advance(3.0)
+        assert timeline.clock.now() == 0.4
+        assert [block.primary_text for block in presenter.snapshot().blocks] == ["settled"]
+        await timeline.advance(3)
         assert presenter.snapshot().blocks[0].primary_text == "settled"
         stale = await presenter.emit(caption(4, unit, "obsolete", revision=2))
         preview_after_final = await presenter.emit(
@@ -325,28 +329,30 @@ async def test_metadata_only_version_does_not_extend_actual_upper_reading_clock(
         assert entry.last_meaningful_visible_at == 0.0
         assert entry.peer_protected_until == 2.0
         await timeline.advance(1.2)
+        assert any(block.id == f"peer:{upper}" for block in presenter.snapshot().blocks)
+        await timeline.advance(6)
         assert all(block.id != f"peer:{upper}" for block in presenter.snapshot().blocks)
     finally:
         await presenter.close()
 
 
 @pytest.mark.asyncio
-async def test_calibration_changes_reflow_peer_pages_on_three_second_timer() -> None:
+async def test_calibration_changes_reflow_current_fragments_without_page_timer() -> None:
     timeline = Timeline()
     presenter = presenter_for(timeline)
     unit = uuid4()
-    text = "가" * 100
+    text = "가" * 64
     try:
         await presenter.emit(caption(1, unit, text))
         await presenter.update_calibration(OverlayCalibration(text_scale=2.0))
         assert (
             presenter.snapshot().blocks[0].primary_text
-            == peer_translation_pages(text, text_scale=2.0)[0]
+            == peer_translation_fragments(text, text_scale=2.0)[0]
         )
-        await timeline.advance(3.0)
+        await timeline.advance(0.5)
         assert (
             presenter.snapshot().blocks[0].primary_text
-            == peer_translation_pages(text, text_scale=2.0)[1]
+            == peer_translation_fragments(text, text_scale=2.0)[0]
         )
     finally:
         await presenter.close()
@@ -369,9 +375,10 @@ async def test_effective_layout_port_tracks_supported_large_calibration_in_join_
         assert presenter.peer_caption_text_scale == 1.2
         assert initial_lines <= 2 < effective_lines
         assert effective_lines == pytest.approx(initial_lines * 1.2)
-        assert len(peer_translation_pages(source)) == 1
+        assert len(peer_translation_fragments(source)) == 1
         assert (
-            len(peer_translation_pages(source, text_scale=presenter.peer_caption_text_scale)) == 2
+            len(peer_translation_fragments(source, text_scale=presenter.peer_caption_text_scale))
+            == 2
         )
     finally:
         await presenter.close()
@@ -446,52 +453,37 @@ async def test_native_preview_final_and_source_only_repair_settle_matching_prese
 
 
 @pytest.mark.asyncio
-async def test_native_attribution_repair_and_duplicate_preserve_current_page_and_lifetime() -> None:
+async def test_native_attribution_repair_and_duplicate_preserve_fragments_and_lifetime() -> None:
     timeline, surface = Timeline(), Surface()
     presenter = presenter_for(timeline, surface)
     unit = uuid4()
-    text = "가" * 56 + "나" * 56 + "다" * 20
+    text = "가" * 64
     try:
         await presenter.emit(caption(1, unit, text, assignment=native_assignment(None)))
-        await timeline.advance(3.0)
-        entry = presenter._entries[("peer", unit)]
-        assert entry.peer_page_index == 1
-        before = (
-            entry.peer_page_due_at,
-            entry.last_meaningful_visible_at,
-            entry.visible_since,
-            entry.appearance_seq,
-            surface.expirations[f"peer:{unit}"],
-        )
+        await timeline.advance(0)
+        before = [
+            (block.id, block.primary_text, surface.expirations[block.id])
+            for block in presenter.snapshot().blocks
+        ]
         await timeline.advance(0.5)
         known = native_assignment("B")
         accepted = caption(2, unit, text, revision=2, assignment=known)
         assert (await presenter.emit(accepted)).outcome == "applied"
-        assert entry.speaker_style == "cyan"
-        assert entry.speaker_gray_reason is None
-        assert entry.peer_page_index == 1
-        assert presenter.snapshot().blocks[0].primary_text == peer_translation_pages(text)[1]
-        assert before == (
-            entry.peer_page_due_at,
-            entry.last_meaningful_visible_at,
-            entry.visible_since,
-            entry.appearance_seq,
-            surface.expirations[f"peer:{unit}"],
-        )
+        assert all(block.speaker_style == "cyan" for block in presenter.snapshot().blocks)
+        assert before == [
+            (block.id, block.primary_text, surface.expirations[block.id])
+            for block in presenter.snapshot().blocks
+        ]
         snapshot = presenter.snapshot()
         duplicate = replace(
             accepted, event_id=str(uuid4()), seq=3, speaker_assignment=native_assignment(None)
         )
         assert (await presenter.emit(duplicate)).outcome == "stale"
         assert presenter.snapshot() == snapshot
-        assert entry.speaker_assignment == known
-        await timeline.advance(2.5)
-        assert entry.peer_page_index == 2
-        await timeline.advance(30.0)
+        await timeline.advance(7.5)
         assert not presenter.snapshot().blocks
         late = await presenter.emit(caption(4, unit, text, revision=3, assignment=known))
         assert late.outcome == "stale"
-        assert not presenter.snapshot().blocks
     finally:
         await presenter.close()
 
@@ -544,6 +536,7 @@ async def test_native_revisions_preserve_handoff_gray_after_old_color_leaves() -
         await presenter.emit(
             caption(4, later, "later", assignment=replace(new_assignment, scope_order=(1, 3, 0)))
         )
+        await timeline.advance(1)
         assert ("peer", old) not in presenter._entries
         await presenter.emit(
             caption(
@@ -685,7 +678,7 @@ async def test_authoritative_identity_corrections_refresh_style_and_divider_toge
 @pytest.mark.asyncio
 @pytest.mark.parametrize("show_original", [False, True])
 @pytest.mark.parametrize("with_preview", [False, True])
-async def test_source_only_settlement_replaces_preview_with_authoritative_paged_source(
+async def test_source_only_settlement_replaces_preview_with_authoritative_fragments(
     show_original: bool,
     with_preview: bool,
 ) -> None:
@@ -710,17 +703,16 @@ async def test_source_only_settlement_replaces_preview_with_authoritative_paged_
         assert entry.peer_caption_final is True
         assert entry.peer_caption_revision == 2
         first = presenter.snapshot().blocks[0]
-        assert first.primary_text == peer_translation_pages(source)[0]
+        assert first.primary_text == peer_translation_fragments(source)[0]
         assert first.primary_language == "en"
         assert first.secondary_text == ""
         assert first.secondary_enabled is False
         assert first.update_id == "source-only-settlement"
-        await timeline.advance(3.0)
-        assert presenter.snapshot().blocks[0].primary_text == peer_translation_pages(source)[1]
+        await timeline.advance(0.1)
         await presenter.update_calibration(OverlayCalibration(text_scale=1.2))
         assert (
             presenter.snapshot().blocks[0].primary_text
-            == peer_translation_pages(source, text_scale=1.2)[0]
+            == peer_translation_fragments(source, text_scale=1.2)[0]
         )
         late_preview = await presenter.emit(
             caption(3, unit, "late preview", revision=3, final=False)
@@ -776,7 +768,7 @@ async def test_source_only_repair_absorbs_all_previews_and_rejects_obsolete_reti
 
 
 @pytest.mark.asyncio
-async def test_empty_authoritative_retirement_cancels_pages_without_waiting_or_resurrection() -> (
+async def test_empty_authoritative_retirement_cancels_fragments_without_waiting_or_resurrection() -> (
     None
 ):
     timeline = Timeline()

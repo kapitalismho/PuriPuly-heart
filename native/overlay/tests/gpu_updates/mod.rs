@@ -4,7 +4,7 @@ use windows::Win32::Graphics::Direct3D11::{
     D3D11_USAGE_STAGING,
 };
 
-fn read_pixels(frame: &RenderedFrame) -> Vec<u8> {
+pub(super) fn read_pixels(frame: &RenderedFrame) -> Vec<u8> {
     let texture = frame.d3d11_texture().unwrap();
     unsafe {
         let device = texture.GetDevice().unwrap();

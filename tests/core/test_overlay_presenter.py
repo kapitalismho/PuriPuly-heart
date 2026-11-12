@@ -2005,9 +2005,7 @@ async def test_presenter_allows_two_self_rows_and_evicts_oldest_on_third_self_tu
 
 
 @pytest.mark.asyncio
-async def test_presenter_preserves_input_order_when_two_turns_first_become_visible_in_same_window() -> (
-    None
-):
+async def test_presenter_orders_new_peer_items_by_renderable_registration_not_source_time() -> None:
     bridge = RecordingPresentationBridge()
     clock = FakeClock(_now=10.0)
     presenter = OverlayPresenter(
@@ -2059,14 +2057,16 @@ async def test_presenter_preserves_input_order_when_two_turns_first_become_visib
             created_at=13.1,
         )
     )
+    for _ in range(12):
+        await asyncio.sleep(0)
 
     assert [block.id for block in bridge.snapshots[-1].blocks] == [
-        f"peer:{older.utterance_id}",
         f"peer:{newer.utterance_id}",
+        f"peer:{older.utterance_id}",
     ]
     assert [block.primary_text for block in bridge.snapshots[-1].blocks] == [
-        "피어 하나",
         "피어 둘",
+        "피어 하나",
     ]
 
 
@@ -2232,6 +2232,9 @@ async def test_scoped_peer_children_survive_earlier_sibling_retirement() -> None
                 output_scope=scope,
             )
         )
+        presenter.clock.advance(1)
+        for _ in range(12):
+            await asyncio.sleep(0)
         assert receipt.outcome == "applied"
         assert presenter.snapshot().blocks[-1].id == f"peer:{child_id}"
         assert presenter.snapshot().blocks[-1].publication_index == index
@@ -2286,6 +2289,9 @@ async def test_scoped_peer_children_survive_earlier_sibling_retirement() -> None
             )
         )
     ).outcome == "applied"
+    presenter.clock.advance(1)
+    for _ in range(12):
+        await asyncio.sleep(0)
     assert presenter.snapshot().blocks[-1].id == f"peer:{next_child}"
 
 
@@ -3808,7 +3814,9 @@ async def test_presenter_native_fresh_render_peer_event_matrix_uses_exact_visibl
         )
     )
     assert presenter.snapshot().native_fresh_render_generations.peer == 2
-    assert presenter.snapshot().native_quiet_tail_episodes.peer == stream_episode
+    assert (
+        presenter.snapshot().native_quiet_tail_episodes.peer.generation > stream_episode.generation
+    )
     await presenter.emit(
         adapter.transcript_final(
             Transcript(
@@ -3838,7 +3846,9 @@ async def test_presenter_native_fresh_render_peer_event_matrix_uses_exact_visibl
         )
     )
     assert presenter.snapshot().native_fresh_render_generations.peer == 4
-    assert presenter.snapshot().native_quiet_tail_episodes.peer == final_episode
+    assert (
+        presenter.snapshot().native_quiet_tail_episodes.peer.generation > final_episode.generation
+    )
 
 
 @pytest.mark.asyncio
@@ -4037,14 +4047,14 @@ async def test_presenter_native_fresh_render_generations_preserve_channels_and_e
         show_peer_original=False,
     )
     assert presenter.snapshot().native_fresh_render_generations.self > generations.self
-    assert presenter.snapshot().native_fresh_render_generations.peer == generations.peer
+    assert presenter.snapshot().native_fresh_render_generations.peer > generations.peer
     generations = presenter.snapshot().native_fresh_render_generations
     await presenter.update_display_preferences(
         show_translation=True,
         show_peer_original=True,
     )
     assert presenter.snapshot().native_fresh_render_generations.self > generations.self
-    assert presenter.snapshot().native_fresh_render_generations.peer == generations.peer
+    assert presenter.snapshot().native_fresh_render_generations.peer > generations.peer
     generations = presenter.snapshot().native_fresh_render_generations
     self_generation = generations.self
     await presenter.update_calibration(OverlayCalibration(distance=1.2))
@@ -4055,8 +4065,7 @@ async def test_presenter_native_fresh_render_generations_preserve_channels_and_e
         peer=U64_MAX,
     )
     await presenter.emit(peer_translation)
-    rolled = presenter.snapshot().native_fresh_render_generations
-    assert (rolled.self, rolled.peer) == (self_generation, 1)
+    assert presenter._retry_projection.generations.peer == U64_MAX
     presenter.reset_scene()
     assert presenter.snapshot().native_fresh_render_generations is None
 

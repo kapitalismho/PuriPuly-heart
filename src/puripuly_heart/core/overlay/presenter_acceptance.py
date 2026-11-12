@@ -5,6 +5,7 @@ from dataclasses import dataclass, field, replace
 from typing import Mapping
 from uuid import UUID
 
+from .protocol import U64_MAX
 from .sink import (
     OverlayApplicationReceipt,
     OverlayEventUnion,
@@ -41,6 +42,7 @@ class PresenterAcceptanceLedger:
     entry_ordering: dict[EntryKey, tuple[str, int, int, int]] = field(default_factory=dict)
     sequence_namespaces: dict[EntryKey, tuple[int, int]] = field(default_factory=dict)
     retired_turn_frontiers: dict[tuple[str, int], tuple[int, int]] = field(default_factory=dict)
+    peer_retired_highwaters: dict[tuple[str, int], tuple[int, int]] = field(default_factory=dict)
 
     def reset(self) -> None:
         self.terminal_registry.clear()
@@ -50,6 +52,7 @@ class PresenterAcceptanceLedger:
         self.entry_ordering.clear()
         self.sequence_namespaces.clear()
         self.retired_turn_frontiers.clear()
+        self.peer_retired_highwaters.clear()
 
     def receipt(self, publication_id: str) -> OverlayApplicationReceipt | None:
         return self.receipts_by_id.get(publication_id)
@@ -189,9 +192,19 @@ class PresenterAcceptanceLedger:
             return
         scope, generation, order, index = ordering
         frontier_key = (scope, generation)
-        self.retired_turn_frontiers[frontier_key] = max(
-            (order, index), self.retired_turn_frontiers.get(frontier_key, (-1, -1))
-        )
+        retired = max((order, index), self.retired_turn_frontiers.get(frontier_key, (-1, -1)))
+        if scope == "peer":
+            retired = max(retired, self.peer_retired_highwaters.get(frontier_key, (-1, -1)))
+            self.peer_retired_highwaters[frontier_key] = retired
+            for live_scope, live_generation, live_order, live_index in self.entry_ordering.values():
+                if (live_scope, live_generation) != frontier_key:
+                    continue
+                before_live = (
+                    (live_order, live_index - 1) if live_index > 0 else (live_order - 1, U64_MAX)
+                )
+                retired = min(retired, before_live)
+        if retired[0] >= 0:
+            self.retired_turn_frontiers[frontier_key] = retired
 
     def terminal_reason(self, key: EntryKey) -> str | None:
         reason = self.scene_terminal_keys.get(key)
@@ -261,7 +274,7 @@ class PresenterAcceptanceLedger:
             value = getattr(entry, field_name)
             if isinstance(value, str):
                 total += len(value.encode("utf-8"))
-        total += sum(len(page.encode("utf-8")) for page in entry.peer_pages)
+        total += sum(len(fragment.encode("utf-8")) for fragment in entry.peer_fragments)
         return total
 
     @staticmethod
@@ -319,7 +332,7 @@ class PresenterAcceptanceLedger:
         if event.channel == "peer" and isinstance(
             event, (TranslationStreamUpdate, TranslationFinal)
         ):
-            current -= sum(len(page.encode("utf-8")) for page in entry.peer_pages)
+            current -= sum(len(fragment.encode("utf-8")) for fragment in entry.peer_fragments)
         replacements: tuple[tuple[str, str | None], ...] = ()
         if isinstance(event, (SelfTranscriptFinal, PeerTranscriptFinal)):
             replacements = (

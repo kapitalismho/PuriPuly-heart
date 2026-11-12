@@ -2481,8 +2481,12 @@ async def test_retirement_cancels_presenter_paced_peer_and_preserves_self_occupa
     )
 
     accepted = await _publish_peer_overlay(owner, event, source_order=1)
-    await asyncio.sleep(0)
-    await asyncio.sleep(0)
+    async with asyncio.timeout(0.5):
+        while not any(
+            decision.publication_id == event.event_id and decision.reason == "logical_pacing_wait"
+            for decision in owner.routing_decisions
+        ):
+            await asyncio.sleep(0)
     assert accepted.decision.reason == "accepted_handoff"
     assert presenter.snapshot().blocks[0].id == f"self:{self_turn}"
     pacing_waits = [
@@ -2773,19 +2777,26 @@ async def test_revisioned_preview_preemption_preserves_unrelated_final_order_and
         await asyncio.wait_for(sink.unrelated_started.wait(), 1)
         assert sink.preview_cancelled.is_set()
         assert owner._peer_overlay_worker is writer
-        assert sink.events == [first]
+        assert [event.event_id for event in sink.events] == [first.event_id, repair.event_id]
+        assert [event.turn_order for event in sink.events] == [1, 1]
         await _publish_peer_overlay(owner, queued_preview, source_order=4)
         await _publish_peer_overlay(owner, queued_final, source_order=4)
         sink.release_unrelated.set()
         await asyncio.wait_for(owner.wait_for_peer_output_idle(), 1)
-        assert sink.events == [first, independent, repair, queued_final]
+        assert [event.event_id for event in sink.events] == [
+            first.event_id,
+            repair.event_id,
+            independent.event_id,
+            queued_final.event_id,
+        ]
+        assert [event.turn_order for event in sink.events] == [1, 1, 3, 4]
         superseded = {
             decision.publication_id
             for decision in owner.routing_decisions
             if decision.reason == "peer_caption_superseded"
         }
         assert superseded == {pending.event_id, queued_preview.event_id}
-        assert owner._peer_delivery_task is None
+        assert owner._peer_active_batches == []
         assert not owner.has_active_overlay_deliveries
     finally:
         sink.release_unrelated.set()
