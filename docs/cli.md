@@ -132,6 +132,12 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 - Unsaved, reverted, or unknown-outcome edits remain only in the current page's memory; closing the app does not preserve them for restart. Explicitly submitting the affected setting again permits another attempt. Unrelated edits, repeated queue drains, and navigation without a new draft do not replay a failed submission.
 - This settings queue belongs to the GUI. CLI operations use the application owners and their receipts. Explicit runtime-only application and existing provider, telemetry-reporting, and model-installation recovery are unchanged. Actual persistence and resource application can still delay other ordered operations.
 
+### GUI GitHub Star Requests
+
+- Startup star requests use one app-wide record of a nonempty successful translation, regardless of connection type. Index, managed, BYOK, ChatGPT, local and custom HTTP translations all qualify; there is no managed-usage threshold.
+- Only launches with that success record count toward the first request. Changing the model or connection does not reset the record or count. Launch and repeat-display gates are owned by the [prompt service](../src/puripuly_heart/app/services/github_star_prompt.py); higher-priority startup feedback can suppress a request for that launch.
+- The GitHub action opens the repository and asynchronously saves the clicked state. A successful save suppresses future requests across restarts without checking whether the user actually starred the repository. If saving fails, a later request remains possible.
+
 ### Interpret Readiness at Its Owner
 
 | Observation | What it does not establish |

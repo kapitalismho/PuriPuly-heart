@@ -22,11 +22,9 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 from puripuly_heart.app.services.github_star_prompt_settings import (
     compose_github_star_prompt_owner,
 )
-from puripuly_heart.app.services.managed.managed_usage import ManagedUsageOwner
 from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.settings_vnext.serialization import to_dict as canonical_to_dict
-from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata
 from puripuly_heart.ui import app as app_module
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
@@ -109,7 +107,9 @@ def _persisted_settings(controller: PromptBackend) -> AppSettingsVNext:
 def _settings_for_connection(connection: str) -> AppSettingsVNext:
     settings = AppSettingsVNext()
     model = settings.intent.translation.model
-    if connection in {"managed_china", "official_byok"}:
+    if connection == "public_api":
+        model = "index_translate_35b"
+    elif connection in {"managed_china", "official_byok"}:
         model = "deepseek_v4_flash_41"
     elif connection == "ollama":
         model = "local_llm"
@@ -145,12 +145,8 @@ class PromptBackend:
         self.settings_owner = compose_settings_owner(self.config_path)
         self.settings_owner.start()
         self.settings_owner.remember_projection(self.settings_owner.require_canonical())
-        self.usage = SimpleNamespace(usage_metadata=None)
         self.owner = compose_github_star_prompt_owner(
             settings=self.settings_owner,
-            managed_remaining_percent=lambda: ManagedUsageOwner.remaining_percent_for(
-                self.usage.usage_metadata
-            ),
             transaction_result_sink=lambda _result: None,
             save_failure_sink=lambda _context, _exc: None,
             runtime_diagnostics_sink=lambda _event, _metadata: None,
@@ -160,12 +156,6 @@ class PromptBackend:
     @property
     def settings(self) -> AppSettingsVNext:
         return self.settings_owner.canonical
-
-    def _get_managed_usage_owner(self) -> object:
-        return self.usage
-
-    def _get_github_star_prompt_owner(self):
-        return self.owner
 
     def should_show_github_star_prompt(self, *, now: datetime | None = None) -> bool:
         return self.owner.should_show(now=now)
@@ -180,14 +170,13 @@ class PromptBackend:
         return await self.owner.persist_clicked()
 
 
-def _eligible_managed_backend(settings: AppSettingsVNext | None = None) -> PromptBackend:
-    backend = PromptBackend(settings or _settings_for_connection("managed"))
-    backend._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
-        limit_usd=100.0,
-        remaining_usd=50.0,
-        usage_usd=50.0,
+def _eligible_backend(settings: AppSettingsVNext | None = None) -> PromptBackend:
+    return PromptBackend(
+        _with_star(
+            settings or _settings_for_connection("public_api"),
+            translation_success_observed=True,
+        )
     )
-    return backend
 
 
 def _utc_z(value: datetime) -> str:
@@ -199,19 +188,18 @@ def _eligible_app(
     settings: AppSettingsVNext | None = None,
     *,
     eligible_launch_count: int | None = None,
+    translation_success_observed: bool = True,
 ) -> tuple[TranslatorApp, DummyPage, PromptBackend]:
     page = page or DummyPage()
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = page
-    initial = settings or _settings_for_connection("managed")
+    initial = _with_star(
+        settings or _settings_for_connection("public_api"),
+        translation_success_observed=translation_success_observed,
+    )
     if eligible_launch_count is not None:
         initial = _with_star(initial, eligible_launch_count=eligible_launch_count)
     backend = PromptBackend(initial)
-    backend._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
-        limit_usd=100.0,
-        remaining_usd=50.0,
-        usage_usd=50.0,
-    )
     app._ui_application = compose_test_ui_application_boundary(backend)
     return app, page, backend
 
@@ -220,10 +208,10 @@ def _eligible_app(
     ("changes", "expected"),
     [
         ({}, False),
-        ({"eligible_launch_count": 3}, True),
-        ({"eligible_launch_count": 3, "clicked": True}, False),
-        ({"eligible_launch_count": 3, "days_since_show": 13}, False),
-        ({"eligible_launch_count": 3, "days_since_show": 14}, True),
+        ({"eligible_launch_count": 5}, True),
+        ({"eligible_launch_count": 5, "clicked": True}, False),
+        ({"eligible_launch_count": 5, "days_since_show": 13}, False),
+        ({"eligible_launch_count": 5, "days_since_show": 14}, True),
     ],
 )
 def test_github_star_prompt_state_blocks_clicked_and_recent_shows(changes, expected) -> None:
@@ -232,8 +220,8 @@ def test_github_star_prompt_state_blocks_clicked_and_recent_shows(changes, expec
     days = prompt.pop("days_since_show", None)
     if days is not None:
         prompt["last_shown_at"] = _utc_z(now - timedelta(days=days))
-    controller = _eligible_managed_backend(
-        _with_star(_settings_for_connection("managed"), **prompt)
+    controller = _eligible_backend(
+        _with_star(_settings_for_connection("public_api"), **prompt)
     )
 
     assert controller.should_show_github_star_prompt(now=now) is expected
@@ -244,72 +232,32 @@ def test_github_star_prompt_state_blocks_clicked_and_recent_shows(changes, expec
 async def test_launch_github_star_snackbar_counts_eligible_launches_before_first_show(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = _settings_for_connection("managed")
-    saved_payloads: list[dict[str, object]] = []
+    settings = _settings_for_connection("public_api")
     sleeps: list[float] = []
 
     async def fake_sleep(seconds: float) -> None:
         sleeps.append(seconds)
 
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    first_app, first_page, first_controller = _eligible_app(settings=settings)
-    _patch_settings_save(
-        monkeypatch,
-        first_controller,
-        lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
-    )
+    for launch_number in range(1, 6):
+        app, page, controller = _eligible_app(settings=settings)
 
-    first_shown = await first_app.maybe_show_github_star_prompt_after_launch()
+        shown = await app.maybe_show_github_star_prompt_after_launch()
 
-    assert first_shown is False
-    assert first_page.opened == []
-    assert sleeps == []
-    assert _star(first_controller).eligible_launch_count == 1
-    assert _payload_star(saved_payloads[-1])["eligible_launch_count"] == 1
-
-    second_app, second_page, second_controller = _eligible_app(
-        settings=_persisted_settings(first_controller)
-    )
-    _patch_settings_save(
-        monkeypatch,
-        second_controller,
-        lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
-    )
-    second_shown = await second_app.maybe_show_github_star_prompt_after_launch()
-
-    assert second_shown is False
-    assert second_page.opened == []
-    assert sleeps == []
-    assert _star(second_controller).eligible_launch_count == 2
-    assert _payload_star(saved_payloads[-1])["eligible_launch_count"] == 2
-
-    third_app, third_page, third_controller = _eligible_app(
-        settings=_persisted_settings(second_controller)
-    )
-    _patch_settings_save(
-        monkeypatch,
-        third_controller,
-        lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
-    )
-    third_shown = await third_app.maybe_show_github_star_prompt_after_launch()
-
-    assert third_shown is True
-    assert len(sleeps) == 1
-    assert len(third_page.opened) == 1
-    assert _star(third_controller).eligible_launch_count == 3
-    assert _star(third_controller).show_count == 1
-    assert _payload_star(saved_payloads[-2])["eligible_launch_count"] == 3
-    assert _payload_star(saved_payloads[-2])["show_count"] == 0
-    assert _payload_star(saved_payloads[-1])["show_count"] == 1
-    assert _persisted_settings(third_controller).state.github_star_prompt == _star(third_controller)
+        assert shown is (launch_number == 5)
+        assert len(page.opened) == (1 if launch_number == 5 else 0)
+        assert _star(controller).eligible_launch_count == launch_number
+        assert _star(controller).show_count == (1 if launch_number == 5 else 0)
+        assert len(sleeps) == (1 if launch_number == 5 else 0)
+        settings = _persisted_settings(controller)
+        assert settings.state.github_star_prompt == _star(controller)
 
 
 @pytest.mark.asyncio
 async def test_launch_github_star_snackbar_does_not_count_ineligible_launch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app()
-    controller._get_managed_usage_owner().usage_metadata = None
+    app, page, controller = _eligible_app(translation_success_observed=False)
     saved_payloads: list[dict[str, object]] = []
 
     async def fail_sleep(_seconds: float) -> None:
@@ -334,7 +282,7 @@ async def test_launch_github_star_snackbar_does_not_count_ineligible_launch(
 async def test_prompt_open_persists_durably_before_display(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app(eligible_launch_count=3)
+    app, page, controller = _eligible_app(eligible_launch_count=5)
     entered = threading.Event()
     release = threading.Event()
     displayed_states = []
@@ -377,7 +325,7 @@ async def test_prompt_open_persists_durably_before_display(
 async def test_prompt_open_refuses_display_and_restores_state_when_persistence_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app(eligible_launch_count=3)
+    app, page, controller = _eligible_app(eligible_launch_count=5)
 
     async def fake_sleep(_seconds: float) -> None:
         return None
@@ -410,7 +358,7 @@ async def test_prompt_open_refuses_display_and_restores_state_when_persistence_f
 async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_suppresses(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app(eligible_launch_count=3)
+    app, page, controller = _eligible_app(eligible_launch_count=5)
     saved_payloads: list[dict[str, object]] = []
     sleeps: list[float] = []
     opened_urls: list[str] = []
@@ -478,13 +426,17 @@ async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_
 
     assert _star(controller).clicked is True
     assert _payload_star(saved_payloads[-1])["clicked"] is True
-    assert _persisted_settings(controller).state.github_star_prompt.clicked is True
+    persisted = _persisted_settings(controller)
+    assert persisted.state.github_star_prompt.clicked is True
+    restarted_app, restarted_page, restarted_controller = _eligible_app(settings=persisted)
     assert (
-        controller.should_show_github_star_prompt(
+        restarted_controller.should_show_github_star_prompt(
             now=datetime.now(timezone.utc) + timedelta(days=30)
         )
         is False
     )
+    assert await restarted_app.maybe_show_github_star_prompt_after_launch() is False
+    assert restarted_page.opened == []
 
 
 @pytest.mark.asyncio
@@ -542,7 +494,7 @@ async def test_launch_github_star_snackbar_skips_if_higher_priority_feedback_was
 async def test_launch_github_star_snackbar_skips_if_feedback_appears_during_delay(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app(eligible_launch_count=2)
+    app, page, controller = _eligible_app(eligible_launch_count=4)
     saved_payloads: list[dict[str, object]] = []
 
     async def fake_sleep(_seconds: float) -> None:
@@ -559,9 +511,9 @@ async def test_launch_github_star_snackbar_skips_if_feedback_appears_during_dela
 
     assert shown is False
     assert page.opened == []
-    assert _star(controller).eligible_launch_count == 3
+    assert _star(controller).eligible_launch_count == 5
     assert _star(controller).show_count == 0
-    assert _payload_star(saved_payloads[-1])["eligible_launch_count"] == 3
+    assert _payload_star(saved_payloads[-1])["eligible_launch_count"] == 5
     assert _payload_star(saved_payloads[-1])["show_count"] == 0
 
 
@@ -569,7 +521,7 @@ async def test_launch_github_star_snackbar_skips_if_feedback_appears_during_dela
 async def test_launch_github_star_prompt_runtime_close_cancels_delay_and_prevents_late_open(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app(eligible_launch_count=2)
+    app, page, controller = _eligible_app(eligible_launch_count=4)
     sleep_started = asyncio.Event()
     sleep_cancelled = asyncio.Event()
     original_sleep = asyncio.sleep
@@ -600,7 +552,7 @@ async def test_launch_github_star_prompt_runtime_close_cancels_delay_and_prevent
 async def test_launch_github_star_snackbar_skips_and_restores_if_feedback_appears_during_open_save(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app(eligible_launch_count=3)
+    app, page, controller = _eligible_app(eligible_launch_count=5)
     saved_payloads: list[dict[str, object]] = []
     entered = threading.Event()
     release = threading.Event()
@@ -640,7 +592,7 @@ async def test_launch_github_star_snackbar_skips_and_restores_if_feedback_appear
 async def test_prompt_close_joins_physical_open_save_without_late_display(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app(eligible_launch_count=3)
+    app, page, controller = _eligible_app(eligible_launch_count=5)
     entered = threading.Event()
     release = threading.Event()
     settled = threading.Event()
@@ -1041,7 +993,7 @@ def test_debug_preview_github_star_snackbar_opens_without_mutating_prompt_state(
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    backend = _eligible_managed_backend()
+    backend = _eligible_backend()
     initial_prompt_state = backend.settings.state.github_star_prompt
     app._ui_application = compose_test_ui_application_boundary(backend)
     opened_urls: list[str] = []

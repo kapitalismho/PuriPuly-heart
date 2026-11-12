@@ -1585,9 +1585,6 @@ def compose_application_runtime(
         if github_prompt is None:
             github_prompt = compose_github_star_prompt_owner(
                 settings=settings,
-                managed_remaining_percent=lambda: (
-                    require_runtime_components().managed_account.usage.remaining_percent
-                ),
                 transaction_result_sink=(require_settings_application().results.set),
                 save_failure_sink=github_save_failure,
                 runtime_diagnostics_sink=github_diagnostic,

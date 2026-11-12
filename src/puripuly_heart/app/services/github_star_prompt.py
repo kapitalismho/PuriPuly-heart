@@ -10,7 +10,7 @@ from typing import Any, Protocol
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, GithubStarPromptState
 from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 
-GITHUB_STAR_PROMPT_ELIGIBLE_LAUNCH_THRESHOLD = 3
+GITHUB_STAR_PROMPT_ELIGIBLE_LAUNCH_THRESHOLD = 5
 GITHUB_STAR_PROMPT_RECENCY_WINDOW = timedelta(days=14)
 
 
@@ -96,8 +96,6 @@ class GithubStarPromptOwner:
         [GithubStarPromptSettings, GithubStarPromptSettings],
         Awaitable[bool],
     ]
-    is_eligible: Callable[[], bool]
-    has_user_owned_cloud_connection: Callable[[GithubStarPromptSettings | None], bool]
     log_save_failure: Callable[[str, Exception], None]
     runtime_diagnostics_sink: Callable[[str, Mapping[str, object]], None]
     translation_success_observation: Callable[[], Coroutine[Any, Any, bool]] | None = None
@@ -132,6 +130,12 @@ class GithubStarPromptOwner:
                 diagnostics_sink=self.runtime_diagnostics_sink,
             )
         return self._runtime
+
+    def is_eligible(self) -> bool:
+        settings = self.settings_provider()
+        return bool(
+            settings is not None and _star_state(settings).translation_success_observed
+        )
 
     def initial_launch_gate_satisfied(self, settings: GithubStarPromptSettings) -> bool:
         prompt = _star_state(settings)
@@ -282,8 +286,6 @@ class GithubStarPromptOwner:
 
     async def persist_translation_success_observed(self) -> bool:
         def mutate(settings: AppSettingsVNext) -> AppSettingsVNext | None:
-            if not self.has_user_owned_cloud_connection(settings):
-                return None
             if _star_state(settings).translation_success_observed:
                 return None
             return _with_star_state(settings, translation_success_observed=True)
@@ -305,8 +307,6 @@ class GithubStarPromptOwner:
     def schedule_translation_success_observed(self) -> bool:
         settings = self.settings_provider()
         if settings is None:
-            return False
-        if not self.has_user_owned_cloud_connection(settings):
             return False
         if _star_state(settings).translation_success_observed:
             return False
