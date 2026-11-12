@@ -27,13 +27,30 @@ CORPUS = {
 
 class NativePresenter(OverlayPresenter):
     def __init__(self, **kwargs):
-        self.applied_events = []
+        self.accepted_events = []
+        self.receipt_observations = []
         super().__init__(**kwargs)
 
+    def observe_receipt(self, event, receipt, *, cancelled=False):
+        self.receipt_observations.append(
+            {
+                "event_id": event.event_id,
+                "outcome": None if receipt is None else receipt.outcome,
+                "scene_revision": None if receipt is None else receipt.scene_revision,
+                "observed_at": self.clock.now(),
+                "cancelled": cancelled,
+            }
+        )
+        if receipt is not None and receipt.outcome in {"applied", "registered"}:
+            self.accepted_events.append(event)
+
     async def emit(self, event):
-        receipt = await super().emit(event)
-        if receipt.outcome == "applied":
-            self.applied_events.append(event)
+        try:
+            receipt = await super().emit(event)
+        except asyncio.CancelledError:
+            self.observe_receipt(event, self.application_receipt(event.event_id), cancelled=True)
+            raise
+        self.observe_receipt(event, receipt)
         return receipt
 
 
@@ -70,19 +87,24 @@ class NativeFixture:
                 "caption_revision": revision,
                 "snapshot": self.presenter.snapshot().to_dict(),
                 "expirations": dict(self.surface.expirations),
+                "output_has_active_deliveries": self.output.has_active_overlay_deliveries,
+                "receipt_observations": list(self.presenter.receipt_observations),
                 "fragments": [
                     {
-                        "id": entry.block_id,
-                        "index": entry.peer_fragment_index,
-                        "registered_at": entry.peer_registered_at,
-                        "visible_since": entry.visible_since,
-                        "last_meaningful_visible_at": entry.last_meaningful_visible_at,
-                        "pending": entry.peer_pending,
-                        "departed": entry.peer_departed,
-                        "protected_until": entry.peer_protected_until,
+                        "logical_id": str(state.logical_id),
+                        "id": state.id,
+                        "index": state.index,
+                        "revision": state.revision,
+                        "registered_at": state.registered_at,
+                        "registration_order": state.registration_order,
+                        "visible_since": state.visible_since,
+                        "last_meaningful_visible_at": state.last_meaningful_visible_at,
+                        "pending": state.pending,
+                        "departed": state.departed,
+                        "protected_until": state.protected_until,
+                        "expires_at": state.expires_at,
                     }
-                    for entry in self.presenter._entries.values()
-                    if entry.channel == "peer"
+                    for state in self.presenter.peer_fragment_states()
                 ],
             }
         )
@@ -97,6 +119,7 @@ class NativeFixture:
         output_scope: OverlayPublicationScope | None = None,
         source_order: int = 1,
         target_language: str | None = None,
+        publication_generation: int = 1,
     ):
         ready_at_ms = round(self.timeline.clock.now() * 1000)
         decision_start = len(self.output.routing_decisions)
@@ -114,13 +137,14 @@ class NativeFixture:
             output_scope=output_scope,
         )
         await self.output.publish_overlay_event(
-            event, publication_generation=1, source_order=source_order
+            event, publication_generation=publication_generation, source_order=source_order
         )
         await self.output.wait_for_peer_output_idle()
         await self.timeline.advance(0)
         self.record(label, text=text, revision=revision)
         self.rows[-1]["content_ready_at_ms"] = ready_at_ms
         self.rows[-1]["logical_observed_at_ms"] = round(self.timeline.clock.now() * 1000)
+        self.rows[-1]["publication_generation"] = publication_generation
         self.rows[-1]["output_decisions"] = [
             decision.reason for decision in self.output.routing_decisions[decision_start:]
         ]
@@ -318,7 +342,7 @@ async def ready_order():
         )
         accepted_event = next(
             accepted
-            for accepted in fixture.presenter.applied_events
+            for accepted in fixture.presenter.accepted_events
             if accepted.event_id == event.event_id
         )
         fixture.rows[-1]["accepted_display_order"] = accepted_event.turn_order
@@ -357,6 +381,47 @@ async def ready_order():
         await fixture.close()
 
 
+async def generation_retirement():
+    fixture = NativeFixture(70)
+    old_unit = fixture.unit
+    try:
+        await fixture.own("self")
+        fixture.rows.clear()
+        await fixture.peer("generation-one-root", "가" * 64, 1)
+        await fixture.at(0.2)
+        retired_surface_start = len(fixture.surface.snapshots)
+        fixture.output.retire_peer_generation(1)
+        await fixture.output.wait_for_peer_output_idle()
+        await fixture.timeline.advance(0)
+        fixture.record("generation-one-retired")
+        await fixture.at(1.2)
+        fixture.record("retired-tail-deadline")
+        await fixture.at(3.2)
+        fixture.record("before-recovery")
+        fixture.rows[-1]["published_while_retired"] = [
+            snapshot.to_dict() for snapshot in fixture.surface.snapshots[retired_surface_start:]
+        ]
+        fixture.output.activate_peer_generation(2)
+        fixture.unit = UUID(int=71)
+        await fixture.peer(
+            "generation-two-caption",
+            "Current generation two caption",
+            1,
+            publication_generation=2,
+        )
+        await fixture.at(3.9)
+        fixture.unit = old_unit
+        await fixture.peer(
+            "late-retired-generation",
+            "Late retired generation one",
+            2,
+            publication_generation=1,
+        )
+        return fixture.rows
+    finally:
+        await fixture.close()
+
+
 async def corpus():
     result = {}
     for index, (name, text) in enumerate(CORPUS.items()):
@@ -382,6 +447,7 @@ async def main():
         "fragments": fragments,
         "local": local,
         "ready-order": ready_order,
+        "generation-retirement": generation_retirement,
         "corpus": corpus,
     }
     print(json.dumps(await cases[mode](), ensure_ascii=False))

@@ -379,6 +379,7 @@ async fn issue403_local_revision_zero_fragments_start_only_when_drawable() {
     assert!(pending["visible_since"].is_null());
     assert!(pending["last_meaningful_visible_at"].is_null());
     assert!(pending["protected_until"].is_null());
+    assert!(pending["expires_at"].is_null());
     let tail = pending["id"].as_str().unwrap();
     assert!(!queued["expirations"]
         .as_object()
@@ -440,6 +441,93 @@ async fn issue403_native_accepts_later_ready_older_source_after_expiry_but_not_r
     let owner = run_rows(rows, "issue403-ready-order").await;
     assert_bounded_episode(&owner, &rows[0], 5);
     assert_bounded_episode(&owner, &rows[3], 5);
+}
+
+#[tokio::test]
+async fn issue403_output_generation_retirement_fences_pending_tail_and_allows_recovery() {
+    let input = python_cases("generation-retirement");
+    let rows = input.as_array().unwrap();
+    assert_current_targets(rows);
+    let original = &rows[0];
+    let root = "peer:00000000-0000-0000-0000-000000000046";
+    let tail = original["fragments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|fragment| fragment["index"] == 1)
+        .unwrap();
+    let tail_id = tail["id"].as_str().unwrap();
+    assert_eq!(original["publication_generation"], 1);
+    assert_eq!(
+        original["snapshot"]["native_fresh_render_targets"]["peer"],
+        root
+    );
+    assert_eq!(tail["pending"], true);
+    assert!(tail["visible_since"].is_null());
+    assert!(tail["expires_at"].is_null());
+    assert_eq!(original["output_has_active_deliveries"], false);
+    assert!(original["output_decisions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reason| reason == "application_applied"));
+    for row in &rows[1..4] {
+        assert!(row["snapshot"]["blocks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|block| block["id"] != tail_id));
+        let episode = row["snapshot"]["native_quiet_tail_episodes"]["peer"]["generation"].as_u64();
+        assert!(episode.is_none() || episode == Some(peer_episode(original)));
+        let generation = row["snapshot"]["native_fresh_render_generations"]["peer"].as_u64();
+        assert!(generation.is_none() || generation == Some(peer_generation(original)));
+    }
+    for scene in rows[3]["published_while_retired"].as_array().unwrap() {
+        assert!(scene["blocks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|block| block["id"] != tail_id));
+        assert_ne!(scene["native_fresh_render_targets"]["peer"], tail_id);
+        let episode = scene["native_quiet_tail_episodes"]["peer"]["generation"].as_u64();
+        assert!(episode.is_none() || episode == Some(peer_episode(original)));
+        let generation = scene["native_fresh_render_generations"]["peer"].as_u64();
+        assert!(generation.is_none() || generation == Some(peer_generation(original)));
+    }
+    let recovered = &rows[4];
+    let current = "peer:00000000-0000-0000-0000-000000000047";
+    assert_eq!(recovered["publication_generation"], 2);
+    assert_eq!(
+        recovered["snapshot"]["native_fresh_render_targets"]["peer"],
+        current
+    );
+    assert!(recovered["snapshot"]["blocks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|block| block["channel"] == "self"));
+    assert!(recovered["snapshot"]["blocks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|block| block["id"] != root && block["id"] != tail_id));
+    assert!(peer_generation(recovered) > peer_generation(original));
+    assert!(peer_episode(recovered) > peer_episode(original));
+    assert_eq!(rows[5]["snapshot"], recovered["snapshot"]);
+    assert_eq!(rows[5]["expirations"], recovered["expirations"]);
+    assert!(rows[5]["output_decisions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reason| reason == "publication_generation_retired"));
+    let owner = run_rows(rows, "issue403-generation-retirement").await;
+    assert_bounded_episode(&owner, original, 5);
+    assert_bounded_episode(&owner, recovered, 5);
+    assert!(owner
+        .fresh_retry_audit_for_test()
+        .iter()
+        .filter(|fact| fact.0 == "peer" && fact.2 == "scheduled")
+        .all(|fact| fact.1 == peer_generation(original) || fact.1 == peer_generation(recovered)));
 }
 
 #[cfg(windows)]

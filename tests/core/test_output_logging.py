@@ -344,13 +344,22 @@ async def test_normal_policy_decisions_remain_owned_without_rendered_noise(outpu
 
 
 @pytest.mark.asyncio
-async def test_peer_overlay_wait_is_file_only_and_success_stays_in_delivery_history(output_logs):
+@pytest.mark.parametrize("outcome", ["applied", "registered"])
+async def test_peer_overlay_wait_is_file_only_and_success_stays_in_delivery_history(
+    output_logs, outcome
+):
     service, live, log_file = output_logs
     started, release = asyncio.Event(), asyncio.Event()
 
     class PacedSink:
-        async def emit_peer_when_admissible(
-            self, event, *, on_wait=None, admission_started_at=None
+        async def register_peer_caption(
+            self,
+            event,
+            *,
+            publication_generation,
+            is_current=None,
+            on_wait=None,
+            admission_started_at=None,
         ):
             if on_wait is not None:
                 on_wait("protected_rows")
@@ -358,10 +367,13 @@ async def test_peer_overlay_wait_is_file_only_and_success_stays_in_delivery_hist
             await release.wait()
             return OverlayApplicationReceipt(
                 stage="application_accepted",
-                outcome="applied",
+                outcome=outcome,
                 publication_id=event.event_id,
-                scene_revision=1,
+                scene_revision=1 if outcome == "applied" else None,
             )
+
+        def retire_peer_generation(self, publication_generation):
+            self.retired_generation = publication_generation
 
     output = OutputRuntime(
         chatbox=ChatboxPaginator(sender=FakeSender(), clock=FakeClock(), runtime_logging=service),
@@ -389,10 +401,12 @@ async def test_peer_overlay_wait_is_file_only_and_success_stays_in_delivery_hist
         assert [decision.reason for decision in output.routing_decisions] == [
             "accepted_handoff",
             "logical_pacing_wait",
-            "application_applied",
+            f"application_{outcome}",
         ]
         applied = output.routing_decisions[-1]
         assert applied.metadata["physical_ack"] is False
+        assert applied.metadata["outcome"] == outcome
+        assert applied.metadata["scene_revision"] == (1 if outcome == "applied" else None)
         assert live.getvalue() == ""
         assert log_file.read_text(encoding="utf-8") == pending_file
     finally:

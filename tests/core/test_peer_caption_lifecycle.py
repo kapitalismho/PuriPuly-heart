@@ -1847,8 +1847,15 @@ async def test_ready_repair_cancels_absorbed_preview_at_real_protected_upper_gat
             "translated:The preceding, second"
         )
         assert any(
-            decision.reason == "peer_caption_superseded"
+            decision.reason == "application_registered"
+            and decision.metadata.get("utterance_id") == str(incoming.utterance_id)
+            and decision.metadata["scene_revision"] is None
             for decision in harness.output_runtime.routing_decisions
+        )
+        assert presenter.peer_fragment_state(incoming.utterance_id, 0) is None
+        assert (
+            presenter._acceptance.terminal_reason(("peer", incoming.utterance_id))
+            == "absorbed_by_repair"
         )
         await timeline.advance(1.1)
         assert all(
@@ -1947,13 +1954,19 @@ async def test_final_settlement_keeps_waiting_preview_original_one_second_budget
             ):
                 await asyncio.sleep(0)
         original_admission_at = clock.now()
+        registration = presenter.peer_fragment_state(incoming.utterance_id, 0)
         await timeline.advance(0.6)
         await final(harness, incoming)
         await harness.peer_owner.cloud_captions.wait_for_idle()
         await turn_loop()
         assert (
-            harness.output_runtime._peer_caption_admission_started_at[incoming.utterance_id]
+            presenter.peer_fragment_state(incoming.utterance_id, 0).registered_at
             == original_admission_at
+            == registration.registered_at
+        )
+        assert (
+            presenter.peer_fragment_state(incoming.utterance_id, 0).registration_order
+            == registration.registration_order
         )
         assert all(
             block.id != f"peer:{incoming.utterance_id}" for block in presenter.snapshot().blocks
@@ -2294,21 +2307,21 @@ async def test_local_revision_zero_overflow_enters_fragments_without_extra_reque
         blocks = [block for block in presenter.snapshot().blocks if block.channel == "peer"]
         if self_contention:
             assert [block.id for block in blocks] == [f"peer:{child}"]
-            first = presenter._entries[("peer", child)]
-            tail = next(
-                entry for entry in presenter._entries.values() if entry.peer_parent_id == child
-            )
+            first = presenter.peer_fragment_state(child, 0)
+            tail = presenter.peer_fragment_state(child, 1)
             assert first.visible_since == 0
-            assert tail.peer_pending and tail.visible_since is None
+            assert tail.pending and tail.visible_since is None
             await timeline.advance(0.9)
             assert [
                 block.id for block in presenter.snapshot().blocks if block.channel == "peer"
             ] == [f"peer:{child}"]
             await timeline.advance(0.1)
             blocks = [block for block in presenter.snapshot().blocks if block.channel == "peer"]
-            assert first.peer_departed and first.visible_since == 0
-            assert not tail.peer_pending and tail.visible_since == 1
-            assert surface.expirations[tail.block_id] == 9
+            first = presenter.peer_fragment_state(child, 0)
+            tail = presenter.peer_fragment_state(child, 1)
+            assert first.departed and first.visible_since == 0
+            assert not tail.pending and tail.visible_since == 1
+            assert surface.expirations[tail.id] == 9
             assert [block.primary_text for block in blocks] == [peer_translation_fragments(text)[1]]
         else:
             assert [block.primary_text for block in blocks] == list(
@@ -2526,8 +2539,8 @@ async def test_g4_owner_full_revisions_keep_one_logical_history_contribution():
         await harness.peer_owner.cloud_captions.check_previews()
         await idle(harness)
         unit = backend.calls[0].utterance_id
-        tail = next(entry for entry in presenter._entries.values() if entry.peer_parent_id == unit)
-        registration = tail.peer_registered_at, tail.appearance_seq
+        tail = presenter.peer_fragment_state(unit, 1)
+        registration = tail.registered_at, tail.registration_order
         await timeline.advance(0.1)
         await presenter.emit(caption(101, unrelated, "B"))
         await timeline.advance(0.1)
@@ -2535,29 +2548,22 @@ async def test_g4_owner_full_revisions_keep_one_logical_history_contribution():
         await harness.peer_owner.cloud_captions.wait_for_idle()
         await timeline.advance(0)
         pending = sorted(
-            (entry for entry in presenter._entries.values() if entry.peer_pending),
-            key=lambda entry: entry.appearance_seq,
+            (entry for entry in presenter.peer_fragment_states() if entry.pending),
+            key=lambda entry: entry.registration_order,
         )
-        assert [
-            (entry.peer_parent_id or entry.utterance_id, entry.peer_fragment_index)
-            for entry in pending
-        ] == [
+        assert [(entry.logical_id, entry.index) for entry in pending] == [
             (unit, 1),
             (unrelated, 0),
             (unit, 2),
         ]
-        assert (pending[0].peer_registered_at, pending[0].appearance_seq) == registration
-        assert all(
-            entry.peer_caption_revision == 2
-            for entry in presenter._entries.values()
-            if entry.utterance_id == unit or entry.peer_parent_id == unit
-        )
+        assert (pending[0].registered_at, pending[0].registration_order) == registration
+        assert all(entry.revision == 2 for entry in presenter.peer_fragment_states(unit))
         await timeline.advance(0.1)
         await partial(harness, repair)
         await final(harness, repair)
         await harness.peer_owner.cloud_captions.wait_for_idle()
         await timeline.advance(0)
-        assert all(entry.peer_parent_id != unit for entry in presenter._entries.values())
+        assert [entry.index for entry in presenter.peer_fragment_states(unit)] == [0]
         assert presenter._entries[("peer", unit)].peer_caption_revision == 3
         assert presenter._entries[("peer", unrelated)].peer_pending
         assert [entry.text for entry in harness.peer_runtime.translation_history] == [

@@ -106,13 +106,13 @@ async def test_continuations_use_ordinary_slots_and_wait_instead_of_page_timer()
         assert [block.primary_text for block in presenter.snapshot().blocks] == list(fragments)
         assert set(surface.expirations.values()) == {8.0}
         await timeline.advance(0.1)
-        pending = asyncio.create_task(
-            presenter.emit_peer_when_admissible(caption(2, second, "next"))
+        receipt = await presenter.register_peer_caption(
+            caption(2, second, "next"), publication_generation=1
         )
-        await timeline.advance(0)
-        assert not pending.done()
+        assert receipt.outcome == "registered" and receipt.scene_revision is None
+        assert presenter.peer_fragment_state(second, 0).pending
         await timeline.advance(1)
-        assert (await pending).outcome == "applied"
+        assert not presenter.peer_fragment_state(second, 0).pending
         assert presenter.snapshot().blocks[-1].primary_text == "next"
         assert all(block.id != f"peer:{first}" for block in presenter.snapshot().blocks)
         await timeline.advance(3)
@@ -132,8 +132,8 @@ async def test_correction_extends_expiry_and_obsolete_timer_cannot_remove_curren
         old_revision = presenter._entries[("peer", upper)].expiration_revision
         assert surface.expirations[f"peer:{upper}"] == 8.0
         await timeline.advance(1.7)
-        receipt = await presenter.emit_peer_when_admissible(
-            caption(3, upper, "정" * 40, revision=2)
+        receipt = await presenter.register_peer_caption(
+            caption(3, upper, "정" * 40, revision=2), publication_generation=1
         )
         assert receipt.outcome == "applied"
         assert timeline.clock.now() == 1.7
@@ -152,20 +152,17 @@ async def test_new_preview_waits_at_most_one_second_then_evicts_protected_upper(
     timeline = Timeline()
     presenter = presenter_for(timeline)
     first, second, third = uuid4(), uuid4(), uuid4()
-    pending = None
     try:
         await presenter.emit(caption(1, first, "가" * 40))
         await presenter.emit(caption(2, second, "lower"))
-        pending = asyncio.create_task(
-            presenter.emit_peer_when_admissible(caption(3, third, "new preview", final=False))
+        receipt = await presenter.register_peer_caption(
+            caption(3, third, "new preview", final=False), publication_generation=1
         )
-        await timeline.advance(0)
-        assert not pending.done()
+        assert receipt.outcome == "registered" and receipt.scene_revision is None
         await timeline.advance(0.9)
-        assert not pending.done()
+        assert presenter.peer_fragment_state(third, 0).pending
         await timeline.advance(0.1)
-        assert pending.done()
-        assert (await pending).outcome == "applied"
+        assert not presenter.peer_fragment_state(third, 0).pending
         assert [block.id for block in presenter.snapshot().blocks] == [
             f"peer:{second}",
             f"peer:{third}",
@@ -173,9 +170,6 @@ async def test_new_preview_waits_at_most_one_second_then_evicts_protected_upper(
         stale = await presenter.emit(caption(4, first, "late repair", revision=2))
         assert stale.outcome == "stale"
     finally:
-        if pending is not None and not pending.done():
-            pending.cancel()
-            await asyncio.gather(pending, return_exceptions=True)
         await presenter.close()
 
 
@@ -186,19 +180,23 @@ async def test_new_full_revision_reconciles_fragments_and_settlement_is_immediat
     unit = uuid4()
     text = "가" * 64
     try:
-        await presenter.emit_peer_when_admissible(caption(1, unit, text, final=False))
+        await presenter.register_peer_caption(
+            caption(1, unit, text, final=False), publication_generation=1
+        )
         await timeline.advance(0)
         original_ids = [block.id for block in presenter.snapshot().blocks]
         await timeline.advance(0.2)
-        await presenter.emit_peer_when_admissible(
-            caption(2, unit, "나" * 64, revision=2, final=False)
+        await presenter.register_peer_caption(
+            caption(2, unit, "나" * 64, revision=2, final=False), publication_generation=1
         )
         assert [block.id for block in presenter.snapshot().blocks] == original_ids
         assert [block.primary_text for block in presenter.snapshot().blocks] == list(
             peer_translation_fragments("나" * 64)
         )
         await timeline.advance(0.2)
-        await presenter.emit_peer_when_admissible(caption(3, unit, "settled", revision=3))
+        await presenter.register_peer_caption(
+            caption(3, unit, "settled", revision=3), publication_generation=1
+        )
         assert timeline.clock.now() == 0.4
         assert [block.primary_text for block in presenter.snapshot().blocks] == ["settled"]
         await timeline.advance(3)
@@ -222,14 +220,16 @@ async def test_repair_absorbs_preview_atomically_and_stale_chained_repair_cannot
     try:
         await presenter.emit(caption(1, unit, "first"))
         await presenter.emit(caption(2, preview, "preview", final=False))
-        await presenter.emit_peer_when_admissible(
-            caption(3, unit, "first repaired", revision=2, superseded=(preview,))
+        await presenter.register_peer_caption(
+            caption(3, unit, "first repaired", revision=2, superseded=(preview,)),
+            publication_generation=1,
         )
         assert len(surface.snapshots[-1].blocks) == 1
         assert surface.snapshots[-1].blocks[0].primary_text == "first repaired"
         await presenter.emit(caption(4, next_preview, "next preview", final=False))
-        await presenter.emit_peer_when_admissible(
-            caption(5, unit, "chained repair", revision=4, superseded=(preview, next_preview))
+        await presenter.register_peer_caption(
+            caption(5, unit, "chained repair", revision=4, superseded=(preview, next_preview)),
+            publication_generation=1,
         )
         old = await presenter.emit(
             caption(6, unit, "old chained repair", revision=3, superseded=(preview,))
@@ -606,8 +606,9 @@ async def test_cross_final_mixed_repair_clears_semantic_ranges_and_overflow_divi
         initial_style = first.speaker_style
         assert initial_style == "gray"
         assert presenter.snapshot().speaker_divider is True
-        receipt = await presenter.emit_peer_when_admissible(
-            caption(3, repaired, "combined", revision=2, source="alpha, beta", assignment=mixed)
+        receipt = await presenter.register_peer_caption(
+            caption(3, repaired, "combined", revision=2, source="alpha, beta", assignment=mixed),
+            publication_generation=1,
         )
         assert receipt.outcome == "applied"
         assert first.original_text == "alpha, beta"
@@ -694,7 +695,7 @@ async def test_source_only_settlement_replaces_preview_with_authoritative_fragme
             caption(2, unit, "", revision=2, source=source),
             update_id="source-only-settlement",
         )
-        receipt = await presenter.emit_peer_when_admissible(settled)
+        receipt = await presenter.register_peer_caption(settled, publication_generation=1)
         assert receipt.outcome == "applied"
         assert timeline.clock.now() == 0
         entry = presenter._entries[("peer", unit)]
@@ -735,7 +736,7 @@ async def test_source_only_repair_absorbs_all_previews_and_rejects_obsolete_reti
     try:
         await presenter.emit(caption(1, unit, "first final"))
         await presenter.emit(caption(2, preview, "preview to absorb", final=False))
-        await presenter.emit_peer_when_admissible(
+        await presenter.register_peer_caption(
             caption(
                 3,
                 unit,
@@ -743,7 +744,8 @@ async def test_source_only_repair_absorbs_all_previews_and_rejects_obsolete_reti
                 revision=3,
                 source="first source and corrected next source",
                 superseded=(preview, absent_preview),
-            )
+            ),
+            publication_generation=1,
         )
         assert len(surface.snapshots[-1].blocks) == 1
         assert surface.snapshots[-1].blocks[0].id == f"peer:{unit}"
@@ -777,14 +779,15 @@ async def test_empty_authoritative_retirement_cancels_fragments_without_waiting_
     try:
         await presenter.emit(caption(1, preview, "가" * 120, final=False))
         await presenter.emit(caption(2, unrelated, "unrelated final"))
-        retired_absent = await presenter.emit_peer_when_admissible(
-            caption(3, absent, "", revision=2, source="")
+        retired_absent = await presenter.register_peer_caption(
+            caption(3, absent, "", revision=2, source=""), publication_generation=1
         )
         assert retired_absent.outcome == "applied"
         assert timeline.clock.now() == 0
         assert len(presenter.snapshot().blocks) == 2
-        retired = await presenter.emit_peer_when_admissible(
-            caption(4, preview, "", revision=2, source="", superseded=(absent,))
+        retired = await presenter.register_peer_caption(
+            caption(4, preview, "", revision=2, source="", superseded=(absent,)),
+            publication_generation=1,
         )
         assert retired.outcome == "applied"
         assert ("peer", preview) not in presenter._entries
@@ -824,33 +827,27 @@ async def test_superseding_final_uses_remaining_original_caption_admission_budge
     timeline = Timeline()
     presenter = presenter_for(timeline)
     upper, lower, unit = uuid4(), uuid4(), uuid4()
-    preview_task = final_task = None
     try:
         assert isinstance(presenter, PeerCaptionAdmissionPort)
         await presenter.emit(caption(1, upper, "가" * 40))
         await presenter.emit(caption(2, lower, "lower"))
         admission_started_at = timeline.clock.now()
-        preview_task = asyncio.create_task(
-            presenter.emit_peer_when_admissible(caption(3, unit, "waiting preview", final=False))
+        preview_receipt = await presenter.register_peer_caption(
+            caption(3, unit, "waiting preview", final=False), publication_generation=1
         )
-        await timeline.advance(0)
-        assert not preview_task.done()
+        assert preview_receipt.outcome == "registered"
         await timeline.advance(0.6)
-        preview_task.cancel()
-        await asyncio.gather(preview_task, return_exceptions=True)
-        final_task = asyncio.create_task(
-            presenter.emit_peer_when_admissible(
-                caption(4, unit, "authoritative final", revision=2),
-                admission_started_at=admission_started_at,
-            )
+        final_receipt = await presenter.register_peer_caption(
+            caption(4, unit, "authoritative final", revision=2),
+            admission_started_at=admission_started_at,
+            publication_generation=1,
         )
-        await timeline.advance(0)
-        assert not final_task.done()
+        assert final_receipt.outcome == "registered" and final_receipt.scene_revision is None
+        assert presenter.peer_fragment_state(unit, 0).registered_at == admission_started_at
         await timeline.advance(0.39)
-        assert not final_task.done()
+        assert presenter.peer_fragment_state(unit, 0).pending
         await timeline.advance(0.01)
-        assert final_task.done()
-        assert (await final_task).outcome == "applied"
+        assert not presenter.peer_fragment_state(unit, 0).pending
         assert timeline.clock.now() == pytest.approx(1.0)
         assert [block.id for block in presenter.snapshot().blocks] == [
             f"peer:{lower}",
@@ -859,9 +856,7 @@ async def test_superseding_final_uses_remaining_original_caption_admission_budge
         assert presenter.snapshot().blocks[-1].primary_text == "authoritative final"
         stale = await presenter.emit(caption(5, unit, "waiting preview", final=False))
         assert stale.outcome == "stale"
+        assert presenter.application_receipt(preview_receipt.publication_id) is preview_receipt
+        assert presenter.application_receipt(final_receipt.publication_id) is final_receipt
     finally:
-        for task in (preview_task, final_task):
-            if task is not None and not task.done():
-                task.cancel()
-                await asyncio.gather(task, return_exceptions=True)
         await presenter.close()

@@ -181,31 +181,24 @@ async def test_g4_full_revision_updates_survivors_appends_after_waiters_and_remo
         await presenter.emit(caption(101, a, "가" * 64))
         await presenter.emit(own_speech(102))
         await timeline.advance(0)
-        second = presenter._entries[("peer", uuid5(a, "fragment:1"))]
-        original = second.peer_registered_at, second.appearance_seq
+        second = presenter.peer_fragment_state(a, 1)
+        original = second.registered_at, second.registration_order
         await timeline.advance(0.1)
         await presenter.emit(caption(102, b, "B"))
         await timeline.advance(0.1)
         await presenter.emit(caption(103, a, "나" * 128, revision=2))
         pending = sorted(
-            (entry for entry in presenter._entries.values() if entry.peer_pending),
-            key=lambda entry: entry.appearance_seq,
+            (entry for entry in presenter.peer_fragment_states() if entry.pending),
+            key=lambda entry: entry.registration_order,
         )
-        assert [
-            (entry.peer_parent_id or entry.utterance_id, entry.peer_fragment_index)
-            for entry in pending
-        ] == [(a, 1), (b, 0), (a, 2)]
-        assert (pending[0].peer_registered_at, pending[0].appearance_seq) == original
-        assert all(
-            entry.peer_caption_revision == 2
-            for entry in presenter._entries.values()
-            if entry.utterance_id == a or entry.peer_parent_id == a
-        )
+        assert [(entry.logical_id, entry.index) for entry in pending] == [(a, 1), (b, 0), (a, 2)]
+        assert (pending[0].registered_at, pending[0].registration_order) == original
+        assert all(entry.revision == 2 for entry in presenter.peer_fragment_states(a))
         assert presenter.snapshot().native_fresh_render_targets.peer in {
             block.id for block in presenter.snapshot().blocks
         }
         await presenter.emit(caption(104, a, "다" * 24, revision=3))
-        assert all(entry.peer_parent_id != a for entry in presenter._entries.values())
+        assert [entry.index for entry in presenter.peer_fragment_states(a)] == [0]
         assert presenter._entries[("peer", b)].peer_pending
         assert presenter.snapshot().blocks[0].primary_text == "다" * 24
         await timeline.advance(0.9)
@@ -232,7 +225,7 @@ async def test_pending_continuation_survives_first_sibling_eviction_without_repl
         await presenter.emit(own_speech(102))
         await timeline.advance(0)
         assert sorted(
-            entry.peer_fragment_index for entry in presenter._entries.values() if entry.peer_pending
+            entry.index for entry in presenter.peer_fragment_states() if entry.pending
         ) == [1, 2]
         await timeline.advance(1)
         assert presenter._entries[("peer", unit)].peer_departed
@@ -241,16 +234,9 @@ async def test_pending_continuation_survives_first_sibling_eviction_without_repl
         blocks = [block for block in presenter.snapshot().blocks if block.channel == "peer"]
         assert blocks and all(block.id != fragment_id(unit, 0) for block in blocks)
         assert presenter.snapshot().native_fresh_render_targets.peer == blocks[-1].id
-        assert all(
-            entry.peer_caption_revision == 2
-            for entry in presenter._entries.values()
-            if entry.peer_parent_id == unit
-        )
+        assert all(entry.revision == 2 for entry in presenter.peer_fragment_states(unit))
         await presenter.emit(caption(103, identity(42), "replacement", superseded=(unit,)))
-        assert not any(
-            entry.utterance_id == unit or entry.peer_parent_id == unit
-            for entry in presenter._entries.values()
-        )
+        assert presenter.peer_fragment_states(unit) == ()
         assert (await presenter.emit(caption(104, unit, "late", revision=3))).outcome == "stale"
     finally:
         await presenter.close()
@@ -312,7 +298,8 @@ async def test_waiting_revisioned_output_cancellation_cannot_apply_or_revive(end
         await _publish_peer_overlay(output, event, source_order=3)
         await timeline.advance(0)
         assert presenter._entries[("peer", pending)].peer_pending
-        assert presenter.application_receipt(event.event_id) is None
+        receipt = presenter.application_receipt(event.event_id)
+        assert receipt.outcome == "registered" and receipt.scene_revision is None
         before = presenter.snapshot().native_quiet_tail_episodes.peer
         if ending == "generation-retirement":
             output.retire_peer_generation(1)
@@ -326,7 +313,7 @@ async def test_waiting_revisioned_output_cancellation_cannot_apply_or_revive(end
             decision.publication_id == event.event_id and decision.reason == "application_applied"
             for decision in output.routing_decisions
         )
-        assert output._peer_active_batches == []
+        assert output._peer_active_batch is None
     finally:
         await output.close()
         await presenter.close()

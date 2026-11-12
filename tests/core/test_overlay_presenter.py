@@ -2235,7 +2235,10 @@ async def test_scoped_peer_children_survive_earlier_sibling_retirement() -> None
         presenter.clock.advance(1)
         for _ in range(12):
             await asyncio.sleep(0)
-        assert receipt.outcome == "applied"
+        assert receipt.outcome == ("applied" if index < 2 else "registered")
+        if receipt.outcome == "registered":
+            assert receipt.scene_revision is None
+            assert presenter.application_receipt(receipt.publication_id) is receipt
         assert presenter.snapshot().blocks[-1].id == f"peer:{child_id}"
         assert presenter.snapshot().blocks[-1].publication_index == index
         close_receipt = await presenter.emit(
@@ -2288,7 +2291,7 @@ async def test_scoped_peer_children_survive_earlier_sibling_retirement() -> None
                 output_scope=next_scope,
             )
         )
-    ).outcome == "applied"
+    ).outcome == "registered"
     presenter.clock.advance(1)
     for _ in range(12):
         await asyncio.sleep(0)
@@ -4572,10 +4575,13 @@ async def test_presenter_self_overlay_unchanged_by_translation_enabled() -> None
 async def test_expiry_wakes_pending_peer_before_shared_replacement_deadline() -> None:
     clock = FakeClock(_now=10.0)
     sleep_waiters: list[tuple[float, asyncio.Event]] = []
+    replacement_wait_started = asyncio.Event()
 
     async def controlled_sleep(delay: float) -> None:
         release = asyncio.Event()
         sleep_waiters.append((delay, release))
+        if delay == PEER_REPLACEMENT_INTERVAL_SECONDS:
+            replacement_wait_started.set()
         await release.wait()
 
     presenter = OverlayPresenter(
@@ -4626,7 +4632,7 @@ async def test_expiry_wakes_pending_peer_before_shared_replacement_deadline() ->
     )
     pending_peer = uuid4()
     pending = asyncio.create_task(
-        presenter.emit_peer_when_admissible(
+        presenter.register_peer_caption(
             adapter.transcript_final(
                 Transcript(
                     utterance_id=pending_peer,
@@ -4637,20 +4643,23 @@ async def test_expiry_wakes_pending_peer_before_shared_replacement_deadline() ->
                 ),
                 source_language="en",
                 target_language="ja",
-            )
+            ),
+            publication_generation=1,
         )
     )
     await asyncio.sleep(0)
     await asyncio.sleep(0)
-    assert not pending.done()
-    assert any(delay == PEER_REPLACEMENT_INTERVAL_SECONDS for delay, _ in sleep_waiters)
+    assert pending.done()
+    assert (await pending).outcome == "registered"
+    assert presenter.peer_fragment_state(pending_peer, 0).pending
+    await asyncio.wait_for(replacement_wait_started.wait(), timeout=0.5)
 
     clock.advance(0.5)
     expiry_release = next(release for delay, release in sleep_waiters if delay == 8.0)
     expiry_release.set()
-    receipt = await asyncio.wait_for(pending, timeout=0.5)
-
-    assert receipt.outcome == "applied"
+    for _ in range(12):
+        await asyncio.sleep(0)
+    assert not presenter.peer_fragment_state(pending_peer, 0).pending
     assert [block.id for block in presenter.snapshot().blocks] == [
         f"self:{self_turn}",
         f"peer:{pending_peer}",
@@ -4691,7 +4700,7 @@ async def test_protected_rows_are_not_evicted_by_elapsed_pacing_interval() -> No
     )
     peer_turn = uuid4()
     pending = asyncio.create_task(
-        presenter.emit_peer_when_admissible(
+        presenter.register_peer_caption(
             adapter.transcript_final(
                 Transcript(
                     utterance_id=peer_turn,
@@ -4702,7 +4711,8 @@ async def test_protected_rows_are_not_evicted_by_elapsed_pacing_interval() -> No
                 ),
                 source_language="en",
                 target_language="ja",
-            )
+            ),
+            publication_generation=1,
         )
     )
     await asyncio.sleep(0)
@@ -4710,18 +4720,18 @@ async def test_protected_rows_are_not_evicted_by_elapsed_pacing_interval() -> No
 
     clock.advance(10.0)
     await asyncio.sleep(0)
-    assert not pending.done()
+    assert pending.done()
+    assert (await pending).outcome == "registered"
+    assert presenter.peer_fragment_state(peer_turn, 0).pending
     assert all(delay != PEER_REPLACEMENT_INTERVAL_SECONDS for delay in sleep_calls)
     assert [block.id for block in presenter.snapshot().blocks] == [f"self:{self_turn}"]
-    pending.cancel()
-    await asyncio.gather(pending, return_exceptions=True)
     await presenter.close()
 
 
 @pytest.mark.asyncio
 async def test_peer_admission_paces_only_new_replacements_after_free_slots_fill() -> None:
     clock = FakeClock(_now=10.0)
-    expected_admission_times = [10.0, 10.0, 11.0]
+    expected_registration_outcomes = ["applied", "applied", "registered"]
 
     async def fake_sleep(delay: float) -> None:
         if delay > PEER_REPLACEMENT_INTERVAL_SECONDS:
@@ -4740,7 +4750,7 @@ async def test_peer_admission_paces_only_new_replacements_after_free_slots_fill(
     turn_ids = [uuid4(), uuid4(), uuid4()]
 
     for index, turn_id in enumerate(turn_ids):
-        receipt = await presenter.emit_peer_when_admissible(
+        receipt = await presenter.register_peer_caption(
             adapter.transcript_final(
                 Transcript(
                     utterance_id=turn_id,
@@ -4751,17 +4761,22 @@ async def test_peer_admission_paces_only_new_replacements_after_free_slots_fill(
                 ),
                 source_language="en",
                 target_language="ja",
-            )
+            ),
+            publication_generation=1,
         )
-        assert receipt.outcome == "applied"
-        assert clock.now() == expected_admission_times[index]
+        assert receipt.outcome == expected_registration_outcomes[index]
+        assert clock.now() == 10.0
+
+    for _ in range(12):
+        await asyncio.sleep(0)
+    assert clock.now() == 11.0
 
     assert [block.id for block in presenter.snapshot().blocks] == [
         f"peer:{turn_ids[1]}",
         f"peer:{turn_ids[2]}",
     ]
 
-    await presenter.emit_peer_when_admissible(
+    await presenter.register_peer_caption(
         adapter.transcript_final(
             Transcript(
                 utterance_id=turn_ids[2],
@@ -4772,7 +4787,8 @@ async def test_peer_admission_paces_only_new_replacements_after_free_slots_fill(
             ),
             source_language="en",
             target_language="ja",
-        )
+        ),
+        publication_generation=1,
     )
     assert clock.now() == 11.0
     await presenter.close()
@@ -4812,7 +4828,7 @@ async def test_peer_replacement_uses_self_new_occupant_as_shared_anchor() -> Non
     )
 
     peer_turn_id = uuid4()
-    receipt = await presenter.emit_peer_when_admissible(
+    receipt = await presenter.register_peer_caption(
         adapter.transcript_final(
             Transcript(
                 utterance_id=peer_turn_id,
@@ -4823,10 +4839,14 @@ async def test_peer_replacement_uses_self_new_occupant_as_shared_anchor() -> Non
             ),
             source_language="en",
             target_language="ja",
-        )
+        ),
+        publication_generation=1,
     )
 
-    assert receipt.outcome == "applied"
+    assert receipt.outcome == "registered" and receipt.scene_revision is None
+    assert clock.now() == 20.0
+    for _ in range(12):
+        await asyncio.sleep(0)
     assert clock.now() == 20.0 + PEER_REPLACEMENT_INTERVAL_SECONDS
     assert presenter.snapshot().blocks[0].id == f"peer:{peer_turn_id}"
     await presenter.close()
