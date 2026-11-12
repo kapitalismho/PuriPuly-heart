@@ -111,6 +111,8 @@ Keep the export outside the repository; it may contain local device choices. Run
 
 The [simulator](../src/puripuly_heart/release_evidence/agent_chat_simulator/) replaces the application-control owner beneath production chat adapters with synthetic state. Hidden causes stay outside assistant/user inputs. Synthetic outcomes do not establish actual GUI, device, provider-signup, or remote-display behavior.
 
+The user simulator **Terra** (`gpt-6.1-terra`, medium) and judge **Sol** (`gpt-6.1-sol`, xhigh) **must use Sign in with ChatGPT, not OpenAI API keys**. Pass `--subscription-only` to every live `probe`, `run`, and `calibration-rejudge` command. `--sign-in` alone still permits API-key fallback; if ChatGPT access is unavailable, stop rather than switch to API billing. This requirement concerns the simulator's benchmark login, separate from the app account and Relay server credentials.
+
 Use the checkout's Python environment and write reports outside the repository:
 
 ```powershell

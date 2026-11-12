@@ -120,7 +120,7 @@ export default {
       questions: contract.questions,
       prompt_cache_options: { mode: 'explicit', ttl: '30m' },
     } : {
-      model: 'gpt-6-luna',
+      model: accounting.model,
       safety_identifier: installation,
       ...(outOfScope ? outOfScopeOptions : social ? socialOptions : contract.workOptions),
       input: noTools ? input : [contract.workDeveloperMessage, ...input],
@@ -196,7 +196,7 @@ export default {
         return error(503, 'service_allowance_exhausted', 'The assistant service allowance is exhausted. Try again after it resets.');
       }
       if (capabilityError(result, upstream.status)) {
-        return error(502, 'upstream_capability_unavailable', `The configured gpt-6-luna ${classification ? 'Decisions' : 'Responses'} capability is unavailable. No alternate model was used.`);
+        return error(502, 'upstream_capability_unavailable', `The configured ${accounting.model} ${classification ? 'Decisions' : 'Responses'} capability is unavailable. No alternate model was used.`);
       }
       return error(502, 'upstream_unavailable', 'The model service could not complete this request.');
     }

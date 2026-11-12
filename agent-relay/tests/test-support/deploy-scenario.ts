@@ -67,7 +67,7 @@ export function createDeployScenario(options: {
   writeFileSync(workerPath, JSON.stringify({
     deployments: 0,
     secrets: { PURI_TOKEN_SECRET: tokenSecret, OPENAI_API_KEY: 'deployed-only-provider-key', DISCORD_OPERATIONS_WEBHOOK_URL: 'deployed-only-webhook' },
-    vars: { AGENT_SERVICE_ENABLED: 'true', SUPPORT_REPORTS_ENABLED: 'true', NON_OWNED_RUNTIME_SETTING: 'preserve-me' },
+    vars: { AGENT_SERVICE_ENABLED: 'true', PHOTO_SERVICE_ENABLED: 'true', SUPPORT_REPORTS_ENABLED: 'true', NON_OWNED_RUNTIME_SETTING: 'preserve-me' },
     reportsBound: true,
   } satisfies WorkerState));
   writeFileSync(join(root, 'github-env'), '');
@@ -88,7 +88,7 @@ export function createDeployScenario(options: {
       GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/dev', GITHUB_SHA: commit,
       REVIEWED_COMMIT: commit, CONFIRM_PRODUCTION_DEPLOY: 'deploy puripuly-heart-agent-relay from dev',
       GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2',
-      AGENT_SERVICE_ENABLED: 'true', SUPPORT_REPORTS_ENABLED: 'true',
+      AGENT_SERVICE_ENABLED: 'true', PHOTO_SERVICE_ENABLED: 'true', SUPPORT_REPORTS_ENABLED: 'true',
       AGENT_RELAY_CANONICAL_WORKERS_DEV_URL: canonicalOrigin,
       CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32), CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token',
       AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: '11111111-1111-4111-8111-111111111111',

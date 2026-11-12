@@ -10,8 +10,20 @@ export const defaultRates = {
   decisions_output: 0,
 };
 
+const terraRates = {
+  as_of: '2026-11-11',
+  input: 2,
+  cache_read: 0.20,
+  cache_write: 2.50,
+  responses_output: 12,
+  decisions_output: 0,
+};
+
+export type ResponseModel = 'gpt-5.6-terra' | 'gpt-6-luna';
+export const terraDailyTokens = 10_000_000;
+
 type Rates = typeof defaultRates;
-type Usage = { uncached: number; read: number; write: number; output: number; missing: number };
+type Usage = { uncached: number; read: number; write: number; write12h: number; output: number; missing: number };
 
 export const turnLifetimeMs = 24 * 60 * 60 * 1000;
 export const maxTurnAdmissions = 15;
@@ -22,6 +34,7 @@ export type Accounting = {
   installation: string;
   day: string;
   rates: Rates;
+  model: ResponseModel;
   owner: string;
   finalAdmission: boolean;
   deadline: number;
@@ -70,17 +83,20 @@ export async function checkAllowance(
     classification ? 1 : 0, installation, turnId, timestamp, installation, turnId, timestamp, maxTurnAdmissions,
     classification ? 1 : 0, installation, turnId, installation, day);
   const admitted = db.prepare(`
-    INSERT INTO prompt_turns (installation_hash, turn_id, utc_date, expires_at, model_admissions, classifier_admitted)
-    SELECT ?, ?, ?, ?, 1, ?
+    INSERT INTO prompt_turns (installation_hash, turn_id, utc_date, expires_at, model_admissions, classifier_admitted, response_model)
+    SELECT ?, ?, ?, ?, 1, ?, CASE WHEN ? = 1 THEN NULL
+      WHEN COALESCE((SELECT tokens FROM terra_daily WHERE utc_date = ?), 0) < ? THEN 'gpt-5.6-terra'
+      ELSE 'gpt-6-luna' END
     WHERE EXISTS (SELECT 1 FROM request_slots WHERE installation_hash = ? AND slot < 2 AND owner = ?)
     ON CONFLICT(installation_hash, turn_id) DO UPDATE SET
       model_admissions = prompt_turns.model_admissions + 1,
-      classifier_admitted = prompt_turns.classifier_admitted + excluded.classifier_admitted
+      classifier_admitted = prompt_turns.classifier_admitted + excluded.classifier_admitted,
+      response_model = COALESCE(prompt_turns.response_model, excluded.response_model)
     WHERE prompt_turns.expires_at > ? AND prompt_turns.model_admissions < ?
       AND (? = 0 OR prompt_turns.classifier_admitted = 0)
-    RETURNING turn_id, model_admissions, expires_at
+    RETURNING turn_id, model_admissions, expires_at, response_model
   `).bind(installation, turnId, day, timestamp + turnLifetimeMs, classification ? 1 : 0,
-    installation, owner, timestamp, maxTurnAdmissions, classification ? 1 : 0);
+    classification ? 1 : 0, day, terraDailyTokens, installation, owner, timestamp, maxTurnAdmissions, classification ? 1 : 0);
   const results = await db.batch([claimed, admitted]);
   if (results.length !== 2 || results.some((result) => !result.success)) throw new Error('accounting_unavailable');
   const row = results[1].results[0];
@@ -106,8 +122,11 @@ export async function checkAllowance(
   if (!isRecord(row) || row.turn_id !== turnId || !Number.isSafeInteger(row.model_admissions)
     || (row.model_admissions as number) < 1 || (row.model_admissions as number) > maxTurnAdmissions
     || !Number.isSafeInteger(row.expires_at) || (row.expires_at as number) <= timestamp
+    || (!classification && !['gpt-5.6-terra', 'gpt-6-luna'].includes(row.response_model as string))
     || !isRecord(claim) || claim.owner !== owner) throw new Error('accounting_unavailable');
-  return { accounting: { db, installation, day, rates, owner, finalAdmission: row.model_admissions === maxTurnAdmissions,
+  const model = classification ? 'gpt-6-luna' : row.response_model as ResponseModel;
+  return { accounting: { db, installation, day, rates: model === 'gpt-5.6-terra' ? terraRates : rates,
+    model, owner, finalAdmission: row.model_admissions === maxTurnAdmissions,
     deadline: Math.min(timestamp + requestDeadlineMs, row.expires_at as number) } };
 }
 
@@ -123,18 +142,20 @@ export function usageRecorder(accounting: Accounting, classification: boolean, c
 }
 
 function responseUsage(result: unknown): Usage {
-  let usage: Usage = { uncached: 0, read: 0, write: 0, output: 0, missing: 1 };
+  let usage: Usage = { uncached: 0, read: 0, write: 0, write12h: 0, output: 0, missing: 1 };
   const returned = isRecord(result) ? result.usage : undefined;
   if (isRecord(returned)) {
     const details = returned.input_tokens_details;
     const read = isRecord(details) ? details.cached_tokens ?? 0 : 0;
     const write = isRecord(details) ? details.cache_write_tokens ?? 0 : 0;
+    const writeDetails = isRecord(details) ? details.cache_write_tokens_details : undefined;
+    const write12h = isRecord(writeDetails) ? writeDetails.ttl_12h_tokens ?? 0 : 0;
     const input = returned.input_tokens;
     const output = returned.output_tokens;
-    if ([input, output, read, write].every((value) => Number.isSafeInteger(value) && (value as number) >= 0)
-      && (read as number) + (write as number) <= (input as number)) {
+    if ([input, output, read, write, write12h].every((value) => Number.isSafeInteger(value) && (value as number) >= 0)
+      && (read as number) + (write as number) <= (input as number) && (write12h as number) <= (write as number)) {
       usage = { uncached: (input as number) - (read as number) - (write as number),
-        read: read as number, write: write as number, output: output as number, missing: 0 };
+        read: read as number, write: write as number, write12h: write12h as number, output: output as number, missing: 0 };
     }
   }
   return usage;
@@ -143,7 +164,8 @@ function responseUsage(result: unknown): Usage {
 export async function recordUsage(accounting: Accounting, result: unknown, classification: boolean): Promise<void> {
   const usage = responseUsage(result);
   const { rates } = accounting;
-  const cost = (usage.uncached * rates.input + usage.read * rates.cache_read + usage.write * rates.cache_write
+  const cost = (usage.uncached * rates.input + usage.read * rates.cache_read
+    + (usage.write + (accounting.model === 'gpt-5.6-terra' ? usage.write12h : 0)) * rates.cache_write
     + usage.output * (classification ? rates.decisions_output : rates.responses_output)) / 1_000_000;
   if (!Number.isFinite(cost)) throw new Error('accounting_unavailable');
   const statements = [accounting.db.prepare(`
@@ -163,6 +185,12 @@ export async function recordUsage(accounting: Accounting, result: unknown, class
   `).bind(accounting.installation, accounting.day, usage.uncached, usage.read, usage.write,
     classification ? usage.output : 0, classification ? 0 : usage.output,
     classification ? 1 : 0, classification ? 0 : 1, usage.missing, cost)];
+  if (!classification && accounting.model === 'gpt-5.6-terra' && !usage.missing) {
+    statements.push(accounting.db.prepare(`
+      INSERT INTO terra_daily (utc_date, tokens) VALUES (?, ?)
+      ON CONFLICT(utc_date) DO UPDATE SET tokens = tokens + excluded.tokens
+    `).bind(accounting.day, usage.uncached + usage.read + usage.write + usage.output));
+  }
   if (accounting.protocol !== undefined) {
     statements.push(accounting.db.prepare(`
       INSERT INTO protocol_daily (installation_hash, utc_date, agent_protocol, requests) VALUES (?, ?, ?, 1)
@@ -189,7 +217,7 @@ export function photoPolicy(raw?: string): PhotoPolicy {
     maxBodyBytes: 4 * 1024 * 1024,
     maxOutputTokens: 8192,
     concurrency: 1,
-    allowance: 50,
+    allowance: 25,
     periodMs: 86_400_000,
     deadlineMs: 240_000,
   };

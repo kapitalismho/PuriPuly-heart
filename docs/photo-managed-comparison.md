@@ -121,7 +121,7 @@ Applied-policy native SHA-256: `f29f5f600301b7bf91a83f95c4ef03cd52c2aceb4fb8b9cf
 | `maxBodyBytes` | 4194304 | Supplied-photo requests: 98,633–475,850 bytes; image base64: 98,524–473,576 bytes. Separate image allowance, not a copied text-chat cap. |
 | `maxOutputTokens` | 8192 | Supplied responses: 11–1328 tokens, 13–4772 JSON bytes; earlier dense synthetic probes reached 2556 tokens. Preserve full output headroom. |
 | `concurrency` | 1 | Existing photo owner processes one accepted translation at a time; isolate each installation. |
-| `allowance` | 50 | Provisional bounded admissions per period, not a measured daily-use frequency. The supplied run used 46 Relay admissions without changing this limit. |
+| `allowance` | 25 | Installation admissions per UTC day, including failed or uncertain admitted work. The supplied run used 46 Relay admissions under the previous 50-request default. |
 | `periodMs` | 86400000 | Installation allowance persists across tokens/connections within the period. |
 | `deadlineMs` | 240000 | Supplied schema completion: 1.64–11.84 s; earlier dense samples about 18–21 s. Cancellation and lease recovery remain bounded. |
 

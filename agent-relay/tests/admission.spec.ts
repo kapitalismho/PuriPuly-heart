@@ -204,7 +204,9 @@ describe('durable model request admission', () => {
     try {
       const seed = sqlite.prepare('INSERT INTO prompt_turns (installation_hash, turn_id, utc_date) VALUES (?, ?, ?)');
       for (let index = 0; index < 29; index++) seed.run(installationHash, index.toString(16).padStart(32, '0'), '2026-11-01');
-      sqlite.exec(readFileSync(new URL('../migrations/0004_request_admission.sql', import.meta.url), 'utf8'));
+      for (const migration of relayMigrations.slice(3)) {
+        sqlite.exec(readFileSync(new URL(`../migrations/${migration}`, import.meta.url), 'utf8'));
+      }
       const legacyId = '0'.repeat(32);
       for (const classification of [false, true]) {
         expect(await checkAllowance({ AGENT_USAGE_DB: db }, installationHash, legacyId, classification, start))

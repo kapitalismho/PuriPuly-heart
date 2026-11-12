@@ -132,7 +132,7 @@ describe('bounded relay service', () => {
     expect(d.slice(0, 10)).toEqual([installationHash, new Date().toISOString().slice(0, 10), 70, 20, 10, 20, 0, 1, 0, 0]);
     expect(m.slice(0, 10)).toEqual([installationHash, new Date().toISOString().slice(0, 10), 70, 20, 10, 0, 20, 0, 1, 0]);
     expect(d[10]).toBeCloseTo(0.00000845, 12);
-    expect(m[10]).toBeCloseTo(0.00001845, 12);
+    expect(m[10]).toBeCloseTo(0.000409, 12);
     expect(upstream).toHaveBeenCalledTimes(2);
   });
 
@@ -207,7 +207,7 @@ describe('bounded relay service', () => {
         expect(row).toMatchObject({ decisions_calls: 101, responses_calls: 101, uncached_input_tokens: 140,
           cache_read_tokens: 40, cache_write_tokens: 20, decisions_output_tokens: 20, responses_output_tokens: 20,
           missing_usage_count: 0 });
-        expect(row?.cost_usd).toBeCloseTo(2.0000269, 12);
+        expect(row?.cost_usd).toBeCloseTo(2.00041745, 12);
         expect(sqlite.prepare('SELECT agent_protocol, requests FROM protocol_daily WHERE installation_hash = ? AND utc_date = ?')
           .all(installationHash, '2026-10-30')).toEqual([{ agent_protocol: 6, requests: 2 }]);
         sqlite.prepare('UPDATE usage_daily SET cost_usd = 0.5 WHERE installation_hash = ? AND utc_date = ?')
@@ -267,7 +267,7 @@ describe('bounded relay service', () => {
       expect(rows[1]).toMatchObject({ utc_date: '2026-10-31', decisions_calls: 1, responses_calls: 2,
         uncached_input_tokens: 210, cache_read_tokens: 60, cache_write_tokens: 30, decisions_output_tokens: 20,
         responses_output_tokens: 40, missing_usage_count: 0 });
-      expect(rows[1].cost_usd).toBeCloseTo(0.00004535, 12);
+      expect(rows[1].cost_usd).toBeCloseTo(0.00082645, 12);
       expect(upstream).toHaveBeenCalledTimes(4);
     } finally {
       sqlite.close();
@@ -376,9 +376,11 @@ describe('bounded relay service', () => {
     expect(error).not.toHaveBeenCalled();
   });
 
-  it('accepts explicit dated service rates and rejects unusable configuration before upstream', async () => {
+  it('accepts explicit dated Luna rates and rejects unusable configuration before upstream', async () => {
     const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => responseEvents(result()));
     const database = usageDatabase();
+    database.admission.mockImplementation(async (turn_id: string) =>
+      ({ turn_id, model_admissions: 1, expires_at: Date.now() + 86_400_000, response_model: 'gpt-6-luna' }));
     const env = { ...testEnv(), AGENT_USAGE_DB: database.db };
     const rates = { as_of: '2026-10-30', input: 1, cache_read: 2, cache_write: 3, responses_output: 4, decisions_output: 5 };
     expect((await settled(request(), { ...env, AGENT_USAGE_RATES: JSON.stringify(rates) })).status).toBe(200);

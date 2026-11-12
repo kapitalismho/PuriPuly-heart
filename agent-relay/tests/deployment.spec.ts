@@ -203,7 +203,7 @@ describe('manual relay deployment preparation', () => {
         database.exec(await readFile(new URL(`../migrations/${name}`, import.meta.url), 'utf8'));
         rows.push({ kind: 'migration', name, table_name: '' });
       }
-      for (const table of ['usage_daily', 'support_daily', 'prompt_turns', 'request_slots', 'protocol_daily', 'photo_admissions']) {
+      for (const table of ['usage_daily', 'support_daily', 'prompt_turns', 'request_slots', 'protocol_daily', 'photo_admissions', 'terra_daily']) {
         for (const row of database.prepare('SELECT name FROM pragma_table_info(?)').all(table)) {
           rows.push({ kind: 'column', name: String(row.name), table_name: table });
         }
