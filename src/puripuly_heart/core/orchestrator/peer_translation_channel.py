@@ -881,7 +881,7 @@ class PeerTranslationChannelOwner:
                     runtime=runtime,
                     source_language=child.precomputed_translation.source_language,
                 )
-            return TranslationTurnProcessResult(
+            result = TranslationTurnProcessResult(
                 "translated",
                 TranslationOutputSubmission(
                     parent_utterance_id=child.parent_utterance_id,
@@ -905,13 +905,20 @@ class PeerTranslationChannelOwner:
                     context_texts=None if prepared is None else prepared.context_texts,
                 ),
             )
-        result = await self.translation_requests.process(
-            self._translation_process_request(child, target_language),
-            cancellation_requested=cancellation_requested,
-            prepared=self._prepared_requests.get(child.utterance_id),
-        )
+        else:
+            result = await self.translation_requests.process(
+                self._translation_process_request(child, target_language),
+                cancellation_requested=cancellation_requested,
+                prepared=self._prepared_requests.get(child.utterance_id),
+            )
         if cancellation_requested():
             raise asyncio.CancelledError
+        if result.output is not None:
+            await self.output_projection.project_peer_overlay(
+                self._prepared_output_submission(result.output),
+                early=True,
+                cancellation_requested=cancellation_requested,
+            )
         return result
 
     @staticmethod
@@ -1024,6 +1031,9 @@ class PeerTranslationChannelOwner:
                 "cancelled",
             }
             and not output_submitted
+            and not self.output_projection.peer_overlay_was_projected(
+                child.parent_utterance_id, child.sequence
+            )
         ):
             configuration = child.config_snapshot.value
             assignment = self._speaker_identities.assignment_for(child.utterance_id)
@@ -1154,12 +1164,9 @@ class PeerTranslationChannelOwner:
             return submission
         return replace(submission, context_texts=prepared.context_texts)
 
-    async def submit_translation_output(
-        self,
-        submission: TranslationOutputSubmission,
-    ) -> TranslationResultProjectionReceipt:
-        if submission.channel != "peer":
-            raise ValueError("Peer translation owner received non-Peer output")
+    def _prepared_output_submission(
+        self, submission: TranslationOutputSubmission
+    ) -> TranslationOutputSubmission:
         assignment = self._speaker_identities.assignment_for(submission.child_utterance_id)
         if assignment is not None:
             submission = replace(
@@ -1171,7 +1178,15 @@ class PeerTranslationChannelOwner:
                     else replace(submission.translation, speaker_assignment=assignment)
                 ),
             )
-        return await self._publish_translation_result(self._with_prepared_context(submission))
+        return self._with_prepared_context(submission)
+
+    async def submit_translation_output(
+        self,
+        submission: TranslationOutputSubmission,
+    ) -> TranslationResultProjectionReceipt:
+        if submission.channel != "peer":
+            raise ValueError("Peer translation owner received non-Peer output")
+        return await self._publish_translation_result(self._prepared_output_submission(submission))
 
     async def _publish_translation_result(
         self,

@@ -396,6 +396,8 @@ class DestinationBatchAdmission:
             self.reserved_bytes[batch.scope] = remaining
         else:
             self.reserved_bytes.pop(batch.scope, None)
+        batch.retained_payloads.clear()
+        batch.reserved_bytes = 0
         batch.disposition = disposition
         batch.ready.set()
         waiting = self.waiting.get(batch.scope)

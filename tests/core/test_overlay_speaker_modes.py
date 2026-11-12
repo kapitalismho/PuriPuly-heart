@@ -18,6 +18,7 @@ from puripuly_heart.domain.models import (
 )
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
+from tests.core.test_peer_overlay_policy import Timeline
 
 
 def _assignment(scope: str, speaker: str | None, order: int, index: int | None):
@@ -70,9 +71,12 @@ async def test_first_readable_color_is_immutable_across_updates_self_and_replay(
 
 @pytest.mark.asyncio
 async def test_non_diarized_gold_does_not_block_identified_speaker_scope() -> None:
-    clock = FakeClock(_now=25.0)
+    timeline = Timeline(clock=FakeClock(_now=25.0))
+    clock = timeline.clock
     adapter = OverlayEventAdapter(clock=clock)
-    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=clock, sleep=timeline.sleep
+    )
     off, identified, unknown = uuid4(), uuid4(), uuid4()
     off_assignment = SpeakerAssignment(SpeakerAttribution("non_diarized"), (1, 1, 0))
     await presenter.emit(_peer_event(adapter, off, "off", off_assignment))
@@ -81,6 +85,9 @@ async def test_non_diarized_gold_does_not_block_identified_speaker_scope() -> No
     await presenter.emit(
         _peer_event(adapter, unknown, "unknown", _assignment("new", None, 3, None))
     )
+    assert presenter.peer_fragment_state(unknown, 0).pending
+    await timeline.advance(0)
+    await timeline.advance(1)
     assert [block.speaker_style for block in presenter.snapshot().blocks] == ["gold", "gray"]
     await presenter.close()
 
@@ -122,9 +129,12 @@ async def test_gemini_peer_without_diarization_uses_gold_across_readable_updates
 
 @pytest.mark.asyncio
 async def test_speaker_identity_color_survives_non_diarized_turn() -> None:
-    clock = FakeClock(_now=27.0)
+    timeline = Timeline(clock=FakeClock(_now=27.0))
+    clock = timeline.clock
     adapter = OverlayEventAdapter(clock=clock)
-    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=clock, sleep=timeline.sleep
+    )
     allocator = PeerSpeakerIdentityAllocator()
     for order, speaker, expected_style in (
         (1, "A", "gold"),
@@ -157,15 +167,22 @@ async def test_speaker_identity_color_survives_non_diarized_turn() -> None:
         )
         assignment = allocator.observe(transcript, child_sequence=0)
         await presenter.emit(_peer_event(adapter, transcript.utterance_id, text, assignment))
+        if order > 2:
+            assert presenter.peer_fragment_state(transcript.utterance_id, 0).pending
+            await timeline.advance(0)
+            await timeline.advance(1)
         assert presenter.snapshot().blocks[-1].speaker_style == expected_style
     await presenter.close()
 
 
 @pytest.mark.asyncio
 async def test_scope_handoff_keeps_old_color_and_grays_new_until_old_leaves() -> None:
-    clock = FakeClock(_now=30.0)
+    timeline = Timeline(clock=FakeClock(_now=30.0))
+    clock = timeline.clock
     adapter = OverlayEventAdapter(clock=clock)
-    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=clock, sleep=timeline.sleep
+    )
     old, new, later = uuid4(), uuid4(), uuid4()
     await presenter.emit(_peer_event(adapter, old, "old readable", _assignment("old", "A", 1, 0)))
     await presenter.emit(_peer_event(adapter, new, "new readable", _assignment("new", "A", 2, 0)))
@@ -174,6 +191,9 @@ async def test_scope_handoff_keeps_old_color_and_grays_new_until_old_leaves() ->
     assert blocks[f"peer:{new}"].speaker_style == "gray"
     clock.advance(1)
     await presenter.emit(_peer_event(adapter, later, "new later", _assignment("new", "A", 3, 0)))
+    assert presenter.peer_fragment_state(later, 0).pending
+    await timeline.advance(0)
+    await timeline.advance(1)
     assert presenter.snapshot().blocks[-1].speaker_style == "gold"
     assert presenter._entries[("peer", new)].speaker_style == "gray"
     await presenter.close()
@@ -284,15 +304,21 @@ async def test_speaker_divider_matrix(events, expected: bool) -> None:
 
 @pytest.mark.asyncio
 async def test_handoff_gray_next_to_overflow_draws_no_divider() -> None:
-    clock = FakeClock(_now=60.0)
+    timeline = Timeline(clock=FakeClock(_now=60.0))
+    clock = timeline.clock
     adapter = OverlayEventAdapter(clock=clock)
-    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=clock, sleep=timeline.sleep
+    )
     old, handoff, overflow = uuid4(), uuid4(), uuid4()
     await presenter.emit(_peer_event(adapter, old, "old", _assignment("old", "A", 1, 0)))
     await presenter.emit(_peer_event(adapter, handoff, "handoff", _assignment("new", "X", 2, 0)))
     assert presenter._entries[("peer", handoff)].speaker_gray_reason == "scope_handoff"
     clock.advance(1)
     await presenter.emit(_peer_event(adapter, overflow, "overflow", _overflow("new", "F", 3)))
+    assert presenter.peer_fragment_state(overflow, 0).pending
+    await timeline.advance(0)
+    await timeline.advance(1)
     snapshot = presenter.snapshot()
     assert [block.id for block in snapshot.blocks] == [f"peer:{handoff}", f"peer:{overflow}"]
     assert presenter._entries[("peer", overflow)].speaker_gray_reason == "palette_overflow"

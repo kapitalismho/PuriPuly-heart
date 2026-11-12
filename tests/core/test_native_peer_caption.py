@@ -339,7 +339,7 @@ async def test_non_target_routes_keep_strict_source_segmentation(provider):
 
 
 @pytest.mark.asyncio
-async def test_grouped_final_replaces_preview_without_tail_barrier_and_keeps_source_order():
+async def test_grouped_final_replaces_preview_without_tail_barrier_and_keeps_history_order():
     harness, backend, events, clock = setup()
     try:
         await harness.start()
@@ -364,18 +364,25 @@ async def test_grouped_final_replaces_preview_without_tail_barrier_and_keeps_sou
         ]
         backend.completions[1].set_result(None)
         await turn_loop()
-        assert [event.type for event in events] == ["translation_stream_update"]
+        assert [event.source_text for event in events if event.type == "translation_final"] == [
+            "two "
+        ]
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+            "one unknown ",
+            "two ",
+            "three",
+        ]
         backend.completions[0].set_result(None)
         await turn_loop()
         finals = [event for event in events if event.type == "translation_final"]
-        assert [event.source_text for event in finals] == ["one unknown ", "two "]
-        assert finals[0].utterance_id == item.utterance_id
-        assert finals[1].utterance_id != item.utterance_id
-        assert [event.speaker_assignment.palette_index for event in finals] == [0, 1]
+        assert [event.source_text for event in finals] == ["two ", "one unknown "]
+        assert finals[1].utterance_id == item.utterance_id
+        assert finals[0].utterance_id != item.utterance_id
+        assert [event.speaker_assignment.palette_index for event in finals] == [1, 0]
         backend.completions[2].set_result(None)
         await idle(harness)
         finals = [event for event in events if event.type == "translation_final"]
-        assert [event.source_text for event in finals] == ["one unknown ", "two ", "three"]
+        assert [event.source_text for event in finals] == ["two ", "one unknown ", "three"]
         assert finals[-1].text == ""
         assert finals[-1].speaker_assignment.palette_index == 0
         assert (
@@ -437,7 +444,7 @@ async def test_native_newer_repair_settles_source_and_attribution_before_stale_r
 
 
 @pytest.mark.asyncio
-async def test_first_group_repair_publishes_before_ready_sibling(monkeypatch):
+async def test_ready_sibling_is_not_blocked_by_first_group_repair(monkeypatch):
     monkeypatch.setattr(
         "puripuly_heart.core.orchestrator.peer_caption.estimate_peer_translation_lines",
         lambda *_, **__: 2.0,
@@ -458,16 +465,20 @@ async def test_first_group_repair_publishes_before_ready_sibling(monkeypatch):
         await turn_loop()
         backend.completions[1].set_result(None)
         await turn_loop()
-        assert len(events) == 1
+        assert [event.source_text for event in events] == [first.text, "other speaker"]
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+            "The first part, and more ",
+            "other speaker",
+        ]
         backend.completions[0].set_result(None)
         await idle(harness)
         assert [event.source_text for event in events] == [
             first.text,
-            "The first part, and more ",
             "other speaker",
+            "The first part, and more ",
         ]
-        assert events[-2].utterance_id == first.utterance_id
-        assert events[-1].utterance_id not in (first.utterance_id, item.utterance_id)
+        assert events[-1].utterance_id == first.utterance_id
+        assert events[-2].utterance_id not in (first.utterance_id, item.utterance_id)
         assert [entry.text for entry in harness.peer_runtime.translation_history] == [
             "The first part, and more ",
             "other speaker",

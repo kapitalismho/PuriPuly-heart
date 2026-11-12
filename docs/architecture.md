@@ -87,7 +87,7 @@ Behavior: [production-composition evidence checks](../tests/release_evidence/tes
 
 - Provider adapters own provider-specific authentication, requests, streaming, and errors behind the common provider boundary. Turn owners own admission, cancellation, stale-result rejection, and publication.
 - Self source closure and translation completion are independent. Speculative results are not accepted history; source/target revisions and turn identity govern presentation.
-- Self and Peer have separate admission while sharing provider capacity. Cloud Peer owns caption revisions and adjacent-caption repair; local Peer retains per-final translation. Ordinary caption revisions retain their initial context; publication preserves admitted source order.
+- Self and Peer have separate admission while sharing provider capacity. Cloud Peer owns caption revisions and adjacent-caption repair; local Peer retains per-final translation. Ordinary caption revisions retain their initial context.
 - Manual text bypasses capture/STT and uses Self publication. Admission, translation completion, and destination delivery are separate outcomes.
 - Managed local translation owns its server, model, and capacity behind the same provider boundary. Requests retain native resources until settlement; model/backend replacement drains work before admitting a replacement.
 
@@ -99,7 +99,6 @@ Behavior: [turn lifecycle](../tests/core/test_translation_turn_owner.py), [reque
 - Output preserves turn/publication identity. Revisions may update retained turns without refocusing the dashboard or reviving retired captions. Preview presentation is separate from final accepted history.
 - Peer logging retains append-only caption revisions; GUI history converges on one current record per caption.
 - Python owns logical caption state and lifetime; native overlays own rendering. Presentation does not gate translation, and delivery receipts do not prove physical display or remote UDP receipt.
-- The output runtime owns cancelable Peer admission; the presenter owns paging, reading protection, absorbed-caption retirement and layout-scale projection. Desktop and native render the resulting scene; Self admission bypasses Peer waiting.
 - The VRChat scene owner survives pipeline rebuilds and has no audio, VAD, or OSC dependency. Only trusted, sanitized population context reaches translation; names/raw logs stay local, and custom HTTP extensions receive no scene data.
 
 Behavior: [output runtime](../tests/core/runtime/test_output_runtime.py), [Self caption policy](../tests/core/test_self_caption_policy.py), [Peer lifecycle](../tests/core/test_peer_caption_lifecycle.py), [Peer history](../tests/ui/test_peer_caption_history.py), [overlay presenter](../tests/core/test_overlay_presenter.py). Protocols: [native overlays](../native/overlay/README.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](http-extensions.md).

@@ -1998,20 +1998,15 @@ async def test_peer_translation_overlay_waits_for_translation_and_includes_sourc
 
 
 @pytest.mark.asyncio
-async def test_peer_overlay_events_arrive_before_translation_done_and_preserve_payload(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class OrderingOverlaySink:
-        def __init__(self, order: list[str]) -> None:
+async def test_peer_outputs_preserve_payload_and_per_destination_order() -> None:
+    class RecordingOverlaySink:
+        def __init__(self) -> None:
             self.events: list[object] = []
-            self._order = order
 
         async def emit(self, event: object) -> None:
-            self._order.append(f"overlay:{event.type}")
             self.events.append(event)
 
-    call_order: list[str] = []
-    sink = OrderingOverlaySink(call_order)
+    sink = RecordingOverlaySink()
     harness = compose_translation_test_harness(
         stt=None,
         llm=SequencedTranslateLLMProvider(responses=["hello"], delay_s=0.0),
@@ -2019,13 +2014,6 @@ async def test_peer_overlay_events_arrive_before_translation_done_and_preserve_p
         overlay_sink=sink,
         peer_translation_enabled=True,
     )
-    original_put = harness.ui_events.put
-
-    async def recording_put(event) -> None:
-        call_order.append(f"ui:{event.type.value}")
-        await original_put(event)
-
-    monkeypatch.setattr(harness.ui_events, "put", recording_put)
 
     await harness.translate_peer_text_for_test("안녕")
 
@@ -2042,12 +2030,6 @@ async def test_peer_overlay_events_arrive_before_translation_done_and_preserve_p
         "utterance_closed",
     ]
     assert sink.events[0].source_text == "안녕"
-    assert call_order == [
-        "ui:TRANSCRIPT_FINAL",
-        "overlay:translation_final",
-        "overlay:utterance_closed",
-        "ui:TRANSLATION_DONE",
-    ]
     decision = _latest_peer_chatbox_decision(harness)
     assert decision.decision == "denied"
     assert decision.reason == "peer_chatbox_denied"

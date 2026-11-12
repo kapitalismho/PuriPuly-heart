@@ -20,7 +20,7 @@ _ADAPTER_SEQUENCE_NAMESPACES = itertools.count(1)
 @dataclass(frozen=True, slots=True)
 class OverlayApplicationReceipt:
     stage: Literal["application_accepted"]
-    outcome: Literal["applied", "not_applied", "stale", "cancelled_local"]
+    outcome: Literal["applied", "registered", "not_applied", "stale", "cancelled_local"]
     publication_id: str
     scene_revision: int | None
     cause: str | None = None
@@ -203,13 +203,19 @@ class OverlaySink(Protocol):
 
 @runtime_checkable
 class PeerCaptionAdmissionPort(Protocol):
-    async def emit_peer_when_admissible(
+    async def register_peer_caption(
         self,
         event: OverlayEventUnion,
         *,
+        publication_generation: int,
+        is_current: Callable[[], bool] | None = None,
         on_wait: PeerPacingWaitObserver | None = None,
         admission_started_at: float | None = None,
     ) -> OverlayApplicationReceipt: ...
+
+    def retire_peer_generation(self, publication_generation: int) -> None: ...
+
+    def refresh_peer_caption_currentness(self) -> None: ...
 
 
 @runtime_checkable

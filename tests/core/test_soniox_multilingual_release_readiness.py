@@ -23,6 +23,7 @@ from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
 from puripuly_heart.providers.stt.soniox import _SonioxSession
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
+from tests.core.test_peer_overlay_policy import Timeline
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
 
@@ -430,10 +431,13 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
     runs, _ = await _controlled_final_runs(("ja", "zh", "ko"))
 
     for show_peer_original in (True, False):
+        timeline = Timeline()
         parent_id = uuid4()
         presenter = OverlayPresenter(
             calibration=OverlayCalibration(),
             show_peer_original=show_peer_original,
+            clock=timeline.clock,
+            sleep=timeline.sleep,
         )
         overlay = _RecordingOverlaySink(presenter=presenter)
         osc = RecordingOscQueue()
@@ -444,6 +448,7 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
             osc=osc,
             overlay_sink=overlay,
             peer_translation_enabled=True,
+            clock=timeline.clock,
         )
 
         try:
@@ -497,6 +502,13 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
                 "Chinese translation",
                 "Korean translation",
             ]
+            assert [block.primary_text for block in presenter.snapshot().blocks] == [
+                "Japanese translation",
+                "Chinese translation",
+            ]
+            assert presenter.peer_fragment_state(translations[-1].utterance_id, 0).pending
+            await timeline.advance(0)
+            await timeline.advance(1)
             blocks = presenter.snapshot().blocks
             assert [block.primary_text for block in blocks] == [
                 "Chinese translation",

@@ -31,6 +31,8 @@ use puripuly_heart_overlay::{
 #[cfg(windows)]
 mod gpu_updates;
 
+mod issue403_native;
+
 #[test]
 fn native_fresh_retry_production_policy_matches_dd_002() {
     assert_eq!(NATIVE_FRESH_RETRY_CADENCE, Duration::from_millis(100));
