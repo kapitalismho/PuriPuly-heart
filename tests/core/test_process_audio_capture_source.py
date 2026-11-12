@@ -32,6 +32,7 @@ class FakeCapture:
     started: bool = field(init=False, default=False)
     closed: bool = field(init=False, default=False)
     close_thread_ids: list[int] = field(init=False, default_factory=list)
+    close_threads: list[threading.Thread] = field(init=False, default_factory=list)
 
     def start(self) -> None:
         self.started = True
@@ -41,6 +42,7 @@ class FakeCapture:
     def close(self) -> None:
         self.closed = True
         self.close_thread_ids.append(threading.get_ident())
+        self.close_threads.append(threading.current_thread())
 
 
 @dataclass
@@ -284,10 +286,10 @@ async def test_process_source_terminal_frame_failure_defers_native_close_from_ca
         platform_availability=_supported,
     )
 
-    callback_thread_ids: list[int] = []
+    callback_threads: list[threading.Thread] = []
 
     def invoke_callback() -> None:
-        callback_thread_ids.append(threading.get_ident())
+        callback_threads.append(threading.current_thread())
         factory.captures[0][1].on_data(b"\x00", 1)
 
     callback_thread = threading.Thread(target=invoke_callback)
@@ -302,7 +304,7 @@ async def test_process_source_terminal_frame_failure_defers_native_close_from_ca
 
     assert factory.captures[0][1].closed is True
     assert watcher.watches[0].closed is True
-    assert factory.captures[0][1].close_thread_ids != callback_thread_ids
+    assert factory.captures[0][1].close_threads != callback_threads
 
 
 def test_unsupported_platform_never_constructs_or_imports_proctap(monkeypatch) -> None:
