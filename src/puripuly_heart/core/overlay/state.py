@@ -104,6 +104,15 @@ class OverlayLogicalTurnEntry:
     peer_protected_until: float | None = None
     peer_publication_generation: int | None = None
     peer_is_current: Callable[[], bool] | None = None
+    peer_partition_is_source: bool = False
+    peer_source_index: int | None = None
+    peer_translation_index: int | None = None
+    peer_source_departed_indices: set[int] = field(default_factory=set)
+    peer_translation_departed_indices: set[int] = field(default_factory=set)
+    peer_dormant: bool = False
+    peer_registration_count: int = 0
+    peer_last_visible_at: float | None = None
+    peer_cached_at: float | None = None
 
     @property
     def block_id(self) -> str:
@@ -131,6 +140,9 @@ class PeerFragmentRegistration:
     closed_at: float | None = None
     closed_seq: int | None = None
     caption_staged: bool = False
+    peer_source_index: int | None = None
+    peer_translation_index: int | None = None
+    peer_dormant: bool = False
 
     @property
     def block_id(self) -> str:
@@ -163,6 +175,35 @@ class PeerFragmentRegistration:
     @property
     def peer_caption_revision(self) -> int:
         return self.parent.peer_caption_revision
+
+
+@dataclass(frozen=True, slots=True)
+class PeerFragmentBinding:
+    index: int
+    source_index: int | None
+    translation_index: int | None
+    dormant: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PeerFragmentPlan:
+    fragments: tuple[str, ...]
+    text: str
+    source: bool
+    bindings: tuple[PeerFragmentBinding, ...]
+    removed: frozenset[int]
+    departed: frozenset[int]
+    source_departed: frozenset[int]
+    translation_departed: frozenset[int]
+
+    @property
+    def retained_bytes(self) -> int:
+        return (
+            sum(len(fragment.encode("utf-8")) for fragment in self.fragments)
+            + len(self.bindings) * PEER_FRAGMENT_REGISTRATION_BYTES
+            + (len(self.departed) + len(self.source_departed) + len(self.translation_departed))
+            * PEER_FRAGMENT_DEPARTURE_BYTES
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -326,27 +367,176 @@ class OverlayPresentationState:
         return self.entries | {
             key: entry
             for key, entry in self.peer_registrations.items()
-            if not entry.peer_pending and not entry.peer_departed
+            if not entry.peer_pending and not entry.peer_departed and not entry.peer_dormant
         }
 
-    def peer_fragment_plan(self, event: object) -> tuple[str, ...] | None:
+    def peer_fragment_plan(
+        self, event: object, *, translation_enabled: bool = True
+    ) -> PeerFragmentPlan | None:
         if not isinstance(event, TranslationStreamUpdate) or event.channel != "peer":
             return None
-        text = (
-            event.source_text
-            if isinstance(event, TranslationFinal)
+        source_only = (
+            isinstance(event, TranslationFinal)
             and event.peer_caption_revision > 0
             and not event.text.strip()
-            else event.text
         )
+        if not event.text.strip() and not source_only:
+            return None
         entry = self.entries.get(("peer", event.utterance_id))
-        if (
-            entry is not None
-            and entry.peer_partition_text == text
-            and entry.peer_partition_scale == self.peer_text_scale
-        ):
-            return entry.peer_fragments
-        return peer_translation_fragments(text, text_scale=self.peer_text_scale)
+        source_text = (
+            event.source_text
+            if event.source_text.strip()
+            else ("" if entry is None else entry.original_text or entry.live_text)
+        )
+        return self._peer_view_plan(
+            entry,
+            source_text=source_text,
+            translation_text=event.text,
+            source_view=not translation_enabled or source_only,
+            revision=True,
+        )
+
+    def _peer_view_plan(
+        self,
+        entry: OverlayLogicalTurnEntry | None,
+        *,
+        source_text: str,
+        translation_text: str,
+        source_view: bool,
+        revision: bool,
+    ) -> PeerFragmentPlan:
+        source_view = source_view or not translation_text.strip()
+        source_parts = peer_translation_fragments(source_text, text_scale=self.peer_text_scale)
+        translation_parts = peer_translation_fragments(
+            translation_text, text_scale=self.peer_text_scale
+        )
+        fragments = source_parts if source_view else translation_parts
+        mode = 0 if source_view else 1
+        counts = len(source_parts), len(translation_parts)
+        records = (
+            {}
+            if entry is None
+            else {
+                candidate.peer_fragment_index: candidate
+                for candidate in (entry, *self.peer_registrations.values())
+                if (candidate is entry or candidate.peer_parent_id == entry.utterance_id)
+                and not candidate.peer_departed
+            }
+        )
+        mappings = {
+            index: [candidate.peer_source_index, candidate.peer_translation_index]
+            for index, candidate in records.items()
+        }
+        if entry is None:
+            mappings[0] = [None, None]
+        departed = set() if entry is None else set(entry.peer_departed_indices)
+        mode_departed = [
+            set() if entry is None else set(entry.peer_source_departed_indices),
+            set() if entry is None else set(entry.peer_translation_departed_indices),
+        ]
+        old_mode = mode if entry is None else (0 if entry.peer_partition_is_source else 1)
+        removed = set()
+        if revision or old_mode == mode:
+            for index, mapping in mappings.items():
+                original = tuple(mapping)
+                for view in (0, 1):
+                    if mapping[view] is not None and mapping[view] >= counts[view]:
+                        if index in records and records[index].peer_dormant:
+                            mode_departed[view].add(mapping[view])
+                        mapping[view] = None
+                candidate = records.get(index)
+                if (
+                    candidate is not None
+                    and not candidate.peer_dormant
+                    and old_mode == mode
+                    and original[mode] is not None
+                    and original[mode] >= len(fragments)
+                ):
+                    removed.add(index)
+        active = {
+            mapping[mode]: index
+            for index, mapping in mappings.items()
+            if index not in removed
+            and mapping[mode] is not None
+            and mapping[mode] < len(fragments)
+            and mapping[mode] not in mode_departed[mode]
+        }
+        visible_ids = {block.id for block in self._snapshot.blocks}
+        first_pending = min(
+            (
+                index
+                for index, candidate in records.items()
+                if candidate.peer_pending and not candidate.peer_dormant
+            ),
+            key=lambda index: records[index].appearance_seq or 0,
+            default=None,
+        )
+        has_visible = any(candidate.block_id in visible_ids for candidate in records.values())
+        reusable = sorted(
+            (
+                index
+                for index, candidate in records.items()
+                if index not in removed
+                and index not in active.values()
+                and (
+                    candidate.block_id in visible_ids
+                    or (not has_visible and index == first_pending)
+                )
+            ),
+            key=lambda index: records[index].appearance_seq or 0,
+        )
+        next_index = max((*mappings, *departed, -1)) + 1
+        for position in range(len(fragments)):
+            if position in active or position in mode_departed[mode]:
+                continue
+            if reusable:
+                index = reusable.pop(0)
+            elif (
+                0 in mappings
+                and 0 not in removed
+                and mappings[0] == [None, None]
+                and (entry is None or entry.peer_registered_at is None)
+            ):
+                index = 0
+            else:
+                index = next_index
+                next_index += 1
+                mappings[index] = [None, None]
+            mappings[index][mode] = position
+            active[position] = index
+        active_indices = set(active.values())
+        if revision:
+            removed.update(
+                index
+                for index, candidate in records.items()
+                if not candidate.peer_dormant and index not in active_indices
+            )
+        for index, mapping in mappings.items():
+            if index not in active_indices and mapping == [None, None]:
+                removed.add(index)
+        for index in removed:
+            departed.add(index)
+            candidate = records.get(index)
+            if candidate is not None:
+                for view, position in enumerate(
+                    (candidate.peer_source_index, candidate.peer_translation_index)
+                ):
+                    if position is not None:
+                        mode_departed[view].add(position)
+        return PeerFragmentPlan(
+            fragments=fragments,
+            text=source_text if source_view else translation_text,
+            source=source_view,
+            bindings=tuple(
+                PeerFragmentBinding(index, mapping[0], mapping[1], index not in active_indices)
+                for index, mapping in sorted(mappings.items())
+                if index not in removed
+            ),
+            removed=frozenset(removed),
+            departed=frozenset(departed),
+            source_departed=frozenset(mode_departed[0]),
+            translation_departed=frozenset(mode_departed[1]),
+        )
 
     def remove_entry(
         self,
@@ -355,12 +545,19 @@ class OverlayPresentationState:
         reason: str,
         now: float | None = None,
         tombstone_seq: int | None = None,
+        retire_parent: bool = True,
     ) -> OverlayEntryRemovalRecord | None:
         entry = self.display_entry(key)
         if entry is not None and entry.channel == "peer":
             parent = self.logical_entry(key)
             parent_id = parent.utterance_id
             parent.peer_departed_indices.add(entry.peer_fragment_index)
+            if entry.peer_source_index is not None:
+                parent.peer_source_departed_indices.add(entry.peer_source_index)
+            if entry.peer_translation_index is not None:
+                parent.peer_translation_departed_indices.add(entry.peer_translation_index)
+            if not entry.peer_departed and entry.peer_registered_at is not None:
+                parent.peer_registration_count -= 1
             if entry is parent and any(
                 candidate.peer_parent_id == parent_id
                 for candidate in self.peer_registrations.values()
@@ -368,6 +565,16 @@ class OverlayPresentationState:
                 entry.peer_departed = True
                 entry.peer_pending = False
                 entry.peer_protected_until = None
+                if retire_parent and not any(
+                    child.parent is parent and not child.peer_dormant
+                    for child in self.peer_registrations.values()
+                ):
+                    self.remove_peer_caption(
+                        ("peer", parent_id),
+                        reason=reason,
+                        now=now,
+                        seq=parent.last_updated_seq,
+                    )
                 return None
         if self.live_self_turn_key == key:
             self.live_self_turn_key = None
@@ -388,23 +595,28 @@ class OverlayPresentationState:
             parent_key = ("peer", entry.peer_parent_id)
             parent = self.entries.get(parent_key)
             if (
-                parent is not None
-                and parent.peer_departed
+                retire_parent
+                and parent is not None
+                and (parent.peer_departed or parent.peer_dormant)
                 and not any(
-                    candidate.peer_parent_id == entry.peer_parent_id
+                    candidate.parent is parent and not candidate.peer_dormant
                     for candidate in self.peer_registrations.values()
                 )
             ):
-                self.remove_entry(parent_key, reason=reason, now=now, tombstone_seq=tombstone_seq)
+                self.remove_peer_caption(
+                    parent_key, reason=reason, now=now, seq=parent.last_updated_seq
+                )
         return record
 
     def remove_peer_caption(
-        self, key: OverlayEntryKey, *, reason: str, now: float, seq: int
+        self, key: OverlayEntryKey, *, reason: str, now: float | None, seq: int
     ) -> None:
         for child_key, child in tuple(self.peer_registrations.items()):
             if child.peer_parent_id == key[1]:
-                self.remove_entry(child_key, reason=reason, now=now, tombstone_seq=seq)
-        self.remove_entry(key, reason=reason, now=now, tombstone_seq=seq)
+                self.remove_entry(
+                    child_key, reason=reason, now=now, tombstone_seq=seq, retire_parent=False
+                )
+        self.remove_entry(key, reason=reason, now=now, tombstone_seq=seq, retire_parent=False)
 
     def reconcile_peer_fragments(
         self,
@@ -412,37 +624,45 @@ class OverlayPresentationState:
         *,
         now: float,
         next_appearance_seq: NextAppearanceSeq,
-        fragments: tuple[str, ...] | None = None,
+        fragments: PeerFragmentPlan | None = None,
+        translation_enabled: bool = True,
     ) -> None:
-        text = entry.original_text if entry.peer_source_only else entry.translation_text
-        if fragments is not None:
-            entry.peer_fragments = fragments
-        elif (
-            entry.peer_partition_text != text or entry.peer_partition_scale != self.peer_text_scale
-        ):
-            entry.peer_fragments = peer_translation_fragments(text, text_scale=self.peer_text_scale)
-        entry.peer_partition_text = text
-        entry.peer_partition_scale = self.peer_text_scale
-        parent_id = entry.utterance_id
-        if ("peer", parent_id) not in self.entries:
+        if ("peer", entry.utterance_id) not in self.entries:
             return
-        for key, child in tuple(self.peer_registrations.items()):
-            if child.peer_parent_id == parent_id and child.peer_fragment_index >= len(
-                entry.peer_fragments
-            ):
-                self.remove_entry(
-                    key,
-                    reason="revision_tail_removed",
-                    now=now,
-                    tombstone_seq=entry.last_updated_seq,
+        plan = fragments or self._peer_view_plan(
+            entry,
+            source_text=entry.original_text or entry.live_text,
+            translation_text=entry.translation_text,
+            source_view=not translation_enabled or entry.peer_source_only,
+            revision=False,
+        )
+        if entry.peer_cached_at is None:
+            entry.peer_cached_at = now
+        entry.peer_fragments = plan.fragments
+        entry.peer_partition_text = plan.text
+        entry.peer_partition_scale = self.peer_text_scale
+        entry.peer_partition_is_source = plan.source
+        for binding in plan.bindings:
+            key = (
+                "peer",
+                (
+                    entry.utterance_id
+                    if binding.index == 0
+                    else uuid5(entry.utterance_id, f"fragment:{binding.index}")
+                ),
+            )
+            item = self.display_entry(key)
+            if item is None:
+                item = PeerFragmentRegistration(
+                    parent=entry,
+                    utterance_id=key[1],
+                    peer_fragment_index=binding.index,
+                    appearance_seq=next_appearance_seq(),
+                    peer_registered_at=now,
                 )
-        for index in range(len(entry.peer_fragments)):
-            if index in entry.peer_departed_indices:
-                continue
-            key = ("peer", parent_id if index == 0 else uuid5(parent_id, f"fragment:{index}"))
-            if index == 0:
-                if entry.peer_registered_at is not None:
-                    continue
+                self.peer_registrations[key] = item
+                entry.peer_registration_count += 1
+            elif binding.index == 0 and entry.peer_registered_at is None:
                 visible = next(
                     (block for block in self._snapshot.blocks if block.id == entry.block_id), None
                 )
@@ -460,14 +680,31 @@ class OverlayPresentationState:
                 entry.visible_since = None
                 entry.last_meaningful_visible_at = None
                 entry.closed_at = None
-            elif key not in self.peer_registrations:
-                self.peer_registrations[key] = PeerFragmentRegistration(
-                    parent=entry,
-                    utterance_id=key[1],
-                    peer_fragment_index=index,
-                    appearance_seq=next_appearance_seq(),
-                    peer_registered_at=now,
-                )
+                entry.peer_registration_count += 1
+            if item.peer_dormant and not binding.dormant:
+                item.peer_pending = True
+            item.peer_source_index = binding.source_index
+            item.peer_translation_index = binding.translation_index
+            item.peer_dormant = binding.dormant
+        for index in plan.removed:
+            key = (
+                "peer",
+                (
+                    entry.utterance_id
+                    if index == 0
+                    else uuid5(entry.utterance_id, f"fragment:{index}")
+                ),
+            )
+            if index == 0 and entry.peer_registered_at is None and not plan.bindings:
+                entry.peer_dormant = True
+                continue
+            self.remove_entry(
+                key, reason="revision_tail_removed", now=now, tombstone_seq=entry.last_updated_seq
+            )
+        entry.peer_departed_indices.update(plan.departed)
+        entry.peer_source_departed_indices.update(plan.source_departed)
+        entry.peer_translation_departed_indices.update(plan.translation_departed)
+        entry.peer_registration_count = len(plan.bindings)
 
     def apply_self_caption_update(
         self,
@@ -1125,7 +1362,7 @@ class OverlayPresentationState:
         next_appearance_seq: NextAppearanceSeq,
         terminal_update_reason: OverlayTerminalUpdateReason,
         translation_enabled: bool = True,
-        peer_fragments: tuple[str, ...] | None = None,
+        peer_fragments: PeerFragmentPlan | None = None,
     ) -> OverlayReductionResult:
 
         key = self.entry_key(event.channel, event.utterance_id)
@@ -1236,7 +1473,11 @@ class OverlayPresentationState:
         entry.caption_staged = False
         if event.text.strip() or source_only:
             self.reconcile_peer_fragments(
-                entry, now=now, next_appearance_seq=next_appearance_seq, fragments=peer_fragments
+                entry,
+                now=now,
+                next_appearance_seq=next_appearance_seq,
+                fragments=peer_fragments,
+                translation_enabled=translation_enabled,
             )
         else:
             self._refresh_entry_visibility_and_expiration(
@@ -1290,7 +1531,7 @@ class OverlayPresentationState:
     ) -> bool:
         expired_keys = [
             key
-            for key, entry in self.display_entries().items()
+            for key, entry in (*self.entries.items(), *self.peer_registrations.items())
             if (
                 deadline := self.entry_expiration_deadline(
                     entry,
@@ -1481,6 +1722,7 @@ class OverlayPresentationState:
             and not entry.caption_staged
             and not entry.peer_pending
             and not entry.peer_departed
+            and not entry.peer_dormant
         )
 
     def rendered_block_signature(
@@ -1553,6 +1795,27 @@ class OverlayPresentationState:
         visible_ttl_seconds: float,
         self_translation_min_visible_seconds: float,
     ) -> tuple[float | None, float | None, float | None]:
+        if entry.channel == "peer" and entry.peer_dormant and not entry.peer_departed:
+            parent = entry.parent if isinstance(entry, PeerFragmentRegistration) else entry
+            anchor = entry.last_meaningful_visible_at
+            if anchor is None:
+                anchor = parent.peer_last_visible_at
+            if anchor is not None:
+                return anchor + visible_ttl_seconds, None, None
+            anchor = (
+                parent.closed_at
+                if parent.closed_at is not None
+                else (
+                    parent.peer_registered_at
+                    if parent.peer_registered_at is not None
+                    else parent.peer_cached_at
+                )
+            )
+            return (
+                None if anchor is None else anchor + late_arrival_window_seconds,
+                None,
+                None,
+            )
         if entry.channel == "peer" and entry.caption_staged and entry.closed_at is not None:
             return entry.closed_at + late_arrival_window_seconds, None, None
         if entry.channel == "peer" and (entry.peer_pending or entry.peer_departed):
@@ -1884,13 +2147,20 @@ class OverlayPresentationState:
         show_translation: bool,
         show_peer_original: bool,
         translation_enabled: bool = True,
+        peer_partition_index: int | None = None,
     ) -> OverlayPresentationBlock | None:
         if isinstance(entry, PeerFragmentRegistration):
+            position = (
+                entry.peer_source_index
+                if entry.parent.peer_partition_is_source
+                else entry.peer_translation_index
+            )
             block = self._build_presentation_block(
                 entry.parent,
                 show_translation=show_translation,
                 show_peer_original=show_peer_original,
                 translation_enabled=translation_enabled,
+                peer_partition_index=position,
             )
             if block is None:
                 return None
@@ -1899,11 +2169,6 @@ class OverlayPresentationState:
                 id=entry.block_id,
                 occupant_key=entry.occupant_key,
                 appearance_seq=entry.appearance_seq,
-                primary_text=(
-                    entry.parent.peer_fragments[entry.peer_fragment_index]
-                    if translation_enabled
-                    else block.primary_text
-                ),
             )
         if prefer_live_self and entry.channel == "self":
             primary_text = entry.live_text.strip()
@@ -1951,6 +2216,18 @@ class OverlayPresentationState:
                 logical_turn_key=logical_turn_key,
             )
         if entry.channel == "peer":
+            position = peer_partition_index
+            if position is None:
+                position = (
+                    entry.peer_source_index
+                    if entry.peer_partition_is_source
+                    else entry.peer_translation_index
+                )
+            fragment = (
+                entry.peer_fragments[position]
+                if position is not None and position < len(entry.peer_fragments)
+                else None
+            )
             if not translation_enabled:
                 live_source_text = entry.live_text.strip()
                 if live_source_text:
@@ -1979,7 +2256,7 @@ class OverlayPresentationState:
                         ),
                         channel="peer",
                         block_variant="finalized",
-                        primary_text=finalized_source_text,
+                        primary_text=fragment if fragment is not None else finalized_source_text,
                         secondary_text="",
                         secondary_enabled=False,
                         primary_language=_line_language(
@@ -1998,11 +2275,7 @@ class OverlayPresentationState:
                     appearance_seq=self._block_appearance_seq(entry),
                     channel="peer",
                     block_variant="finalized",
-                    primary_text=(
-                        entry.peer_fragments[entry.peer_fragment_index]
-                        if entry.peer_fragments
-                        else original_text
-                    ),
+                    primary_text=fragment if fragment is not None else original_text,
                     secondary_text="",
                     secondary_enabled=False,
                     primary_language=_line_language(entry.original_language, original_text),
@@ -2025,11 +2298,7 @@ class OverlayPresentationState:
                     ),
                     channel="peer",
                     block_variant="finalized",
-                    primary_text=(
-                        entry.peer_fragments[entry.peer_fragment_index]
-                        if entry.peer_fragments
-                        else translated_text
-                    ),
+                    primary_text=fragment if fragment is not None else translated_text,
                     secondary_text=original_text,
                     secondary_enabled=show_peer_original and bool(original_text),
                     primary_language=_line_language(
@@ -2060,7 +2329,7 @@ class OverlayPresentationState:
                     channel="peer",
                     block_variant="active_peer",
                     primary_text="",
-                    secondary_text=active_text,
+                    secondary_text=fragment if fragment is not None else active_text,
                     secondary_enabled=True,
                     primary_language=None,
                     secondary_language=_line_language(entry.original_language, active_text),
@@ -2080,7 +2349,7 @@ class OverlayPresentationState:
                     channel="peer",
                     block_variant="finalized",
                     primary_text="",
-                    secondary_text=original_text,
+                    secondary_text=fragment if fragment is not None else original_text,
                     secondary_enabled=True,
                     primary_language=None,
                     secondary_language=_line_language(entry.original_language, original_text),

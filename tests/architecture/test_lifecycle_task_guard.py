@@ -251,7 +251,7 @@ TASK_CREATION_REVIEWS = (
     ),
     *_reviews(
         "core/overlay/presenter.py",
-        {"OverlayPresenter.emit_peer_when_admissible": 2},
+        {"OverlayPresenter._wait_peer_admission": 2},
         "OverlayPresenter locally owns replacement wake and deadline waiters and cancels plus gathers both in finally",
     ),
     *_reviews(

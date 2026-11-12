@@ -530,5 +530,67 @@ async fn issue403_output_generation_retirement_fences_pending_tail_and_allows_re
         .all(|fact| fact.1 == peer_generation(original) || fact.1 == peer_generation(recovered)));
 }
 
+#[tokio::test]
+async fn issue403_translation_toggle_repartitions_current_source_without_tail_revival() {
+    let input = python_cases("translation-toggle");
+    let rows = input.as_array().unwrap();
+    assert_eq!(rows.len(), 4);
+    assert_current_targets(rows);
+    let original = &rows[0];
+    let translated = original["snapshot"]["blocks"].as_array().unwrap();
+    assert_eq!(translated.len(), 2);
+    assert!(translated.iter().all(|block| block["channel"] == "peer"));
+    assert_eq!(
+        translated
+            .iter()
+            .map(|block| compact(block["primary_text"].as_str().unwrap()))
+            .collect::<String>(),
+        "가".repeat(64)
+    );
+    assert_eq!(original["source_input"], "One source sentence.");
+    let root_id = translated[0]["id"].as_str().unwrap();
+    let tail_id = translated[1]["id"].as_str().unwrap();
+    let source_only = &rows[1];
+    let source_blocks = source_only["snapshot"]["blocks"].as_array().unwrap();
+    assert_eq!(source_blocks.len(), 1);
+    assert_eq!(source_blocks[0]["id"], root_id);
+    assert_eq!(
+        compact(source_blocks[0]["primary_text"].as_str().unwrap()),
+        "Onesourcesentence."
+    );
+    assert_eq!(
+        source_only["snapshot"]["native_fresh_render_targets"]["peer"],
+        root_id
+    );
+    assert!(peer_generation(source_only) > peer_generation(original));
+    assert!(peer_episode(source_only) > peer_episode(original));
+    for row in &rows[1..] {
+        assert!(row["snapshot"]["blocks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|block| block["id"] != tail_id));
+        assert_eq!(row["snapshot"], source_only["snapshot"]);
+        assert_eq!(row["expirations"], source_only["expirations"]);
+        if let Some(tail) = row["fragments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|fragment| fragment["id"] == tail_id)
+        {
+            assert_eq!(tail["dormant"], true);
+            assert_eq!(tail["pending"], false);
+        }
+    }
+    let owner = run_rows(rows, "issue403-translation-toggle").await;
+    assert_bounded_episode(&owner, original, 5);
+    assert_bounded_episode(&owner, source_only, 5);
+    assert!(owner
+        .fresh_retry_audit_for_test()
+        .iter()
+        .filter(|fact| fact.0 == "peer" && fact.2 == "scheduled")
+        .all(|fact| fact.1 == peer_generation(original) || fact.1 == peer_generation(source_only)));
+}
+
 #[cfg(windows)]
 mod rendered;

@@ -128,6 +128,7 @@ class _PeerOverlayBatch:
     publication_generation: int
     source_order: int
     parent_id: UUID
+    admission_epoch: int
     events: deque[_PeerOverlayPublication] = field(default_factory=deque)
     delivery: _PeerOverlayPublication | None = None
     delivery_task: asyncio.Task[Any] | None = None
@@ -181,6 +182,7 @@ class OutputRuntime:
     _replacement_cancelled_delivery_tasks: set[asyncio.Task[Any]] = field(default_factory=set)
     _peer_generation: int | None = None
     _retired_peer_generation: int = -1
+    _peer_caption_admission_epoch: int = 0
     _latest_peer_source_order: int = -1
     _peer_identity_by_utterance: dict[UUID, tuple[int, int]] = field(default_factory=dict)
     _peer_identity_order: deque[UUID] = field(default_factory=deque)
@@ -440,9 +442,33 @@ class OutputRuntime:
                 self._peer_caption_admission_started_at.pop(unit_id, None)
 
     async def reset_peer_caption_admission(self) -> None:
+        self._peer_caption_admission_epoch += 1
+        epoch = self._peer_caption_admission_epoch
+        self._peer_caption_admission_started_at.clear()
+        sink = self.overlay_sink
+        if isinstance(sink, PeerCaptionAdmissionPort):
+            sink.refresh_peer_caption_currentness()
         async with self._batch_admission.lock:
-            self._supersede_peer_previews(tuple(self._peer_identity_by_utterance))
-            self._peer_caption_admission_started_at.clear()
+            batches = (
+                *((self._peer_active_batch,) if self._peer_active_batch is not None else ()),
+                *self._peer_overlay_batches,
+            )
+            for batch in batches:
+                if batch.admission_epoch >= epoch:
+                    continue
+                for event, key, scope, destination in batch.events:
+                    if key in self._publications_in_flight:
+                        self._reject_peer_event(
+                            event, key, scope, destination, reason="cancelled_local"
+                        )
+                batch.events.clear()
+                if batch.delivery is not None and batch.delivery[1] in self._publications_in_flight:
+                    batch.delivery_superseded = True
+                    if batch.delivery_task is not None:
+                        batch.delivery_task.cancel()
+            self._peer_overlay_batches = deque(
+                batch for batch in self._peer_overlay_batches if batch.admission_epoch >= epoch
+            )
 
     async def wait_for_peer_output_idle(self) -> None:
         while True:
@@ -1616,7 +1642,9 @@ class OutputRuntime:
                         self._peer_overlay_batches.popleft(),
                         reason="output_overload",
                     )
-                batch = _PeerOverlayBatch(generation, order, parent_id)
+                batch = _PeerOverlayBatch(
+                    generation, order, parent_id, self._peer_caption_admission_epoch
+                )
                 self._peer_overlay_batches.append(batch)
             batch.events.append((event, publication_key, publication_scope, destination_batch))
             self._publications_in_flight.add(publication_key)
@@ -1678,6 +1706,15 @@ class OutputRuntime:
                         reason="publication_generation_retired",
                     )
                     continue
+                if batch.admission_epoch != self._peer_caption_admission_epoch:
+                    self._reject_peer_event(
+                        event,
+                        publication_key,
+                        publication_scope,
+                        destination_batch,
+                        reason="cancelled_local",
+                    )
+                    continue
                 if not destination_batch.active and not isinstance(
                     self.overlay_sink, PeerCaptionAdmissionPort
                 ):
@@ -1690,7 +1727,11 @@ class OutputRuntime:
                                 publication_key,
                                 publication_scope,
                                 destination_batch,
-                                reason="peer_caption_superseded",
+                                reason=(
+                                    "cancelled_local"
+                                    if batch.admission_epoch != self._peer_caption_admission_epoch
+                                    else "peer_caption_superseded"
+                                ),
                             )
                             continue
                         cancel_reason = self._peer_writer_cancel_reason or (
@@ -1734,7 +1775,11 @@ class OutputRuntime:
                         publication_key,
                         publication_scope,
                         destination_batch,
-                        reason="peer_caption_superseded",
+                        reason=(
+                            "cancelled_local"
+                            if batch.admission_epoch != self._peer_caption_admission_epoch
+                            else "peer_caption_superseded"
+                        ),
                     )
                     continue
                 sink = self.overlay_sink
@@ -1811,10 +1856,11 @@ class OutputRuntime:
                             sink.register_peer_caption(
                                 presentation_event,
                                 publication_generation=batch.publication_generation,
-                                is_current=lambda sink=sink, generation=batch.publication_generation, destination=destination_batch: (
+                                is_current=lambda sink=sink, generation=batch.publication_generation, destination=destination_batch, epoch=batch.admission_epoch: (
                                     self._state == "open"
                                     and self.overlay_sink is sink
                                     and self._peer_generation == generation
+                                    and self._peer_caption_admission_epoch == epoch
                                     and destination.disposition in {None, "applied"}
                                 ),
                                 on_wait=observe_pacing_wait,
@@ -1857,7 +1903,11 @@ class OutputRuntime:
                                 publication_key,
                                 publication_scope,
                                 destination_batch,
-                                reason="peer_caption_superseded",
+                                reason=(
+                                    "cancelled_local"
+                                    if batch.admission_epoch != self._peer_caption_admission_epoch
+                                    else "peer_caption_superseded"
+                                ),
                                 pacing_metadata=pacing_outcome(),
                             )
                         continue
@@ -2030,6 +2080,7 @@ class OutputRuntime:
                     batch.parent_id,
                 )
                 == (generation, order, parent_id)
+                and batch.admission_epoch == self._peer_caption_admission_epoch
             ),
             None,
         )

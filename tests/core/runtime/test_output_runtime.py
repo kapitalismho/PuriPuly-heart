@@ -278,6 +278,9 @@ class PacedOverlaySink(RecordingOverlaySink):
     def retire_peer_generation(self, publication_generation: int) -> None:
         self.retired_generation = publication_generation
 
+    def refresh_peer_caption_currentness(self) -> None:
+        self.currentness_refreshed = True
+
 
 class CloseRaceFailingOverlaySink(RecordingOverlaySink):
     def __init__(self) -> None:
@@ -2761,6 +2764,9 @@ async def test_revisioned_preview_preemption_preserves_unrelated_final_order_and
 
         def retire_peer_generation(self, publication_generation):
             self.retired_generation = publication_generation
+
+        def refresh_peer_caption_currentness(self):
+            self.currentness_refreshed = True
 
     sink = GateSink()
     owner = _output_runtime_class()(chatbox=RecordingChatbox(), overlay_sink=sink)

@@ -100,6 +100,7 @@ class NativeFixture:
                         "visible_since": state.visible_since,
                         "last_meaningful_visible_at": state.last_meaningful_visible_at,
                         "pending": state.pending,
+                        "dormant": state.dormant,
                         "departed": state.departed,
                         "protected_until": state.protected_until,
                         "expires_at": state.expires_at,
@@ -119,6 +120,7 @@ class NativeFixture:
         output_scope: OverlayPublicationScope | None = None,
         source_order: int = 1,
         target_language: str | None = None,
+        source_text: str = "Synthetic source",
         publication_generation: int = 1,
     ):
         ready_at_ms = round(self.timeline.clock.now() * 1000)
@@ -128,7 +130,7 @@ class NativeFixture:
             utterance_id=self.unit,
             channel="peer",
             text=text,
-            source_text="Synthetic source",
+            source_text=source_text,
             source_language="en",
             target_language=target_language
             or ("ko" if any(ord(char) > 127 for char in text) else "en"),
@@ -142,6 +144,7 @@ class NativeFixture:
         await self.output.wait_for_peer_output_idle()
         await self.timeline.advance(0)
         self.record(label, text=text, revision=revision)
+        self.rows[-1]["source_input"] = source_text
         self.rows[-1]["content_ready_at_ms"] = ready_at_ms
         self.rows[-1]["logical_observed_at_ms"] = round(self.timeline.clock.now() * 1000)
         self.rows[-1]["publication_generation"] = publication_generation
@@ -422,6 +425,30 @@ async def generation_retirement():
         await fixture.close()
 
 
+async def translation_toggle():
+    fixture = NativeFixture(40307)
+    try:
+        await fixture.peer(
+            "translated-fragments",
+            "가" * 64,
+            1,
+            source_text="One source sentence.",
+        )
+        await fixture.at(0.65)
+        await fixture.presenter.update_translation_enabled(False)
+        await fixture.timeline.advance(0)
+        fixture.record("source-only")
+        await fixture.at(1.3)
+        await fixture.presenter.update_translation_enabled(False)
+        await fixture.timeline.advance(0)
+        fixture.record("source-only-noop")
+        await fixture.at(1.7)
+        fixture.record("source-only-stable")
+        return fixture.rows
+    finally:
+        await fixture.close()
+
+
 async def corpus():
     result = {}
     for index, (name, text) in enumerate(CORPUS.items()):
@@ -448,6 +475,7 @@ async def main():
         "local": local,
         "ready-order": ready_order,
         "generation-retirement": generation_retirement,
+        "translation-toggle": translation_toggle,
         "corpus": corpus,
     }
     print(json.dumps(await cases[mode](), ensure_ascii=False))

@@ -199,12 +199,12 @@ class PeerCaptionOwner:
         self._epoch += 1
         for segment in self._segments.values():
             segment.closed = True
+        await self.output.reset_peer_caption_admission()
         tasks = tuple(self._tasks)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await self._scope.close()
-        await self.output.reset_peer_caption_admission()
         self._scope = LifecycleScope("PeerCaptionOwner")
         self._segments.clear()
         self._last = None

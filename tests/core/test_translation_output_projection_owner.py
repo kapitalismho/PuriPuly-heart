@@ -141,6 +141,9 @@ class BlockingPeerOverlay(RecordingOverlay):
     def retire_peer_generation(self, publication_generation: int) -> None:
         self.retired_generation = publication_generation
 
+    def refresh_peer_caption_currentness(self) -> None:
+        self.currentness_refreshed = True
+
 
 def make_owner(
     *,

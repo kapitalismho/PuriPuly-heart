@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass, field, replace
-from typing import Collection, Mapping
+from typing import Mapping
 from uuid import UUID
 
 from .protocol import U64_MAX
@@ -22,6 +22,7 @@ from .state import (
     PEER_FRAGMENT_DEPARTURE_BYTES,
     PEER_FRAGMENT_REGISTRATION_BYTES,
     OverlayLogicalTurnEntry,
+    PeerFragmentPlan,
 )
 
 CLOSED_TOMBSTONE_LIMIT = 64
@@ -104,7 +105,7 @@ class PresenterAcceptanceLedger:
         entries: Mapping[EntryKey, OverlayLogicalTurnEntry],
         *,
         closed: bool,
-        peer_fragments: tuple[str, ...] | None = None,
+        peer_fragments: PeerFragmentPlan | None = None,
     ) -> str | None:
         if closed:
             return "closed"
@@ -252,24 +253,6 @@ class PresenterAcceptanceLedger:
             getattr(event, "peer_superseded_unit_ids", None),
         )
 
-    @staticmethod
-    def _peer_fragment_payload_bytes(
-        fragments: tuple[str, ...],
-        departed: Collection[int],
-        *,
-        previous_count: int = 0,
-    ) -> int:
-        count = len(fragments)
-        registrations = count - sum(index < count for index in departed)
-        removed = max(0, previous_count - count) - sum(
-            count <= index < previous_count for index in departed
-        )
-        return (
-            sum(len(fragment.encode("utf-8")) for fragment in fragments)
-            + registrations * PEER_FRAGMENT_REGISTRATION_BYTES
-            + (len(departed) + removed) * PEER_FRAGMENT_DEPARTURE_BYTES
-        )
-
     @classmethod
     def entry_payload_bytes(cls, entry: OverlayLogicalTurnEntry | None) -> int:
         if entry is None:
@@ -297,7 +280,16 @@ class PresenterAcceptanceLedger:
             value = getattr(entry, field_name)
             if isinstance(value, str):
                 total += len(value.encode("utf-8"))
-        total += cls._peer_fragment_payload_bytes(entry.peer_fragments, entry.peer_departed_indices)
+        total += (
+            sum(len(fragment.encode("utf-8")) for fragment in entry.peer_fragments)
+            + entry.peer_registration_count * PEER_FRAGMENT_REGISTRATION_BYTES
+            + (
+                len(entry.peer_departed_indices)
+                + len(entry.peer_source_departed_indices)
+                + len(entry.peer_translation_departed_indices)
+            )
+            * PEER_FRAGMENT_DEPARTURE_BYTES
+        )
         return total
 
     @staticmethod
@@ -328,7 +320,7 @@ class PresenterAcceptanceLedger:
         entry: OverlayLogicalTurnEntry | None,
         event: OverlayEventUnion,
         *,
-        peer_fragments: tuple[str, ...] | None = None,
+        peer_fragments: PeerFragmentPlan | None = None,
     ) -> int:
         if (
             event.channel == "peer"
@@ -340,11 +332,7 @@ class PresenterAcceptanceLedger:
             return 0
         partition_bytes = 0
         if peer_fragments is not None:
-            partition_bytes = cls._peer_fragment_payload_bytes(
-                peer_fragments,
-                () if entry is None else entry.peer_departed_indices,
-                previous_count=0 if entry is None else len(entry.peer_fragments),
-            )
+            partition_bytes = peer_fragments.retained_bytes
         if entry is None:
             identity_bytes = (
                 len(f"peer:{event.utterance_id}".encode("utf-8")) if event.channel == "peer" else 0
@@ -352,8 +340,15 @@ class PresenterAcceptanceLedger:
             return cls.event_payload_bytes(event) + partition_bytes + identity_bytes
         current = cls.entry_payload_bytes(entry)
         if peer_fragments is not None:
-            current += partition_bytes - cls._peer_fragment_payload_bytes(
-                entry.peer_fragments, entry.peer_departed_indices
+            current += partition_bytes - (
+                sum(len(fragment.encode("utf-8")) for fragment in entry.peer_fragments)
+                + entry.peer_registration_count * PEER_FRAGMENT_REGISTRATION_BYTES
+                + (
+                    len(entry.peer_departed_indices)
+                    + len(entry.peer_source_departed_indices)
+                    + len(entry.peer_translation_departed_indices)
+                )
+                * PEER_FRAGMENT_DEPARTURE_BYTES
             )
         replacements: tuple[tuple[str, str | None], ...] = ()
         if isinstance(event, (SelfTranscriptFinal, PeerTranscriptFinal)):

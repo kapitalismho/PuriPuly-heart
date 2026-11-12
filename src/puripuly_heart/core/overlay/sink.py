@@ -215,6 +215,8 @@ class PeerCaptionAdmissionPort(Protocol):
 
     def retire_peer_generation(self, publication_generation: int) -> None: ...
 
+    def refresh_peer_caption_currentness(self) -> None: ...
+
 
 @runtime_checkable
 class PeerCaptionLayoutPort(Protocol):

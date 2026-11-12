@@ -170,7 +170,14 @@ async def test_f3_large_valid_partition_keeps_logical_capacity_and_self_progress
         assert presenter._entries[("peer", unit)].peer_fragments == fragments
         parent = presenter._entries[("peer", unit)]
         base_bytes = presenter._acceptance.entry_payload_bytes(
-            replace(parent, peer_fragments=(), peer_departed_indices=set())
+            replace(
+                parent,
+                peer_fragments=(),
+                peer_registration_count=0,
+                peer_departed_indices=set(),
+                peer_source_departed_indices=set(),
+                peer_translation_departed_indices=set(),
+            )
         )
         expected_bytes = (
             base_bytes
@@ -180,7 +187,9 @@ async def test_f3_large_valid_partition_keeps_logical_capacity_and_self_progress
         assert presenter._acceptance.entry_payload_bytes(parent) == expected_bytes
         assert (
             presenter._acceptance.projected_entry_payload_bytes(
-                None, event, peer_fragments=fragments
+                None,
+                event,
+                peer_fragments=presenter._presentation_state.peer_fragment_plan(event),
             )
             >= expected_bytes
         )
@@ -209,7 +218,7 @@ async def test_f3_large_valid_partition_keeps_logical_capacity_and_self_progress
             base_bytes
             + sum(len(fragment.encode("utf-8")) for fragment in fragments)
             + PEER_FRAGMENT_REGISTRATION_BYTES
-            + (len(fragments) - 1) * PEER_FRAGMENT_DEPARTURE_BYTES
+            + 2 * (len(fragments) - 1) * PEER_FRAGMENT_DEPARTURE_BYTES
         )
     finally:
         await presenter.close()

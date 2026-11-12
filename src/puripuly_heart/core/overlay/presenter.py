@@ -39,6 +39,8 @@ from .state import (
     OverlayPresentationEntry,
     OverlayPresentationState,
     OverlayReductionResult,
+    PeerFragmentPlan,
+    PeerFragmentRegistration,
 )
 from .state import (
     OverlayLogicalTurnEntry as _LogicalTurnEntry,
@@ -65,6 +67,7 @@ class PeerFragmentState:
     last_meaningful_visible_at: float | None
     pending: bool
     departed: bool
+    dormant: bool
     protected_until: float | None
     expires_at: float | None
 
@@ -276,6 +279,7 @@ class OverlayPresenter(OverlaySink):
             last_meaningful_visible_at=entry.last_meaningful_visible_at,
             pending=entry.peer_pending,
             departed=entry.peer_departed,
+            dormant=entry.peer_dormant,
             protected_until=entry.peer_protected_until,
             expires_at=self._entry_expiration_deadline(entry),
         )
@@ -290,7 +294,9 @@ class OverlayPresenter(OverlaySink):
             if existing is not None:
                 return existing
             event = self._acceptance.normalize_sequence(event, self._entries)
-            peer_fragments = self._presentation_state.peer_fragment_plan(event)
+            peer_fragments = self._presentation_state.peer_fragment_plan(
+                event, translation_enabled=self.translation_enabled
+            )
             rejection_reason = self._application_rejection_reason(
                 event, peer_fragments=peer_fragments
             )
@@ -367,6 +373,10 @@ class OverlayPresenter(OverlaySink):
         self._discard_revoked_peer_pending()
         self._signal_peer_admission_change()
 
+    def refresh_peer_caption_currentness(self) -> None:
+        self._discard_revoked_peer_pending()
+        self._signal_peer_admission_change()
+
     def _peer_parent_is_current(self, entry: _LogicalTurnEntry) -> bool:
         return (
             entry.peer_publication_generation is None
@@ -384,14 +394,14 @@ class OverlayPresenter(OverlaySink):
                 else "publication_revoked"
             )
             for child_key, child in tuple(self._presentation_state.peer_registrations.items()):
-                if child.parent is parent and child.peer_pending:
+                if child.parent is parent and (child.peer_pending or child.peer_dormant):
                     self._presentation_state.remove_entry(
                         child_key,
                         reason=reason,
                         now=self.clock.now(),
                         tombstone_seq=parent.last_updated_seq,
                     )
-            if parent.peer_pending:
+            if parent.peer_pending or parent.peer_dormant:
                 self._presentation_state.remove_entry(
                     key,
                     reason=reason,
@@ -434,7 +444,10 @@ class OverlayPresenter(OverlaySink):
                     *self._entries.values(),
                     *self._presentation_state.peer_registrations.values(),
                 )
-                if entry.channel == "peer" and entry.peer_pending and not entry.caption_staged
+                if entry.channel == "peer"
+                and entry.peer_pending
+                and not entry.caption_staged
+                and not entry.peer_dormant
             ),
             key=lambda entry: entry.appearance_seq,
             default=None,
@@ -505,7 +518,7 @@ class OverlayPresenter(OverlaySink):
         self,
         event: OverlayEventUnion,
         *,
-        peer_fragments: tuple[str, ...] | None = None,
+        peer_fragments: PeerFragmentPlan | None = None,
         on_accepted: Callable[[], None] | None = None,
     ) -> None:
         previous = self._entries.get((event.channel, event.utterance_id))
@@ -542,7 +555,7 @@ class OverlayPresenter(OverlaySink):
             on_accepted()
 
     def _application_rejection_reason(
-        self, event: OverlayEventUnion, *, peer_fragments: tuple[str, ...] | None = None
+        self, event: OverlayEventUnion, *, peer_fragments: PeerFragmentPlan | None = None
     ) -> str | None:
         self._discard_revoked_peer_pending()
         registration = self._peer_registration_context.get(event.event_id)
@@ -583,6 +596,7 @@ class OverlayPresenter(OverlaySink):
                             entry,
                             now=self.clock.now(),
                             next_appearance_seq=self._next_appearance_seq,
+                            translation_enabled=self.translation_enabled,
                         )
             await self._publish_if_changed()
 
@@ -610,7 +624,30 @@ class OverlayPresenter(OverlaySink):
             if next_enabled == self.translation_enabled:
                 return
             self.translation_enabled = next_enabled
-            await self._publish_if_changed()
+            for entry in tuple(self._entries.values()):
+                if entry.channel == "peer" and (
+                    entry.translation_text.strip()
+                    or entry.original_text.strip()
+                    or entry.peer_fragments
+                ):
+                    self._presentation_state.reconcile_peer_fragments(
+                        entry,
+                        now=self.clock.now(),
+                        next_appearance_seq=self._next_appearance_seq,
+                        translation_enabled=next_enabled,
+                    )
+            self._drain_presentation_state_removals()
+            for key, entry in (
+                *self._entries.items(),
+                *self._presentation_state.peer_registrations.items(),
+            ):
+                self._schedule_expiration(key, entry)
+            await self._publish_if_changed(admit_peer=False)
+            for _ in range(self.visible_window_target_blocks):
+                pending = self._next_pending_peer()
+                if pending is None or self._pending_peer_delay(pending) != 0:
+                    break
+                await self._publish_if_changed()
 
     async def begin_native_retry_epoch(self, *, enabled: bool) -> None:
         async with self._ownership_transition_lock:
@@ -644,7 +681,7 @@ class OverlayPresenter(OverlaySink):
             self._closed = True
 
     def _apply_event(
-        self, event: OverlayEventUnion, *, peer_fragments: tuple[str, ...] | None = None
+        self, event: OverlayEventUnion, *, peer_fragments: PeerFragmentPlan | None = None
     ) -> bool:
         now = self.clock.now()
         self._expire_closed_entries(now=now)
@@ -670,7 +707,11 @@ class OverlayPresenter(OverlaySink):
         return False
 
     def _apply_peer_event(
-        self, event: OverlayEventUnion, *, now: float, peer_fragments: tuple[str, ...] | None = None
+        self,
+        event: OverlayEventUnion,
+        *,
+        now: float,
+        peer_fragments: PeerFragmentPlan | None = None,
     ) -> bool:
         if isinstance(event, PeerActiveUpdate):
             # Reserved compatibility/fallback path. Normal product peer overlay
@@ -746,7 +787,7 @@ class OverlayPresenter(OverlaySink):
         event: TranslationStreamUpdate | TranslationFinal,
         *,
         now: float,
-        peer_fragments: tuple[str, ...] | None = None,
+        peer_fragments: PeerFragmentPlan | None = None,
     ) -> bool:
         result = self._presentation_state.apply_peer_translation_update(
             event,
@@ -1066,6 +1107,9 @@ class OverlayPresenter(OverlaySink):
                 if entry.visible_since is None or new_occurrence:
                     entry.visible_since = now
                 entry.last_meaningful_visible_at = now
+                if entry.channel == "peer":
+                    parent = self._presentation_state.logical_entry(key)
+                    parent.peer_last_visible_at = now
             if entry.channel == "peer":
                 if new_occurrence:
                     entry.peer_promoted_at = None
@@ -1131,6 +1175,8 @@ class OverlayPresenter(OverlaySink):
                     entry.window_evicted_at = None
                     self._schedule_expiration(key, entry)
                 entry.ever_visible = True
+                if isinstance(entry, PeerFragmentRegistration):
+                    entry.parent.ever_visible = True
 
     def _apply_speaker_presentation(
         self,

@@ -375,6 +375,9 @@ async def test_peer_overlay_wait_is_file_only_and_success_stays_in_delivery_hist
         def retire_peer_generation(self, publication_generation):
             self.retired_generation = publication_generation
 
+        def refresh_peer_caption_currentness(self):
+            self.currentness_refreshed = True
+
     output = OutputRuntime(
         chatbox=ChatboxPaginator(sender=FakeSender(), clock=FakeClock(), runtime_logging=service),
         overlay_sink=PacedSink(),
