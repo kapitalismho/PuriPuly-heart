@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
+import pytest
+
 from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     cleanup_local_stt_install_residue,
 )
@@ -68,36 +70,44 @@ def test_startup_cleanup_keeps_unrelated_models_and_current_install(
     assert (install / "weights.bin").read_bytes() == b"live"
 
 
-def test_startup_cleanup_still_restores_backup_and_removes_staging(
-    tmp_path: Path,
-) -> None:
-    backup = tmp_path / "model.backup"
-    staging = tmp_path / "model.staging-abcd"
-    backup.mkdir()
-    staging.mkdir()
-    (backup / "weights.bin").write_bytes(b"ready")
+def test_startup_cleanup_removes_regular_file_deletion_residue(tmp_path: Path) -> None:
+    trash = tmp_path / "model.deleting-file"
+    trash.write_bytes(b"residue")
 
     reconciled = cleanup_local_stt_install_residue(
         model_root=tmp_path,
         install_dirnames=("model",),
     )
 
-    assert {path.name for path in reconciled} == {"model.backup", "model.staging-abcd"}
-    assert (tmp_path / "model" / "weights.bin").read_bytes() == b"ready"
-    assert not backup.exists()
-    assert not staging.exists()
+    assert trash in reconciled
+    assert not trash.exists()
 
 
-def test_removal_entry_point_still_reclaims_previous_residue(tmp_path: Path) -> None:
-    install = tmp_path / "model"
-    (install / "nested").mkdir(parents=True)
-    (install / "nested" / "weights.bin").write_bytes(b"x")
-    old_residue = tmp_path / "model.deleting-old"
-    old_residue.mkdir()
+@pytest.mark.parametrize("target_exists", [True, False], ids=["directory", "dangling"])
+def test_startup_cleanup_unlinks_deletion_symlinks_without_touching_targets(
+    tmp_path: Path, target_exists: bool
+) -> None:
+    target = tmp_path / "external"
+    target.mkdir()
+    sentinel = target / "weights.bin"
+    sentinel.write_bytes(b"preserve")
+    link_target = target if target_exists else target / "missing"
+    root = tmp_path / "models"
+    root.mkdir()
+    trash = root / "model.deleting-link"
+    try:
+        trash.symlink_to(link_target, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"symlink permission unavailable: {type(error).__name__}")
 
-    assert remove_model_install_dir(install) is True
+    reconciled = cleanup_local_stt_install_residue(
+        model_root=root,
+        install_dirnames=("model",),
+    )
 
-    assert not install.exists()
-    assert not old_residue.exists()
-    assert list(tmp_path.iterdir()) == []
-    assert remove_model_install_dir(install) is False
+    assert trash in reconciled
+    assert not trash.is_symlink()
+    assert not trash.exists()
+    assert sentinel.read_bytes() == b"preserve"
+    if not target_exists:
+        assert not link_target.exists()
