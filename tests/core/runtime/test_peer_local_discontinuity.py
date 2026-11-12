@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 import numpy as np
 import pytest
@@ -10,6 +11,7 @@ import pytest
 from puripuly_heart.app.wiring import wiring_local_asr_provider_runtime as runtime_wiring
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.audio.format import AudioCaptureDiscontinuity, AudioFrameF32
+from puripuly_heart.core.audio.ownership import PeerAudioSegmentLedger
 from puripuly_heart.core.clock import SystemClock
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
@@ -20,14 +22,22 @@ from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import TranslationFinal, UtteranceClosed
 from puripuly_heart.core.peer_capture import PeerCaptureLanguageFacts, PeerCaptureSessionState
 from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
+from puripuly_heart.core.runtime.peer_channel import _CaptureGeneration, _GenerationGuardedVadSink
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
 from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
-from puripuly_heart.core.vad.gating import VadGating
+from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
+from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart, VadGating
 from tests.core.runtime.test_local_asr_provider_runtime import _resolved_config
 from tests.core.runtime.test_peer_capture_session import FakeProvider, make_config, make_owner
 from tests.core.test_peer_caption_lifecycle import setup
 from tests.core.test_peer_overlay_policy import Surface, Timeline
-from tests.core.test_stt_scoped_engine import ControlledScopedSession, span, wait_until
+from tests.core.test_stt_scoped_engine import (
+    ControlledScopedSession,
+    settings,
+    span,
+    wait_until,
+    watchdogs,
+)
 from tests.helpers.vad import SequenceVadEngine
 
 
@@ -307,3 +317,98 @@ async def test_audio_loop_gap_settles_local_scope_and_recovers_through_display(
         await recognition.close_backend()
         await translation.stop()
         await presenter.close()
+
+
+@pytest.mark.parametrize("provider_id", ["local_granite", "local_qwen_gpu"])
+async def test_consecutive_queued_gaps_do_not_exhaust_provider_recovery(provider_id):
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings(provider_id))
+    sessions = []
+    emitted = []
+
+    async def open_session(_settings, _epoch):
+        session = ControlledScopedSession()
+        session.terminal_on_seal = ("final", "Completed after repeated gaps.")
+        sessions.append(session)
+        return session
+
+    engine = ScopedRecognitionEngine(
+        session_factory=open_session,
+        event_sink=emitted.append,
+        watchdog_resolver=lambda _: watchdogs(write_timeout_s=1),
+    )
+    ready = asyncio.Event()
+    ready.set()
+    guard = _GenerationGuardedVadSink(
+        sink=engine,
+        runtime=SimpleNamespace(
+            segment_ledger=ledger, is_current_generation=lambda generation: generation == 1
+        ),
+        capture_generation=_CaptureGeneration(1),
+        provider_ingress_ready=ready,
+    )
+    try:
+        for index in range(4):
+            segment_id = uuid4()
+            first_sample = index * 2048
+            start = ledger.observe_vad_event(
+                SpeechStart(
+                    segment_id,
+                    np.empty(0, dtype=np.float32),
+                    np.full(512, 0.2, dtype=np.float32),
+                    chunk_capture=(span(index * 3, first_sample, first_sample + 512),),
+                ),
+                now_monotonic_s=index,
+            )
+            await guard.handle_owned_vad_event(start)
+            await wait_until(lambda: len(sessions) == index + 1)
+            session = sessions[-1]
+            await wait_until(lambda: any(call[0] == "send_done" for call in session.calls))
+            if index < 3:
+                session.emit(
+                    STTProviderTurnTerminal(
+                        identity=session.requests[0].identity,
+                        outcome="final",
+                        text="Early text from input that will fail.",
+                        text_authority="authoritative",
+                    )
+                )
+                await wait_until(lambda: engine._turn.terminal_ready.done())
+                session.send_gate.clear()
+                chunk = ledger.observe_vad_event(
+                    SpeechChunk(
+                        segment_id,
+                        np.full(512, 0.2, dtype=np.float32),
+                        chunk_capture=(
+                            span(index * 3 + 1, first_sample + 512, first_sample + 1024),
+                        ),
+                    ),
+                    now_monotonic_s=index + 0.1,
+                )
+                await guard.handle_owned_vad_event(chunk)
+                await wait_until(lambda: sum(call[0] == "send" for call in session.calls) == 2)
+            end = ledger.observe_vad_event(
+                SpeechEnd(
+                    segment_id,
+                    reason="source_discontinuity" if index < 3 else "source_eof",
+                    trailing_silence_ms=0,
+                ),
+                now_monotonic_s=index + 0.2,
+            )
+            await guard.handle_owned_vad_event(end)
+            if index < 3:
+                ledger.terminalize(segment_id, outcome="failed", now_monotonic_s=index + 0.2)
+                session.send_gate.set()
+            await wait_until(lambda: len(emitted) == index + 1)
+        await asyncio.wait_for(guard.finish(), 1)
+        assert [event.outcome for event in emitted] == ["cancelled"] * 3 + ["final"]
+        assert [event.text for event in emitted] == [""] * 3 + ["Completed after repeated gaps."]
+        assert emitted[-1].identity.segment == start.segment.identity
+        assert all(
+            sum(call[0] == "abort" for call in session.calls) == 1 for session in sessions[:3]
+        )
+        assert not any(call[0] == "abort" for call in sessions[-1].calls)
+    finally:
+        for session in sessions:
+            session.send_gate.set()
+        await guard.abort()
+        await engine.close_backend()

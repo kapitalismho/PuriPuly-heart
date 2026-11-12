@@ -2349,7 +2349,7 @@ class ScopedRecognitionEngine:
             self._terminal_failure_notified = False
             self._connection_retry_at_s = None
         elif (
-            terminal.outcome not in ("final", "empty", "submitted")
+            terminal.outcome not in ("final", "empty", "submitted", "cancelled")
             and not (terminal.recovery_pending and self._connection_retry_at_s is not None)
             and not (
                 turn.independent_recognition
