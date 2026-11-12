@@ -566,3 +566,67 @@ async def test_r4_calibration_reflow_uses_the_same_retained_budget_and_terminal_
         assert (stale.outcome, stale.cause) == ("stale", "stale")
     finally:
         await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_overlay_reattachment_preserves_capture_generation_and_revokes_old_pending_content():
+    timeline = Timeline()
+    old_surface, new_surface = Surface(), Surface()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=timeline.clock,
+        sleep=timeline.sleep,
+        bridge=old_surface,
+        native_retry_enabled=True,
+    )
+    output = OutputRuntime(chatbox=RecordingChatbox(), clock=timeline.clock, overlay_sink=presenter)
+    output.activate_peer_generation(1)
+    visible, pending, successor = identity(4501), identity(4502), identity(4503)
+    try:
+        await presenter.emit(own_speech())
+        for order, unit, text in (
+            (1, visible, "가" * 64),
+            (2, pending, "old pending final"),
+        ):
+            await output.publish_overlay_event(
+                caption(order, unit, text), publication_generation=1, source_order=order
+            )
+            await output.wait_for_peer_output_idle()
+        assert presenter.peer_fragment_state(visible, 1).pending
+        assert presenter.peer_fragment_state(pending, 0).pending
+        assert await output.replace_overlay_sink(None)
+        assert presenter.peer_fragment_state(visible, 1) is None
+        assert presenter.peer_fragment_states(pending) == ()
+        presenter.detach_bridge()
+        await presenter.begin_native_retry_epoch(enabled=False)
+        presenter.attach_bridge(new_surface)
+        assert await output.replace_overlay_sink(presenter)
+        await presenter.begin_native_retry_epoch(enabled=True)
+        correction = caption(3, visible, "current visible correction", revision=2)
+        await output.publish_overlay_event(correction, publication_generation=1, source_order=1)
+        await output.wait_for_peer_output_idle()
+        assert presenter.snapshot().blocks[-1].primary_text == "current visible correction"
+        assert presenter.application_receipt(correction.event_id).outcome == "applied"
+        await output.publish_overlay_event(
+            caption(4, successor, "new same-capture final"),
+            publication_generation=1,
+            source_order=3,
+        )
+        await output.wait_for_peer_output_idle()
+        await timeline.advance(0)
+        await timeline.advance(1)
+        assert [block.channel for block in presenter.snapshot().blocks] == ["self", "peer"]
+        assert presenter.snapshot().blocks[-1].primary_text == "new same-capture final"
+        current_scene = presenter.snapshot()
+        stale = caption(5, pending, "late old pending final", revision=2)
+        await output.publish_overlay_event(stale, publication_generation=1, source_order=2)
+        await output.wait_for_peer_output_idle()
+        assert presenter.snapshot() == current_scene
+        assert all(
+            block.id not in {fragment_id(visible, 1), fragment_id(pending, 0)}
+            for snapshot in new_surface.snapshots
+            for block in snapshot.blocks
+        )
+    finally:
+        await output.close()
+        await presenter.close()

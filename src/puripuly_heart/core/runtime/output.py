@@ -1858,6 +1858,7 @@ class OutputRuntime:
                                 publication_generation=batch.publication_generation,
                                 is_current=lambda sink=sink, generation=batch.publication_generation, destination=destination_batch, epoch=batch.admission_epoch: (
                                     self._state == "open"
+                                    and self._peer_writer_cancel_reason is None
                                     and self.overlay_sink is sink
                                     and self._peer_generation == generation
                                     and self._peer_caption_admission_epoch == epoch
@@ -2368,17 +2369,15 @@ class OutputRuntime:
 
     async def _cancel_active_delivery_tasks_locked(self, *, replacement: bool) -> None:
         peer_worker = self._peer_overlay_worker
-        sink = self.overlay_sink
-        if self._peer_generation is not None and isinstance(sink, PeerCaptionAdmissionPort):
-            sink.retire_peer_generation(self._peer_generation)
         self._peer_writer_cancel_reason = (
             "destination_replaced" if replacement else "output_runtime_closing"
         )
+        if isinstance(self.overlay_sink, PeerCaptionAdmissionPort):
+            self.overlay_sink.refresh_peer_caption_currentness()
         self._peer_caption_admission_started_at.clear()
         if peer_worker is not None and not peer_worker.done():
             peer_worker.cancel()
             await asyncio.gather(peer_worker, return_exceptions=True)
-        self._peer_writer_cancel_reason = None
         self._peer_overlay_worker = None
         peer_reason = "destination_replaced" if replacement else "output_runtime_closing"
         for batch in tuple(self._peer_overlay_batches):
@@ -2400,6 +2399,7 @@ class OutputRuntime:
         self._active_delivery_tasks.difference_update(tasks)
         self._replacement_cancelled_delivery_tasks.difference_update(tasks)
         self._publications_in_flight.clear()
+        self._peer_writer_cancel_reason = None
 
     @staticmethod
     def _emit_cleanup_failure(stage: str, exception: Exception) -> None:
