@@ -388,7 +388,7 @@ class OverlayPresentationState:
             if event.source_text.strip()
             else ("" if entry is None else entry.original_text or entry.live_text)
         )
-        return self._peer_view_plan(
+        return self.peer_view_plan(
             entry,
             source_text=source_text,
             translation_text=event.text,
@@ -396,7 +396,7 @@ class OverlayPresentationState:
             revision=True,
         )
 
-    def _peer_view_plan(
+    def peer_view_plan(
         self,
         entry: OverlayLogicalTurnEntry | None,
         *,
@@ -629,7 +629,7 @@ class OverlayPresentationState:
     ) -> None:
         if ("peer", entry.utterance_id) not in self.entries:
             return
-        plan = fragments or self._peer_view_plan(
+        plan = fragments or self.peer_view_plan(
             entry,
             source_text=entry.original_text or entry.live_text,
             translation_text=entry.translation_text,

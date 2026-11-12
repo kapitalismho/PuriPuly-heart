@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
+from puripuly_heart.core.overlay import presenter_acceptance
 from puripuly_heart.core.overlay.peer_caption_layout import peer_translation_fragments
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter, OverlayPublicationScope
@@ -446,4 +447,122 @@ async def test_r1_reset_cancels_output_owned_final_before_scene_lock_and_recover
         surface.release.set()
         await asyncio.gather(scene, return_exceptions=True)
         await output.close()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_r4_source_expansion_over_budget_retires_caption_and_preserves_self_progress():
+    timeline, surface = Timeline(), Surface()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=timeline.clock,
+        sleep=timeline.sleep,
+        bridge=surface,
+        native_retry_enabled=True,
+    )
+    unit = identity(4401)
+    event = caption(1, unit, "short translation", source="가\n" * 90000)
+    try:
+        assert (
+            presenter._acceptance.event_payload_bytes(event)
+            < presenter_acceptance.PRESENTER_EVENT_BYTE_LIMIT
+        )
+        assert (await presenter.emit(event)).outcome == "applied"
+        await presenter.update_translation_enabled(False)
+        assert (
+            sum(
+                presenter._acceptance.entry_payload_bytes(entry)
+                for entry in presenter._entries.values()
+            )
+            <= presenter_acceptance.PRESENTER_AGGREGATE_BYTE_LIMIT
+        )
+        assert presenter.peer_fragment_states(unit) == ()
+        assert presenter.snapshot().blocks == []
+        episodes = presenter.snapshot().native_quiet_tail_episodes
+        assert episodes is None or episodes.peer is None
+        assert (await presenter.emit(own_speech())).outcome == "applied"
+        assert any(block.channel == "self" for block in surface.snapshots[-1].blocks)
+        await presenter.update_translation_enabled(True)
+        stale = await presenter.emit(caption(2, unit, "late old translation", revision=2))
+        assert (stale.outcome, stale.cause) == ("stale", "stale")
+        successor = identity(4402)
+        assert (
+            await presenter.emit(caption(3, successor, "current translation"))
+        ).outcome == "applied"
+        await timeline.advance(1)
+        assert {block.id for block in presenter.snapshot().blocks} == {
+            f"self:{identity(900)}",
+            fragment_id(successor, 0),
+        }
+        assert presenter.peer_fragment_states(unit) == ()
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_r4_source_view_budget_accounts_for_other_captions_without_truncating_survivors(
+    monkeypatch,
+):
+    monkeypatch.setattr(presenter_acceptance, "PRESENTER_AGGREGATE_BYTE_LIMIT", 3500)
+    timeline = Timeline()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=timeline.clock, sleep=timeline.sleep
+    )
+    first, second = identity(4411), identity(4412)
+    source = "가\n" * 10
+    try:
+        for seq, unit in enumerate((first, second), start=1):
+            assert (
+                await presenter.emit(caption(seq, unit, "short translation", source=source))
+            ).outcome == "applied"
+        await presenter.update_translation_enabled(False)
+        assert presenter._entries[("peer", first)].peer_fragments == peer_translation_fragments(
+            source
+        )
+        assert presenter.peer_fragment_states(second) == ()
+        assert (
+            sum(
+                presenter._acceptance.entry_payload_bytes(entry)
+                for entry in presenter._entries.values()
+            )
+            <= presenter_acceptance.PRESENTER_AGGREGATE_BYTE_LIMIT
+        )
+        assert (await presenter.emit(own_speech())).outcome == "applied"
+        assert any(block.channel == "self" for block in presenter.snapshot().blocks)
+        assert any(block.channel == "peer" for block in presenter.snapshot().blocks)
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_r4_calibration_reflow_uses_the_same_retained_budget_and_terminal_retirement(
+    monkeypatch,
+):
+    monkeypatch.setattr(presenter_acceptance, "PRESENTER_AGGREGATE_BYTE_LIMIT", 1700)
+    timeline = Timeline()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=timeline.clock,
+        sleep=timeline.sleep,
+        translation_enabled=False,
+        native_retry_enabled=True,
+    )
+    unit = identity(4421)
+    try:
+        assert (
+            await presenter.emit(caption(1, unit, "short translation", source="가" * 64))
+        ).outcome == "applied"
+        assert len(presenter.peer_fragment_states(unit)) == 2
+        await presenter.update_calibration(OverlayCalibration(text_scale=2))
+        assert presenter.peer_fragment_states(unit) == ()
+        assert presenter.snapshot().blocks == []
+        episodes = presenter.snapshot().native_quiet_tail_episodes
+        assert episodes is None or episodes.peer is None
+        await presenter.update_calibration(OverlayCalibration())
+        assert presenter.snapshot().blocks == []
+        assert (await presenter.emit(own_speech())).outcome == "applied"
+        assert any(block.channel == "self" for block in presenter.snapshot().blocks)
+        stale = await presenter.emit(caption(2, unit, "late fitting text", revision=2))
+        assert (stale.outcome, stale.cause) == ("stale", "stale")
+    finally:
         await presenter.close()

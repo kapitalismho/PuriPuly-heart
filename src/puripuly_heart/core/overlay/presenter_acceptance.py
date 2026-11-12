@@ -280,7 +280,11 @@ class PresenterAcceptanceLedger:
             value = getattr(entry, field_name)
             if isinstance(value, str):
                 total += len(value.encode("utf-8"))
-        total += (
+        return total + cls.peer_fragment_payload_bytes(entry)
+
+    @staticmethod
+    def peer_fragment_payload_bytes(entry: OverlayLogicalTurnEntry) -> int:
+        return (
             sum(len(fragment.encode("utf-8")) for fragment in entry.peer_fragments)
             + entry.peer_registration_count * PEER_FRAGMENT_REGISTRATION_BYTES
             + (
@@ -290,7 +294,6 @@ class PresenterAcceptanceLedger:
             )
             * PEER_FRAGMENT_DEPARTURE_BYTES
         )
-        return total
 
     @staticmethod
     def event_payload_bytes(event: OverlayEventUnion) -> int:
@@ -313,6 +316,23 @@ class PresenterAcceptanceLedger:
                 total += len(value.encode("utf-8"))
         total += len(getattr(event, "peer_superseded_unit_ids", ())) * 16
         return total
+
+    @classmethod
+    def peer_repartition_rejection_reason(
+        cls,
+        entry: OverlayLogicalTurnEntry,
+        fragments: PeerFragmentPlan,
+        *,
+        retained_payload_bytes: int,
+    ) -> str | None:
+        projected = (
+            retained_payload_bytes
+            - cls.peer_fragment_payload_bytes(entry)
+            + fragments.retained_bytes
+        )
+        if projected > PRESENTER_AGGREGATE_BYTE_LIMIT:
+            return "presenter_payload_exhausted"
+        return None
 
     @classmethod
     def projected_entry_payload_bytes(
@@ -340,16 +360,7 @@ class PresenterAcceptanceLedger:
             return cls.event_payload_bytes(event) + partition_bytes + identity_bytes
         current = cls.entry_payload_bytes(entry)
         if peer_fragments is not None:
-            current += partition_bytes - (
-                sum(len(fragment.encode("utf-8")) for fragment in entry.peer_fragments)
-                + entry.peer_registration_count * PEER_FRAGMENT_REGISTRATION_BYTES
-                + (
-                    len(entry.peer_departed_indices)
-                    + len(entry.peer_source_departed_indices)
-                    + len(entry.peer_translation_departed_indices)
-                )
-                * PEER_FRAGMENT_DEPARTURE_BYTES
-            )
+            current += partition_bytes - cls.peer_fragment_payload_bytes(entry)
         replacements: tuple[tuple[str, str | None], ...] = ()
         if isinstance(event, (SelfTranscriptFinal, PeerTranscriptFinal)):
             replacements = (

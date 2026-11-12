@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import OrderedDict
-from collections.abc import Awaitable, Callable, Coroutine, Mapping
+from collections.abc import Awaitable, Callable, Coroutine, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 from uuid import UUID
@@ -586,18 +586,13 @@ class OverlayPresenter(OverlaySink):
             self.calibration = calibration.copy()
             if self._presentation_state.peer_text_scale != calibration.text_scale:
                 self._presentation_state.peer_text_scale = calibration.text_scale
-                for entry in tuple(self._entries.values()):
-                    if (
-                        entry.channel == "peer"
-                        and entry.peer_parent_id is None
-                        and entry.peer_fragments
-                    ):
-                        self._presentation_state.reconcile_peer_fragments(
-                            entry,
-                            now=self.clock.now(),
-                            next_appearance_seq=self._next_appearance_seq,
-                            translation_enabled=self.translation_enabled,
-                        )
+                self._reconcile_peer_views(
+                    entry
+                    for entry in tuple(self._entries.values())
+                    if entry.channel == "peer"
+                    and entry.peer_parent_id is None
+                    and entry.peer_fragments
+                )
             await self._publish_if_changed()
 
     async def update_display_preferences(
@@ -624,19 +619,16 @@ class OverlayPresenter(OverlaySink):
             if next_enabled == self.translation_enabled:
                 return
             self.translation_enabled = next_enabled
-            for entry in tuple(self._entries.values()):
-                if entry.channel == "peer" and (
+            self._reconcile_peer_views(
+                entry
+                for entry in tuple(self._entries.values())
+                if entry.channel == "peer"
+                and (
                     entry.translation_text.strip()
                     or entry.original_text.strip()
                     or entry.peer_fragments
-                ):
-                    self._presentation_state.reconcile_peer_fragments(
-                        entry,
-                        now=self.clock.now(),
-                        next_appearance_seq=self._next_appearance_seq,
-                        translation_enabled=next_enabled,
-                    )
-            self._drain_presentation_state_removals()
+                )
+            )
             for key, entry in (
                 *self._entries.items(),
                 *self._presentation_state.peer_registrations.items(),
@@ -648,6 +640,40 @@ class OverlayPresenter(OverlaySink):
                 if pending is None or self._pending_peer_delay(pending) != 0:
                     break
                 await self._publish_if_changed()
+
+    def _reconcile_peer_views(self, entries: Iterable[_LogicalTurnEntry]) -> None:
+        retained_payload_bytes = sum(
+            self._acceptance.entry_payload_bytes(entry) for entry in self._entries.values()
+        )
+        now = self.clock.now()
+        for entry in entries:
+            key = ("peer", entry.utterance_id)
+            previous = self._acceptance.entry_payload_bytes(entry)
+            fragments = self._presentation_state.peer_view_plan(
+                entry,
+                source_text=entry.original_text or entry.live_text,
+                translation_text=entry.translation_text,
+                source_view=not self.translation_enabled or entry.peer_source_only,
+                revision=False,
+            )
+            rejection = self._acceptance.peer_repartition_rejection_reason(
+                entry, fragments, retained_payload_bytes=retained_payload_bytes
+            )
+            if rejection is not None:
+                self._presentation_state.remove_peer_caption(
+                    key, reason=rejection, now=now, seq=entry.last_updated_seq
+                )
+            else:
+                self._presentation_state.reconcile_peer_fragments(
+                    entry,
+                    now=now,
+                    next_appearance_seq=self._next_appearance_seq,
+                    fragments=fragments,
+                )
+            retained_payload_bytes += (
+                self._acceptance.entry_payload_bytes(self._entries.get(key)) - previous
+            )
+        self._drain_presentation_state_removals()
 
     async def begin_native_retry_epoch(self, *, enabled: bool) -> None:
         async with self._ownership_transition_lock:
@@ -1423,6 +1449,7 @@ class OverlayPresenter(OverlaySink):
             "peer_caption_retired",
             "publication_generation_retired",
             "publication_revoked",
+            "presenter_payload_exhausted",
         }:
             self._acceptance.remember_scene_terminal(key, record.reason)
         if seq is not None:
