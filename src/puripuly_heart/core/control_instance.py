@@ -529,8 +529,9 @@ def discover(settings_path: Path) -> InstanceRecord | None:
                 raise
 
         with _local_leases_lock:
-            if str(path) in _local_leases:
-                return current_record()
+            local_owner = str(path) in _local_leases
+        if local_owner:
+            return current_record()
         with lock_path.open("r+b") as stream:
             if not security.lock(stream):
                 return current_record()
