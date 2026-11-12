@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 _READ_CHUNK_BYTES = 65536
+_ANCHOR_BYTES = 64
 _NAME_SKEW_FUTURE_S = 120.0
 _NAME_BEFORE_START_TOLERANCE_S = 5.0
 _CTIME_TOLERANCE_S = 120.0
@@ -126,7 +127,8 @@ class VrchatSceneLogTailer:
     _offset: int = field(default=0, init=False, repr=False)
     _pending_text: str = field(default="", init=False, repr=False)
     _decoder: codecs.IncrementalDecoder | None = field(default=None, init=False, repr=False)
-    _identity: tuple[int, int, float] | None = field(default=None, init=False, repr=False)
+    _identity: tuple[int, int] | None = field(default=None, init=False, repr=False)
+    _anchor: bytes = field(default=b"", init=False, repr=False)
     _observed_mtime: float | None = field(default=None, init=False, repr=False)
 
     @property
@@ -173,6 +175,7 @@ class VrchatSceneLogTailer:
         self._pending_text = ""
         self._decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         self._identity = None
+        self._anchor = b""
         self._observed_mtime = None
         lines = self._consume(path, 0)
         self._record_observation(path)
@@ -186,17 +189,11 @@ class VrchatSceneLogTailer:
             status = path.stat()
         except OSError:
             raise
-        if (
-            self._identity is not None
-            and (
-                status.st_dev,
-                status.st_ino,
-                status.st_ctime,
-            )
-            != self._identity
-        ):
+        if self._identity is not None and (status.st_dev, status.st_ino) != self._identity:
             raise VrchatSceneLogTruncated(str(path))
         if status.st_size < self._offset:
+            raise VrchatSceneLogTruncated(str(path))
+        if not self._anchor_matches(path):
             raise VrchatSceneLogTruncated(str(path))
         if status.st_size == self._offset:
             if self._observed_mtime is not None and status.st_mtime != self._observed_mtime:
@@ -211,8 +208,16 @@ class VrchatSceneLogTailer:
             status = path.stat()
         except OSError:
             return
-        self._identity = (status.st_dev, status.st_ino, status.st_ctime)
+        self._identity = (status.st_dev, status.st_ino)
         self._observed_mtime = status.st_mtime
+
+    def _anchor_matches(self, path: Path) -> bool:
+        anchor = self._anchor
+        if not anchor:
+            return True
+        with open(path, "rb") as stream:
+            stream.seek(self._offset - len(anchor))
+            return stream.read(len(anchor)) == anchor
 
     def _consume(self, path: Path, start: int) -> list[str]:
         decoder = self._decoder
@@ -228,6 +233,7 @@ class VrchatSceneLogTailer:
                 if not chunk:
                     break
                 offset += len(chunk)
+                self._anchor = (self._anchor + chunk)[-_ANCHOR_BYTES:]
                 pieces.append(decoder.decode(chunk, False))
         text = self._pending_text + "".join(pieces)
         self._offset = offset
