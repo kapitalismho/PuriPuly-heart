@@ -263,7 +263,7 @@ def test_record_reader_preserves_owner_cleanup_and_failed_republication(
 
 @pytest.mark.parametrize(
     ("query", "pause_on_read"),
-    [(discover, 1), (discover_instances, 1), (discover_instances, 2)],
+    [(discover, 1), (discover, 2), (discover_instances, 1), (discover_instances, 2)],
 )
 def test_inflight_discovery_read_cannot_fail_owner_cleanup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, query, pause_on_read: int
@@ -301,13 +301,17 @@ def test_inflight_discovery_read_cannot_fail_owner_cleanup(
     worker.start()
     try:
         assert entered.wait(3)
-        assert discover(settings).port == 23456
+        record = discover(settings)
+        assert record.port == 23456
         lease.close()
         release.set()
         worker.join(timeout=5)
         assert not worker.is_alive()
         assert not failures
-        assert results == ([None] if query is discover else [[]])
+        if query is discover and pause_on_read == 2:
+            assert results[0] in (None, record)
+        else:
+            assert results == ([None] if query is discover else [[]])
         assert discover(settings) is None
     finally:
         release.set()

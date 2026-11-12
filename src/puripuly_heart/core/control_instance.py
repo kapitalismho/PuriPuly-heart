@@ -514,17 +514,27 @@ def discover(settings_path: Path) -> InstanceRecord | None:
         path, _canonical = _identity(settings_path, security)
         if not _exists(path):
             return None
-        record = _record(path, security)
+        _record(path, security)
         lock_path = path.with_suffix(".lock")
         if not _exists(lock_path):
             return None
         security.verify_path(lock_path)
+
+        def current_record() -> InstanceRecord | None:
+            try:
+                return _record(path, security)
+            except FileNotFoundError, InstanceSecurityError:
+                if not _exists(path):
+                    return None
+                raise
+
         with _local_leases_lock:
-            if str(path) in _local_leases:
-                return record
+            local_owner = str(path) in _local_leases
+        if local_owner:
+            return current_record()
         with lock_path.open("r+b") as stream:
             if not security.lock(stream):
-                return record
+                return current_record()
             security.unlock(stream)
             return None
     finally:
