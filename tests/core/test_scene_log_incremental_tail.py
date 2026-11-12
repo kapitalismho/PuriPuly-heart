@@ -16,6 +16,7 @@ from puripuly_heart.core.vrchat_scene_tailer import (
 
 _LOG_NAME = "output_log_2026-09-07_01-48-37.txt"
 _USER_A = "usr_11111111-1111-4111-8111-111111111111"
+_USER_B = "usr_22222222-2222-4222-8222-222222222222"
 
 
 def _line(payload: str) -> str:
@@ -134,15 +135,22 @@ async def test_growing_log_is_tailed_without_full_replays(tmp_path: Path) -> Non
         quiescence_s=0.05,
     )
 
+    async def wait_for_count(expected: int) -> None:
+        for _ in range(200):
+            snapshot = service.snapshot()
+            if snapshot.status == "ready" and snapshot.participant_count == expected:
+                return
+            await asyncio.sleep(0.02)
+        raise AssertionError(
+            f"scene did not reach ready with {expected} people: {service.snapshot()}"
+        )
+
     tailer_module.open = counting_open  # type: ignore[attr-defined]
     try:
         await service.start()
-        for _ in range(200):
-            if service.snapshot().status == "ready":
-                break
-            await asyncio.sleep(0.02)
-        assert service.snapshot().status == "ready"
+        await wait_for_count(1)
         ready_at = read_bytes
+        initial_size = path.stat().st_size
 
         for _ in range(20):
             with open(path, "a", encoding="utf-8") as stream:
@@ -151,8 +159,22 @@ async def test_growing_log_is_tailed_without_full_replays(tmp_path: Path) -> Non
 
         assert service.snapshot().status == "ready"
         assert service.snapshot().participant_count == 1
+        for payload, expected_count in (
+            (
+                _line(f"[Behaviour] OnPlayerJoined Mira ({_USER_B})")
+                + "\n"
+                + _line('[Behaviour] Initialized PlayerAPI "Mira" is remote')
+                + "\n",
+                2,
+            ),
+            (_line(f"[Behaviour] OnPlayerLeft Mira ({_USER_B})") + "\n", 1),
+        ):
+            with open(path, "a", encoding="utf-8") as stream:
+                stream.write(payload)
+            await wait_for_count(expected_count)
+
         consumed = read_bytes - ready_at
-        grown = path.stat().st_size - len("\n".join(_roster_lines())) - 1
+        grown = path.stat().st_size - initial_size
         assert (
             consumed <= grown * 2
         ), f"tailed {consumed} bytes for a log that grew by {grown} bytes"

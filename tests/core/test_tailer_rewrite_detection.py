@@ -99,6 +99,37 @@ def test_same_size_in_place_rewrite_is_detected(tmp_path: Path) -> None:
         tailer.read_new_lines()
 
 
+@pytest.mark.parametrize("read_chunk_bytes", [3, 64, 65, 65536])
+def test_same_size_and_mtime_rewrite_is_detected_and_replay_recovers(
+    tmp_path: Path, read_chunk_bytes: int
+) -> None:
+    import os as _os
+
+    path = tmp_path / "output_log_2026-09-07_01-48-37.txt"
+    path.write_bytes(b"a" * 128 + b"\n")
+    tailer = VrchatSceneLogTailer(tmp_path, read_chunk_bytes=read_chunk_bytes)
+    assert tailer.begin_replay(path) == ["a" * 128]
+    original_status = path.stat()
+
+    path.write_bytes(b"a" * 96 + b"b" + b"a" * 31 + b"\n")
+    _os.utime(path, ns=(original_status.st_atime_ns, original_status.st_mtime_ns))
+    rewritten_status = path.stat()
+    assert (rewritten_status.st_dev, rewritten_status.st_ino) == (
+        original_status.st_dev,
+        original_status.st_ino,
+    )
+    assert rewritten_status.st_size == original_status.st_size
+    assert rewritten_status.st_mtime_ns == original_status.st_mtime_ns
+
+    with pytest.raises(VrchatSceneLogTruncated):
+        tailer.read_new_lines()
+
+    assert tailer.begin_replay(path) == ["a" * 96 + "b" + "a" * 31]
+    with open(path, "ab") as stream:
+        stream.write(b"after-rewrite\n")
+    assert tailer.read_new_lines() == ["after-rewrite"]
+
+
 def test_equal_size_replacement_file_is_detected(tmp_path: Path) -> None:
     import os as _os
 

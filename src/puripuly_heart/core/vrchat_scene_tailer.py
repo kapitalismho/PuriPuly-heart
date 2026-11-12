@@ -233,7 +233,10 @@ class VrchatSceneLogTailer:
                 if not chunk:
                     break
                 offset += len(chunk)
-                self._anchor = (self._anchor + chunk)[-_ANCHOR_BYTES:]
+                if len(chunk) >= _ANCHOR_BYTES:
+                    self._anchor = chunk[-_ANCHOR_BYTES:]
+                else:
+                    self._anchor = (self._anchor + chunk)[-_ANCHOR_BYTES:]
                 pieces.append(decoder.decode(chunk, False))
         text = self._pending_text + "".join(pieces)
         self._offset = offset
