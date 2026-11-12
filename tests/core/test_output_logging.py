@@ -13,6 +13,7 @@ from pythonosc.osc_message import OscMessage
 
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfig
 from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
 from puripuly_heart.core.orchestrator.translation_output_projection import TranslationUiMessageQueue
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
@@ -24,7 +25,12 @@ from puripuly_heart.core.overlay.sink import (
 )
 from puripuly_heart.core.runtime.output import OutputRuntime
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks, SessionRuntimeLoggingService
-from puripuly_heart.domain.events import SelfTurnPresentation, UIEvent, UIEventType
+from puripuly_heart.domain.events import (
+    SelfTurnPresentation,
+    SelfTurnTargetPresentation,
+    UIEvent,
+    UIEventType,
+)
 from tests.helpers.fakes import FakeSender, RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
 
@@ -283,6 +289,26 @@ async def test_normal_policy_decisions_remain_owned_without_rendered_noise(outpu
     )
     output.publish_system_disclosure_chatbox(text="notice")
     await output.publish_overlay_event(_event("self", "optional-overlay"))
+    await output.publish_self_turn(
+        SelfTurnPresentation(
+            utterance_id=uuid4(),
+            turn_generation=1,
+            turn_order=0,
+            revision=1,
+            source_revision=1,
+            source_text="",
+            source_language="ko",
+            source_closed=True,
+            status="complete",
+            targets=(
+                SelfTurnTargetPresentation(
+                    target_language="en", source_revision=1, status="source_only"
+                ),
+            ),
+            created_at=clock.now(),
+        ),
+        TranslationRuntimeConfig(chatbox_include_source=False),
+    )
 
     assert sender.sent == ["synthetic"]
     assert [decision.reason for decision in output.routing_decisions] == [
@@ -291,6 +317,8 @@ async def test_normal_policy_decisions_remain_owned_without_rendered_noise(outpu
         "peer_chatbox_denied",
         "activation_notice_disabled",
         "destination_unconfigured",
+        "output_empty",
+        None,
     ]
     assert live.getvalue() == ""
     assert log_file.read_text(encoding="utf-8") == ""
