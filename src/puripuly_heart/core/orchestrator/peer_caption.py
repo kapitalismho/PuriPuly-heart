@@ -89,7 +89,8 @@ def join_action(
         return "independent"
     previous = previous.rstrip()
     incoming = incoming.lstrip()
-    last_word = previous.rstrip(".!?。？！,，、:;\"'“”‘’").split()[-1].lower() if previous else ""
+    previous_words = previous.rstrip(".!?。？！,，、:;\"'“”‘’").split()
+    last_word = previous_words[-1].lower() if previous_words else ""
     r0 = (
         previous.endswith(("—", "-", "...", "…", ",", "，", "、"))
         or not previous.endswith((".", "?", "!", "。", "？", "！"))
