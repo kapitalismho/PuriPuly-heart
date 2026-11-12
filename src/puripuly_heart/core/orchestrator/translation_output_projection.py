@@ -950,6 +950,7 @@ class TranslationOutputProjectionOwner:
     )
     _self_caption_order: tuple[int, int] | None = None
     _self_caption_retired: OrderedDict[tuple[int, UUID], None] = field(default_factory=OrderedDict)
+    _early_peer_overlays: set[tuple[UUID, int]] = field(default_factory=set)
 
     def __post_init__(self) -> None:
         if self.self_turn_tombstone_capacity < 1:
@@ -1188,6 +1189,88 @@ class TranslationOutputProjectionOwner:
             destination_targets=destination_targets,
         )
 
+    def peer_overlay_was_projected(self, parent_id: UUID, sequence: int) -> bool:
+        return (parent_id, sequence) in self._early_peer_overlays
+
+    async def project_peer_overlay(
+        self,
+        submission: TranslationOutputSubmission,
+        *,
+        early: bool = False,
+        cancellation_requested: Callable[[], bool] | None = None,
+    ) -> None:
+        if submission.peer_caption_revision > 0:
+            if cancellation_requested is not None and cancellation_requested():
+                raise asyncio.CancelledError
+            await self._project_peer_caption_overlay(submission)
+            return
+        key = (submission.parent_utterance_id, submission.sequence)
+        if not early and key in self._early_peer_overlays:
+            self._early_peer_overlays.remove(key)
+            return
+        if not self.has_overlay_destination or submission.channel != "peer":
+            return
+        if (
+            submission.outcome == "failed"
+            and submission.failure_code == "stale_provider_completion"
+        ):
+            return
+        if cancellation_requested is not None and cancellation_requested():
+            raise asyncio.CancelledError
+        if early:
+            self._early_peer_overlays.add(key)
+        configuration = submission.config_snapshot.value
+        source_language = self._source_language_for("peer", configuration)
+        target_language = self._target_language_for("peer", configuration)
+        output_scope = self._overlay_publication_scope(submission)
+        translation = submission.translation
+        if submission.outcome == "translated" and translation is not None:
+            await self.emit_translation(
+                TranslationOverlayProjection(
+                    translation=translation,
+                    source_text=translation.source_text,
+                    source_language=self._language_or_fallback(
+                        translation.source_language, source_language
+                    ),
+                    target_language=self._language_or_fallback(
+                        translation.target_language, target_language
+                    ),
+                    applied_context_mode=submission.applied_context_mode,
+                    record_peer_first_emit=True,
+                    publication_generation=submission.publication_generation,
+                    source_order=submission.source_order,
+                    output_scope=output_scope,
+                )
+            )
+            await self.close_overlay_utterance(
+                utterance_id=submission.child_utterance_id,
+                channel="peer",
+                is_final=True,
+                publication_generation=submission.publication_generation,
+                source_order=submission.source_order,
+                finalize_latency=False,
+                output_scope=output_scope,
+            )
+        elif submission.outcome in {"source_only", "failed"}:
+            await self.project_peer_source_only(
+                transcript=Transcript(
+                    utterance_id=submission.child_utterance_id,
+                    text=submission.source_text,
+                    is_final=True,
+                    created_at=self.clock.now(),
+                    channel="peer",
+                    publication_generation=submission.publication_generation,
+                    source_order=submission.source_order,
+                ),
+                source_language=source_language,
+                target_language=target_language,
+                close_is_final=submission.outcome == "source_only",
+                finalize_latency=submission.outcome == "source_only"
+                or not configuration.fallback_transcript_only,
+                speaker_assignment=submission.speaker_assignment,
+                output_scope=output_scope,
+            )
+
     async def await_translation_parent_output(
         self,
         submission: TranslationOutputSubmission,
@@ -1233,6 +1316,7 @@ class TranslationOutputProjectionOwner:
         dual_target_self: bool,
         destinations: frozenset[str] | set[str] | None = None,
     ) -> None:
+        self._early_peer_overlays.discard((parent_utterance_id, sequence))
         destination_indexes = self._translation_destination_indexes(
             sequence=sequence,
             target_index=target_index,
@@ -2435,13 +2519,9 @@ class TranslationOutputProjectionOwner:
             request_id=submission.request_id,
         )
 
-    async def project_peer_caption(self, submission: TranslationOutputSubmission) -> None:
-        if submission.channel != "peer" or submission.peer_caption_revision < 1:
-            raise ValueError("Peer caption publication requires revision identity")
+    async def _project_peer_caption_overlay(self, submission: TranslationOutputSubmission) -> None:
         preview = submission.peer_request_kind == "preview"
         translation = submission.translation
-        if not preview and submission.source_text.strip():
-            self._record_conversation_submission(submission)
         if translation is not None or not preview:
             if self.has_overlay_destination:
                 self.diagnostics.retain_latency_until_output("peer", submission.child_utterance_id)
@@ -2476,6 +2556,18 @@ class TranslationOutputProjectionOwner:
                 publication_generation=submission.publication_generation,
                 source_order=submission.source_order,
             )
+
+    async def project_peer_caption(
+        self, submission: TranslationOutputSubmission, *, overlay_projected: bool = False
+    ) -> None:
+        if submission.channel != "peer" or submission.peer_caption_revision < 1:
+            raise ValueError("Peer caption publication requires revision identity")
+        preview = submission.peer_request_kind == "preview"
+        translation = submission.translation
+        if not preview and submission.source_text.strip():
+            self._record_conversation_submission(submission)
+        if not overlay_projected:
+            await self.project_peer_overlay(submission)
         if not preview and submission.source_text.strip():
             transcript = Transcript(
                 utterance_id=submission.child_utterance_id,
@@ -2537,23 +2629,7 @@ class TranslationOutputProjectionOwner:
 
         if submission.outcome == "source_only":
             if channel == "peer":
-                await self.project_peer_source_only(
-                    transcript=Transcript(
-                        utterance_id=utterance_id,
-                        text=submission.source_text,
-                        is_final=True,
-                        created_at=self.clock.now(),
-                        channel="peer",
-                        publication_generation=submission.publication_generation,
-                        source_order=submission.source_order,
-                    ),
-                    source_language=source_language,
-                    target_language=target_language,
-                    close_is_final=True,
-                    finalize_latency=True,
-                    speaker_assignment=submission.speaker_assignment,
-                    output_scope=output_scope,
-                )
+                await self.project_peer_overlay(submission)
                 await self.publish_peer_chatbox_denial(utterance_id)
             elif dual_target_self:
                 if (
@@ -2649,9 +2725,6 @@ class TranslationOutputProjectionOwner:
                 return TranslationResultProjectionReceipt(True)
 
             fallback_to_chatbox = configuration.fallback_transcript_only and publish_to_chatbox
-            denied_fallback_to_chatbox = (
-                configuration.fallback_transcript_only and deny_peer_chatbox_attempt
-            )
             if channel == "self":
                 await self.close_overlay_utterance(
                     utterance_id=utterance_id,
@@ -2661,23 +2734,7 @@ class TranslationOutputProjectionOwner:
                     output_scope=output_scope,
                 )
             else:
-                await self.project_peer_source_only(
-                    transcript=Transcript(
-                        utterance_id=utterance_id,
-                        text=submission.source_text,
-                        is_final=True,
-                        created_at=self.clock.now(),
-                        channel="peer",
-                        publication_generation=submission.publication_generation,
-                        source_order=submission.source_order,
-                    ),
-                    source_language=source_language,
-                    target_language=target_language,
-                    close_is_final=False,
-                    finalize_latency=not denied_fallback_to_chatbox,
-                    speaker_assignment=submission.speaker_assignment,
-                    output_scope=output_scope,
-                )
+                await self.project_peer_overlay(submission)
             if fallback_to_chatbox and await self._await_translation_destination(
                 submission,
                 admitted_destinations,
@@ -2711,35 +2768,8 @@ class TranslationOutputProjectionOwner:
             turn_generation=submission.turn_generation,
             turn_order=submission.turn_order,
         )
-        if channel == "peer" and self.has_overlay_destination:
-            await self.emit_translation(
-                TranslationOverlayProjection(
-                    translation=translation,
-                    source_text=translation.source_text,
-                    source_language=self._language_or_fallback(
-                        translation.source_language,
-                        source_language,
-                    ),
-                    target_language=self._language_or_fallback(
-                        translation.target_language,
-                        target_language,
-                    ),
-                    applied_context_mode=submission.applied_context_mode,
-                    record_peer_first_emit=True,
-                    publication_generation=submission.publication_generation,
-                    source_order=submission.source_order,
-                    output_scope=output_scope,
-                )
-            )
-            await self.close_overlay_utterance(
-                utterance_id=utterance_id,
-                channel=channel,
-                is_final=True,
-                publication_generation=submission.publication_generation,
-                source_order=submission.source_order,
-                finalize_latency=not (publish_to_chatbox or deny_peer_chatbox_attempt),
-                output_scope=output_scope,
-            )
+        if channel == "peer":
+            await self.project_peer_overlay(submission)
         self_turn_key = (submission.turn_generation, submission.turn_order)
         parent_utterance_id = submission.parent_utterance_id
         if channel != "self":

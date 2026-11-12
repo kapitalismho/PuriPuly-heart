@@ -97,10 +97,13 @@ def test_second_process_cleanup_cannot_disturb_active_provisioning_lease(
 ) -> None:
     staging = tmp_path / "known-model.staging-active"
     backup = tmp_path / "known-model.backup"
+    deleting = tmp_path / "known-model.deleting-active"
     ready = tmp_path / "lease-ready"
     release = tmp_path / "lease-release"
     staging.mkdir()
     backup.mkdir()
+    deleting.mkdir()
+    (deleting / "weights.bin").write_bytes(b"preserve-while-locked")
     script = "\n".join(
         (
             "import pathlib, sys, time",
@@ -141,6 +144,7 @@ def test_second_process_cleanup_cannot_disturb_active_provisioning_lease(
         assert reconciled is None
         assert staging.exists()
         assert backup.exists()
+        assert (deleting / "weights.bin").read_bytes() == b"preserve-while-locked"
     finally:
         release.touch()
         try:
@@ -157,6 +161,7 @@ def test_second_process_cleanup_cannot_disturb_active_provisioning_lease(
     assert reconciled is not None
     assert not staging.exists()
     assert not backup.exists()
+    assert not deleting.exists()
     assert (tmp_path / "known-model").exists()
 
 

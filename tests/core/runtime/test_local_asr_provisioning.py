@@ -195,19 +195,27 @@ async def test_owner_cleans_only_known_stale_install_residue_before_inspection(
     manifest = load_local_stt_asset_manifest(FUN_ASR_NANO_MODEL_ID)
     stale_staging = tmp_path / f"{manifest.install_dirname}.staging-abcd"
     stale_backup = tmp_path / f"{manifest.install_dirname}.backup"
+    stale_deleting = tmp_path / f"{manifest.install_dirname}.deleting-abcd"
     restored_install = tmp_path / manifest.install_dirname
     unrelated = tmp_path / f"{manifest.install_dirname}.evidence"
+    unrelated_deleting = tmp_path / "unknown-model.deleting-abcd"
     stale_staging.mkdir()
     stale_backup.mkdir()
+    stale_deleting.mkdir()
+    (stale_deleting / "weights.bin").write_bytes(b"stale")
     unrelated.mkdir()
+    unrelated_deleting.mkdir()
+    (unrelated_deleting / "weights.bin").write_bytes(b"preserve")
     owner = _owner(MutableProvisioningBackend(_all_states()), model_root=tmp_path)
 
     await owner.inspect_cpu()
 
     assert not stale_staging.exists()
     assert not stale_backup.exists()
+    assert not stale_deleting.exists()
     assert restored_install.exists()
     assert unrelated.exists()
+    assert (unrelated_deleting / "weights.bin").read_bytes() == b"preserve"
     assert owner.diagnostics[0].event == "cleanup"
     assert owner.diagnostics[0].outcome == "ready"
 

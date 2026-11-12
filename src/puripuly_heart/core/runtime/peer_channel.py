@@ -352,6 +352,10 @@ class _GenerationGuardedVadSink:
             isinstance(event, OwnedVadEvent)
             and ledger is not None
             and ledger.is_segment_terminal(event.segment.identity.segment_id)
+            and not (
+                isinstance(event.event, SpeechEnd)
+                and event.segment.identity.segment_id in self._started_segment_ids
+            )
         ):
             return
         worker = self._worker
@@ -362,10 +366,6 @@ class _GenerationGuardedVadSink:
             await worker
             raise RuntimeError("peer VAD dispatch worker stopped")
         if isinstance(event, OwnedVadEvent) and isinstance(event.event, SpeechStart):
-            if ledger is not None:
-                for segment_id in tuple(self._started_segment_ids):
-                    if ledger.is_segment_terminal(segment_id):
-                        self._started_segment_ids.discard(segment_id)
             self._stream_drop_pending = False
         if (
             isinstance(event, OwnedStreamInput)
@@ -443,6 +443,9 @@ class _GenerationGuardedVadSink:
                     and ledger is not None
                     and queued.segment_id is not None
                     and ledger.is_segment_terminal(queued.segment_id)
+                    and not (
+                        queued.closes_segment and queued.segment_id in self._started_segment_ids
+                    )
                 ):
                     continue
                 if queued.opens_segment and queued.segment_id is not None:

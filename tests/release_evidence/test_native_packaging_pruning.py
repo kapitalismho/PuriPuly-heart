@@ -5,6 +5,8 @@ import csv
 import hashlib
 import json
 import marshal
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -20,7 +22,6 @@ from puripuly_heart.release_evidence.native_distribution import (
 from puripuly_heart.release_evidence.native_packaging_pruning import (
     ONNX_PRELOAD_DLLS,
     PRUNING_SCHEMA,
-    SCIENTIFIC_TEST_ROOTS,
     SHERPA_DUPLICATE_DLLS,
     prune_runtime_dependencies,
 )
@@ -51,13 +52,32 @@ def _wheel(root: Path, name: str, version: str, tag: str, files: dict[str, bytes
 
 
 @pytest.fixture
-def staged_dependencies(tmp_path: Path) -> Path:
+def selected_test_files() -> dict[str, bytes]:
+    return {
+        "numpy/_core/tests/test_contract.py": b"raise AssertionError('excluded suite')\n",
+        "numpy/_core/tests/data/input.bin": b"test fixture",
+        "numpy/tests/test_contract.py": b"raise AssertionError('excluded suite')\n",
+        "numpy/testing/tests/test_contract.py": b"raise AssertionError('excluded suite')\n",
+        "numpy/ma/tests/test_contract.py": b"raise AssertionError('excluded suite')\n",
+        "scipy/_lib/tests/test_contract.py": b"raise AssertionError('excluded suite')\n",
+        "scipy/signal/tests/test_contract.py": b"raise AssertionError('excluded suite')\n",
+        "scipy/signal/tests/data/input.bin": b"test fixture",
+        "scipy/fft/tests/test_contract.py": b"raise AssertionError('excluded suite')\n",
+    }
+
+
+@pytest.fixture
+def staged_dependencies(tmp_path: Path, selected_test_files: dict[str, bytes]) -> Path:
     root = tmp_path / "site-packages"
     for name, version in (("numpy", "2.5.1"), ("scipy", "1.18.0")):
-        files = {f"{name}/__init__.py": b"VALUE = 1\n"}
-        for subtree in SCIENTIFIC_TEST_ROOTS[name]:
-            files[f"{subtree}/test_contract.py"] = b"raise AssertionError('excluded suite')\n"
-            files[f"{subtree}/data/input.bin"] = b"test fixture"
+        files = {
+            f"{name}/__init__.py": b"VALUE = 1\n",
+            **{
+                path: data
+                for path, data in selected_test_files.items()
+                if path.startswith(f"{name}/")
+            },
+        }
         if name == "numpy":
             files.update(
                 {
@@ -80,6 +100,7 @@ def staged_dependencies(tmp_path: Path) -> Path:
                     "scipy/_lib/_testutils.py": b"VALUE = 42\n",
                     "scipy/_lib/_uarray/LICENSE": b"license payload",
                     "scipy/fft/_duccfft/LICENSE.md": b"license payload",
+                    "scipy/signal/__init__.py": b"from ._signaltools import VALUE\n",
                     "scipy/signal/_signaltools.py": b"VALUE = 42\n",
                     "scipy/special/tests/test_hyp2f1.py": b"VALUE = 42\n",
                     "scipy/special/tests/data/input.bin": b"retained test fixture",
@@ -123,17 +144,59 @@ def _files(root: Path) -> dict[str, bytes]:
     }
 
 
+def _assert_signal_runtime(root: Path, *, bundled: bool = False) -> None:
+    script = (
+        "import importlib.machinery, os, sys\n"
+        f"sys.path.insert(0, {str(root / 'site-packages')!r})\n"
+    )
+    if bundled:
+        loader_root = Path(__file__).resolve().parents[2] / "native/windows_host"
+        script += (
+            f"sys.path.insert(0, {str(loader_root)!r})\n"
+            "from _puripuly_native_runtime import install\n"
+            f"os.environ['PURIPULY_HEART_NATIVE_RESOURCE_ROOT'] = {str(root / 'app')!r}\n"
+            f"install({str(root)!r})\n"
+            "def reject_source_code(self, fullname):\n"
+            "    raise AssertionError(f'loose dependency source executed: {fullname}')\n"
+            "importlib.machinery.SourceFileLoader.get_code = reject_source_code\n"
+        )
+    script += "from scipy.signal import _signaltools\nprint(_signaltools.VALUE)\n"
+    process = subprocess.run(
+        [sys.executable, "-I", "-S", "-B", "-c", script],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert process.returncode == 0, process.stdout + process.stderr
+    assert process.stdout.strip() == "42"
+
+
 def test_pruning_removes_only_qualified_files_and_rewrites_owned_records(
-    staged_dependencies: Path,
+    staged_dependencies: Path, selected_test_files: dict[str, bytes]
 ) -> None:
     root = staged_dependencies
     before = _files(root)
+    expected_removed = {f"site-packages/{path}" for path in selected_test_files} | {
+        "site-packages/Scripts/onnxruntime.dll",
+        "site-packages/Scripts/sherpa-onnx-c-api.dll",
+        "site-packages/Scripts/sherpa-onnx-cxx-api.dll",
+    }
+    expected_records = {
+        f"site-packages/{wheel}/RECORD"
+        for wheel in (
+            "numpy-2.5.1.dist-info",
+            "scipy-1.18.0.dist-info",
+            "sherpa_onnx_core-1.13.8.dist-info",
+        )
+    }
 
     evidence = prune_runtime_dependencies(root)
 
     after = _files(root)
     removed = {row["path"]: row for row in evidence["removed_files"]}
     assert evidence["schema"] == PRUNING_SCHEMA
+    assert removed.keys() == expected_removed
     assert set(before) - set(after) == removed.keys()
     assert len([path for path in removed if path.startswith("site-packages/Scripts/")]) == 3
     for path, row in removed.items():
@@ -153,7 +216,7 @@ def test_pruning_removes_only_qualified_files_and_rewrites_owned_records(
     assert not obsolete.keys() & after.keys()
     updated = {row["path"] for row in evidence["updated_records"]}
     assert {path for path in before.keys() & after.keys() if before[path] != after[path]} == updated
-    assert len(updated) == 3
+    assert updated == expected_records
     assert {row["name"]: row["version"] for row in evidence["source_wheels"]} == {
         "numpy": "2.5.1",
         "scipy": "1.18.0",
@@ -178,7 +241,7 @@ def test_pruning_removes_only_qualified_files_and_rewrites_owned_records(
                 )
                 assert size == str(len(data))
     for path, data in before.items():
-        if path not in removed and path not in updated:
+        if path not in expected_removed and path not in expected_records:
             assert after[path] == data
     assert (
         after["site-packages/sherpa_onnx/lib/onnxruntime.dll"]
@@ -190,6 +253,7 @@ def test_pruning_removes_only_qualified_files_and_rewrites_owned_records(
         "site-packages/numpy/_core/tests/native.pyd",
         "site-packages/numpy/_core/tests/NOTICE.txt",
     }
+    _assert_signal_runtime(root)
 
 
 @pytest.mark.parametrize(
@@ -259,7 +323,7 @@ def test_pruning_preflight_preserves_every_input_on_rejection(
 
 
 def test_pruning_exclusions_flow_into_bytecode_archive_index_and_final_inventory(
-    staged_dependencies: Path,
+    staged_dependencies: Path, selected_test_files: dict[str, bytes]
 ) -> None:
     root = staged_dependencies
     layout_path = Path(__file__).resolve().parents[2] / "native/windows_host/artifact-layout.json"
@@ -283,16 +347,33 @@ def test_pruning_exclusions_flow_into_bytecode_archive_index_and_final_inventory
     manifest = create_manifest(root, layout_path, root / "manifest.json")
 
     excluded = {row["path"] for row in pruning["obsolete_files"]}
+    excluded |= {f"site-packages/{path}" for path in selected_test_files}
     assert not excluded & {row["path"] for row in manifest["inventory"]}
     assert not excluded & {row["source"] for row in compiled["bytecode"]}
+    retained_modules = {
+        "numpy.testing": "numpy/testing/__init__.py",
+        "scipy._lib._testutils": "scipy/_lib/_testutils.py",
+        "scipy.signal._signaltools": "scipy/signal/_signaltools.py",
+        "scipy.special.tests.test_hyp2f1": "scipy/special/tests/test_hyp2f1.py",
+        "unrelated.tests.test_keep": "unrelated/tests/test_keep.py",
+    }
+    retained_sources = {f"site-packages/{path}" for path in retained_modules.values()}
+    assert retained_sources <= {row["source"] for row in compiled["bytecode"]}
+    assert retained_sources <= {row["path"] for row in manifest["inventory"]}
     with zipfile.ZipFile(root / bundled["archive"]["path"]) as archive:
         names = set(archive.namelist())
         index = marshal.loads(archive.read("_native_dependencies.index"))["modules"]
-    assert not any("test_contract" in name for name in names | set(index) | set(index.values()))
-    assert "_native_dependencies/numpy/testing/__init__.pyc" in names
-    assert "_native_dependencies/scipy/_lib/_testutils.pyc" in names
-    assert "_native_dependencies/scipy/special/tests/test_hyp2f1.pyc" in names
-    assert "_native_dependencies/unrelated/tests/test_keep.pyc" in names
+    for source in selected_test_files:
+        assert f"_native_dependencies/{source}" not in names
+        if source.endswith(".py"):
+            assert (
+                f"_native_dependencies/{Path(source).with_suffix('.pyc').as_posix()}" not in names
+            )
+        assert source not in index.values()
+    for module, source in retained_modules.items():
+        assert index[module] == source
+        assert f"_native_dependencies/{Path(source).with_suffix('.pyc').as_posix()}" in names
+    _assert_signal_runtime(root, bundled=True)
     assert (
         NativeArtifactLayout.load(layout_path).resolve(root, "local_sherpa_runtime_root")
         == root / "site-packages/onnxruntime/capi"

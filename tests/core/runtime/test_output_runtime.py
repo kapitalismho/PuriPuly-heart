@@ -10,6 +10,7 @@ import pytest
 
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfig
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.overlay.presenter import (
     PEER_REPLACEMENT_INTERVAL_SECONDS,
@@ -23,7 +24,8 @@ from puripuly_heart.core.overlay.sink import (
     UtteranceClosed,
 )
 from puripuly_heart.core.runtime.output_batch import OUTPUT_BATCH_MAX_UNSENT
-from puripuly_heart.domain.models import OSCMessage, Transcript
+from puripuly_heart.domain.events import SelfTurnPresentation, SelfTurnTargetPresentation
+from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from tests.helpers.fakes import FakeSender
 
@@ -252,12 +254,14 @@ class PacedOverlaySink(RecordingOverlaySink):
         self.release = asyncio.Event()
 
     async def emit(self, _event: OverlayEventUnion) -> None:
-        raise AssertionError("Peer writer must use presenter-paced admission")
+        raise AssertionError("Peer writer must use presenter registration")
 
-    async def emit_peer_when_admissible(
+    async def register_peer_caption(
         self,
         event: OverlayEventUnion,
         *,
+        publication_generation: int,
+        is_current=None,
         on_wait=None,
         admission_started_at: float | None = None,
     ) -> OverlayApplicationReceipt:
@@ -270,6 +274,12 @@ class PacedOverlaySink(RecordingOverlaySink):
             publication_id=event.event_id,
             scene_revision=1,
         )
+
+    def retire_peer_generation(self, publication_generation: int) -> None:
+        self.retired_generation = publication_generation
+
+    def refresh_peer_caption_currentness(self) -> None:
+        self.currentness_refreshed = True
 
 
 class CloseRaceFailingOverlaySink(RecordingOverlaySink):
@@ -816,6 +826,109 @@ async def test_output_runtime_accepts_distinct_parent_presentation_revisions_onc
         ("ja",),
         ("zh-CN", "ja"),
     ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("queued", [False, True], ids=["immediate", "behind-pagination"])
+@pytest.mark.parametrize(
+    "text", ["", " \t\r\n", "\u3000"], ids=["empty", "whitespace", "ideographic-space"]
+)
+async def test_empty_self_turn_releases_ordered_successor_and_output_admission(
+    text: str, queued: bool
+) -> None:
+    OutputRuntime = _output_runtime_class()
+    clock = FakeClock()
+    sender = FakeSender()
+    chatbox = ChatboxPaginator(sender=sender, clock=clock, max_chars=5)
+    owner = OutputRuntime(chatbox=chatbox, clock=clock)
+    configuration = TranslationRuntimeConfig(chatbox_include_source=False)
+    empty = SelfTurnPresentation(
+        utterance_id=uuid4(),
+        turn_generation=1,
+        turn_order=0,
+        revision=1,
+        source_revision=1,
+        source_text=text,
+        source_language="ko",
+        source_closed=True,
+        status="active",
+        targets=(
+            SelfTurnTargetPresentation(target_language="en", source_revision=1, status="pending"),
+        ),
+        created_at=clock.now(),
+    )
+    successor_id = uuid4()
+    successor = replace(
+        empty,
+        utterance_id=successor_id,
+        turn_order=1,
+        source_text="next",
+        status="complete",
+        targets=(
+            SelfTurnTargetPresentation(
+                target_language="en",
+                source_revision=1,
+                status="ready",
+                translation=Translation(utterance_id=successor_id, text="hello"),
+            ),
+        ),
+    )
+    await owner.start()
+    try:
+        if queued:
+            await owner.publish_chatbox(
+                publication_id=uuid4(),
+                channel="self",
+                transcript_text="abcde fghij",
+                translation_text=None,
+                include_source=False,
+            )
+        await owner.publish_self_turn(empty, configuration)
+        await owner.publish_self_turn(successor, configuration)
+        assert sender.sent == (["abcde"] if queued else [])
+
+        await owner.publish_self_turn(
+            replace(
+                empty,
+                revision=2,
+                status="complete",
+                targets=(
+                    SelfTurnTargetPresentation(
+                        target_language="en", source_revision=1, status="source_only"
+                    ),
+                ),
+            ),
+            configuration,
+        )
+        if queued:
+            assert sender.sent == ["abcde"]
+            assert not any(
+                decision.reason == "output_empty" for decision in owner.routing_decisions
+            )
+            clock.advance(chatbox.page_interval_s)
+            chatbox.process_due()
+
+        async with asyncio.timeout(1.0):
+            while owner.overlay_admission_snapshot()["batches"]:
+                await asyncio.sleep(0)
+
+        assert sender.sent == (["abcde", "fghij", "hello"] if queued else ["hello"])
+        assert [
+            (decision.publication_id, decision.decision, decision.reason)
+            for decision in owner.routing_decisions
+            if decision.metadata.get("stage") == "self_stream_delivery"
+        ] == [
+            (str(empty.utterance_id), "skipped", "output_empty"),
+            (str(successor_id), "published", "first_page_sent"),
+        ]
+        assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
+        clock.advance(chatbox.page_interval_s)
+        chatbox.process_due()
+        assert sender.sent == (["abcde", "fghij", "hello"] if queued else ["hello"])
+    finally:
+        await asyncio.wait_for(owner.close(), timeout=1.0)
+
+    assert not owner.has_resources
 
 
 @pytest.mark.asyncio
@@ -2291,13 +2404,13 @@ async def test_output_presenter_five_ready_peers_follow_two_slot_pacing_schedule
         assert result.decision.reason == "accepted_handoff"
     await owner.wait_for_peer_output_idle()
 
-    assert clock.now() == 10.0 + 3 * PEER_REPLACEMENT_INTERVAL_SECONDS
+    assert clock.now() == 10.0 + PEER_REPLACEMENT_INTERVAL_SECONDS
     assert [block.id for block in presenter.snapshot().blocks] == [
         f"peer:{turn_ids[3]}",
         f"peer:{turn_ids[4]}",
     ]
     assert (
-        sum(decision.reason == "application_applied" for decision in owner.routing_decisions) == 5
+        sum(decision.reason == "application_applied" for decision in owner.routing_decisions) == 2
     )
     pacing_waits = [
         decision for decision in owner.routing_decisions if decision.reason == "logical_pacing_wait"
@@ -2315,14 +2428,15 @@ async def test_output_presenter_five_ready_peers_follow_two_slot_pacing_schedule
     paced_outcomes = [
         decision
         for decision in owner.routing_decisions
-        if decision.reason == "application_applied" and "handoff_wait_ms" in decision.metadata
+        if decision.reason == "application_registered"
     ]
     assert len(paced_outcomes) == 3
     assert all(
         decision.metadata["stage"] == "application_accepted"
-        and decision.metadata["outcome"] == "applied"
+        and decision.metadata["outcome"] == "registered"
+        and decision.metadata["scene_revision"] is None
         and decision.metadata["physical_ack"] is False
-        and decision.metadata["handoff_wait_ms"] == PEER_REPLACEMENT_INTERVAL_SECONDS * 1000
+        and decision.metadata["handoff_wait_ms"] == 0
         and decision.metadata["wait_reason"] == "replacement_gate"
         for decision in paced_outcomes
     )
@@ -2376,8 +2490,12 @@ async def test_retirement_cancels_presenter_paced_peer_and_preserves_self_occupa
     )
 
     accepted = await _publish_peer_overlay(owner, event, source_order=1)
-    await asyncio.sleep(0)
-    await asyncio.sleep(0)
+    async with asyncio.timeout(0.5):
+        while not any(
+            decision.publication_id == event.event_id and decision.reason == "logical_pacing_wait"
+            for decision in owner.routing_decisions
+        ):
+            await asyncio.sleep(0)
     assert accepted.decision.reason == "accepted_handoff"
     assert presenter.snapshot().blocks[0].id == f"self:{self_turn}"
     pacing_waits = [
@@ -2395,20 +2513,18 @@ async def test_retirement_cancels_presenter_paced_peer_and_preserves_self_occupa
     await owner.wait_for_peer_output_idle()
 
     assert presenter.snapshot().blocks[0].id == f"self:{self_turn}"
-    assert any(
-        decision.publication_id == event.event_id
-        and decision.reason == "publication_generation_retired"
-        for decision in owner.routing_decisions
+    assert presenter.peer_fragment_state(peer_turn, 0) is None
+    assert (
+        presenter._acceptance.terminal_reason(("peer", peer_turn))
+        == "publication_generation_retired"
     )
     terminal = next(
         decision
         for decision in owner.routing_decisions
-        if decision.publication_id == event.event_id
-        and decision.reason == "publication_generation_retired"
+        if decision.publication_id == event.event_id and decision.reason == "application_registered"
     )
-    assert terminal.metadata["handoff_wait_ms"] == 0
+    assert terminal.metadata["scene_revision"] is None
     assert terminal.metadata["wait_reason"] == "protected_rows"
-    assert isinstance(terminal.metadata["pending_batches"], int)
     await owner.close()
     await presenter.close()
 
@@ -2479,9 +2595,12 @@ async def test_retirement_cleans_pacing_waits_and_cannot_publish_after_cancellat
     accepted = await _publish_peer_overlay(owner, waiting, source_order=2)
     await asyncio.wait_for(pacing_started.wait(), timeout=0.5)
     assert accepted.decision.reason == "accepted_handoff"
+    admission_task = presenter._peer_admission_task
+    assert admission_task is not None
 
     owner.retire_peer_generation(1)
     await owner.wait_for_peer_output_idle()
+    await asyncio.wait_for(admission_task, timeout=0.5)
     await asyncio.wait_for(pacing_cancelled.wait(), timeout=0.5)
     await asyncio.sleep(0)
 
@@ -2496,8 +2615,14 @@ async def test_retirement_cleans_pacing_waits_and_cannot_publish_after_cancellat
     )
     assert any(
         decision.publication_id == waiting.event_id
-        and decision.reason == "publication_generation_retired"
+        and decision.reason == "application_registered"
+        and decision.metadata["scene_revision"] is None
         for decision in owner.routing_decisions
+    )
+    assert presenter.peer_fragment_state(waiting_turn, 0) is None
+    assert (
+        presenter._acceptance.terminal_reason(("peer", waiting_turn))
+        == "publication_generation_retired"
     )
     await owner.close()
     await presenter.close()
@@ -2614,10 +2739,16 @@ async def test_revisioned_preview_preemption_preserves_unrelated_final_order_and
             self.release_unrelated = asyncio.Event()
 
         async def emit(self, event):
-            raise AssertionError("Peer delivery must use the paced boundary")
+            raise AssertionError("Peer delivery must use the registration boundary")
 
-        async def emit_peer_when_admissible(
-            self, event, *, on_wait=None, admission_started_at=None
+        async def register_peer_caption(
+            self,
+            event,
+            *,
+            publication_generation,
+            is_current=None,
+            on_wait=None,
+            admission_started_at=None,
         ):
             if event.type == "translation_stream_update":
                 self.preview_started.set()
@@ -2630,6 +2761,12 @@ async def test_revisioned_preview_preemption_preserves_unrelated_final_order_and
                 self.unrelated_started.set()
                 await self.release_unrelated.wait()
             self.events.append(event)
+
+        def retire_peer_generation(self, publication_generation):
+            self.retired_generation = publication_generation
+
+        def refresh_peer_caption_currentness(self):
+            self.currentness_refreshed = True
 
     sink = GateSink()
     owner = _output_runtime_class()(chatbox=RecordingChatbox(), overlay_sink=sink)
@@ -2668,19 +2805,26 @@ async def test_revisioned_preview_preemption_preserves_unrelated_final_order_and
         await asyncio.wait_for(sink.unrelated_started.wait(), 1)
         assert sink.preview_cancelled.is_set()
         assert owner._peer_overlay_worker is writer
-        assert sink.events == [first]
+        assert [event.event_id for event in sink.events] == [first.event_id]
+        assert [event.turn_order for event in sink.events] == [1]
         await _publish_peer_overlay(owner, queued_preview, source_order=4)
         await _publish_peer_overlay(owner, queued_final, source_order=4)
         sink.release_unrelated.set()
         await asyncio.wait_for(owner.wait_for_peer_output_idle(), 1)
-        assert sink.events == [first, independent, repair, queued_final]
+        assert [event.event_id for event in sink.events] == [
+            first.event_id,
+            independent.event_id,
+            repair.event_id,
+            queued_final.event_id,
+        ]
+        assert [event.turn_order for event in sink.events] == [1, 3, 1, 4]
         superseded = {
             decision.publication_id
             for decision in owner.routing_decisions
             if decision.reason == "peer_caption_superseded"
         }
         assert superseded == {pending.event_id, queued_preview.event_id}
-        assert owner._peer_delivery_task is None
+        assert owner._peer_active_batch is None
         assert not owner.has_active_overlay_deliveries
     finally:
         sink.release_unrelated.set()

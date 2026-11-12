@@ -12,11 +12,6 @@ from .protocol import (
     OverlayPresentationBlock,
     OverlayPresentationSnapshot,
 )
-from .sink import (
-    OverlayEventUnion,
-    PeerTranscriptFinal,
-    TranslationFinal,
-)
 
 
 @dataclass(slots=True)
@@ -25,7 +20,6 @@ class NativeRetryIntentProjection:
     generations: NativeFreshRenderGenerations = field(default_factory=NativeFreshRenderGenerations)
     targets: NativeFreshRenderTargets = field(default_factory=NativeFreshRenderTargets)
     episodes: NativeQuietTailEpisodes = field(default_factory=NativeQuietTailEpisodes)
-    _episode_targets: dict[str, str] = field(default_factory=dict)
     _episode_generations: dict[str, int] = field(default_factory=dict)
 
     def reset(self, *, enabled: bool = False) -> None:
@@ -33,7 +27,6 @@ class NativeRetryIntentProjection:
         self.generations = NativeFreshRenderGenerations()
         self.targets = NativeFreshRenderTargets()
         self.episodes = NativeQuietTailEpisodes()
-        self._episode_targets.clear()
         self._episode_generations.clear()
 
     def clear_scene(self) -> None:
@@ -97,7 +90,6 @@ class NativeRetryIntentProjection:
         self.episodes = NativeQuietTailEpisodes(
             self=episodes.get("self"), peer=episodes.get("peer")
         )
-        self._episode_targets.update(targets)
         self._episode_generations.update(generations)
 
     def reconcile_self_scene(
@@ -123,7 +115,6 @@ class NativeRetryIntentProjection:
             ),
             peer=self.episodes.peer,
         )
-        self._episode_targets["self"] = NATIVE_SELF_SCENE_TARGET
         self._episode_generations["self"] = episode_generation
         return True
 
@@ -168,22 +159,56 @@ class NativeRetryIntentProjection:
             if block.channel == "self" and block.primary_text.strip()
         )
 
-    def advance(self, channel: str, event: OverlayEventUnion | None) -> None:
-        if channel != "peer" or event is None or event.utterance_id is None:
-            return
-        target = f"peer:{event.utterance_id}"
+    def reconcile_peer_scene(
+        self,
+        previous_blocks: list[OverlayPresentationBlock],
+        rendered_blocks: list[OverlayPresentationBlock],
+        *,
+        phases: dict[str, str],
+    ) -> bool:
+        if not self.enabled:
+            return False
+        previous = {
+            block.id: self._peer_signature(block)
+            for block in previous_blocks
+            if block.channel == "peer" and block.primary_text.strip()
+        }
+        drawable = [
+            block
+            for block in rendered_blocks
+            if block.channel == "peer" and block.primary_text.strip()
+        ]
+        changed = [
+            block for block in drawable if previous.get(block.id) != self._peer_signature(block)
+        ]
+        if not changed and self.targets.peer not in {block.id for block in drawable}:
+            changed = drawable
+        if not changed:
+            return False
+        target = changed[-1]
+        generation = self.next_generation(self._episode_generations.get("peer"))
         self.generations = NativeFreshRenderGenerations(
             self=self.generations.self, peer=self.next_generation(self.generations.peer)
         )
-        self.targets = NativeFreshRenderTargets(self=self.targets.self, peer=target)
-        phase = "final" if isinstance(event, (PeerTranscriptFinal, TranslationFinal)) else "stream"
-        current = self.episodes.peer
-        if current is None or current.phase != phase or self._episode_targets.get("peer") != target:
-            generation = self.next_generation(self._episode_generations.get("peer"))
-            current = NativeQuietTailEpisode(phase=phase, generation=generation)
-            self._episode_generations["peer"] = generation
-        self._episode_targets["peer"] = target
-        self.episodes = NativeQuietTailEpisodes(self=self.episodes.self, peer=current)
+        self.targets = NativeFreshRenderTargets(self=self.targets.self, peer=target.id)
+        self.episodes = NativeQuietTailEpisodes(
+            self=self.episodes.self,
+            peer=NativeQuietTailEpisode(
+                phase=phases.get(target.id, "final"), generation=generation
+            ),
+        )
+        self._episode_generations["peer"] = generation
+        return True
+
+    @staticmethod
+    def _peer_signature(block: OverlayPresentationBlock) -> tuple[object, ...]:
+        return (
+            block.primary_text,
+            block.secondary_text if block.secondary_enabled else "",
+            block.primary_language,
+            block.secondary_language if block.secondary_enabled else None,
+            block.speaker_style,
+        )
 
     def prune(self, rendered_blocks: list[OverlayPresentationBlock]) -> None:
         visible = {block.id for block in rendered_blocks if block.primary_text.strip()}
@@ -199,10 +224,6 @@ class NativeRetryIntentProjection:
             else None
         )
         peer_target = self.targets.peer if self.targets.peer in visible else None
-        if self_target is None:
-            self._episode_targets.pop("self", None)
-        if peer_target is None:
-            self._episode_targets.pop("peer", None)
         self.targets = NativeFreshRenderTargets(self=self_target, peer=peer_target)
         self.episodes = NativeQuietTailEpisodes(
             self=self.episodes.self if self_target is not None else None,

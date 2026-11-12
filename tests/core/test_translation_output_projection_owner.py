@@ -119,10 +119,12 @@ class BlockingPeerOverlay(RecordingOverlay):
         self.started = asyncio.Event()
         self.release = asyncio.Event()
 
-    async def emit_peer_when_admissible(
+    async def register_peer_caption(
         self,
         event: OverlayEventUnion,
         *,
+        publication_generation: int,
+        is_current=None,
         on_wait=None,
         admission_started_at: float | None = None,
     ) -> OverlayApplicationReceipt:
@@ -135,6 +137,12 @@ class BlockingPeerOverlay(RecordingOverlay):
             publication_id=event.event_id,
             scene_revision=1,
         )
+
+    def retire_peer_generation(self, publication_generation: int) -> None:
+        self.retired_generation = publication_generation
+
+    def refresh_peer_caption_currentness(self) -> None:
+        self.currentness_refreshed = True
 
 
 def make_owner(

@@ -27,6 +27,7 @@ uv run python -m puripuly_heart.main cli --config C:\work\puripuly-dev.json app 
 - Use the same `--config` path for host and clients. It identifies canonical settings-file ownership; omission selects the user's normal settings. Use isolated synthetic settings for probes, not a live user's configuration. A separate settings path alone does not isolate model, secret-store or other writable runtime roots.
 - Only one host may own that settings identity. `app start` defaults to foreground; `--background` outlives the launching terminal. Ordinary no-command application launch still opens the GUI.
 - `app list` lists current-user instances. `app discover` and `app status` target the selected settings identity; `app restart --background` replaces that host.
+- Discovery is a point-in-time snapshot. A pending discovery read does not retain a stopping host's ownership lease.
 - Queries and mutations never start a missing host implicitly: `instance_not_found` requires an explicit start. A PID is observation, not control identity; the CLI never kills by PID.
 - `app stop` waits for the original endpoint and observed process identity to disappear. `cleanup_outcome: unobserved` does not certify every teardown callback or resource release. `--no-wait` returns only shutdown acceptance.
 - `--timeout <seconds>` bounds client waiting, not operation lifetime, and never retries a mutation. `Ctrl+C` exits 130; a background host remains independent.
