@@ -172,6 +172,12 @@ def cleanup_local_stt_install_residue(
                 else:
                     shutil.rmtree(staging_dir)
                 reconciled.append(staging_dir)
+            for trash_dir in resolved_root.glob(f"{dirname}.deleting-*"):
+                if trash_dir.is_symlink() or not trash_dir.is_dir():
+                    trash_dir.unlink(missing_ok=True)
+                else:
+                    shutil.rmtree(trash_dir)
+                reconciled.append(trash_dir)
         return tuple(reconciled)
     finally:
         lease.close()
