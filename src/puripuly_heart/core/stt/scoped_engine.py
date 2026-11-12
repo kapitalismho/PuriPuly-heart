@@ -921,27 +921,41 @@ class ScopedRecognitionEngine:
             turns = tuple(self._turns.values())
             session = self._session
             for turn in turns:
-                turn.local_sealed = True
-                terminal = STTProviderTurnTerminal(
-                    identity=turn.identity,
-                    outcome="cancelled",
-                    text_authority="none",
-                    failure_reason=reason,
-                    epoch_disposition="retire",
-                    failure_diagnostics=failure_diagnostics,
+                self._cancel_turn(
+                    turn, session, reason=reason, failure_diagnostics=failure_diagnostics
                 )
-                if turn.terminal_ready.done():
-                    turn.terminal_ready = asyncio.get_running_loop().create_future()
-                turn.terminal_ready.set_result(terminal)
-                if session is not None:
-                    task = asyncio.create_task(
-                        session.abort_turn(turn.identity, reason=reason),
-                        name=f"scoped-stt-abort:{turn.identity.provider_turn_id}",
-                    )
-                    self._operation_tasks.setdefault(id(session), set()).add(task)
             await self._drain_completed_turns()
             if not turns:
                 self._retire_current_session()
+
+    def _cancel_turn(
+        self,
+        turn: _ActiveTurn,
+        session: STTScopedTurnSession | None,
+        *,
+        reason: str,
+        failure_diagnostics: ErrorDiagnostics | None = None,
+    ) -> None:
+        turn.local_sealed = True
+        turn.write_failed = True
+        turn.pending_update = None
+        terminal = STTProviderTurnTerminal(
+            identity=turn.identity,
+            outcome="cancelled",
+            text_authority="none",
+            failure_reason=reason,
+            epoch_disposition="retire",
+            failure_diagnostics=failure_diagnostics,
+        )
+        if turn.terminal_ready.done():
+            turn.terminal_ready = asyncio.get_running_loop().create_future()
+        turn.terminal_ready.set_result(terminal)
+        if session is not None:
+            task = asyncio.create_task(
+                session.abort_turn(turn.identity, reason=reason),
+                name=f"scoped-stt-abort:{turn.identity.provider_turn_id}",
+            )
+            self._operation_tasks.setdefault(id(session), set()).add(task)
 
     async def warmup(
         self,
@@ -1204,6 +1218,10 @@ class ScopedRecognitionEngine:
             return
         if owned.segment.state != "sealed" or owned.segment.sealed_at_monotonic_s is None:
             raise RuntimeError("recognition terminality requires a locally sealed segment")
+        if event.reason == "source_discontinuity":
+            self._cancel_turn(turn, self._session, reason=event.reason)
+            await self._drain_completed_turns()
+            return
         turn.local_sealed = True
         session = self._session
         if (
@@ -2331,7 +2349,7 @@ class ScopedRecognitionEngine:
             self._terminal_failure_notified = False
             self._connection_retry_at_s = None
         elif (
-            terminal.outcome not in ("final", "empty", "submitted")
+            terminal.outcome not in ("final", "empty", "submitted", "cancelled")
             and not (terminal.recovery_pending and self._connection_retry_at_s is not None)
             and not (
                 turn.independent_recognition
