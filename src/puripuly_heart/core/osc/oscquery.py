@@ -339,8 +339,9 @@ class ZeroconfOscQueryService(OscQueryServicePort):
         state_change: object,
     ) -> None:
         state_name = getattr(state_change, "name", str(state_change)).casefold()
+        removed = state_name == "removed"
         info = None
-        if state_name != "removed":
+        if not removed:
             get_info = getattr(zeroconf, "get_service_info", None)
             if callable(get_info):
                 with contextlib.suppress(Exception):
@@ -349,10 +350,24 @@ class ZeroconfOscQueryService(OscQueryServicePort):
         if loop is None or loop.is_closed():
             return
         with contextlib.suppress(RuntimeError):
-            loop.call_soon_threadsafe(self._queue_service_update, service_type, name, info)
+            loop.call_soon_threadsafe(
+                self._queue_service_update,
+                service_type,
+                name,
+                info,
+                removed,
+            )
 
-    def _queue_service_update(self, service_type: str, name: str, info: object | None) -> None:
+    def _queue_service_update(
+        self,
+        service_type: str,
+        name: str,
+        info: object | None,
+        removed: bool = True,
+    ) -> None:
         key = _base_service_name(name, service_type)
+        if info is None and not removed:
+            return
         if info is None:
             raw = self._raw_services.get(key)
             if raw is not None:
