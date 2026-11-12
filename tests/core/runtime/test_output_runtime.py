@@ -10,6 +10,7 @@ import pytest
 
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfig
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.overlay.presenter import (
     PEER_REPLACEMENT_INTERVAL_SECONDS,
@@ -23,7 +24,8 @@ from puripuly_heart.core.overlay.sink import (
     UtteranceClosed,
 )
 from puripuly_heart.core.runtime.output_batch import OUTPUT_BATCH_MAX_UNSENT
-from puripuly_heart.domain.models import OSCMessage, Transcript
+from puripuly_heart.domain.events import SelfTurnPresentation, SelfTurnTargetPresentation
+from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from tests.helpers.fakes import FakeSender
 
@@ -816,6 +818,109 @@ async def test_output_runtime_accepts_distinct_parent_presentation_revisions_onc
         ("ja",),
         ("zh-CN", "ja"),
     ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("queued", [False, True], ids=["immediate", "behind-pagination"])
+@pytest.mark.parametrize(
+    "text", ["", " \t\r\n", "\u3000"], ids=["empty", "whitespace", "ideographic-space"]
+)
+async def test_empty_self_turn_releases_ordered_successor_and_output_admission(
+    text: str, queued: bool
+) -> None:
+    OutputRuntime = _output_runtime_class()
+    clock = FakeClock()
+    sender = FakeSender()
+    chatbox = ChatboxPaginator(sender=sender, clock=clock, max_chars=5)
+    owner = OutputRuntime(chatbox=chatbox, clock=clock)
+    configuration = TranslationRuntimeConfig(chatbox_include_source=False)
+    empty = SelfTurnPresentation(
+        utterance_id=uuid4(),
+        turn_generation=1,
+        turn_order=0,
+        revision=1,
+        source_revision=1,
+        source_text=text,
+        source_language="ko",
+        source_closed=True,
+        status="active",
+        targets=(
+            SelfTurnTargetPresentation(target_language="en", source_revision=1, status="pending"),
+        ),
+        created_at=clock.now(),
+    )
+    successor_id = uuid4()
+    successor = replace(
+        empty,
+        utterance_id=successor_id,
+        turn_order=1,
+        source_text="next",
+        status="complete",
+        targets=(
+            SelfTurnTargetPresentation(
+                target_language="en",
+                source_revision=1,
+                status="ready",
+                translation=Translation(utterance_id=successor_id, text="hello"),
+            ),
+        ),
+    )
+    await owner.start()
+    try:
+        if queued:
+            await owner.publish_chatbox(
+                publication_id=uuid4(),
+                channel="self",
+                transcript_text="abcde fghij",
+                translation_text=None,
+                include_source=False,
+            )
+        await owner.publish_self_turn(empty, configuration)
+        await owner.publish_self_turn(successor, configuration)
+        assert sender.sent == (["abcde"] if queued else [])
+
+        await owner.publish_self_turn(
+            replace(
+                empty,
+                revision=2,
+                status="complete",
+                targets=(
+                    SelfTurnTargetPresentation(
+                        target_language="en", source_revision=1, status="source_only"
+                    ),
+                ),
+            ),
+            configuration,
+        )
+        if queued:
+            assert sender.sent == ["abcde"]
+            assert not any(
+                decision.reason == "output_empty" for decision in owner.routing_decisions
+            )
+            clock.advance(chatbox.page_interval_s)
+            chatbox.process_due()
+
+        async with asyncio.timeout(1.0):
+            while owner.overlay_admission_snapshot()["batches"]:
+                await asyncio.sleep(0)
+
+        assert sender.sent == (["abcde", "fghij", "hello"] if queued else ["hello"])
+        assert [
+            (decision.publication_id, decision.decision, decision.reason)
+            for decision in owner.routing_decisions
+            if decision.metadata.get("stage") == "self_stream_delivery"
+        ] == [
+            (str(empty.utterance_id), "skipped", "output_empty"),
+            (str(successor_id), "published", "first_page_sent"),
+        ]
+        assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
+        clock.advance(chatbox.page_interval_s)
+        chatbox.process_due()
+        assert sender.sent == (["abcde", "fghij", "hello"] if queued else ["hello"])
+    finally:
+        await asyncio.wait_for(owner.close(), timeout=1.0)
+
+    assert not owner.has_resources
 
 
 @pytest.mark.asyncio
