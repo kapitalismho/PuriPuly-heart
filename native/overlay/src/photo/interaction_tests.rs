@@ -5,7 +5,7 @@ fn photo(attempt: u64) -> Photo {
     serde_json::from_value(json!({
         "photo_id":"test-a", "path":"test.png", "file_size":1, "shutter_unix_ms":1000,
         "expected_file_id":["1","2"],
-        "attempt_id":attempt, "phase":if attempt == 0 {"offer"} else {"requesting"},
+        "attempt_id":attempt, "phase":if attempt == 0 {"offer"} else {"completed"},
         "offer_open":attempt == 0, "visible":attempt > 0, "image":null,
         "preparations":[], "blocks":[], "failure_code":null, "first_block_drawn":false,
         "excluded_blocks":[],
@@ -952,8 +952,10 @@ fn first_continuous_grip_unfolds_by_distance_and_remains_held_across_authorizati
     assert!(!prepared.pull);
     assert_eq!(prepared.photo.unwrap().alpha, 1.0);
     assert!(!f.step(10030, Some(input(false, 0.0))).hidden);
-    assert!((f.step(12605, Some(input(false, 0.0))).photo.unwrap().alpha - 0.5).abs() < 0.00001);
-    let gone = f.step(12680, Some(input(false, 0.0)));
+    assert_eq!(f.step(12605, Some(input(false, 0.0))).photo.unwrap().alpha, 1.0);
+    f.photo.phase = PhotoPhase::Completed;
+    assert!((f.step(15180, Some(input(false, 0.0))).photo.unwrap().alpha - 0.5).abs() < 0.00001);
+    let gone = f.step(15255, Some(input(false, 0.0)));
     assert!(gone.photo.is_none() && gone.hidden);
 }
 
@@ -1302,4 +1304,24 @@ fn presses_away_from_the_photo_or_while_quiescing_never_regrab() {
     reach.right_grip = false;
     f.step(3100, Some(reach));
     assert!(f.interaction.quiescent());
+}
+
+#[test]
+fn a_photo_released_while_translating_stays_until_the_request_settles_then_lingers() {
+    let mut f = Fixture::new(1);
+    f.photo.phase = PhotoPhase::Requesting;
+    let world = placed_photo(&mut f);
+    let waiting = f.step(20000, Some(input(false, 0.12)));
+    assert_eq!(waiting.photo.unwrap().alpha, 1.0);
+    assert_transform_close(waiting.photo.unwrap().transform, world);
+    f.photo.phase = PhotoPhase::Completed;
+    f.step(20100, Some(input(false, 0.12)));
+    assert_eq!(f.step(22499, Some(input(false, 0.12))).photo.unwrap().alpha, 1.0);
+    assert!((f.step(22575, Some(input(false, 0.12))).photo.unwrap().alpha - 0.5).abs() < 0.00001);
+    let gone = f.step(22650, Some(input(false, 0.12)));
+    assert!(gone.photo.is_none() && gone.hidden);
+    let mut failed = Fixture::new(1);
+    placed_photo(&mut failed);
+    failed.photo.phase = PhotoPhase::Failed;
+    assert!(failed.step(3200, Some(input(false, 0.12))).photo.is_none());
 }

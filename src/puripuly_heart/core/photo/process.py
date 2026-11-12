@@ -60,6 +60,7 @@ class PhotoProcessSupervisor:
         diagnostic: Callable[[str, dict], None],
         runner: PhotoProcessRunner | None = None,
         backend: str = "openvr",
+        interaction: Callable[[], dict | None] = lambda: None,
         startup_timeout: float = 10,
         shutdown_timeout: float = 3,
         restart_limit: int = 2,
@@ -71,6 +72,7 @@ class PhotoProcessSupervisor:
         self._renderer_changed = renderer_changed
         self._diagnostic = diagnostic
         self._runner = runner or PhotoProcessRunner()
+        self._interaction = interaction
         self.backend = backend
         self._startup_timeout = startup_timeout
         self._shutdown_timeout = shutdown_timeout
@@ -120,6 +122,9 @@ class PhotoProcessSupervisor:
             self._renderer_changed(self.generation)
             manifest = await self.bridge.activate(self.generation, backend=self.backend)
             self.instance_id = manifest["instance_id"]
+            interaction = await run_owned_thread_call(self._interaction)
+            if interaction is not None:
+                manifest["interaction"] = interaction
             directory = tempfile.TemporaryDirectory(
                 prefix="puripuly-photo-child-", dir=self._temporary_root
             )

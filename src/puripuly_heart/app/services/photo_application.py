@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from puripuly_heart.core.lifecycle import LifecycleScope
-from puripuly_heart.core.photo.bridge import PhotoBridge
+from puripuly_heart.core.photo.bridge import PhotoBridge, valid_wrist_calibration
 from puripuly_heart.core.photo.capture import PhotoCaptureWatcher
 from puripuly_heart.core.photo.image import PreparedPhoto, load_prepared_photo
 from puripuly_heart.core.photo.lifecycle import PhotoLifecycle, PhotoRoute
@@ -25,8 +26,10 @@ class PhotoApplicationOwner:
         backend: str = "openvr",
         temporary_root: Path | None = None,
         poll_interval: float = 0.25,
+        wrist_calibration_path: Path | None = None,
     ) -> None:
         self._resolve_route = resolve_route
+        self._wrist_calibration_path = wrist_calibration_path
         self._diagnostic = diagnostic
         self._watcher = watcher or PhotoCaptureWatcher()
         self._poll_interval = poll_interval
@@ -49,6 +52,7 @@ class PhotoApplicationOwner:
             runner=runner,
             backend=backend,
             temporary_root=temporary_root,
+            interaction=self._interaction,
         )
         self.bridge.abort_preparation = self.supervisor.abort_preparation
 
@@ -76,6 +80,15 @@ class PhotoApplicationOwner:
                     {"photo_id": photo_id, "attempt_id": attempt_id, "duration_ms": duration},
                 )
         return await load_prepared_photo(result, directory=directory)
+
+    def _interaction(self) -> dict | None:
+        if self._wrist_calibration_path is None:
+            return None
+        try:
+            calibration = json.loads(self._wrist_calibration_path.read_text(encoding="utf-8"))
+        except OSError, ValueError:
+            return None
+        return {"wrist_calibration": calibration} if valid_wrist_calibration(calibration) else None
 
     async def start(self) -> None:
         if self._started or self._frozen:

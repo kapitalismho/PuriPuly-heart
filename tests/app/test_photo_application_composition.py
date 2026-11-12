@@ -79,6 +79,7 @@ async def test_composed_startup_starts_photo_with_captions_off_survives_pipeline
         return ControlledConnection(records)
 
     monkeypatch.setattr(photo_provider, "make_photo_connection", connection)
+    monkeypatch.setenv("PURIPULY_PHOTO_BENCHMARK_ROUTE", "personal")
     photos = tmp_path / "photos"
     photos.mkdir()
     owned = tmp_path / "owned"
@@ -198,6 +199,7 @@ async def test_composed_startup_starts_photo_with_captions_off_survives_pipeline
 async def test_composed_route_priority_requires_chatgpt_session_not_openai_key(
     tmp_path, monkeypatch, signed_in, google_key, expected
 ):
+    monkeypatch.setenv("PURIPULY_PHOTO_BENCHMARK_ROUTE", "personal")
     monkeypatch.setattr(
         application_runtime, "default_http_extensions_dir", lambda: tmp_path / "extensions"
     )
@@ -241,5 +243,71 @@ async def test_composed_route_priority_requires_chatgpt_session_not_openai_key(
             else:
                 assert calls[0]["gemini_api_key"] == google_key
                 assert "chatgpt_session" not in calls[0]
+    finally:
+        await app.stop()
+
+
+async def test_composed_default_route_uses_relay_and_reads_the_local_wrist_calibration(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv("PURIPULY_PHOTO_BENCHMARK_ROUTE", raising=False)
+    monkeypatch.setattr(
+        application_runtime, "default_http_extensions_dir", lambda: tmp_path / "extensions"
+    )
+    monkeypatch.setattr(ChatGptSession, "status", lambda self: SimpleNamespace(signed_in=True))
+    monkeypatch.setattr(
+        application_runtime,
+        "create_secret_store",
+        lambda *args, **kwargs: {"gemini_api_key": "synthetic-google"},
+    )
+    owners = []
+
+    def make_owner(**kwargs):
+        owner = PhotoApplicationOwner(
+            **kwargs,
+            watcher=PhotoCaptureWatcher(tmp_path / "photos", tmp_path / "logs"),
+            temporary_root=tmp_path,
+        )
+        owners.append(owner)
+        return owner
+
+    monkeypatch.setattr(application_runtime, "PhotoApplicationOwner", make_owner)
+    calibration = {
+        "transform": [[1.0, 0.0, 0.0, 0.05], [0.0, 1.0, 0.0, 0.03], [0.0, 0.0, 1.0, 0.06]],
+        "reference": {
+            "model": "synthetic_controller_right",
+            "serial": "synthetic-serial",
+            "handgrip_transform": [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+            ],
+        },
+    }
+    app = application_runtime.compose_application_runtime(
+        presentation=HeadlessApplicationPresentation(), config_path=tmp_path / "settings.json"
+    )
+    canonical = AppSettingsVNext()
+    app._settings.settings.canonical = replace(
+        canonical,
+        intent=replace(
+            canonical.intent,
+            languages=replace(
+                canonical.intent.languages, source_language="ja", target_language="en"
+            ),
+        ),
+    )
+    try:
+        owner = owners[0]
+        route = await owner._resolve_route()
+        assert route.identity == "managed-luna"
+        assert owner.lifecycle._target_language() == "ja"
+        assert owner._interaction() is None
+        (tmp_path / "photo-wrist-calibration.json").write_text(
+            json.dumps(calibration), encoding="utf-8"
+        )
+        assert owner._interaction() == {"wrist_calibration": calibration}
+        (tmp_path / "photo-wrist-calibration.json").write_text("{broken", encoding="utf-8")
+        assert owner._interaction() is None
     finally:
         await app.stop()

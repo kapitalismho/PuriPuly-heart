@@ -352,20 +352,11 @@ impl PhotoRuntime {
         use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
 
         async fn message(socket: &mut WebSocketStream<TcpStream>) -> serde_json::Value {
-            let incoming = tokio::time::timeout(Duration::from_secs(2), socket.next())
-                .await
-                .unwrap()
-                .unwrap()
-                .unwrap();
-            serde_json::from_str(incoming.to_text().unwrap()).unwrap()
+            next_photo_message(socket, 2000).await.unwrap()
         }
 
         async fn no_report(socket: &mut WebSocketStream<TcpStream>) {
-            assert!(
-                tokio::time::timeout(Duration::from_millis(20), socket.next())
-                    .await
-                    .is_err()
-            );
+            assert!(next_photo_message(socket, 20).await.is_none());
         }
 
         async fn publish(
@@ -754,7 +745,7 @@ async fn quiescent_bridge_ack_waits_for_interaction_and_release_or_loss() {
         let current = json!({
             "photo_id":"synthetic", "path":"synthetic.png", "file_size":1, "shutter_unix_ms":unix_ms(),
             "expected_file_id":["1","2"],
-            "attempt_id":1, "phase":"requesting", "offer_open":false, "visible":true, "image":null,
+            "attempt_id":1, "phase":"completed", "offer_open":false, "visible":true, "image":null,
             "preparations":[], "blocks":[], "failure_code":null, "first_block_drawn":false,
             "excluded_blocks":[],
         });

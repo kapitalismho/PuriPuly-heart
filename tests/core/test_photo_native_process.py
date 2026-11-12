@@ -271,6 +271,12 @@ async def test_actual_native_portrait_photo_is_sent_upright_in_portrait_canvas(t
     temporary.mkdir()
     records = {"preopened": 0, "starts": 0, "closed": 0}
     route = PhotoRoute("controlled", lambda model: ControlledConnection(records))
+    calibration = tmp_path / "photo-wrist-calibration.json"
+    calibration.write_text(
+        '{"transform":[[1,0,0,0.05],[0,1,0,0.03],[0,0,1,0.06]],"reference":{"model":"synthetic",'
+        '"serial":"synthetic","handgrip_transform":[[1,0,0,0],[0,1,0,0],[0,0,1,0]]}}',
+        encoding="utf-8",
+    )
 
     async def resolve():
         return route
@@ -279,6 +285,7 @@ async def test_actual_native_portrait_photo_is_sent_upright_in_portrait_canvas(t
         resolve_route=resolve,
         target_language=lambda: "ko",
         diagnostic=lambda stage, fields: None,
+        wrist_calibration_path=calibration,
         watcher=PhotoCaptureWatcher(photos, tmp_path / "isolated-logs"),
         runner=PhotoProcessRunner(executable),
         backend="probe",
@@ -303,6 +310,7 @@ async def test_actual_native_portrait_photo_is_sent_upright_in_portrait_canvas(t
         assert (prepared.offset_x, prepared.offset_y) == (0, 0)
         boxes = [b["bbox"] for b in owner.lifecycle.snapshot["photo"]["blocks"]]
         assert boxes == [[0.0, 0.0, 75.0, 75.0], [75.0, 75.0, 150.0, 150.0]]
+        assert owner._interaction()["wrist_calibration"]["reference"]["model"] == "synthetic"
     finally:
         await owner.close()
     assert owner.supervisor.last_exit_code == 0

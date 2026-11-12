@@ -40,7 +40,7 @@ class PhotoProviderAdapter:
     _http: httpx.AsyncClient | None = field(default=None, init=False)
 
     async def resolve_route(self) -> PhotoRoute | None:
-        route = self.benchmark_route or "personal"
+        route = self.benchmark_route or ("managed" if self.token_owner is not None else "personal")
         if route == "managed":
             if self.token_owner is None:
                 return None

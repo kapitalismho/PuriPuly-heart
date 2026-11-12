@@ -2119,6 +2119,12 @@ def test_photo_stage_timings_and_failures_survive_without_content_or_live_ui(tmp
         f"[Photo] failed {identity} failure_code=photo_authentication_failed",
         f"[Photo] cleanup_failed {identity} failure_code=photo_connection_close_failed",
         "[Photo] process_failed generation=2 failure_code=photo_child_exited",
+        f"[Photo] interaction {identity} distance_m=0.131 facing_deg=12.500 forward_deg=30.000"
+        " interaction=grip_ignored reason=out_of_range",
+        f"[Photo] interaction {identity} hand=right interaction=photo_regrab",
+        f"[Photo] result {identity} request_elapsed_ms=5300.250 outcome=completed"
+        " output_blocks=12 corrected_blocks=0 excluded_blocks=1",
+        f"[Photo] preparation {identity} duration_ms=12.000 image_base64_bytes=180224",
     ]
     accepted.extend(
         f"[Photo] image_{stage} {identity} block_id=0 duration_ms=1.250"
@@ -2134,6 +2140,10 @@ def test_photo_stage_timings_and_failures_survive_without_content_or_live_ui(tmp
         f"[Photo] private-stage {identity}",
         f"[Photo] image_unrecognized {identity} duration_ms=1",
         f"[Photo] total {identity} duration_ms=1 duration_ms=2",
+        f"[Photo] interaction {identity} interaction=private_gesture",
+        f"[Photo] interaction {identity} interaction=grab distance_m=-0.100",
+        f"[Photo] interaction {identity} interaction=grab hand=both",
+        f"[Photo] result {identity} outcome=private-outcome",
     ]
     try:
         for message in accepted + rejected:

@@ -1911,11 +1911,12 @@ def compose_application_runtime(
     photo_owner = PhotoApplicationOwner(
         resolve_route=photo_provider.resolve_route,
         target_language=lambda: (
-            settings.canonical.intent.languages.target_language
+            settings.canonical.intent.languages.source_language
             if settings.canonical is not None
             else "ko"
         ),
         diagnostic=photo_diagnostic,
+        wrist_calibration_path=Path(config_path).parent / "photo-wrist-calibration.json",
     )
 
     def translation_runtime_enabled() -> bool:

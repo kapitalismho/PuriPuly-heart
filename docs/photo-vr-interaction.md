@@ -81,6 +81,12 @@ Until the fade completes, a fresh side-grip press of **either hand** whose actua
 
 Native reports `photo_hidden` when the photo actually disappears after the linger and fade, not when the hand releases it.
 
+While the authorized request is still preparing or requesting, a released photo stays in place; its 2.5 s linger starts only after the request settles (2026-11-13 owner request).
+
+The application passes `interaction.wrist_calibration` from `photo-wrist-calibration.json` beside its settings file when that file holds a valid calibration; otherwise the default placement applies. The probe's `--calibrate-wrist --wrist-calibration <that path>` writes the same format. Photos are translated into the Self source language (`intent.languages.source_language`). Without a source-only override, the photo route is the Relay whenever the installation token owner exists; `PURIPULY_PHOTO_BENCHMARK_ROUTE=personal` restores the ChatGPT-then-Gemini route.
+
+Native interaction notes also travel over the photo bridge as validated `photo_interaction` messages and appear in the application log as `[Photo] interaction …` records.
+
 Original-photo viewing is removed (2026-11-13 owner decision): the `photo_debug_original` control, its compositor state and the offline `original_view.png` output no longer exist.
 
 Portrait sources (height greater than width) stay upright throughout. Display content fits within 1080×1920 instead of 1920×1080, the send JPEG uses a 720×1280 canvas instead of 1280×720, and the 1440 reference scale uses the short side. The card keeps its long side at the selected length, so a 9:16 portrait card is 21.09375 × 37.5 cm, revealed from the held left edge like a landscape card. Python derives the same send canvas from the source dimensions; the Relay request carries it as `image_size` under photo protocol 2. Landscape files whose content was shot with a tilted camera are not detected or rotated.

@@ -292,6 +292,12 @@ def _is_photo_metadata_text(message: str) -> bool:
         "process_started",
         "process_failed",
         "capture_unavailable",
+        "interaction",
+        "accepted",
+        "result",
+        "first_display",
+        "block_excluded",
+        "block_corrected",
     }:
         return False
     seen: set[str] = set()
@@ -308,8 +314,32 @@ def _is_photo_metadata_text(message: str) -> bool:
             )
         elif key in {"attempt_id", "block_id", "generation", "pid"}:
             valid = re.fullmatch(r"[0-9]{1,20}", value)
-        elif key == "duration_ms":
+        elif key in {"duration_ms", "request_elapsed_ms"}:
             valid = re.fullmatch(r"[0-9]{1,12}(?:\.[0-9]{1,3})?", value)
+        elif key in {"image_base64_bytes", "output_blocks", "corrected_blocks", "excluded_blocks"}:
+            valid = re.fullmatch(r"[0-9]{1,12}", value)
+        elif key in {"facing_deg", "forward_deg", "distance_m", "progress"}:
+            valid = re.fullmatch(r"[0-9]{1,4}\.[0-9]{3}", value)
+        elif key == "outcome":
+            valid = value in {"completed", "completed_corrected", "partial", "no_text"}
+        elif key == "interaction":
+            valid = value in {
+                "icon_shown",
+                "icon_hidden",
+                "icon_near_miss",
+                "grip_ignored",
+                "grab",
+                "grab_released",
+                "pull",
+                "hold_released",
+                "photo_regrab",
+                "photo_placed",
+                "photo_faded",
+            }
+        elif key == "reason":
+            valid = value in {"icon_hidden", "not_ready", "out_of_range"}
+        elif key == "hand":
+            valid = value in {"left", "right"}
         elif key == "model":
             valid = value in {
                 "gpt-6-luna",

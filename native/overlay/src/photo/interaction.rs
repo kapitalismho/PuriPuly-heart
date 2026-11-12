@@ -793,7 +793,10 @@ impl PhotoInteraction {
                 self.notes.push(InteractionNote::PhotoPlaced);
             }
         }
-        if let Some(release) = &self.photo_release {
+        if let Some(release) = &mut self.photo_release {
+            if matches!(photo.phase, PhotoPhase::Preparing | PhotoPhase::Requesting) {
+                release.started = now;
+            }
             let fading = now.saturating_duration_since(release.started).saturating_sub(PHOTO_LINGER);
             let progress = fading.as_secs_f32() / 0.15;
             self.photo_alpha = release.from * (1.0 - progress).max(0.0);
