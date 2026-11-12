@@ -13,6 +13,8 @@ The native builder runs `native_distribution prune-runtime` on fresh dependency 
 
 The omitted upstream dependency self-tests are not available in the installed application. This does not remove application tests from the repository or introduce a first-use runtime download.
 
+The pruning regression fixtures independently arrange selected test files beside retained executable runtime content. The checks verify exact permitted removals, unchanged retained files and truthful wheel RECORDs, then follow the retained helpers through compilation, the dependency archive/index and the final inventory. An isolated import executes the synthetic `scipy.signal._signaltools` module before packaging and through the production dependency loader afterward, with loose-source execution disabled for the archive check. This synthetic boundary evidence does not qualify actual SciPy inference, Windows installation or a published release.
+
 ## Installation and upgrades
 
 The experimental build writes `BuildRoot/evidence/native-packaging-pruning.json`. Its `removed_files` contains actual staging removals. Its `obsolete_files` additionally identifies the two former `_runtime/local_qwen` copies from their retained canonical DLL bytes; these copies are not staged in a new build.
