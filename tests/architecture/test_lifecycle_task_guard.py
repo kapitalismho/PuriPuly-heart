@@ -395,7 +395,7 @@ TASK_CREATION_REVIEWS = (
         {
             "ScopedRecognitionEngine.bind_event_sink": 1,
             "ScopedRecognitionEngine._run_stream_write": 1,
-            "ScopedRecognitionEngine.abort": 1,
+            "ScopedRecognitionEngine._cancel_turn": 1,
             "ScopedRecognitionEngine.close_backend": 1,
             "ScopedRecognitionEngine._handle_end": 1,
             "ScopedRecognitionEngine._ensure_session": 2,
