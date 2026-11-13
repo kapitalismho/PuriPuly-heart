@@ -8,6 +8,12 @@ from pathlib import Path
 
 import pytest
 
+from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL
+from puripuly_heart.app.services.agent_chat.execution import (
+    app_tool_descriptions,
+    app_tool_schemas,
+)
+from puripuly_heart.release_evidence.agent_chat_simulator.app import choice_catalog
 from puripuly_heart.release_evidence.native_distribution import (
     bundle_runtime,
     compile_runtime,
@@ -169,11 +175,13 @@ def staged_compact_bundled_runtime(
 
 
 @pytest.fixture
-def relay_context_manifest() -> dict:
+async def relay_context_manifest() -> dict:
     marker = "TRUSTED_CONTEXT_ONLY_NOT_FOR_TERRA"
+    schemas = app_tool_schemas(await choice_catalog())
+    descriptions = app_tool_descriptions()
     return {
         "format": "puri-agent-relay-context-1",
-        "agent_protocol": 6,
+        "agent_protocol": AGENT_CHAT_PROTOCOL,
         "relay_build": "a" * 64,
         "bundle_hashes": {"index.js": "a" * 64, "guide.md": "b" * 64},
         "contexts": {
@@ -215,7 +223,16 @@ def relay_context_manifest() -> dict:
                         ],
                     }
                 ],
-                "tools": [{"type": "function", "name": "synthetic_context_tool"}],
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": name,
+                        "description": descriptions[name],
+                        "strict": False,
+                        "parameters": schema,
+                    }
+                    for name, schema in schemas.items()
+                ],
                 "reasoning": {"effort": "high"},
                 "prompt_cache_options": {"mode": "implicit", "ttl": "30m"},
                 "store": False,

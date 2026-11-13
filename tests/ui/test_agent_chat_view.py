@@ -167,7 +167,7 @@ async def test_successive_cards_require_distinct_clicks_and_reenable_after_compl
                     snapshot(
                         busy=True,
                         phase="working",
-                        active_tool=("change_settings", None),
+                        active_tool=("manage_proposal", "settings"),
                     )
                 )
                 accepted.set()

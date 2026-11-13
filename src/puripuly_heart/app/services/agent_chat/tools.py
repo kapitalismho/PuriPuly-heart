@@ -628,6 +628,19 @@ class AgentTools:
             if isinstance(context.get(key), Mapping):
                 self._context[key] = deepcopy(context[key])
 
+    def observe_operation_receipt(self, receipt: dict) -> None:
+        if receipt.get("terminal") is not True or not receipt.get("operation_id"):
+            return
+        for signature, retained in self._command_requests.items():
+            accepted = retained.get("receipt")
+            if (
+                isinstance(accepted, dict)
+                and accepted.get("operation_id") == receipt["operation_id"]
+                and retained["request_id"] == receipt.get("request_id")
+            ):
+                del self._command_requests[signature]
+                return
+
     def reset_context(self) -> None:
         self._context.clear()
 
@@ -1333,6 +1346,7 @@ class AgentTools:
                     if (
                         isinstance(observed, dict)
                         and observed.get("operation_id") == receipt["operation_id"]
+                        and observed.get("request_id") == request_id
                         and isinstance(observed.get("status"), str)
                     ):
                         receipt = observed
@@ -1367,6 +1381,7 @@ class AgentTools:
                     if (
                         isinstance(observed, dict)
                         and observed.get("operation_id") == receipt["operation_id"]
+                        and observed.get("request_id") == request_id
                         and isinstance(observed.get("status"), str)
                     ):
                         receipt = observed
@@ -1385,8 +1400,9 @@ class AgentTools:
         if isinstance(receipt, dict):
             retained["receipt"] = dict(receipt)
         retained["result"] = deepcopy(result)
-        if result["status"] not in {"pending", "unavailable"} or (
-            isinstance(receipt, dict) and receipt.get("terminal") is True
+        if self._command_requests.get(signature) is retained and (
+            result["status"] not in {"pending", "unavailable"}
+            or (isinstance(receipt, dict) and receipt.get("terminal") is True)
         ):
             self._command_requests.pop(signature, None)
         self._record_action(

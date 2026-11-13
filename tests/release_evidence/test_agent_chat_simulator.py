@@ -864,8 +864,8 @@ async def test_owner_repair_regression_and_repair_follow_current_normal_events(
     replies = []
     changes = [repair, regression, *([repair] if repaired_again else [])]
     for index, change in enumerate(changes):
-        call = tool(str(index), arguments=json.dumps({"changes": change}))
-        call["name"] = "change_settings"
+        call = tool(str(index), arguments=json.dumps({"action": "settings", "changes": change}))
+        call["name"] = "manage_proposal"
         replies.append({"status": "completed", "output": [call]})
         replies.append(answer("변경 카드의 비용과 중단 영향을 확인해 줘."))
     replies.append(answer("현재 설정과 실제 결과를 확인했어."))
@@ -1088,9 +1088,12 @@ async def test_start_without_explicit_control_is_invalid_not_combined_legacy_act
 @pytest.mark.asyncio
 async def test_owner_overlay_visibility_receipt_does_not_enable_translation_or_capture():
     call = tool(
-        "visibility", arguments=json.dumps({"changes": {"overlay.translation.enabled": True}})
+        "visibility",
+        arguments=json.dumps(
+            {"action": "settings", "changes": {"overlay.translation.enabled": True}}
+        ),
     )
-    call["name"] = "change_settings"
+    call["name"] = "manage_proposal"
     actions = iter(
         [
             {
@@ -1236,9 +1239,11 @@ async def test_english_recognition_only_still_fails_but_normal_captions_can_pass
     case = scenario("fixture-english-mismatch")
     call = tool(
         "caption-languages",
-        arguments=json.dumps({"changes": {"languages": {"source": "en", "target": "ko"}}}),
+        arguments=json.dumps(
+            {"action": "settings", "changes": {"languages": {"source": "en", "target": "ko"}}}
+        ),
     )
-    call["name"] = "change_settings"
+    call["name"] = "manage_proposal"
     actions = iter(
         [
             {"action": "speak", "text": case.persona.concern, "provider": None, "target": None},
@@ -1460,10 +1465,12 @@ async def test_obtainable_key_needs_actual_public_setup_and_secure_field_action(
 
 @pytest.mark.asyncio
 async def test_actual_capture_and_translation_tools_advance_independent_normal_state():
-    capture = tool("capture", arguments=json.dumps({"channel": "self", "enabled": True}))
-    capture["name"] = "set_capture"
-    translation = tool("translation", arguments=json.dumps({"enabled": True}))
-    translation["name"] = "set_translation"
+    capture = tool("capture", arguments=json.dumps({"target": "capture.self", "enabled": True}))
+    capture["name"] = "set_app"
+    translation = tool(
+        "translation", arguments=json.dumps({"target": "translation", "enabled": True})
+    )
+    translation["name"] = "set_app"
     observations = []
     result = await run_attempt(
         scenario("fixture-first-run"),
@@ -2483,17 +2490,20 @@ async def test_slow_model_route_acceptance_uses_consumer_observed_suitable_norma
     change = tool(
         "slow-model-change",
         arguments=json.dumps(
-            {"changes": {"translation.model": model, "translation.connection": connection}}
+            {
+                "action": "settings",
+                "changes": {"translation.model": model, "translation.connection": connection},
+            }
         ),
     )
-    change["name"] = "change_settings"
+    change["name"] = "manage_proposal"
     replies = []
     if connection == "official_byok":
         navigation = tool(
             "owned-openai-key",
-            arguments=json.dumps({"section": "api", "provider": "openai"}),
+            arguments=json.dumps({"view": "settings", "section": "api", "provider": "openai"}),
         )
-        navigation["name"] = "open_settings"
+        navigation["name"] = "open_app"
         replies.extend(
             [
                 {"status": "completed", "output": [navigation]},
@@ -2740,10 +2750,15 @@ async def test_free_signup_recovers_on_verified_direct_or_rolling_provider(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["gemini_transcribe", "rolling_free"])
 async def test_free_signup_direct_and_rolling_reach_final_owner_code_judgment(provider):
-    setup = tool("setup", arguments=json.dumps({"provider": "gemini_transcribe"}))
-    setup["name"] = "get_provider_setup"
-    change = tool("change", arguments=json.dumps({"changes": {"stt.provider": provider}}))
-    change["name"] = "change_settings"
+    setup = tool(
+        "setup", arguments=json.dumps({"view": "provider_setup", "provider": "gemini_transcribe"})
+    )
+    setup["name"] = "open_app"
+    change = tool(
+        "change",
+        arguments=json.dumps({"action": "settings", "changes": {"stt.provider": provider}}),
+    )
+    change["name"] = "manage_proposal"
     responses = [
         {"status": "completed", "output": [setup]},
         answer(
@@ -3112,8 +3127,10 @@ async def test_persona_signup_constraint_is_recorded_and_allows_speech_or_normal
                 response["value"] = next(actions)
             return response
 
-    setup = tool("openai-setup", arguments=json.dumps({"provider": "openai"}))
-    setup["name"] = "get_provider_setup"
+    setup = tool(
+        "openai-setup", arguments=json.dumps({"view": "provider_setup", "provider": "openai"})
+    )
+    setup["name"] = "open_app"
 
     def transport_factory(app):
         apps.append(app)
@@ -3249,8 +3266,10 @@ async def test_persona_signup_restriction_never_masks_structural_browser_errors(
                 response["value"] = next(actions)
             return response
 
-    setup = tool("openai-setup", arguments=json.dumps({"provider": "openai"}))
-    setup["name"] = "get_provider_setup"
+    setup = tool(
+        "openai-setup", arguments=json.dumps({"view": "provider_setup", "provider": "openai"})
+    )
+    setup["name"] = "open_app"
     result = await run_attempt(
         scenario("recommend-gemma"),
         InvalidBrowserUser(),
@@ -4040,20 +4059,21 @@ async def test_required_vr_host_option_explanation_can_fail_despite_normal_micro
         for item in diagnosis["diagnosis"]["candidates"]
         if item["id"] == diagnosis["diagnosis"]["selected_candidate_id"]
     )
-    diagnose = tool("measure-route", arguments="{}")
-    diagnose["name"] = "diagnose_microphone"
+    diagnose = tool("measure-route", arguments=json.dumps({"target": "microphone"}))
+    diagnose["name"] = "probe_app"
     repair = tool(
         "repair-route",
         arguments=json.dumps(
             {
+                "action": "settings",
                 "changes": {
                     "audio.input_host_api": selected["input_host_api"],
                     "audio.input_device": selected["input_device"],
-                }
+                },
             }
         ),
     )
-    repair["name"] = "change_settings"
+    repair["name"] = "manage_proposal"
     omission = "현재 설정과 실제 결과를 확인했어."
 
     class FailedExplanation(ControlledModels):
@@ -4457,10 +4477,13 @@ async def test_advice_only_user_declines_offered_activation_without_changing_run
     change = tool(
         "offered-local",
         arguments=json.dumps(
-            {"changes": {"translation.model": "managed_gemma", "translation.connection": "cpu"}}
+            {
+                "action": "settings",
+                "changes": {"translation.model": "managed_gemma", "translation.connection": "cpu"},
+            }
         ),
     )
-    change["name"] = "change_settings"
+    change["name"] = "manage_proposal"
     result = await run_attempt(
         scenario("recommend-local-cpu"),
         ControlledModels(),
@@ -4514,8 +4537,10 @@ def test_advice_accepts_only_unchanged_state_not_initial_caption_success(identit
 @pytest.mark.asyncio
 @pytest.mark.parametrize("refresh", [False, True], ids=["expired", "fresh-setup"])
 async def test_owner_current_setup_generation_controls_synthetic_visible_links(refresh):
-    setup = tool("first-setup", arguments=json.dumps({"provider": "openrouter"}))
-    setup["name"] = "get_provider_setup"
+    setup = tool(
+        "first-setup", arguments=json.dumps({"view": "provider_setup", "provider": "openrouter"})
+    )
+    setup["name"] = "open_app"
     fresh = deepcopy(setup)
     fresh["call_id"] = "fresh-setup"
     responses = [
@@ -4583,8 +4608,11 @@ async def test_owner_current_setup_generation_controls_synthetic_visible_links(r
 
 @pytest.mark.asyncio
 async def test_expired_owner_secure_entry_cannot_verify_an_owned_key():
-    setup = tool("owned-key-setup", arguments=json.dumps({"provider": "openrouter"}))
-    setup["name"] = "get_provider_setup"
+    setup = tool(
+        "owned-key-setup",
+        arguments=json.dumps({"view": "provider_setup", "provider": "openrouter"}),
+    )
+    setup["name"] = "open_app"
     actions = iter(
         [
             {"action": "speak", "text": "Show the key field.", "provider": None, "target": None},

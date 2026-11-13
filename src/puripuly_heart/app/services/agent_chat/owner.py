@@ -1020,12 +1020,7 @@ class AgentChatOwner:
                 observed = await self._control.operation(receipt["operation_id"])
             except Exception:
                 continue
-            if observed.get("terminal") and self._operations.get(item["action_id"]) is item:
-                item["result"] = {
-                    "status": observed["status"],
-                    "receipt": project_operation_receipt(observed, item["tool"]),
-                }
-                item["phase"] = "completed"
+            self._observe_operation_receipt(item, observed)
         pending = [
             item
             for item in pending
@@ -1465,13 +1460,8 @@ class AgentChatOwner:
                     if result.get("status") == "pending":
                         receipt = await self._control.operation(identity)
                         self._require_current(generation)
-                        result = {
-                            "status": receipt["status"] if receipt.get("terminal") else "pending",
-                            "receipt": project_operation_receipt(receipt, operation["tool"]),
-                        }
-                        operation["result"] = deepcopy(result)
-                        if receipt.get("terminal"):
-                            operation["phase"] = "completed"
+                        if self._observe_operation_receipt(operation, receipt):
+                            result = deepcopy(operation["result"])
             elif action.handler == "report":
                 result = self._propose_report(bound["summary"], generation)
             else:
@@ -1499,6 +1489,26 @@ class AgentChatOwner:
         projected = model_receipt(result)
         self._record_result(call, topic, projected)
         return projected
+
+    def _observe_operation_receipt(self, operation: dict, receipt: dict) -> bool:
+        retained = operation.get("result", {}).get("receipt", operation.get("receipt", {}))
+        if (
+            self._operations.get(operation["action_id"]) is not operation
+            or not isinstance(receipt, dict)
+            or not retained.get("operation_id")
+            or receipt.get("operation_id") != retained["operation_id"]
+            or receipt.get("request_id") != operation["action_id"]
+            or not isinstance(receipt.get("status"), str)
+        ):
+            return False
+        operation["result"] = {
+            "status": receipt["status"] if receipt.get("terminal") is True else "pending",
+            "receipt": project_operation_receipt(receipt, operation["tool"]),
+        }
+        if receipt.get("terminal") is True:
+            operation["phase"] = "completed"
+            self._tools.observe_operation_receipt(receipt)
+        return True
 
     def _require_notice_epoch(self, epoch: int) -> None:
         if self._closed or epoch != self._notice_epoch:

@@ -669,3 +669,152 @@ async def test_retired_generation_before_submit_does_not_poison_next_turn_signat
     finally:
         await asyncio.gather(retired, return_exceptions=True)
         await tools.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("observation", ["operation", "context"])
+async def test_terminal_observation_allows_new_probe_on_current_runtime(observation):
+    from tests.app.test_translation_probe import ControlledBackend, control_for
+
+    backend = ControlledBackend(hold=True)
+    replacement = ControlledBackend(hold=True)
+    production, runtime = control_for(backend)
+
+    class LinkedControl(Records):
+        def __init__(self):
+            super().__init__()
+            self.submitted = []
+            self.lookup_receipt = None
+
+        async def submit(self, *args, **kwargs):
+            self.submitted.append(kwargs["request_id"])
+            return await production.submit(*args, **kwargs)
+
+        async def wait(self, identity, timeout=None):
+            return await production.wait(identity, timeout=0)
+
+        async def operation(self, identity):
+            if self.lookup_receipt is not None:
+                return dict(self.lookup_receipt)
+            return await production.operation(identity)
+
+    control = LinkedControl()
+    owner = AgentChatOwner(control, None, localize=str)
+
+    async def invoke(identity):
+        frame = call(identity, "probe_app", "translation.self")
+        return await owner._execute_call(frame, owner._arguments(frame), owner._generation)
+
+    async def observe(identity, operation_id):
+        if observation == "operation":
+            frame = call(f"observe-{identity}", "read_app", "operation", operation_id=operation_id)
+            return await owner._execute_call(frame, owner._arguments(frame), owner._generation)
+        context = await owner._context()
+        return next(
+            item["result"] for item in context["agent_operations"] if item["action_id"] == identity
+        )
+
+    try:
+        original = await invoke("original")
+        assert original["status"] == "pending"
+        original_id = original["receipt"]["operation_id"]
+        await asyncio.wait_for(backend.entered.wait(), 1)
+        repeated = await invoke("unresolved-repeat")
+        assert repeated["status"] == "pending"
+        assert repeated["receipt"]["request_id"] == "original"
+        assert control.submitted == ["original"]
+
+        backend.release.set()
+        terminal = await production.wait(original_id, timeout=2)
+        assert terminal["status"] == "applied"
+        observed = await observe("original", original_id)
+        assert observed["status"] == "applied"
+        assert observed["receipt"]["request_id"] == "original"
+        assert observed["receipt"]["captured_generation"] == 0
+
+        await runtime.replace_provider(replacement, start=False)
+        assert backend.closed
+        assert runtime.provider is replacement
+        intentional = await invoke("intentional-new")
+        assert intentional["status"] == "pending"
+        current_id = intentional["receipt"]["operation_id"]
+        assert current_id != original_id
+        assert intentional["receipt"]["request_id"] == "intentional-new"
+        await asyncio.wait_for(replacement.entered.wait(), 1)
+        assert len(backend.requests) == len(replacement.requests) == 1
+
+        for index, mismatched in enumerate(
+            (terminal, {**terminal, "operation_id": current_id}, {})
+        ):
+            control.lookup_receipt = mismatched
+            observed = await observe("intentional-new", current_id)
+            assert observed["status"] == "pending"
+            assert observed["receipt"]["request_id"] == "intentional-new"
+            repeated = await invoke(f"mismatched-repeat-{index}")
+            assert repeated["status"] == "pending"
+            assert repeated["receipt"]["operation_id"] == current_id
+            assert repeated["receipt"]["request_id"] == "intentional-new"
+            assert control.submitted == ["original", "intentional-new"]
+
+        control.lookup_receipt = None
+        replacement.release.set()
+        completed = await production.wait(current_id, timeout=2)
+        assert completed["status"] == "applied"
+        observed = await observe("intentional-new", current_id)
+        assert observed["status"] == "applied"
+        assert observed["receipt"]["request_id"] == "intentional-new"
+        assert observed["receipt"]["captured_generation"] == runtime.generation == 1
+        assert len(backend.requests) == len(replacement.requests) == 1
+        assert control.submitted == ["original", "intentional-new"]
+        retained = owner._operations["original"]["result"]["receipt"]
+        assert retained["operation_id"] == original_id
+        assert retained["captured_generation"] == 0
+    finally:
+        backend.release.set()
+        replacement.release.set()
+        await owner.close()
+        production.freeze_ingress()
+        await production.drain_operations()
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_old_command_completion_does_not_retire_new_pending_identity(catalog):
+    class Delayed(ExecutionControl):
+        async def wait(self, identity, timeout=None):
+            if self.operations[identity]["request_id"] == "original":
+                self.entered.set()
+                await self.release.wait()
+            return dict(self.operations[identity])
+
+        async def operation(self, identity):
+            return dict(self.operations[identity])
+
+    control = Delayed(catalog)
+    tools, _, _ = tools_for(control)
+    original = asyncio.create_task(
+        tools.execute("set_app", {"target": "overlay", "enabled": True}, request_id="original")
+    )
+    try:
+        await asyncio.wait_for(control.entered.wait(), 1)
+        control.operations["op-1"].update(status="applied", terminal=True)
+        tools.observe_operation_receipt(control.operations["op-1"])
+        current = await tools.execute(
+            "set_app", {"target": "overlay", "enabled": True}, request_id="current"
+        )
+        assert current["status"] == "pending"
+        assert current["receipt"]["request_id"] == "current"
+        tools.observe_operation_receipt(control.operations["op-1"])
+        control.release.set()
+        assert (await original)["status"] == "applied"
+        repeated = await tools.execute(
+            "set_app", {"target": "overlay", "enabled": True}, request_id="repeat"
+        )
+        assert repeated["status"] == "pending"
+        assert repeated["receipt"]["operation_id"] == "op-2"
+        assert repeated["receipt"]["request_id"] == "current"
+        assert len(control.submissions) == 2
+    finally:
+        control.release.set()
+        await original
+        await tools.close()
