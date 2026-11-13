@@ -334,17 +334,17 @@ async def test_agent_tools_preserve_component_receipt_and_reject_model_input(
         emit_event=lambda _: pytest.fail("probe emitted a notice"),
     )
     try:
-        name = f"probe_{channel}_recognition"
+        target = f"recognition.{channel}"
         for arguments in (
             {"text": "PRIVATE"},
             {"audio": "PRIVATE"},
             {"path": "PRIVATE"},
             {"channel": channel},
         ):
-            rejected = await tools.execute(name, arguments)
+            rejected = await tools.execute("probe_app", {"target": target, **arguments})
             assert rejected["status"] == "rejected"
         assert fixture.backends == []
-        result = await tools.execute(name, {})
+        result = await tools.execute("probe_app", {"target": target})
         assert result["status"] == "applied"
         assert_isolated(result["receipt"])
         assert result["receipt"]["channel"] == channel
@@ -377,7 +377,7 @@ async def test_agent_probe_rejects_late_success_then_recovers_without_capture(
         record_action=actions.append,
         emit_event=lambda _: pytest.fail("probe requested confirmation"),
     )
-    task = asyncio.create_task(tools.execute(f"probe_{channel}_recognition", {}))
+    task = asyncio.create_task(tools.execute("probe_app", {"target": f"recognition.{channel}"}))
     cancelling = None
     try:
         async with asyncio.timeout(3):
@@ -409,7 +409,7 @@ async def test_agent_probe_rejects_late_success_then_recovers_without_capture(
         assert actions[-1]["phase"] == "completed" and actions[-1]["result"] == result
         assert backend.closes == 1
         assert fixture.runtime.current_provider(channel) is None
-        recovered = await tools.execute(f"probe_{channel}_recognition", {})
+        recovered = await tools.execute("probe_app", {"target": f"recognition.{channel}"})
         assert recovered["status"] == "applied"
         assert recovered["receipt"]["recognition_result"] == "succeeded"
         assert recovered["receipt"]["capture"] == "not_exercised"
