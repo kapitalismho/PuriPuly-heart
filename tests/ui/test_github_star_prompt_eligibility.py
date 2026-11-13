@@ -64,7 +64,6 @@ class PromptBackend:
         return self.owner.schedule_translation_success_observed()
 
 
-
 def _prompt_backend_for(settings: AppSettingsVNext) -> PromptBackend:
     return PromptBackend(settings)
 
