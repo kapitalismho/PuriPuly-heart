@@ -132,7 +132,7 @@ class ManagedGemmaTranslationOwner:
         from puripuly_heart.core.feature_diagnostics import log_feature
 
         with self._residue_cleanup_lock:
-            if self._residue_cleanup_complete:
+            if self._closed or self._residue_cleanup_complete:
                 return
             try:
                 removed = cleanup_gemma_install_residue()
@@ -155,6 +155,10 @@ class ManagedGemmaTranslationOwner:
                     "residue_removed",
                     level=logging.INFO,
                 )
+
+    def _stop_residue_cleanup(self) -> None:
+        with self._residue_cleanup_lock:
+            self._residue_cleanup_complete = True
 
     async def prepare(
         self,
@@ -445,6 +449,7 @@ class ManagedGemmaTranslationOwner:
         lingering = self._cancel_linger()
         if self._closed and self._prepare_task is None and self._asset_task is None:
             await self._await_cancelled_linger(lingering)
+            await run_owned_thread_call(self._stop_residue_cleanup)
             await self._runtime.close()
             return
         self._closed = True
@@ -465,6 +470,7 @@ class ManagedGemmaTranslationOwner:
             await self._task_scope.close()
         finally:
             async with self._lock:
+                await run_owned_thread_call(self._stop_residue_cleanup)
                 await self._runtime.close()
                 self._publish("closed", backend=None, progress_percent=None)
 

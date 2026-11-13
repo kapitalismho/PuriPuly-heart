@@ -369,3 +369,48 @@ def test_cleanup_logs_success_as_info_and_failure_as_error(
         assert records[0].levelno == logging.INFO
         assert "code=residue_removed" in records[0].getMessage()
         assert "failure" not in records[0].getMessage()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancel_inspection", [False, True], ids=["active", "cancelled"])
+async def test_close_drains_inspection_cleanup_and_prevents_new_cleanup(
+    models_root: Path,
+    blocked_cleanup: tuple[Path, threading.Event, threading.Event],
+    cancel_inspection: bool,
+) -> None:
+    staging, entered, release = blocked_cleanup
+    owner = _owner()
+    inspection = asyncio.create_task(asyncio.to_thread(owner.install_status, GEMMA_26B))
+    closing = None
+    try:
+        assert await asyncio.to_thread(entered.wait, 5)
+        if cancel_inspection:
+            inspection.cancel()
+            for _ in range(5):
+                await asyncio.sleep(0)
+        closing = asyncio.create_task(owner.close())
+        for _ in range(5):
+            await asyncio.sleep(0)
+
+        assert not closing.done()
+        assert owner.snapshot.state != "closed"
+        assert staging.exists()
+        assert not _lease_available(models_root)
+    finally:
+        release.set()
+        result = (await asyncio.gather(inspection, return_exceptions=True))[0]
+        if closing is not None:
+            await closing
+        await owner.close()
+
+    if cancel_inspection:
+        assert isinstance(result, asyncio.CancelledError)
+    else:
+        assert result == "missing"
+    assert not staging.exists()
+    assert _lease_available(models_root)
+    assert owner.snapshot.state == "closed"
+
+    later_residue = _residue(models_root, GEMMA_E4B, "staging")
+    assert owner.install_status(GEMMA_26B) == "missing"
+    assert later_residue.exists()
