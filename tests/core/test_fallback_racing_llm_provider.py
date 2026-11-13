@@ -6,6 +6,11 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from puripuly_heart.core.diagnostics import (
+    DIAGNOSTIC_RECORD_ATTRIBUTE,
+    deserialize_diagnostics,
+    serialize_diagnostics,
+)
 from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.fallback_racing import LLMProviderRaceError
@@ -157,6 +162,7 @@ async def test_fallback_racer_returns_fallback_after_timeout() -> None:
     )
 
     assert result.text == "fallback"
+    assert result.recovered_failures == ()
     assert primary.translate_started.is_set()
     assert fallback.translate_started.is_set()
     await provider.close()
@@ -549,3 +555,114 @@ async def test_late_loser_error_is_consumed_without_replacing_winner() -> None:
         loser.cancel_release.set()
         await asyncio.wait_for(provider.close(), 0.3)
     assert loser.close_calls == winner.close_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_successful_fallback_carries_original_evidence_when_sink_fails(monkeypatch):
+    class BrokenLogger:
+        def log(self, *_args, **_kwargs):
+            raise OSError("PRIVATE_SECRET")
+
+    error = OpenRouterResponseError(403)
+    provider = FallbackRacingLLMProvider(
+        primary=FakeLLM(error=error),
+        fallback=FakeLLM(translated_text="winner"),
+        fallback_timeout_ms=100,
+    )
+    monkeypatch.setattr("puripuly_heart.core.llm.fallback_racing.logger", BrokenLogger())
+    turn_id = uuid4()
+    result = await provider.translate(**_translation_kwargs(utterance_id=turn_id))
+    await provider.close()
+
+    assert result.text == "winner"
+    assert len(result.recovered_failures) == 1
+    recovered = deserialize_diagnostics(result.recovered_failures[0])
+    assert recovered.diagnostic_id == error.failure_diagnostics.diagnostic_id
+    assert recovered.turn_id == str(turn_id)
+    assert recovered.status_code == 403
+    assert recovered.category == "auth"
+    with pytest.raises(TypeError):
+        result.recovered_failures[0]["fields"]["provider"] = "PRIVATE_SECRET"
+
+
+@pytest.mark.asyncio
+async def test_cleanup_failure_is_degraded_without_replacing_success(caplog):
+    class CleanupFailure(FakeLLM):
+        async def close(self):
+            raise PermissionError(13, "PRIVATE_SECRET", "C:/Users/private/file")
+
+    provider = FallbackRacingLLMProvider(primary=CleanupFailure(translated_text="winner"))
+    result = await provider.translate(**_translation_kwargs(utterance_id=uuid4()))
+    await provider.close()
+    records = [
+        getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+        for record in caplog.records
+        if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+    ]
+
+    assert result.text == "winner" and result.recovered_failures == ()
+    assert len(records) == 1
+    failure, severity, disposition, stage, _ = records[0]
+    assert failure.code == "provider.cleanup_failed"
+    assert failure.fields["errno"] == 13
+    assert (severity, disposition, stage) == ("warning", "degraded", "cleanup")
+    assert "PRIVATE_SECRET" not in repr(failure)
+
+
+@pytest.mark.asyncio
+async def test_cancelled_request_keeps_late_failure_as_history_not_terminal_outcome(caplog):
+    primary = HeldCancelLLM(error=OpenRouterResponseError(403), gate=asyncio.Event())
+    provider = FallbackRacingLLMProvider(primary=primary)
+    operation = asyncio.create_task(provider.translate(**_translation_kwargs(utterance_id=uuid4())))
+    await asyncio.wait_for(primary.translate_started.wait(), 0.2)
+    operation.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await operation
+    await asyncio.wait_for(primary.translate_cancelled.wait(), 0.2)
+    primary.cancel_release.set()
+    await asyncio.wait_for(provider.close(), 0.3)
+    records = [
+        getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+        for record in caplog.records
+        if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+    ]
+    assert len(records) == 1
+    failure, _, disposition, _, _ = records[0]
+    assert failure.status_code == 403
+    assert disposition == "degraded"
+
+
+@pytest.mark.asyncio
+async def test_fallback_preserves_winner_secondary_evidence_and_collection_loss_flags():
+    recovered = OpenRouterResponseError(502).failure_diagnostics
+    secondary = OpenRouterResponseError(503).failure_diagnostics
+    primary_error = OpenRouterResponseError(403)
+
+    class EvidenceWinner(FakeLLM):
+        async def translate(self, **kwargs):
+            return Translation(
+                utterance_id=kwargs["utterance_id"],
+                text="winner",
+                recovered_failures=(serialize_diagnostics(recovered),),
+                secondary_diagnostics=(serialize_diagnostics(secondary),),
+                recovered_failures_truncated=True,
+                secondary_diagnostics_truncated=True,
+            )
+
+    provider = FallbackRacingLLMProvider(
+        primary=FakeLLM(error=primary_error),
+        fallback=EvidenceWinner(),
+        fallback_timeout_ms=100,
+    )
+    result = await provider.translate(**_translation_kwargs(utterance_id=uuid4()))
+    await provider.close()
+    assert result.text == "winner"
+    assert [item["diagnostic_id"] for item in result.recovered_failures] == [
+        recovered.diagnostic_id,
+        primary_error.failure_diagnostics.diagnostic_id,
+    ]
+    assert [item["diagnostic_id"] for item in result.secondary_diagnostics] == [
+        secondary.diagnostic_id
+    ]
+    assert result.recovered_failures_truncated is True
+    assert result.secondary_diagnostics_truncated is True

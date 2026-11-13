@@ -454,7 +454,7 @@ def synthetic_native_capture(monkeypatch) -> SimpleNamespace:
             self.stopped = True
             for watch in state.watches:
                 if watch.pid == self.ready.pid and not watch.closed:
-                    watch.on_terminal()
+                    watch.on_terminal("target_exited", None)
 
     class Capture:
         def __init__(self, pid: int, on_data) -> None:
@@ -545,12 +545,18 @@ async def test_native_runner_writes_observed_retry_and_measurement_outcomes(
     exit_code = await isolation.run(report_path, thresholds_path)
 
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert len(retry_attempts) == 1
+    assert len(retry_attempts) == 1, report
     assert all(capture.started and capture.close_count == 1 for capture in state.captures)
     assert all(watch.closed for watch in state.watches)
     assert len(state.emitters) == 3
     assert all(emitter.stopped for emitter in state.emitters)
     assert report["schema"] == EVIDENCE_SCHEMA
+    assert report["measurements"]["sample_frames"] == int(
+        isolation.CAPTURE_SECONDS * SAMPLE_RATE_HZ
+    )
+    assert (
+        report["lifecycle"]["typed_warning"] == PeerCaptureFailureReason.PROCESS_TARGET_EXITED.value
+    )
     assert report["lifecycle"]["retry_action"] == "PeerApplicationOwner.retry_process_capture"
     assert report["lifecycle"]["retry_succeeded"] is (scenario != "retry_rejected")
     assert report["lifecycle"]["fresh_pid"] is True

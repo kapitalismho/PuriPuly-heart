@@ -22,8 +22,8 @@ def latest_update(request):
 async def test_repeated_reads_reuse_retained_evidence_and_join_followup_scope():
     transport = RoutedResponses(
         selected_decision("translation"),
-        call("get_app_context", {"topic": "output"}, "first-read"),
-        call("get_app_context", {"topic": "output"}, "repeat-read"),
+        call("read_app", {"topic": "output"}, "first-read"),
+        call("read_app", {"topic": "output"}, "repeat-read"),
         answer(),
         answer(),
     )
@@ -135,10 +135,10 @@ async def test_account_read_stages_current_controls_even_when_account_facts_are_
     transport = RoutedResponses(
         selected_decision("accounts"),
         answer(),
-        call("get_app_context", {"topic": "accounts"}, "first-controls"),
-        call("get_app_context", {"topic": "accounts"}, "same-controls"),
+        call("open_app", {"view": "accounts"}, "first-controls"),
+        call("read_app", {"topic": "accounts"}, "same-controls"),
         answer(),
-        call("get_app_context", {"topic": "accounts"}, "new-controls"),
+        call("open_app", {"view": "accounts"}, "new-controls"),
         answer(),
     )
     owner = owner_for(transport)
@@ -151,7 +151,7 @@ async def test_account_read_stages_current_controls_even_when_account_facts_are_
         staged, repeated = second.tool_results
         assert staged.status == "observed"
         assert "account.chatgpt.setup" in staged.result["context"]["accounts"]["actions"]
-        assert repeated.status == "not_executed"
+        assert repeated.status == "unchanged"
         first_actions = {action.id for action in owner.snapshot.setup_actions if action.available}
         assert any(
             action.action_id == "account.chatgpt.setup" for action in owner.snapshot.setup_actions

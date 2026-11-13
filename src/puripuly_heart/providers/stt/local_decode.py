@@ -13,6 +13,7 @@ import numpy as np
 from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call as _run_owned_thread_call
 
 DEFAULT_LOCAL_DECODE_BACKLOG_WARN_SIZE = 8
@@ -93,6 +94,10 @@ class LocalDecodeCoordinator:
     _closed: bool = field(init=False, default=False, repr=False)
     _failed: bool = field(init=False, default=False, repr=False)
     _close_complete: asyncio.Event = field(init=False, repr=False)
+    failure_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
+    delivery_failure_diagnostics: ErrorDiagnostics | None = field(
+        init=False, default=None, repr=False
+    )
 
     def __post_init__(self) -> None:
         if self.sample_rate_hz <= 0:
@@ -318,6 +323,9 @@ class LocalDecodeCoordinator:
             self._active_job = None
 
     async def _notify_failure(self, failure: LocalDecodeFailure) -> None:
+        self.failure_diagnostics = stt_failure_report(
+            failure.error, provider="local_asr", channel="unknown", operation="decode"
+        ).diagnostics
         try:
             await self.on_failure(failure)
         except asyncio.CancelledError:
@@ -330,11 +338,16 @@ class LocalDecodeCoordinator:
             secondary = stt_failure_report(
                 callback_exc, provider="local_asr", channel="unknown", operation="decode"
             ).diagnostics
+            secondary = replace(
+                secondary,
+                code="stt.decode_callback_failed",
+                cause_id=primary.diagnostic_id,
+                causes=(*secondary.causes, primary),
+            )
+            self.delivery_failure_diagnostics = secondary
             emit_failure(
                 logger,
-                replace(
-                    secondary, code="stt.decode_callback_failed", cause_id=primary.diagnostic_id
-                ),
+                secondary,
                 severity="warning",
                 disposition="degraded",
                 stage="decode",

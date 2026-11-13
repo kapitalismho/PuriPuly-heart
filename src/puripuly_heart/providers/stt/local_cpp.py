@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import tempfile
 import unicodedata
 import wave
 from collections.abc import Awaitable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Literal, TypeVar, cast
 from uuid import uuid4
@@ -17,7 +18,9 @@ from puripuly_heart.core.asr_worker import (
     ASRWorkerClientPort,
     ASRWorkerClosedError,
     ASRWorkerProcessFactoryPort,
+    ASRWorkerRequestError,
 )
+from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr.local_stt_assets import (
     GIGAAM_MODEL_ID,
@@ -26,6 +29,10 @@ from puripuly_heart.core.local_asr.local_stt_assets import (
 )
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
+from puripuly_heart.core.stt.diagnostics import (
+    recognition_cleanup_failure,
+    recognition_failure_diagnostics,
+)
 from puripuly_heart.providers.stt.local_session import LocalOfflineSTTBackend
 
 _T = TypeVar("_T")
@@ -35,6 +42,8 @@ _T = TypeVar("_T")
 class LocalCppSTTBackend(LocalOfflineSTTBackend):
     process_factory: ASRWorkerProcessFactoryPort | None = field(default=None, repr=False)
     _scope: LifecycleScope = field(init=False, repr=False)
+    _resource_id: str = field(init=False, default_factory=lambda: uuid4().hex, repr=False)
+    _quarantined_client: ASRWorkerClientPort | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
         super(LocalCppSTTBackend, self).__post_init__()
@@ -57,6 +66,9 @@ class LocalCppSTTBackend(LocalOfflineSTTBackend):
         )
 
     async def close(self) -> None:
+        if self._quarantined_client is not None:
+            await self._close_resource(self._quarantined_client)
+            self._quarantined_client = None
         await super(LocalCppSTTBackend, self).close()
         assert self.process_factory is not None
         await self.process_factory.close_pending_startups()
@@ -86,6 +98,9 @@ class LocalCppSTTBackend(LocalOfflineSTTBackend):
 
     async def _load_resource(self) -> object:
         assert self.process_factory is not None
+        if self._quarantined_client is not None:
+            await self._close_resource(self._quarantined_client)
+            self._quarantined_client = None
         client = await self.process_factory.start(mode="persistent")
         try:
             manifest = load_local_stt_asset_manifest(self.model_id)
@@ -98,10 +113,42 @@ class LocalCppSTTBackend(LocalOfflineSTTBackend):
                     n_threads=2,
                 )
             )
+            self._resource_id = uuid4().hex
             start_lifecycle_task(self._scope, self._drain_events(client), name="events")
             return client
-        except BaseException:
-            await client.close()
+        except BaseException as primary:
+            self._quarantined_client = client
+            diagnostics = recognition_failure_diagnostics(
+                primary,
+                provider=self.provider_id,
+                channel=self.stream_label or "unknown",
+                operation="readiness",
+                reason="provider_not_ready",
+            )
+            primary.failure_diagnostics = diagnostics
+            try:
+                await self._close_resource(client)
+            except Exception as cleanup:
+                secondary = recognition_cleanup_failure(
+                    cleanup,
+                    provider=self.provider_id,
+                    channel=self.stream_label,
+                    primary=diagnostics,
+                )
+                primary.cleanup_diagnostics = (secondary,)
+                primary.failure_diagnostics = replace(
+                    diagnostics, causes=(*diagnostics.causes, secondary)
+                )
+                cleanup.failure_diagnostics = secondary
+                emit_failure(
+                    logging.getLogger(__name__),
+                    secondary,
+                    severity="warning",
+                    disposition="degraded",
+                    stage="cleanup",
+                )
+            else:
+                self._quarantined_client = None
             raise
 
     async def _drain_events(self, client: ASRWorkerClientPort) -> None:
@@ -112,13 +159,27 @@ class LocalCppSTTBackend(LocalOfflineSTTBackend):
             return
 
     async def _close_resource(self, resource: object) -> None:
-        await cast(ASRWorkerClientPort, resource).close()
+        client = cast(ASRWorkerClientPort, resource)
+        await client.close()
+        if not client.is_closed:
+            raise RuntimeError("provider_resource_quarantined")
+
+    def decode_failure_retryable(self, error: BaseException | None) -> bool:
+        return (
+            isinstance(error, ASRWorkerRequestError)
+            and error.code == "decode_failure"
+            and error.attempt_started
+        )
 
     async def decode_f32(self, samples_f32: np.ndarray) -> str:
-        client = cast(ASRWorkerClientPort, await self._ensure_recognizer())
         async with self._decode_lock:
-            if self._closed:
-                raise RuntimeError("Local STT backend is closed")
+            return await self._decode_owned(samples_f32)
+
+    async def _decode_owned(self, samples_f32: np.ndarray) -> str:
+        client = cast(ASRWorkerClientPort, await self._ensure_recognizer())
+        if self._closed:
+            raise RuntimeError("Local STT backend is closed")
+        try:
             with tempfile.TemporaryDirectory(prefix="puripuly-cpu-asr-") as directory:
                 audio_path = Path(directory) / "audio.wav"
                 await run_owned_thread_call(lambda: _write_audio(audio_path, samples_f32))
@@ -141,6 +202,10 @@ class LocalCppSTTBackend(LocalOfflineSTTBackend):
                     ):
                         return ""
                 return text
+        except (ASRWorkerRequestError, ASRWorkerClosedError) as exc:
+            self._failed_recognizer = True
+            exc.failure_resource_id = self._resource_id
+            raise
 
 
 def _write_audio(path: Path, samples: np.ndarray) -> None:

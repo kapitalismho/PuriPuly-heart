@@ -32,6 +32,7 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionState,
 )
 from puripuly_heart.core.stt.backend import (
+    STTChannelAvailability,
     STTProviderInputTerminal,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
@@ -717,7 +718,9 @@ async def test_recoverable_terminal_retires_utterance_without_interrupting_next_
             "failed",
             failure_reason="soniox_receive_failed",
             failure_retryable=True,
-            recovery_pending=True,
+            channel_availability=(
+                STTChannelAvailability.RECOVERING if True else STTChannelAvailability.UNAVAILABLE
+            ),
             epoch_disposition="retire",
         )
     )
@@ -787,7 +790,11 @@ async def test_input_terminal_retires_audio_without_faulting_active_self_capture
                     outcome,
                     channel="self",
                     failure_reason="provider_input_failed" if outcome == "failed" else None,
-                    recovery_pending=outcome == "failed",
+                    channel_availability=(
+                        STTChannelAvailability.RECOVERING
+                        if outcome == "failed"
+                        else STTChannelAvailability.UNAVAILABLE
+                    ),
                 )
             )
             if outcome == "failed":
@@ -1054,7 +1061,9 @@ async def test_permanent_or_exhausted_terminal_faults_capture(failure_retryable:
             "failed",
             failure_reason="soniox_receive_failed" if failure_retryable else "soniox_auth_failed",
             failure_retryable=failure_retryable,
-            recovery_pending=False,
+            channel_availability=(
+                STTChannelAvailability.RECOVERING if False else STTChannelAvailability.UNAVAILABLE
+            ),
             epoch_disposition="retire",
         )
     )
@@ -1081,7 +1090,11 @@ async def test_late_old_generation_terminal_does_not_fault_reactivated_capture(
             ),
             "failed",
             failure_reason="soniox_receive_failed",
-            recovery_pending=recovery_pending,
+            channel_availability=(
+                STTChannelAvailability.RECOVERING
+                if recovery_pending
+                else STTChannelAvailability.UNAVAILABLE
+            ),
             epoch_disposition="retire",
         )
     )
@@ -1103,7 +1116,9 @@ async def test_explicit_toggle_off_wins_over_late_recoverable_terminal() -> None
             STTProviderTurnIdentity(AudioSegmentIdentity(generation, 1, uuid4(), 1), "old", "old"),
             "failed",
             failure_reason="soniox_receive_failed",
-            recovery_pending=True,
+            channel_availability=(
+                STTChannelAvailability.RECOVERING if True else STTChannelAvailability.UNAVAILABLE
+            ),
             epoch_disposition="retire",
         )
     )
@@ -2245,4 +2260,28 @@ async def test_partial_source_open_failure_keeps_cleanup_owner_and_blocks_reacti
     await owner.apply_intent(config(), enabled=True)
     assert len(calls) == 2 and owner.snapshot.cleanup_debt == 0
     assert owner.snapshot.state is SelfCaptureSessionState.RUNNING
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_capture_fault_tears_down_and_retains_primary_when_observers_fail():
+    owner, _admission, provider, sources, _loop, _sink = build_owner()
+    await owner.apply_intent(config(), enabled=True)
+
+    def fail_observer(*args):
+        raise OSError(5, "private observer detail")
+
+    owner._diagnostic_sink = fail_observer
+    owner._state_changed = fail_observer
+    owner.note_recognition_failure("session_failed")
+    await wait_until(lambda: owner.snapshot.state is SelfCaptureSessionState.FAULTED)
+    await wait_until(lambda: not owner._fault_tasks)
+    snapshot = owner.snapshot
+    assert snapshot.failure_diagnostics.code == "capture.self.session_failed"
+    assert snapshot.failure_diagnostics.causes
+    assert sources[0].close_calls == 1
+    assert provider.release_calls[-1] == ("abort", None)
+    assert snapshot.desired_active is False
+    assert snapshot.has_source is False
+    assert "private" not in repr(snapshot.failure_diagnostics)
     await owner.close()

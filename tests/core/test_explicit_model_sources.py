@@ -1,11 +1,13 @@
 import asyncio
 import hashlib
+import json
 import threading
 from dataclasses import replace
 
 import httpx
 import pytest
 
+from puripuly_heart.core.diagnostics import serialize_diagnostics
 from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRInstallRequest
 from puripuly_heart.core.local_asr.local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
@@ -169,8 +171,28 @@ async def test_explicit_source_error_retains_safe_code_and_status_without_fallba
             huggingface_downloader=Downloader(),
         )
     assert len(requests) == 1
+    assert requests[0].endpoint == HF_MIRROR_ENDPOINT
     assert caught.value.failure_code == "mirror_redirect_external"
-    assert caught.value.status_code == 308
+    diagnostics = caught.value.failure_diagnostics
+    assert diagnostics is not None
+    assert diagnostics.code == "local_asr_install_failed"
+    assert diagnostics.fields["model_id"] == GRANITE_MODEL_ID
+    assert diagnostics.status_code is None
+    assert len(diagnostics.causes) == 1
+    source_failure = diagnostics.causes[0]
+    assert source_failure.code == "local_asr.download_failed"
+    assert source_failure.status_code == 308
+    assert source_failure.fields["asset_failure_code"] == "mirror_redirect_external"
+    assert source_failure.fields["model_id"] == GRANITE_MODEL_ID
+    assert source_failure.fields["source_kind"] == "huggingface_mirror"
+    assert source_failure.fields["source_attempt"] == 1
+    serialized = serialize_diagnostics(diagnostics)
+    assert serialized["diagnostic_id"] == diagnostics.diagnostic_id
+    assert serialized["causes"][0]["diagnostic_id"] == source_failure.diagnostic_id
+    assert serialized["status_code"] is None
+    assert serialized["causes"][0]["status_code"] == 308
+    assert "signed-uri-secret" not in json.dumps(serialized)
+    assert str(tmp_path) not in json.dumps(serialized)
     assert "signed-uri-secret" not in str(caught.value)
     assert not (tmp_path / "models" / manifest.install_dirname).exists()
 

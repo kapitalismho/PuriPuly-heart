@@ -9,6 +9,7 @@ from uuid import UUID
 import numpy as np
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 SegmentTerminalOutcome = Literal[
     "final",
@@ -69,6 +70,7 @@ class AudioSegmentSnapshot:
     seal_reason: str | None
     delivery_pause_s: float | None = None
     smart_turn_incomplete: bool = False
+    delivery_failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,6 +225,7 @@ class _MutableSegment:
     delivery_pause_s: float | None = None
     smart_turn_incomplete: bool = False
     terminal: AudioSegmentTerminalReceipt | None = None
+    delivery_failure_diagnostics: ErrorDiagnostics | None = None
 
 
 class PeerAudioSegmentLedger:
@@ -287,6 +290,54 @@ class PeerAudioSegmentLedger:
         receipts = tuple(self._ready_terminal_receipts)
         self._ready_terminal_receipts.clear()
         return receipts
+
+    def retain_delivery_failure(self, diagnostics: ErrorDiagnostics) -> bool:
+        try:
+            segment_id = UUID(diagnostics.turn_id)
+        except TypeError, ValueError, AttributeError:
+            return False
+        segment = self._segments.get(segment_id)
+        receipt = (
+            segment.terminal if segment is not None else self._retired_receipts.get(segment_id)
+        )
+        identity = (
+            segment.identity
+            if segment is not None
+            else (receipt.identity if receipt is not None else None)
+        )
+        if identity is None or diagnostics.generation != identity.activation_generation:
+            return False
+        previous = (
+            segment.delivery_failure_diagnostics
+            if segment is not None
+            else receipt.segment.delivery_failure_diagnostics
+        )
+        if previous is not None:
+            if previous.diagnostic_id == diagnostics.diagnostic_id or any(
+                cause.diagnostic_id == diagnostics.diagnostic_id for cause in previous.causes
+            ):
+                return True
+            diagnostics = replace(
+                previous,
+                causes=(*previous.causes[-15:], diagnostics),
+                causes_truncated=previous.causes_truncated or len(previous.causes) >= 16,
+            )
+        if segment is not None:
+            segment.delivery_failure_diagnostics = diagnostics
+        if receipt is not None:
+            receipt = replace(
+                receipt, segment=replace(receipt.segment, delivery_failure_diagnostics=diagnostics)
+            )
+            if segment is not None:
+                segment.terminal = receipt
+                self._terminal_by_order[receipt.identity.segment_order] = receipt
+            else:
+                self._retired_receipts[segment_id] = receipt
+            self._ready_terminal_receipts = [
+                receipt if item.identity.segment_id == segment_id else item
+                for item in self._ready_terminal_receipts
+            ]
+        return True
 
     def observe_vad_event(
         self,
@@ -698,6 +749,7 @@ class PeerAudioSegmentLedger:
             seal_reason=segment.seal_reason,
             delivery_pause_s=segment.delivery_pause_s,
             smart_turn_incomplete=segment.smart_turn_incomplete,
+            delivery_failure_diagnostics=segment.delivery_failure_diagnostics,
         )
 
 

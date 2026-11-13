@@ -17,6 +17,8 @@ from puripuly_heart.core.audio.format import (
     AudioCaptureSpan,
     AudioFrameF32,
 )
+from puripuly_heart.core.diagnostics import exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime_logging import emit_basic_log
 
@@ -32,7 +34,7 @@ class SoundDeviceInputMetadata:
     max_input_channels: int | None
     default_samplerate: float | None
     metadata_status: str
-    metadata_error: str | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,11 +53,10 @@ class MicrophoneTestRouteObservation:
     hostapi_index: int | None
     resolved_device_idx: int | None
     resolved_device_name: str | None
-    resolution_exception_class: str | None
-    resolution_exception_message: str | None
     should_attempt_open: bool
     wasapi_auto_convert: bool = False
     wasapi_exclusive: bool = False
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 def _input_metadata_from_info(
@@ -72,7 +73,7 @@ def _input_metadata_from_info(
             max_input_channels=None,
             default_samplerate=None,
             metadata_status=invalid_status,
-            metadata_error="device info is not mapping-like",
+            failure_diagnostics=_metadata_failure(ValueError()),
         )
 
     get_value = info.get  # type: ignore[attr-defined]
@@ -88,7 +89,7 @@ def _input_metadata_from_info(
             max_input_channels=None,
             default_samplerate=None,
             metadata_status=invalid_status,
-            metadata_error=str(exc),
+            failure_diagnostics=_metadata_failure(exc),
         )
 
     samplerate_value = get_value("default_samplerate", None)
@@ -107,7 +108,7 @@ def _input_metadata_from_info(
             max_input_channels=max_input_channels,
             default_samplerate=default_samplerate,
             metadata_status=invalid_status,
-            metadata_error="max_input_channels is not positive",
+            failure_diagnostics=_metadata_failure(ValueError()),
         )
 
     return SoundDeviceInputMetadata(
@@ -116,6 +117,15 @@ def _input_metadata_from_info(
         max_input_channels=max_input_channels,
         default_samplerate=default_samplerate,
         metadata_status=ok_status,
+    )
+
+
+def _metadata_failure(exception: BaseException) -> ErrorDiagnostics:
+    return exception_diagnostics(
+        exception,
+        component="capture.self",
+        operation="device_metadata",
+        code="capture.self.device_metadata_failed",
     )
 
 
@@ -132,7 +142,7 @@ def query_sounddevice_input_metadata(device_idx: int | None) -> SoundDeviceInput
                 max_input_channels=None,
                 default_samplerate=None,
                 metadata_status="query_failed",
-                metadata_error=str(exc),
+                failure_diagnostics=_metadata_failure(exc),
             )
         return _input_metadata_from_info(
             device_idx=None,
@@ -150,7 +160,7 @@ def query_sounddevice_input_metadata(device_idx: int | None) -> SoundDeviceInput
             max_input_channels=None,
             default_samplerate=None,
             metadata_status="query_failed",
-            metadata_error=str(exc),
+            failure_diagnostics=_metadata_failure(exc),
         )
 
     if device_idx < 0 or device_idx >= len(devices):
@@ -160,7 +170,7 @@ def query_sounddevice_input_metadata(device_idx: int | None) -> SoundDeviceInput
             max_input_channels=None,
             default_samplerate=None,
             metadata_status="invalid",
-            metadata_error=f"device index {device_idx} is out of range",
+            failure_diagnostics=_metadata_failure(IndexError()),
         )
 
     return _input_metadata_from_info(
@@ -248,11 +258,15 @@ def _microphone_test_observation(
         hostapi_index=hostapi_index,
         resolved_device_idx=resolved_device_idx,
         resolved_device_name=resolved_device_name,
-        resolution_exception_class=(
-            type(resolution_exception).__name__ if resolution_exception is not None else None
-        ),
-        resolution_exception_message=(
-            str(resolution_exception) if resolution_exception is not None else None
+        failure_diagnostics=(
+            exception_diagnostics(
+                resolution_exception,
+                component="capture.self",
+                operation="device_resolution",
+                code="capture.self.device_resolution_failed",
+            )
+            if resolution_exception is not None
+            else None
         ),
         should_attempt_open=should_attempt_open,
         wasapi_auto_convert=wasapi_auto_convert,
@@ -550,6 +564,18 @@ class AudioSourceOpenFailure(RuntimeError):
         super().__init__("audio_source_open_cleanup_failed")
         self.source = source
         self.failure = failure
+        diagnostics = getattr(failure, "failure_diagnostics", None)
+        self.failure_diagnostics = (
+            diagnostics
+            if isinstance(diagnostics, ErrorDiagnostics)
+            else exception_diagnostics(
+                failure,
+                component="capture.self",
+                operation="source_open",
+                code="capture.self.source_open_failed",
+                fields={"cleanup_confirmed": False},
+            )
+        )
 
 
 @dataclass(slots=True)

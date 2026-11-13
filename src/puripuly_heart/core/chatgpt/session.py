@@ -22,7 +22,7 @@ from puripuly_heart.core.chatgpt.oauth import (
     revoke_refresh_token,
     token_set_from_response,
 )
-from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.storage.secrets import SecretStore
@@ -41,36 +41,42 @@ def _session_diagnostics(
     owning = getattr(exception, "diagnostics", None)
     if isinstance(owning, ErrorDiagnostics):
         return replace(owning, fields={**owning.fields, **fields})
+    category = (
+        "network"
+        if code in {"refresh_network_error", "chatgpt_refresh_network_error"}
+        else (
+            "auth"
+            if isinstance(exception, ChatGptAuthError)
+            else (
+                "lifecycle"
+                if isinstance(exception, (TimeoutError, httpx.HTTPError))
+                else "transaction" if isinstance(exception, OSError) else "unknown"
+            )
+        )
+    )
+    if exception is not None:
+        diagnostic = exception_diagnostics(
+            exception,
+            component="chatgpt_session",
+            operation=phase,
+            code=code if code.startswith("chatgpt_") else f"chatgpt_{code}",
+            category=category,
+            fields={"phase": phase, **fields},
+        )
+        return replace(
+            diagnostic,
+            status_code=status_code if status_code is not None else diagnostic.status_code,
+        )
     return ErrorDiagnostics(
         component="chatgpt_session",
         operation=phase,
         code=code if code.startswith("chatgpt_") else f"chatgpt_{code}",
-        category=(
-            "network"
-            if code in {"refresh_network_error", "chatgpt_refresh_network_error"}
-            else (
-                "auth"
-                if isinstance(exception, ChatGptAuthError)
-                else (
-                    "timeout"
-                    if isinstance(exception, (TimeoutError, httpx.TimeoutException))
-                    else (
-                        "network"
-                        if isinstance(exception, httpx.HTTPError)
-                        else "transaction" if isinstance(exception, OSError) else "unknown"
-                    )
-                )
-            )
-        ),
+        category=category,
         visibility="basic",
         content_policy="metadata_only",
         status_code=status_code,
         retry_after_ms=None,
-        fields={
-            "phase": phase,
-            **fields,
-            **(safe_exception_fields(exception) if exception is not None else {}),
-        },
+        fields={"phase": phase, **fields},
     )
 
 
@@ -458,7 +464,12 @@ class ChatGptSession:
             exc.diagnostics = primary
             raise
         except httpx.HTTPError as exc:
-            raise ChatGptAuthError("refresh_network_error") from exc
+            raise ChatGptAuthError(
+                "refresh_network_error",
+                diagnostics=_session_diagnostics(
+                    "chatgpt_refresh_network_error", "refresh_request", exc
+                ),
+            ) from exc
         self._refresh_phase = "refresh_response"
         tokens = token_set_from_response(
             payload, previous_refresh_token=refresh_token, now=self.clock()

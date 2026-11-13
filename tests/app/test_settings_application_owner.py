@@ -16,6 +16,7 @@ from puripuly_heart.app.ports.settings_runtime_effects import (
     SettingsRuntimeTransition,
 )
 from puripuly_heart.app.ports.settings_view import ActivationNoticeSettingsIntent
+from puripuly_heart.app.ports.ui_presentation import SettingsRenderResult
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.capture.self_capture_application import (
     SelfCaptureRuntimeApplyError,
@@ -207,7 +208,9 @@ async def test_settings_application_owner_routes_mixed_surfaces_in_transaction_o
     settings = FakeSettingsOwner(AppSettingsVNext())
     service = RecordingMutationService(settings)
     projection = SettingsProjectionOwner(
-        presentation=SimpleNamespace(render_settings=lambda *_args, **_kwargs: True),
+        presentation=SimpleNamespace(
+            render_settings=lambda *_args, **_kwargs: SettingsRenderResult(True)
+        ),
         config_path=Path("settings.json"),
         current_settings=lambda: settings.canonical,
     )
@@ -263,7 +266,9 @@ async def test_settings_application_owner_routes_mixed_surfaces_in_transaction_o
 async def test_settings_application_owner_logs_coded_failed_apply_result() -> None:
     settings = FakeSettingsOwner(AppSettingsVNext())
     projection = SettingsProjectionOwner(
-        presentation=SimpleNamespace(render_settings=lambda *_args, **_kwargs: True),
+        presentation=SimpleNamespace(
+            render_settings=lambda *_args, **_kwargs: SettingsRenderResult(True)
+        ),
         config_path=Path("settings.json"),
         current_settings=lambda: settings.canonical,
     )
@@ -320,6 +325,7 @@ async def test_settings_application_owner_can_suppress_language_view_reload(
     projection = SettingsProjectionOwner(
         presentation=SimpleNamespace(
             render_settings=lambda *args, **_kwargs: renders.append(args[0])
+            or SettingsRenderResult(True)
         ),
         config_path=Path("settings.json"),
         current_settings=lambda: settings.canonical,
@@ -373,7 +379,9 @@ async def test_settings_application_owner_names_degrading_runtime_apply_exceptio
 ) -> None:
     settings = FakeSettingsOwner(AppSettingsVNext())
     projection = SettingsProjectionOwner(
-        presentation=SimpleNamespace(render_settings=lambda *_args, **_kwargs: True),
+        presentation=SimpleNamespace(
+            render_settings=lambda *_args, **_kwargs: SettingsRenderResult(True)
+        ),
         config_path=Path("settings.json"),
         current_settings=lambda: settings.canonical,
     )
@@ -434,7 +442,9 @@ async def test_settings_application_owner_owns_direct_persistence_sequence() -> 
     events: list[str] = []
     settings = FakeSettingsOwner(AppSettingsVNext(), events)
     projection = SettingsProjectionOwner(
-        presentation=SimpleNamespace(render_settings=lambda *_args, **_kwargs: True),
+        presentation=SimpleNamespace(
+            render_settings=lambda *_args, **_kwargs: SettingsRenderResult(True)
+        ),
         config_path=Path("settings.json"),
         current_settings=lambda: settings.canonical,
     )
@@ -479,7 +489,9 @@ async def test_direct_runtime_failure_finalizes_commit_and_preserves_it_on_next_
             projection_snapshot=copy.deepcopy(current),
         )
         projection = SettingsProjectionOwner(
-            presentation=SimpleNamespace(render_settings=lambda *_args, **_kwargs: True),
+            presentation=SimpleNamespace(
+                render_settings=lambda *_args, **_kwargs: SettingsRenderResult(True)
+            ),
             config_path=settings.path,
             current_settings=lambda: settings.canonical,
         )
@@ -562,7 +574,9 @@ async def test_routed_mutation_cancellation_finalizes_committed_settings(
         projection_snapshot=copy.deepcopy(current),
     )
     projection = SettingsProjectionOwner(
-        presentation=SimpleNamespace(render_settings=lambda *_args, **_kwargs: True),
+        presentation=SimpleNamespace(
+            render_settings=lambda *_args, **_kwargs: SettingsRenderResult(True)
+        ),
         config_path=settings.path,
         current_settings=lambda: settings.canonical,
     )
@@ -627,9 +641,9 @@ async def test_activation_notice_edit_commits_or_restores_without_generic_runtim
     persistence.persist(settings.path, current)
     rendered: list[bool] = []
 
-    def render_settings(**kwargs: object) -> bool:
+    def render_settings(**kwargs: object) -> SettingsRenderResult:
         rendered.append(kwargs["general"].activation_notice_enabled)
-        return True
+        return SettingsRenderResult(True)
 
     projection = SettingsProjectionOwner(
         presentation=SimpleNamespace(render_settings=render_settings),

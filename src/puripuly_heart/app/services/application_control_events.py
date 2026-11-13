@@ -7,6 +7,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from uuid import UUID
 
+from puripuly_heart.core.diagnostics import normalize_diagnostic
 from puripuly_heart.core.messages import UserErrorReport
 from puripuly_heart.domain.events import STTSessionState, UIEvent, UIEventType
 from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
@@ -75,17 +76,28 @@ class ControlEvents:
         }
         if event.type == UIEventType.ERROR:
             item["error"] = {"code": "runtime_error"}
-            if isinstance(payload, UserErrorReport) and self.diagnostic_recorder is not None:
+            if isinstance(payload, UserErrorReport):
                 diagnostics = payload.diagnostics
                 if diagnostics.channel is None and event.channel in {"self", "peer"}:
                     diagnostics = replace(diagnostics, channel=event.channel)
                 if diagnostics.turn_id is None and isinstance(event.utterance_id, UUID):
                     diagnostics = replace(diagnostics, turn_id=str(event.utterance_id))
-                diagnostic = self.diagnostic_recorder(
+                diagnostic = normalize_diagnostic(
                     diagnostics,
+                    instance_id=self.instance_id,
                     severity=payload.message.severity,
                     disposition="failed",
+                    file_evidence="unavailable",
                 )
+                if self.diagnostic_recorder is not None:
+                    try:
+                        diagnostic = self.diagnostic_recorder(
+                            diagnostics,
+                            severity=payload.message.severity,
+                            disposition="failed",
+                        )
+                    except Exception:
+                        pass
                 item["error"]["code"] = diagnostic["code"]
                 item["error"]["diagnostics"] = diagnostic
                 item["diagnostic_id"] = diagnostic["diagnostic_id"]

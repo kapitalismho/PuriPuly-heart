@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
+import logging
 import threading
+from collections import deque
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from puripuly_heart.app.ports.managed_gemma_translation import (
     ManagedGemmaTranslationSelection,
 )
+from puripuly_heart.core.diagnostics import current_diagnostic_operation, sanitize_diagnostics
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr.local_stt_download_port import (
     HuggingFaceDownloadPort,
@@ -17,7 +19,9 @@ from puripuly_heart.core.local_asr.local_stt_download_port import (
 )
 from puripuly_heart.core.local_asr.local_stt_runtime_installer import LocalSTTProvisioningLease
 from puripuly_heart.core.local_translation.assets import (
+    GemmaInstallState,
     InstalledGemmaManifest,
+    cleanup_gemma_install_residue,
     default_gemma_install_dir,
     inspect_gemma_install,
     resolve_gemma_spec,
@@ -37,6 +41,9 @@ from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaRuntimeOwner,
     ManagedGemmaRuntimeVersionError,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.model_asset_diagnostics import model_asset_failure_diagnostics
+from puripuly_heart.core.network_diagnostics import transport_exception_chain
 from puripuly_heart.core.observability import DiagnosticEvent
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 
@@ -46,13 +53,11 @@ class ManagedGemmaTranslationSnapshot:
     state: str
     backend: str | None
     progress_percent: int | None
-    error_type: str | None = None
-    failure_phase: str | None = None
-    failure_code: str | None = None
-    cause_type: str | None = None
-    worker_exit_code: int | None = None
-    status_code: int | None = None
-    os_error_code: int | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
+    recovery_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    recovery_diagnostics_truncated: bool = False
+    secondary_diagnostics_truncated: bool = False
     model_id: str | None = None
 
 
@@ -107,6 +112,52 @@ class ManagedGemmaTranslationOwner:
         self._active_generation: int | None = None
         self._selected_model_id: str | None = None
         self._closed = False
+        self._diagnostics: deque[ErrorDiagnostics] = deque(maxlen=8)
+        self._diagnostics_truncated = False
+        self._residue_cleanup_lock = threading.Lock()
+        self._residue_cleanup_complete = False
+
+    @property
+    def diagnostics(self) -> tuple[ErrorDiagnostics, ...]:
+        return tuple(self._diagnostics)
+
+    def _record_failure(
+        self, error: BaseException, *, identity: dict[str, str | None] | None = None
+    ) -> ErrorDiagnostics:
+        if isinstance(error, ManagedGemmaRuntimeVersionError):
+            operation, code = "runtime_version", "model_assets.runtime_incompatible"
+        elif isinstance(error, ManagedGemmaRuntimeMissingError):
+            operation, code = "runtime_files", "model_assets.runtime_missing"
+        elif isinstance(error, ManagedGemmaRuntimeError):
+            operation, code = "runtime", "model_assets.runtime_failed"
+        elif not isinstance(error, BaseExceptionGroup) and any(
+            isinstance(item, LocalSTTDownloadPortError) for item in transport_exception_chain(error)
+        ):
+            operation, code = "download", "model_assets.install_failed"
+        else:
+            operation, code = "gemma_install", "model_assets.install_failed"
+        diagnostics = model_asset_failure_diagnostics(error, operation=operation, code=code)
+        if identity is not None:
+            diagnostics = sanitize_diagnostics(
+                replace(
+                    diagnostics,
+                    operation_id=identity.get("operation_id") or diagnostics.operation_id,
+                    request_id=identity.get("request_id") or diagnostics.request_id,
+                )
+            )
+        error.failure_diagnostics = diagnostics
+        if (
+            not self._diagnostics
+            or self._diagnostics[-1].diagnostic_id != diagnostics.diagnostic_id
+        ):
+            self._diagnostics_truncated |= len(self._diagnostics) == self._diagnostics.maxlen
+            self._diagnostics.append(diagnostics)
+        return diagnostics
+
+    def _retain_settled_results(self, results: list[object]) -> None:
+        for result in results:
+            if isinstance(result, BaseException) and not isinstance(result, asyncio.CancelledError):
+                self._record_failure(result)
 
     @property
     def runtime(self) -> ManagedGemmaRuntimeOwner:
@@ -114,20 +165,81 @@ class ManagedGemmaTranslationOwner:
 
     @property
     def snapshot(self) -> ManagedGemmaTranslationSnapshot:
-        return self._snapshot
+        snapshot = self._snapshot
+        excluded = {
+            value.diagnostic_id
+            for value in snapshot.recovery_diagnostics + snapshot.secondary_diagnostics
+        }
+        if snapshot.failure_diagnostics is not None:
+            excluded.add(snapshot.failure_diagnostics.diagnostic_id)
+        secondary = snapshot.secondary_diagnostics + tuple(
+            value for value in self.diagnostics if value.diagnostic_id not in excluded
+        )
+        truncated = snapshot.secondary_diagnostics_truncated or self._diagnostics_truncated
+        if (
+            secondary == snapshot.secondary_diagnostics
+            and truncated == snapshot.secondary_diagnostics_truncated
+        ):
+            return snapshot
+        return replace(
+            snapshot,
+            secondary_diagnostics=secondary,
+            secondary_diagnostics_truncated=truncated,
+        )
 
     @property
     def active_model_id(self) -> str | None:
         return self._selected_model_id if self._active_generation is not None else None
 
-    def install_status(self, model_id: str) -> str:
-        return inspect_gemma_install(spec=resolve_gemma_spec(model_id)).status
+    def install_state(self, model_id: str) -> GemmaInstallState:
+        self._ensure_startup_cleanup()
+        return inspect_gemma_install(spec=resolve_gemma_spec(model_id))
+
+    def _ensure_startup_cleanup(self) -> None:
+        from puripuly_heart.core.feature_diagnostics import log_feature
+
+        with self._residue_cleanup_lock:
+            if self._closed or self._residue_cleanup_complete:
+                return
+            try:
+                removed = cleanup_gemma_install_residue()
+            except Exception as error:
+                self._residue_cleanup_complete = True
+                error.failure_diagnostics = model_asset_failure_diagnostics(
+                    error,
+                    operation="cleanup",
+                    code="model_assets.cleanup_failed",
+                    fields={"cleanup_complete": False},
+                )
+                self._record_failure(error)
+                log_feature(
+                    "ModelDownload",
+                    "cleanup",
+                    "cleanup_failed",
+                    error=error,
+                )
+                return
+            if removed is None:
+                return
+            self._residue_cleanup_complete = True
+            if removed:
+                log_feature(
+                    "ModelDownload",
+                    "cleanup",
+                    "residue_removed",
+                    level=logging.INFO,
+                )
+
+    def _stop_residue_cleanup(self) -> None:
+        with self._residue_cleanup_lock:
+            self._residue_cleanup_complete = True
 
     async def prepare(
         self,
         selection: ManagedGemmaTranslationSelection,
     ) -> ManagedGemmaActivation:
         backend = selection.backend
+        identity = current_diagnostic_operation()
         if self._asset_task is not None:
             raise GemmaProvisioningError("Another model task is active", failure_code="task_busy")
         lingering = self._cancel_linger()
@@ -157,9 +269,10 @@ class ManagedGemmaTranslationOwner:
                 )
 
             spec = resolve_gemma_spec(selection.model_id)
-            task = start_lifecycle_task(
-                self._task_scope,
-                self._runtime.prepare(
+
+            async def prepare_runtime() -> ManagedGemmaReadiness:
+                await run_owned_thread_call(self._ensure_startup_cleanup)
+                return await self._runtime.prepare(
                     backend=backend,
                     source_language=selection.source_language,
                     target_language=selection.target_language,
@@ -173,7 +286,11 @@ class ManagedGemmaTranslationOwner:
                         "spec": spec,
                         "locale": selection.locale,
                     },
-                ),
+                )
+
+            task = start_lifecycle_task(
+                self._task_scope,
+                prepare_runtime(),
                 name=f"prepare-{generation}",
             )
             self._prepare_task = task
@@ -182,39 +299,31 @@ class ManagedGemmaTranslationOwner:
             except asyncio.CancelledError as exc:
                 if asyncio.current_task() is not None and asyncio.current_task().cancelling():
                     raise
-                self._publish("cancelled", backend=backend, progress_percent=None)
-                raise GemmaProvisioningCancelled("Gemma model provisioning cancelled") from exc
-            except GemmaProvisioningCancelled:
-                self._publish("cancelled", backend=backend, progress_percent=None)
-                raise
-            except BaseExceptionGroup as exc:
-                failure = _failure_metadata(exc)
+                history = getattr(exc, "secondary_diagnostics", ())
                 self._publish(
-                    "failed",
+                    "cancelled",
                     backend=backend,
                     progress_percent=None,
-                    error_type=type(exc).__name__,
-                    failure_phase=failure["phase"],
-                    failure_code=failure["code"],
-                    cause_type=failure["cause_type"],
-                    worker_exit_code=failure["worker_exit_code"],
-                    status_code=failure["status_code"],
-                    os_error_code=failure["os_error_code"],
+                    secondary_diagnostics=history,
+                )
+                cancelled = GemmaProvisioningCancelled("Gemma model provisioning cancelled")
+                cancelled.secondary_diagnostics = history
+                raise cancelled from exc
+            except GemmaProvisioningCancelled as exc:
+                self._publish(
+                    "cancelled",
+                    backend=backend,
+                    progress_percent=None,
+                    secondary_diagnostics=exc.secondary_diagnostics,
                 )
                 raise
-            except Exception as exc:
-                failure = _failure_metadata(exc)
+            except (Exception, BaseExceptionGroup) as exc:
+                diagnostics = self._record_failure(exc, identity=identity)
                 self._publish(
                     "failed",
                     backend=backend,
                     progress_percent=None,
-                    error_type=type(exc).__name__,
-                    failure_phase=failure["phase"],
-                    failure_code=failure["code"],
-                    cause_type=failure["cause_type"],
-                    worker_exit_code=failure["worker_exit_code"],
-                    status_code=failure["status_code"],
-                    os_error_code=failure["os_error_code"],
+                    failure_diagnostics=diagnostics,
                 )
                 raise
             finally:
@@ -226,7 +335,15 @@ class ManagedGemmaTranslationOwner:
                 await self._runtime.release()
                 raise GemmaProvisioningCancelled("Gemma model activation was superseded")
             self._active_generation = generation
-            self._publish("ready", backend=backend, progress_percent=100)
+            self._publish(
+                "ready",
+                backend=backend,
+                progress_percent=100,
+                recovery_diagnostics=readiness.recovery_diagnostics,
+                secondary_diagnostics=readiness.secondary_diagnostics,
+                recovery_diagnostics_truncated=readiness.recovery_diagnostics_truncated,
+                secondary_diagnostics_truncated=readiness.secondary_diagnostics_truncated,
+            )
             return ManagedGemmaActivation(
                 readiness=readiness,
                 runtime=self._runtime,
@@ -268,6 +385,8 @@ class ManagedGemmaTranslationOwner:
     ) -> InstalledGemmaManifest:
         from puripuly_heart.core.feature_diagnostics import log_feature
 
+        identity = current_diagnostic_operation()
+
         if self._closed:
             raise RuntimeError("Model owner closed")
         if self._lock.locked() or self._asset_task is not None:
@@ -280,9 +399,9 @@ class ManagedGemmaTranslationOwner:
             else None if source == "local" else self._downloader
         )
 
-        task = start_lifecycle_task(
-            self._task_scope,
-            ensure_gemma_installed(
+        async def install() -> InstalledGemmaManifest:
+            await run_owned_thread_call(self._ensure_startup_cleanup)
+            return await ensure_gemma_installed(
                 source=source,
                 spec=spec,
                 downloader=downloader,
@@ -290,7 +409,11 @@ class ManagedGemmaTranslationOwner:
                 on_status=on_status,
                 locale=locale,
                 verify_existing_checksums=True,
-            ),
+            )
+
+        task = start_lifecycle_task(
+            self._task_scope,
+            install(),
             name="install-assets",
         )
         self._asset_task = task
@@ -302,10 +425,13 @@ class ManagedGemmaTranslationOwner:
             current = asyncio.current_task()
             if current is not None and current.cancelling():
                 raise
-            raise GemmaProvisioningCancelled("Gemma asset installation cancelled") from exc
+            cancelled = GemmaProvisioningCancelled("Gemma asset installation cancelled")
+            cancelled.secondary_diagnostics = getattr(exc, "secondary_diagnostics", ())
+            raise cancelled from exc
         except GemmaProvisioningCancelled:
             raise
-        except Exception as error:
+        except (Exception, BaseExceptionGroup) as error:
+            self._record_failure(error, identity=identity)
             log_feature(
                 "ModelDownload",
                 "installation",
@@ -344,6 +470,7 @@ class ManagedGemmaTranslationOwner:
                 raise ModelInstallInUseError("Model is loaded for translation")
             if self._active_generation is None:
                 await self._runtime.release()
+            await run_owned_thread_call(self._ensure_startup_cleanup)
             install_dir = default_gemma_install_dir(resolve_gemma_spec(model_id))
 
             def remove_install() -> None:
@@ -387,7 +514,7 @@ class ManagedGemmaTranslationOwner:
         preparing = task is not None and not task.done()
         self.cancel()
         if task is not None and task is not asyncio.current_task():
-            await asyncio.gather(task, return_exceptions=True)
+            self._retain_settled_results(await asyncio.gather(task, return_exceptions=True))
         if linger and not preparing and not self._closed:
             self._publish("idle", backend=None, progress_percent=None)
             self._schedule_linger(self._idle_linger_s)
@@ -402,6 +529,7 @@ class ManagedGemmaTranslationOwner:
         lingering = self._cancel_linger()
         if self._closed and self._prepare_task is None and self._asset_task is None:
             await self._await_cancelled_linger(lingering)
+            await run_owned_thread_call(self._stop_residue_cleanup)
             await self._runtime.close()
             return
         self._closed = True
@@ -416,27 +544,41 @@ class ManagedGemmaTranslationOwner:
             if task is not None and task is not asyncio.current_task()
         )
         if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+            self._retain_settled_results(await asyncio.gather(*tasks, return_exceptions=True))
         await self._await_cancelled_linger(lingering)
+        failures: list[BaseException] = []
         try:
             await self._task_scope.close()
-        finally:
-            async with self._lock:
+        except BaseException as error:
+            failures.append(error)
+            if not isinstance(error, asyncio.CancelledError):
+                self._record_failure(error)
+        async with self._lock:
+            try:
+                await run_owned_thread_call(self._stop_residue_cleanup)
                 await self._runtime.close()
+            except BaseException as error:
+                failures.append(error)
+                if not isinstance(error, asyncio.CancelledError):
+                    self._record_failure(error)
+            else:
                 self._publish("closed", backend=None, progress_percent=None)
+        if len(failures) == 1:
+            raise failures[0]
+        if failures:
+            raise BaseExceptionGroup("Managed Gemma owner shutdown failed", failures)
 
     def _cancel_linger(self) -> asyncio.Task[None] | None:
         task = self._linger_task
         self._linger_task = None
         if task is not None and not task.done():
             task.cancel()
-            return task
-        return None
+        return task
 
     async def _await_cancelled_linger(self, task: asyncio.Task[None] | None) -> None:
         if task is None or task is asyncio.current_task():
             return
-        await asyncio.gather(task, return_exceptions=True)
+        self._retain_settled_results(await asyncio.gather(task, return_exceptions=True))
 
     def _schedule_linger(self, delay_s: float) -> None:
         self._cancel_linger()
@@ -481,121 +623,35 @@ class ManagedGemmaTranslationOwner:
         *,
         backend: str | None,
         progress_percent: int | None,
-        error_type: str | None = None,
-        failure_phase: str | None = None,
-        failure_code: str | None = None,
-        cause_type: str | None = None,
-        worker_exit_code: int | None = None,
-        status_code: int | None = None,
-        os_error_code: int | None = None,
+        failure_diagnostics: ErrorDiagnostics | None = None,
+        recovery_diagnostics: tuple[ErrorDiagnostics, ...] = (),
+        secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
+        recovery_diagnostics_truncated: bool = False,
+        secondary_diagnostics_truncated: bool = False,
     ) -> None:
         snapshot = ManagedGemmaTranslationSnapshot(
             state=state,
             backend=backend,
             progress_percent=progress_percent,
-            error_type=error_type,
-            failure_phase=failure_phase,
-            failure_code=failure_code,
-            cause_type=cause_type,
-            worker_exit_code=worker_exit_code,
-            status_code=status_code,
-            os_error_code=os_error_code,
+            failure_diagnostics=failure_diagnostics,
+            recovery_diagnostics=recovery_diagnostics,
+            secondary_diagnostics=secondary_diagnostics,
+            recovery_diagnostics_truncated=recovery_diagnostics_truncated,
+            secondary_diagnostics_truncated=secondary_diagnostics_truncated,
             model_id=self._selected_model_id if backend is not None else None,
         )
         self._snapshot = snapshot
         if self._status_sink is not None:
-            with contextlib.suppress(Exception):
-                self._status_sink(snapshot)
-
-
-def _exception_tree(exception: BaseException) -> tuple[BaseException, ...]:
-    found: list[BaseException] = []
-    pending = [exception]
-    seen: set[int] = set()
-    while pending:
-        current = pending.pop()
-        if id(current) in seen:
-            continue
-        seen.add(id(current))
-        found.append(current)
-        if isinstance(current, BaseExceptionGroup):
-            pending.extend(reversed(current.exceptions))
-        linked = current.__cause__ or current.__context__
-        if linked is not None:
-            pending.append(linked)
-    return tuple(found)
-
-
-def _failure_metadata(exception: BaseException) -> dict[str, str | int | None]:
-    chain = _exception_tree(exception)
-    filesystem_failure = next((item for item in chain if isinstance(item, OSError)), None)
-    if isinstance(exception, BaseExceptionGroup) and filesystem_failure is not None:
-        return {
-            "phase": "provisioning",
-            "code": "filesystem_failed",
-            "cause_type": type(filesystem_failure).__name__,
-            "worker_exit_code": None,
-            "status_code": None,
-            "os_error_code": getattr(filesystem_failure, "winerror", None)
-            or filesystem_failure.errno,
-        }
-    download_failure = next(
-        (item for item in chain if isinstance(item, LocalSTTDownloadPortError)),
-        None,
-    )
-    if download_failure is not None:
-        return {
-            "phase": "download",
-            "code": download_failure.failure_code,
-            "cause_type": download_failure.cause_type or type(chain[-1]).__name__,
-            "worker_exit_code": download_failure.worker_exit_code,
-            "status_code": download_failure.status_code,
-            "os_error_code": download_failure.os_error_code,
-        }
-    runtime_files_failure = next(
-        (
-            item
-            for item in chain
-            if isinstance(item, ManagedGemmaRuntimeMissingError | ManagedGemmaRuntimeVersionError)
-        ),
-        None,
-    )
-    if runtime_files_failure is not None:
-        return {
-            "phase": "runtime_files",
-            "code": (
-                "runtime_missing"
-                if isinstance(runtime_files_failure, ManagedGemmaRuntimeMissingError)
-                else "runtime_incompatible"
-            ),
-            "cause_type": type(runtime_files_failure).__name__,
-            "worker_exit_code": None,
-            "status_code": None,
-            "os_error_code": None,
-        }
-    if isinstance(exception, GemmaProvisioningError):
-        phase = "provisioning"
-        code = "provisioning_failed"
-    elif isinstance(exception, ManagedGemmaRuntimeError):
-        phase = "runtime"
-        code = "runtime_failed"
-    else:
-        phase = "prepare"
-        code = "prepare_failed"
-    root = chain[-1]
-    os_error_code = None
-    if isinstance(root, OSError):
-        phase = "provisioning"
-        code = "filesystem_failed"
-        os_error_code = getattr(root, "winerror", None) or root.errno
-    return {
-        "phase": phase,
-        "code": code,
-        "cause_type": type(root).__name__,
-        "worker_exit_code": None,
-        "status_code": None,
-        "os_error_code": os_error_code,
-    }
+            try:
+                self._status_sink(self.snapshot)
+            except Exception as error:
+                diagnostics = model_asset_failure_diagnostics(
+                    error,
+                    operation="state_delivery",
+                    code="model_assets.state_delivery_failed",
+                )
+                self._diagnostics_truncated |= len(self._diagnostics) == self._diagnostics.maxlen
+                self._diagnostics.append(diagnostics)
 
 
 __all__ = [

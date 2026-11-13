@@ -2288,6 +2288,7 @@ class OverlayPresentationState:
                     logical_turn_key=entry.translation_logical_turn_key,
                 )
             if translated_text:
+                secondary_text = original_text if position in (None, 0) else ""
                 return OverlayPresentationBlock(
                     id=entry.block_id,
                     occupant_key=entry.occupant_key,
@@ -2299,15 +2300,15 @@ class OverlayPresentationState:
                     channel="peer",
                     block_variant="finalized",
                     primary_text=fragment if fragment is not None else translated_text,
-                    secondary_text=original_text,
-                    secondary_enabled=show_peer_original and bool(original_text),
+                    secondary_text=secondary_text,
+                    secondary_enabled=show_peer_original and bool(secondary_text),
                     primary_language=_line_language(
                         entry.translation_language,
                         translated_text,
                     ),
                     secondary_language=_line_language(
                         entry.original_language,
-                        original_text,
+                        secondary_text,
                         enabled=show_peer_original,
                     ),
                     update_id=entry.translation_update_id,

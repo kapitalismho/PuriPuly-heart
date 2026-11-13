@@ -13,10 +13,11 @@ Download `{{INSTALLER_EXE}}` from the Assets section below, then run it.
 - Local CPU and GPU Peer recognition recover after audio-source discontinuities without restarting recognition. Failed input is discarded, started work is safely settled, and recovered finals retain independent translation and shared caption display.
 - Peer caption corrections update visible text without waiting behind unrelated captions and receive a fresh bounded native-render retry episode.
 - Cloud and local Peer captions use ordered, readable two-line continuation fragments instead of timed paging. Upper captions retain the ordinary eight-second idle lifetime; Self priority and the one-second replacement-wait limit still allow earlier replacement.
+- With Peer "show original" enabled, only the first translation fragment shows the complete original text. Continuation fragments remain translation-only, even after the first fragment departs.
 - Peer source-view and text-size changes respect the existing caption storage limit. A caption that cannot fit is retired instead of blocking Self captions.
-- Puri uses three app-tool families for observations, immediate actions, and user-approved proposals. Settings changes remain subject to approval.
+- Puri uses six flat app-tool families for observations, runtime switches, probes, retries, navigation, and proposals. Failed or pending operations no longer block unrelated follow-up tools for the entire turn. Settings changes still require approval, and reports still require the user's send click.
 - Puri sends more compact app context and tool results, and uses revised recommendation guidance that distinguishes preferences from usable provider access.
-- Puri uses protocol 6. Update to this app version to use the updated relay; protocol-5 apps, including 2.10.2, are no longer supported by that relay.
+- Puri uses protocol 7, with explicit Self/Peer translation probes. The matching relay supports protocols 6 and 7; deploy it before releasing the protocol-7 app. Protocol-5 apps, including 2.10.2, remain unsupported.
 - Broker adds atomic first-installation enrollment limits of 5 per hour and 10 per day per network identity. The Puri token network limit is 200 requests per 15 minutes; existing installations retain their installation-scoped limit.
 - Windows Setup checks existing and staged ASR models by manifest identity, file presence, and exact size instead of SHA-256. It reuses the ready-page download plan and no longer hashes ASR downloads.
 - The installer completion page offers a checked-by-default option to launch PuriPuly. Silent installations do not launch the application.

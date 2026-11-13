@@ -192,3 +192,33 @@ async def test_deepgram_cancelled_close_fails_blocked_writes_and_joins_owned_tas
     assert all(
         task.done() for task in (session._send_task, session._recv_task, session._keepalive_task)
     )
+
+
+def test_sdk_native_error_keeps_validated_code_and_excludes_payload():
+    from uuid import uuid4
+
+    from puripuly_heart.providers.stt.deepgram import _sdk_failure
+
+    request_id = uuid4().hex
+    failure = _sdk_failure(
+        {
+            "err_code": "NET-0001",
+            "code": 503,
+            "status_code": 503,
+            "request_id": request_id,
+            "err_msg": "PRIVATE_PROVIDER_BODY",
+        }
+    )
+    diagnostics = failure.failure_diagnostics
+    assert diagnostics.status_code == 503
+    assert diagnostics.fields["provider_code"] == 503
+    assert diagnostics.fields["deepgram_code"] == "NET-0001"
+    assert diagnostics.fields["provider_request_id"] == request_id
+    assert "PRIVATE" not in repr(diagnostics)
+    unknown = _sdk_failure(
+        {"err_code": "PRIVATE_PROVIDER_CODE", "code": True, "reason": "PRIVATE_REASON"},
+        close=True,
+    ).failure_diagnostics
+    baseline_rejections = _sdk_failure({}, close=True).failure_diagnostics.rejected_fields
+    assert unknown.rejected_fields == baseline_rejections + 2
+    assert "deepgram_code" not in unknown.fields and "ws_close_code" not in unknown.fields

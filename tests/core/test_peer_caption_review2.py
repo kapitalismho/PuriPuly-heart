@@ -175,6 +175,7 @@ async def test_r2_toggle_reconciles_effective_source_and_cached_translation_with
         await presenter.update_translation_enabled(False)
         peers = [block for block in presenter.snapshot().blocks if block.channel == "peer"]
         assert [block.primary_text for block in peers] == [source]
+        assert all(not block.secondary_text and not block.secondary_enabled for block in peers)
         assert surface.expirations[peers[0].id] == pytest.approx(8.2)
         episode = presenter.snapshot().native_quiet_tail_episodes.peer
         await timeline.advance(1)
@@ -189,6 +190,10 @@ async def test_r2_toggle_reconciles_effective_source_and_cached_translation_with
             [peer_translation_fragments(text)[1]]
             if self_active
             else list(peer_translation_fragments(text))
+        )
+        assert [block.secondary_text for block in peers] == ([""] if self_active else [source, ""])
+        assert [block.secondary_enabled for block in peers] == (
+            [False] if self_active else [True, False]
         )
         assert presenter.snapshot().native_fresh_render_targets.peer in {
             block.id for block in peers

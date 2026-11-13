@@ -171,6 +171,32 @@ async def test_translation_probe_reports_configured_self_targets_without_publish
 
 
 @pytest.mark.asyncio
+async def test_simulator_peer_probe_preserves_requested_direction_and_isolation():
+    app = ScenarioApp(scenario("fixture-first-run"))
+    app.intent["languages"].update(
+        source_language="es",
+        target_language="fr",
+        secondary_target_language="de",
+        peer_source_language="ja",
+        peer_target_language="ko",
+    )
+    tools = fixture_tools(app)
+    before = deepcopy(app.intent)
+    try:
+        result = await tools.execute("probe_app", {"target": "translation.peer"})
+        receipt = result["receipt"]
+        assert result["status"] == "applied"
+        assert receipt["channel"] == "peer"
+        assert receipt["source_language"] == "ja"
+        assert receipt["target_languages"] == ["ko"]
+        assert receipt["output_delivery"] == receipt["display"] == "not_exercised"
+        assert app.intent == before
+        assert app.normal_recognition == app.normal_translation == 0
+    finally:
+        await tools.close()
+
+
+@pytest.mark.asyncio
 async def test_real_owner_adapters_visibility_notice_receipt_and_report_boundaries():
     results = {}
     for identity in (
@@ -840,8 +866,8 @@ async def test_owner_repair_regression_and_repair_follow_current_normal_events(
     replies = []
     changes = [repair, regression, *([repair] if repaired_again else [])]
     for index, change in enumerate(changes):
-        call = tool(str(index), arguments=json.dumps({"changes": change}))
-        call["name"] = "change_settings"
+        call = tool(str(index), arguments=json.dumps({"action": "settings", "changes": change}))
+        call["name"] = "manage_proposal"
         replies.append({"status": "completed", "output": [call]})
         replies.append(answer("변경 카드의 비용과 중단 영향을 확인해 줘."))
     replies.append(answer("현재 설정과 실제 결과를 확인했어."))
@@ -1064,9 +1090,12 @@ async def test_start_without_explicit_control_is_invalid_not_combined_legacy_act
 @pytest.mark.asyncio
 async def test_owner_overlay_visibility_receipt_does_not_enable_translation_or_capture():
     call = tool(
-        "visibility", arguments=json.dumps({"changes": {"overlay.translation.enabled": True}})
+        "visibility",
+        arguments=json.dumps(
+            {"action": "settings", "changes": {"overlay.translation.enabled": True}}
+        ),
     )
-    call["name"] = "change_settings"
+    call["name"] = "manage_proposal"
     actions = iter(
         [
             {
@@ -1212,9 +1241,11 @@ async def test_english_recognition_only_still_fails_but_normal_captions_can_pass
     case = scenario("fixture-english-mismatch")
     call = tool(
         "caption-languages",
-        arguments=json.dumps({"changes": {"languages": {"source": "en", "target": "ko"}}}),
+        arguments=json.dumps(
+            {"action": "settings", "changes": {"languages": {"source": "en", "target": "ko"}}}
+        ),
     )
-    call["name"] = "change_settings"
+    call["name"] = "manage_proposal"
     actions = iter(
         [
             {"action": "speak", "text": case.persona.concern, "provider": None, "target": None},
@@ -1440,10 +1471,12 @@ async def test_obtainable_key_needs_actual_public_setup_and_secure_field_action(
 
 @pytest.mark.asyncio
 async def test_actual_capture_and_translation_tools_advance_independent_normal_state():
-    capture = tool("capture", arguments=json.dumps({"channel": "self", "enabled": True}))
-    capture["name"] = "set_capture"
-    translation = tool("translation", arguments=json.dumps({"enabled": True}))
-    translation["name"] = "set_translation"
+    capture = tool("capture", arguments=json.dumps({"target": "capture.self", "enabled": True}))
+    capture["name"] = "set_app"
+    translation = tool(
+        "translation", arguments=json.dumps({"target": "translation", "enabled": True})
+    )
+    translation["name"] = "set_app"
     observations = []
     result = await run_attempt(
         scenario("fixture-first-run"),
@@ -2283,7 +2316,7 @@ def fixture_tools(app):
 async def approved_tool_change(app, tools, changes):
     context = await collect_agent_context(app, activity=AgentActivity(), topic="overview")
     tools.observe_context(context)
-    result = await tools.execute("change_settings", {"changes": changes})
+    result = await tools.execute("manage_proposal", {"action": "settings", "changes": changes})
     assert result["status"] == "needs_confirmation"
     while tools.confirmation is not None:
         card = tools.confirmation
@@ -2293,7 +2326,7 @@ async def approved_tool_change(app, tools, changes):
 
 
 async def issue_fixture_key(app, tools, provider):
-    setup = await tools.execute("get_provider_setup", {"provider": provider})
+    setup = await tools.execute("open_app", {"view": "provider_setup", "provider": provider})
     assert setup["status"] == "available"
     assert setup["link_opened"] is False
     app.provider_setups[provider] = deepcopy(setup)
@@ -2315,7 +2348,9 @@ async def issue_fixture_key(app, tools, provider):
             app.browser_step(provider, page["controls"][0]["id"], guidance)
             is BrowserStepResult.COMPLETED
         )
-    navigation = await tools.execute("open_settings", {"section": "api", "provider": provider})
+    navigation = await tools.execute(
+        "open_app", {"view": "settings", "section": "api", "provider": provider}
+    )
     assert navigation["field_visible"]
     assert app.enter_key(provider)
     assert app.key_verifications[-1]["success"]
@@ -2331,15 +2366,15 @@ async def test_capture_off_requires_agent_control_and_current_normal_recognition
     assert app.translation_enabled
     tools = fixture_tools(app)
     try:
-        probe = await tools.execute("probe_self_recognition", {})
+        probe = await tools.execute("probe_app", {"target": "recognition.self"})
         assert probe["receipt"]["recognition_result"] == "succeeded"
         assert not app.resolved()
-        result = await tools.execute("set_capture", {"channel": "self", "enabled": True})
+        result = await tools.execute("set_app", {"target": "capture.self", "enabled": True})
         assert result["status"] == "applied"
         assert app.resolved()
         assert app.current_observations("self")["usable_recognition"]
         assert app.capture_commands == [{"channel": "self", "enabled": True, "revision": 1}]
-        stopped = await tools.execute("set_capture", {"channel": "self", "enabled": False})
+        stopped = await tools.execute("set_app", {"target": "capture.self", "enabled": False})
         assert stopped["status"] == "applied"
         assert not app.resolved()
     finally:
@@ -2359,7 +2394,7 @@ async def test_new_microphone_causes_require_measured_approved_working_pair(iden
     assert app.current_observations("self")["recognition"] is None
     tools = fixture_tools(app)
     try:
-        result = await tools.execute("diagnose_microphone", {})
+        result = await tools.execute("probe_app", {"target": "microphone"})
         assert result["receipt"]["recognition"] == "not_exercised"
         diagnosis = result["receipt"]["diagnosis"]
         selected = next(
@@ -2413,7 +2448,7 @@ async def test_openrouter_model_timeout_is_route_scoped_and_reuses_verified_acco
     assert not app.resolved()
     tools = fixture_tools(app)
     try:
-        probe = await tools.execute("probe_translation", {})
+        probe = await tools.execute("probe_app", {"target": "translation.self"})
         assert probe["receipt"]["translation_result"] == "failed"
         assert not app.resolved()
         app.capture_active["self"] = False
@@ -2427,7 +2462,7 @@ async def test_openrouter_model_timeout_is_route_scoped_and_reuses_verified_acco
         assert app.transitions[-1]["approved_exact"]
         assert not app.current_observations("self")["translation"]
         assert not app.resolved()
-        ready_probe = await tools.execute("probe_translation", {})
+        ready_probe = await tools.execute("probe_app", {"target": "translation.self"})
         assert ready_probe["receipt"]["translation_result"] == "succeeded"
         assert not app.resolved()
         assert app.start("self_capture")
@@ -2461,17 +2496,20 @@ async def test_slow_model_route_acceptance_uses_consumer_observed_suitable_norma
     change = tool(
         "slow-model-change",
         arguments=json.dumps(
-            {"changes": {"translation.model": model, "translation.connection": connection}}
+            {
+                "action": "settings",
+                "changes": {"translation.model": model, "translation.connection": connection},
+            }
         ),
     )
-    change["name"] = "change_settings"
+    change["name"] = "manage_proposal"
     replies = []
     if connection == "official_byok":
         navigation = tool(
             "owned-openai-key",
-            arguments=json.dumps({"section": "api", "provider": "openai"}),
+            arguments=json.dumps({"view": "settings", "section": "api", "provider": "openai"}),
         )
-        navigation["name"] = "open_settings"
+        navigation["name"] = "open_app"
         replies.extend(
             [
                 {"status": "completed", "output": [navigation]},
@@ -2719,10 +2757,15 @@ async def test_free_signup_recovers_on_verified_direct_or_rolling_provider(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["gemini_transcribe", "rolling_free"])
 async def test_free_signup_direct_and_rolling_reach_final_owner_code_judgment(provider):
-    setup = tool("setup", arguments=json.dumps({"provider": "gemini"}))
-    setup["name"] = "get_provider_setup"
-    change = tool("change", arguments=json.dumps({"changes": {"stt.provider": provider}}))
-    change["name"] = "change_settings"
+    setup = tool(
+        "setup", arguments=json.dumps({"view": "provider_setup", "provider": "gemini"})
+    )
+    setup["name"] = "open_app"
+    change = tool(
+        "change",
+        arguments=json.dumps({"action": "settings", "changes": {"stt.provider": provider}}),
+    )
+    change["name"] = "manage_proposal"
     responses = [
         {"status": "completed", "output": [setup]},
         answer(
@@ -3091,8 +3134,10 @@ async def test_persona_signup_constraint_is_recorded_and_allows_speech_or_normal
                 response["value"] = next(actions)
             return response
 
-    setup = tool("openai-setup", arguments=json.dumps({"provider": "openai"}))
-    setup["name"] = "get_provider_setup"
+    setup = tool(
+        "openai-setup", arguments=json.dumps({"view": "provider_setup", "provider": "openai"})
+    )
+    setup["name"] = "open_app"
 
     def transport_factory(app):
         apps.append(app)
@@ -3228,8 +3273,10 @@ async def test_persona_signup_restriction_never_masks_structural_browser_errors(
                 response["value"] = next(actions)
             return response
 
-    setup = tool("openai-setup", arguments=json.dumps({"provider": "openai"}))
-    setup["name"] = "get_provider_setup"
+    setup = tool(
+        "openai-setup", arguments=json.dumps({"view": "provider_setup", "provider": "openai"})
+    )
+    setup["name"] = "open_app"
     result = await run_attempt(
         scenario("recommend-gemma"),
         InvalidBrowserUser(),
@@ -3278,9 +3325,11 @@ async def test_browser_gemini_console_uses_shared_credential_and_rejects_legacy_
     assert legacy_provider not in PROVIDER_SETUPS
     tools = fixture_tools(app)
     try:
-        legacy_setup = await tools.execute("get_provider_setup", {"provider": legacy_provider})
+        legacy_setup = await tools.execute(
+            "open_app", {"view": "provider_setup", "provider": legacy_provider}
+        )
         assert legacy_setup["status"] != "available"
-        setup = await tools.execute("get_provider_setup", {"provider": provider})
+        setup = await tools.execute("open_app", {"view": "provider_setup", "provider": provider})
     finally:
         await tools.close()
     assert setup["status"] == "available"
@@ -3693,7 +3742,7 @@ async def test_fixture_audio_operation_history_retains_its_actual_operation_iden
     app = ScenarioApp(scenario("recognition-microphone"))
     tools = fixture_tools(app)
     try:
-        result = await tools.execute("diagnose_microphone", {})
+        result = await tools.execute("probe_app", {"target": "microphone"})
         operation_id = result["receipt"]["operation_id"]
         records = await app.query("diagnostics.history", {"operation_id": operation_id})
         assert records["lookup"] == "found"
@@ -3731,10 +3780,10 @@ async def test_osc_retry_settles_internal_recovery_without_publishing_or_requiri
         diagnostic = (await app.query("diagnostics.history", {}))["records"][-1]
         assert diagnostic["component"] == "osc_control"
         assert diagnostic["category"] == "network"
-        probe = await tools.execute("probe_translation", {})
+        probe = await tools.execute("probe_app", {"target": "translation.self"})
         assert probe["receipt"]["translation_result"] == "succeeded"
         assert app.normal_observations == before["normal_observations"]
-        retry = await tools.execute("retry_osc_discovery", {})
+        retry = await tools.execute("retry_app", {"target": "osc_discovery"})
         receipt = retry["receipt"]
         assert retry["status"] == "applied"
         assert receipt["retry_started"] is True
@@ -3820,7 +3869,7 @@ async def test_osc_failed_and_ineligible_retries_do_not_resolve_or_change_settin
         app.osc_retry_pending = True
     tools = fixture_tools(app)
     try:
-        retry = await tools.execute("retry_osc_discovery", {})
+        retry = await tools.execute("retry_app", {"target": "osc_discovery"})
         attempted = condition in {"failed", "running_lost"}
         assert retry["status"] == ("degraded" if attempted else "rejected")
         assert retry["receipt"]["terminal"] is True
@@ -3848,7 +3897,7 @@ async def test_successful_discovery_and_completed_local_send_do_not_prove_chatbo
     app.advance()
     tools = fixture_tools(app)
     try:
-        await tools.execute("retry_osc_discovery", {})
+        await tools.execute("retry_app", {"target": "osc_discovery"})
         app.complete_osc_discovery()
         app._osc_destination = app._osc_fallback_destination
         app.advance()
@@ -3884,7 +3933,7 @@ async def test_synthetic_chatbox_observations_reject_wrong_stale_or_uncorrelated
     app.advance()
     tools = fixture_tools(app)
     try:
-        await tools.execute("retry_osc_discovery", {})
+        await tools.execute("retry_app", {"target": "osc_discovery"})
         app.advance()
         assert app.resolved()
         observation = next(
@@ -4075,20 +4124,21 @@ async def test_required_vr_host_option_explanation_can_fail_despite_normal_micro
         for item in diagnosis["diagnosis"]["candidates"]
         if item["id"] == diagnosis["diagnosis"]["selected_candidate_id"]
     )
-    diagnose = tool("measure-route", arguments="{}")
-    diagnose["name"] = "diagnose_microphone"
+    diagnose = tool("measure-route", arguments=json.dumps({"target": "microphone"}))
+    diagnose["name"] = "probe_app"
     repair = tool(
         "repair-route",
         arguments=json.dumps(
             {
+                "action": "settings",
                 "changes": {
                     "audio.input_host_api": selected["input_host_api"],
                     "audio.input_device": selected["input_device"],
-                }
+                },
             }
         ),
     )
-    repair["name"] = "change_settings"
+    repair["name"] = "manage_proposal"
     omission = "현재 설정과 실제 결과를 확인했어."
 
     class FailedExplanation(ControlledModels):
@@ -4139,7 +4189,7 @@ async def test_synthetic_chatbox_freshness_is_independent_of_internal_recovery(g
     app.advance()
     tools = fixture_tools(app)
     try:
-        await tools.execute("retry_osc_discovery", {})
+        await tools.execute("retry_app", {"target": "osc_discovery"})
         app.advance()
         assert app.resolved()
         if generation == "capture":
@@ -4170,8 +4220,14 @@ async def test_osc_retry_never_accepts_a_caller_destination_or_chatbox_text():
     tools = fixture_tools(app)
     try:
         rejected = await tools.execute(
-            "retry_osc_discovery",
-            {"connection": "manual", "host": "127.0.0.1", "port": 19000, "text": "arbitrary"},
+            "retry_app",
+            {
+                "target": "osc_discovery",
+                "connection": "manual",
+                "host": "127.0.0.1",
+                "port": 19000,
+                "text": "arbitrary",
+            },
         )
         assert rejected["status"] == "rejected"
         assert rejected["error"]["code"] == "invalid_arguments"
@@ -4487,10 +4543,13 @@ async def test_advice_only_user_declines_offered_activation_without_changing_run
     change = tool(
         "offered-local",
         arguments=json.dumps(
-            {"changes": {"translation.model": "managed_gemma", "translation.connection": "cpu"}}
+            {
+                "action": "settings",
+                "changes": {"translation.model": "managed_gemma", "translation.connection": "cpu"},
+            }
         ),
     )
-    change["name"] = "change_settings"
+    change["name"] = "manage_proposal"
     result = await run_attempt(
         scenario("recommend-local-cpu"),
         ControlledModels(),
@@ -4544,8 +4603,10 @@ def test_advice_accepts_only_unchanged_state_not_initial_caption_success(identit
 @pytest.mark.asyncio
 @pytest.mark.parametrize("refresh", [False, True], ids=["expired", "fresh-setup"])
 async def test_owner_current_setup_generation_controls_synthetic_visible_links(refresh):
-    setup = tool("first-setup", arguments=json.dumps({"provider": "openrouter"}))
-    setup["name"] = "get_provider_setup"
+    setup = tool(
+        "first-setup", arguments=json.dumps({"view": "provider_setup", "provider": "openrouter"})
+    )
+    setup["name"] = "open_app"
     fresh = deepcopy(setup)
     fresh["call_id"] = "fresh-setup"
     responses = [
@@ -4613,8 +4674,11 @@ async def test_owner_current_setup_generation_controls_synthetic_visible_links(r
 
 @pytest.mark.asyncio
 async def test_expired_owner_secure_entry_cannot_verify_an_owned_key():
-    setup = tool("owned-key-setup", arguments=json.dumps({"provider": "openrouter"}))
-    setup["name"] = "get_provider_setup"
+    setup = tool(
+        "owned-key-setup",
+        arguments=json.dumps({"view": "provider_setup", "provider": "openrouter"}),
+    )
+    setup["name"] = "open_app"
     actions = iter(
         [
             {"action": "speak", "text": "Show the key field.", "provider": None, "target": None},
@@ -4710,16 +4774,11 @@ def test_official_deepseek_key_is_not_ready_until_observed_credit_and_secure_ver
     assert app.intent["translation"] == app.initial_translation
 
 
-@pytest.mark.parametrize("unified", (False, True))
-def test_report_evidence_cannot_be_supplied_after_the_offer(unified):
+def test_report_evidence_cannot_be_supplied_after_the_offer():
     report = {
         "type": "function_call",
-        "name": "propose_app" if unified else "propose_report",
-        "arguments": json.dumps(
-            {"action": "report", "summary": "Synthetic issue"}
-            if unified
-            else {"summary": "Synthetic issue"}
-        ),
+        "name": "manage_proposal",
+        "arguments": json.dumps({"action": "report", "summary": "Synthetic issue"}),
     }
     offer = {
         "id": 1,

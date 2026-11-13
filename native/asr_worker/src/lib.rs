@@ -35,8 +35,8 @@ struct OperationFailure {
 impl From<EngineError> for OperationFailure {
     fn from(error: EngineError) -> Self {
         Self {
+            fields: native_failure_fields(&error),
             error,
-            fields: json!({}),
             attempt_started: false,
         }
     }
@@ -93,32 +93,14 @@ async fn run_worker(manifest: LaunchManifest) -> Result<(), i32> {
     )
     .await
     .map_err(|_| 11)?;
-    let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded_channel::<Value>();
+    let (outgoing_tx, outgoing_rx) = mpsc::unbounded_channel::<Value>();
     let heartbeat_interval = Duration::from_millis(manifest.heartbeat_interval_ms);
-    let session_id_for_writer = manifest.session_id.clone();
-    let writer = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(heartbeat_interval);
-        loop {
-            tokio::select! {
-                _ = interval.tick() => {
-                    let heartbeat = json!({
-                        "type": "heartbeat",
-                        "contract_version": CONTRACT_VERSION,
-                        "session_id": session_id_for_writer,
-                    });
-                    if write_frame(&mut write_half, &heartbeat).await.is_err() {
-                        return;
-                    }
-                }
-                payload = outgoing_rx.recv() => {
-                    let Some(payload) = payload else { return; };
-                    if write_frame(&mut write_half, &payload).await.is_err() {
-                        return;
-                    }
-                }
-            }
-        }
-    });
+    let mut writer = spawn_writer(
+        write_half,
+        manifest.session_id.clone(),
+        heartbeat_interval,
+        outgoing_rx,
+    );
     outgoing_tx
         .send(event(&manifest.session_id, "startup", None, json!({})))
         .map_err(|_| 11)?;
@@ -127,13 +109,32 @@ async fn run_worker(manifest: LaunchManifest) -> Result<(), i32> {
     let mut reader = BufReader::new(read_half).lines();
     let mut active: Option<ActiveOperation> = None;
     let mut shutdown_request_id: Option<String> = None;
+    let mut terminal_code = None;
+    let mut writer_finished = false;
 
     loop {
         tokio::select! {
+            result = &mut writer => {
+                writer_finished = true;
+                terminal_code = Some(14);
+                let _ = result;
+                if let Some(operation) = &active {
+                    operation.token.cancel();
+                }
+                break;
+            }
             line = reader.next_line() => {
                 let line = match line {
                     Ok(Some(value)) => value,
-                    _ => {
+                    Ok(None) => {
+                        terminal_code = Some(13);
+                        if let Some(operation) = &active {
+                            operation.token.cancel();
+                        }
+                        break;
+                    }
+                    Err(_) => {
+                        terminal_code = Some(15);
                         if let Some(operation) = &active {
                             operation.token.cancel();
                         }
@@ -249,26 +250,16 @@ async fn run_worker(manifest: LaunchManifest) -> Result<(), i32> {
             result = async { (&mut active.as_mut().expect("active operation").handle).await }, if active.is_some() => {
                 let operation_result = match result {
                     Ok(value) => value,
-                    Err(_) => OperationResult {
+                    Err(error) => OperationResult {
                         request_id: active.as_ref().expect("active operation").request_id.clone(),
-                        payload: Err(EngineError::BackendFailure.into()),
+                        payload: Err(join_failure(&error).into()),
                     },
                 };
-                match operation_result.payload {
-                    Ok(payload) => {
-                        let _ = outgoing_tx.send(response(&manifest.session_id, &operation_result.request_id, payload));
-                    }
-                    Err(failure_result) => {
-                        let _ = outgoing_tx.send(failure(
-                            &manifest.session_id,
-                            Some(&operation_result.request_id),
-                            failure_result.error.code(),
-                            failure_result.attempt_started,
-                            failure_result.fields,
-                        ));
-                    }
-                }
                 active = None;
+                if let Err(code) = send_operation_result(&outgoing_tx, &manifest.session_id, operation_result) {
+                    terminal_code = terminal_code.or(Some(code));
+                    break;
+                }
                 if shutdown_request_id.is_some() {
                     break;
                 }
@@ -277,28 +268,127 @@ async fn run_worker(manifest: LaunchManifest) -> Result<(), i32> {
     }
 
     if let Some(operation) = active {
-        operation.token.cancel();
-        let _ = operation.handle.await;
+        settle_active_operation(
+            operation,
+            &outgoing_tx,
+            &manifest.session_id,
+            &mut terminal_code,
+        ).await;
     }
     let engine_for_unload = Arc::clone(&engine);
-    let _ = tokio::task::spawn_blocking(move || {
+    if let Err(error) = tokio::task::spawn_blocking(move || {
         engine_for_unload
             .lock()
             .unwrap_or_else(|error| error.into_inner())
             .unload();
     })
-    .await;
-    let _ = outgoing_tx.send(event(
-        &manifest.session_id,
-        "shutdown",
-        shutdown_request_id.as_deref(),
-        json!({"outcome": "completed"}),
-    ));
-    tokio::time::sleep(Duration::from_millis(20)).await;
+    .await
+    {
+        terminal_code = terminal_code.or(Some(12));
+        let _ = outgoing_tx.send(failure(
+            &manifest.session_id,
+            shutdown_request_id.as_deref(),
+            if error.is_panic() { "worker_unload_panicked" } else { "worker_unload_cancelled" },
+            false,
+            json!({}),
+        ));
+    }
+    if !writer_finished {
+        let _ = outgoing_tx.send(event(
+            &manifest.session_id,
+            "shutdown",
+            shutdown_request_id.as_deref(),
+            json!({"outcome": if terminal_code.is_some() { "failed" } else { "completed" }}),
+        ));
+    }
     drop(outgoing_tx);
-    writer.abort();
-    let _ = writer.await;
-    Ok(())
+    if !writer_finished {
+        finish_writer(writer, &mut terminal_code).await;
+    }
+    terminal_code.map_or(Ok(()), Err)
+}
+
+fn spawn_writer<W>(
+    mut writer: W,
+    session_id: String,
+    heartbeat_interval: Duration,
+    mut outgoing: mpsc::UnboundedReceiver<Value>,
+) -> JoinHandle<Result<(), std::io::Error>>
+where
+    W: AsyncWrite + Unpin + Send + 'static,
+{
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(heartbeat_interval);
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    write_frame(&mut writer, &json!({
+                        "type": "heartbeat",
+                        "contract_version": CONTRACT_VERSION,
+                        "session_id": session_id,
+                    })).await?;
+                }
+                payload = outgoing.recv() => {
+                    let Some(payload) = payload else { return Ok(()); };
+                    write_frame(&mut writer, &payload).await?;
+                }
+            }
+        }
+    })
+}
+
+async fn settle_active_operation(
+    operation: ActiveOperation,
+    outgoing: &mpsc::UnboundedSender<Value>,
+    session_id: &str,
+    terminal_code: &mut Option<i32>,
+) {
+    operation.token.cancel();
+    let result = match operation.handle.await {
+        Ok(result) => result,
+        Err(error) => OperationResult {
+            request_id: operation.request_id,
+            payload: Err(join_failure(&error).into()),
+        },
+    };
+    if let Err(code) = send_operation_result(outgoing, session_id, result) {
+        *terminal_code = terminal_code.or(Some(code));
+    }
+}
+
+async fn finish_writer(
+    writer: JoinHandle<Result<(), std::io::Error>>,
+    terminal_code: &mut Option<i32>,
+) {
+    if !matches!(writer.await, Ok(Ok(()))) {
+        *terminal_code = terminal_code.or(Some(14));
+    }
+}
+
+fn join_failure(error: &tokio::task::JoinError) -> EngineError {
+    if error.is_panic() {
+        EngineError::OperationPanicked
+    } else {
+        EngineError::OperationCancelled
+    }
+}
+
+fn send_operation_result(
+    outgoing: &mpsc::UnboundedSender<Value>,
+    session_id: &str,
+    result: OperationResult,
+) -> Result<(), i32> {
+    let payload = match result.payload {
+        Ok(payload) => response(session_id, &result.request_id, payload),
+        Err(result_failure) => failure(
+            session_id,
+            Some(&result.request_id),
+            result_failure.error.code(),
+            result_failure.attempt_started,
+            result_failure.fields,
+        ),
+    };
+    outgoing.send(payload).map_err(|_| 14)
 }
 
 fn spawn_discovery(request_id: String) -> ActiveOperation {
@@ -407,23 +497,31 @@ fn transcription_operation_failure(
     failure: TranscriptionFailure,
 ) -> OperationFailure {
     let started_timing = failure.started_timing();
+    let mut fields = native_failure_fields(&failure.error);
+    if let Some(object) = fields.as_object_mut() {
+        object.insert("channel".into(), json!(channel));
+        object.insert("backend".into(), json!(backend));
+        if let Some((audio_seconds, decode_seconds, rtf)) = started_timing {
+            object.insert("audio_seconds".into(), json!(audio_seconds));
+            object.insert("decode_seconds".into(), json!(decode_seconds));
+            object.insert("rtf".into(), json!(rtf));
+        }
+    }
     OperationFailure {
         error: failure.error,
         attempt_started: started_timing.is_some(),
-        fields: match started_timing {
-            Some((audio_seconds, decode_seconds, rtf)) => json!({
-                "channel": channel,
-                "backend": backend,
-                "audio_seconds": audio_seconds,
-                "decode_seconds": decode_seconds,
-                "rtf": rtf,
-            }),
-            None => json!({
-                "channel": channel,
-                "backend": backend,
-            }),
-        },
+        fields,
     }
+}
+
+fn native_failure_fields(error: &EngineError) -> Value {
+    error.native_cause().map_or_else(
+        || json!({}),
+        |cause| json!({
+            "native_reason": cause.native_reason,
+            "native_status": cause.native_status,
+        }),
+    )
 }
 
 fn response(session_id: &str, request_id: &str, payload: Value) -> Value {
@@ -482,6 +580,40 @@ mod tests {
     use super::{failure, transcription_operation_failure};
     use crate::engine::{EngineError, TranscriptionFailure};
     use serde_json::json;
+
+    #[test]
+    fn native_failure_frame_retains_only_safe_cause_and_timing() {
+        let error = EngineError::Native {
+            classification: "decode_failure",
+            cause: crate::engine::NativeCause {
+                native_reason: "output_repetition",
+                native_status: 15,
+            },
+        };
+        let result = transcription_operation_failure(
+            "self",
+            "cpu",
+            TranscriptionFailure {
+                error,
+                audio_seconds: Some(1.0),
+                decode_seconds: 0.2,
+                attempt_started: true,
+            },
+        );
+        let frame = failure(
+            "session",
+            Some("request"),
+            result.error.code(),
+            result.attempt_started,
+            result.fields,
+        );
+        assert_eq!(frame["error_code"], "decode_failure");
+        assert_eq!(frame["payload"]["native_reason"], "output_repetition");
+        assert_eq!(frame["payload"]["native_status"], 15);
+        assert_eq!(frame["payload"]["decode_seconds"], 0.2);
+        assert!(frame["payload"].get("message").is_none());
+        assert!(frame["payload"].get("partial").is_none());
+    }
 
     #[test]
     fn failure_frame_distinguishes_prestart_from_started_attempts() {
@@ -559,6 +691,115 @@ mod tests {
                 json!({"channel": "peer", "backend": "Vulkan"}),
                 "{audio_seconds:?} {decode_seconds}"
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn worker_shutdown_drains_writer_and_disconnect_is_not_success() {
+        use super::{run_worker, write_frame, LaunchManifest, WorkerMode, CONTRACT_VERSION};
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        use tokio::net::TcpListener;
+
+        for mode in ["shutdown", "disconnect", "invalid_utf8"] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+            let manifest = LaunchManifest {
+                contract_version: CONTRACT_VERSION,
+                session_id: "synthetic-session".into(),
+                auth_token: "synthetic-auth-token-not-a-secret".into(),
+                connect_host: "127.0.0.1".into(),
+                connect_port: listener.local_addr().unwrap().port(),
+                heartbeat_interval_ms: 100,
+                mode: WorkerMode::Persistent,
+            };
+            let worker = tokio::spawn(run_worker(manifest));
+            let (stream, _) = listener.accept().await.unwrap();
+            let (reader, mut writer) = stream.into_split();
+            let mut lines = BufReader::new(reader).lines();
+            assert!(lines.next_line().await.unwrap().is_some());
+            if mode == "shutdown" {
+                write_frame(
+                    &mut writer,
+                    &json!({
+                        "type": "shutdown",
+                        "contract_version": CONTRACT_VERSION,
+                        "session_id": "synthetic-session",
+                        "request_id": "synthetic-shutdown",
+                    }),
+                ).await.unwrap();
+                let mut completed = false;
+                while let Some(line) = lines.next_line().await.unwrap() {
+                    let frame: serde_json::Value = serde_json::from_str(&line).unwrap();
+                    if frame["event"] == "shutdown" {
+                        assert_eq!(frame["fields"]["outcome"], "completed");
+                        completed = true;
+                    }
+                }
+                assert!(completed);
+                assert_eq!(worker.await.unwrap(), Ok(()));
+            } else if mode == "invalid_utf8" {
+                writer.write_all(&[0xff, b'\n']).await.unwrap();
+                let outcome = tokio::time::timeout(std::time::Duration::from_secs(1), worker)
+                    .await.unwrap().unwrap();
+                assert_eq!(outcome, Err(15));
+            } else {
+                drop(lines);
+                drop(writer);
+                let outcome = tokio::time::timeout(std::time::Duration::from_secs(1), worker)
+                    .await.unwrap().unwrap();
+                assert!(matches!(outcome, Err(13 | 14)));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn worker_join_failures_keep_panic_and_cancellation_distinct() {
+        let panicked = tokio::spawn(async { panic!("PRIVATE_PANIC_DETAIL") })
+            .await.unwrap_err();
+        assert_eq!(super::join_failure(&panicked).code(), "worker_operation_panicked");
+        let cancelled = tokio::spawn(std::future::pending::<()>());
+        cancelled.abort();
+        let error = cancelled.await.unwrap_err();
+        assert_eq!(super::join_failure(&error).code(), "worker_operation_cancelled");
+    }
+
+    #[tokio::test]
+    async fn failed_writer_does_not_replace_primary_while_active_work_settles() {
+        use super::{finish_writer, settle_active_operation, spawn_writer, ActiveOperation, OperationResult};
+        use std::time::Duration;
+        use tokio::sync::{mpsc, oneshot};
+        use transcribe_cpp::CancelToken;
+
+        for primary in [None, Some(13), Some(15)] {
+            let (transport, peer) = tokio::io::duplex(64);
+            let (outgoing, incoming) = mpsc::unbounded_channel();
+            let writer = spawn_writer(
+                transport, "synthetic-session".into(), Duration::from_millis(100), incoming
+            );
+            let token = CancelToken::new();
+            let active_token = token.clone();
+            let (started, running) = oneshot::channel();
+            let operation = ActiveOperation {
+                request_id: "synthetic-active".into(),
+                token,
+                handle: tokio::spawn(async move {
+                    started.send(()).unwrap();
+                    while !active_token.is_cancelled() {
+                        tokio::task::yield_now().await;
+                    }
+                    OperationResult {
+                        request_id: "synthetic-active".into(),
+                        payload: Err(EngineError::Cancelled.into()),
+                    }
+                }),
+            };
+            running.await.unwrap();
+            drop(peer);
+            let mut terminal = primary;
+            finish_writer(writer, &mut terminal).await;
+            assert_eq!(terminal, primary.or(Some(14)));
+            settle_active_operation(operation, &outgoing, "synthetic-session", &mut terminal).await;
+            assert_eq!(terminal, primary.or(Some(14)));
+            assert!(outgoing.is_closed());
         }
     }
 }

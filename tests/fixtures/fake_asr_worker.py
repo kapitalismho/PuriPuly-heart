@@ -177,6 +177,7 @@ for raw in reader:
                         "audio_seconds": 1.0,
                         "decode_seconds": 0.25,
                         "rtf": 0.25,
+                        **json.loads(os.environ.get("FAKE_ASR_WORKER_FAILURE_FIELDS", "{}")),
                     },
                 }
             )

@@ -8,11 +8,13 @@ import os
 import re
 import socket
 import subprocess
+from collections import deque
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol, TypeVar
 
+from puripuly_heart.core.diagnostics import sanitize_diagnostics
 from puripuly_heart.core.local_translation.assets import (
     GEMMA_26B_MODEL_ID,
     GemmaModelSpec,
@@ -31,6 +33,8 @@ from puripuly_heart.core.local_translation.runtime_profile import (
     build_gemma_server_command,
     default_gemma_runtime_paths,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.model_asset_diagnostics import model_asset_failure_diagnostics
 from puripuly_heart.core.translation_backend import require_translation_preparation_allowed
 
 GEMMA_PROMPT_TEMPLATE_VERSION = "translation-prefix-v1"
@@ -61,28 +65,44 @@ async def validate_gemma_runtime_version(executable: Path) -> None:
     )
     try:
         output, _ = await asyncio.wait_for(process.communicate(), timeout=10.0)
-    except BaseException:
-        if process.returncode is None:
-            process.kill()
-        await process.wait()
+    except BaseException as primary:
+        try:
+            if process.returncode is None:
+                process.kill()
+            await process.wait()
+        except BaseException as cleanup:
+            raise BaseExceptionGroup(
+                "Runtime version observation and cleanup failed", (primary, cleanup)
+            ) from primary
         raise
     version = output.decode("utf-8", errors="replace")
-    match = re.search(r"\bbuild\s+(\d+),\s+commit\s+([0-9a-f]{9,40})\b", version)
+    match = re.search(r"\bbuild\s+([0-9]{1,9}),\s+commit\s+([0-9a-f]{9,40})\b", version)
     if (
         process.returncode != 0
         or match is None
         or f"b{match[1]}" != LLAMA_CPP_BUILD
         or not LLAMA_CPP_COMMIT.startswith(match[2])
     ):
-        raise ManagedGemmaRuntimeVersionError(
-            f"Incompatible llama.cpp executable: {executable}. "
-            f"Use {LLAMA_CPP_BUILD} ({LLAMA_CPP_COMMIT[:9]}) or remove "
-            "PURIPULY_HEART_LLAMA_CPP_ROOT to use the managed runtime."
+        failure = ManagedGemmaRuntimeVersionError(
+            f"Incompatible llama.cpp executable. Use {LLAMA_CPP_BUILD} "
+            "or remove PURIPULY_HEART_LLAMA_CPP_ROOT to use the managed runtime."
         )
+        failure.failure_diagnostics = model_asset_failure_diagnostics(
+            failure,
+            operation="runtime_version",
+            code="model_assets.runtime_incompatible",
+            fields={
+                "exit_code": process.returncode,
+                "runtime_build": int(match[1]) if match is not None else None,
+                "build_match": match is not None and f"b{match[1]}" == LLAMA_CPP_BUILD,
+                "commit_match": match is not None and LLAMA_CPP_COMMIT.startswith(match[2]),
+            },
+        )
+        raise failure
 
 
 class ManagedGemmaRuntimeError(RuntimeError):
-    pass
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 class ManagedGemmaRuntimeClosedError(ManagedGemmaRuntimeError):
@@ -156,6 +176,10 @@ class ManagedGemmaMetrics:
 class ManagedGemmaResponse:
     text: str
     metrics: ManagedGemmaMetrics
+    recovery_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    recovery_diagnostics_truncated: bool = False
+    secondary_diagnostics_truncated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +189,10 @@ class ManagedGemmaReadiness:
     source_language: str
     target_language: str
     prefix_identity: str
+    recovery_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    recovery_diagnostics_truncated: bool = False
+    secondary_diagnostics_truncated: bool = False
 
 
 def _allocate_loopback_port() -> int:
@@ -285,6 +313,64 @@ class ManagedGemmaRuntimeOwner:
         self._operation_tasks: set[asyncio.Task[object]] = set()
         self._releasing = False
         self._closed = False
+        self._diagnostics: deque[ErrorDiagnostics] = deque(maxlen=8)
+        self._recoveries: deque[ErrorDiagnostics] = deque(maxlen=8)
+        self._secondaries: deque[ErrorDiagnostics] = deque(maxlen=8)
+        self._diagnostics_truncated = False
+        self._recoveries_truncated = False
+        self._secondaries_truncated = False
+
+    @property
+    def diagnostics(self) -> tuple[ErrorDiagnostics, ...]:
+        return tuple(self._diagnostics)
+
+    @property
+    def diagnostics_truncated(self) -> bool:
+        return self._diagnostics_truncated
+
+    def _retain_recovery(self, diagnostics: ErrorDiagnostics) -> None:
+        self._recoveries_truncated |= len(self._recoveries) == self._recoveries.maxlen
+        self._recoveries.append(diagnostics)
+
+    def _retain_secondary(self, diagnostics: ErrorDiagnostics) -> None:
+        self._secondaries_truncated |= len(self._secondaries) == self._secondaries.maxlen
+        self._secondaries.append(diagnostics)
+
+    def _record_failure(
+        self, failure: BaseException, *, operation: str = "runtime"
+    ) -> ErrorDiagnostics:
+        if isinstance(failure, ManagedGemmaRuntimeVersionError):
+            operation, code = "runtime_version", "model_assets.runtime_incompatible"
+        elif isinstance(failure, ManagedGemmaRuntimeMissingError):
+            operation, code = "runtime_files", "model_assets.runtime_missing"
+        else:
+            code = "model_assets.runtime_failed"
+        diagnostics = model_asset_failure_diagnostics(failure, operation=operation, code=code)
+        failure.failure_diagnostics = diagnostics
+        if (
+            not self._diagnostics
+            or self._diagnostics[-1].diagnostic_id != diagnostics.diagnostic_id
+        ):
+            self._diagnostics_truncated |= len(self._diagnostics) == self._diagnostics.maxlen
+            self._diagnostics.append(diagnostics)
+        return diagnostics
+
+    async def _stop_after_failure(self, failure: BaseException) -> None:
+        try:
+            await self._stop_locked()
+        except BaseException as cleanup:
+            raise BaseExceptionGroup(
+                "Managed Gemma operation and cleanup failed", (failure, cleanup)
+            ) from failure
+
+    def _attach_cleanup(
+        self, primary: BaseException, cleanup: BaseException, *, operation: str
+    ) -> None:
+        diagnostics = self._record_failure(primary, operation=operation)
+        secondary = self._record_failure(cleanup, operation="slot_cleanup")
+        primary.failure_diagnostics = sanitize_diagnostics(
+            replace(diagnostics, causes=diagnostics.causes + (secondary,))
+        )
 
     @property
     def readiness(self) -> ManagedGemmaReadiness | None:
@@ -326,6 +412,10 @@ class ManagedGemmaRuntimeOwner:
                     spec=spec,
                 )
                 return readiness
+        except BaseException as failure:
+            if not isinstance(failure, asyncio.CancelledError):
+                self._record_failure(failure)
+            raise
         finally:
             self._operation_tasks.discard(task)
 
@@ -378,7 +468,18 @@ class ManagedGemmaRuntimeOwner:
                 raise ManagedGemmaRuntimeError("managed Gemma result superseded by runtime change")
             self._ensure_process_alive()
             self._log_metrics(readiness, response.metrics)
-            return response
+            return ManagedGemmaResponse(
+                text=response.text,
+                metrics=response.metrics,
+                recovery_diagnostics=tuple(self._recoveries),
+                secondary_diagnostics=tuple(self._secondaries),
+                recovery_diagnostics_truncated=self._recoveries_truncated,
+                secondary_diagnostics_truncated=self._secondaries_truncated,
+            )
+        except BaseException as failure:
+            if not isinstance(failure, asyncio.CancelledError):
+                self._record_failure(failure)
+            raise
         finally:
             if slot_id is not None:
                 self._busy_slots.discard(slot_id)
@@ -426,7 +527,7 @@ class ManagedGemmaRuntimeOwner:
             if cancellation is not None:
                 if not task.cancelled():
                     failure = task.exception()
-                    if abort_requested and failure is not None:
+                    if failure is not None:
                         raise BaseExceptionGroup(
                             "managed Gemma preparation cancellation cleanup failed",
                             [cancellation, failure],
@@ -444,11 +545,13 @@ class ManagedGemmaRuntimeOwner:
     ) -> ManagedGemmaResponse:
         try:
             return await transport.translate(**arguments)  # type: ignore[arg-type]
-        except Exception:
+        except Exception as primary:
             try:
                 await transport.wait_slot_idle(slot_id=slot_id)
-            except Exception:
+            except Exception as cleanup:
                 self._unsettled = True
+                self._attach_cleanup(primary, cleanup, operation="runtime")
+                raise primary from cleanup
             self._slot_identities[slot_id] = None
             raise
 
@@ -517,6 +620,10 @@ class ManagedGemmaRuntimeOwner:
                 if not self._unsettled:
                     self._generation += 1
                 self._readiness = None
+                self._recoveries.clear()
+                self._recoveries_truncated = False
+                self._secondaries.clear()
+                self._secondaries_truncated = False
                 try:
                     await self._drain_locked()
                     self._ensure_accepting()
@@ -524,7 +631,11 @@ class ManagedGemmaRuntimeOwner:
                     kwargs = dict(provision_kwargs or {})
                     kwargs.setdefault("install_dir", install_dir)
                     kwargs.setdefault("spec", resolved_spec)
-                    await self._provisioner(**kwargs)
+                    installed = await self._provisioner(**kwargs)
+                    for diagnostics in getattr(installed, "recovery_diagnostics", ()):
+                        self._retain_recovery(diagnostics)
+                    for diagnostics in getattr(installed, "secondary_diagnostics", ()):
+                        self._retain_secondary(diagnostics)
                     self._ensure_accepting()
                     await self._stop_locked()
                     try:
@@ -532,28 +643,38 @@ class ManagedGemmaRuntimeOwner:
                             backend=backend, vulkan_device=vulkan_device, spec=resolved_spec
                         )
                         self._ensure_process_alive()
-                    except asyncio.CancelledError:
-                        await self._stop_locked()
+                    except asyncio.CancelledError as exc:
+                        await self._stop_after_failure(exc)
                         raise
                     except Exception as exc:
-                        await self._stop_locked()
-                        if (
-                            backend != "gpu"
-                            or resolved_spec.model_id == GEMMA_26B_MODEL_ID
-                            or isinstance(exc, ManagedGemmaRuntimeVersionError)
-                        ):
+                        original = self._record_failure(exc, operation="runtime_startup")
+                        await self._stop_after_failure(exc)
+                        if isinstance(exc, ManagedGemmaRuntimeVersionError):
+                            raise
+                        if backend != "gpu" or resolved_spec.model_id == GEMMA_26B_MODEL_ID:
                             raise ManagedGemmaRuntimeError(
                                 f"managed Gemma {backend} startup failed; "
-                                f"check the runtime and GPU resources or explicitly select E4B CPU: {exc}"
+                                "check the runtime and GPU resources or explicitly select E4B CPU"
                             ) from exc
                         self._emit(
                             "[ManagedGemma] backend_fallback requested=gpu effective=cpu reason=vulkan_start_failed",
                             logging.WARNING,
                         )
-                        await self._start_locked(
-                            backend="cpu", vulkan_device=vulkan_device, spec=resolved_spec
-                        )
-                        self._ensure_process_alive()
+                        try:
+                            await self._start_locked(
+                                backend="cpu", vulkan_device=vulkan_device, spec=resolved_spec
+                            )
+                            self._ensure_process_alive()
+                        except BaseException as fallback:
+                            fallback.failure_diagnostics = model_asset_failure_diagnostics(
+                                BaseExceptionGroup(
+                                    "Managed Gemma GPU and CPU startup failed", (exc, fallback)
+                                ),
+                                operation="runtime_startup",
+                                code="model_assets.runtime_failed",
+                            )
+                            raise
+                        self._retain_recovery(original)
                     self._requested_backend = backend
                     self._requested_vulkan_device = requested_vulkan_device
                     self._active_spec = resolved_spec
@@ -583,12 +704,13 @@ class ManagedGemmaRuntimeOwner:
                     abort_on_cancel=not self._busy_slots,
                 )
             except Exception as exc:
+                original = self._record_failure(exc, operation="prefix")
                 require_translation_preparation_allowed()
                 self._transitioning = True
                 try:
                     await self._drain_locked()
                     self._ensure_accepting()
-                    await self._stop_locked()
+                    await self._stop_after_failure(exc)
                     if (
                         backend != "gpu"
                         or effective != "vulkan"
@@ -602,9 +724,19 @@ class ManagedGemmaRuntimeOwner:
                         "[ManagedGemma] backend_fallback requested=gpu effective=cpu reason=vulkan_prefill_failed",
                         logging.WARNING,
                     )
-                    await self._start_locked(
-                        backend="cpu", vulkan_device=vulkan_device, spec=resolved_spec
-                    )
+                    try:
+                        await self._start_locked(
+                            backend="cpu", vulkan_device=vulkan_device, spec=resolved_spec
+                        )
+                    except BaseException as fallback:
+                        fallback.failure_diagnostics = model_asset_failure_diagnostics(
+                            BaseExceptionGroup(
+                                "Managed Gemma GPU prefix and CPU startup failed", (exc, fallback)
+                            ),
+                            operation="prefix",
+                            code="model_assets.prefix_failed",
+                        )
+                        raise
                     self._requested_backend = backend
                     self._requested_vulkan_device = requested_vulkan_device
                     self._active_spec = resolved_spec
@@ -621,9 +753,13 @@ class ManagedGemmaRuntimeOwner:
                             self._prepare_prefix(transport, identity, slot_id, rendered_prompt),
                             abort_on_cancel=not self._busy_slots,
                         )
-                    except BaseException:
-                        await self._stop_locked()
-                        raise
+                    except BaseException as fallback:
+                        combined = BaseExceptionGroup(
+                            "Managed Gemma GPU and CPU prefix preparation failed", (exc, fallback)
+                        )
+                        await self._stop_after_failure(combined)
+                        raise combined from fallback
+                    self._retain_recovery(original)
                 finally:
                     self._transitioning = False
                     self._condition.notify_all()
@@ -638,6 +774,10 @@ class ManagedGemmaRuntimeOwner:
             source_language=source_language,
             target_language=target_language,
             prefix_identity=identity,
+            recovery_diagnostics=tuple(self._recoveries),
+            secondary_diagnostics=tuple(self._secondaries),
+            recovery_diagnostics_truncated=self._recoveries_truncated,
+            secondary_diagnostics_truncated=self._secondaries_truncated,
         )
         self._readiness = readiness
         return readiness, slot_id
@@ -682,11 +822,13 @@ class ManagedGemmaRuntimeOwner:
             if current is not None and current.cancelling() and not self._busy_slots:
                 await self._stop_locked()
             raise
-        except Exception:
+        except Exception as primary:
             try:
                 await transport.wait_slot_idle(slot_id=slot_id)
-            except Exception:
+            except Exception as cleanup:
                 self._unsettled = True
+                self._attach_cleanup(primary, cleanup, operation="prefix")
+                raise primary from cleanup
             raise
 
     def _clear_slots(self) -> None:
@@ -725,8 +867,14 @@ class ManagedGemmaRuntimeOwner:
         filename = cache.filename_for(identity, backend)
         try:
             restored = await transport.restore_prefix(filename=filename, slot_id=slot_id)
-        except Exception:
-            await transport.wait_slot_idle(slot_id=slot_id)
+        except Exception as primary:
+            diagnostics = self._record_failure(primary, operation="prefix_restore")
+            try:
+                await transport.wait_slot_idle(slot_id=slot_id)
+            except Exception as cleanup:
+                self._attach_cleanup(primary, cleanup, operation="prefix_restore")
+                raise primary from cleanup
+            self._retain_recovery(diagnostics)
             return False
         if restored:
             cache.touch(identity, backend)
@@ -749,8 +897,14 @@ class ManagedGemmaRuntimeOwner:
         filename = cache.filename_for(identity, backend)
         try:
             await transport.save_prefix(filename=filename, slot_id=slot_id)
-        except Exception:
-            await transport.wait_slot_idle(slot_id=slot_id)
+        except Exception as primary:
+            diagnostics = self._record_failure(primary, operation="prefix_save")
+            try:
+                await transport.wait_slot_idle(slot_id=slot_id)
+            except Exception as cleanup:
+                self._attach_cleanup(primary, cleanup, operation="prefix_save")
+                raise primary from cleanup
+            self._retain_recovery(diagnostics)
             self._emit(
                 f"[ManagedGemma] prefix_cache save_failed backend={backend} identity={identity[:12]} slot={slot_id}",
                 logging.WARNING,
@@ -761,7 +915,14 @@ class ManagedGemmaRuntimeOwner:
     def _ensure_process_alive(self) -> None:
         process = self._process
         if process is None or process.returncode is not None:
-            raise ManagedGemmaRuntimeError("managed Gemma process exited before readiness")
+            failure = ManagedGemmaRuntimeError("managed Gemma process exited before readiness")
+            failure.failure_diagnostics = model_asset_failure_diagnostics(
+                failure,
+                operation="runtime",
+                code="model_assets.process_exited",
+                fields={"exit_code": process.returncode if process is not None else None},
+            )
+            raise failure
 
     async def _wait_for_startup(
         self,
@@ -774,6 +935,7 @@ class ManagedGemmaRuntimeOwner:
             transport.wait_until_ready(timeout_s=self._startup_timeout_s)
         )
         process_exit = asyncio.create_task(process.wait())
+        primary: BaseException | None = None
         try:
             done, _pending = await asyncio.wait(
                 (readiness, process_exit),
@@ -785,16 +947,36 @@ class ManagedGemmaRuntimeOwner:
                     f"[ManagedGemma] process_exit phase=startup backend={backend} exit_code={exit_code}",
                     logging.ERROR,
                 )
-                raise ManagedGemmaRuntimeError(
-                    f"managed Gemma {backend} process exited during startup "
-                    f"with exit code {exit_code}"
+                failure = ManagedGemmaRuntimeError("managed Gemma process exited during startup")
+                failure.failure_diagnostics = model_asset_failure_diagnostics(
+                    failure,
+                    operation="runtime_startup",
+                    code="model_assets.process_exited",
+                    fields={"exit_code": exit_code, "backend": backend},
                 )
+                raise failure
             await readiness
+        except BaseException as exc:
+            primary = exc
+            raise
         finally:
             for task in (readiness, process_exit):
                 if not task.done():
                     task.cancel()
-            await asyncio.gather(readiness, process_exit, return_exceptions=True)
+            results = await asyncio.gather(readiness, process_exit, return_exceptions=True)
+            failures = [
+                result
+                for result in results
+                if isinstance(result, BaseException)
+                and not isinstance(result, asyncio.CancelledError)
+                and result is not primary
+            ]
+            if failures:
+                if primary is not None:
+                    raise BaseExceptionGroup(
+                        "Managed Gemma startup observations failed", (primary, *failures)
+                    ) from primary
+                raise BaseExceptionGroup("Managed Gemma startup observations failed", failures)
 
     async def _start_locked(
         self,
@@ -843,8 +1025,8 @@ class ManagedGemmaRuntimeOwner:
                 transport=transport,
                 backend=backend,
             )
-        except BaseException:
-            await self._stop_locked()
+        except BaseException as failure:
+            await self._stop_after_failure(failure)
             raise
 
     async def release(self) -> None:
@@ -882,18 +1064,25 @@ class ManagedGemmaRuntimeOwner:
                 timeout=self._shutdown_timeout_s,
             )
             if done:
-                await asyncio.gather(*done, return_exceptions=True)
+                self._retain_settled_results(await asyncio.gather(*done, return_exceptions=True))
             if pending:
                 await self._stop_locked()
                 for work in tuple(self._server_tasks):
                     work.cancel()
                 done, pending = await asyncio.wait(pending, timeout=self._shutdown_timeout_s)
                 if done:
-                    await asyncio.gather(*done, return_exceptions=True)
+                    self._retain_settled_results(
+                        await asyncio.gather(*done, return_exceptions=True)
+                    )
                 if pending:
                     raise ManagedGemmaRuntimeError(
                         f"managed Gemma operations did not stop: {len(pending)}"
                     )
+
+    def _retain_settled_results(self, results: list[object]) -> None:
+        for result in results:
+            if isinstance(result, BaseException) and not isinstance(result, asyncio.CancelledError):
+                self._record_failure(result, operation="cleanup")
 
     async def _stop_locked(self) -> None:
         transport = self._transport
@@ -946,6 +1135,9 @@ class ManagedGemmaRuntimeOwner:
                     except BaseException as exc:
                         process_failures.append(exc)
             if process.returncode is not None and self._process is process:
+                for failure in process_failures:
+                    if not isinstance(failure, asyncio.CancelledError):
+                        self._retain_secondary(self._record_failure(failure, operation="cleanup"))
                 self._process = None
             else:
                 failures.extend(process_failures)
@@ -956,6 +1148,9 @@ class ManagedGemmaRuntimeOwner:
                         )
                     )
         if failures:
+            for failure in failures:
+                if not isinstance(failure, asyncio.CancelledError):
+                    self._record_failure(failure, operation="cleanup")
             try:
                 if len(failures) == 1:
                     raise failures[0]
@@ -996,9 +1191,14 @@ class ManagedGemmaRuntimeOwner:
     def _emit(self, message: str, level: int) -> None:
         if self._log_sink is None:
             return
-        result = self._log_sink(message, level)
-        if inspect.isawaitable(result):
-            raise TypeError("managed Gemma log sink must be synchronous")
+        try:
+            result = self._log_sink(message, level)
+            if inspect.isawaitable(result):
+                if inspect.iscoroutine(result):
+                    result.close()
+                raise TypeError("managed Gemma log sink must be synchronous")
+        except Exception as failure:
+            self._retain_secondary(self._record_failure(failure, operation="diagnostic_delivery"))
 
 
 __all__ = [

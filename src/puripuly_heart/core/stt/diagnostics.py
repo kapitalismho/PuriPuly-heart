@@ -3,10 +3,13 @@ from __future__ import annotations
 from dataclasses import replace
 
 from puripuly_heart.core.asr_worker import ASRWorkerRequestError
-from puripuly_heart.core.diagnostic_validation import stt_startup_failure_code
+from puripuly_heart.core.diagnostics import exception_diagnostics, sanitize_diagnostic_fields
 from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.messages import ErrorDiagnostics
-from puripuly_heart.core.network_diagnostics import transport_exception_chain
+from puripuly_heart.core.network_diagnostics import (
+    classify_transport_error,
+    transport_exception_chain,
+)
 from puripuly_heart.core.stt.backend import STTProviderTurnIdentity
 
 _RECOGNITION_CAUSES = frozenset(
@@ -78,6 +81,7 @@ _RECOGNITION_CAUSES = frozenset(
         "model_unavailable",
         "unreachable",
         "audio_write_failed",
+        "commit_write_failed",
         "provider_protocol_error",
         "session_closed",
         "scribe_committed_transcript_missing_text",
@@ -138,6 +142,33 @@ def recognition_cause(reason: str | None) -> str:
     return "unclassified"
 
 
+def retryable_transport_failure(exception: BaseException | None) -> bool:
+    if exception is None:
+        return False
+    for cause in transport_exception_chain(exception):
+        if isinstance(
+            cause, (FileNotFoundError, IsADirectoryError, NotADirectoryError, PermissionError)
+        ):
+            return False
+        diagnostics = getattr(cause, "failure_diagnostics", None)
+        if isinstance(diagnostics, ErrorDiagnostics) and diagnostics.category in {
+            "auth",
+            "quota",
+            "configuration",
+            "invalid_request",
+        }:
+            return False
+        response = getattr(cause, "response", None)
+        status = getattr(cause, "status_code", None) or getattr(response, "status_code", None)
+        if type(status) is int:
+            return status in {408, 429, 500, 502, 503, 504}
+        close = getattr(cause, "rcvd", None)
+        code = getattr(close, "code", None)
+        if type(code) is int:
+            return code in {1001, 1006, 1011, 1012, 1013, 1014}
+    return classify_transport_error(exception) in {"network", "timeout"}
+
+
 def recognition_failure_diagnostics(
     exception: BaseException | ErrorDiagnostics | None,
     *,
@@ -175,9 +206,19 @@ def recognition_failure_diagnostics(
     if isinstance(exception, BaseException):
         for item in transport_exception_chain(exception):
             if isinstance(item, ASRWorkerRequestError):
-                native_code = stt_startup_failure_code(item.code)
-                if native_code not in {"none", "unclassified"}:
-                    fields["native_classification"] = native_code
+                native_fields, _ = sanitize_diagnostic_fields(
+                    {
+                        "native_classification": item.code,
+                        **{
+                            key: item.fields[key]
+                            for key in ("native_reason", "native_status")
+                            if key in item.fields
+                        },
+                    }
+                )
+                native_code = native_fields.get("native_classification")
+                if native_code is not None:
+                    fields.update(native_fields)
                     category = (
                         "timeout"
                         if native_code in {"heartbeat_timeout", "channel_cancel_timeout"}
@@ -208,3 +249,31 @@ def recognition_failure_diagnostics(
         ),
         fields=fields,
     )
+
+
+def recognition_cleanup_failure(
+    exception: BaseException,
+    *,
+    provider: str,
+    channel: str | None,
+    primary: ErrorDiagnostics | None = None,
+) -> ErrorDiagnostics:
+    diagnostics = exception_diagnostics(
+        exception,
+        component="provider.stt",
+        operation="cleanup",
+        code="stt.provider_cleanup_failed",
+        fields={
+            "provider": provider,
+            "recognition_cause": "provider_cleanup_failed",
+        },
+    )
+    diagnostics = replace(
+        diagnostics,
+        channel=channel if channel in {"self", "peer"} else None,
+        cause_id=primary.diagnostic_id if primary is not None else diagnostics.cause_id,
+        causes=(*diagnostics.causes, *((primary,) if primary is not None else ())),
+        fields={**diagnostics.fields, "cleanup_confirmed": False},
+    )
+    exception.failure_diagnostics = diagnostics
+    return diagnostics

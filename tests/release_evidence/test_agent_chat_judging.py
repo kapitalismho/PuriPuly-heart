@@ -218,7 +218,7 @@ def test_model_payload_excludes_only_typed_reasoning_items_including_terminal_co
     tool = {
         "type": "function_call",
         "call_id": "settings",
-        "name": "get_app_context",
+        "name": "read_app",
         "arguments": '{"topic":"reasoning"}',
     }
     outcome = {
@@ -539,9 +539,9 @@ def pending_card_evidence(*, reject=False):
     archive = [
         {
             "type": "function_call",
-            "name": "withdraw_confirmation",
+            "name": "manage_proposal",
             "call_id": "withdraw-paid",
-            "arguments": json.dumps({"card_id": card["id"]}),
+            "arguments": json.dumps({"action": "withdraw", "card_id": card["id"]}),
         },
         {
             "type": "function_call_output",
@@ -553,7 +553,7 @@ def pending_card_evidence(*, reject=False):
         "status": "completed",
         "tool_results": [
             {
-                "tool": "withdraw_confirmation",
+                "tool": "manage_proposal",
                 "call_id": "withdraw-paid",
                 "status": "withdrawn",
                 "result": withdrawal,
@@ -684,7 +684,7 @@ def report_evidence_calls(*, inspection_first=True, source="initial_context"):
             "output": [
                 {
                     "type": "function_call",
-                    "name": "propose_app",
+                    "name": "manage_proposal",
                     "arguments": '{"action":"report","summary":"Synthetic unresolved issue."}',
                 }
             ]

@@ -5,6 +5,7 @@ import sys
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.clipboard import ClipboardRuntime
 
 ClipboardWatcherFactory = Callable[[Callable[[str], None]], object]
@@ -44,11 +45,16 @@ class ClipboardAutoTranslationOwner:
             self._lock = asyncio.Lock()
         return self._lock
 
+    @property
+    def failure_diagnostics(self) -> ErrorDiagnostics | None:
+        return self._runtime.failure_diagnostics if self._runtime is not None else None
+
     def get_runtime(self) -> ClipboardRuntime:
         if self._runtime is None:
             self._runtime = ClipboardRuntime(
                 watcher_factory=self.watcher_factory,
-                submit_handler=self._submit_text,
+                submit_handler=self.submit_text,
+                failure_sink=self._on_failure,
             )
         return self._runtime
 
@@ -69,7 +75,6 @@ class ClipboardAutoTranslationOwner:
                     strict_runtime_errors=strict,
                 )
             except Exception:
-                self.failure_sink("Clipboard watcher failed to start")
                 if strict:
                     raise
 
@@ -82,7 +87,6 @@ class ClipboardAutoTranslationOwner:
             try:
                 await runtime.stop(strict_runtime_errors=strict)
             except Exception:
-                self.failure_sink("Clipboard watcher failed to stop")
                 if strict:
                     raise
 
@@ -95,7 +99,6 @@ class ClipboardAutoTranslationOwner:
             try:
                 await runtime.close()
             except Exception:
-                self.failure_sink("Clipboard runtime failed to close")
                 if strict:
                     raise
 
@@ -106,7 +109,7 @@ class ClipboardAutoTranslationOwner:
         try:
             self.get_runtime().submit_from_loop(text)
         except RuntimeError as exc:
-            self.failure_sink(f"Clipboard submit scheduling failed: {exc}")
+            self.get_runtime().record_failure(exc, "clipboard_submit")
 
     async def submit_now(self, text: str) -> None:
         await self._submit_text(text)
@@ -115,7 +118,22 @@ class ClipboardAutoTranslationOwner:
         try:
             await self.submit_text(text)
         except Exception as exc:
-            self.failure_sink(f"Clipboard submit failed: {exc}")
+            self.get_runtime().record_failure(exc, "clipboard_submit")
+
+    def _on_failure(self, diagnostics: ErrorDiagnostics) -> None:
+        message = {
+            "watcher_start": "Clipboard watcher failed to start",
+            "watcher_stop": "Clipboard watcher failed to stop",
+            "clipboard_read": "Clipboard could not be read",
+            "clipboard_callback": "Clipboard callback failed",
+            "clipboard_loop": "Clipboard watcher stopped after an internal failure",
+            "clipboard_cleanup": "Clipboard watcher cleanup failed",
+            "submit_drain": "Clipboard submissions did not settle before shutdown",
+        }.get(diagnostics.operation, "Clipboard submit failed")
+        try:
+            self.failure_sink(message)
+        except Exception:
+            pass
 
     def _resolve_strict_runtime_errors(self, value: bool | None) -> bool:
         return self.strict_runtime_errors if value is None else bool(value)

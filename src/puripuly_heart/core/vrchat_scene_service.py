@@ -100,6 +100,8 @@ class VrchatSceneService(SceneSnapshotProvider):
     _process_observation_succeeded: bool | None = field(default=None, init=False, repr=False)
     _process_present: bool | None = field(default=None, init=False, repr=False)
     _observation_diagnostics: ErrorDiagnostics | None = field(default=None, init=False, repr=False)
+    _file_failure_diagnostics: ErrorDiagnostics | None = field(default=None, init=False, repr=False)
+    failure_diagnostics: ErrorDiagnostics | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         if self.poll_interval_s <= 0:
@@ -136,6 +138,11 @@ class VrchatSceneService(SceneSnapshotProvider):
                 if self._observation_diagnostics
                 else None
             ),
+            "file_observation_diagnostic_id": (
+                self._file_failure_diagnostics.diagnostic_id
+                if self._file_failure_diagnostics
+                else None
+            ),
         }
 
     async def start(self) -> None:
@@ -156,6 +163,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         self._instance_id = None
         self._log_candidate = None
         self._tailer = VrchatSceneLogTailer(self.log_directory)
+        self._file_failure_diagnostics = None
         self._tracker.reset()
         self._publish_snapshot(UNAVAILABLE_SNAPSHOT)
 
@@ -272,6 +280,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         self._instance_id = identity.instance_id
         self._log_candidate = None
         self._tailer = VrchatSceneLogTailer(self.log_directory)
+        self._file_failure_diagnostics = None
         self._tracker.reset()
         self._publish_snapshot(self._tracker.snapshot())
         self._touch()
@@ -308,6 +317,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         self._instance_id = None
         self._log_candidate = None
         self._tailer = VrchatSceneLogTailer(self.log_directory)
+        self._file_failure_diagnostics = None
         self._tracker.reset()
         self._publish_snapshot(UNAVAILABLE_SNAPSHOT)
 
@@ -436,20 +446,22 @@ class VrchatSceneService(SceneSnapshotProvider):
     def _mark_file_failure(self, generation: int, error: BaseException | None = None) -> None:
         if generation != self._generation or not self._started or not self._in_lifecycle:
             return
-        previous = self._snapshot.status
         self._tracker.on_file_failure()
         self._snapshot = self._tracker.snapshot()
-        if self._snapshot.status == previous:
-            return
-        emit_failure(
-            logger,
-            self._diagnostics("vrchat_scene_log_read_failed", "scene_log_read", error),
-            severity="warning",
-            disposition="degraded",
-            stage="scene_log_read",
-        )
+        if self._file_failure_diagnostics is None:
+            self._file_failure_diagnostics = self._diagnostics(
+                "vrchat_scene_log_read_failed", "scene_log_read", error
+            )
+            emit_failure(
+                logger,
+                self._file_failure_diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="scene_log_read",
+            )
 
     def _feed_lines(self, lines: list[str]) -> int:
+        self._file_failure_diagnostics = None
         parsed = 0
         for line in lines:
             event = parse_vrchat_scene_line(line)
@@ -493,7 +505,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         exception: BaseException | None = None,
         **fields: bool | None,
     ) -> ErrorDiagnostics:
-        return ErrorDiagnostics(
+        diagnostics = ErrorDiagnostics(
             component="vrchat_scene",
             operation=phase,
             code=code,
@@ -509,6 +521,8 @@ class VrchatSceneService(SceneSnapshotProvider):
             },
             generation=self._generation,
         )
+        self.failure_diagnostics = diagnostics
+        return diagnostics
 
 
 __all__ = ["VrchatSceneService"]

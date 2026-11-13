@@ -328,7 +328,7 @@ describe('user-authorized opaque support storage', () => {
   });
 
   it('publishes a bounded report proposal without a send tool', () => {
-    const tool = appTools.find((value) => value.name === 'propose_app');
+    const tool = appTools.find((value) => value.name === 'manage_proposal');
     expect(tool).toMatchObject({ type: 'function', parameters: { type: 'object', additionalProperties: false,
       properties: { summary: { type: 'string', minLength: 1, maxLength: 2000 } } } });
     const properties = tool?.parameters.properties;

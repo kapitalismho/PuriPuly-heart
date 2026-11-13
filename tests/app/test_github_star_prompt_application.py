@@ -55,7 +55,6 @@ def _settings(*, connection: str, translation_success_observed: bool = False) ->
 def _prompt_owner(
     settings: AppSettingsVNext,
     *,
-    remaining_percent: int | None = None,
     persistence: RecordingPersistence | None = None,
     diagnostics: list[tuple[str, dict[str, object]]] | None = None,
 ) -> tuple[
@@ -76,7 +75,6 @@ def _prompt_owner(
     results: list[TransactionResult] = []
     prompt = compose_github_star_prompt_owner(
         settings=settings_owner,
-        managed_remaining_percent=lambda: remaining_percent,
         transaction_result_sink=results.append,
         save_failure_sink=lambda _context, _error: None,
         runtime_diagnostics_sink=lambda event, metadata: resolved_diagnostics.append(
@@ -88,8 +86,8 @@ def _prompt_owner(
 
 
 @pytest.mark.asyncio
-async def test_prompt_settings_owner_persists_user_owned_click_without_controller() -> None:
-    settings = _settings(connection="openrouter", translation_success_observed=True)
+async def test_prompt_settings_owner_persists_click_without_controller() -> None:
+    settings = _settings(connection="public_api", translation_success_observed=True)
     settings_owner, prompt, results, persistence = _prompt_owner(settings)
 
     assert prompt.is_eligible() is True
@@ -120,25 +118,3 @@ async def test_prompt_settings_owner_reports_safe_order24_persistence_failure() 
     assert results[-1].status == TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED
     assert results[-1].diagnostics.diagnostic_id == settings_owner.last_failure.diagnostic_id
     assert raw_failure not in repr(results[-1].diagnostics)
-
-
-@pytest.mark.parametrize(
-    ("remaining_percent", "expected"),
-    (
-        (None, False),
-        (61, False),
-        (60, True),
-        (0, True),
-    ),
-)
-def test_prompt_settings_owner_preserves_managed_usage_threshold(
-    remaining_percent: int | None,
-    expected: bool,
-) -> None:
-    settings = _settings(connection="managed")
-    _settings_owner, prompt, _results, _persistence = _prompt_owner(
-        settings,
-        remaining_percent=remaining_percent,
-    )
-
-    assert prompt.is_eligible() is expected

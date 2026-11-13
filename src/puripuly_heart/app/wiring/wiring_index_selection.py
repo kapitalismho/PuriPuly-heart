@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import math
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
@@ -17,6 +17,7 @@ from puripuly_heart.app.wiring.wiring_managed_auth_factory import (
 )
 from puripuly_heart.app.wiring.wiring_secrets_factory import create_secret_store
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.openrouter.openrouter_credentials import resolve_openrouter_credentials
 from puripuly_heart.core.openrouter.openrouter_handoff import is_effectively_exhausted
@@ -52,19 +53,32 @@ async def check_index_availability() -> None:
         await provider.close()
 
 
-def unknown_managed_allowance(reason: str) -> IndexManagedAllowanceObservation:
+def unknown_managed_allowance(
+    reason: str, exception: BaseException | None = None
+) -> IndexManagedAllowanceObservation:
     return IndexManagedAllowanceObservation(
         "unknown",
-        ErrorDiagnostics(
-            component="index_selection",
-            operation="managed_allowance",
-            code="index_managed_allowance_unknown",
-            category="unknown",
-            visibility="basic",
-            content_policy="metadata_only",
-            status_code=None,
-            retry_after_ms=None,
-            fields={"reason": reason},
+        (
+            exception_diagnostics(
+                exception,
+                component="index_selection",
+                operation="managed_allowance",
+                code="index_managed_allowance_unknown",
+                category="unknown",
+                fields={"reason": reason},
+            )
+            if exception is not None
+            else ErrorDiagnostics(
+                component="index_selection",
+                operation="managed_allowance",
+                code="index_managed_allowance_unknown",
+                category="unknown",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={"reason": reason},
+            )
         ),
     )
 
@@ -76,6 +90,7 @@ class IndexManagedAllowanceObserver:
     verifier: ProviderVerifierPort
     ingress_frozen: Callable[[], bool]
     metadata_timeout_seconds: float = 5.0
+    failure_diagnostics: ErrorDiagnostics | None = field(default=None, init=False)
 
     async def destination_credential_available(self) -> bool:
         current = self.settings.canonical
@@ -89,7 +104,10 @@ class IndexManagedAllowanceObserver:
 
         try:
             available = await run_owned_thread_call(resolve)
-        except Exception:
+        except Exception as exc:
+            self.failure_diagnostics = unknown_managed_allowance(
+                "credential_unavailable", exc
+            ).diagnostics
             return False
         live = self.settings.canonical
         return bool(
@@ -124,8 +142,10 @@ class IndexManagedAllowanceObserver:
 
         try:
             key = await run_owned_thread_call(read_key)
-        except Exception:
-            return unknown_managed_allowance("credential_unavailable")
+        except Exception as exc:
+            observation = unknown_managed_allowance("credential_unavailable", exc)
+            self.failure_diagnostics = observation.diagnostics
+            return observation
         if not current_identity():
             return unknown_managed_allowance("credential_not_current")
         if not key:
@@ -134,8 +154,10 @@ class IndexManagedAllowanceObserver:
             async with asyncio.timeout(self.metadata_timeout_seconds):
                 metadata = await self.verifier.fetch_openrouter_key_metadata(key)
             latest_key = await run_owned_thread_call(read_key)
-        except Exception:
-            return unknown_managed_allowance("metadata_unavailable")
+        except Exception as exc:
+            observation = unknown_managed_allowance("metadata_unavailable", exc)
+            self.failure_diagnostics = observation.diagnostics
+            return observation
         if not current_identity() or latest_key != key:
             return unknown_managed_allowance("credential_not_current")
         remaining = metadata.remaining_usd if metadata is not None else None
@@ -152,7 +174,10 @@ class IndexManagedAllowanceObserver:
                 return False
             try:
                 return await run_owned_thread_call(read_key) == key and current_identity()
-            except Exception:
+            except Exception as exc:
+                self.failure_diagnostics = unknown_managed_allowance(
+                    "credential_unavailable", exc
+                ).diagnostics
                 return False
 
         return IndexManagedAllowanceObservation(

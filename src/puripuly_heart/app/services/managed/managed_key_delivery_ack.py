@@ -18,6 +18,7 @@ from puripuly_heart.app.services.managed.managed_operation import (
 )
 from puripuly_heart.core.diagnostics import (
     emit_failure,
+    exception_diagnostics,
     safe_exception_fields,
     sanitize_diagnostics,
 )
@@ -489,18 +490,21 @@ class ManagedKeyDeliveryAckService:
                     diagnostics=primary,
                     ack_result=ack_result,
                 )
+            secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
             if not preserve_operation:
                 try:
                     await clear_resume_token(self.secret_store)
                 except Exception as exc:
+                    diagnostics = _diagnostics(
+                        operation="clear_delivery_ack_metadata",
+                        code="managed_application_failed",
+                        fields={"source": source, "cleanup_confirmed": False},
+                        exception=exc,
+                    )
+                    secondary_diagnostics = (diagnostics,)
                     emit_failure(
                         logging.getLogger(__name__),
-                        _diagnostics(
-                            operation="clear_delivery_ack_metadata",
-                            code="managed_application_failed",
-                            fields={"source": source},
-                            exception=exc,
-                        ),
+                        diagnostics,
                         severity="warning",
                         disposition="degraded",
                     )
@@ -508,6 +512,7 @@ class ManagedKeyDeliveryAckService:
                 succeeded=True,
                 status=ack_result.status,
                 ack_result=ack_result,
+                secondary_diagnostics=secondary_diagnostics,
             )
         return ManagedKeyDeliveryAckServiceResult(
             succeeded=False,
@@ -709,8 +714,13 @@ def _diagnostics(
     cause: ErrorDiagnostics | None = None,
 ) -> ErrorDiagnostics:
     if cause is None and exception is not None:
-        candidate = getattr(exception, "diagnostics", None)
-        cause = candidate if isinstance(candidate, ErrorDiagnostics) else None
+        cause = exception_diagnostics(
+            exception,
+            component="managed_key_delivery_ack",
+            operation=operation,
+            code=code,
+            fields={"phase": operation, **fields},
+        )
     if cause is not None:
         safe = sanitize_diagnostics(cause)
         return replace(safe, fields={**fields, **safe.fields})

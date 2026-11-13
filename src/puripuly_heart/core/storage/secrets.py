@@ -7,12 +7,14 @@ import os
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
 
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+
+from puripuly_heart.core.diagnostics import exception_diagnostics
 
 _GEMINI_API_KEY = "gemini_api_key"
 _GEMINI_LEGACY_KEYS = ("gemini_transcribe_api_key", "google_api_key")
@@ -209,11 +211,37 @@ def _derive_key(*, passphrase: str, salt: bytes) -> bytes:
 
 def _atomic_write_json(path: Path, data: object) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
+    failure: Exception | None = None
     try:
         with tmp.open("w", encoding="utf-8") as stream:
             json.dump(data, stream, ensure_ascii=False, indent=2)
             stream.flush()
             os.fsync(stream.fileno())
         tmp.replace(path)
+    except Exception as exc:
+        failure = exc
+        raise
     finally:
-        tmp.unlink(missing_ok=True)
+        try:
+            tmp.unlink(missing_ok=True)
+        except Exception as cleanup_exc:
+            cleanup = exception_diagnostics(
+                cleanup_exc,
+                component="secret_store",
+                operation="temporary_cleanup",
+                code="secret_cleanup_failed",
+                category="transaction",
+                fields={"secret_write_succeeded": failure is None, "cleanup_confirmed": False},
+            )
+            if failure is None:
+                cleanup_exc.diagnostics = cleanup
+                raise
+            primary = exception_diagnostics(
+                failure,
+                component="secret_store",
+                operation="set_secret",
+                code="secret_write_failed",
+                category="transaction",
+                fields={"secret_write_succeeded": False},
+            )
+            failure.diagnostics = replace(primary, causes=(*primary.causes, cleanup))

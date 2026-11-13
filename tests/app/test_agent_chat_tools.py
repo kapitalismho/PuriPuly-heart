@@ -209,7 +209,7 @@ async def test_actual_receipt_approved_revert_and_following_navigation(catalog):
     tools, actions, events = adapter(control)
     try:
         first = await tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": 0.4}}
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.4}}
         )
         assert first["status"] == "needs_confirmation"
         assert not control.submissions
@@ -219,7 +219,7 @@ async def test_actual_receipt_approved_revert_and_following_navigation(catalog):
         assert control.submissions[0]["expected_revision"] == 11
         tools.observe_context(first["context"])
         second = await tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": 0.8}}
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.8}}
         )
         assert second["status"] == "needs_confirmation"
         assert len(control.submissions) == 1
@@ -227,7 +227,7 @@ async def test_actual_receipt_approved_revert_and_following_navigation(catalog):
         assert second["status"] == "applied"
         tools.observe_context(second["context"])
         revert = await tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": 0.4}}
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.4}}
         )
         assert revert["status"] == "needs_confirmation"
         assert len(control.submissions) == 2
@@ -247,7 +247,7 @@ async def test_actual_receipt_approved_revert_and_following_navigation(catalog):
                 "completion_observable": False,
             }
         )
-        opened = await tools.execute("open_settings", {"section": "overlay", "provider": None})
+        opened = await tools.execute("open_app", {"view": "settings", "section": "overlay"})
         assert opened["opened"] is True
         assert events[-1]["kind"] == "navigation_requested"
         assert [action["phase"] for action in actions] == [
@@ -268,7 +268,7 @@ async def test_confirmation_replacement_decline_and_captured_revision_conflict(c
     tools, actions, events = adapter(control)
     try:
         request = {"changes": {"stt.provider": "deepgram"}}
-        needed = await tools.execute("change_settings", request)
+        needed = await tools.execute("manage_proposal", {"action": "settings", **request})
         first = needed["confirmation"]
         assert needed["status"] == "needs_confirmation"
         assert first["changes"] == request["changes"]
@@ -279,9 +279,13 @@ async def test_confirmation_replacement_decline_and_captured_revision_conflict(c
         assert not control.submissions
         assert control.context()["settings"]["stt.provider"] != "deepgram"
         assert events[-1]["kind"] == "confirmation"
-        old = (await tools.execute("change_settings", request))["confirmation"]
+        old = (await tools.execute("manage_proposal", {"action": "settings", **request}))[
+            "confirmation"
+        ]
         replacement = (
-            await tools.execute("change_settings", {"changes": {"stt.provider": "soniox"}})
+            await tools.execute(
+                "manage_proposal", {"action": "settings", "changes": {"stt.provider": "soniox"}}
+            )
         )["confirmation"]
         assert tools.confirmation["id"] == replacement["id"]
         assert (await tools.confirm(old["id"], True))["status"] == "rejected"
@@ -308,15 +312,19 @@ async def test_withdraw_exact_pending_confirmation_preserves_completed_settings(
     tools, actions, events = adapter(control)
     try:
         proposed = await tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": 0.4}}
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.4}}
         )
         await tools.confirm(proposed["confirmation"]["id"], True)
         before = control.context()
-        card = (await tools.execute("change_settings", {"changes": {"stt.provider": "deepgram"}}))[
-            "confirmation"
-        ]
+        card = (
+            await tools.execute(
+                "manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}
+            )
+        )["confirmation"]
         prior_actions, prior_events = deepcopy(actions), deepcopy(events)
-        result = await tools.execute("withdraw_confirmation", {"card_id": card["id"]})
+        result = await tools.execute(
+            "manage_proposal", {"action": "withdraw", "card_id": card["id"]}
+        )
         assert result == {"status": "withdrawn", "card_id": card["id"]}
         assert tools.confirmation is None
         assert control.context() == before
@@ -349,11 +357,13 @@ async def test_withdraw_invalid_or_unknown_card_keeps_current_proposal(catalog, 
     control = Control(catalog)
     tools, actions, events = adapter(control)
     try:
-        card = (await tools.execute("change_settings", {"changes": {"stt.provider": "deepgram"}}))[
-            "confirmation"
-        ]
+        card = (
+            await tools.execute(
+                "manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}
+            )
+        )["confirmation"]
         before = control.context()
-        result = await tools.execute("withdraw_confirmation", arguments)
+        result = await tools.execute("manage_proposal", {"action": "withdraw", **arguments})
         assert result["status"] == "rejected"
         assert tools.confirmation == card
         assert control.context() == before
@@ -367,14 +377,20 @@ async def test_withdraw_stale_or_already_applied_card_cannot_change_settings(cat
     control = Control(catalog)
     tools, actions, events = adapter(control)
     try:
-        old = (await tools.execute("change_settings", {"changes": {"stt.provider": "deepgram"}}))[
-            "confirmation"
-        ]
-        current = (await tools.execute("change_settings", {"changes": {"stt.provider": "soniox"}}))[
-            "confirmation"
-        ]
+        old = (
+            await tools.execute(
+                "manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}
+            )
+        )["confirmation"]
+        current = (
+            await tools.execute(
+                "manage_proposal", {"action": "settings", "changes": {"stt.provider": "soniox"}}
+            )
+        )["confirmation"]
         before = control.context()
-        rejected = await tools.execute("withdraw_confirmation", {"card_id": old["id"]})
+        rejected = await tools.execute(
+            "manage_proposal", {"action": "withdraw", "card_id": old["id"]}
+        )
         assert rejected["error"]["code"] == "confirmation_unavailable"
         assert tools.confirmation == current
         assert control.context() == before
@@ -382,7 +398,9 @@ async def test_withdraw_stale_or_already_applied_card_cannot_change_settings(cat
         assert (await tools.confirm(current["id"], True))["status"] == "applied"
         applied = control.context()
         prior_actions, prior_events = deepcopy(actions), deepcopy(events)
-        rejected = await tools.execute("withdraw_confirmation", {"card_id": current["id"]})
+        rejected = await tools.execute(
+            "manage_proposal", {"action": "withdraw", "card_id": current["id"]}
+        )
         assert rejected["error"]["code"] == "confirmation_unavailable"
         assert tools.confirmation is None
         assert control.context() == applied
@@ -401,13 +419,13 @@ async def test_active_interruption_approval_groups_exact_translation_choice(cata
     control.channels["self"]["effective_active"] = True
     try:
         vad = await tools.execute(
-            "change_settings", {"changes": {"self_vad.speech_threshold": 0.7}}
+            "manage_proposal", {"action": "settings", "changes": {"self_vad.speech_threshold": 0.7}}
         )
         assert vad["status"] == "needs_confirmation"
         assert not control.submissions
         tools.cancel_confirmation()
         changes = {"translation.model": "gpt_6_luna", "translation.connection": "official_byok"}
-        needed = await tools.execute("change_settings", {"changes": changes})
+        needed = await tools.execute("manage_proposal", {"action": "settings", "changes": changes})
         card = needed["confirmation"]
         changes["translation.model"] = "local_llm"
         assert card["changes"]["translation.model"] == "gpt_6_luna"
@@ -420,8 +438,11 @@ async def test_active_interruption_approval_groups_exact_translation_choice(cata
         control.channels["self"]["effective_active"] = False
         tools.observe_context(applied["context"])
         local = await tools.execute(
-            "change_settings",
-            {"changes": {"translation.model": "managed_gemma", "translation.connection": "cpu"}},
+            "manage_proposal",
+            {
+                "action": "settings",
+                "changes": {"translation.model": "managed_gemma", "translation.connection": "cpu"},
+            },
         )
         assert local["status"] == "needs_confirmation"
         assert len(control.submissions) == 1
@@ -434,11 +455,12 @@ async def test_active_interruption_approval_groups_exact_translation_choice(cata
 async def test_strict_real_schema_excludes_private_content_and_uses_catalog_bounds(catalog):
     schema = settings_tool_schema(catalog)
     assert set(schema["properties"]) == SETTINGS_FIELDS
-    assert set(schema["required"]) == SETTINGS_FIELDS
+    assert schema["required"] == []
     assert schema["additionalProperties"] is False
-    language_schema = schema["properties"]["languages"]["anyOf"][0]
-    assert set(language_schema["required"]) == set(LANGUAGE_FIELD_PATHS)
-    assert schema["properties"]["stt.cloud_free_tier_providers"]["anyOf"][0] == {
+    language_schema = schema["properties"]["languages"]
+    assert language_schema["required"] == []
+    assert set(language_schema["properties"]) == set(LANGUAGE_FIELD_PATHS)
+    assert schema["properties"]["stt.cloud_free_tier_providers"] == {
         "type": "array",
         "items": {
             "type": "string",
@@ -461,7 +483,9 @@ async def test_strict_real_schema_excludes_private_content_and_uses_catalog_boun
             "osc.connection_mode",
             "local_llm.base_url",
         ):
-            result = await tools.execute("change_settings", {"changes": {excluded: None}})
+            result = await tools.execute(
+                "manage_proposal", {"action": "settings", "changes": {excluded: None}}
+            )
             assert result["status"] == "rejected"
         for changes in (
             {"overlay.background_alpha": 0.9},
@@ -481,14 +505,12 @@ async def test_strict_real_schema_excludes_private_content_and_uses_catalog_boun
             {"stt.cloud_free_tier_providers": ["deepgram", None]},
             {"stt.cloud_free_tier_providers": "deepgram"},
         ):
-            assert (await tools.execute("change_settings", {"changes": changes}))[
-                "status"
-            ] == "rejected"
+            assert (
+                await tools.execute("manage_proposal", {"action": "settings", "changes": changes})
+            )["status"] == "rejected"
         assert not control.submissions
-        values = dict.fromkeys(SETTINGS_FIELDS)
-        values["languages"] = dict.fromkeys(LANGUAGE_FIELD_PATHS)
-        values["languages"]["source"] = "en"
-        applied = await tools.execute("change_settings", {"changes": values})
+        values = {"languages": {"source": "en"}}
+        applied = await tools.execute("manage_proposal", {"action": "settings", "changes": values})
         assert applied["status"] == "needs_confirmation"
         assert not control.submissions
         applied = await tools.confirm(applied["confirmation"]["id"], True)
@@ -506,7 +528,9 @@ async def test_free_cloud_membership_uses_current_catalog_without_selecting_paid
     original_provider = control.context()["settings"]["stt.provider"]
     try:
         assert control.context()["settings"][field] == ["gemini_transcribe"]
-        applied = await tools.execute("change_settings", {"changes": {field: ["deepgram"]}})
+        applied = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": {field: ["deepgram"]}}
+        )
         assert applied["status"] == "needs_confirmation"
         assert not control.submissions
         applied = await tools.confirm(applied["confirmation"]["id"], True)
@@ -518,7 +542,7 @@ async def test_free_cloud_membership_uses_current_catalog_without_selecting_paid
         assert control.context()["settings"][field] == ["deepgram"]
         tools.observe_context(applied["context"])
         restored = await tools.execute(
-            "change_settings", {"changes": {field: ["gemini_transcribe"]}}
+            "manage_proposal", {"action": "settings", "changes": {field: ["gemini_transcribe"]}}
         )
         assert restored["status"] == "needs_confirmation"
         restored = await tools.confirm(restored["confirmation"]["id"], True)
@@ -526,7 +550,9 @@ async def test_free_cloud_membership_uses_current_catalog_without_selecting_paid
         assert restored["context"]["settings"][field] == ["gemini_transcribe"]
         tools.observe_context(restored["context"])
         changes = {"stt.provider": "rolling_free", field: ["deepgram"]}
-        selected = await tools.execute("change_settings", {"changes": changes})
+        selected = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": changes}
+        )
         assert selected["status"] == "needs_confirmation"
         selected = await tools.confirm(selected["confirmation"]["id"], True)
         assert selected["status"] == "applied"
@@ -534,7 +560,9 @@ async def test_free_cloud_membership_uses_current_catalog_without_selecting_paid
         assert selected["context"]["settings"][field] == ["deepgram"]
         tools.observe_context(selected["context"])
         control.catalog["choices"][field] = ["gemini_transcribe"]
-        rejected = await tools.execute("change_settings", {"changes": {field: ["deepgram"]}})
+        rejected = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": {field: ["deepgram"]}}
+        )
         assert rejected["status"] == "rejected"
         assert len(control.submissions) == 3
     finally:
@@ -557,7 +585,7 @@ async def test_free_cloud_membership_preserves_disruptive_approval_and_exact_cha
     field = "stt.cloud_free_tier_providers"
     changes = {field: ["deepgram"]}
     try:
-        needed = await tools.execute("change_settings", {"changes": changes})
+        needed = await tools.execute("manage_proposal", {"action": "settings", "changes": changes})
         assert needed["status"] == "needs_confirmation"
         card = needed["confirmation"]
         channels = ("self", "peer") if active_channel is None else (active_channel,)
@@ -569,7 +597,7 @@ async def test_free_cloud_membership_preserves_disruptive_approval_and_exact_cha
         declined = await tools.confirm(card["id"], False)
         assert declined["status"] == "declined"
         assert control.context()["settings"][field] == ["gemini_transcribe"]
-        needed = await tools.execute("change_settings", {"changes": changes})
+        needed = await tools.execute("manage_proposal", {"action": "settings", "changes": changes})
         changes[field].append("soniox")
         card = needed["confirmation"]
         assert card["changes"][field] == ["deepgram"]
@@ -590,7 +618,9 @@ async def test_free_cloud_membership_keeps_revision_conflicts_and_paid_switch_po
     tools, _, _ = adapter(control)
     field = "stt.cloud_free_tier_providers"
     try:
-        needed = await tools.execute("change_settings", {"changes": {field: ["deepgram"]}})
+        needed = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": {field: ["deepgram"]}}
+        )
         card = needed["confirmation"]
         control.revision += 1
         tools.observe_context(control.context())
@@ -601,8 +631,8 @@ async def test_free_cloud_membership_keeps_revision_conflicts_and_paid_switch_po
         assert control.submissions == [{"changes": {field: ["deepgram"]}, "expected_revision": 11}]
         control.channels["self"]["effective_active"] = False
         needed = await tools.execute(
-            "change_settings",
-            {"changes": {"stt.provider": "deepgram", field: ["deepgram"]}},
+            "manage_proposal",
+            {"action": "settings", "changes": {"stt.provider": "deepgram", field: ["deepgram"]}},
         )
         assert needed["status"] == "needs_confirmation"
         assert len(control.submissions) == 1
@@ -629,29 +659,41 @@ async def test_navigation_hidden_field_precedes_navigation_and_requires_real_wat
                 "verification_available": False,
             }
 
-        headless = await tools.execute("open_settings", {"section": "api", "provider": "openai"})
+        headless = await tools.execute(
+            "open_app", {"view": "settings", "section": "api", "provider": "openai"}
+        )
         assert headless["opened"] is False
         assert headless["verification_available"] is False
         tools.bind_navigation(navigate)
-        result = await tools.execute("open_settings", {"section": "api", "provider": "openai"})
+        result = await tools.execute(
+            "open_app", {"view": "settings", "section": "api", "provider": "openai"}
+        )
         assert result["opened"] is True
         assert result["field_visible"] is False
         assert result["completion_observable"] is False
         assert result["verification_available"] is False
         assert not control.submissions
         assert "local_llm" not in NAVIGATION_PROVIDERS
-        assert (await tools.execute("open_settings", {"section": "api", "provider": "unknown"}))[
-            "status"
-        ] == "rejected"
         assert (
             await tools.execute(
-                "open_settings", {"section": "api", "provider": "openai", "key": "PRIVATE-KEY"}
+                "open_app", {"view": "settings", "section": "api", "provider": "unknown"}
             )
         )["status"] == "rejected"
         assert (
             await tools.execute(
-                "open_settings",
-                {"section": "api", "provider": "openai", "url": "https://attacker.invalid"},
+                "open_app",
+                {"view": "settings", "section": "api", "provider": "openai", "key": "PRIVATE-KEY"},
+            )
+        )["status"] == "rejected"
+        assert (
+            await tools.execute(
+                "open_app",
+                {
+                    "view": "settings",
+                    "section": "api",
+                    "provider": "openai",
+                    "url": "https://attacker.invalid",
+                },
             )
         )["status"] == "rejected"
         assert "PRIVATE-KEY" not in json.dumps(events)
@@ -667,7 +709,9 @@ async def test_navigation_hidden_field_precedes_navigation_and_requires_real_wat
         }
     )
     try:
-        result = await watched.execute("open_settings", {"section": "api", "provider": "openai"})
+        result = await watched.execute(
+            "open_app", {"view": "settings", "section": "api", "provider": "openai"}
+        )
         assert result["completion_observable"] is True
         assert result["verification_available"] is True
     finally:
@@ -692,7 +736,7 @@ async def test_interrupted_caller_retains_terminal_receipt_and_revert_conflicts(
     }
     tools, actions, _ = adapter(control)
     proposal = await tools.execute(
-        "change_settings", {"changes": {"overlay.background_alpha": 0.6}}
+        "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.6}}
     )
     caller = asyncio.create_task(tools.confirm(proposal["confirmation"]["id"], True))
     await control.entered.wait()
@@ -715,13 +759,13 @@ async def test_interrupted_caller_retains_terminal_receipt_and_revert_conflicts(
     tools, _, _ = adapter(control)
     try:
         applied = await tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": 0.7}}
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.7}}
         )
         applied = await tools.confirm(applied["confirmation"]["id"], True)
         assert applied["status"] == "applied"
         tools.observe_context(applied["context"])
         revert = await tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": 0.6}}
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.6}}
         )
         control.revision += 1
         reverted = await tools.confirm(revert["confirmation"]["id"], True)
@@ -742,12 +786,12 @@ async def test_visible_snapshot_revision_never_refreshes_and_projection_failure_
     tools, _, _ = adapter(control)
     try:
         applied = await tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": 0.4}}
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.4}}
         )
         applied = await tools.confirm(applied["confirmation"]["id"], True)
         assert applied["status"] == "applied"
         stale = await tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": 0.8}}
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.8}}
         )
         stale = await tools.confirm(stale["confirmation"]["id"], True)
         assert stale["status"] == "rejected"
@@ -756,7 +800,7 @@ async def test_visible_snapshot_revision_never_refreshes_and_projection_failure_
         control.status = "degraded"
         control.fail_current = True
         degraded = await tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": 0.5}}
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.5}}
         )
         degraded = await tools.confirm(degraded["confirmation"]["id"], True)
         assert degraded["status"] == "degraded"
@@ -768,9 +812,7 @@ async def test_visible_snapshot_revision_never_refreshes_and_projection_failure_
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("following_tool", ["change_settings", "open_settings", "context_batch"])
-async def test_owner_cannot_execute_following_tool_while_confirmation_is_pending(
-    catalog, following_tool
-):
+async def test_owner_retains_normal_tools_after_confirmation_boundary(catalog, following_tool):
     def response(call_id, changes):
         return {
             "status": "completed",
@@ -778,8 +820,8 @@ async def test_owner_cannot_execute_following_tool_while_confirmation_is_pending
                 {
                     "type": "function_call",
                     "call_id": call_id,
-                    "name": "change_settings",
-                    "arguments": json.dumps({"changes": changes}),
+                    "name": "manage_proposal",
+                    "arguments": json.dumps({"action": "settings", "changes": changes}),
                     "status": "completed",
                 }
             ],
@@ -800,8 +842,8 @@ async def test_owner_cannot_execute_following_tool_while_confirmation_is_pending
                                 "type": "function_call",
                                 "call_id": "rogue",
                                 "status": "completed",
-                                "name": "open_settings",
-                                "arguments": '{"section":"overlay"}',
+                                "name": "open_app",
+                                "arguments": '{"view":"settings","section":"overlay"}',
                             }
                         ],
                     }
@@ -814,7 +856,7 @@ async def test_owner_cannot_execute_following_tool_while_confirmation_is_pending
                         {
                             "type": "function_call",
                             "call_id": f"context-{index}",
-                            "name": "get_app_context",
+                            "name": "read_app",
                             "arguments": json.dumps({"topic": topic}),
                             "status": "completed",
                         }
@@ -835,7 +877,23 @@ async def test_owner_cannot_execute_following_tool_while_confirmation_is_pending
 
         async def respond(self, *, input, turn_id, effort, route, allow_tools):
             self.allowed.append(allow_tools)
-            yield {"type": "completed", "response": self.responses.pop(0)}
+            yield {
+                "type": "completed",
+                "response": (
+                    self.responses.pop(0)
+                    if self.responses
+                    else {
+                        "status": "completed",
+                        "output": [
+                            {
+                                "type": "message",
+                                "role": "assistant",
+                                "content": [{"type": "output_text", "text": "Review the card."}],
+                            }
+                        ],
+                    }
+                ),
+            }
 
         async def close(self):
             self.responses.clear()
@@ -848,19 +906,24 @@ async def test_owner_cannot_execute_following_tool_while_confirmation_is_pending
     await owner.start()
     try:
         result = await owner.send("Switch recognition to Deepgram.")
-        assert result.status == "needs_confirmation"
-        assert transport.allowed == [True, False]
-        following_count = 2 if following_tool == "context_batch" else 1
+        assert result.status == "completed"
+        assert transport.allowed == [True, True, True]
         assert [item.status for item in result.tool_results] == (
-            ["needs_confirmation"] + ["not_executed"] * following_count
+            ["needs_confirmation"]
+            + (
+                ["needs_confirmation"]
+                if following_tool == "change_settings"
+                else ["opened"] if following_tool == "open_settings" else ["rejected", "observed"]
+            )
         )
-        assert [item.result["code"] for item in result.tool_results[1:]] == [
-            "confirmation_pending"
-        ] * following_count
         assert not control.submissions
-        assert not navigations
+        assert bool(navigations) == (following_tool == "open_settings")
         card = owner.snapshot.confirmation
-        assert card["changes"] == {"stt.provider": "deepgram"}
+        assert card["changes"] == (
+            {"overlay.background_alpha": 0.9}
+            if following_tool == "change_settings"
+            else {"stt.provider": "deepgram"}
+        )
         approved = await owner.confirm(card["id"], True)
         assert approved["status"] == "applied"
         assert control.submissions == [{"changes": card["changes"], "expected_revision": 11}]
@@ -944,16 +1007,20 @@ async def test_osc_discovery_retry_uses_empty_native_command_and_safe_actual_rec
             {"text": "PRIVATE-TEXT"},
             {"destination": "PRIVATE-REMOTE"},
         ):
-            assert (await tools.execute("retry_osc_discovery", arguments))["status"] == "rejected"
-            assert (
-                AgentChatOwner._arguments(
-                    {"name": "retry_osc_discovery", "arguments": json.dumps(arguments)}
-                )
-                is None
-            )
+            assert (await tools.execute("retry_app", {"target": "osc_discovery", **arguments}))[
+                "status"
+            ] == "rejected"
+            assert AgentChatOwner._arguments(
+                {
+                    "name": "retry_app",
+                    "arguments": json.dumps({"target": "osc_discovery", **arguments}),
+                }
+            ) == {"target": "osc_discovery", **arguments}
         assert not control.submissions
-        assert AgentChatOwner._arguments({"name": "retry_osc_discovery", "arguments": "{}"}) == {}
-        result = await tools.execute("retry_osc_discovery", {})
+        assert AgentChatOwner._arguments(
+            {"name": "retry_app", "arguments": '{"target":"osc_discovery"}'}
+        ) == {"target": "osc_discovery"}
+        result = await tools.execute("retry_app", {"target": "osc_discovery"})
         assert result["status"] == status
         assert result["receipt"]["terminal"] is True
         assert result["receipt"]["retry_started"] is (status != "rejected")
@@ -1094,7 +1161,7 @@ async def test_composed_agent_retry_awaits_target_application_and_records_it(
     if not initial_failure:
         fixture.service.fail_discovery = False
         fixture.service.info = None
-        await fixture.tools.execute("retry_osc_discovery", {})
+        await fixture.tools.execute("retry_app", {"target": "osc_discovery"})
         assert fixture.owner.output_snapshot()["query_service_started"] is True
         assert fixture.owner.output_snapshot()["discovered_remote_present"] is False
     before = await control.query("settings.current", {})
@@ -1105,7 +1172,7 @@ async def test_composed_agent_retry_awaits_target_application_and_records_it(
     )
     fixture.service.block_discovery = True
     receiver_calls = list(fixture.receiver.control_calls)
-    caller = asyncio.create_task(fixture.tools.execute("retry_osc_discovery", {}))
+    caller = asyncio.create_task(fixture.tools.execute("retry_app", {"target": "osc_discovery"}))
     try:
         await asyncio.wait_for(fixture.service.discovery_started.wait(), 5)
         assert not caller.done()
@@ -1145,8 +1212,8 @@ async def test_composed_agent_cancellation_keeps_admitted_osc_retry_and_actual_a
                     "type": "function_call",
                     "id": "fc_retry",
                     "call_id": "retry",
-                    "name": "retry_osc_discovery",
-                    "arguments": "{}",
+                    "name": "retry_app",
+                    "arguments": '{"target":"osc_discovery"}',
                     "status": "completed",
                 }
             ],
@@ -1190,7 +1257,7 @@ async def test_composed_agent_retry_preserves_unsupported_mode_and_destinations(
     persisted = fixture.path.read_bytes()
     output = fixture.owner.output_snapshot()
     calls = list(fixture.receiver.control_calls), fixture.service.started, fixture.service.stopped
-    result = await fixture.tools.execute("retry_osc_discovery", {})
+    result = await fixture.tools.execute("retry_app", {"target": "osc_discovery"})
     assert result["status"] == "rejected"
     assert result["receipt"]["reason"] == "automatic_mode_required"
     assert result["receipt"]["retry_started"] is False
@@ -1272,7 +1339,7 @@ async def test_composed_agent_retry_resolves_local_host_info_before_applying_udp
     monkeypatch.setattr(fixture.owner, "_sender_provider", lambda: sender)
     persisted = fixture.path.read_bytes()
     revision = (await fixture.app.control().query("settings.current", {}))["revision"]
-    task = asyncio.create_task(fixture.tools.execute("retry_osc_discovery", {}))
+    task = asyncio.create_task(fixture.tools.execute("retry_app", {"target": "osc_discovery"}))
     try:
         await asyncio.wait_for(entered.wait(), 2)
         assert not task.done()
@@ -1326,14 +1393,14 @@ async def test_typed_runtime_controls_preserve_user_only_peer_terms_and_actual_r
         assert not control.submissions
         control.status = "action_required"
         control.receipt_extra = {"action": "accept_peer_translation_terms"}
-        peer = await tools.execute("set_capture", {"channel": "peer", "enabled": True})
+        peer = await tools.execute("set_app", {"target": "capture.peer", "enabled": True})
         assert peer["status"] == "action_required"
         assert peer["receipt"]["action"] == "accept_peer_translation_terms"
         assert control.submissions[-1]["command"] == "capture.set"
         assert control.submissions[-1]["arguments"] == {"channel": "peer", "enabled": True}
         control.status = "applied"
         control.receipt_extra = {"translation_enabled": True}
-        translation = await tools.execute("set_translation", {"enabled": True})
+        translation = await tools.execute("set_app", {"target": "translation", "enabled": True})
         assert translation["receipt"]["translation_enabled"] is True
         assert control.submissions[-1]["command"] == "translation.set"
         assert not events
@@ -1364,7 +1431,7 @@ async def test_runtime_controls_project_safe_channel_and_diagnosis_evidence(cata
                 },
             }
         }
-        capture = await tools.execute("set_capture", {"channel": "self", "enabled": True})
+        capture = await tools.execute("set_app", {"target": "capture.self", "enabled": True})
         assert capture["receipt"]["channel"]["effective_active"] is True
         assert capture["receipt"]["channel"]["capture"] == {"generation": 7, "has_source": True}
         control.status = "action_required"
@@ -1402,7 +1469,7 @@ async def test_runtime_controls_project_safe_channel_and_diagnosis_evidence(cata
                 "raw_log": "PRIVATE-LOG",
             },
         }
-        diagnosis = await tools.execute("diagnose_microphone", {})
+        diagnosis = await tools.execute("probe_app", {"target": "microphone"})
         assert control.submissions[-1]["command"] == "audio.diagnose"
         assert control.submissions[-1]["arguments"] == {}
         receipt = diagnosis["receipt"]
@@ -1422,7 +1489,7 @@ async def test_runtime_action_outlives_cancelled_caller_and_retains_terminal_rec
     control.hold = True
     tools, actions, _ = adapter(control)
     caller = asyncio.create_task(
-        tools.execute("set_capture", {"channel": "self", "enabled": False})
+        tools.execute("set_app", {"target": "capture.self", "enabled": False})
     )
     await control.entered.wait()
     caller.cancel()
@@ -1465,12 +1532,12 @@ async def test_audio_setting_routes_use_current_enumeration_pair_and_interruptio
             {"audio.input_host_api": "MME", "audio.input_device": "WASAPI Mic"},
             {"audio.input_host_api": "MME", "audio.input_device": "Gone Mic"},
         ):
-            assert (await tools.execute("change_settings", {"changes": changes}))[
-                "status"
-            ] == "rejected"
+            assert (
+                await tools.execute("manage_proposal", {"action": "settings", "changes": changes})
+            )["status"] == "rejected"
         assert not control.submissions
         changes = {"audio.input_host_api": "MME", "audio.input_device": "MME Mic"}
-        needed = await tools.execute("change_settings", {"changes": changes})
+        needed = await tools.execute("manage_proposal", {"action": "settings", "changes": changes})
         assert needed["status"] == "needs_confirmation"
         assert needed["confirmation"]["changes"] == changes
         assert not control.submissions
@@ -1479,13 +1546,15 @@ async def test_audio_setting_routes_use_current_enumeration_pair_and_interruptio
         assert control.submissions[-1]["changes"] == changes
         tools.observe_context(applied["context"])
         control.channels["self"]["effective_active"] = False
-        default = await tools.execute("change_settings", {"changes": {"audio.input_device": ""}})
+        default = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": {"audio.input_device": ""}}
+        )
         assert default["status"] == "needs_confirmation"
         default = await tools.confirm(default["confirmation"]["id"], True)
         assert default["status"] == "applied"
         schema = settings_tool_schema(control.catalog)
         for field in ("audio.input_host_api", "audio.input_device"):
-            assert schema["properties"][field]["anyOf"][0] == {"type": "string"}
+            assert schema["properties"][field] == {"type": "string"}
     finally:
         await tools.close()
 
@@ -1516,7 +1585,9 @@ async def test_provider_setup_is_fixed_public_metadata_without_navigation_or_sec
         assert set(PROVIDER_SETUPS) == set(NAVIGATION_PROVIDERS)
         fields = set()
         for provider in NAVIGATION_PROVIDERS:
-            result = await tools.execute("get_provider_setup", {"provider": provider})
+            result = await tools.execute(
+                "open_app", {"view": "provider_setup", "provider": provider}
+            )
             assert result["status"] == "available"
             field = SettingsSecretKey(result["secure_field"]["secret_key"])
             fields.add(field)
@@ -1538,9 +1609,11 @@ async def test_provider_setup_is_fixed_public_metadata_without_navigation_or_sec
                     "manual_key_fallback": True,
                 }
                 result["browser_authorization"]["method"] = "untrusted"
-                assert (await tools.execute("get_provider_setup", {"provider": provider}))[
-                    "browser_authorization"
-                ]["method"] == "oauth_pkce"
+                assert (
+                    await tools.execute(
+                        "open_app", {"view": "provider_setup", "provider": provider}
+                    )
+                )["browser_authorization"]["method"] == "oauth_pkce"
             else:
                 assert "browser_authorization" not in result
             for link in result["links"]:
@@ -1555,16 +1628,18 @@ async def test_provider_setup_is_fixed_public_metadata_without_navigation_or_sec
             assert result["completion_observable"] is False
             assert result["last_navigation"] is None
             result["links"][0]["url"] = "https://attacker.invalid"
-            assert (await tools.execute("get_provider_setup", {"provider": provider}))["links"][0][
-                "url"
-            ] != "https://attacker.invalid"
+            assert (
+                await tools.execute("open_app", {"view": "provider_setup", "provider": provider})
+            )["links"][0]["url"] != "https://attacker.invalid"
         assert len(fields) == len(NAVIGATION_PROVIDERS)
         for arguments in (
             {"provider": "unknown"},
             {"provider": "gemini", "url": "https://attacker.invalid"},
             {"provider": "openai", "key": "PRIVATE-KEY"},
         ):
-            assert (await tools.execute("get_provider_setup", arguments))["status"] == "rejected"
+            assert (await tools.execute("open_app", {"view": "provider_setup", **arguments}))[
+                "status"
+            ] == "rejected"
         assert not navigations and not events and not control.submissions
     finally:
         await tools.close()
@@ -1578,10 +1653,12 @@ async def test_provider_setup_marks_navigation_as_last_observation_without_insta
     tools, _, events = adapter(control, watching=True)
     tools.bind_navigation(lambda *_: {"opened": True, "field_visible": True})
     try:
-        opened = await tools.execute("open_settings", {"section": "api", "provider": "openai"})
+        opened = await tools.execute(
+            "open_app", {"view": "settings", "section": "api", "provider": "openai"}
+        )
         assert opened["completion_observable"] is True
         count = len(events)
-        setup = await tools.execute("get_provider_setup", {"provider": "openai"})
+        setup = await tools.execute("open_app", {"view": "provider_setup", "provider": "openai"})
         assert len(events) == count
         assert setup["completion_observable"] is False
         assert setup["field_visibility"] == "not_observed"
@@ -1594,7 +1671,7 @@ async def test_provider_setup_marks_navigation_as_last_observation_without_insta
             "source": "last_navigation",
         }
         tools.bind_navigation(None)
-        assert (await tools.execute("get_provider_setup", {"provider": "openai"}))[
+        assert (await tools.execute("open_app", {"view": "provider_setup", "provider": "openai"}))[
             "last_navigation"
         ] is None
     finally:
@@ -1791,7 +1868,7 @@ async def test_sparse_translation_pair_uses_observed_state_and_revision(
     control.settings["intent"]["translation"].update(before)
     tools, _, _ = adapter(control)
     try:
-        result = await tools.execute("change_settings", {"changes": changes})
+        result = await tools.execute("manage_proposal", {"action": "settings", "changes": changes})
         assert result["status"] == "needs_confirmation"
         card = tools.confirmation_display
         assert card["changes"] == expected
@@ -1832,7 +1909,7 @@ async def test_sparse_translation_pair_rejects_incompatible_observed_route(catal
     )
     tools, _, _ = adapter(control)
     try:
-        result = await tools.execute("change_settings", {"changes": changes})
+        result = await tools.execute("manage_proposal", {"action": "settings", "changes": changes})
         assert result["status"] == "rejected"
         assert tools.confirmation is None
         assert not control.submissions
@@ -1887,7 +1964,7 @@ async def test_runtime_command_failure_retains_safe_action_without_private_excep
     control.submit = fail
     tools, actions, _ = adapter(control)
     try:
-        result = await tools.execute("diagnose_microphone", {})
+        result = await tools.execute("probe_app", {"target": "microphone"})
         assert result["status"] == "unavailable"
         assert result["error"]["code"] == "audio_diagnose_outcome_unknown"
         assert result["request_id"] == actions[-1]["action_id"]
@@ -1921,7 +1998,9 @@ async def test_recognition_cost_and_readiness_follow_observed_credential(
     control.presence = {key: presence} if presence is not None else {}
     tools, _, _ = adapter(control)
     try:
-        result = await tools.execute("change_settings", {"changes": {"stt.provider": provider}})
+        result = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": {"stt.provider": provider}}
+        )
         assert result["status"] == status
         details = result["confirmation"] if status == "needs_confirmation" else result
         expected = {
@@ -1957,7 +2036,9 @@ async def test_free_tier_ready_switch_still_requires_active_capture_approval(cat
     control.channels[channel]["effective_active"] = True
     tools, _, _ = adapter(control)
     try:
-        result = await tools.execute("change_settings", {"changes": {field: "gemini_transcribe"}})
+        result = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": {field: "gemini_transcribe"}}
+        )
         card = result["confirmation"]
         assert result["status"] == "needs_confirmation"
         assert card["route_effects"][0]["cost"] == "free_credit_or_allowance"
@@ -2007,12 +2088,13 @@ async def test_rolling_free_requires_any_selected_member_not_an_unselected_key(
     tools, _, _ = adapter(control)
     try:
         result = await tools.execute(
-            "change_settings",
+            "manage_proposal",
             {
+                "action": "settings",
                 "changes": {
                     "stt.provider": "rolling_free",
                     "stt.cloud_free_tier_providers": members,
-                }
+                },
             },
         )
         assert result["status"] == status
@@ -2062,12 +2144,10 @@ async def test_translation_cost_follows_connection_and_keeps_account_budgets_sep
     tools, _, _ = adapter(control)
     try:
         result = await tools.execute(
-            "change_settings",
+            "manage_proposal",
             {
-                "changes": {
-                    "translation.model": model,
-                    "translation.connection": connection,
-                }
+                "action": "settings",
+                "changes": {"translation.model": model, "translation.connection": connection},
             },
         )
         assert result["status"] == status
@@ -2093,7 +2173,8 @@ async def test_failed_credential_observation_is_unknown_not_missing(catalog):
     tools, _, _ = adapter(control)
     try:
         result = await tools.execute(
-            "change_settings", {"changes": {"stt.provider": "gemini_transcribe"}}
+            "manage_proposal",
+            {"action": "settings", "changes": {"stt.provider": "gemini_transcribe"}},
         )
         assert result["confirmation"]["route_effects"][0]["credential_readiness"] == "unknown"
         assert "PRIVATE-" not in json.dumps(result)
@@ -2235,12 +2316,11 @@ async def test_native_accounts_query_reads_existing_usage_without_refresh_or_acc
         ),
         chatgpt_sign_in_required=lambda: False,
     )
-    owner = SimpleNamespace(
-        application=application,
-        instance_id="account-context",
-        _current_revision=lambda: 11,
-        settings=SimpleNamespace(committed_settings=None),
-    )
+    owner = ApplicationControlOwner.__new__(ApplicationControlOwner)
+    owner.application = application
+    owner.instance_id = "account-context"
+    owner._revision = 11
+    owner.settings = SimpleNamespace(committed_settings=None)
     try:
         result = await ApplicationControlOwner.query(owner, "accounts.status", {})
         assert result["chatgpt"]["signed_in"] is True
@@ -2299,7 +2379,8 @@ async def test_effective_credentials_include_runtime_environment_and_legacy_sour
     tools, _, _ = adapter(control)
     try:
         result = await tools.execute(
-            "change_settings", {"changes": {"stt.provider": "gemini_transcribe"}}
+            "manage_proposal",
+            {"action": "settings", "changes": {"stt.provider": "gemini_transcribe"}},
         )
         assert result["status"] == "needs_confirmation"
         assert not control.submissions
@@ -2315,12 +2396,11 @@ async def test_native_account_unknown_credentials_are_not_signed_out(signed_in):
         chatgpt_account_snapshot=lambda: ChatGptAccountSnapshot(signed_in=signed_in),
         chatgpt_sign_in_required=lambda: True,
     )
-    owner = SimpleNamespace(
-        application=application,
-        instance_id="unknown-account-context",
-        _current_revision=lambda: 11,
-        settings=SimpleNamespace(committed_settings=None),
-    )
+    owner = ApplicationControlOwner.__new__(ApplicationControlOwner)
+    owner.application = application
+    owner.instance_id = "unknown-account-context"
+    owner._revision = 11
+    owner.settings = SimpleNamespace(committed_settings=None)
     observed = await ApplicationControlOwner.query(owner, "accounts.status", {})
     assert observed["chatgpt"]["signed_in"] is signed_in
     assert observed["chatgpt"]["sign_in_required"] is (True if signed_in is False else None)
@@ -2385,7 +2465,9 @@ async def test_queue_keeps_coupled_routes_and_each_language_block_exact_once(
         {"locale": "en"},
     ]
     try:
-        proposal = await tools.execute("change_settings", {"changes": changes})
+        proposal = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": changes}
+        )
         assert proposal["status"] == "needs_confirmation"
         assert not control.submissions and not actions
         assert control.context() == before
@@ -2454,16 +2536,20 @@ async def test_stopping_later_card_preserves_completed_changes_and_clears_remain
         "languages": {"source": "en", "target": "ko", "secondary_target": "ja"},
     }
     try:
-        proposal = await tools.execute("change_settings", {"changes": changes})
+        proposal = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": changes}
+        )
         await tools.confirm(proposal["confirmation"]["id"], True)
         before = control.context()
         card = tools.confirmation
         if resolution == "decline":
             assert (await tools.confirm(card["id"], False))["status"] == "declined"
         elif resolution == "withdraw":
-            assert (await tools.execute("withdraw_confirmation", {"card_id": card["id"]}))[
-                "status"
-            ] == "withdrawn"
+            assert (
+                await tools.execute(
+                    "manage_proposal", {"action": "withdraw", "card_id": card["id"]}
+                )
+            )["status"] == "withdrawn"
         else:
             tools.cancel_confirmation()
         assert tools.confirmation is None
@@ -2482,7 +2568,9 @@ async def test_non_successful_card_stops_all_remaining_cards(catalog, status):
     tools, actions, events = adapter(control)
     changes = {"overlay.background_alpha": 0.4, "locale": "en", "stt.provider": "deepgram"}
     try:
-        proposal = await tools.execute("change_settings", {"changes": changes})
+        proposal = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": changes}
+        )
         control.status = status
         result = await tools.confirm(proposal["confirmation"]["id"], True)
         assert result["status"] == status
@@ -2514,7 +2602,9 @@ async def test_next_card_uses_own_receipt_revision_not_external_current_revision
         "overlay.translation.enabled": False,
     }
     try:
-        proposal = await tools.execute("change_settings", {"changes": changes})
+        proposal = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": changes}
+        )
         first = await tools.confirm(proposal["confirmation"]["id"], True)
         assert first["receipt"]["revision"] == 12
         assert first["context"]["revision"] == 13
@@ -2537,20 +2627,58 @@ async def test_invalid_later_block_never_stages_or_replaces_valid_queue(catalog)
     control = Control(catalog)
     tools, actions, events = adapter(control)
     try:
-        proposal = await tools.execute("change_settings", {"changes": {"locale": "en"}})
+        proposal = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": {"locale": "en"}}
+        )
         current = proposal["confirmation"]
         invalid = await tools.execute(
-            "change_settings",
+            "manage_proposal",
             {
+                "action": "settings",
                 "changes": {
                     "overlay.background_alpha": 0.4,
                     "stt.provider": "deepgram",
                     "languages": {"source": "not-a-language"},
-                }
+                },
             },
         )
         assert invalid["status"] == "rejected"
         assert tools.confirmation == current
         assert not control.submissions and not actions and not events
     finally:
+        await tools.close()
+
+
+@pytest.mark.asyncio
+async def test_withdrawing_pending_card_does_not_cancel_accepted_runtime_work(catalog):
+    control = RuntimeControl(catalog)
+    tools, actions, _ = adapter(control)
+    proposal = await tools.execute(
+        "manage_proposal",
+        {"action": "settings", "changes": {"overlay.background_alpha": 0.4}},
+    )
+    card = proposal["confirmation"]
+    control.hold = True
+    accepted = asyncio.create_task(
+        tools.execute("set_app", {"target": "capture.self", "enabled": True}, request_id="accepted")
+    )
+    try:
+        await asyncio.wait_for(control.entered.wait(), 1)
+        withdrawn = await tools.execute(
+            "manage_proposal", {"action": "withdraw", "card_id": card["id"]}
+        )
+        assert withdrawn == {"status": "withdrawn", "card_id": card["id"]}
+        assert tools.confirmation is None
+        assert not accepted.done()
+        assert len(control.submissions) == 1
+        assert control.submissions[0]["request_id"] == "accepted"
+        control.release.set()
+        result = await accepted
+        assert result["status"] == "applied" and result["receipt"]["terminal"]
+        assert actions[-1]["phase"] == "completed"
+        assert (await tools.confirm(card["id"], True))["status"] == "rejected"
+        assert len(control.submissions) == 1
+    finally:
+        control.release.set()
+        await accepted
         await tools.close()

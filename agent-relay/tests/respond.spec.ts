@@ -7,7 +7,7 @@ import { authHeaders, installationHash, relayEvents, responseEvents, testEnv, tu
 
 const env = testEnv();
 const body = {
-  agent_protocol: 6,
+  agent_protocol: 7,
   turn_id: turnId,
   input: [{ type: 'configuration_update', reasoning: { effort: 'high' } }, { role: 'user', content: '번역이 안 떠' }],
   effort: 'high',
@@ -48,16 +48,16 @@ afterEach(() => {
 });
 
 describe('authenticated agent relay', () => {
-  it('publishes OSC retry as an execute_app action and admits its owned tool history', () => {
-    const execute = appTools.find((tool) => tool.name === 'execute_app');
+  it('publishes OSC retry as a retry_app target and admits its owned tool history', () => {
+    const execute = appTools.find((tool) => tool.name === 'retry_app');
     const properties = execute?.parameters.properties;
-    expect(properties && 'action' in properties ? properties.action?.enum : [])
-      .toContain('osc.discovery.retry');
+    expect(properties && 'target' in properties ? properties.target?.enum : [])
+      .toContain('osc_discovery');
     const history = {
       ...body,
       input: [
         ...body.input,
-        { type: 'function_call', status: 'completed', call_id: 'osc-retry', name: 'execute_app', arguments: '{"action":"osc.discovery.retry"}' },
+        { type: 'function_call', status: 'completed', call_id: 'osc-retry', name: 'retry_app', arguments: '{"target":"osc_discovery"}' },
         { type: 'function_call_output', call_id: 'osc-retry', output: JSON.stringify({
           status: 'applied',
           receipt: {
@@ -77,10 +77,10 @@ describe('authenticated agent relay', () => {
   });
 
   it('publishes exact-card withdrawal without model approval or undo authority', () => {
-    const execute = appTools.find((tool) => tool.name === 'execute_app');
+    const execute = appTools.find((tool) => tool.name === 'manage_proposal');
     const properties = execute?.parameters.properties;
     expect(properties && 'action' in properties ? properties.action?.enum : [])
-      .toContain('confirmation.withdraw');
+      .toContain('withdraw');
     expect(properties).toHaveProperty('card_id', { type: 'string', minLength: 1, maxLength: 64 });
     const actions = appTools.flatMap((tool) =>
       'action' in tool.parameters.properties ? tool.parameters.properties.action?.enum ?? [] : []);
@@ -89,7 +89,7 @@ describe('authenticated agent relay', () => {
       ...body,
       input: [
         ...body.input,
-        { type: 'function_call', status: 'completed', call_id: 'withdraw', name: 'execute_app', arguments: '{"action":"confirmation.withdraw","card_id":"current-card"}' },
+        { type: 'function_call', status: 'completed', call_id: 'withdraw', name: 'manage_proposal', arguments: '{"action":"withdraw","card_id":"current-card"}' },
         { type: 'function_call_output', call_id: 'withdraw', output: '{"status":"withdrawn","card_id":"current-card"}' },
       ],
     })).toBe(true);

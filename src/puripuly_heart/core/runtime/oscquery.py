@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Final, Literal
 
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.osc.oscquery_contract import (
     OscQueryAdvertisement,
     OscQueryServiceInfo,
@@ -23,6 +25,7 @@ OscResyncGenerationProvider = Callable[[], int]
 OscResyncStarter = Callable[[str, int | None], int | None]
 OscAvatarInspector = Callable[[Mapping[str, object]], Awaitable[None] | None]
 VRCHAT_OSC_DEFAULT_INPUT_PORT: Final = 9000
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -46,6 +49,7 @@ class OscQueryRuntime:
     effective_receive_port: int | None = field(init=False, default=None)
     avatar_tree: Mapping[str, object] | None = field(init=False, default=None)
     _started: bool = field(init=False, default=False)
+    failures: tuple[ErrorDiagnostics, ...] = field(init=False, default=())
     _service_started: bool = field(init=False, default=False)
     _refresh_requested: bool = field(init=False, default=False)
     _fallback_send_port: int = field(init=False, default=VRCHAT_OSC_DEFAULT_INPUT_PORT)
@@ -221,14 +225,20 @@ class OscQueryRuntime:
         self._monitor_scope = LifecycleScope("OscQueryRuntimeMonitor")
         self._monitor_task = None
         if self.advertised_port is not None:
-            with contextlib.suppress(Exception):
+            try:
                 await self.service.unadvertise_receiver()
+            except Exception as exc:
+                self._retain_failure(exc, "unadvertise_receiver")
         if stop_receiver and (self._started or self.effective_receive_port is not None):
-            with contextlib.suppress(Exception):
+            try:
                 await self.receiver_stop()
+            except Exception as exc:
+                self._retain_failure(exc, "receiver_stop")
         if self._service_started and self.mode == "automatic":
-            with contextlib.suppress(Exception):
+            try:
                 await self.service.stop()
+            except Exception as exc:
+                self._retain_failure(exc, "service_stop")
         self._started = False
         self._service_started = False
         self._refresh_requested = False
@@ -267,7 +277,11 @@ class OscQueryRuntime:
         if self.sender_destination_changed is not None:
             await _maybe_await(self.sender_destination_changed(destination_host, destination_port))
         self.avatar_tree = await self.service.query_avatar(service) if service is not None else None
-        if self._application_current() and self.avatar_inspector is not None:
+        if (
+            self._application_current()
+            and self.avatar_inspector is not None
+            and getattr(self.service, "avatar_observation", "available") == "available"
+        ):
             await _maybe_await(self.avatar_inspector(self.avatar_tree or {}))
 
     def _start_discovery_monitor(self) -> None:
@@ -285,8 +299,15 @@ class OscQueryRuntime:
             await asyncio.sleep(interval)
             try:
                 await self.refresh()
-            except Exception:
-                continue
+            except Exception as exc:
+                self._retain_failure(exc, "discovery_monitor")
+
+    def _retain_failure(self, exc: Exception, operation: str) -> None:
+        diagnostics = exception_diagnostics(
+            exc, component="osc_control", operation=operation, code="oscquery_unavailable"
+        )
+        self.failures = (*self.failures[-7:], diagnostics)
+        emit_failure(logger, diagnostics, severity="warning", disposition="degraded")
 
 
 async def _maybe_await(value: object) -> object:

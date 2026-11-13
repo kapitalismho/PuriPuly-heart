@@ -17,6 +17,7 @@ from websockets.exceptions import ProtocolError
 
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
@@ -33,7 +34,11 @@ from puripuly_heart.core.stt.backend import (
     STTScopedWriteFailure,
     STTSessionProjection,
 )
-from puripuly_heart.core.stt.diagnostics import recognition_cause, recognition_failure_diagnostics
+from puripuly_heart.core.stt.diagnostics import (
+    recognition_cause,
+    recognition_cleanup_failure,
+    recognition_failure_diagnostics,
+)
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
 
@@ -179,6 +184,9 @@ class SonioxRealtimeSTTBackend(STTBackend):
     enable_speaker_diarization: bool = True
     language_hints_strict: bool = False
     connect_timeout_s: float = 5.0
+    _starting_sessions: list[STTBackendSession] = field(
+        init=False, default_factory=list, repr=False
+    )
 
     async def open_session(
         self,
@@ -200,6 +208,8 @@ class SonioxRealtimeSTTBackend(STTBackend):
         if self.language_hints_strict and not self.language_hints:
             raise PermanentSTTScopedSessionError("language_hints_strict requires language_hints")
 
+        if self._starting_sessions:
+            await self.close()
         session = _SonioxSession(
             api_key=self.api_key,
             model=self.model,
@@ -217,11 +227,31 @@ class SonioxRealtimeSTTBackend(STTBackend):
         )
         try:
             await session.start()
-        except BaseException:
-            with contextlib.suppress(BaseException):
+        except BaseException as primary:
+            diagnostics = recognition_failure_diagnostics(
+                primary,
+                provider="soniox",
+                channel=None,
+                operation="readiness",
+                reason="provider_not_ready",
+            )
+            primary.failure_diagnostics = diagnostics
+            session._failure_diagnostics = diagnostics
+            try:
                 await session.close()
+            except Exception as cleanup:
+                self._starting_sessions.append(session)
+                primary.failure_diagnostics = replace(
+                    diagnostics,
+                    causes=(*diagnostics.causes, cleanup.failure_diagnostics),
+                )
             raise
         return session
+
+    async def close(self) -> None:
+        for session in tuple(self._starting_sessions):
+            await session.close()
+            self._starting_sessions.remove(session)
 
     @staticmethod
     async def verify_api_key(
@@ -389,6 +419,7 @@ class _SonioxSession(STTBackendSession):
         except websockets.exceptions.InvalidStatus as exc:
             status = _safe_code(exc.response.status_code, maximum=999999)
             if status in _RETRYABLE_SERVER_ERRORS:
+                exc.readiness_retryable = True
                 raise
             raise PermanentSTTScopedSessionError("soniox_connection_rejected") from exc
         except (
@@ -429,9 +460,13 @@ class _SonioxSession(STTBackendSession):
                         else RuntimeError("soniox_request_failed")
                     )
                     error.failure_diagnostics = self._failure_diagnostics
+                    error.readiness_retryable = not isinstance(
+                        error, PermanentSTTScopedSessionError
+                    )
                     raise error from exc
             if not _retryable_transport_failure("soniox_write_failed", exc, self._ws):
                 raise PermanentSTTScopedSessionError("soniox_connection_rejected") from exc
+            exc.readiness_retryable = True
             raise
         self._last_send_at = time.monotonic()
 
@@ -1322,14 +1357,22 @@ class _SonioxSession(STTBackendSession):
             task.cancel()
         await asyncio.gather(*(t for t in tasks if t is not None), return_exceptions=True)
         if self._ws is not None:
-            with contextlib.suppress(Exception):
+            try:
                 await self._ws.close()
+            except Exception as exc:
+                diagnostics = recognition_cleanup_failure(
+                    exc,
+                    provider="soniox",
+                    channel=self._event_projection.channel,
+                    primary=self._failure_diagnostics,
+                )
+                emit_failure(
+                    logger, diagnostics, severity="warning", disposition="degraded", stage="cleanup"
+                )
+                raise
             self._ws = None
         self._event_projection.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         async for event in self._event_projection.events():
             yield event
-
-
-import contextlib  # placed at bottom to keep the main logic compact

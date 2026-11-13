@@ -1012,3 +1012,38 @@ async def test_deleted_log_warns_with_safe_reason_without_file_name(
     assert file_name not in warnings[0].getMessage()
     assert _USER_A not in caplog.text
     assert _USER_B not in caplog.text
+
+
+async def test_scene_scan_failure_retains_cause_and_recovers_without_false_empty(
+    tmp_path, monkeypatch
+):
+    snapshots = FakeSnapshots()
+    snapshots.items = (_snapshot(4242, "C:\\VRChat\\VRChat.exe", time.time() - 5),)
+    service = _service(snapshots, FakeWatcherFactory(snapshots), tmp_path)
+    original = Path.iterdir
+    unavailable = True
+
+    def scan(path):
+        if unavailable:
+            raise PermissionError(13, "private scene log directory")
+        return original(path)
+
+    monkeypatch.setattr(Path, "iterdir", scan)
+    await service.start()
+    try:
+        await _wait_for_status(service, "degraded")
+        diagnostics = service.failure_diagnostics
+        assert diagnostics.code == "vrchat_scene_log_read_failed"
+        assert diagnostics.fields["errno"] == 13
+        assert "private" not in repr(diagnostics)
+        unavailable = False
+        create_time = time.time() - 5
+        (tmp_path / _log_name(create_time)).write_text(
+            "\n".join(_roster_block(("Self", "Peer"), (_USER_A, _USER_B), "Self")) + "\n",
+            encoding="utf-8",
+        )
+        await _wait_for_status(service, "ready")
+        assert service.snapshot().participant_count == 2
+        assert service.lifecycle_owner_snapshot()["file_observation_diagnostic_id"] is None
+    finally:
+        await service.close()

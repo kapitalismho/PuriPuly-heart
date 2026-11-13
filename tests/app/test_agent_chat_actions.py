@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 import pytest
 
@@ -13,6 +13,7 @@ from puripuly_heart.ui.app import TranslatorApp
 from puripuly_heart.ui.components.agent_secure_entry import AgentSecureEntryController
 from tests.app.test_agent_chat import Records, Responses, answer, tool
 from tests.app.test_agent_chat_report import ReportResponses, contents, proposal
+from tests.app.test_diagnostic_consumers import failure
 
 
 def setup_call(provider="openrouter", identity="setup"):
@@ -21,8 +22,8 @@ def setup_call(provider="openrouter", identity="setup"):
         "output": [
             {
                 **tool(identity),
-                "name": "get_provider_setup",
-                "arguments": json.dumps({"provider": provider}),
+                "name": "open_app",
+                "arguments": json.dumps({"view": "provider_setup", "provider": provider}),
             }
         ],
     }
@@ -125,6 +126,7 @@ async def test_secure_failure_then_success_resumes_with_typed_notices_without_se
     transport = Responses(setup_call(), answer(), answer(), answer())
     owner = AgentChatOwner(Records(), transport, localize=str)
     saved, persisted, verified, events, snapshots = [], [], [], [], []
+    original = replace(failure(), component="provider_verification", operation="verify")
 
     async def verify(provider, credential):
         verified.append((provider, credential))
@@ -132,6 +134,7 @@ async def test_secure_failure_then_success_resumes_with_typed_notices_without_se
             provider=provider,
             status="failed" if len(verified) == 1 else "verified",
             error_text="private diagnostic prose must not become a notice",
+            diagnostics=original if len(verified) == 1 else None,
         )
 
     adapter = bind_secure(
@@ -148,9 +151,10 @@ async def test_secure_failure_then_success_resumes_with_typed_notices_without_se
         first = next(item for item in owner.snapshot.secure_entry_requests if item.available)
         assert first.masked and first.settings_alternative
         owner.mark_secure_entry_displayed(first.id)
-        assert (await owner.submit_secure_entry(first.id, "synthetic-private-first"))[
-            "status"
-        ] == "failed"
+        failed_result = await owner.submit_secure_entry(first.id, "synthetic-private-first")
+        assert failed_result["status"] == "failed"
+        assert failed_result["diagnostics"]["diagnostic_id"] == original.diagnostic_id
+        assert failed_result["diagnostics"]["status_code"] == 403
         await settle_notices(owner)
         assert len(transport.requests) == 2
         retry = next(item for item in owner.snapshot.secure_entry_requests if item.available)
@@ -166,6 +170,8 @@ async def test_secure_failure_then_success_resumes_with_typed_notices_without_se
         failed = next(i for i, text in enumerate(resumed) if "result=failed" in text)
         succeeded = next(i for i, text in enumerate(resumed) if "result=success" in text)
         assert failed < succeeded
+        notice_cause = json.loads(resumed[failed].partition(" diagnostics=")[2])
+        assert notice_cause == failed_result["diagnostics"]
         assert len(saved) == len(verified) == len(persisted) == 2
         assert [item[2] for item in persisted] == [False, True]
         assert not adapter._value and adapter._controller is None
@@ -301,7 +307,9 @@ async def test_account_actions_only_open_existing_user_auth_or_fixed_public_usag
     transport = Responses(
         {
             "status": "completed",
-            "output": [{**tool(), "arguments": json.dumps({"topic": "accounts"})}],
+            "output": [
+                {**tool(), "name": "open_app", "arguments": json.dumps({"view": "accounts"})}
+            ],
         },
         answer("Account setup actions are available."),
     )

@@ -32,4 +32,7 @@ def log_feature(
             fields.append(f"os_code={os_code}")
     if isinstance(http_status, int) and 100 <= http_status <= 599:
         fields.append(f"http_status={http_status}")
-    emit_basic_log(logger, " ".join(fields), level=level)
+    try:
+        emit_basic_log(logger, " ".join(fields), level=level)
+    except Exception:
+        return

@@ -6,6 +6,9 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any
 
+from puripuly_heart.core.diagnostics import exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
+
 TransportTaskFactory = Callable[
     [Coroutine[Any, Any, Any], str],
     asyncio.Task[Any],
@@ -17,6 +20,7 @@ class TransportWriteResult:
     outcome: str
     send_task: asyncio.Task[Any]
     cause: str | None = None
+    diagnostics: ErrorDiagnostics | None = None
 
 
 class TransportWriteCancelled(asyncio.CancelledError):
@@ -45,17 +49,29 @@ class OverlayTransportExecutor:
             await asyncio.wait_for(asyncio.shield(send_task), timeout=timeout)
         except asyncio.CancelledError as exc:
             raise TransportWriteCancelled(send_task) from exc
-        except TimeoutError:
+        except TimeoutError as exc:
             return TransportWriteResult(
                 outcome="ambiguous",
                 send_task=send_task,
                 cause="write_timeout",
+                diagnostics=exception_diagnostics(
+                    exc,
+                    component="overlay_bridge",
+                    operation="transport_write",
+                    code="destination_write_timeout",
+                ),
             )
         except Exception as exc:
             return TransportWriteResult(
                 outcome="failed",
                 send_task=send_task,
                 cause=type(exc).__name__,
+                diagnostics=exception_diagnostics(
+                    exc,
+                    component="overlay_bridge",
+                    operation="transport_write",
+                    code="destination_write_failed",
+                ),
             )
         return TransportWriteResult(outcome="written", send_task=send_task)
 

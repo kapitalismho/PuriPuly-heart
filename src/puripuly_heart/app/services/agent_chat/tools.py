@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 from collections.abc import Callable, Mapping
 from copy import deepcopy
@@ -14,13 +15,13 @@ from puripuly_heart.app.control_presentation import (
 from puripuly_heart.app.ports.application_control import ApplicationControl
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
 from puripuly_heart.app.services.agent_chat.execution import (
-    CARD_COMMANDS,
-    DIRECT_COMMANDS,
+    AppAction,
     private_fields,
     project_catalog,
+    project_diagnostic_evidence,
     project_query,
-    request_schemas,
     safe_receipt,
+    select_app_action,
     validate,
 )
 from puripuly_heart.app.services.agent_chat.provider_setup import (
@@ -101,6 +102,8 @@ _OSC_ENUMS = {
     "configured_mode": frozenset({"automatic", "manual", "off", None}),
     "effective_mode": frozenset({"automatic", "manual", "off"}),
     "query_failure": frozenset({"oscquery_unavailable", None}),
+    "discovery_observation": frozenset({"unknown", "available", "absent", "unavailable"}),
+    "avatar_observation": frozenset({"unknown", "available", "unsupported", "unavailable"}),
     "local_availability": frozenset(
         {"closed", "off", "receiver_unavailable", "sender_unavailable", "starting", "available"}
     ),
@@ -174,6 +177,7 @@ def project_accounts(value: object) -> dict:
                 for key in ("available", "signed_in", "in_progress", "sign_in_required")
             },
             "usage": {"availability": "unavailable", "remaining_percent": None},
+            **safe_receipt(chatgpt),
         },
         "managed": {
             "provider": (
@@ -189,6 +193,7 @@ def project_accounts(value: object) -> dict:
                 "availability": availability,
                 "freshness": "unknown",
             },
+            **safe_receipt(managed),
         },
         "puri": {
             "allowance": {
@@ -238,6 +243,18 @@ def project_osc_output(value: object) -> dict:
         }
     )
     result["remote_delivery"] = "unacknowledged"
+    result.update(project_diagnostic_evidence(source))
+    if isinstance(source.get("state_publication"), Mapping):
+        result["state_publication"] = _pick(
+            source["state_publication"],
+            (
+                "diagnostic_id",
+                "code",
+                "local_send_completed",
+                "local_send_requested",
+                "disposition",
+            ),
+        )
     listener = _mapping(source.get("local_listener"))
     if listener:
         status = listener.get("status")
@@ -271,8 +288,17 @@ def project_osc_output(value: object) -> dict:
 def _safe_osc_receipt(receipt: dict) -> dict:
     result = _pick(
         receipt,
-        ("instance_id", "operation_id", "request_id", "status", "terminal", "revision"),
+        (
+            "instance_id",
+            "operation_id",
+            "request_id",
+            "status",
+            "terminal",
+            "revision",
+            "diagnostic_id",
+        ),
     )
+    result.update(project_diagnostic_evidence(receipt))
     reason = receipt.get("reason")
     if type(reason) is str and reason in {
         "lifecycle_stopped",
@@ -346,13 +372,11 @@ def _schema(catalog: dict, source: dict) -> dict:
                 key: {"type": "string", "choices": source["value_choices_by_key"] + "/" + key}
                 for key in _choices(catalog, source["key_choices"])
             }
-        properties = {
-            key: _nullable(_schema(catalog, item)) for key, item in (members or {}).items()
-        }
+        properties = {key: _schema(catalog, item) for key, item in (members or {}).items()}
         return {
             "type": "object",
             "properties": properties,
-            "required": list(properties),
+            "required": [],
             "additionalProperties": False,
         }
     if kind == "array<string>":
@@ -385,24 +409,18 @@ def _schema(catalog: dict, source: dict) -> dict:
     return result
 
 
-def _nullable(schema: dict) -> dict:
-    return {"anyOf": [schema, {"type": "null"}]}
-
-
 def settings_tool_schema(catalog: dict) -> dict:
     schemas = _mapping(catalog.get("field_schemas"))
     if not SETTINGS_FIELDS <= schemas.keys():
         raise ValueError("settings schemas unavailable")
     properties = {
-        key: _nullable(
-            {"type": "string"} if key in _DYNAMIC_CHOICE_FIELDS else _schema(catalog, schemas[key])
-        )
+        key: {"type": "string"} if key in _DYNAMIC_CHOICE_FIELDS else _schema(catalog, schemas[key])
         for key in sorted(SETTINGS_FIELDS)
     }
     return {
         "type": "object",
         "properties": properties,
-        "required": list(properties),
+        "required": [],
         "additionalProperties": False,
     }
 
@@ -424,6 +442,7 @@ def project_audio_diagnosis(value: object) -> dict:
             "failure_code",
         ),
     )
+    result.update(safe_receipt(source))
     result["current_route"] = {
         key: safe_audio_device_label(item)
         for key, item in _mapping(source.get("current_route")).items()
@@ -451,9 +470,11 @@ def project_audio_diagnosis(value: object) -> dict:
                     "speech_threshold",
                     "elapsed_ms",
                     "failure_code",
+                    "device_metadata_availability",
                     "cleanup_complete",
                 ),
             )
+            projected.update(safe_receipt(candidate))
             samples = _mapping(candidate).get("observed_speech_probabilities")
             if isinstance(samples, list):
                 projected["observed_speech_probabilities"] = [
@@ -475,64 +496,36 @@ def project_audio_diagnosis(value: object) -> dict:
 
 
 def _safe_receipt(receipt: dict) -> dict:
-    result = _pick(
-        receipt,
-        (
-            "instance_id",
-            "operation_id",
-            "request_id",
-            "status",
-            "terminal",
-            "revision",
-            "reason",
-            "diagnostic_id",
-            "action",
-            "translation_enabled",
-            "runtime_ready",
-            "recognition",
-            "settings_changed",
-        ),
+    result = safe_receipt(receipt)
+    result.update(
+        _pick(
+            receipt,
+            (
+                "instance_id",
+                "operation_id",
+                "request_id",
+                "status",
+                "terminal",
+                "revision",
+                "reason",
+                "diagnostic_id",
+                "action",
+                "translation_enabled",
+                "runtime_ready",
+                "recognition",
+                "settings_changed",
+            ),
+        )
     )
     if isinstance(receipt.get("error"), Mapping):
         result["error"] = _pick(receipt["error"], ("code", "type", "current_revision"))
-    diagnostic_fields = ("diagnostic_id", "code", "category", "disposition", "operation")
-    if isinstance(receipt.get("diagnostics"), Mapping):
-        result["diagnostics"] = _pick(receipt["diagnostics"], diagnostic_fields)
-    if isinstance(receipt.get("transaction"), Mapping):
-        transaction = receipt["transaction"]
-        result["transaction"] = _pick(transaction, ("status",))
-        if isinstance(transaction.get("diagnostics"), Mapping):
-            result["transaction"]["diagnostics"] = _pick(
-                transaction["diagnostics"], diagnostic_fields
-            )
-    if isinstance(receipt.get("runtime_observation"), Mapping):
-        result["runtime_observation"] = _pick(receipt["runtime_observation"], ("status", "reason"))
-    if isinstance(receipt.get("channel"), Mapping):
-        state = receipt["channel"]
-        result["channel"] = _pick(
-            state,
-            (
-                "selected_provider",
-                "runtime_provider",
-                "capture_attached_provider",
-                "desired_active",
-                "effective_active",
-                "pending_handoff",
-                "failure_reason",
-                "provider_status",
-            ),
-        )
-        result["channel"]["capture"] = _pick(
-            state.get("capture"),
-            ("generation", "state", "desired_active", "effective_active", "has_source"),
-        )
     if isinstance(receipt.get("diagnosis"), Mapping):
         result["diagnosis"] = project_audio_diagnosis(receipt["diagnosis"])
     return result
 
 
 def project_operation_receipt(receipt: dict, tool: str) -> dict:
-    if tool == "retry_osc_discovery":
+    if tool == "osc.discovery.retry":
         return _safe_osc_receipt(receipt)
     result = _safe_receipt(receipt)
     result.update(
@@ -541,6 +534,7 @@ def project_operation_receipt(receipt: dict, tool: str) -> dict:
             (
                 "translation_result",
                 "recognition_result",
+                "recognition_execution_result",
                 "channel",
                 "captured_settings_revision",
                 "current_settings_revision",
@@ -574,7 +568,10 @@ def project_operation_receipt(receipt: dict, tool: str) -> dict:
         ]
     if isinstance(receipt.get("target_results"), list):
         result["target_results"] = [
-            _pick(target, ("target_language", "translation_result"))
+            {
+                **safe_receipt(target),
+                **_pick(target, ("target_language", "translation_result", "turn_id")),
+            }
             for target in receipt["target_results"][:2]
             if isinstance(target, Mapping)
         ]
@@ -605,6 +602,7 @@ class AgentTools:
         self._confirmation_queue: list[dict] = []
         self._proposal_id: str | None = None
         self._tasks: set[asyncio.Task] = set()
+        self._command_requests: dict[str, dict] = {}
         self._scope = LifecycleScope("agent-settings-tools")
         self._closed = False
         self._localize: Callable[[str], str] = lambda key: key
@@ -634,6 +632,19 @@ class AgentTools:
             if isinstance(context.get(key), Mapping):
                 self._context[key] = deepcopy(context[key])
 
+    def observe_operation_receipt(self, receipt: dict) -> None:
+        if receipt.get("terminal") is not True or not receipt.get("operation_id"):
+            return
+        for signature, retained in self._command_requests.items():
+            accepted = retained.get("receipt")
+            if (
+                isinstance(accepted, dict)
+                and accepted.get("operation_id") == receipt["operation_id"]
+                and retained["request_id"] == receipt.get("request_id")
+            ):
+                del self._command_requests[signature]
+                return
+
     def reset_context(self) -> None:
         self._context.clear()
 
@@ -662,68 +673,73 @@ class AgentTools:
             return _rejected("tools_closed", "Settings tools are closed.")
         if type(arguments) is not dict:
             return _rejected("invalid_arguments", "Tool arguments must be an object.")
-        if name == "control_app":
-            return await self._control_app(arguments, require_current, request_id)
-        command = None
-        command_arguments = arguments
-        if name in {
-            "probe_translation",
-            "probe_self_recognition",
-            "probe_peer_recognition",
-            "diagnose_microphone",
-            "retry_osc_discovery",
-        }:
-            if arguments:
-                return _rejected("invalid_arguments", "Diagnostic tools take no arguments.")
-            if name == "diagnose_microphone":
-                command = "audio.diagnose"
-            elif name == "retry_osc_discovery":
-                command = "osc.discovery.retry"
-            elif name == "probe_translation":
-                command = "translation.probe"
-            else:
-                command = "recognition.probe"
-                command_arguments = {
-                    "channel": "self" if name == "probe_self_recognition" else "peer"
-                }
-        elif name == "set_capture":
-            if (
-                arguments.keys() != {"channel", "enabled"}
-                or type(arguments["channel"]) is not str
-                or arguments["channel"] not in {"self", "peer"}
-                or type(arguments["enabled"]) is not bool
-            ):
-                return _rejected(
-                    "invalid_arguments", "Provide a capture channel and boolean enabled."
-                )
-            command = "capture.set"
-        elif name == "set_translation":
-            if arguments.keys() != {"enabled"} or type(arguments["enabled"]) is not bool:
-                return _rejected("invalid_arguments", "Provide only boolean enabled.")
-            command = "translation.set"
-        if command is not None:
+        try:
+            action = select_app_action(name, arguments)
+        except ValueError:
+            return _rejected("invalid_arguments", "Choose a supported action for this tool.")
+        catalog = {}
+        if action.settings:
+            try:
+                catalog = await self._control.query("settings.choices", {})
+                require_current()
+            except Exception:
+                return _rejected("settings_unavailable", "Settings choices are unavailable.")
+        try:
+            validate(arguments, action.schema(catalog))
+        except ValueError:
+            return _rejected(
+                "invalid_arguments", f"Use {action.signature}; omit other fields and nulls."
+            )
+        return await self.execute_action(
+            action, action.arguments(arguments), catalog, require_current, request_id
+        )
+
+    async def execute_action(
+        self,
+        action: AppAction,
+        arguments: dict,
+        catalog: dict,
+        require_current: Callable[[], None],
+        request_id: str | None,
+    ) -> dict:
+        require_current()
+        if action.handler == "command":
+            command = arguments["command"]
             task = self._scope.create_task(
                 self._run_command(
-                    name, command, deepcopy(command_arguments), require_current, request_id
+                    command,
+                    command,
+                    {key: value for key, value in arguments.items() if key != "command"},
+                    require_current,
+                    request_id,
                 ),
-                name=f"{name}:{uuid4().hex}",
+                name=f"{command}:{uuid4().hex}",
             )
             self._tasks.add(task)
             task.add_done_callback(self._tasks.discard)
             return await asyncio.shield(task)
-        if name == "open_settings":
+        if action.handler == "query":
+            name = arguments["query"]
+            try:
+                source = await self._control.query(name, {})
+                require_current()
+                if not isinstance(source, dict) or source.get("status") == "failed":
+                    return {"status": "unavailable", "code": "query_unavailable"}
+                projected = await project_query(name, source, self._control, self._localize)
+                return {"status": "observed", "result": projected}
+            except Exception:
+                return {"status": "unavailable", "code": "query_unavailable"}
+        if action.handler == "card":
+            return await self._propose_command(
+                arguments["command"],
+                {key: value for key, value in arguments.items() if key != "command"},
+                require_current,
+            )
+        if action.handler == "navigation":
             return self._open_settings(arguments)
-        if name == "get_provider_setup":
+        if action.handler == "provider_setup":
             return self._get_provider_setup(arguments)
-        if name == "withdraw_confirmation":
-            if (
-                arguments.keys() != {"card_id"}
-                or type(arguments["card_id"]) is not str
-                or not arguments["card_id"]
-            ):
-                return _rejected(
-                    "invalid_arguments", "Provide only the current confirmation card ID."
-                )
+        if action.handler == "withdraw":
             card = self._confirmation
             if card is None or card["id"] != arguments["card_id"]:
                 return _rejected(
@@ -731,8 +747,13 @@ class AgentTools:
                 )
             self.cancel_confirmation()
             return {"status": "withdrawn", "card_id": card["id"]}
-        if name != "change_settings":
-            return _rejected("unsupported_tool", "This settings tool is not supported.")
+        if action.handler != "settings":
+            return _rejected("unsupported_tool", "This action is owned by the conversation.")
+        return await self._change_settings(arguments, catalog, require_current)
+
+    async def _change_settings(
+        self, arguments: dict, catalog: dict, require_current: Callable[[], None]
+    ) -> dict:
         if arguments.keys() != {"changes"} or type(arguments["changes"]) is not dict:
             return _rejected("invalid_arguments", "Provide only a changes object.")
         original = arguments["changes"]
@@ -740,26 +761,13 @@ class AgentTools:
             return _rejected(
                 "invalid_arguments", "The requested settings fields are not supported."
             )
-        changes = deepcopy({key: value for key, value in original.items() if value is not None})
-        if type(changes.get("languages")) is dict:
-            if changes["languages"].keys() - LANGUAGE_FIELD_PATHS.keys():
-                return _rejected("invalid_arguments", "Unknown language field.")
-            changes["languages"] = {
-                key: value for key, value in changes["languages"].items() if value is not None
-            }
-            if not changes["languages"]:
-                del changes["languages"]
-        if not changes:
+        changes = deepcopy(original)
+        if not changes or changes.get("languages") == {}:
             return _rejected("invalid_arguments", "Provide at least one supported change.")
         context = deepcopy(self._context)
         if type(context.get("revision")) is not int:
             return _rejected("context_required", "Read current settings before changing them.")
-        try:
-            catalog = await self._control.query("settings.choices", {})
-            require_current()
-            schema = settings_tool_schema(catalog)
-        except Exception:
-            return _rejected("settings_unavailable", "Settings choices are unavailable.")
+        schema = settings_tool_schema(catalog)
         try:
             if changes.keys() & {"translation.model", "translation.connection"}:
                 for field in ("translation.model", "translation.connection"):
@@ -1250,7 +1258,7 @@ class AgentTools:
             submitted = _safe_receipt(receipt)
             self._record_action(
                 {
-                    "tool": "change_settings",
+                    "tool": "settings.apply",
                     "action_id": request_id,
                     "phase": "submitted",
                     "changes": deepcopy(changes),
@@ -1299,7 +1307,7 @@ class AgentTools:
         self._record_action(
             {
                 "action_id": request_id,
-                "tool": "change_settings",
+                "tool": "settings.apply",
                 "phase": phase,
                 "changed": changes != previous,
                 "result": deepcopy(result),
@@ -1325,11 +1333,32 @@ class AgentTools:
         require_current: Callable[[], None],
         request_id: str | None = None,
     ) -> dict:
-        request_id = request_id or uuid4().hex
-        receipt = None
         require_current()
+        signature = json.dumps([command, arguments], sort_keys=True, separators=(",", ":"))
+        previous = self._command_requests.get(signature)
+        retained = self._command_requests.setdefault(
+            signature, {"request_id": request_id or uuid4().hex}
+        )
+        request_id = retained["request_id"]
+        receipt = retained.get("receipt")
+        if previous is not None and receipt is None:
+            return deepcopy(retained.get("result", {"status": "pending", "request_id": request_id}))
         try:
-            receipt = await self._control.submit(command, arguments, request_id=request_id)
+            if receipt is not None:
+                try:
+                    observed = await self._control.operation(receipt["operation_id"])
+                    if (
+                        isinstance(observed, dict)
+                        and observed.get("operation_id") == receipt["operation_id"]
+                        and observed.get("request_id") == request_id
+                        and isinstance(observed.get("status"), str)
+                    ):
+                        receipt = observed
+                except Exception:
+                    pass
+            else:
+                receipt = await self._control.submit(command, arguments, request_id=request_id)
+            retained["receipt"] = dict(receipt)
             self._record_action(
                 {
                     "tool": name,
@@ -1352,7 +1381,14 @@ class AgentTools:
         except Exception:
             if isinstance(receipt, dict) and receipt.get("operation_id"):
                 try:
-                    receipt = await self._control.operation(receipt["operation_id"])
+                    observed = await self._control.operation(receipt["operation_id"])
+                    if (
+                        isinstance(observed, dict)
+                        and observed.get("operation_id") == receipt["operation_id"]
+                        and observed.get("request_id") == request_id
+                        and isinstance(observed.get("status"), str)
+                    ):
+                        receipt = observed
                 except Exception:
                     pass
                 result = {
@@ -1365,6 +1401,14 @@ class AgentTools:
                     "request_id": request_id,
                     "error": {"code": f"{command.replace('.', '_')}_outcome_unknown"},
                 }
+        if isinstance(receipt, dict):
+            retained["receipt"] = dict(receipt)
+        retained["result"] = deepcopy(result)
+        if self._command_requests.get(signature) is retained and (
+            result["status"] not in {"pending", "unavailable"}
+            or (isinstance(receipt, dict) and receipt.get("terminal") is True)
+        ):
+            self._command_requests.pop(signature, None)
         self._record_action(
             {
                 "tool": name,
@@ -1374,45 +1418,6 @@ class AgentTools:
             }
         )
         return result
-
-    async def _control_app(
-        self, arguments: dict, require_current: Callable[[], None], request_id: str | None = None
-    ) -> dict:
-        if arguments.keys() != {"request"} or type(arguments["request"]) is not dict:
-            return {"status": "rejected", "code": "invalid_control_request"}
-        request = deepcopy(arguments["request"])
-        try:
-            catalog = await self._control.query("settings.choices", {})
-            require_current()
-            validate(request, {"anyOf": request_schemas(catalog)})
-        except Exception:
-            return {"status": "rejected", "code": "invalid_control_request"}
-        action = request.pop("action")
-        request = {key: value for key, value in request.items() if value is not None}
-        if action.startswith("query."):
-            name = action.removeprefix("query.")
-            try:
-                source = await self._control.query(name, request)
-                require_current()
-                if not isinstance(source, dict) or source.get("status") == "failed":
-                    return {"status": "unavailable", "code": "query_unavailable"}
-                projected = await project_query(name, source, self._control, self._localize)
-                if name == "settings.current":
-                    self.observe_context(projected)
-                return {"status": "observed", "result": projected}
-            except Exception:
-                return {"status": "unavailable", "code": "query_unavailable"}
-        if action in DIRECT_COMMANDS:
-            task = self._scope.create_task(
-                self._run_command("control_app", action, request, require_current, request_id),
-                name=f"control-app:{request_id or uuid4().hex}",
-            )
-            self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
-            return await asyncio.shield(task)
-        if action in CARD_COMMANDS:
-            return await self._propose_command(action, request, require_current)
-        return {"status": "rejected", "code": "unsupported_action"}
 
     async def _propose_command(
         self, command: str, arguments: dict, require_current: Callable[[], None]
@@ -1490,7 +1495,7 @@ class AgentTools:
         result.update(command=command, changes=deepcopy(card["changes"]))
         self._record_action(
             {
-                "tool": "control_app",
+                "tool": command,
                 "action_id": request_id,
                 "phase": "observed" if result["status"] == "pending" else "completed",
                 "result": deepcopy(result),

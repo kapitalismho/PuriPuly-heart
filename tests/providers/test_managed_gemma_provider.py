@@ -7,6 +7,11 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from puripuly_heart.core.diagnostics import (
+    deserialize_diagnostics,
+    exception_diagnostics,
+    serialize_diagnostics,
+)
 from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaMetrics,
     ManagedGemmaResponse,
@@ -255,3 +260,97 @@ async def test_http_transport_restore_miss_returns_false() -> None:
     await transport.close()
 
     assert restored is False
+
+
+@pytest.mark.asyncio
+async def test_readiness_timeout_retains_last_validated_http_failure():
+    transport = HttpxManagedGemmaTransport("http://127.0.0.1:38191", poll_interval_s=0.001)
+    transport._client = httpx.AsyncClient(
+        base_url=transport.base_url,
+        transport=httpx.MockTransport(lambda _request: httpx.Response(503)),
+    )
+    try:
+        with pytest.raises(TimeoutError) as failure:
+            await transport.wait_until_ready(timeout_s=0.005)
+        assert failure.value.__cause__.failure_diagnostics.status_code == 503
+    finally:
+        await transport.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["restore_prefix", "save_prefix"])
+async def test_prefix_request_failure_preserves_secondary_settlement_failure(operation):
+    transport = HttpxManagedGemmaTransport("http://127.0.0.1:38191")
+    transport._client = httpx.AsyncClient(
+        base_url=transport.base_url,
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(
+                500 if request.url.path == "/slots" else 503,
+                json={"message": "PRIVATE_SECRET"},
+            )
+        ),
+    )
+    try:
+        with pytest.raises(
+            RuntimeError if operation == "restore_prefix" else httpx.HTTPStatusError
+        ) as failure:
+            await getattr(transport, operation)(filename="cache.bin", slot_id=0)
+        diagnostics = failure.value.failure_diagnostics
+        assert diagnostics.status_code == 503
+        assert diagnostics.causes[0].status_code == 500
+        assert diagnostics.causes[0].fields["cleanup_confirmed"] is False
+        assert "PRIVATE_SECRET" not in repr(diagnostics)
+    finally:
+        await transport.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("truncated", [False, True])
+async def test_provider_preserves_runtime_recovery_and_secondary_values_without_history(truncated):
+    original = exception_diagnostics(
+        PermissionError(13, "PRIVATE_SECRET", "C:/Users/private/file"),
+        component="model_assets",
+        operation="runtime",
+        code="model_assets.runtime_failed",
+    )
+    cleanup = exception_diagnostics(
+        OSError(13, "PRIVATE_CLEANUP_SECRET"),
+        component="model_assets",
+        operation="slot_cleanup",
+        code="model_assets.cleanup_failed",
+    )
+
+    class RecoveredRuntime(FakeRuntime):
+        async def translate(self, **kwargs):
+            return ManagedGemmaResponse(
+                "hello",
+                ManagedGemmaMetrics(1, 1, 1, 1.0, 1.0, 1.0),
+                recovery_diagnostics=(original,),
+                secondary_diagnostics=(cleanup,),
+                recovery_diagnostics_truncated=truncated,
+                secondary_diagnostics_truncated=truncated,
+            )
+
+    provider = ManagedGemmaLLMProvider(runtime=RecoveredRuntime(), backend="cpu")
+    result = await provider.translate(
+        utterance_id=uuid4(),
+        text="input",
+        system_prompt="translate",
+        source_language="ko",
+        target_language="en",
+    )
+    await provider.close()
+    assert result.text == "hello"
+    assert len(result.recovered_failures) == 1
+    recovered = serialize_diagnostics(deserialize_diagnostics(result.recovered_failures[0]))
+    assert recovered == serialize_diagnostics(original)
+    assert "PRIVATE_SECRET" not in repr(recovered)
+    assert len(result.secondary_diagnostics) == 1
+    secondary = serialize_diagnostics(deserialize_diagnostics(result.secondary_diagnostics[0]))
+    assert secondary == serialize_diagnostics(cleanup)
+    assert original.diagnostic_id != secondary["diagnostic_id"]
+    assert "PRIVATE_CLEANUP_SECRET" not in repr(secondary)
+    with pytest.raises(TypeError):
+        result.secondary_diagnostics[0]["fields"]["errno"] = 42
+    assert result.recovered_failures_truncated is truncated
+    assert result.secondary_diagnostics_truncated is truncated

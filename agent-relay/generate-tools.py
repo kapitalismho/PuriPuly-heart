@@ -5,28 +5,12 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
-from puripuly_heart.app.services.agent_chat.execution import APP_TOOLS, app_tool_schemas
+from puripuly_heart.app.services.agent_chat.execution import (
+    APP_TOOLS,
+    app_tool_descriptions,
+    app_tool_schemas,
+)
 
-DESCRIPTIONS = {
-    "read_app": (
-        "Observe current app state without UI or runtime effects. topic: a context module or "
-        "overview; diagnostics with optional diagnostic_id, operation_id or after; gpu, models, "
-        "auth or peer_consent status; provider_setup with provider; operation with operation_id "
-        "for a retained receipt."
-    ),
-    "execute_app": (
-        "Run an immediate operation or stage existing UI controls. Parameters: capture.set "
-        "channel and enabled; translation.set and overlay.set enabled; recognition.probe channel; "
-        "ui.provider_setup provider; ui.settings section, optional provider; "
-        "confirmation.withdraw card_id. Probes are active scoped checks, not proof of live "
-        "capture or display; audio.diagnose measures local capture/VAD and never changes settings."
-    ),
-    "propose_app": (
-        "Queue a user approval card: settings with sparse changes (only changed fields, never "
-        "null placeholders), secrets.delete name, auth.logout provider, overlay.position.reset, "
-        "or report summary, which offers a send button."
-    ),
-}
 DEFINITION_NAMES = {
     "source": "language",
     "secondary_target": "optional_language",
@@ -98,11 +82,12 @@ def _share_definitions(schema: dict) -> dict:
 
 def app_tools(catalog: dict) -> list[dict]:
     schemas = app_tool_schemas(catalog)
+    descriptions = app_tool_descriptions()
     return [
         {
             "type": "function",
             "name": name,
-            "description": DESCRIPTIONS[name],
+            "description": descriptions[name],
             "strict": False,
             "parameters": _share_definitions(_openai_schema(schemas[name])),
         }

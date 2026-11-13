@@ -11,10 +11,12 @@ def create_button_spinner(
     semantics_label: str | None = None,
     color: str = COLOR_PRIMARY,
 ) -> ft.ProgressRing:
+    stroke_width = max(3, icon_size * 0.06)
     return ft.ProgressRing(
-        width=icon_size * 0.7,
-        height=icon_size * 0.7,
-        stroke_width=max(3, icon_size * 0.06),
+        width=icon_size * 0.7 + stroke_width,
+        height=icon_size * 0.7 + stroke_width,
+        stroke_width=stroke_width,
+        stroke_align=-1,
         color=color,
         visible=False,
         semantics_label=semantics_label,
@@ -28,9 +30,10 @@ def create_section_spinner(
     color: str | None = None,
 ) -> ft.ProgressRing:
     kwargs: dict[str, object] = {
-        "width": size,
-        "height": size,
+        "width": size + stroke_width,
+        "height": size + stroke_width,
         "stroke_width": stroke_width,
+        "stroke_align": -1,
     }
     if color is not None:
         kwargs["color"] = color

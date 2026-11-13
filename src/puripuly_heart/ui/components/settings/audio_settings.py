@@ -11,6 +11,8 @@ from puripuly_heart.config.audio_host_api import (
     WINDOWS_WASAPI_HOST_API,
     normalize_input_host_api,
 )
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.ui.components.settings.settings_modal import OptionItem
 from puripuly_heart.ui.i18n import t
 
@@ -26,6 +28,28 @@ class AudioSettings:
         self._current_host_api = ""
         self._current_microphone = ""
         self._current_desktop_output_device = ""
+        self._failures: dict[str, ErrorDiagnostics] = {}
+
+    @property
+    def enumeration_diagnostics(self) -> tuple[ErrorDiagnostics, ...]:
+        return tuple(self._failures.values())
+
+    def _record_failure(self, operation: str, error: Exception) -> None:
+        diagnostics = exception_diagnostics(
+            error,
+            component="ui_audio_settings",
+            operation=operation,
+            code=(
+                "audio_device_cleanup_failed"
+                if operation == "desktop_output_cleanup"
+                else "audio_device_enumeration_failed"
+            ),
+            category="lifecycle",
+        )
+        self._failures[operation] = diagnostics
+        emit_failure(
+            logger, diagnostics, severity="warning", disposition="degraded", stage=operation
+        )
 
     @property
     def host_api(self) -> str:
@@ -79,6 +103,7 @@ class AudioSettings:
     def _get_host_api_options(self) -> list[OptionItem]:
         """Get available host API options."""
         options = [OptionItem(value="", label=self._default_option_label)]
+        self._failures.pop("host_api_enumeration", None)
 
         try:
             import sounddevice as sd
@@ -86,8 +111,8 @@ class AudioSettings:
             available_host_apis = {
                 str(api.get("name", "") or "").strip().casefold() for api in sd.query_hostapis()
             }
-        except Exception as e:
-            logger.warning(f"Failed to enumerate host APIs: {e}")
+        except Exception as exc:
+            self._record_failure("host_api_enumeration", exc)
             return options
 
         if WINDOWS_MME_HOST_API.casefold() in available_host_apis:
@@ -125,6 +150,7 @@ class AudioSettings:
     def _get_microphone_options(self) -> list[OptionItem]:
         """Get available microphone options based on selected host API."""
         options = [OptionItem(value="", label=self._default_option_label)]
+        self._failures.pop("microphone_enumeration", None)
 
         try:
             import sounddevice as sd
@@ -150,13 +176,15 @@ class AudioSettings:
                 name = str(dev.get("name", "") or "").strip()
                 if name:
                     options.append(OptionItem(value=name, label=name))
-        except Exception as e:
-            logger.warning(f"Failed to enumerate microphones: {e}")
+        except Exception as exc:
+            self._record_failure("microphone_enumeration", exc)
 
         return options
 
     def _get_desktop_output_options(self) -> list[OptionItem]:
         options = [OptionItem(value="", label=self._default_option_label)]
+        self._failures.pop("desktop_output_enumeration", None)
+        self._failures.pop("desktop_output_cleanup", None)
 
         manager = None
         try:
@@ -170,15 +198,14 @@ class AudioSettings:
                     continue
                 seen.add(name)
                 options.append(OptionItem(value=name, label=name))
-        except Exception as e:
-            logger.warning(f"Failed to enumerate desktop loopback outputs: {e}")
+        except Exception as exc:
+            self._record_failure("desktop_output_enumeration", exc)
         finally:
             if manager is not None:
                 try:
                     manager.terminate()
-                except Exception:
-                    pass
-
+                except Exception as exc:
+                    self._record_failure("desktop_output_cleanup", exc)
         return options
 
     def apply_locale(self) -> None:

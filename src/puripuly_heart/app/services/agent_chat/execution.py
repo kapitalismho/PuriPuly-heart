@@ -2,13 +2,47 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 from puripuly_heart.app.control_presentation import SETTINGS_PRESENTATION, setting_catalog
-from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
 from puripuly_heart.app.services.application_audio_devices import safe_audio_device_label
 from puripuly_heart.app.services.application_control import COMMANDS, QUERIES, SETTINGS_FIELDS
 from puripuly_heart.core.diagnostic_validation import contains_known_secret_pattern
-from puripuly_heart.core.diagnostics import sanitize_diagnostic_fields
+from puripuly_heart.core.diagnostics import (
+    DIAGNOSTIC_CAUSE_MAX_COUNT,
+    project_diagnostic_record,
+    sanitize_diagnostic_fields,
+)
+
+CHANNEL_FIELDS = (
+    "selected_provider",
+    "runtime_provider",
+    "capture_attached_provider",
+    "desired_active",
+    "effective_active",
+    "pending_handoff",
+    "failure_reason",
+    "provider_status",
+)
+OVERLAY_FIELDS = (
+    "settings_available",
+    "desired_enabled",
+    "configured_target",
+    "effective_target",
+    "attempting_target",
+    "lifecycle",
+    "runtime_active",
+    "process_state",
+    "presentation_ready",
+    "desktop_visible",
+    "failure_reason",
+    "auto_restart_scheduled",
+    "fallback_active",
+    "recovery_active",
+    "recovery_reason",
+    "ingress_stopped",
+    "generation",
+)
 
 DEDICATED_COMMANDS = frozenset(
     {
@@ -82,18 +116,6 @@ def private_fields() -> frozenset[str]:
 
 def scalar(kind: str, choices=None, **bounds) -> dict:
     return {"type": kind, **({"enum": list(choices)} if choices is not None else {}), **bounds}
-
-
-def object_schema(properties: dict, optional=()) -> dict:
-    return {
-        "type": "object",
-        "properties": {
-            key: {"anyOf": [value, {"type": "null"}]} if key in optional else value
-            for key, value in properties.items()
-        },
-        "required": list(properties),
-        "additionalProperties": False,
-    }
 
 
 def model_safe_catalog(catalog: dict) -> dict:
@@ -175,145 +197,210 @@ def project_catalog(catalog: dict, localize) -> dict:
     return setting_catalog(model_safe_catalog(catalog), localize)
 
 
-def request_schemas(catalog: dict) -> list[dict]:
-    check_inventory()
-    s = scalar("string", minLength=1, maxLength=128)
-    secret = scalar("string", catalog.get("command_choices", {}).get("secrets.names", ()))
-    provider = scalar("string", ("qq", "discord", "openrouter", "chatgpt"))
-    specs = {
-        "overlay.set": ({"enabled": scalar("boolean")}, ()),
-        "audio.retry": ({}, ()),
-        "models.retry": ({"backend": scalar("string", ("gpu",))}, ("backend",)),
-        "secrets.delete": ({"name": secret}, ()),
-        "auth.logout": ({"provider": provider}, ()),
-        "overlay.position.reset": ({}, ()),
-    }
-    for name in QUERY_DOMAINS:
-        fields = {}
-        if name == "diagnostics.history":
-            fields = {
-                "operation_id": s,
-                "diagnostic_id": s,
-                "after": scalar("integer", minimum=0),
-                "limit": scalar("integer", minimum=1, maximum=100),
-            }
-        specs["query." + name] = (fields, tuple(fields))
-    return [
-        object_schema({"action": scalar("string", (name,)), **fields}, optional)
-        for name, (fields, optional) in sorted(specs.items())
-    ]
-
-
-APP_TOOLS = ("read_app", "execute_app", "propose_app")
+APP_TOOLS = ("read_app", "set_app", "probe_app", "retry_app", "open_app", "manage_proposal")
 DETAIL_TOPICS = {
     "gpu": "gpu.status",
     "models": "models.status",
     "auth": "auth.status",
     "peer_consent": "consent.peer_translation",
 }
+TOOL_PURPOSES = {
+    "read_app": "Observe current app state without UI or runtime effects.",
+    "set_app": "Set an existing runtime switch; no saved settings change.",
+    "probe_app": "Run an isolated scoped check, not live pipeline repair or output delivery.",
+    "retry_app": "Retry existing application recovery through its resource owner.",
+    "open_app": "Stage existing app controls; staging is not display, click, verification or readiness.",
+    "manage_proposal": "Create or withdraw a user card, never approve or send it.",
+}
 
 
-def app_tool_variants(catalog: dict, family: str) -> list[dict]:
+@dataclass(frozen=True, slots=True)
+class AppAction:
+    tool: str
+    key: str
+    value: str
+    handler: str
+    binding: dict
+    fields: dict
+    optional: tuple[str, ...] = ()
+    guidance: str = ""
+    settings: bool = False
+
+    def schema(self, catalog: dict) -> dict:
+        fields = self.fields
+        if self.settings:
+            from puripuly_heart.app.services.agent_chat.tools import settings_tool_schema
+
+            fields = {"changes": settings_tool_schema(catalog)}
+        return {
+            "type": "object",
+            "properties": {self.key: scalar("string", (self.value,)), **fields},
+            "required": [self.key, *(key for key in fields if key not in self.optional)],
+            "additionalProperties": False,
+        }
+
+    def arguments(self, request: dict) -> dict:
+        return {**self.binding, **{key: value for key, value in request.items() if key != self.key}}
+
+    @property
+    def signature(self) -> str:
+        fields = {"changes": {}} if self.settings else self.fields
+        arguments = ", ".join(f"{name}{'?' if name in self.optional else ''}" for name in fields)
+        return f"{self.value}{'(' + arguments + ')' if arguments else ''}"
+
+
+def app_actions() -> tuple[AppAction, ...]:
+    from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
     from puripuly_heart.app.services.agent_chat.modules import TOPICS
     from puripuly_heart.app.services.agent_chat.provider_setup import NAVIGATION_PROVIDERS
-    from puripuly_heart.app.services.agent_chat.tools import settings_tool_schema
-
-    def sparse(schema):
-        if "anyOf" in schema:
-            variants = [item for item in schema["anyOf"] if item != {"type": "null"}]
-            if len(variants) == 1:
-                return sparse(variants[0])
-        result = dict(schema)
-        if result.get("type") == "object":
-            result["properties"] = {
-                key: sparse(value) for key, value in result["properties"].items()
-            }
-            result["required"] = []
-        return result
-
-    def variant(key, values, fields=None, optional=()):
-        schema = object_schema({key: scalar("string", values), **(fields or {})})
-        schema["required"] = [name for name in schema["properties"] if name not in optional]
-        return schema
 
     provider = scalar("string", sorted(NAVIGATION_PROVIDERS))
     identity = scalar("string", minLength=1, maxLength=64)
-    if family == "read_app":
-        return [
-            variant("topic", sorted(TOPICS - {"diagnostics"} | DETAIL_TOPICS.keys())),
-            variant(
-                "topic",
-                ["diagnostics"],
-                {
-                    "diagnostic_id": identity,
-                    "operation_id": identity,
-                    "after": scalar("integer", minimum=0),
-                },
-                ("diagnostic_id", "operation_id", "after"),
-            ),
-            variant("topic", ["provider_setup"], {"provider": provider}),
-            variant("topic", ["operation"], {"operation_id": identity}),
-        ]
-    if family == "execute_app":
-        return [
-            variant(
-                "action",
-                ["capture.set"],
-                {"channel": scalar("string", ("self", "peer")), "enabled": scalar("boolean")},
-            ),
-            variant("action", ["translation.set", "overlay.set"], {"enabled": scalar("boolean")}),
-            variant(
-                "action", ["recognition.probe"], {"channel": scalar("string", ("self", "peer"))}
-            ),
-            variant(
-                "action",
-                [
-                    "translation.probe",
-                    "audio.diagnose",
-                    "audio.retry",
-                    "osc.discovery.retry",
-                    "ui.accounts",
-                ],
-            ),
-            variant(
-                "action", ["models.retry"], {"backend": scalar("string", ("gpu",))}, ("backend",)
-            ),
-            variant("action", ["ui.provider_setup"], {"provider": provider}),
-            variant(
-                "action",
-                ["ui.settings"],
-                {
-                    "section": scalar("string", ("api", "general", "overlay", "prompts")),
-                    "provider": provider,
-                },
-                ("provider",),
-            ),
-            variant("action", ["confirmation.withdraw"], {"card_id": identity}),
-        ]
-    if family == "propose_app":
-        return [
-            variant("action", ["settings"], {"changes": sparse(settings_tool_schema(catalog))}),
-            variant(
-                "action", ["report"], {"summary": scalar("string", minLength=1, maxLength=2000)}
-            ),
-            *[
-                spec
-                for spec in request_schemas(catalog)
-                if spec["properties"]["action"]["enum"][0] in CARD_COMMANDS
-            ],
-        ]
-    raise ValueError("unsupported_app_tool")
+    actions = []
+
+    def add(
+        tool, value, handler, binding=None, fields=None, optional=(), guidance="", settings=False
+    ):
+        key = {"read_app": "topic", "open_app": "view", "manage_proposal": "action"}.get(
+            tool, "target"
+        )
+        actions.append(
+            AppAction(
+                tool, key, value, handler, binding or {}, fields or {}, optional, guidance, settings
+            )
+        )
+
+    for topic in sorted(TOPICS - {"diagnostics"}):
+        add("read_app", topic, "context", {"topic": topic})
+    add(
+        "read_app",
+        "diagnostics",
+        "context",
+        {"topic": "diagnostics"},
+        {
+            "diagnostic_id": identity,
+            "operation_id": identity,
+            "after": scalar("integer", minimum=0),
+        },
+        ("diagnostic_id", "operation_id", "after"),
+    )
+    for topic, query in DETAIL_TOPICS.items():
+        add("read_app", topic, "query", {"query": query})
+    add("read_app", "provider_setup", "provider_setup", fields={"provider": provider})
+    add(
+        "read_app",
+        "operation",
+        "operation",
+        fields={"operation_id": identity},
+        guidance="Retained receipt; resolve pending/uncertain work by its identity, not resubmission.",
+    )
+    for channel in ("self", "peer"):
+        add(
+            "set_app",
+            f"capture.{channel}",
+            "command",
+            {"command": "capture.set", "channel": channel},
+            {"enabled": scalar("boolean")},
+        )
+    for target in ("translation", "overlay"):
+        add(
+            "set_app",
+            target,
+            "command",
+            {"command": f"{target}.set"},
+            {"enabled": scalar("boolean")},
+        )
+    for kind in ("recognition", "translation"):
+        for channel in ("self", "peer"):
+            add(
+                "probe_app",
+                f"{kind}.{channel}",
+                "command",
+                {"command": f"{kind}.probe", "channel": channel},
+            )
+    add(
+        "probe_app",
+        "microphone",
+        "command",
+        {"command": "audio.diagnose"},
+        guidance="Local capture/VAD only; no settings change.",
+    )
+    for target, command, binding in (
+        ("audio", "audio.retry", {}),
+        ("osc_discovery", "osc.discovery.retry", {}),
+        ("gpu_activation", "models.retry", {"backend": "gpu"}),
+    ):
+        add("retry_app", target, "command", {"command": command, **binding})
+    add("open_app", "accounts", "context", {"topic": "accounts"})
+    add("open_app", "provider_setup", "provider_setup", fields={"provider": provider})
+    add(
+        "open_app",
+        "settings",
+        "navigation",
+        fields={
+            "section": scalar("string", ("api", "general", "overlay", "prompts")),
+            "provider": provider,
+        },
+        optional=("provider",),
+    )
+    add(
+        "manage_proposal",
+        "settings",
+        "settings",
+        settings=True,
+        guidance="Sparse changes only; absent fields stay unchanged, never null placeholders.",
+    )
+    add(
+        "manage_proposal",
+        "report",
+        "report",
+        fields={"summary": scalar("string", minLength=1, maxLength=2000)},
+        guidance="Offers a send button; upload requires the user's click.",
+    )
+    add(
+        "manage_proposal",
+        "auth.logout",
+        "card",
+        {"command": "auth.logout"},
+        {"provider": scalar("string", ("qq", "discord", "openrouter", "chatgpt"))},
+    )
+    add("manage_proposal", "overlay.position.reset", "card", {"command": "overlay.position.reset"})
+    add(
+        "manage_proposal",
+        "secrets.delete",
+        "card",
+        {"command": "secrets.delete"},
+        {"name": scalar("string", tuple(key.value for key in SettingsSecretKey))},
+    )
+    add(
+        "manage_proposal",
+        "withdraw",
+        "withdraw",
+        fields={"card_id": identity},
+        guidance="Only the matching pending card; accepted application work is not cancelled.",
+    )
+    return tuple(actions)
+
+
+def select_app_action(tool: str, arguments: dict) -> AppAction:
+    for action in app_actions():
+        if action.tool == tool and arguments.get(action.key) == action.value:
+            return action
+    raise ValueError("invalid_control_choice")
+
+
+def app_tool_variants(catalog: dict, family: str) -> list[dict]:
+    return [action.schema(catalog) for action in app_actions() if action.tool == family]
 
 
 def app_tool_schemas(catalog: dict, *, family: str | None = None) -> dict[str, dict]:
+    check_inventory()
     schemas = {}
     for name in APP_TOOLS if family is None else (family,):
         variants = app_tool_variants(catalog, name)
         key = next(iter(variants[0]["properties"]))
         properties = {
-            key: scalar(
-                "string", [value for item in variants for value in item["properties"][key]["enum"]]
-            )
+            key: scalar("string", [item["properties"][key]["enum"][0] for item in variants])
         }
         for item in variants:
             for field, schema in item["properties"].items():
@@ -322,77 +409,32 @@ def app_tool_schemas(catalog: dict, *, family: str | None = None) -> dict[str, d
         schemas[name] = {
             "type": "object",
             "properties": properties,
-            "required": [key],
+            "required": [
+                field for field in properties if all(field in item["required"] for item in variants)
+            ],
             "additionalProperties": False,
         }
     return schemas
 
 
-def validate_app_request(family: str, arguments: dict, catalog: dict) -> dict:
-    request = {key: value for key, value in arguments.items() if value is not None}
-    if family in {"read_app", "execute_app"} and request.get("provider") in (
-        "google",
-        "gemini_transcribe",
-    ):
-        request["provider"] = "gemini"
-    if (
-        family == "propose_app"
-        and request.get("action") == "secrets.delete"
-        and request.get("name") in ("google_api_key", "gemini_transcribe_api_key")
-    ):
-        request["name"] = SettingsSecretKey.GEMINI_API_KEY.value
-    key = "topic" if family == "read_app" else "action"
-    variants = app_tool_variants(catalog, family)
-    if request.keys() - {field for item in variants for field in item["properties"]}:
-        raise ValueError("invalid_control_fields")
-    variant = next(
-        (item for item in variants if request.get(key) in item["properties"][key]["enum"]),
-        None,
-    )
-    if variant is None:
-        raise ValueError("invalid_control_choice")
-    request = {field: value for field, value in request.items() if field in variant["properties"]}
-    validate(request, variant)
-    return request
-
-
-def app_tool_target(name: str, arguments: dict) -> tuple[str, dict]:
-    request = dict(arguments)
-    if name == "read_app":
-        topic = request.pop("topic")
-        if topic == "provider_setup":
-            return "get_provider_setup", request
-        if topic == "operation":
-            return "read_operation", request
-        if topic in DETAIL_TOPICS:
-            if request:
-                raise ValueError("unsupported_read_filters")
-            return "control_app", {"request": {"action": "query." + DETAIL_TOPICS[topic]}}
-        return "get_app_context", {"topic": topic, **request}
-    action = request.pop("action")
-    if name == "propose_app":
-        if action == "settings":
-            return "change_settings", request
-        if action == "report":
-            return "propose_report", request
-        return "control_app", {"request": {"action": action, **request}}
-    targets = {
-        "capture.set": "set_capture",
-        "translation.set": "set_translation",
-        "audio.diagnose": "diagnose_microphone",
-        "osc.discovery.retry": "retry_osc_discovery",
-        "translation.probe": "probe_translation",
-        "ui.provider_setup": "get_provider_setup",
-        "ui.settings": "open_settings",
-        "confirmation.withdraw": "withdraw_confirmation",
+def app_tool_descriptions() -> dict[str, str]:
+    return {
+        tool: TOOL_PURPOSES[tool]
+        + " Arguments: "
+        + "; ".join(
+            action.signature + (". " + action.guidance.rstrip(".") if action.guidance else "")
+            for action in app_actions()
+            if action.tool == tool
+        )
+        + ". Supply only the selected action's fields."
+        for tool in APP_TOOLS
     }
-    if action == "recognition.probe":
-        return f"probe_{request['channel']}_recognition", {}
-    if action == "ui.accounts":
-        return "get_app_context", {"topic": "accounts"}
-    if action in targets:
-        return targets[action], request
-    return "control_app", {"request": {"action": action, **request}}
+
+
+def validate_app_request(family: str, arguments: dict, catalog: dict) -> dict:
+    action = select_app_action(family, arguments)
+    validate(arguments, action.schema(catalog))
+    return dict(arguments)
 
 
 def validate(value, schema: dict, *, partial: bool = False) -> None:
@@ -500,6 +542,112 @@ RECEIPT_FIELDS = frozenset(
 )
 
 
+def project_diagnostic_evidence(value: object) -> dict:
+    source = value if isinstance(value, Mapping) else {}
+    result = {
+        key: project_diagnostic_record(source[key])
+        for key in (
+            "diagnostics",
+            "cause_diagnostics",
+            "failure_diagnostics",
+            "query_diagnostics",
+            "discovery_diagnostics",
+            "avatar_diagnostics",
+            "source_open_diagnostics",
+        )
+        if isinstance(source.get(key), Mapping)
+    }
+    for key in ("secondary_diagnostics_truncated", "diagnostics_truncated"):
+        if type(source.get(key)) is bool:
+            result[key] = source[key]
+    for key, bound, count_key, flag_key in (
+        ("secondary_diagnostics", 4, "secondary_omitted_count", "secondary_truncated"),
+        (
+            "recovered_diagnostics",
+            DIAGNOSTIC_CAUSE_MAX_COUNT,
+            "recovered_diagnostics_omitted_count",
+            "recovered_failures_truncated",
+        ),
+        (
+            "recovery_diagnostics",
+            DIAGNOSTIC_CAUSE_MAX_COUNT,
+            "recovery_diagnostics_omitted_count",
+            "recovery_diagnostics_truncated",
+        ),
+        (
+            "runtime_failures",
+            DIAGNOSTIC_CAUSE_MAX_COUNT,
+            "runtime_failures_omitted_count",
+            "runtime_failures_truncated",
+        ),
+        (
+            "service_failures",
+            DIAGNOSTIC_CAUSE_MAX_COUNT,
+            "service_failures_omitted_count",
+            "service_failures_truncated",
+        ),
+        (
+            "dispatch_failures",
+            DIAGNOSTIC_CAUSE_MAX_COUNT,
+            "dispatch_failures_omitted_count",
+            "dispatch_failures_truncated",
+        ),
+    ):
+        if type(source.get(flag_key)) is bool:
+            result[flag_key] = source[flag_key]
+        omitted = source.get(count_key)
+        if type(omitted) is int and 0 <= omitted < 2**31:
+            result[count_key] = omitted
+        items = source.get(key)
+        if isinstance(items, (list, tuple)):
+            result[key] = [
+                project_diagnostic_record(item)
+                for item in items[:bound]
+                if isinstance(item, Mapping)
+            ]
+            if len(items) > bound:
+                result[count_key] = result.get(count_key, 0) + len(items) - bound
+                result[flag_key] = True
+    return result
+
+
+def project_capture_channel(value: object) -> dict:
+    source = value if isinstance(value, Mapping) else {}
+    capture = source.get("capture")
+    capture = capture if isinstance(capture, Mapping) else {}
+    result = {
+        **safe_fields(source, CHANNEL_FIELDS),
+        **project_diagnostic_evidence(source),
+        "capture": {
+            **safe_fields(
+                capture,
+                (
+                    "state",
+                    "generation",
+                    "desired_active",
+                    "effective_active",
+                    "has_source",
+                    "cleanup_debt",
+                    "closed",
+                    "source_open_recovered",
+                ),
+            ),
+            **project_diagnostic_evidence(capture),
+        },
+    }
+    provider = project_diagnostic_evidence(source.get("provider"))
+    if provider:
+        result["provider"] = provider
+    return result
+
+
+def project_overlay_output(value: object) -> dict:
+    return {
+        **safe_fields(value, OVERLAY_FIELDS),
+        **project_diagnostic_evidence(value),
+    }
+
+
 def safe_receipt(value: object) -> dict:
     source = value if isinstance(value, Mapping) else {}
 
@@ -516,18 +664,45 @@ def safe_receipt(value: object) -> dict:
         return result
 
     result = project(source)
-    for key in ("error", "diagnostics", "transaction", "runtime_observation"):
+    result.update(project_diagnostic_evidence(source))
+    for key in ("error", "runtime_observation"):
         if isinstance(source.get(key), Mapping):
             result[key] = project(source[key])
+    observation = source.get("runtime_observation")
+    if isinstance(observation, Mapping) and isinstance(observation.get("channels"), Mapping):
+        result["runtime_observation"]["channels"] = {
+            channel: project_capture_channel(value)
+            for channel, value in observation["channels"].items()
+            if channel in {"self", "peer"}
+        }
+    if isinstance(source.get("channel"), Mapping):
+        result["channel"] = project_capture_channel(source["channel"])
+    if isinstance(source.get("output"), Mapping):
+        result["output"] = project_diagnostic_evidence(source["output"])
+    if isinstance(source.get("transaction"), Mapping):
+        result["transaction"] = safe_receipt(source["transaction"])
+    if isinstance(source.get("audio_test"), Mapping):
+        result["audio_test"] = project_audio_test(source["audio_test"])
+    return result
+
+
+def project_audio_test(source: Mapping) -> dict:
+    result = safe_fields(source, ("state", "desired_active", "effective_active"))
+    result["channels"] = {
+        channel: {
+            **safe_fields(
+                value, ("state", "failure_reason", "failure_type", "device_metadata_availability")
+            ),
+            **safe_receipt(value),
+        }
+        for channel, value in source.get("channels", {}).items()
+        if channel in {"self", "peer"} and isinstance(value, Mapping)
+    }
     return result
 
 
 async def project_query(name: str, source: dict, control, localize) -> dict:
-    from puripuly_heart.app.services.agent_chat.context import (
-        CHANNEL_FIELDS,
-        OVERLAY_FIELDS,
-        _audio_devices,
-    )
+    from puripuly_heart.app.services.agent_chat.context import _audio_devices
     from puripuly_heart.app.services.agent_chat.tools import (
         project_accounts,
         project_osc_output,
@@ -552,7 +727,7 @@ async def project_query(name: str, source: dict, control, localize) -> dict:
         return {
             **base,
             **safe_fields(source, ("target", "locked")),
-            "output": safe_fields(source.get("output"), OVERLAY_FIELDS),
+            "output": project_overlay_output(source.get("output")),
         }
     if domain == "devices":
         return {**base, **_audio_devices(source, {})}
@@ -565,18 +740,11 @@ async def project_query(name: str, source: dict, control, localize) -> dict:
             ),
         }
         result["channels"] = {
-            channel: {
-                **safe_fields(source.get("channels", {}).get(channel), CHANNEL_FIELDS),
-                "capture": safe_fields(
-                    source.get("channels", {}).get(channel, {}).get("capture"),
-                    ("state", "generation", "desired_active", "effective_active", "has_source"),
-                ),
-            }
+            channel: project_capture_channel(source.get("channels", {}).get(channel))
             for channel in ("self", "peer")
         }
-        result["audio_test"] = safe_fields(
-            source.get("audio_test"),
-            ("state", "ready", "active", "failure_code", "cleanup_complete"),
+        result["audio_test"] = project_audio_test(
+            source["audio_test"] if isinstance(source.get("audio_test"), Mapping) else {}
         )
         return result
     if domain == "secrets":
@@ -594,10 +762,15 @@ async def project_query(name: str, source: dict, control, localize) -> dict:
     if domain == "auth":
         return {
             **base,
+            **safe_receipt(source),
             **safe_fields(source, ("action", "prompt_kind", "failure_kind", "consent_accepted")),
-            "chatgpt": safe_fields(
-                source.get("chatgpt"), ("available", "signed_in", "in_progress", "sign_in_required")
-            ),
+            "chatgpt": {
+                **safe_fields(
+                    source.get("chatgpt"),
+                    ("available", "signed_in", "in_progress", "sign_in_required"),
+                ),
+                **safe_receipt(source.get("chatgpt")),
+            },
             "login_available_locally": True,
         }
     if domain == "consent":
@@ -666,6 +839,7 @@ async def project_query(name: str, source: dict, control, localize) -> dict:
             if isinstance(item, Mapping):
                 return {
                     **safe_fields(item, fields),
+                    **safe_receipt(item),
                     **{
                         key: project(value, depth + 1)
                         for key, value in item.items()
@@ -708,7 +882,11 @@ async def project_query(name: str, source: dict, control, localize) -> dict:
                     "truncated",
                 ),
             ),
-            "records": [project_event(item) for item in source.get("records", [])[:100]],
+            "records": [
+                project_diagnostic_record(item)
+                for item in source.get("records", [])[:100]
+                if isinstance(item, Mapping)
+            ],
         }
     if domain == "health":
         fields = {
@@ -801,5 +979,11 @@ def project_event(source: dict, *, depth: int = 0) -> dict:
     if isinstance(source.get("receipt"), Mapping):
         result["receipt"] = safe_receipt(source["receipt"])
     if depth == 0 and isinstance(source.get("diagnostic"), Mapping):
-        result["diagnostic"] = project_event(source["diagnostic"], depth=1)
+        result["diagnostic"] = project_diagnostic_record(source["diagnostic"])
+    if isinstance(source.get("error"), Mapping):
+        result["error"] = safe_receipt({"error": source["error"]})["error"]
+        if isinstance(source["error"].get("diagnostics"), Mapping):
+            result["error"]["diagnostics"] = project_diagnostic_record(
+                source["error"]["diagnostics"]
+            )
     return result

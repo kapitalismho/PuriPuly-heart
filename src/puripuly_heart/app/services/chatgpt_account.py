@@ -26,7 +26,11 @@ from puripuly_heart.core.chatgpt.oauth import (
     token_set_from_response,
 )
 from puripuly_heart.core.chatgpt.session import ChatGptSession
-from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
+from puripuly_heart.core.diagnostics import (
+    emit_failure,
+    exception_diagnostics,
+    safe_exception_fields,
+)
 from puripuly_heart.core.messages import ErrorDiagnostics
 
 logger = logging.getLogger(__name__)
@@ -132,29 +136,20 @@ class ChatGptAccountOwner:
             )
             primary = (
                 exc.diagnostics if isinstance(exc, ChatGptAuthError) else None
-            ) or ErrorDiagnostics(
+            ) or exception_diagnostics(
+                exc,
                 component="chatgpt_account",
                 operation=self._phase,
                 code=f"chatgpt_{code}",
                 category=(
                     "auth"
                     if isinstance(exc, ChatGptAuthError)
-                    else (
-                        "timeout"
-                        if isinstance(exc, TimeoutError)
-                        else (
-                            "network"
-                            if isinstance(exc, httpx.HTTPError)
-                            else "lifecycle" if isinstance(exc, OSError) else "unknown"
-                        )
-                    )
+                    else "lifecycle" if isinstance(exc, (OSError, httpx.HTTPError)) else "unknown"
                 ),
-                visibility="basic",
-                content_policy="metadata_only",
-                status_code=exc.status_code if isinstance(exc, ChatGptAuthError) else None,
-                retry_after_ms=None,
-                fields={"phase": self._phase, **safe_exception_fields(exc)},
+                fields={"phase": self._phase},
             )
+            if isinstance(exc, ChatGptAuthError) and exc.status_code is not None:
+                primary = replace(primary, status_code=exc.status_code)
             secondary = (
                 *(exc.secondary_diagnostics if isinstance(exc, ChatGptAuthError) else ()),
                 *(

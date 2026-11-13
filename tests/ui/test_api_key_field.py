@@ -481,7 +481,7 @@ async def test_completion_reports_actual_verification_not_restored_status(succes
     field._handle_blur(None)
     await field._run_verification()
 
-    assert completed == [("openrouter", success, None if success else "verification_failed")]
+    assert completed == [("openrouter", success, None if success else "verification_failed", None)]
     assert secret not in repr(completed)
     assert field._get_key_hash(secret) not in repr(completed)
 
@@ -568,12 +568,16 @@ async def test_completion_rejects_stale_async_save_failure_and_allows_retry(
         assert field.controller.status == "success"
         assert field.controller.last_verified_hash == field._get_key_hash("replacement")
     else:
-        assert completed == [("openrouter", False, "verification_failed")]
+        assert [item[:3] for item in completed] == [("openrouter", False, "verification_failed")]
+        assert completed[0][3].code == "verification_save_failed"
+        assert completed[0][3].fields["exception_class"] == (
+            "OSError" if raises else "RuntimeError"
+        )
         assert field.controller.status == "error"
         field._handle_blur(None)
         await field._run_verification()
         assert len(saves) == 2
-        assert completed[-1] == ("openrouter", True, None)
+        assert completed[-1] == ("openrouter", True, None, None)
         assert verified == ["openrouter"]
     assert "synthetic-private-value" not in repr(completed)
 
@@ -605,10 +609,15 @@ async def test_completion_forwards_typed_error_but_not_exception_prose() -> None
         field._handle_blur(None)
         await field._run_verification()
 
-    assert completed == [
+    assert [item[:3] for item in completed] == [
         ("openrouter", False, "openrouter.auth.credential_rejected"),
         ("openrouter", False, "verification_failed"),
     ]
+    assert [item[3].code for item in completed] == [
+        "openrouter.auth.credential_rejected",
+        "openrouter.auth.unknown",
+    ]
+    assert "401 unauthorized" not in repr(completed)
 
 
 @pytest.mark.asyncio
@@ -701,20 +710,22 @@ async def test_real_verification_preserves_typed_completion_recovery_and_generic
     controller.handle_blur(current["value"])
     await controller.run_pending()
     assert controller.status == "error"
-    assert completed == [("openrouter", False, "openrouter.auth.rate_limit")]
+    assert [item[:3] for item in completed] == [("openrouter", False, "openrouter.auth.rate_limit")]
+    assert completed[0][3].status_code == 429
 
     controller.handle_blur(current["value"])
     await controller.run_pending()
     assert controller.status == "success"
     assert controller.last_verified_hash == controller.key_hash(secret)
-    assert completed[-1] == ("openrouter", True, None)
+    assert completed[-1] == ("openrouter", True, None, None)
 
     current["value"] = "synthetic-rejected-value"
     controller.handle_blur(current["value"])
     await controller.run_pending()
     assert controller.status == "error"
     assert controller.last_verified_hash == ""
-    assert completed[-1] == ("openrouter", False, "verification_failed")
+    assert completed[-1][:3] == ("openrouter", False, "openrouter.auth.credential_rejected")
+    assert completed[-1][3].status_code == 401
     assert messages == [
         ("snackbar.verification_failed", "error.openrouter_auth.rate_limit"),
         ("snackbar.verification_ok", ""),

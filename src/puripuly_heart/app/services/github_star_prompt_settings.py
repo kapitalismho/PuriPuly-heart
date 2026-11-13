@@ -13,7 +13,6 @@ from puripuly_heart.app.services.settings.settings_mutation_legacy import (
     build_ui_prompt_clipboard_state_settings_path_patch,
     settings_path_mutation_validator_for_command,
 )
-from puripuly_heart.config.translation_values import TranslationConnection
 from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -22,21 +21,6 @@ from puripuly_heart.core.messages import (
     TransactionResult,
 )
 
-GITHUB_STAR_PROMPT_MANAGED_REMAINING_PERCENT_THRESHOLD = 60
-_MANAGED_CONNECTIONS = frozenset(
-    {
-        TranslationConnection.MANAGED,
-        TranslationConnection.MANAGED_CHINA,
-    }
-)
-_USER_OWNED_CLOUD_CONNECTIONS = frozenset(
-    {
-        TranslationConnection.OPENROUTER,
-        TranslationConnection.OFFICIAL_BYOK,
-    }
-)
-
-GithubStarPromptRemainingPercentProvider = Callable[[], int | None]
 GithubStarPromptTransactionResultSink = Callable[[TransactionResult], None]
 GithubStarPromptSaveFailureSink = Callable[[str, Exception], None]
 GithubStarPromptRuntimeDiagnosticsSink = Callable[[str, Mapping[str, object]], None]
@@ -59,7 +43,6 @@ class _GithubStarPromptNoopRuntimeApply:
 def compose_github_star_prompt_owner(
     *,
     settings: SettingsOwner,
-    managed_remaining_percent: GithubStarPromptRemainingPercentProvider,
     transaction_result_sink: GithubStarPromptTransactionResultSink,
     save_failure_sink: GithubStarPromptSaveFailureSink,
     runtime_diagnostics_sink: GithubStarPromptRuntimeDiagnosticsSink,
@@ -93,55 +76,15 @@ def compose_github_star_prompt_owner(
             TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
         }
 
-    def connection_for(value: object | None) -> TranslationConnection | None:
-        if value is None:
-            return None
-        translation = getattr(value, "translation", None)
-        raw_connection = getattr(translation, "connection", None)
-        if raw_connection is None:
-            intent = getattr(value, "intent", None)
-            raw_connection = getattr(
-                getattr(intent, "translation", None),
-                "connection",
-                None,
-            )
-        if isinstance(raw_connection, TranslationConnection):
-            return raw_connection
-        try:
-            return TranslationConnection(raw_connection)
-        except TypeError, ValueError:
-            return None
-
-    def has_user_owned_cloud_connection(value: object | None) -> bool:
-        return connection_for(value) in _USER_OWNED_CLOUD_CONNECTIONS
-
-    def is_eligible() -> bool:
-        current = settings.canonical
-        connection = connection_for(current)
-        if connection in _MANAGED_CONNECTIONS:
-            remaining_percent = managed_remaining_percent()
-            return (
-                remaining_percent is not None
-                and remaining_percent <= GITHUB_STAR_PROMPT_MANAGED_REMAINING_PERCENT_THRESHOLD
-            )
-        if connection in _USER_OWNED_CLOUD_CONNECTIONS and current is not None:
-            prompt = current.state.github_star_prompt
-            return bool(prompt.translation_success_observed)
-        return False
-
     return GithubStarPromptOwner(
         settings_provider=lambda: settings.canonical,
         persist_settings_state=persist_state,
-        is_eligible=is_eligible,
-        has_user_owned_cloud_connection=has_user_owned_cloud_connection,
         log_save_failure=save_failure_sink,
         runtime_diagnostics_sink=runtime_diagnostics_sink,
     )
 
 
 __all__ = [
-    "GITHUB_STAR_PROMPT_MANAGED_REMAINING_PERCENT_THRESHOLD",
-    "GithubStarPromptRemainingPercentProvider",
     "GithubStarPromptRuntimeDiagnosticsSink",
     "GithubStarPromptSaveFailureSink",
     "GithubStarPromptSettingsMutationServiceProvider",

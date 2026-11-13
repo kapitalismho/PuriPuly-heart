@@ -17,7 +17,7 @@ from puripuly_heart.core.diagnostic_validation import (
     redact_text_for_sink,
     redact_user_message_ref_for_sink,
 )
-from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
 from puripuly_heart.core.error_messages import sanitize_legacy_raw_user_visible_error_text
 from puripuly_heart.core.messages import ErrorDiagnostics, UserErrorReport, UserMessageRef
 from puripuly_heart.core.openrouter.managed_openrouter_release import (
@@ -333,6 +333,7 @@ class UIEventBridge:
         self._running = False
         self._closed = False
         self._started = asyncio.Event()
+        self.presentation_observer_failure: ErrorDiagnostics | None = None
 
     def _get_language_codes(self) -> tuple[str | None, str | None]:
         if callable(self._get_language_codes_callback):
@@ -572,5 +573,26 @@ class UIEventBridge:
             return
         try:
             self._error_presented_callback(text, payload.diagnostics.diagnostic_id)
-        except Exception:
-            logger.error("A user interface operation failed.")
+        except Exception as exc:
+            original = payload.diagnostics
+            diagnostics = replace(
+                exception_diagnostics(
+                    exc,
+                    component="ui_application",
+                    operation="error_presented",
+                    code="ui_boundary_failed",
+                ),
+                cause_id=original.diagnostic_id,
+                operation_id=original.operation_id,
+                request_id=original.request_id,
+                turn_id=original.turn_id,
+                channel=original.channel,
+            )
+            self.presentation_observer_failure = diagnostics
+            emit_failure(
+                logger,
+                diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="error_presented",
+            )

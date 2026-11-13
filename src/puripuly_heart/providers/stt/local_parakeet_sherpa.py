@@ -89,5 +89,8 @@ class LocalParakeetJapaneseSherpaSTTBackend(LocalOfflineSTTBackend):
         except Exception as exc:
             raise LocalParakeetSherpaLoadError(str(exc)) from exc
 
+    def decode_failure_retryable(self, error: BaseException | None) -> bool:
+        return isinstance(error, LocalParakeetSherpaInferenceError)
+
     def _inference_error(self, exc: Exception) -> RuntimeError:
         return LocalParakeetSherpaInferenceError(str(exc))

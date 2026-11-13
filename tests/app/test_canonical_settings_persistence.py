@@ -1035,3 +1035,53 @@ def test_reentrant_start_notification_cannot_reopen_retirement_authority(
     assert (root / "qwen3-asr-0.6b-int8-sherpa").is_dir()
     compose_settings_owner(path).start()
     assert not (root / "qwen3-asr-0.6b-int8-sherpa").exists()
+
+
+def test_failed_backup_write_retains_cleanup_failure(tmp_path, monkeypatch):
+    from puripuly_heart.config.settings_vnext import compat
+
+    class FailedWrite:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def write(self, _data):
+            raise PermissionError(13, "synthetic-private-path")
+
+    def fail_cleanup(*_args, **_kwargs):
+        raise OSError(5, "synthetic-private-cleanup")
+
+    monkeypatch.setattr(Path, "open", lambda *_args, **_kwargs: FailedWrite())
+    monkeypatch.setattr(Path, "unlink", fail_cleanup)
+    with pytest.raises(Exception) as raised:
+        compat.create_pre_migration_backup(
+            tmp_path / "settings.json", b"synthetic-private-settings", previous_schema_version="0"
+        )
+    error = compat.safe_persistence_error(
+        compat.SettingsPersistenceStatus.BACKUP_FAILED, raised.value
+    )
+    assert error.diagnostics.fields["errno"] == 13
+    assert error.secondary_diagnostics[0].fields["errno"] == 5
+    assert error.secondary_diagnostics[0].cause_id == error.diagnostics.diagnostic_id
+    assert "synthetic-private" not in str(error)
+
+
+def test_load_failure_survives_unavailable_logging_sink(tmp_path, monkeypatch):
+    from puripuly_heart.config.settings_vnext import compat
+
+    def fail_read(_path):
+        raise PermissionError(13, "synthetic-private-path")
+
+    def fail_sink(*_args, **_kwargs):
+        raise RuntimeError("synthetic sink failure")
+
+    monkeypatch.setattr(Path, "read_bytes", fail_read)
+    monkeypatch.setattr(compat.logger, "log", fail_sink)
+    result = compat.load_vnext_settings(tmp_path / "settings.json")
+
+    assert result.status == compat.SettingsPersistenceStatus.PARSE_FAILED
+    assert result.error.diagnostics.fields["exception_class"] == "PermissionError"
+    assert result.error.diagnostics.fields["errno"] == 13
+    assert "synthetic" not in str(result.error)

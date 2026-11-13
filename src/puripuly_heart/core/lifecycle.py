@@ -5,6 +5,7 @@ import inspect
 from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any, Final, Literal, TypeAlias, TypeVar
+from weakref import WeakSet
 
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
@@ -68,6 +69,20 @@ class LifecycleDiagnosticsUnavailableError(RuntimeError):
     def __init__(self, scope_name: str, diagnostics: tuple[DiagnosticEvent, ...]) -> None:
         self.scope_name = scope_name
         self.diagnostics = diagnostics
+        self.failure_diagnostics = ErrorDiagnostics(
+            component="lifecycle.scope",
+            operation="close",
+            code="lifecycle_exception",
+            category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
+            visibility=DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
+            content_policy=CONTENT_POLICY_METADATA_ONLY,
+            status_code=None,
+            retry_after_ms=None,
+            fields={},
+            causes=tuple(
+                event.diagnostics for event in diagnostics if event.diagnostics is not None
+            ),
+        )
         super().__init__(
             "Lifecycle diagnostics unavailable "
             f"for scope {scope_name!r}: {len(diagnostics)} event(s) pending"
@@ -143,10 +158,13 @@ class LifecycleShutdownCoordinator:
         exception: Exception,
     ) -> None:
         event = _shutdown_diagnostic_event(callback=callback, exception=exception)
-        if self._diagnostics_sink is None:
-            self._pending_diagnostics.append(event)
-            return
-        await self._diagnostics_sink.emit_diagnostic(event)
+        self._pending_diagnostics.append(event)
+        if self._diagnostics_sink is not None:
+            try:
+                await self._diagnostics_sink.emit_diagnostic(event)
+            except Exception:
+                return
+            self._pending_diagnostics.pop()
 
 
 class LifecycleScope:
@@ -166,9 +184,10 @@ class LifecycleScope:
         self._close_lock = asyncio.Lock()
         self._tasks_by_name: dict[str, asyncio.Task[Any]] = {}
         self._task_names: dict[asyncio.Task[Any], str] = {}
-        self._diagnosed_tasks: set[asyncio.Task[Any]] = set()
+        self._diagnosed_tasks: WeakSet[asyncio.Task[Any]] = WeakSet()
         self._close_callbacks: list[_RegisteredCloseCallback] = []
         self._pending_diagnostics: list[DiagnosticEvent] = []
+        self.failure_diagnostics: ErrorDiagnostics | None = None
 
     @property
     def name(self) -> str:
@@ -273,7 +292,7 @@ class LifecycleScope:
             except BaseException as exc:
                 if isinstance(exc, asyncio.CancelledError):
                     raise
-                self._pending_diagnostics.append(
+                self._record_failure(
                     self._diagnostic_event(
                         phase="close_callback",
                         callback_name=callback.name,
@@ -293,7 +312,12 @@ class LifecycleScope:
 
         while self._pending_diagnostics:
             event = self._pending_diagnostics[0]
-            await self._diagnostics_sink.emit_diagnostic(event)
+            try:
+                await self._diagnostics_sink.emit_diagnostic(event)
+            except Exception as exc:
+                raise LifecycleDiagnosticsUnavailableError(
+                    self._name, tuple(self._pending_diagnostics)
+                ) from exc
             self._pending_diagnostics.pop(0)
 
     def _on_task_done(self, task: asyncio.Task[Any]) -> None:
@@ -320,13 +344,17 @@ class LifecycleScope:
         phase: str,
     ) -> None:
         self._diagnosed_tasks.add(task)
-        self._pending_diagnostics.append(
+        self._record_failure(
             self._diagnostic_event(
                 phase=phase,
                 task_name=task_name,
                 exception=exception,
             )
         )
+
+    def _record_failure(self, event: DiagnosticEvent) -> None:
+        self.failure_diagnostics = event.diagnostics
+        self._pending_diagnostics.append(event)
 
     def _diagnostic_event(
         self,
@@ -336,25 +364,23 @@ class LifecycleScope:
         task_name: str | None = None,
         callback_name: str | None = None,
     ) -> DiagnosticEvent:
+        from puripuly_heart.core.diagnostics import exception_diagnostics, safe_exception_fields
+
         fields = {
             "scope_name": _safe_field_value(self._name),
             "phase": _safe_field_value(phase),
-            "exception_class": _safe_field_value(type(exception).__name__),
+            **safe_exception_fields(exception),
         }
         if task_name is not None:
             fields["task_name"] = _safe_field_value(task_name)
         if callback_name is not None:
             fields["callback_name"] = _safe_field_value(callback_name)
 
-        diagnostics = ErrorDiagnostics(
+        diagnostics = exception_diagnostics(
+            exception,
             component="lifecycle.scope",
             operation=phase,
             code="lifecycle_exception",
-            category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
-            visibility=DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
-            content_policy=CONTENT_POLICY_METADATA_ONLY,
-            status_code=None,
-            retry_after_ms=None,
             fields=fields,
         )
         return DiagnosticEvent(
@@ -383,21 +409,19 @@ def _shutdown_diagnostic_event(
     callback: LifecycleShutdownCallback,
     exception: Exception,
 ) -> DiagnosticEvent:
+    from puripuly_heart.core.diagnostics import exception_diagnostics, safe_exception_fields
+
     fields = {
         "phase": _safe_field_value(callback.phase),
         "owner_name": _safe_field_value(callback.owner_name),
         "callback_name": _safe_field_value(callback.callback_name),
-        "exception_class": _safe_field_value(type(exception).__name__),
+        **safe_exception_fields(exception),
     }
-    diagnostics = ErrorDiagnostics(
+    diagnostics = exception_diagnostics(
+        exception,
         component="lifecycle.shutdown",
         operation=callback.phase,
         code="lifecycle_shutdown_exception",
-        category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
-        visibility=DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
-        content_policy=CONTENT_POLICY_METADATA_ONLY,
-        status_code=None,
-        retry_after_ms=None,
         fields=fields,
     )
     return DiagnosticEvent(

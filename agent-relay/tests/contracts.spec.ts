@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { contracts, currentProtocol, supportedProtocols } from '../src/contracts';
 import relay from '../src/index';
+import { workInstructions } from '../src/instructions';
 import { authHeaders, responseEvents, testEnv } from './fixtures';
 
 type AppRequest = { path: string; body: { agent_protocol: number; route?: string; input: Record<string, unknown>[] } };
@@ -23,6 +24,26 @@ describe('app protocol contracts', () => {
   it('keeps a recorded app request fixture for exactly the supported protocols, including the current one', () => {
     expect(supportedProtocols).toContain(currentProtocol);
     expect([...recorded.keys()].sort((a, b) => a - b)).toEqual(supportedProtocols);
+  });
+
+  it('retains protocol six meaning and selects the complete six-tool protocol seven contract', () => {
+    const previous = contracts.get(6)!;
+    const current = contracts.get(7)!;
+    expect(previous.tools.map(({ name }) => name)).toEqual(['read_app', 'execute_app', 'propose_app']);
+    expect(current.tools.map(({ name }) => name)).toEqual([
+      'read_app', 'set_app', 'probe_app', 'retry_app', 'open_app', 'manage_proposal',
+    ]);
+    expect(current.tools.every((tool) => tool.strict === false)).toBe(true);
+    const previousInstructions = workInstructions(previous);
+    const currentInstructions = workInstructions(current);
+    expect(previousInstructions).toContain(previous.executionBoundary);
+    expect(previousInstructions).toContain('Explicit execute_app actions ui.accounts and ui.provider_setup');
+    expect(previousInstructions).not.toContain('normal tools available on your next response');
+    expect(currentInstructions).toContain(current.executionBoundary);
+    expect(currentInstructions).toContain('Explicit open_app views accounts and provider_setup');
+    expect(currentInstructions).toContain('independent reads still run and every call gets a result');
+    expect(currentInstructions).not.toContain('{{execution_boundary}}');
+    expect(currentInstructions).not.toContain('execute_app');
   });
 
   it.each(supportedProtocols)('serves recorded protocol %i app requests with that protocol contract', async (protocol) => {

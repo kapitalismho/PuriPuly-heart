@@ -7,6 +7,7 @@ import sys
 import traceback
 from dataclasses import replace
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -1466,7 +1467,7 @@ async def test_soniox_protocol_rejection_logs_safe_detail_once(
     session = _make_session(
         projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
     )
-    session._ws = SimpleNamespace(close_code=None)
+    session._ws = SimpleNamespace(close_code=None, close=AsyncMock())
     request = _scoped_request()
     with caplog.at_level(logging.INFO):
         await session.begin_turn(request)
@@ -1545,7 +1546,7 @@ async def test_soniox_server_error_code_never_logs_arbitrary_content(
     session = _make_session(
         projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
     )
-    session._ws = SimpleNamespace(close_code="private-close-reason")
+    session._ws = SimpleNamespace(close_code="private-close-reason", close=AsyncMock())
     request = _scoped_request()
     with caplog.at_level(logging.INFO):
         await session.begin_turn(request)
@@ -1698,7 +1699,7 @@ async def test_soniox_abort_logs_safe_reason_before_turn_cleanup(caplog) -> None
     session = _make_session(
         projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
     )
-    session._ws = SimpleNamespace(close_code=None)
+    session._ws = SimpleNamespace(close_code=None, close=AsyncMock())
     request = _scoped_request()
     with caplog.at_level(logging.INFO):
         await session.begin_turn(request)

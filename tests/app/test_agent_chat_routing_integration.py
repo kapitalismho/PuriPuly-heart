@@ -306,8 +306,8 @@ async def test_off_topic_after_work_is_private_without_waiting_and_preserves_wor
 @pytest.mark.parametrize(
     ("name", "arguments"),
     [
-        ("open_settings", '{"section":"overlay"}'),
-        ("probe_translation", "{}"),
+        ("open_app", '{"view":"settings","section":"overlay"}'),
+        ("probe_app", '{"target":"translation.self"}'),
     ],
 )
 async def test_brief_routes_never_execute_unexpected_tool_calls(route, name, arguments):
@@ -341,18 +341,18 @@ async def test_brief_routes_never_execute_unexpected_tool_calls(route, name, arg
 @pytest.mark.parametrize(
     "arguments",
     [
-        '{"action":"translation.probe"}',
-        '{"action":"translation.probe","text":"not allowed"}',
+        '{"target":"translation.peer"}',
+        '{"target":"translation.peer","text":"not allowed"}',
         "null",
         "[]",
     ],
 )
-async def test_probe_tool_requires_empty_arguments_before_owner_dispatch(monkeypatch, arguments):
+async def test_probe_tool_requires_exact_scope_before_owner_dispatch(monkeypatch, arguments):
     transport = RoutedResponses(
         decision("work", "high"),
         {
             "status": "completed",
-            "output": [tool(arguments=arguments) | {"name": "execute_app"}],
+            "output": [tool(arguments=arguments) | {"name": "probe_app"}],
         },
         answer("Observed the tool result."),
     )
@@ -379,12 +379,12 @@ async def test_probe_tool_requires_empty_arguments_before_owner_dispatch(monkeyp
                 if item.get("type") == "function_call_output"
             )
         )
-        if arguments == '{"action":"translation.probe"}':
-            assert dispatched == [("probe_translation", {})]
+        if arguments == '{"target":"translation.peer"}':
+            assert dispatched == [("probe_app", {"target": "translation.peer"})]
             assert output == receipt
         else:
             assert not dispatched
-            assert output == {"status": "rejected", "code": "invalid_tool_call"}
+            assert output["status"] == "rejected" and output["code"] == "invalid_tool_call"
     finally:
         await owner.close()
 
@@ -570,7 +570,9 @@ async def test_error_and_notice_entries_bypass_classifier_and_reuse_effort():
         ).status == "completed"
         assert (await owner.send("Give me a pasta recipe.")).status == "completed"
         owner.bind_verification_providers(frozenset({"openai"}))
-        await owner._tools.execute("open_settings", {"section": "api", "provider": "openai"})
+        await owner._tools.execute(
+            "open_app", {"view": "settings", "section": "api", "provider": "openai"}
+        )
         owner.key_verification_completed("openai", True)
         await owner._notice_task
         assert len(transport.classifications) == 1
@@ -598,7 +600,9 @@ async def test_initial_and_reset_notice_defaults_are_high_after_a_brief_route(re
             owner.new_conversation()
         transport.routing = decision("out_of_scope", "medium")
         assert (await owner.send("Give me a pasta recipe.")).status == "completed"
-        await owner._tools.execute("open_settings", {"section": "api", "provider": "openai"})
+        await owner._tools.execute(
+            "open_app", {"view": "settings", "section": "api", "provider": "openai"}
+        )
         owner.key_verification_completed("openai", True)
         await owner._notice_task
         assert [request["effort"] for request in transport.requests] == (
@@ -624,7 +628,9 @@ async def test_notice_continuation_preserves_the_selected_work_effort(effort):
     await owner.start()
     try:
         assert (await owner.send("Inspect the app setup.")).status == "completed"
-        await owner._tools.execute("open_settings", {"section": "api", "provider": "openai"})
+        await owner._tools.execute(
+            "open_app", {"view": "settings", "section": "api", "provider": "openai"}
+        )
         owner.key_verification_completed("openai", True)
         await owner._notice_task
         assert len(transport.classifications) == 1

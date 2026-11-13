@@ -3,17 +3,18 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from puripuly_heart.core.diagnostics import (
     current_diagnostic_operation,
     emit_failure,
+    exception_diagnostics,
     safe_exception_fields,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.messages import ErrorDiagnostics
 
-ManagedStatusRefreshWork = Callable[[], Awaitable[None]]
+ManagedStatusRefreshWork = Callable[[], Awaitable[object]]
 ManagedStatusRefreshDiagnosticsSink = Callable[
     [str, Mapping[str, object], BaseException | None],
     None,
@@ -22,6 +23,14 @@ ManagedStatusRefreshDiagnosticsSink = Callable[
 
 def _managed_status_refresh_scope() -> LifecycleScope:
     return LifecycleScope("ManagedStatusRefreshOwner")
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedStatusRefreshResult:
+    succeeded: bool
+    cancelled: bool = False
+    diagnostics: ErrorDiagnostics | None = None
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
 
 
 @dataclass(slots=True)
@@ -34,6 +43,7 @@ class ManagedStatusRefreshOwner:
     )
     _task_sequence: int = field(init=False, default=0, repr=False)
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
+    last_result: ManagedStatusRefreshResult | None = field(init=False, default=None)
 
     @property
     def owner_name(self) -> str:
@@ -72,7 +82,9 @@ class ManagedStatusRefreshOwner:
         async def run() -> None:
             try:
                 await work()
+                self.last_result = ManagedStatusRefreshResult(succeeded=True)
             except asyncio.CancelledError:
+                self.last_result = ManagedStatusRefreshResult(succeeded=False, cancelled=True)
                 raise
             except Exception as exc:
                 self._emit(
@@ -121,26 +133,36 @@ class ManagedStatusRefreshOwner:
     ) -> None:
         diagnostics = getattr(exception, "diagnostics", None)
         if not isinstance(diagnostics, ErrorDiagnostics):
-            diagnostics = ErrorDiagnostics(
-                component="managed_status_refresh",
-                operation=event,
-                code=event,
-                category="lifecycle",
-                visibility="basic",
-                content_policy="metadata_only",
-                status_code=None,
-                retry_after_ms=None,
-                fields={
-                    "phase": event,
-                    "refresh_kind": metadata.get("kind"),
-                    **(safe_exception_fields(exception) if exception is not None else {}),
-                },
+            diagnostics = (
+                exception_diagnostics(
+                    exception,
+                    component="managed_status_refresh",
+                    operation=event,
+                    code=event,
+                    fields={"phase": event, "refresh_kind": metadata.get("kind")},
+                )
+                if exception is not None
+                else ErrorDiagnostics(
+                    component="managed_status_refresh",
+                    operation=event,
+                    code=event,
+                    category="lifecycle",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={"phase": event, "refresh_kind": metadata.get("kind")},
+                )
+            )
+            diagnostics = replace(
+                diagnostics,
                 generation=generation,
                 operation_id=operation_id,
                 request_id=request_id,
             )
             if exception is not None and type(exception).__module__ == "builtins":
                 exception.diagnostics = diagnostics
+        self.last_result = ManagedStatusRefreshResult(succeeded=False, diagnostics=diagnostics)
         emit_failure(
             logging.getLogger(__name__), diagnostics, severity="warning", disposition="degraded"
         )
@@ -163,6 +185,9 @@ class ManagedStatusRefreshOwner:
                 generation=generation,
                 operation_id=operation_id,
                 request_id=request_id,
+            )
+            self.last_result = ManagedStatusRefreshResult(
+                succeeded=False, diagnostics=diagnostics, secondary_diagnostics=(secondary,)
             )
             emit_failure(
                 logging.getLogger(__name__), secondary, severity="warning", disposition="degraded"

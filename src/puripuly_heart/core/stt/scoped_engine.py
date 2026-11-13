@@ -20,7 +20,7 @@ from puripuly_heart.core.audio.ownership import (
     OwnedStreamInput,
     OwnedVadEvent,
 )
-from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_CAUSE_MAX_COUNT, emit_failure
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.network_diagnostics import (
     classify_transport_error,
@@ -28,6 +28,7 @@ from puripuly_heart.core.network_diagnostics import (
 )
 from puripuly_heart.core.stt.backend import (
     PermanentSTTScopedSessionError,
+    STTChannelAvailability,
     STTIndependentRecognitionSession,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
@@ -42,7 +43,11 @@ from puripuly_heart.core.stt.backend import (
     STTScopedWriteFailure,
     scoped_event_for_delivery,
 )
-from puripuly_heart.core.stt.diagnostics import recognition_cause, recognition_failure_diagnostics
+from puripuly_heart.core.stt.diagnostics import (
+    recognition_cause,
+    recognition_failure_diagnostics,
+    retryable_transport_failure,
+)
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.stt.scoped_normalizer import (
     STTNormalizationDiagnostic,
@@ -92,7 +97,7 @@ def _log_recognition_terminal(
             final_wait_ms if final_wait_ms is not None else "none",
             final_timeout_ms if final_timeout_ms is not None else "none",
             int(getattr(terminal, "failure_retryable", False)),
-            int(terminal.recovery_pending),
+            int(terminal.channel_availability is STTChannelAvailability.RECOVERING),
         )
 
 
@@ -171,6 +176,7 @@ class _ActiveTurn:
     normalizer: STTScopedTurnNormalizer
     watchdogs: STTRecognitionWatchdogs
     authority_generation: int
+    failure_version: int
     terminal_ready: asyncio.Future[STTProviderTurnTerminal | STTProviderInputTerminal]
     retention_profile: STTRetentionProfile | None
     payload_sequence: int = 0
@@ -311,8 +317,13 @@ class ScopedRecognitionEngine:
     _terminal_failure_notified: bool = field(init=False, default=False, repr=False)
     _episode_failures: int = field(init=False, default=0, repr=False)
     _episode_cause: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = field(init=False, default=(), repr=False)
     _recovery_backoff_pending: bool = field(init=False, default=False, repr=False)
     _connection_retry_at_s: float | None = field(init=False, default=None, repr=False)
+    _failure_version: int = field(init=False, default=0, repr=False)
+    _counted_resource_failures: OrderedDict[str, int] = field(
+        init=False, default_factory=OrderedDict, repr=False
+    )
     _closed: bool = field(init=False, default=False, repr=False)
     _closing: bool = field(init=False, default=False, repr=False)
     _deferred_event_sink: STTScopedTurnEventSink | None = field(
@@ -627,9 +638,6 @@ class ScopedRecognitionEngine:
                 watchdogs.write_timeout_s,
                 recovery=candidate,
             )
-            if written:
-                self._episode_failures = 0
-                self._terminal_failure_notified = False
             return written
         finally:
             if budget is not None:
@@ -747,7 +755,7 @@ class ScopedRecognitionEngine:
         if failure is None:
             return session is self._session and not self._closed
         diagnostics = self._failure_diagnostics(exception, failure, "send")
-        self._episode_cause = self._episode_cause or diagnostics
+        self._retain_episode_cause(diagnostics)
         emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage="send")
         generation = self._authority_generation
         failures = self._episode_failures
@@ -910,9 +918,11 @@ class ScopedRecognitionEngine:
             "source_discontinuity",
         }:
             self._episode_cause = None
-            if self._connection_retry_at_s is not None:
-                self._episode_failures = 0
-                self._connection_retry_at_s = None
+            self._episode_failures = 0
+            self._connection_retry_at_s = None
+            self._recovery_backoff_pending = False
+            self._terminal_failure_notified = False
+            self._counted_resource_failures.clear()
         self._stream_recovery = None
         self._recognition_authorities.clear()
         self._estimated_speech_scope = None
@@ -1128,6 +1138,7 @@ class ScopedRecognitionEngine:
             watchdogs=watchdogs,
             terminal_ready=loop.create_future(),
             authority_generation=authority_generation,
+            failure_version=self._failure_version,
             retention_budget=(owned.retention.budget if owned.retention is not None else None),
             independent_recognition=independent,
         )
@@ -1136,7 +1147,7 @@ class ScopedRecognitionEngine:
         self._turn_order.append(identity)
         self._turn_resolved.clear()
         if open_failure is not None or session is None or self._provider_epoch_id is None:
-            turn.readiness_failure_counted = settings.provider_id == "qwen_audio"
+            turn.readiness_failure_counted = True
             self._set_turn_failure(
                 turn,
                 "provider_not_ready",
@@ -1447,6 +1458,8 @@ class ScopedRecognitionEngine:
         scope = self._settings_scope(settings)
         if self.accepted_settings_scope is not None and scope != self.accepted_settings_scope:
             raise PermanentSTTScopedSessionError("provider_configuration_scope_mismatch")
+        if self._terminal_failure_notified:
+            raise PermanentSTTScopedSessionError("provider_recovery_exhausted")
         if self._connection_retry_at_s is not None:
             if self.monotonic_clock() < self._connection_retry_at_s:
                 return
@@ -1505,22 +1518,33 @@ class ScopedRecognitionEngine:
                 self._schedule_late_factory_reclaim(task, watchdogs)
                 last_error = TimeoutError("provider_readiness_timeout")
                 if settings.provider_id in self.exclusive_provider_ids:
+                    self._retain_episode_cause(
+                        recognition_failure_diagnostics(
+                            last_error,
+                            provider=settings.provider_id,
+                            channel=self.channel,
+                            operation="readiness",
+                            reason="provider_readiness_timeout",
+                        )
+                    )
                     break
             else:
                 self._factory_tasks.discard(task)
                 try:
                     session = task.result()
                 except PermanentSTTScopedSessionError as exc:
-                    self._episode_cause = recognition_failure_diagnostics(
+                    diagnostics = recognition_failure_diagnostics(
                         exc,
                         provider=settings.provider_id,
                         channel=self.channel,
                         operation="readiness",
                         reason="provider_not_ready",
                     )
-                    self._episode_cause = replace(
-                        self._episode_cause,
-                        fields={**self._episode_cause.fields, "provider_epoch_id": epoch_id},
+                    self._retain_episode_cause(
+                        replace(
+                            diagnostics,
+                            fields={**diagnostics.fields, "provider_epoch_id": epoch_id},
+                        )
                     )
                     self._episode_failures = (
                         self._episode_failures + 1
@@ -1531,6 +1555,11 @@ class ScopedRecognitionEngine:
                 except Exception as exc:
                     self._episode_failures += 1
                     last_error = exc
+                    if self._generic_turn_recovery(
+                        settings
+                    ) and not self._retryable_connection_error(exc, settings.provider_id):
+                        self._episode_failures = watchdogs.connect_attempts
+                        raise
                 else:
                     self._session = session
                     self._session_initial_readiness_pending = settings.provider_id == "qwen_audio"
@@ -1559,21 +1588,23 @@ class ScopedRecognitionEngine:
                     )
                     self._schedule_lifetime_check()
                     return
-            if self._episode_cause is None and last_error is not None:
-                self._episode_cause = recognition_failure_diagnostics(
+            if last_error is not None:
+                diagnostics = recognition_failure_diagnostics(
                     last_error,
                     provider=settings.provider_id,
                     channel=self.channel,
                     operation="readiness",
                     reason="provider_not_ready",
                 )
-                self._episode_cause = replace(
-                    self._episode_cause,
-                    fields={**self._episode_cause.fields, "provider_epoch_id": epoch_id},
+                self._retain_episode_cause(
+                    replace(
+                        diagnostics,
+                        fields={**diagnostics.fields, "provider_epoch_id": epoch_id},
+                    )
                 )
                 emit_failure(
                     logger,
-                    self._episode_cause,
+                    diagnostics,
                     severity="warning",
                     disposition="degraded",
                     stage="readiness",
@@ -1590,7 +1621,9 @@ class ScopedRecognitionEngine:
             settings, watchdogs, last_error
         ):
             return
-        raise RuntimeError("provider_recovery_exhausted") from last_error
+        failure = RuntimeError("provider_recovery_exhausted")
+        failure.failure_diagnostics = self._episode_cause
+        raise failure from last_error
 
     def _retryable_connection_error(self, error: BaseException, provider_id: str) -> bool:
         diagnostics = recognition_failure_diagnostics(
@@ -1608,12 +1641,14 @@ class ScopedRecognitionEngine:
             for cause in transport_exception_chain(error)
         )
         explicit_retryable = getattr(error, "readiness_retryable", None)
-        if provider_id == "qwen_audio" and type(explicit_retryable) is bool:
+        if provider_id in {"qwen_audio", "soniox"} and type(explicit_retryable) is bool:
             return (
                 not configuration_failure
                 and classify_transport_error(error) not in {"tls", "proxy"}
                 and explicit_retryable
             )
+        if self._generic_turn_recovery(provider_id):
+            return not configuration_failure and retryable_transport_failure(error)
         return not configuration_failure and (
             diagnostics.category in {"timeout", "service_unavailable", "rate_limit"}
             or (diagnostics.category == "network" and classify_transport_error(error) == "network")
@@ -1712,23 +1747,23 @@ class ScopedRecognitionEngine:
             if not retry_safe:
                 self._quarantined_session = session
             self._episode_failures = attempt + 1
-            if first_cause is None:
-                first_cause = recognition_failure_diagnostics(
-                    last_error,
-                    provider=turn.settings.provider_id,
-                    channel=self.channel,
-                    operation="readiness",
-                    reason="provider_not_ready",
-                    identity=turn.identity,
-                )
-                emit_failure(
-                    logger,
-                    first_cause,
-                    severity="warning",
-                    disposition="degraded",
-                    stage="readiness",
-                )
-            self._episode_cause = first_cause
+            diagnostics = recognition_failure_diagnostics(
+                last_error,
+                provider=turn.settings.provider_id,
+                channel=self.channel,
+                operation="readiness",
+                reason="provider_not_ready",
+                identity=turn.identity,
+            )
+            self._retain_episode_cause(diagnostics)
+            first_cause = self._episode_cause
+            emit_failure(
+                logger,
+                diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="readiness",
+            )
             if not self._retryable_connection_error(last_error, turn.settings.provider_id):
                 break
             if not retry_safe:
@@ -1802,6 +1837,9 @@ class ScopedRecognitionEngine:
                     if not event.is_final:
                         await self._emit(event)
                         continue
+                    self._episode_failures = 0
+                    self._recovery_backoff_pending = False
+                    self._episode_cause = None
                     await self._emit(
                         STTRecognitionUnitTerminal(event, "final" if event.text else "empty")
                     )
@@ -1845,7 +1883,7 @@ class ScopedRecognitionEngine:
                             event.reason or "provider_epoch_ended",
                             "receive",
                         )
-                        self._episode_cause = self._episode_cause or native
+                        self._retain_episode_cause(native)
                         emit_failure(
                             logger,
                             native,
@@ -1857,7 +1895,7 @@ class ScopedRecognitionEngine:
                         idle_failure
                         and self._session_watchdogs is not None
                         and self._session_scope is not None
-                        and self._session_scope[0] == "soniox"
+                        and self._generic_turn_recovery(str(self._session_scope[0]))
                     ):
                         if event.failure_retryable:
                             self._episode_failures += 1
@@ -1938,6 +1976,7 @@ class ScopedRecognitionEngine:
                         )
                     if terminal.epoch_disposition == "retire":
                         self._session_retirement_requested = True
+                    self._account_resource_failure(turn, terminal)
                     turn.terminal_ready.set_result(terminal)
                     await self._drain_completed_turns()
             if (
@@ -1986,10 +2025,10 @@ class ScopedRecognitionEngine:
                     and epoch_id == self._provider_epoch_id
                     and authority_generation == self._authority_generation
                     and self._session_scope is not None
-                    and self._session_scope[0] == "soniox"
+                    and self._generic_turn_recovery(str(self._session_scope[0]))
                     and self._session_watchdogs is not None
                 ):
-                    if isinstance(exc, OSError):
+                    if retryable_transport_failure(exc):
                         self._episode_failures += 1
                         if self._episode_failures < self._session_watchdogs.connect_attempts:
                             self._recovery_backoff_pending = True
@@ -2012,13 +2051,13 @@ class ScopedRecognitionEngine:
                         "provider_event_stream_failed",
                         exception=exc,
                         operation="receive",
-                        failure_retryable=isinstance(exc, OSError),
+                        failure_retryable=retryable_transport_failure(exc),
                     )
                 await self._drain_completed_turns()
                 if (
                     not self._turns
                     and self._session_scope is not None
-                    and self._session_scope[0] == "soniox"
+                    and self._generic_turn_recovery(str(self._session_scope[0]))
                 ):
                     async with self._input_lock:
                         if epoch_id == self._provider_epoch_id and not self._turns:
@@ -2088,7 +2127,8 @@ class ScopedRecognitionEngine:
                 if turn.settings.provider_id == "soniox" or turn.independent_recognition:
                     task.cancel()
                 turn.write_failed = True
-                self._retire_current_session(turn.watchdogs)
+                if not turn.independent_recognition:
+                    self._retire_current_session(turn.watchdogs)
             return False
         operations.discard(task)
         if not operations:
@@ -2099,7 +2139,8 @@ class ScopedRecognitionEngine:
             if self._has_write_authority(session, turn):
                 recovered = False
                 if (
-                    turn.settings.provider_id == "soniox"
+                    self._generic_turn_recovery(turn.settings)
+                    and not turn.independent_recognition
                     and isinstance(exc, STTScopedWriteFailure)
                     and exc.terminal.identity == turn.identity
                 ):
@@ -2117,10 +2158,11 @@ class ScopedRecognitionEngine:
                         f"provider_{operation}_failed",
                         exception=exc,
                         operation=operation,
-                        failure_retryable=isinstance(exc, OSError),
+                        failure_retryable=retryable_transport_failure(exc),
                     )
                 turn.write_failed = True
-                self._retire_current_session(turn.watchdogs)
+                if not turn.independent_recognition:
+                    self._retire_current_session(turn.watchdogs)
             return False
         return self._has_write_authority(session, turn)
 
@@ -2197,7 +2239,7 @@ class ScopedRecognitionEngine:
             terminal = turn.normalizer.failure_terminal(
                 reason=reason,
                 allow_provisional=allow_provisional,
-                failure_retryable=failure_retryable and turn.settings.provider_id == "soniox",
+                failure_retryable=failure_retryable and self._generic_turn_recovery(turn.settings),
             )
         except STTNormalizationError:
             terminal = STTProviderTurnTerminal(
@@ -2206,12 +2248,23 @@ class ScopedRecognitionEngine:
                 text_authority="none",
                 failure_reason=reason,
                 epoch_disposition="retire",
-                failure_retryable=failure_retryable and turn.settings.provider_id == "soniox",
+                failure_retryable=failure_retryable and self._generic_turn_recovery(turn.settings),
             )
+        terminal = replace(
+            terminal,
+            failure_resource_id=getattr(exception, "failure_resource_id", None),
+        )
+        if reason in {"provider_session_lifetime_exceeded", "provider_idle_timeout"}:
+            terminal = replace(terminal, channel_availability=STTChannelAvailability.CONTINUE)
+        self._account_resource_failure(turn, terminal)
         turn.terminal_ready.set_result(
             replace(
                 terminal,
-                recovery_pending=recovery_pending,
+                channel_availability=(
+                    STTChannelAvailability.RECOVERING
+                    if recovery_pending
+                    else terminal.channel_availability
+                ),
                 failure_diagnostics=diagnostics,
             )
         )
@@ -2275,7 +2328,7 @@ class ScopedRecognitionEngine:
                 self.channel,
                 terminal.failure_reason,
                 terminal.epoch_disposition,
-                terminal.recovery_pending,
+                terminal.channel_availability,
                 terminal.failure_diagnostics,
                 independent_recognition=True,
             )
@@ -2320,11 +2373,18 @@ class ScopedRecognitionEngine:
                     epoch_disposition="retire",
                 )
             )
-        older_than_pending_recovery = self._connection_retry_at_s is not None and any(
-            pending.terminal_ready.done() and pending.terminal_ready.result().recovery_pending
+        older_than_pending_recovery = turn.failure_version != self._failure_version or any(
+            pending.terminal_ready.done()
+            and pending.terminal_ready.result().channel_availability
+            is STTChannelAvailability.RECOVERING
             for pending in self._turns.values()
         )
-        if terminal.outcome in ("final", "empty", "submitted") and not older_than_pending_recovery:
+        if (
+            terminal.outcome in ("final", "empty")
+            and not older_than_pending_recovery
+            and turn.authority_generation == self._authority_generation
+            and not self._terminal_failure_notified
+        ):
             if self._episode_cause is not None:
                 recovered = recognition_failure_diagnostics(
                     None,
@@ -2350,25 +2410,39 @@ class ScopedRecognitionEngine:
             self._connection_retry_at_s = None
         elif (
             terminal.outcome not in ("final", "empty", "submitted", "cancelled")
-            and not (terminal.recovery_pending and self._connection_retry_at_s is not None)
+            and not turn.independent_recognition
             and not (
-                turn.independent_recognition
-                and self._stream_recovery is not None
-                and self._stream_recovery.pending
+                terminal.channel_availability is STTChannelAvailability.RECOVERING
+                and self._connection_retry_at_s is not None
             )
         ):
-            if not turn.readiness_failure_counted:
-                self._episode_failures += 1
-            if turn.settings.provider_id == "soniox" and terminal.outcome in ("failed", "degraded"):
-                if not terminal.failure_retryable:
+            if (
+                self._generic_turn_recovery(turn.settings)
+                and terminal.channel_availability is STTChannelAvailability.UNAVAILABLE
+                and terminal.outcome in ("failed", "degraded", "expired")
+            ):
+                self._account_resource_failure(turn, terminal)
+                if not getattr(terminal, "failure_retryable", False):
                     self._episode_failures = turn.watchdogs.connect_attempts
-                elif (
+                recovering = (
                     self._episode_failures < turn.watchdogs.connect_attempts
                     and turn.authority_generation == self._authority_generation
                     and not self._closed
-                ):
-                    terminal = replace(terminal, recovery_pending=True)
-                    self._recovery_backoff_pending = True
+                    and not self._terminal_failure_notified
+                )
+                terminal = replace(
+                    terminal,
+                    channel_availability=(
+                        STTChannelAvailability.RECOVERING
+                        if recovering
+                        else STTChannelAvailability.UNAVAILABLE
+                    ),
+                )
+                self._recovery_backoff_pending = recovering
+            elif not turn.readiness_failure_counted and not self._generic_turn_recovery(
+                turn.settings
+            ):
+                self._episode_failures += 1
         if should_emit and terminal.outcome in ("failed", "degraded"):
             self._failed_terminal_turn_ids.add(key)
         if (
@@ -2390,6 +2464,15 @@ class ScopedRecognitionEngine:
                 turn.watchdogs,
                 reason=terminal.failure_reason or "provider_session_lifetime_exceeded",
                 resume_stream=True,
+                failed=(
+                    terminal.outcome in {"failed", "expired"}
+                    and terminal.failure_reason
+                    not in {
+                        "gemini_go_away",
+                        "provider_session_lifetime_exceeded",
+                        "provider_idle_timeout",
+                    }
+                ),
             )
         if (
             turn.independent_recognition
@@ -2397,7 +2480,7 @@ class ScopedRecognitionEngine:
             and self._stream_recovery is not None
             and self._stream_recovery.pending
         ):
-            terminal = replace(terminal, recovery_pending=True)
+            terminal = replace(terminal, channel_availability=STTChannelAvailability.RECOVERING)
         if should_emit:
             if terminal.outcome in {"failed", "degraded", "expired"} or (
                 terminal.outcome == "cancelled"
@@ -2416,7 +2499,7 @@ class ScopedRecognitionEngine:
                     identity=turn.identity,
                 )
                 first_cause = self._episode_cause
-                self._episode_cause = first_cause or diagnostics
+                self._retain_episode_cause(diagnostics)
                 diagnostics = replace(
                     diagnostics,
                     cause_id=(
@@ -2428,7 +2511,10 @@ class ScopedRecognitionEngine:
                     fields={
                         **diagnostics.fields,
                         "outcome": terminal.outcome,
-                        "recovery_pending": terminal.recovery_pending,
+                        "recovery_pending": (
+                            terminal.channel_availability is STTChannelAvailability.RECOVERING
+                        ),
+                        "channel_availability": terminal.channel_availability.value,
                         "attempts": self._episode_failures,
                     },
                 )
@@ -2441,7 +2527,8 @@ class ScopedRecognitionEngine:
                         if terminal.failure_reason == "stream_input_ownership_changed"
                         else (
                             "warning"
-                            if terminal.recovery_pending or terminal.outcome == "cancelled"
+                            if terminal.channel_availability is STTChannelAvailability.RECOVERING
+                            or terminal.outcome == "cancelled"
                             else "error"
                         )
                     ),
@@ -2476,15 +2563,55 @@ class ScopedRecognitionEngine:
             )
             await self._emit(terminal)
             if (
-                turn.settings.provider_id == "soniox"
-                and terminal.outcome in ("failed", "degraded")
-                and not terminal.recovery_pending
+                terminal.channel_availability is STTChannelAvailability.UNAVAILABLE
+                and terminal.outcome in ("failed", "degraded", "expired")
                 and turn.authority_generation == self._authority_generation
             ):
                 self._notify_terminal_failure(terminal.failure_diagnostics)
         if self._session_retirement_requested and not self._turns:
             self._retire_current_session(turn.watchdogs)
         self._schedule_lifetime_check()
+
+    @staticmethod
+    def _generic_turn_recovery(settings: AudioSegmentSettingsSnapshot | str) -> bool:
+        provider_id = settings if isinstance(settings, str) else settings.provider_id
+        return provider_id in {
+            "soniox",
+            "deepgram",
+            "elevenlabs_scribe",
+            "custom",
+            "custom_offline",
+            "custom_realtime",
+            "rolling_free",
+            "local_cpu_auto",
+            "local_granite",
+            "local_gigaam",
+            "local_fun_asr_nano",
+            "local_fun_asr_mlt_nano",
+            "local_parakeet_ja",
+            "local_qwen_gpu",
+        }
+
+    def _account_resource_failure(
+        self, turn: _ActiveTurn, terminal: STTProviderTurnTerminal
+    ) -> None:
+        if (
+            terminal.outcome not in {"failed", "degraded", "expired"}
+            or terminal.channel_availability is not STTChannelAvailability.UNAVAILABLE
+            or turn.independent_recognition
+            or not self._generic_turn_recovery(turn.settings)
+            or turn.authority_generation != self._authority_generation
+        ):
+            return
+        resource_id = terminal.failure_resource_id or turn.identity.provider_epoch_id
+        if resource_id in self._counted_resource_failures:
+            return
+        self._failure_version += 1
+        self._counted_resource_failures[resource_id] = self._failure_version
+        while len(self._counted_resource_failures) > 4096:
+            self._counted_resource_failures.popitem(last=False)
+        if not turn.readiness_failure_counted:
+            self._episode_failures += 1
 
     def _can_start_turn(self, settings: AudioSegmentSettingsSnapshot) -> bool:
         if self._turn is not None:
@@ -2680,7 +2807,7 @@ class ScopedRecognitionEngine:
             return
         if failed:
             failure_diagnostics = self._failure_diagnostics(failure_diagnostics, reason, "receive")
-            self._episode_cause = self._episode_cause or failure_diagnostics
+            self._retain_episode_cause(failure_diagnostics)
             emit_failure(
                 logger,
                 failure_diagnostics,
@@ -2704,7 +2831,7 @@ class ScopedRecognitionEngine:
                         text_authority="none",
                         failure_reason=reason,
                         epoch_disposition="retire",
-                        failure_retryable=turn.settings.provider_id == "soniox",
+                        failure_retryable=self._generic_turn_recovery(turn.settings),
                         failure_diagnostics=failure_diagnostics,
                     )
                 )
@@ -2783,11 +2910,26 @@ class ScopedRecognitionEngine:
             task.cancel()
 
     async def _emit(self, event: STTProviderTurnEvent) -> None:
-        if (
-            isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal)
-            and event.identity.settings_scope
-            and event.identity.settings_scope[0] in {"qwen_audio", "soniox"}
-            and not (isinstance(event, STTProviderTurnTerminal) and event.outcome == "cancelled")
+        if isinstance(event, STTProviderEpochEnded):
+            recovering = not self._terminal_failure_notified and (
+                self._recovery_backoff_pending
+                or (self._stream_recovery is not None and self._stream_recovery.pending)
+                or self._connection_retry_at_s is not None
+            )
+            event = replace(
+                event,
+                channel_availability=(
+                    STTChannelAvailability.RECOVERING
+                    if recovering
+                    else (
+                        STTChannelAvailability.CONTINUE
+                        if event.orderly
+                        else STTChannelAvailability.UNAVAILABLE
+                    )
+                ),
+            )
+        if isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal) and not (
+            isinstance(event, STTProviderTurnTerminal) and event.outcome == "cancelled"
         ):
             generation = self._delivery_generation
             event = replace(event, is_current=lambda: generation == self._delivery_generation)
@@ -2993,7 +3135,24 @@ class ScopedRecognitionEngine:
         async def reclaim() -> None:
             try:
                 session = await task
-            except BaseException:
+            except asyncio.CancelledError:
+                return
+            except Exception as exc:
+                secondary = self._failure_diagnostics(exc, "provider_begin_failed", "readiness")
+                secondary = replace(
+                    secondary,
+                    cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None,
+                    causes=(
+                        *secondary.causes,
+                        *((self._episode_cause,) if self._episode_cause else ()),
+                    ),
+                )
+                self.secondary_diagnostics = (*self.secondary_diagnostics, secondary)[
+                    -DIAGNOSTIC_CAUSE_MAX_COUNT:
+                ]
+                emit_failure(
+                    logger, secondary, severity="warning", disposition="degraded", stage="readiness"
+                )
                 return
             finally:
                 self._factory_tasks.discard(task)
@@ -3045,6 +3204,10 @@ class ScopedRecognitionEngine:
                 diagnostics,
                 cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None,
                 fields={**diagnostics.fields, "cleanup_confirmed": False},
+                causes=(
+                    *diagnostics.causes,
+                    *((self._episode_cause,) if self._episode_cause else ()),
+                ),
             ),
             severity="warning",
             disposition="degraded",
@@ -3087,6 +3250,22 @@ class ScopedRecognitionEngine:
             },
         )
 
+    def _retain_episode_cause(self, diagnostics: ErrorDiagnostics) -> None:
+        first = self._episode_cause
+        if first is None:
+            self._episode_cause = diagnostics
+            return
+        if diagnostics.diagnostic_id == first.diagnostic_id or any(
+            cause.diagnostic_id == diagnostics.diagnostic_id for cause in first.causes
+        ):
+            return
+        self._episode_cause = replace(
+            first,
+            causes=(*first.causes, diagnostics)[:DIAGNOSTIC_CAUSE_MAX_COUNT],
+            causes_truncated=first.causes_truncated
+            or len(first.causes) >= DIAGNOSTIC_CAUSE_MAX_COUNT,
+        )
+
     def _notify_terminal_failure(self, failure: Exception | ErrorDiagnostics | None) -> None:
         if self._terminal_failure_notified:
             return
@@ -3097,6 +3276,14 @@ class ScopedRecognitionEngine:
         )
         first_cause = self._episode_cause or diagnostics
         self._episode_cause = first_cause
+        first_cause = replace(
+            first_cause,
+            fields={
+                **first_cause.fields,
+                "channel_availability": STTChannelAvailability.UNAVAILABLE.value,
+                "recovery_pending": False,
+            },
+        )
         emit_failure(logger, diagnostics, stage=diagnostics.operation)
         exhausted = self._failure_diagnostics(None, "provider_recovery_exhausted", "recovery")
         emit_failure(
@@ -3116,16 +3303,22 @@ class ScopedRecognitionEngine:
                 operation_id=diagnostics.operation_id,
                 request_id=diagnostics.request_id,
                 fields={
+                    **first_cause.fields,
+                    **diagnostics.fields,
                     **exhausted.fields,
-                    **{
-                        key: value
-                        for key, value in diagnostics.fields.items()
-                        if key
-                        in {"provider", "provider_epoch_id", "provider_turn_id", "capture_epoch"}
-                    },
                     "attempts": self._episode_failures,
                     "outcome": "failed",
+                    "channel_availability": STTChannelAvailability.UNAVAILABLE.value,
+                    "recovery_pending": False,
                 },
+                causes=(
+                    first_cause,
+                    *(
+                        (diagnostics,)
+                        if diagnostics.diagnostic_id != first_cause.diagnostic_id
+                        else ()
+                    ),
+                ),
             ),
             stage="recovery",
         )
@@ -3165,6 +3358,14 @@ class ScopedRecognitionEngine:
                 reason="provider_event_delivery_failed",
                 identity=identity,
             )
+        diagnostics = replace(
+            diagnostics,
+            cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None,
+            causes=(*diagnostics.causes, *((self._episode_cause,) if self._episode_cause else ())),
+        )
+        self.secondary_diagnostics = (*self.secondary_diagnostics, diagnostics)[
+            -DIAGNOSTIC_CAUSE_MAX_COUNT:
+        ]
         emit_failure(
             logger,
             replace(
@@ -3183,9 +3384,10 @@ class ScopedRecognitionEngine:
             result = self.diagnostic_sink(diagnostic)
         except Exception as exc:
             self._record_delivery_failure(exc)
-            raise
+            return
         if inspect.isawaitable(result):
             task = asyncio.create_task(result)
+            self._notification_tasks.add(task)
             task.add_done_callback(self._notification_done)
 
     def _event_provider(self, event: object) -> object | None:

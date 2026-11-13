@@ -2829,3 +2829,47 @@ async def test_revisioned_preview_preemption_preserves_unrelated_final_order_and
     finally:
         sink.release_unrelated.set()
         await asyncio.wait_for(owner.close(), 1)
+
+
+@pytest.mark.asyncio
+async def test_runtime_preserves_accepted_cause_and_owner_history_with_failed_recording(
+    monkeypatch,
+):
+    from puripuly_heart.core.diagnostics import diagnostic_operation, exception_diagnostics
+    from puripuly_heart.core.runtime import output as output_module
+
+    accepted = exception_diagnostics(
+        OSError(13, "private origin"),
+        component="capture.peer",
+        operation="source_read",
+        code="capture.peer.source_failure",
+    )
+
+    class FailedChatbox(RecordingChatbox):
+        def enqueue(self, message):
+            failure = RuntimeError("private destination")
+            failure.failure_diagnostics = accepted
+            raise failure
+
+    def fail_recording(*args, **kwargs):
+        raise OSError("private sink")
+
+    monkeypatch.setattr(output_module.logger, "log", fail_recording)
+    owner = _output_runtime_class()(chatbox=FailedChatbox())
+    publication_id = uuid4()
+    with diagnostic_operation("capture-output-test", "operation-42000000", "request-42000000"):
+        result = await owner.publish_chatbox(
+            publication_id=publication_id,
+            channel="self",
+            transcript_text="synthetic",
+            translation_text=None,
+            include_source=False,
+        )
+    assert result.decision.diagnostics.causes[0].diagnostic_id == accepted.diagnostic_id
+    assert result.decision.diagnostics.causes[0].fields["errno"] == 13
+    assert result.decision.diagnostics.operation_id == "operation-42000000"
+    assert result.decision.diagnostics.request_id == "request-42000000"
+    assert result.decision.diagnostics.fields["publication_id"] == str(publication_id)
+    assert owner.routing_decisions[-1] is result.decision
+    assert "private" not in repr(result.decision)
+    await owner.close()

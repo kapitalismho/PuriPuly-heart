@@ -272,13 +272,9 @@ fn placement_owner_retries_width_and_partial_transform_failures() {
             api.fail_relative = !fail_width;
         });
         let error = fixture.owner.apply_calibration(&calibration).unwrap_err();
-        assert!(matches!(error, OpenVrError::Init(_)));
-        let expected_method = if fail_width {
-            "SetOverlayWidthInMeters"
-        } else {
-            "SetOverlayTransformTrackedDeviceRelative"
-        };
-        assert!(error.to_string().contains(expected_method));
+        let failure = error.native_failure();
+        assert_eq!(failure.native_stage, "calibration");
+        assert_eq!(failure.native_code, Some(openvr_sys::EVROverlayError_VROverlayError_InvalidHandle as i32));
         assert_eq!(counts(), [1, usize::from(!fail_width), 0, 0, 0]);
         fixture.owner.apply_calibration(&calibration).unwrap();
         fixture.owner.apply_calibration(&calibration).unwrap();

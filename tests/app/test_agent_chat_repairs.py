@@ -115,7 +115,8 @@ async def test_approved_noop_has_no_actual_change_fact(catalog, status):
         owner._tools.observe_context(before)
         alpha = before["settings"]["overlay.desktop_flet.visual.background_alpha"]
         result = await owner._tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": alpha}}
+            "manage_proposal",
+            {"action": "settings", "changes": {"overlay.background_alpha": alpha}},
         )
         assert result["status"] == "needs_confirmation"
         assert not control.submissions
@@ -149,7 +150,8 @@ async def test_noop_preserves_five_real_changes_and_approved_revert(catalog, noo
             assert before_alpha != alpha
             control.status = "degraded" if index == 2 else "applied"
             result = await owner._tools.execute(
-                "change_settings", {"changes": {"overlay.background_alpha": alpha}}
+                "manage_proposal",
+                {"action": "settings", "changes": {"overlay.background_alpha": alpha}},
             )
             assert result["status"] == "needs_confirmation"
             result = await owner._tools.confirm(result["confirmation"]["id"], True)
@@ -164,7 +166,7 @@ async def test_noop_preserves_five_real_changes_and_approved_revert(catalog, noo
         owner._tools.observe_context(before)
         control.status = noop_status
         noop = await owner._tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": 0.5}}
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.5}}
         )
         noop = await owner._tools.confirm(noop["confirmation"]["id"], True)
         assert noop["status"] == noop_status
@@ -175,7 +177,7 @@ async def test_noop_preserves_five_real_changes_and_approved_revert(catalog, noo
         control.status = "applied"
         owner._tools.observe_context(control.context())
         revert = await owner._tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": 0.4}}
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.4}}
         )
         assert revert["status"] == "needs_confirmation"
         assert control.context() == before
@@ -184,7 +186,7 @@ async def test_noop_preserves_five_real_changes_and_approved_revert(catalog, noo
         assert control.context()["settings"]["overlay.desktop_flet.visual.background_alpha"] == 0.4
         retained = list(owner._actions)
         assert retained[:-1] == history[1:]
-        assert retained[-1]["tool"] == "change_settings"
+        assert retained[-1]["tool"] == "settings.apply"
         assert retained[-1]["result"]["changes"] == {"overlay.background_alpha": 0.4}
         await owner.send("What actually changed?")
         assert context_of(owner._transport.requests[-1])["core"]["recent_actions"] == [

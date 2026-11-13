@@ -83,6 +83,7 @@ pub enum ReadinessOutcome {
     TimedOut,
     Cancelled,
     Failed,
+    NativeFailed(crate::runtime_diagnostics::NativeFailure),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -552,7 +553,7 @@ impl PresentationDiagnostics {
                 ReadinessOutcome::Ready => PresentationOutcome::Ready,
                 ReadinessOutcome::TimedOut => PresentationOutcome::TimedOut,
                 ReadinessOutcome::Cancelled => PresentationOutcome::Cancelled,
-                ReadinessOutcome::Failed => PresentationOutcome::Failure,
+                ReadinessOutcome::Failed | ReadinessOutcome::NativeFailed(_) => PresentationOutcome::Failure,
             },
             backend,
             None,

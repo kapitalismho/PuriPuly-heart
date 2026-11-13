@@ -61,6 +61,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 )
 from puripuly_heart.core.runtime.output import SELF_SPEECH_TYPING_REASON
 from puripuly_heart.core.stt.backend import (
+    STTChannelAvailability,
     STTContributionConsumptionLedger,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
@@ -598,7 +599,7 @@ class SelfTranslationChannelOwner:
                         channel="self",
                     )
                 )
-                if not event.recovery_pending:
+                if event.channel_availability is STTChannelAvailability.UNAVAILABLE:
                     await self.output_projection.publish_ui(
                         TranslationUiMessage(
                             event_type=UIEventType.ERROR,

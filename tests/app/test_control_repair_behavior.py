@@ -19,7 +19,15 @@ from puripuly_heart.composition import application_runtime
 from puripuly_heart.composition.headless_application import compose_headless_application
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, SecretsIntent
 from puripuly_heart.config.settings_vnext.serialization import to_dict
+from puripuly_heart.core.diagnostics import serialize_diagnostics
+from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRInstallResult
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
+
+
+def _diagnostic_nodes(value):
+    yield value
+    for cause in value.get("causes", ()):
+        yield from _diagnostic_nodes(cause)
 
 
 def isolated_settings(path):
@@ -586,7 +594,7 @@ async def test_model_install_wait_releases_global_lock_but_keeps_backend_order(o
             async def finish():
                 started.set()
                 await release.wait()
-                return SimpleNamespace(cancelled=False, failed_model_ids=(), snapshot=snapshot)
+                return LocalASRInstallResult(request, (), (), False, snapshot)
 
             return asyncio.create_task(finish())
 
@@ -655,7 +663,7 @@ async def test_freeze_cancels_active_install_and_never_starts_queued_backend_wor
             async def finish():
                 started.set()
                 await release.wait()
-                return SimpleNamespace(cancelled=False, failed_model_ids=(), snapshot=snapshot)
+                return LocalASRInstallResult(request, (), (), False, snapshot)
 
             return asyncio.create_task(finish())
 
@@ -1973,8 +1981,13 @@ async def test_gemma_prepare_cancellation_receipt_tracks_settled_provisioning(
             assert control.pipeline.llm_runtime is None
         if outcome == "failed":
             assert owner.snapshot.state == "failed"
-            assert owner.snapshot.failure_code == "filesystem_failed"
-            assert owner.snapshot.cause_type == "PermissionError"
+            diagnostic = owner.snapshot.failure_diagnostics
+            assert diagnostic.code == "model_assets.install_failed"
+            assert any(
+                node["fields"].get("exception_class") == "PermissionError"
+                and node["fields"].get("errno") == 5
+                for node in _diagnostic_nodes(serialize_diagnostics(diagnostic))
+            )
             assert receipt["error"]["code"] == "application_operation_failed"
             assert "diagnostics" in receipt
             assert "PRIVATE_DOWNLOAD_CLEANUP_FAILURE" not in json.dumps(receipt)
@@ -2259,8 +2272,14 @@ async def test_failed_26b_enable_stays_off_without_implicit_retry_and_recovers_e
         assert snapshot["state"] == "failed"
         assert snapshot["model_id"] == spec.model_id
         assert snapshot["backend"] == "gpu"
-        assert snapshot["failure_code"] == "filesystem_failed"
-        assert snapshot["cause_type"] == "OSError"
+        diagnostic = snapshot["failure_diagnostics"]
+        assert any(
+            node["code"] == "model_assets.runtime_failed"
+            and node["operation"] == "runtime_startup"
+            and node["fields"].get("exception_class") == "OSError"
+            and node["fields"].get("errno") == 5
+            for node in _diagnostic_nodes(diagnostic)
+        )
         assert runtime.readiness is None
         assert len(commands) == 1
         assert not processes

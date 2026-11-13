@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from puripuly_heart.core.diagnostics import serialize_diagnostics
 from puripuly_heart.core.local_asr import local_stt_assets as local_stt_assets_module
 from puripuly_heart.core.local_asr.local_stt_assets import (
     InstalledLocalSTTManifest,
@@ -258,13 +259,27 @@ def test_inspect_local_stt_install_state_returns_invalid_for_broken_manifest(
     install_dir.mkdir()
     (install_dir / "model.int8.onnx").write_bytes(b"model-bytes")
     (install_dir / "tokens.txt").write_bytes(b"token-bytes")
-    default_local_stt_installed_manifest_path(install_dir).write_text("{invalid", encoding="utf-8")
+    private_manifest = '{"private-stt-manifest-body":'
+    default_local_stt_installed_manifest_path(install_dir).write_text(
+        private_manifest, encoding="utf-8"
+    )
 
     state = inspect_local_stt_install_state(install_dir, manifest=manifest)
 
     assert state.status == "invalid"
     assert state.installed_manifest is None
-    assert state.error_message == "invalid local STT installed manifest"
+    diagnostics = state.failure_diagnostics
+    assert diagnostics is not None
+    assert diagnostics.component == "model_assets"
+    assert diagnostics.operation == "inspection"
+    assert diagnostics.code == "local_asr.invalid_assets"
+    assert diagnostics.category == "lifecycle"
+    assert len(diagnostics.causes) == 1
+    serialized = serialize_diagnostics(diagnostics)
+    assert serialized["code"] == "local_asr.invalid_assets"
+    assert len(serialized["causes"]) == 1
+    assert private_manifest not in json.dumps(serialized)
+    assert str(tmp_path) not in json.dumps(serialized)
 
 
 def test_inspect_local_stt_install_state_returns_ready_for_valid_install(tmp_path: Path) -> None:

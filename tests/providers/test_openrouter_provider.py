@@ -902,3 +902,20 @@ async def test_openrouter_retry_after_only_accepts_bounded_valid_values(
         assert report.diagnostics.retry_after_ms == expected
     finally:
         await client.close()
+
+
+@pytest.mark.asyncio
+async def test_optional_metadata_failure_retains_typed_safe_cause(monkeypatch):
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(403, json={"error": "PRIVATE_SECRET"}, request=request)
+    )
+    monkeypatch.setattr(
+        "puripuly_heart.providers.llm.openrouter.network_clients.external_async_client",
+        lambda **_kwargs: httpx.AsyncClient(transport=transport, trust_env=False),
+    )
+    with pytest.raises(httpx.HTTPStatusError) as failure:
+        await OpenRouterLLMProvider.fetch_key_metadata("PRIVATE_SECRET")
+    diagnostics = failure.value.failure_diagnostics
+    assert diagnostics.status_code == 403
+    assert diagnostics.category == "auth"
+    assert "PRIVATE_SECRET" not in repr(diagnostics)

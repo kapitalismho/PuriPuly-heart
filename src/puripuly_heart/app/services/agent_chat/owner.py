@@ -30,12 +30,12 @@ from puripuly_heart.app.ports.application_control import ApplicationControl
 from puripuly_heart.app.services.agent_chat.context import AgentActivity, collect_agent_context
 from puripuly_heart.app.services.agent_chat.conversation import AgentConversation
 from puripuly_heart.app.services.agent_chat.execution import (
-    app_tool_target,
-    validate_app_request,
+    APP_TOOLS,
+    select_app_action,
+    validate,
 )
 from puripuly_heart.app.services.agent_chat.modules import (
     MODULES,
-    TOPICS,
     confirmation_modules,
     model_context,
     model_receipt,
@@ -48,11 +48,10 @@ from puripuly_heart.app.services.agent_chat.provider_setup import (
     PROVIDER_SETUPS,
 )
 from puripuly_heart.app.services.agent_chat.report import (
-    MAX_REPORT_SUMMARY,
     MAX_SUPPORT_BYTES,
     SupportReport,
     build_support_bundle,
-    recent_diagnostic_codes,
+    recent_diagnostics,
 )
 from puripuly_heart.app.services.agent_chat.routing import (
     AgentDecision,
@@ -61,7 +60,13 @@ from puripuly_heart.app.services.agent_chat.routing import (
 )
 from puripuly_heart.app.services.agent_chat.tools import AgentTools, project_operation_receipt
 from puripuly_heart.core.diagnostic_validation import contains_known_secret_pattern
+from puripuly_heart.core.diagnostics import (
+    exception_diagnostics,
+    normalize_diagnostic,
+    serialize_diagnostics,
+)
 from puripuly_heart.core.lifecycle import LifecycleScope
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 
@@ -180,7 +185,7 @@ class AgentChatOwner:
         if self._closed:
             return {"status": "rejected", "code": "closed"}
         return await self._tools.execute(
-            "open_settings", {"section": "api"}, require_current=lambda: None
+            "open_app", {"view": "settings", "section": "api"}, require_current=lambda: None
         )
 
     @property
@@ -247,6 +252,7 @@ class AgentChatOwner:
         return await asyncio.shield(task)
 
     async def _send_report(self, report: SupportReport) -> dict:
+        stage = "bundle"
         try:
             ticket = report.ticket
             if ticket is None or self._transport is None:
@@ -254,17 +260,17 @@ class AgentChatOwner:
             if report.bundle is None:
                 log_snapshot = self._support_log_snapshot
                 archive = report.archive
-                if log_snapshot is None or archive is None:
-                    raise RuntimeError("support_log_unavailable")
-                if report.diagnostic_codes is None:
-                    report.diagnostic_codes = await recent_diagnostic_codes(self._control)
-                codes = report.diagnostic_codes
+                if archive is None:
+                    raise RuntimeError("support_archive_unavailable")
+                if report.diagnostics is None:
+                    report.diagnostics = await recent_diagnostics(self._control)
+                diagnostics = report.diagnostics
                 report.bundle = await run_owned_thread_call(
                     lambda: build_support_bundle(
                         ticket=ticket,
                         app_version=__version__,
                         summary=report.summary,
-                        diagnostic_codes=codes,
+                        diagnostics=diagnostics,
                         archive=archive,
                         log_snapshot=log_snapshot,
                     )
@@ -272,6 +278,7 @@ class AgentChatOwner:
                 report.archive = None
             if len(report.bundle) > MAX_SUPPORT_BYTES:
                 raise ValueError("support_bundle_too_large")
+            stage = "upload"
             receipt = await self._transport.upload_support(
                 bundle=report.bundle,
                 ticket=ticket,
@@ -287,12 +294,44 @@ class AgentChatOwner:
         except asyncio.CancelledError:
             report.status = "failed"
             raise
-        except Exception:
+        except Exception as exc:
             report.status = "failed"
-            return {"status": "failed", "ticket": report.ticket}
+            return {
+                "status": "failed",
+                "ticket": report.ticket,
+                "diagnostics": self._failure_evidence(
+                    exc, code="support_report_failed", operation="support_report", stage=stage
+                ),
+            }
         finally:
             self._report_tasks.pop(report.id, None)
             self._publish(self._phase)
+
+    def _failure_evidence(
+        self, exception: Exception, *, code: str, operation: str, stage: str
+    ) -> dict:
+        return normalize_diagnostic(
+            self._failure(exception, code=code, operation=operation),
+            instance_id=getattr(self._control, "instance_id", None),
+            severity="error",
+            disposition="failed",
+            stage=stage,
+            file_evidence="unavailable",
+        )
+
+    def _failure(self, exception: Exception, *, code: str, operation: str) -> ErrorDiagnostics:
+        return exception_diagnostics(
+            exception,
+            component="application_control",
+            operation=operation,
+            code=code,
+            category="unknown",
+            fields=(
+                {"service_code": exception.code}
+                if isinstance(exception, AgentServiceError)
+                else None
+            ),
+        )
 
     def observe(self, callback: Callable[[AgentChatSnapshot], None]) -> Callable[[], None]:
         self._observers.add(callback)
@@ -450,9 +489,15 @@ class AgentChatOwner:
         self._watched_provider = request.provider
         self._watched_context = self._context_scope
         completed = False
+        failure_diagnostics = None
 
-        def complete(provider: str, success: bool, code: str | None) -> None:
-            nonlocal completed
+        def complete(
+            provider: str,
+            success: bool,
+            code: str | None,
+            diagnostics: ErrorDiagnostics | None = None,
+        ) -> None:
+            nonlocal completed, failure_diagnostics
             current = self._current_secure_request(request.id)
             if (
                 completed
@@ -473,7 +518,8 @@ class AgentChatOwner:
                 available=False if success else current.available,
                 code=None if success else safe_code or "verification_failed",
             )
-            self.key_verification_completed(provider, success, safe_code)
+            failure_diagnostics = diagnostics if not success else None
+            self.key_verification_completed(provider, success, safe_code, diagnostics)
 
         self._publish(self._phase)
         try:
@@ -495,6 +541,8 @@ class AgentChatOwner:
         ):
             self._cancel_secure_request(request.id)
         self._publish(self._phase)
+        if isinstance(failure_diagnostics, ErrorDiagnostics):
+            result = {**result, "diagnostics": serialize_diagnostics(failure_diagnostics)}
         return result
 
     def cancel_secure_entry(self, request_id: str) -> dict:
@@ -545,13 +593,17 @@ class AgentChatOwner:
         self._secure_requests[request.id] = replace(request, status="ready", code=None)
         generation = self._generation
         return await self._tools.execute(
-            "open_settings",
-            {"section": "api", "provider": request.provider},
+            "open_app",
+            {"view": "settings", "section": "api", "provider": request.provider},
             require_current=lambda: self._require_current(generation),
         )
 
     def key_verification_completed(
-        self, provider: str, success: bool, code: str | None = None
+        self,
+        provider: str,
+        success: bool,
+        code: str | None = None,
+        diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
         if (
             self._closed
@@ -585,6 +637,10 @@ class AgentChatOwner:
         text = f"[app notice] key_verification provider={provider} result={'success' if success else 'failed'}"
         if safe_code is not None:
             text += f" code={safe_code}"
+        if isinstance(diagnostics, ErrorDiagnostics):
+            text += " diagnostics=" + json.dumps(
+                serialize_diagnostics(diagnostics), separators=(",", ":")
+            )
         if success:
             self._accept_notice(
                 text,
@@ -1021,12 +1077,7 @@ class AgentChatOwner:
                 observed = await self._control.operation(receipt["operation_id"])
             except Exception:
                 continue
-            if observed.get("terminal") and self._operations.get(item["action_id"]) is item:
-                item["result"] = {
-                    "status": observed["status"],
-                    "receipt": project_operation_receipt(observed, item["tool"]),
-                }
-                item["phase"] = "completed"
+            self._observe_operation_receipt(item, observed)
         pending = [
             item
             for item in pending
@@ -1190,8 +1241,6 @@ class AgentChatOwner:
                 if entry != "notice":
                     self._append_user(text)
             calls = 0
-            awaiting_confirmation = False
-            execution_barrier = None
             while True:
                 self._require_current(generation)
                 self._publish("thinking")
@@ -1220,8 +1269,6 @@ class AgentChatOwner:
                         route=decision.route,
                         allow_tools=calls < 10
                         and self._prompt_requests < 15
-                        and not awaiting_confirmation
-                        and execution_barrier is None
                         and decision.route in {"work", "unclear"},
                     )
                     presentation = AgentPresentationBuffer(generation, model_calls)
@@ -1291,17 +1338,6 @@ class AgentChatOwner:
                                 call, None, {"status": "not_executed", "code": "social_turn"}
                             )
                         return self._finish("interrupted", self._localize("agent_chat.interrupted"))
-                    if awaiting_confirmation:
-                        for call in function_calls:
-                            self._record_result(
-                                call,
-                                None,
-                                {"status": "not_executed", "code": "confirmation_pending"},
-                            )
-                        return self._finish(
-                            "needs_confirmation",
-                            "Review the pending confirmation card to continue.",
-                        )
                     if len(function_calls) > 4 or calls + len(function_calls) > 10:
                         for call in function_calls:
                             self._record_result(
@@ -1309,43 +1345,57 @@ class AgentChatOwner:
                             )
                         return self._finish("interrupted", self._localize("agent_chat.tool_limit"))
                     parsed_calls = [self._arguments(call) for call in function_calls]
-                    if (
-                        execution_barrier is None
-                        and len(function_calls) > 1
-                        and all(
-                            call.get("name") == "get_app_context" and parsed is not None
-                            for call, parsed in zip(function_calls, parsed_calls, strict=True)
-                        )
-                    ):
-                        calls += len(function_calls)
-                        self._active_tool = ("get_app_context", parsed_calls[0]["topic"])
+                    calls += len(function_calls)
+                    reads = []
+                    for call, arguments in zip(function_calls, parsed_calls, strict=True):
+                        try:
+                            action = select_app_action(call["name"], arguments or {})
+                            if call["name"] != "read_app" or action.handler != "context":
+                                break
+                            validate(arguments, action.schema({}))
+                            reads.append(action.arguments(arguments))
+                        except ValueError:
+                            break
+                    if len(reads) == len(function_calls) and len(reads) > 1:
+                        self._active_tool = ("read_app", reads[0]["topic"])
                         self._publish("working")
+                        contexts = await asyncio.gather(
+                            *(self._context(**arguments) for arguments in reads),
+                            return_exceptions=True,
+                        )
                         self._require_current(generation)
-                        async with asyncio.TaskGroup() as group:
-                            reads = [
-                                group.create_task(self._context(**parsed))
-                                for parsed in parsed_calls
-                            ]
-                        self._require_current(generation)
-                        for call, parsed, read in zip(
-                            function_calls, parsed_calls, reads, strict=True
+                        for call, arguments, context in zip(
+                            function_calls, reads, contexts, strict=True
                         ):
-                            self._record_context_result(
-                                call, parsed["topic"], read.result(), generation
-                            )
+                            if isinstance(context, BaseException):
+                                failure = {"status": "unavailable", "code": "tool_unavailable"}
+                                if isinstance(context, Exception):
+                                    failure["diagnostics"] = self._failure_evidence(
+                                        context,
+                                        code="agent_tool_failed",
+                                        operation="agent_tool",
+                                        stage="tool_dispatch",
+                                    )
+                                self._record_result(
+                                    call,
+                                    arguments["topic"],
+                                    failure,
+                                )
+                            else:
+                                self._record_context_result(
+                                    call,
+                                    arguments["topic"],
+                                    context,
+                                    generation,
+                                    stage_controls=False,
+                                )
                         self._publish("thinking")
                         continue
-                    calls += len(function_calls)
-                    blocked = execution_barrier
+                    blocked = None
                     for call, arguments in zip(function_calls, parsed_calls, strict=True):
                         self._require_current(generation)
-                        pure_read = call.get("name") in ("read_app", "get_app_context") or (
-                            call.get("name") == "control_app"
-                            and arguments is not None
-                            and isinstance(arguments.get("request"), dict)
-                            and str(arguments["request"].get("action", "")).startswith("query.")
-                        )
-                        if blocked is not None and not (pure_read and blocked == "read_failed"):
+                        pure_read = call.get("name") == "read_app"
+                        if blocked is not None and not pure_read:
                             self._record_result(
                                 call, None, {"status": "not_executed", "code": blocked}
                             )
@@ -1354,7 +1404,6 @@ class AgentChatOwner:
                         self._require_current(generation)
                         status = result["status"]
                         if status == "needs_confirmation":
-                            awaiting_confirmation = True
                             blocked = "confirmation_pending"
                         elif status in {
                             "pending",
@@ -1373,8 +1422,6 @@ class AgentChatOwner:
                             blocked = "user_action_required"
                         if first_useful_seconds is None:
                             first_useful_seconds = self._clock() - started
-                    if blocked not in (None, "read_failed"):
-                        execution_barrier = blocked
                     self._publish("thinking")
                     continue
                 if first_useful_seconds is None:
@@ -1397,13 +1444,23 @@ class AgentChatOwner:
             elif service_error.code == "service_turn_exhausted":
                 self._prompt_requests = 15
             return self._finish(
-                "service_unavailable", self._localize(f"agent_chat.{service_error.code}")
+                "service_unavailable",
+                self._localize(f"agent_chat.{service_error.code}"),
+                diagnostics=self._failure(
+                    service_error, code="agent_service_failed", operation="agent_chat"
+                ),
             )
-        except AgentTransportError:
+        except AgentTransportError as exc:
             self._require_current(generation)
             if self._pending_user is not None:
                 self._append_user(self._pending_user)
-            return self._finish("failed", self._localize("agent_chat.connection_failed"))
+            return self._finish(
+                "failed",
+                self._localize("agent_chat.connection_failed"),
+                diagnostics=self._failure(
+                    exc, code="agent_transport_failed", operation="agent_chat"
+                ),
+            )
         finally:
             self._observations.append(
                 AgentTurnObservation(decision_seconds, first_useful_seconds, model_calls)
@@ -1426,62 +1483,36 @@ class AgentChatOwner:
     async def _execute_call(self, call: dict, arguments: dict | None, generation: int) -> dict:
         self._require_current(generation)
         name = call.get("name")
-        family = (
-            name
-            if isinstance(name, str) and name in {"read_app", "execute_app", "propose_app"}
-            else None
-        )
-        stage_controls = family != "read_app"
         if arguments is None:
             result = {"status": "rejected", "code": "invalid_tool_call"}
             self._record_result(call, None, result)
             return result
-        requested_provider = arguments.get("provider")
-        if family is not None:
-            try:
-                catalog = (
-                    await self._control.query("settings.choices", {})
-                    if family == "propose_app"
-                    else {}
-                )
-                self._require_current(generation)
-                name, arguments = app_tool_target(
-                    family, validate_app_request(family, arguments, catalog)
-                )
-            except Exception:
-                result = {"status": "rejected", "code": "invalid_tool_call"}
-                self._record_result(call, None, result)
-                return result
-        self._require_current(generation)
-        topic = arguments.get("topic")
-        request = arguments.get("request")
-        if isinstance(request, dict):
-            topic = request.get("action")
-        observation = name in {"get_app_context", "get_provider_setup", "read_operation"} or (
-            name == "control_app" and str(topic).startswith("query.")
-        )
-        if (
-            not observation
-            and name != "withdraw_confirmation"
-            and any(
-                item["phase"] == "submitted" or item.get("result", {}).get("status") == "pending"
-                for item in self._operations.values()
-            )
-        ):
-            result = {"status": "not_executed", "code": "operation_pending"}
-            self._record_result(call, topic, result)
+        try:
+            action = select_app_action(name, arguments)
+            if not action.settings:
+                validate(arguments, action.schema({}))
+        except ValueError:
+            result = {
+                "status": "rejected",
+                "code": "invalid_tool_call",
+                "explanation": "Choose a supported action and supply only its applicable fields; omit nulls.",
+            }
+            self._record_result(call, None, result)
             return result
+        topic = arguments[action.key]
+        bound = action.arguments(arguments)
+        stage_controls = name == "open_app"
         self._active_tool = (name, topic)
         self._publish("working")
         try:
-            if name == "get_app_context":
-                context = await self._context(**arguments)
+            if action.handler == "context":
+                context = await self._context(**bound)
                 self._require_current(generation)
                 return self._record_context_result(
-                    call, arguments["topic"], context, generation, stage_controls=stage_controls
+                    call, bound["topic"], context, generation, stage_controls=stage_controls
                 )
-            if name == "read_operation":
-                identity = arguments["operation_id"]
+            if action.handler == "operation":
+                identity = bound["operation_id"]
                 operation = next(
                     (
                         item
@@ -1504,15 +1535,10 @@ class AgentChatOwner:
                     if result.get("status") == "pending":
                         receipt = await self._control.operation(identity)
                         self._require_current(generation)
-                        result = {
-                            "status": receipt["status"] if receipt.get("terminal") else "pending",
-                            "receipt": project_operation_receipt(receipt, operation["tool"]),
-                        }
-                        operation["result"] = deepcopy(result)
-                        if receipt.get("terminal"):
-                            operation["phase"] = "completed"
-            elif name == "propose_report":
-                result = self._propose_report(arguments["summary"], generation)
+                        if self._observe_operation_receipt(operation, receipt):
+                            result = deepcopy(operation["result"])
+            elif action.handler == "report":
+                result = self._propose_report(bound["summary"], generation)
             else:
                 result = await self._tools.execute(
                     name,
@@ -1522,27 +1548,48 @@ class AgentChatOwner:
                 )
                 self._require_current(generation)
                 if (
-                    name == "get_provider_setup"
+                    action.handler == "provider_setup"
                     and result.get("status") == "available"
                     and stage_controls
                 ):
-                    self._stage_provider_setup(arguments["provider"], generation)
+                    self._stage_provider_setup(bound["provider"], generation)
                     result = {**result, "controls_staged": True, "displayed": False}
-                if name == "open_settings" and result.get("opened") is True:
+                if action.handler == "navigation" and result.get("opened") is True:
                     result = {**result, "controls_staged": True}
                 if isinstance(result.get("context"), dict):
                     self._tools.observe_context(result["context"])
-                if result.get("provider") == "gemini" and requested_provider in (
-                    "google",
-                    "gemini_transcribe",
-                ):
-                    result = {**result, "provider": requested_provider}
-        except Exception:
-            result = {"status": "unavailable", "code": "tool_unavailable"}
+        except Exception as exc:
+            result = {
+                "status": "unavailable",
+                "code": "tool_unavailable",
+                "diagnostics": self._failure_evidence(
+                    exc, code="agent_tool_failed", operation="agent_tool", stage="tool_dispatch"
+                ),
+            }
         self._require_current(generation)
         projected = model_receipt(result)
         self._record_result(call, topic, projected)
         return projected
+
+    def _observe_operation_receipt(self, operation: dict, receipt: dict) -> bool:
+        retained = operation.get("result", {}).get("receipt", operation.get("receipt", {}))
+        if (
+            self._operations.get(operation["action_id"]) is not operation
+            or not isinstance(receipt, dict)
+            or not retained.get("operation_id")
+            or receipt.get("operation_id") != retained["operation_id"]
+            or receipt.get("request_id") != operation["action_id"]
+            or not isinstance(receipt.get("status"), str)
+        ):
+            return False
+        operation["result"] = {
+            "status": receipt["status"] if receipt.get("terminal") is True else "pending",
+            "receipt": project_operation_receipt(receipt, operation["tool"]),
+        }
+        if receipt.get("terminal") is True:
+            operation["phase"] = "completed"
+            self._tools.observe_operation_receipt(receipt)
+        return True
 
     def _require_notice_epoch(self, epoch: int) -> None:
         if self._closed or epoch != self._notice_epoch:
@@ -1550,7 +1597,7 @@ class AgentChatOwner:
 
     def _record_action(self, action: dict) -> None:
         identity = action["action_id"]
-        self._operations[identity] = deepcopy(action)
+        self._operations[identity] = {**self._operations.get(identity, {}), **deepcopy(action)}
         self._conversation.record({"type": "app_operation", **action})
         result = action.get("result", {})
         if action.get("changed") and result.get("status") in {"applied", "degraded"}:
@@ -1613,7 +1660,14 @@ class AgentChatOwner:
         if self._closed or generation != self._generation:
             raise asyncio.CancelledError
 
-    def _finish(self, status: str, text: str, *, model_answer: bool = False) -> AgentTurnResult:
+    def _finish(
+        self,
+        status: str,
+        text: str,
+        *,
+        model_answer: bool = False,
+        diagnostics: ErrorDiagnostics | None = None,
+    ) -> AgentTurnResult:
         index = self._conversation.display("assistant" if model_answer else "notice", text)
         if model_answer:
             response_index = (
@@ -1650,7 +1704,7 @@ class AgentChatOwner:
                     )
         if not model_answer:
             self._conversation.append({"role": "assistant", "content": text})
-        return AgentTurnResult(status, text, tuple(self._results))
+        return AgentTurnResult(status, text, tuple(self._results), diagnostics)
 
     def _valid_calls(self, calls: list[dict]) -> bool:
         ids = [call.get("call_id") for call in calls]
@@ -1664,79 +1718,13 @@ class AgentChatOwner:
 
     @staticmethod
     def _arguments(call: dict) -> dict | None:
-        if (
-            not isinstance(call.get("name"), str)
-            or call["name"]
-            not in {
-                "read_app",
-                "execute_app",
-                "propose_app",
-                "get_app_context",
-                "change_settings",
-                "control_app",
-                "withdraw_confirmation",
-                "open_settings",
-                "probe_translation",
-                "probe_self_recognition",
-                "probe_peer_recognition",
-                "propose_report",
-                "set_capture",
-                "set_translation",
-                "diagnose_microphone",
-                "get_provider_setup",
-                "retry_osc_discovery",
-            }
-            or not isinstance(call.get("arguments"), str)
-        ):
+        if call.get("name") not in APP_TOOLS or not isinstance(call.get("arguments"), str):
             return None
         try:
             arguments = json.loads(call["arguments"])
         except ValueError:
             return None
-        if not isinstance(arguments, dict):
-            return None
-        if (
-            call["name"]
-            in {
-                "probe_translation",
-                "probe_self_recognition",
-                "probe_peer_recognition",
-                "diagnose_microphone",
-                "retry_osc_discovery",
-            }
-            and arguments
-        ):
-            return None
-        if call["name"] == "get_app_context":
-            if (
-                arguments.keys() - {"topic", "diagnostic_id", "operation_id", "after"}
-                or not isinstance(arguments.get("topic"), str)
-                or arguments["topic"] not in TOPICS
-                or any(
-                    value is not None and (type(value) is not str or not 1 <= len(value) <= 64)
-                    for value in (arguments.get("diagnostic_id"), arguments.get("operation_id"))
-                )
-                or (
-                    arguments.get("after") is not None
-                    and (type(arguments["after"]) is not int or arguments["after"] < 0)
-                )
-                or (
-                    arguments["topic"] != "diagnostics"
-                    and any(
-                        arguments.get(key) is not None
-                        for key in ("diagnostic_id", "operation_id", "after")
-                    )
-                )
-            ):
-                return None
-        if call["name"] == "propose_report" and (
-            set(arguments) != {"summary"}
-            or not isinstance(arguments["summary"], str)
-            or not arguments["summary"].strip()
-            or len(arguments["summary"]) > MAX_REPORT_SUMMARY
-        ):
-            return None
-        return arguments
+        return arguments if isinstance(arguments, dict) else None
 
     def _record_context_result(
         self, call: dict, topic: str, context: dict, generation: int, *, stage_controls: bool = True

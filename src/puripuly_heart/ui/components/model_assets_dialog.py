@@ -7,6 +7,9 @@ from pathlib import Path
 
 import flet as ft
 
+from puripuly_heart.app.services.model_assets import ModelAssetsError
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.ui.components.modal_kit import (
     CARD_HEIGHT,
     CARD_LABEL_SIZE,
@@ -103,6 +106,29 @@ class ModelAssetsDialog:
         )
         self._progress_text: ft.Text | None = None
         self._action_signature: tuple | None = None
+        self.failure_diagnostics: ErrorDiagnostics | None = None
+        self.secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+
+    def _retain_failure(self, operation: str, error: Exception) -> None:
+        if isinstance(error, ModelAssetsError):
+            if error.failure_code == "cancelled":
+                return
+            diagnostics = getattr(error, "failure_diagnostics", None)
+            if isinstance(diagnostics, ErrorDiagnostics):
+                self.failure_diagnostics = diagnostics
+                self.secondary_diagnostics = error.secondary_diagnostics
+                return
+        diagnostics = exception_diagnostics(
+            error,
+            component="ui_model_assets",
+            operation=operation,
+            code="model_assets_ui_failed",
+        )
+        self.failure_diagnostics = diagnostics
+        self.secondary_diagnostics = ()
+        emit_failure(
+            logger, diagnostics, severity="warning", disposition="degraded", stage=operation
+        )
 
     @property
     def dialog(self) -> ft.AlertDialog | None:
@@ -293,8 +319,8 @@ class ModelAssetsDialog:
         await self._reveal_selected()
         try:
             await self.application.refresh_model_assets()
-        except Exception:
-            logger.debug("Model asset refresh failed", exc_info=True)
+        except Exception as exc:
+            self._retain_failure("refresh", exc)
         while self._is_open:
             self.render()
             await asyncio.sleep(RENDER_INTERVAL_S)
@@ -304,8 +330,8 @@ class ModelAssetsDialog:
             return
         try:
             await self._model_list.scroll_to(scroll_key=ft.ScrollKey(self._selected))
-        except Exception:
-            logger.debug("Model list scroll failed", exc_info=True)
+        except Exception as exc:
+            self._retain_failure("model_list_scroll", exc)
 
     def _on_download(self) -> None:
         model_id = self._selected
@@ -349,8 +375,8 @@ class ModelAssetsDialog:
         async def task() -> None:
             try:
                 await operation()
-            except Exception:
-                logger.debug("Model asset operation ended with a failure", exc_info=True)
+            except Exception as exc:
+                self._retain_failure("asset_operation", exc)
             finally:
                 if self._is_open:
                     self.render()

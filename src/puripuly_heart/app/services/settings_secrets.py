@@ -13,23 +13,20 @@ from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretStorePort,
     SettingsSecretValuesSnapshot,
 )
-from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
 
 logger = logging.getLogger(__name__)
 
 
 def _secret_diagnostics(phase: str, exception: BaseException) -> ErrorDiagnostics:
-    diagnostics = ErrorDiagnostics(
+    diagnostics = exception_diagnostics(
+        exception,
         component="settings_secrets",
         operation=phase,
         code="settings_secret_failed",
         category="transaction",
-        visibility="basic",
-        content_policy="metadata_only",
-        status_code=None,
-        retry_after_ms=None,
-        fields={"phase": phase, **safe_exception_fields(exception)},
+        fields={"phase": phase},
     )
     emit_failure(logger, diagnostics, disposition="degraded", severity="warning", stage=phase)
     return diagnostics
@@ -42,6 +39,7 @@ def _load_value(
     store: SettingsSecretStorePort,
     key: str,
     *,
+    secondary_diagnostics: list[ErrorDiagnostics],
     legacy_keys: tuple[str, ...] = (),
 ) -> str:
     value = store.get(key) or ""
@@ -53,7 +51,7 @@ def _load_value(
             try:
                 store.set(key, legacy_value)
             except Exception as exc:
-                _secret_diagnostics("legacy_secret_migration", exc)
+                secondary_diagnostics.append(_secret_diagnostics("legacy_secret_migration", exc))
             return legacy_value
     return ""
 
@@ -73,6 +71,7 @@ class SettingsSecretsOwner:
             )
 
         snapshot = SettingsSecretSnapshot()
+        secondary_diagnostics: list[ErrorDiagnostics] = []
         try:
             snapshot = replace(
                 snapshot,
@@ -116,6 +115,7 @@ class SettingsSecretsOwner:
                     store,
                     "alibaba_api_key_beijing",
                     legacy_keys=("alibaba_api_key",),
+                    secondary_diagnostics=secondary_diagnostics,
                 ),
             )
             snapshot = replace(
@@ -124,13 +124,18 @@ class SettingsSecretsOwner:
                     store,
                     "alibaba_api_key_singapore",
                     legacy_keys=("alibaba_api_key",),
+                    secondary_diagnostics=secondary_diagnostics,
                 ),
             )
         except Exception as exc:
             return SettingsSecretLoadResult(
-                snapshot=snapshot, diagnostics=_secret_diagnostics("secret_read", exc)
+                snapshot=snapshot,
+                diagnostics=_secret_diagnostics("secret_read", exc),
+                secondary_diagnostics=tuple(secondary_diagnostics),
             )
-        return SettingsSecretLoadResult(snapshot=snapshot)
+        return SettingsSecretLoadResult(
+            snapshot=snapshot, secondary_diagnostics=tuple(secondary_diagnostics)
+        )
 
     def load_values(
         self,

@@ -882,6 +882,9 @@ class SettingsApplicationOwner:
     success_sink: Callable[[str], object] = lambda _message: None
     provider_runtime: ProviderRuntimeOwner | None = None
 
+    def __post_init__(self) -> None:
+        self.projection.failure_sink = self.results.add_presentation_result
+
     async def apply(
         self,
         next_settings: AppSettingsVNext,

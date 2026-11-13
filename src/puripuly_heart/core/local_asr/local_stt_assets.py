@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from puripuly_heart.config import paths
 from puripuly_heart.runtime_layout import current_runtime_layout
+
+if TYPE_CHECKING:
+    from puripuly_heart.core.messages import ErrorDiagnostics
 
 GRANITE_MODEL_ID = "granite-speech-5.0-470m-turboctc-multilingual-q8-0-transcribe-cpu"
 GIGAAM_MODEL_ID = "gigaam-v3-e2e-ctc-q8-0-transcribe-cpu"
@@ -127,6 +130,8 @@ class InstalledLocalSTTManifest:
     install_dirname: str
     selected_source: str
     selected_revision: str
+    recovery_diagnostics: tuple[ErrorDiagnostics, ...] = field(default=(), compare=False)
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = field(default=(), compare=False)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -157,7 +162,7 @@ LocalSTTInstallStatus = Literal["ready", "missing", "invalid"]
 class LocalSTTInstallState:
     status: LocalSTTInstallStatus
     installed_manifest: InstalledLocalSTTManifest | None = None
-    error_message: str | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -407,5 +412,16 @@ def inspect_local_stt_install_state(
     except LocalSTTModelMissingError:
         return LocalSTTInstallState(status="missing")
     except LocalSTTManifestInvalidError as exc:
-        return LocalSTTInstallState(status="invalid", error_message=str(exc))
+        from puripuly_heart.core.diagnostics import exception_diagnostics
+
+        return LocalSTTInstallState(
+            status="invalid",
+            failure_diagnostics=exception_diagnostics(
+                exc,
+                component="model_assets",
+                operation="inspection",
+                code="local_asr.invalid_assets",
+                fields={"model_id": resolved_manifest.model_id},
+            ),
+        )
     return LocalSTTInstallState(status="ready", installed_manifest=installed)

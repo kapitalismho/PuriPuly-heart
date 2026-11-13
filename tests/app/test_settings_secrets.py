@@ -159,3 +159,18 @@ def test_settings_secret_mutation_owns_set_delete_and_failure_results() -> None:
 
     assert failed.succeeded is False
     assert failed.error_type == "OSError"
+
+
+def test_legacy_read_retains_failed_migration_without_losing_recovered_value() -> None:
+    store = RecordingSecretStore({"alibaba_api_key": "synthetic-private-key"})
+    store.failure = PermissionError(13, "synthetic-private-path")
+
+    result = SettingsSecretsOwner(secret_store_factory=lambda: store).load()
+
+    assert result.snapshot.alibaba_api_key_beijing == "synthetic-private-key"
+    assert result.snapshot.alibaba_api_key_singapore == "synthetic-private-key"
+    assert result.diagnostics is None
+    assert len(result.secondary_diagnostics) == 2
+    assert result.secondary_diagnostics[0].fields["errno"] == 13
+    assert result.secondary_diagnostics[0].operation == "legacy_secret_migration"
+    assert "synthetic-private" not in repr(result)

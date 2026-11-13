@@ -139,6 +139,8 @@ class SelfCaptureSessionSnapshot:
     cleanup_debt: int
     closed: bool
     failure_diagnostics: ErrorDiagnostics | None = None
+    source_open_diagnostics: ErrorDiagnostics | None = None
+    source_open_recovered: bool = False
 
 
 class SelfCaptureIngressError(RuntimeError):

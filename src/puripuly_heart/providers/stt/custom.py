@@ -7,14 +7,16 @@ import json
 import logging
 from collections import deque
 from collections.abc import AsyncIterator, Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import httpx
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
+from puripuly_heart.core.diagnostics import emit_failure, sanitize_diagnostic_fields
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
@@ -57,10 +59,27 @@ from puripuly_heart.core.stt.custom_connection import (
     pcm16le_to_wav,
     safe_body_excerpt,
 )
-from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+from puripuly_heart.core.stt.diagnostics import (
+    recognition_cleanup_failure,
+    recognition_failure_diagnostics,
+    retryable_transport_failure,
+)
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
+
+
+def _retryable_request_failure(exception: BaseException | None, reason: str | None) -> bool:
+    if isinstance(exception, CustomSTTRequestError):
+        return exception.category == CUSTOM_STT_VALIDATION_UNREACHABLE
+    return reason in {
+        "offline_total_timeout",
+        "native_transcription_failed",
+        "connection_eof",
+        "provider_final_timeout",
+        "final_timeout",
+    } or retryable_transport_failure(exception)
+
 
 _OFFLINE_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
 _OFFLINE_TOTAL_TIMEOUT_S = 50.0
@@ -161,8 +180,24 @@ class CustomSTTBackend(STTBackend):
             self._starting_sessions.append(session)
             try:
                 await session.start()
-            except BaseException:
-                await self._close_starting_session(session)
+            except BaseException as primary:
+                primary.failure_diagnostics = recognition_failure_diagnostics(
+                    primary,
+                    provider="custom",
+                    channel=None,
+                    operation="readiness",
+                    reason="provider_not_ready",
+                )
+                try:
+                    await self._close_starting_session(session)
+                except Exception as cleanup:
+                    cleanup.failure_diagnostics = recognition_cleanup_failure(
+                        cleanup,
+                        provider="custom",
+                        channel=None,
+                        primary=primary.failure_diagnostics,
+                    )
+                    raise cleanup from primary
                 raise
             self._starting_sessions.remove(session)
             return session
@@ -217,6 +252,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
     _url: str = field(init=False, default="", repr=False)
     _scoped_buffer: bytearray = field(init=False, repr=False)
     _scoped_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    failure_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
@@ -361,6 +397,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
             if outcome in {"failed", "degraded", "expired"}
             else None
         )
+        self.failure_diagnostics = diagnostics or self.failure_diagnostics
         self._event_projection.terminal(
             STTProviderTurnTerminal(
                 identity=identity,
@@ -369,6 +406,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                 text_authority="authoritative" if outcome in ("final", "empty") else "none",
                 failure_reason=failure_reason,
                 epoch_disposition="retire" if retire else "reuse",
+                failure_retryable=_retryable_request_failure(exception, failure_reason),
                 failure_diagnostics=diagnostics,
             )
         )
@@ -377,6 +415,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                 orderly=False,
                 reason=failure_reason or outcome,
                 provider_turn_id=identity.provider_turn_id,
+                failure_retryable=_retryable_request_failure(exception, failure_reason),
                 failure_diagnostics=diagnostics,
             )
 
@@ -397,17 +436,21 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
             try:
                 await self._transcribe(utterance)
             except Exception as exc:
-                logger.warning(
-                    "[STT] Custom offline utterance failed: %s",
-                    _sanitized_error(exc, secret=self.api_key),
+                self.failure_diagnostics = recognition_failure_diagnostics(
+                    exc,
+                    provider="custom",
+                    channel=self._event_projection.channel,
+                    operation="receive",
+                    reason="provider_task_failed",
                 )
+                emit_failure(logger, self.failure_diagnostics, stage="receive")
                 self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
 
     async def stop(self) -> None:
         await self.close()
 
     async def close(self) -> None:
-        if self._stopped:
+        if self._stopped and self._client is None:
             return
         identity = self._event_projection.active_identity
         if identity is not None:
@@ -425,10 +468,25 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                 await task
         async with self._transcribe_lock:
             client = self._client
-            self._client = None
             if client is not None:
-                with contextlib.suppress(Exception):
+                try:
                     await client.aclose()
+                except Exception as exc:
+                    diagnostics = recognition_cleanup_failure(
+                        exc,
+                        provider="custom",
+                        channel=self._event_projection.channel,
+                        primary=self.failure_diagnostics,
+                    )
+                    emit_failure(
+                        logger,
+                        diagnostics,
+                        severity="warning",
+                        disposition="degraded",
+                        stage="cleanup",
+                    )
+                    raise
+                self._client = None
         self._event_projection.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
@@ -509,6 +567,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
     _ws: Any = field(init=False, default=None, repr=False)
     _recv_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
+    failure_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
     _url: str = field(init=False, default="", repr=False)
     _pending_finals: int = field(init=False, default=0)
     _held_audio: bytearray = field(init=False, repr=False)
@@ -645,13 +704,14 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         try:
             async with self._send_lock:
                 await self._send_json({"type": "input_audio_buffer.commit"})
-        except Exception:
+        except Exception as exc:
             self._pending_finals = 0
             self._final_ready.set()
             self._terminalize_scoped(
                 identity,
                 outcome="failed",
                 failure_reason="commit_write_failed",
+                exception=exc,
                 retire=True,
                 provenance=STTNativeProvenance(barrier="commit_write"),
             )
@@ -723,6 +783,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
             if outcome in {"failed", "degraded", "expired"}
             else None
         )
+        self.failure_diagnostics = diagnostics or self.failure_diagnostics
         self._event_projection.terminal(
             STTProviderTurnTerminal(
                 identity=identity,
@@ -731,6 +792,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 text_authority="authoritative" if outcome in ("final", "empty") else "none",
                 failure_reason=failure_reason,
                 epoch_disposition="retire" if retire else "reuse",
+                failure_retryable=_retryable_request_failure(exception, failure_reason),
                 provenance=(provenance,),
                 failure_diagnostics=diagnostics,
             )
@@ -741,6 +803,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 orderly=False,
                 reason=failure_reason or outcome,
                 provider_turn_id=identity.provider_turn_id,
+                failure_retryable=_retryable_request_failure(exception, failure_reason),
                 failure_diagnostics=diagnostics,
             )
 
@@ -797,7 +860,19 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 await recv_task
         ws = self._ws
         if ws is not None:
-            await ws.close()
+            try:
+                await ws.close()
+            except Exception as exc:
+                diagnostics = recognition_cleanup_failure(
+                    exc,
+                    provider="custom",
+                    channel=self._event_projection.channel,
+                    primary=self.failure_diagnostics,
+                )
+                emit_failure(
+                    logger, diagnostics, severity="warning", disposition="degraded", stage="cleanup"
+                )
+                raise
             self._ws = None
         self._event_projection.close()
 
@@ -951,14 +1026,16 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                             category = CUSTOM_STT_VALIDATION_AUTH_FAILURE
                         elif "model" in lowered:
                             category = CUSTOM_STT_VALIDATION_MODEL_UNAVAILABLE
-                        raise CustomSTTRequestError(
-                            "Custom STT realtime session failed",
+                        raise _native_request_failure(
+                            error,
                             category=category,
+                            reason="provider_task_failed",
                         )
                     if self._event_projection.active_identity is not None:
-                        raise CustomSTTRequestError(
-                            "Custom STT realtime provider error",
+                        raise _native_request_failure(
+                            error,
                             category="provider_error",
+                            reason="provider_task_failed",
                         )
                     continue
                 if event_type not in _FINAL_EVENT_TYPES:
@@ -1006,6 +1083,15 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                         outcome="failed" if failed else ("final" if normalized_text else "empty"),
                         text="" if failed else normalized_text,
                         failure_reason="native_transcription_failed" if failed else None,
+                        exception=(
+                            _native_request_failure(
+                                event.get("error"),
+                                category="provider_error",
+                                reason="native_transcription_failed",
+                            )
+                            if failed
+                            else None
+                        ),
                         retire=retire,
                         provenance=STTNativeProvenance(
                             native_event_id=native_event_id,
@@ -1100,11 +1186,38 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
             self._terminal_native_event_ids.add(native_event_id)
 
 
+def _native_request_failure(native: object, *, category: str, reason: str) -> CustomSTTRequestError:
+    failure = CustomSTTRequestError("Custom STT realtime provider failed", category=category)
+    diagnostics = recognition_failure_diagnostics(
+        failure, provider="custom", channel=None, operation="receive", reason=reason
+    )
+    values = native if isinstance(native, Mapping) else {}
+    fields, rejected = sanitize_diagnostic_fields(
+        {f"openai_error_{key}": values[key] for key in ("code", "type", "param") if key in values}
+    )
+    failure.failure_diagnostics = replace(
+        diagnostics,
+        fields={**diagnostics.fields, **fields},
+        rejected_fields=diagnostics.rejected_fields + rejected,
+    )
+    return failure
+
+
 def _sanitized_error(exc: BaseException, *, secret: str) -> Exception:
+    diagnostics = recognition_failure_diagnostics(
+        exc,
+        provider="custom",
+        channel="unknown",
+        operation="receive",
+        reason=exc.category if isinstance(exc, CustomSTTRequestError) else "receive_failed",
+    )
     if isinstance(exc, CustomSTTRequestError):
-        return CustomSTTRequestError(
+        sanitized = CustomSTTRequestError(
             sanitize_custom_stt_text(str(exc), secret=secret),
             category=exc.category,
             status_code=exc.status_code,
         )
-    return RuntimeError(sanitize_custom_stt_text(str(exc), secret=secret))
+    else:
+        sanitized = RuntimeError(sanitize_custom_stt_text(str(exc), secret=secret))
+    sanitized.failure_diagnostics = diagnostics
+    return sanitized

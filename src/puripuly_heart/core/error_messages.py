@@ -19,6 +19,9 @@ from puripuly_heart.core.diagnostic_validation import (
     validate_diagnostics_for_sink,
 )
 from puripuly_heart.core.diagnostics import (
+    DIAGNOSTIC_CAUSE_MAX_COUNT,
+    DIAGNOSTIC_CAUSE_MAX_DEPTH,
+    exception_diagnostics,
     safe_exception_fields,
     sanitize_diagnostic_fields,
     sanitize_diagnostics,
@@ -92,6 +95,16 @@ def provider_failure_report(
     provider: str,
     operation: str,
 ) -> UserErrorReport:
+    return _provider_failure_report(exc, provider=provider, operation=operation, depth=0)
+
+
+def _provider_failure_report(
+    exc: BaseException | ErrorDiagnostics | None,
+    *,
+    provider: str,
+    operation: str,
+    depth: int,
+) -> UserErrorReport:
     report = _failure_report(
         exc,
         surface="provider",
@@ -100,6 +113,7 @@ def provider_failure_report(
         provider=provider,
         operation=operation,
         extra_fields={},
+        depth=depth,
     )
     if report.diagnostics.fields.get("provider") == "openai":
         return replace(
@@ -138,22 +152,23 @@ def openrouter_auth_failure_report(
     stage: OpenRouterAuthStage,
 ) -> UserErrorReport:
     failure = OpenRouterAuthenticationError.from_exception(exc, stage=stage)
-    return UserErrorReport(
-        message=UserMessageRef(key=failure.message_key, params={}, severity=SEVERITY_ERROR),
-        diagnostics=ErrorDiagnostics(
+    if _preserved_diagnostics(exc) is not None:
+        diagnostics = provider_failure_report(
+            exc, provider="openrouter", operation=failure.stage
+        ).diagnostics
+    else:
+        diagnostics = exception_diagnostics(
+            exc,
             component="provider.openrouter.auth",
             operation=failure.stage,
             code=f"openrouter.auth.{failure.reason}",
             category=failure.diagnostic_category,
-            visibility=DIAGNOSTIC_VISIBILITY_BASIC,
-            content_policy=CONTENT_POLICY_METADATA_ONLY,
-            status_code=failure.status_code,
-            retry_after_ms=None,
-            fields={
-                "provider": "openrouter",
-                **safe_exception_fields(failure),
-                **safe_transport_fields(failure),
-            },
+            fields={"provider": "openrouter", **safe_transport_fields(failure)},
+        )
+    return UserErrorReport(
+        message=UserMessageRef(key=failure.message_key, params={}, severity=SEVERITY_ERROR),
+        diagnostics=replace(
+            diagnostics, status_code=failure.status_code or diagnostics.status_code
         ),
     )
 
@@ -288,6 +303,20 @@ def _redact_secret_assignment(match: re.Match[str]) -> str:
     return f"{match.group(1)}={DIAGNOSTIC_REDACTION_MARKER}"
 
 
+def _preserved_diagnostics(
+    exc: BaseException | ErrorDiagnostics | None,
+) -> ErrorDiagnostics | None:
+    if isinstance(exc, ErrorDiagnostics):
+        return exc
+    for item in _exception_chain(exc):
+        candidate = getattr(item, "failure_diagnostics", None)
+        if not isinstance(candidate, ErrorDiagnostics):
+            candidate = getattr(item, "diagnostics", None)
+        if isinstance(candidate, ErrorDiagnostics):
+            return candidate
+    return None
+
+
 def _failure_report(
     exc: BaseException | ErrorDiagnostics | None,
     *,
@@ -297,12 +326,9 @@ def _failure_report(
     provider: str,
     operation: str,
     extra_fields: Mapping[str, DiagnosticFieldValue],
+    depth: int = 0,
 ) -> UserErrorReport:
-    preserved = (
-        exc if isinstance(exc, ErrorDiagnostics) else getattr(exc, "failure_diagnostics", None)
-    )
-    if preserved is None:
-        preserved = getattr(exc, "diagnostics", None)
+    preserved = _preserved_diagnostics(exc)
     if isinstance(preserved, ErrorDiagnostics):
         if isinstance(exc, BaseException):
             status = preserved.status_code or _status_code(exc)
@@ -352,11 +378,21 @@ def _failure_report(
         (item for item in _exception_chain(exc) if isinstance(item, LLMProviderRaceError)),
         None,
     )
+    causes: tuple[ErrorDiagnostics, ...] = ()
+    causes_truncated = False
     if race is not None:
-        branch_reports = tuple(
-            provider_failure_report(error, provider=provider, operation=operation)
-            for error in race.errors
-        )
+        causes_truncated = len(race.errors) > DIAGNOSTIC_CAUSE_MAX_COUNT
+        if depth >= DIAGNOSTIC_CAUSE_MAX_DEPTH:
+            branch_reports = ()
+            causes_truncated = bool(race.errors)
+        else:
+            branch_reports = tuple(
+                _provider_failure_report(
+                    error, provider=provider, operation=operation, depth=depth + 1
+                )
+                for error in race.errors[:DIAGNOSTIC_CAUSE_MAX_COUNT]
+            )
+        causes = tuple(report.diagnostics for report in branch_reports)
         matching = bool(branch_reports) and all(
             report.diagnostics.category == branch_reports[0].diagnostics.category
             and report.diagnostics.status_code == branch_reports[0].diagnostics.status_code
@@ -370,8 +406,12 @@ def _failure_report(
         )
         provider_label = (
             str(branch_reports[0].message.params["provider"])
-            if matching
-            else _safe_label(provider, "unknown")
+            if branch_reports
+            and all(
+                report.message.params["provider"] == branch_reports[0].message.params["provider"]
+                for report in branch_reports
+            )
+            else _diagnostic_provider(None, provider)
         )
         status_code = branch_reports[0].diagnostics.status_code if matching else None
         category = (
@@ -437,13 +477,15 @@ def _failure_report(
             ErrorDiagnostics(
                 component=component,
                 operation=operation_label,
-                code=f"{surface}.{category}",
+                code="provider.compound_failure" if race is not None else f"{surface}.{category}",
                 category=category,
                 visibility=DIAGNOSTIC_VISIBILITY_BASIC,
                 content_policy=CONTENT_POLICY_METADATA_ONLY,
                 status_code=status_code,
                 retry_after_ms=retry_after_ms,
                 fields=fields,
+                causes=causes,
+                causes_truncated=causes_truncated,
             )
         ),
     )

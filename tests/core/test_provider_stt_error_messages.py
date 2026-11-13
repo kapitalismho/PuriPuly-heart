@@ -6,6 +6,11 @@ import importlib.util
 import pytest
 
 from puripuly_heart.core import diagnostic_validation, error_messages, messages
+from puripuly_heart.core.diagnostics import (
+    DiagnosticHistory,
+    project_diagnostic_record,
+    serialize_diagnostics,
+)
 from puripuly_heart.core.http_extensions import (
     HttpExtensionConfigurationError,
     HttpExtensionResponseError,
@@ -245,3 +250,64 @@ def test_format_error_report_for_log_falls_back_when_diagnostics_are_unsafe() ->
     assert "managed_code" not in rendered
     assert "raw_exception" not in rendered
     assert "secret_pattern" not in rendered
+
+
+def test_mixed_provider_attempts_keep_each_refusal_without_false_consensus():
+    errors = tuple(OpenRouterResponseError(status) for status in (403, 403, 404))
+    failure = LLMProviderRaceError(errors)
+    report = error_messages.provider_failure_report(failure, provider="llm", operation="translate")
+    value = serialize_diagnostics(report.diagnostics)
+    history = DiagnosticHistory()
+    retained, _ = history.retain(report.diagnostics, severity="error", disposition="failed")
+    projected = project_diagnostic_record(retained)
+
+    assert report.diagnostics.code == "provider.compound_failure"
+    assert report.diagnostics.status_code is None
+    assert report.diagnostics.category == "unknown"
+    assert report.diagnostics.fields["provider"] == "openrouter"
+    assert [cause["status_code"] for cause in value["causes"]] == [403, 403, 404]
+    assert [cause["category"] for cause in value["causes"]] == ["auth", "auth", "invalid_response"]
+    assert [cause["diagnostic_id"] for cause in value["causes"]] == [
+        error.failure_diagnostics.diagnostic_id for error in errors
+    ]
+    assert projected["causes"] == value["causes"]
+    assert value["causes_truncated"] is False
+
+
+def test_mixed_budget_refusals_preserve_validated_subcauses_per_attempt():
+    errors = (
+        OpenRouterResponseError(
+            402,
+            limit_source="openrouter_in_flight_budget",
+            limit_reason="in_flight_budget_exhausted",
+        ),
+        OpenRouterResponseError(402, limit_source="openrouter_key_limit"),
+        OpenRouterResponseError(403),
+    )
+    report = error_messages.provider_failure_report(
+        LLMProviderRaceError(errors), provider="openrouter", operation="translate"
+    )
+    assert report.message.key == "provider.failure"
+    assert "limit_source" not in report.diagnostics.fields
+    assert report.diagnostics.causes[0].fields["limit_reason"] == "in_flight_budget_exhausted"
+    assert report.diagnostics.causes[1].fields["limit_source"] == "openrouter_key_limit"
+    assert report.diagnostics.causes[2].status_code == 403
+
+
+def test_wrapped_provider_diagnostic_preserves_origin_identity():
+    original = OpenRouterResponseError(404)
+    wrapper = RuntimeError(RAW_PROVIDER_DETAIL)
+    wrapper.__cause__ = original
+    report = error_messages.provider_failure_report(wrapper, provider="llm", operation="translate")
+    assert report.diagnostics.diagnostic_id == original.failure_diagnostics.diagnostic_id
+    assert report.diagnostics.category == "invalid_response"
+    _assert_raw_detail_absent(report, RAW_PROVIDER_DETAIL)
+
+
+def test_openrouter_auth_wrapper_retains_original_typed_failure():
+    original = OpenRouterResponseError(403)
+    report = error_messages.openrouter_auth_failure_report(original, stage="key_verification")
+    assert report.diagnostics.category == "auth"
+    assert report.diagnostics.status_code == 403
+    assert report.diagnostics.diagnostic_id == original.failure_diagnostics.diagnostic_id
+    assert report.diagnostics.code == original.failure_diagnostics.code

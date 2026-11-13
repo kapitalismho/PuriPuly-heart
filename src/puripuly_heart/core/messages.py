@@ -195,9 +195,12 @@ class ErrorDiagnostics:
     generation: int | None = None
     rejected_fields: int = 0
     detail_truncated: bool = False
+    causes: tuple[ErrorDiagnostics, ...] = ()
+    causes_truncated: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "fields", _freeze_safe_mapping(self.fields))
+        object.__setattr__(self, "causes", tuple(self.causes))
 
 
 @dataclass(frozen=True, slots=True)

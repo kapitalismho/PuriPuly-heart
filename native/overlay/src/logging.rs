@@ -106,7 +106,7 @@ impl OverlayLogger {
     }
 
 
-    pub(crate) fn from_streams(stdout: LogStream, stderr: LogStream) -> Self {
+    pub fn from_streams(stdout: LogStream, stderr: LogStream) -> Self {
         let (diagnostic_sender, diagnostic_receiver) =
             std_mpsc::sync_channel(DIAGNOSTIC_QUEUE_CAPACITY);
         let (reliable_sender, reliable_receiver) = std_mpsc::sync_channel(RELIABLE_QUEUE_CAPACITY);

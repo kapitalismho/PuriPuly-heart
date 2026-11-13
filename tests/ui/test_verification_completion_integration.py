@@ -128,7 +128,7 @@ async def test_real_secure_field_completion_keeps_settings_in_place_and_unbinds(
 
     assert owner.calls[-1] == (
         "completion",
-        ("openrouter", success, None if success else "verification_failed"),
+        ("openrouter", success, None if success else "verification_failed", None),
     )
     assert opened == ["settings"]
     assert view._provider_snapshot.translation == before.translation
@@ -236,12 +236,14 @@ async def test_actual_setup_tool_and_navigation_expose_fields_without_provider_s
     try:
         assert set(fields) == set(PROVIDER_SETUPS)
         for provider, setup in PROVIDER_SETUPS.items():
-            metadata = await owner._tools.execute("get_provider_setup", {"provider": provider})
+            metadata = await owner._tools.execute(
+                "open_app", {"view": "provider_setup", "provider": provider}
+            )
             assert metadata["secure_field"]["secret_key"] == setup.secret_key.value
             assert metadata["link_rendered"] is False
             assert metadata["link_opened"] is False
             result = await owner._tools.execute(
-                "open_settings", {"section": "api", "provider": provider}
+                "open_app", {"view": "settings", "section": "api", "provider": provider}
             )
             assert result["status"] == "opened"
             assert result["field_visible"] is True
@@ -252,7 +254,9 @@ async def test_actual_setup_tool_and_navigation_expose_fields_without_provider_s
             view._update_api_visibility()
             assert view._agent_control_visible(view, fields[provider]._text_field)
             assert view._openrouter_pkce_button_row.visible == before_pkce_visibility
-            observation = await owner._tools.execute("get_provider_setup", {"provider": provider})
+            observation = await owner._tools.execute(
+                "open_app", {"view": "provider_setup", "provider": provider}
+            )
             assert observation["last_navigation"] == {
                 "status": "opened",
                 "opened": True,
@@ -261,7 +265,7 @@ async def test_actual_setup_tool_and_navigation_expose_fields_without_provider_s
                 "completion_observable": True,
                 "source": "last_navigation",
             }
-            await owner._tools.execute("open_settings", {"section": "general"})
+            await owner._tools.execute("open_app", {"view": "settings", "section": "general"})
             assert {name: field.visible for name, field in fields.items()} == before_visibility
             assert (
                 view._provider_snapshot,

@@ -1506,16 +1506,23 @@ class ScenarioApp:
                 )
             else:
                 languages = self.intent["languages"]
-                targets = tuple(
-                    language
-                    for language in (
-                        languages["target_language"],
-                        languages["secondary_target_language"],
+                channel = arguments.get("channel", "self")
+                if channel == "peer":
+                    source = languages["peer_source_language"] or languages["source_language"]
+                    targets = (languages["peer_target_language"] or languages["target_language"],)
+                else:
+                    source = languages["source_language"]
+                    targets = tuple(
+                        language
+                        for language in (
+                            languages["target_language"],
+                            languages["secondary_target_language"],
+                        )
+                        if language
                     )
-                    if language
-                )
                 receipt.update(
-                    translation_probe_direction(languages["source_language"], targets),
+                    translation_probe_direction(source, targets),
+                    channel=channel,
                     target_results=[
                         {
                             "target_language": target,

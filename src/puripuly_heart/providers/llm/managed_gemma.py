@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from uuid import UUID
 
 import httpx
 
+from puripuly_heart.core.diagnostics import exception_diagnostics, serialize_diagnostics
+from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.http_client_logging import suppress_http_client_logs
 from puripuly_heart.core.llm.latency import (
     AttemptLatency,
@@ -109,6 +111,12 @@ class HttpxManagedGemmaTransport:
                     response = await client.get("/health")
                     if response.status_code == 200:
                         return
+                    last_error = LLMResponseError(
+                        "managed Gemma readiness request failed",
+                        provider="managed_gemma",
+                        status_code=response.status_code,
+                        operation="readiness",
+                    )
                 except httpx.HTTPError as exc:
                     last_error = exc
                 await asyncio.sleep(self.poll_interval_s)
@@ -154,10 +162,19 @@ class HttpxManagedGemmaTransport:
                 f"/slots/{slot_id}?action=restore",
                 json={"filename": filename},
             )
-        except httpx.HTTPError:
-            await self.wait_slot_idle(slot_id=slot_id)
-            return False
-        return response.status_code == 200
+            if response.status_code == 404:
+                return False
+            if response.status_code != 200:
+                raise LLMResponseError(
+                    "managed Gemma prefix restore failed",
+                    provider="managed_gemma",
+                    status_code=response.status_code,
+                    operation="prefix_restore",
+                )
+        except (httpx.HTTPError, LLMResponseError) as exc:
+            await self._settle_failed_slot(slot_id=slot_id, error=exc)
+            raise
+        return True
 
     async def save_prefix(self, *, filename: str, slot_id: int) -> None:
         try:
@@ -166,9 +183,31 @@ class HttpxManagedGemmaTransport:
                 json={"filename": filename},
             )
             response.raise_for_status()
-        except httpx.HTTPError:
-            await self.wait_slot_idle(slot_id=slot_id)
+        except httpx.HTTPError as exc:
+            await self._settle_failed_slot(slot_id=slot_id, error=exc)
             raise
+
+    async def _settle_failed_slot(self, *, slot_id: int, error: Exception) -> None:
+        diagnostics = provider_failure_report(
+            error, provider="managed_gemma", operation="prefix"
+        ).diagnostics
+        try:
+            await self.wait_slot_idle(slot_id=slot_id)
+        except Exception as cleanup:
+            error.failure_diagnostics = replace(
+                diagnostics,
+                causes=(
+                    *diagnostics.causes,
+                    exception_diagnostics(
+                        cleanup,
+                        component="provider.llm",
+                        operation="slot_cleanup",
+                        code="provider.cleanup_failed",
+                        fields={"provider": "managed_gemma", "cleanup_confirmed": False},
+                    ),
+                ),
+            )
+            raise error from cleanup
 
     async def translate(
         self,
@@ -333,6 +372,14 @@ class ManagedGemmaLLMProvider:
             source_text=text,
             source_language=source_language,
             target_language=target_language,
+            recovered_failures=tuple(
+                serialize_diagnostics(diagnostic) for diagnostic in response.recovery_diagnostics
+            ),
+            secondary_diagnostics=tuple(
+                serialize_diagnostics(diagnostic) for diagnostic in response.secondary_diagnostics
+            ),
+            recovered_failures_truncated=response.recovery_diagnostics_truncated,
+            secondary_diagnostics_truncated=response.secondary_diagnostics_truncated,
         )
 
     async def close(self) -> None:

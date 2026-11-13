@@ -37,31 +37,31 @@ _CONTEXT_SUBJECT_KEYS = {
     "diagnostics": "agent_chat.subject.diagnostics",
 }
 _TOOL_STATUS_KEYS = {
-    "diagnose_microphone": "agent_chat.status.microphone",
-    "probe_self_recognition": "agent_chat.status.recognition_probe",
-    "probe_peer_recognition": "agent_chat.status.recognition_probe",
-    "probe_translation": "agent_chat.status.translation_probe",
-    "change_settings": "agent_chat.status.change_settings",
-    "open_settings": "agent_chat.status.open_settings",
-    "get_provider_setup": "agent_chat.status.provider_setup",
-    "retry_osc_discovery": "agent_chat.status.osc",
-    "set_capture": "agent_chat.status.capture",
-    "set_translation": "agent_chat.status.translation_toggle",
-}
-_CONTROL_STATUS_KEYS = {
-    "overlay.set": "agent_chat.status.overlay_toggle",
-    "audio.retry": "agent_chat.status.peer_retry",
-    "models.retry": "agent_chat.status.gpu_retry",
-    "secrets.delete": "agent_chat.status.change_settings",
-    "auth.logout": "agent_chat.status.change_settings",
-    "overlay.position.reset": "agent_chat.status.change_settings",
+    ("probe_app", "microphone"): "agent_chat.status.microphone",
+    ("probe_app", "recognition.self"): "agent_chat.status.recognition_probe",
+    ("probe_app", "recognition.peer"): "agent_chat.status.recognition_probe",
+    ("probe_app", "translation.self"): "agent_chat.status.translation_probe",
+    ("probe_app", "translation.peer"): "agent_chat.status.translation_probe",
+    ("manage_proposal", "settings"): "agent_chat.status.change_settings",
+    ("manage_proposal", "secrets.delete"): "agent_chat.status.change_settings",
+    ("manage_proposal", "auth.logout"): "agent_chat.status.change_settings",
+    ("manage_proposal", "overlay.position.reset"): "agent_chat.status.change_settings",
+    ("open_app", "settings"): "agent_chat.status.open_settings",
+    ("open_app", "provider_setup"): "agent_chat.status.provider_setup",
+    ("retry_app", "osc_discovery"): "agent_chat.status.osc",
+    ("retry_app", "audio"): "agent_chat.status.peer_retry",
+    ("retry_app", "gpu_activation"): "agent_chat.status.gpu_retry",
+    ("set_app", "capture.self"): "agent_chat.status.capture",
+    ("set_app", "capture.peer"): "agent_chat.status.capture",
+    ("set_app", "translation"): "agent_chat.status.translation_toggle",
+    ("set_app", "overlay"): "agent_chat.status.overlay_toggle",
 }
 _COMMAND_DONE_KEYS = {
     "secret": "agent_chat.status.secret_deleted",
     "account": "agent_chat.status.signed_out",
     "position": "agent_chat.status.position_reset",
 }
-_QUIET_TOOLS = frozenset({"withdraw_confirmation", "propose_report"})
+_QUIET_TOOLS = frozenset({("manage_proposal", "withdraw"), ("manage_proposal", "report")})
 _NOT_DONE_STATUSES = frozenset(
     {
         "rejected",
@@ -119,22 +119,18 @@ class ChatItem:
 
 def tool_label(result: AgentToolResult | tuple[str, str | None], *, done: bool) -> str | None:
     tool, topic = (result.tool, result.topic) if isinstance(result, AgentToolResult) else result
-    if tool in _QUIET_TOOLS:
+    if (tool, topic) in _QUIET_TOOLS:
         return None
     suffix = "done" if done else "active"
-    if tool == "get_app_context" or tool == "control_app" and (topic or "").startswith("query."):
-        context_topic = topic if tool == "get_app_context" else None
+    if tool == "read_app" or (tool, topic) == ("open_app", "accounts"):
+        context_topic = topic
         subject = t(
             _CONTEXT_SUBJECT_KEYS.get(
                 context_topic or "overview", _CONTEXT_SUBJECT_KEYS["overview"]
             )
         )
         return t(f"agent_chat.status.check.{suffix}", subject=subject)
-    key = (
-        _CONTROL_STATUS_KEYS.get(topic or "")
-        if tool == "control_app"
-        else _TOOL_STATUS_KEYS.get(tool)
-    )
+    key = _TOOL_STATUS_KEYS.get((tool, topic))
     return t(f"{key}.{suffix}") if key is not None else None
 
 
@@ -156,19 +152,17 @@ def done_status(results: Sequence[AgentToolResult]) -> str | None:
     subjects: list[str] = []
     others: list[str] = []
     for result in results:
-        if result.status in _NOT_DONE_STATUSES or result.tool in _QUIET_TOOLS:
+        if result.status in _NOT_DONE_STATUSES or (result.tool, result.topic) in _QUIET_TOOLS:
             continue
-        if result.tool == "get_app_context" or (
-            result.tool == "control_app" and (result.topic or "").startswith("query.")
-        ):
-            topic = result.topic if result.tool == "get_app_context" else None
+        if result.tool == "read_app" or (result.tool, result.topic) == ("open_app", "accounts"):
+            topic = result.topic
             subject = t(
                 _CONTEXT_SUBJECT_KEYS.get(topic or "overview", _CONTEXT_SUBJECT_KEYS["overview"])
             )
             if subject not in subjects:
                 subjects.append(subject)
             continue
-        if result.tool == "change_settings":
+        if result.tool == "manage_proposal":
             changes = result.result.get("changes")
             label = applied_label(changes) if isinstance(changes, dict) else None
         else:

@@ -277,6 +277,10 @@ def test_failed_page_is_dropped_without_retrying_or_blocking_later_pages(
         runtime_logging=runtime_logging,
     )
 
+    deliveries = []
+    paginator.bind_delivery_observer(
+        lambda message, status, diagnostics: deliveries.append((status, diagnostics))
+    )
     paginator.enqueue(_message("abcdefghijklmnop", clock))
     assert sender.attempted == ["abcde"]
     assert sender.sent == ["abcde"]
@@ -309,6 +313,11 @@ def test_failed_page_is_dropped_without_retrying_or_blocking_later_pages(
     assert failure["fields"]["remote_delivery"] == "unacknowledged"
     assert failure["fields"]["publication_id"] is not None
     assert failure["severity"] == "warning"
+    assert [status for status, _diagnostics in deliveries] == [
+        "first_page_sent",
+        "page_send_failed",
+    ]
+    assert deliveries[1][1].diagnostic_id == failure["diagnostic_id"]
 
 
 def test_send_immediate_failure_returns_false_and_logs_basic_warning(
@@ -583,7 +592,9 @@ def test_newer_pending_revision_replaces_in_place_behind_system_message() -> Non
     paginator.enqueue(_message("system!!", clock))
     receipts: list[tuple[int, str]] = []
     paginator.bind_delivery_observer(
-        lambda message, status: receipts.append((message.presentation_revision, status))
+        lambda message, status, diagnostics: receipts.append(
+            (message.presentation_revision, status)
+        )
     )
     paginator.enqueue(
         _message(
@@ -932,7 +943,7 @@ def test_empty_self_turn_settles_delivery_once_without_sending() -> None:
     deliveries: list[tuple[uuid.UUID, str]] = []
     paginator = ChatboxPaginator(sender=sender, clock=clock, page_interval_s=3.0)
     paginator.bind_delivery_observer(
-        lambda message, status: deliveries.append((message.utterance_id, status))
+        lambda message, status, diagnostics: deliveries.append((message.utterance_id, status))
     )
 
     empty = _message(
@@ -976,7 +987,7 @@ def test_empty_self_turn_settles_after_older_pagination_drains() -> None:
     deliveries: list[tuple[uuid.UUID, str]] = []
     paginator = ChatboxPaginator(sender=sender, clock=clock, max_chars=5, page_interval_s=3.0)
     paginator.bind_delivery_observer(
-        lambda message, status: deliveries.append((message.utterance_id, status))
+        lambda message, status, diagnostics: deliveries.append((message.utterance_id, status))
     )
 
     paginator.enqueue(_message("abcde fghij", clock))

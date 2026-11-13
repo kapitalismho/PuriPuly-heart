@@ -38,7 +38,7 @@ use crate::retry_episode::{
     FreshSchedule as NativeFreshSchedule, RetryEpisodes, RetryIntent,
     RETRY_AUDIT_CAPACITY as NATIVE_FRESH_AUDIT_CAPACITY,
 };
-use crate::runtime_diagnostics::{project_owner_status, OwnerStatusInput};
+use crate::runtime_diagnostics::{project_owner_status, NativeFailure, OwnerStatusInput};
 use crate::spatial_policy::{SpatialDiagnostic, SpatialReanchorPolicy};
 use crate::state::{
     NativeQuietTailEpisode, NativeQuietTailPhase, OverlayPresentationBlockVariant,
@@ -66,21 +66,23 @@ pub enum StartupError {
     #[error("VR headset not found")]
     HmdNotFound,
     #[error("openvr init failed: {0}")]
-    OpenVrInit(String),
+    OpenVrInit(NativeFailure),
     #[error("renderer init failed: {0}")]
-    RendererInit(String),
+    RendererInit(NativeFailure),
     #[error("GPU readiness timed out")]
     ReadinessTimedOut,
     #[error("GPU readiness was cancelled")]
     ReadinessCancelled,
     #[error("GPU readiness query failed")]
     ReadinessFailed,
+    #[error("GPU readiness native failure: {0}")]
+    ReadinessNative(NativeFailure),
     #[error("runtime bridge failed: {0}")]
     RuntimeBridge(String),
     #[error("runtime render failed: {0}")]
-    RuntimeRender(String),
+    RuntimeRender(NativeFailure),
     #[error("runtime OpenVR failed: {0}")]
-    RuntimeOpenVr(String),
+    RuntimeOpenVr(NativeFailure),
     #[error("runtime disconnected before ready")]
     RuntimeDisconnected,
     #[error("runtime stopped before ready")]
@@ -104,6 +106,7 @@ impl StartupError {
             | Self::ReadinessTimedOut
             | Self::ReadinessCancelled
             | Self::ReadinessFailed
+            | Self::ReadinessNative(_)
             | Self::ReadinessStalled
             | Self::RuntimeRender(_)
             | Self::RuntimeOpenVr(_) => 21,
@@ -116,6 +119,19 @@ impl StartupError {
     }
 
     pub fn failure_reason(&self) -> &'static str {
+        self.reason()
+    }
+
+    pub fn native_failure(&self) -> Option<NativeFailure> {
+        match self {
+            Self::OpenVrInit(failure) | Self::RendererInit(failure)
+            | Self::RuntimeRender(failure) | Self::RuntimeOpenVr(failure)
+            | Self::ReadinessNative(failure) => Some(*failure),
+            _ => None,
+        }
+    }
+
+    fn reason(&self) -> &'static str {
         match self {
             Self::Manifest(_) => "manifest_invalid",
             Self::ContractMismatch(_) => "contract_mismatch",
@@ -128,6 +144,7 @@ impl StartupError {
             Self::ReadinessTimedOut => "gpu_readiness_late",
             Self::ReadinessCancelled => "gpu_readiness_cancelled",
             Self::ReadinessFailed => "gpu_query_failed",
+            Self::ReadinessNative(_) => "gpu_query_failed",
             Self::ReadinessStalled => "gpu_stalled",
             Self::RuntimeBridge(_) => "bridge_failed",
             Self::RuntimeRender(_) => "render_failed",
@@ -148,21 +165,34 @@ pub enum RuntimeFailure {
     #[error("runtime bridge error: {0}")]
     Bridge(String),
     #[error("renderer draw failed: {0}")]
-    Render(String),
+    Render(NativeFailure),
     #[error("openvr submit failed: {0}")]
-    OpenVr(String),
+    OpenVr(NativeFailure),
     #[error("GPU readiness timed out")]
     ReadinessTimedOut,
     #[error("GPU readiness cancelled")]
     ReadinessCancelled,
     #[error("GPU readiness failed")]
     ReadinessFailed,
+    #[error("GPU readiness native failure: {0}")]
+    ReadinessNative(NativeFailure),
     #[error("GPU readiness made no progress")]
     ReadinessStalled,
 }
 
 impl RuntimeFailure {
     pub fn failure_reason(&self) -> &'static str {
+        self.reason()
+    }
+
+    pub fn native_failure(&self) -> Option<NativeFailure> {
+        match self {
+            Self::Render(failure) | Self::OpenVr(failure) | Self::ReadinessNative(failure) => Some(*failure),
+            _ => None,
+        }
+    }
+
+    fn reason(&self) -> &'static str {
         match self {
             Self::RuntimeDisconnected => "runtime_disconnected",
             Self::Stopped => "stopped",
@@ -170,6 +200,7 @@ impl RuntimeFailure {
             Self::ReadinessCancelled => "gpu_readiness_cancelled",
             Self::ReadinessFailed => "gpu_query_failed",
             Self::ReadinessStalled => "gpu_stalled",
+            Self::ReadinessNative(_) => "gpu_query_failed",
             Self::Bridge(_) => "bridge_failed",
             Self::Render(_) => "render_failed",
             Self::OpenVr(_) => "openvr_failed",
@@ -716,6 +747,7 @@ impl PresentationRuntime {
                 ReadinessOutcome::TimedOut => return Err(RuntimeFailure::ReadinessTimedOut),
                 ReadinessOutcome::Cancelled => return Err(RuntimeFailure::ReadinessCancelled),
                 ReadinessOutcome::Failed => return Err(RuntimeFailure::ReadinessFailed),
+                ReadinessOutcome::NativeFailed(failure) => return Err(RuntimeFailure::ReadinessNative(failure)),
             }
         }
         if self.stopped {
@@ -734,7 +766,7 @@ impl PresentationRuntime {
         renderer.set_presentation(presentation.clone());
         openvr
             .apply_calibration(self.state.calibration())
-            .map_err(|error| RuntimeFailure::OpenVr(format!("stage=calibration {error}")))?;
+            .map_err(|error| RuntimeFailure::OpenVr(error.native_failure().at("calibration")))?;
 
         let presentation_backend = renderer.presentation_backend();
         let openvr_adapter_identity = renderer.openvr_adapter_identity();
@@ -858,9 +890,7 @@ impl PresentationRuntime {
                 Ok(frame) => (Arc::new(frame), true),
                 Err(error) => {
                     self.retain_failed_presentation_causes(presentation_correlation);
-                    return Err(RuntimeFailure::Render(format!(
-                        "stage=render_frame {error}"
-                    )));
+                    return Err(RuntimeFailure::Render(error.native_failure().at("render_frame")));
                 }
             }
         };
@@ -938,6 +968,7 @@ impl PresentationRuntime {
                 ReadinessOutcome::TimedOut => RuntimeFailure::ReadinessTimedOut,
                 ReadinessOutcome::Cancelled => RuntimeFailure::ReadinessCancelled,
                 ReadinessOutcome::Failed => RuntimeFailure::ReadinessFailed,
+                ReadinessOutcome::NativeFailed(failure) => RuntimeFailure::ReadinessNative(failure),
                 ReadinessOutcome::Ready => unreachable!(),
             };
             return Err(failure);
@@ -963,7 +994,7 @@ impl PresentationRuntime {
                     }
                     Err(error) => {
                         self.retain_failed_presentation_causes(presentation_correlation);
-                        return Err(RuntimeFailure::OpenVr(format!("stage=reanchor {error}")));
+                        return Err(RuntimeFailure::OpenVr(error.native_failure().at("reanchor")));
                     }
                 }
             }
@@ -990,9 +1021,7 @@ impl PresentationRuntime {
         if let Err(error) = submission_result {
             self.emit_pending_spatial_diagnostics(logger).await;
             self.retain_failed_presentation_causes(presentation_correlation);
-            return Err(RuntimeFailure::OpenVr(format!(
-                "stage=submit_frame {error}"
-            )));
+            return Err(RuntimeFailure::OpenVr(error.native_failure().at("submit_frame")));
         }
         if should_show_after_submit {
             self.presentation_diagnostics.configure_event_metadata(
@@ -1022,9 +1051,7 @@ impl PresentationRuntime {
                 }
             }
             if let Err(error) = visibility_result {
-                return Err(RuntimeFailure::OpenVr(format!(
-                    "stage=show_overlay {error}"
-                )));
+                return Err(RuntimeFailure::OpenVr(error.native_failure().at("show_overlay")));
             }
         }
         if !has_drawable_text && self.first_texture_submitted {
@@ -1241,9 +1268,7 @@ impl PresentationRuntime {
             }
         }
         if let Err(error) = visibility_result {
-            return Err(RuntimeFailure::OpenVr(format!(
-                "stage=hide_overlay {error}"
-            )));
+            return Err(RuntimeFailure::OpenVr(error.native_failure().at("hide_overlay")));
         }
         Ok(())
     }
@@ -1864,6 +1889,8 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 "failure_reason": primary_failure_reason.or(cleanup_failure_reason),
                 "primary_failure_reason": primary_failure_reason,
                 "cleanup_failure_reason": cleanup_failure_reason,
+                "native_failure": result.as_ref().err().and_then(RuntimeFailure::native_failure),
+                "cleanup_native_failure": cleanup_result.as_ref().err().and_then(RuntimeFailure::native_failure),
                 "diagnostic_dropped": logger.dropped_records(),
                 "reliable_delivery_failures": logger.reliable_delivery_failures(),
                 "evidence_state": if terminal_status.is_ok() { "retained" } else { "incomplete" },
@@ -2301,7 +2328,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     .as_mut()
                     .expect("active OpenVR session")
                     .acknowledge_quit_exiting()
-                    .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))
+                    .map_err(|error| RuntimeFailure::OpenVr(error.native_failure().at("acknowledge_quit")))
             } else {
                 Ok(())
             };
@@ -2309,8 +2336,8 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         } else {
             Ok(())
         };
-        if let Some(event) = fatal_event {
-            return Err(RuntimeFailure::OpenVr(format!("event={}", event.as_str())));
+        if fatal_event.is_some() {
+            return Err(RuntimeFailure::OpenVr(NativeFailure::new("event_process_quit", Some(crate::openvr::OPENVR_EVENT_PROCESS_QUIT as i32))));
         }
         if stop_reason.is_some() {
             return stop_result;
@@ -2345,9 +2372,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 desired_visible,
                 visibility_result.is_ok(),
             );
-            visibility_result.map_err(|error| {
-                RuntimeFailure::OpenVr(format!("stage=reconcile_visibility {error}"))
-            })?;
+            visibility_result.map_err(|error| RuntimeFailure::OpenVr(error.native_failure().at("reconcile_visibility")))?;
             self.runtime.visibility_request_pending = Some(desired_visible);
         }
         Ok(())
@@ -2588,15 +2613,12 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             let release_result = openvr.release_resources();
             match (hide_result, release_result) {
                 (Ok(()), Ok(())) => Ok(()),
-                (Err(hide), Ok(())) => Err(RuntimeFailure::OpenVr(format!(
-                    "cleanup hide failed: {hide}"
-                ))),
-                (Ok(()), Err(release)) => Err(RuntimeFailure::OpenVr(format!(
-                    "cleanup release failed: {release}"
-                ))),
-                (Err(hide), Err(release)) => Err(RuntimeFailure::OpenVr(format!(
-                    "cleanup hide failed: {hide}; cleanup release failed: {release}"
-                ))),
+                (Err(hide), Ok(())) => Err(RuntimeFailure::OpenVr(hide.native_failure().at("cleanup_hide"))),
+                (Ok(()), Err(release)) => Err(RuntimeFailure::OpenVr(release.native_failure().at("cleanup_release"))),
+                (Err(hide), Err(release)) => Err(RuntimeFailure::OpenVr(
+                    hide.native_failure().at("cleanup_hide")
+                        .with_secondary(release.native_failure().at("cleanup_release"))
+                )),
             }
         } else {
             Ok(())
@@ -2739,6 +2761,7 @@ async fn run_with_manifest_and_profile(
                     .emit_stdout_event(&json!({
                         "type": "runtime_error",
                         "failure_reason": error.failure_reason(),
+                        "native_failure": error.native_failure(),
                     }))
                     .await;
                 1
@@ -2826,6 +2849,7 @@ fn startup_error_from_runtime_failure(error: RuntimeFailure) -> StartupError {
         RuntimeFailure::ReadinessTimedOut => StartupError::ReadinessTimedOut,
         RuntimeFailure::ReadinessCancelled => StartupError::ReadinessCancelled,
         RuntimeFailure::ReadinessFailed => StartupError::ReadinessFailed,
+        RuntimeFailure::ReadinessNative(failure) => StartupError::ReadinessNative(failure),
         RuntimeFailure::ReadinessStalled => StartupError::ReadinessStalled,
         RuntimeFailure::Bridge(message) => StartupError::RuntimeBridge(message),
         RuntimeFailure::RuntimeDisconnected => StartupError::RuntimeDisconnected,
@@ -2834,11 +2858,11 @@ fn startup_error_from_runtime_failure(error: RuntimeFailure) -> StartupError {
 }
 
 fn startup_error_from_openvr(error: crate::openvr::OpenVrError) -> StartupError {
-    StartupError::OpenVrInit(error.to_string())
+    StartupError::OpenVrInit(error.native_failure())
 }
 
 fn startup_error_from_renderer(error: crate::renderer::CaptionRenderError) -> StartupError {
-    StartupError::RendererInit(error.to_string())
+    StartupError::RendererInit(error.native_failure())
 }
 
 async fn initialize_and_connect_runtime<R>(
@@ -2927,6 +2951,7 @@ fn caption_block_for_strip(strip: &OverlaySlot) -> CaptionBlock {
 
 #[cfg(test)]
 mod tests {
+    use crate::NativeFailure;
     use super::{
         initialize_and_connect_runtime, startup_error_from_runtime_failure, FrameCycleOutcome,
         FreshRetryChannel, NativeFreshSchedule, NativePresentationOwner, OverlayRuntime,
@@ -2944,11 +2969,11 @@ mod tests {
             "bridge_failed"
         );
         assert_eq!(
-            RuntimeFailure::Render("draw".into()).failure_reason(),
+            RuntimeFailure::Render(NativeFailure::new("draw", Some(-1))).failure_reason(),
             "render_failed"
         );
         assert_eq!(
-            RuntimeFailure::OpenVr("device".into()).failure_reason(),
+            RuntimeFailure::OpenVr(NativeFailure::new("submit_frame", Some(10))).failure_reason(),
             "openvr_failed"
         );
         assert_eq!(
@@ -3962,8 +3987,8 @@ mod tests {
     async fn startup_initialization_failures_preserve_cause_without_authentication() {
         for error in [
             StartupError::SteamVrNotRunning,
-            StartupError::OpenVrInit("controlled OpenVR failure".into()),
-            StartupError::RendererInit("controlled renderer failure".into()),
+            StartupError::OpenVrInit(NativeFailure::new("openvr_init", Some(301))),
+            StartupError::RendererInit(NativeFailure::new("renderer_init", Some(-1))),
         ] {
             let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let manifest = controlled_manifest(listener.local_addr().unwrap());
@@ -4162,7 +4187,10 @@ mod tests {
             .finish_run(
                 &mut bridge,
                 &logger,
-                Err(RuntimeFailure::Render("private-token-body-path".into())),
+                Err(RuntimeFailure::Render(
+                    crate::renderer::CaptionRenderError::Draw("private-token-body-path".into())
+                        .native_failure().at("render_frame")
+                )),
             )
             .await;
         assert!(matches!(result, Err(RuntimeFailure::Render(_))));
@@ -4177,6 +4205,8 @@ mod tests {
         assert_eq!(terminal["failure_reason"], "render_failed");
         assert_eq!(terminal["primary_failure_reason"], "render_failed");
         assert_eq!(terminal["cleanup_failure_reason"], "openvr_failed");
+        assert_eq!(terminal["native_failure"]["native_stage"], "render_frame");
+        assert_eq!(terminal["cleanup_native_failure"]["native_stage"], "cleanup_hide");
         assert_eq!(terminal["diagnostic_dropped"], 0);
         assert_eq!(terminal["reliable_delivery_failures"], 0);
         assert!(!emitted.contains("private-token-body-path"));
@@ -4693,7 +4723,7 @@ mod tests {
                                         .any(|value| value["primary_failure_reason"]
                                             == "openvr_failed"));
                                     assert!(
-                                        matches!(&outcome, Err(RuntimeFailure::OpenVr(reason)) if reason == "event=process_quit")
+                                        matches!(&outcome, Err(RuntimeFailure::OpenVr(reason)) if reason.native_stage == "event_process_quit" && reason.native_code == Some(701))
                                     );
                                 }
                             } else {
@@ -4728,6 +4758,7 @@ async fn emit_startup_failure(logger: &OverlayLogger, error: &StartupError) {
         .emit_stderr_event(&json!({
             "type": "startup_error",
             "failure_reason": error.failure_reason(),
+            "native_failure": error.native_failure(),
         }))
         .await;
 }
@@ -4739,6 +4770,7 @@ async fn emit_startup_failure_to_stderr(error: &StartupError) {
         json!({
             "type": "startup_error",
             "failure_reason": error.failure_reason(),
+            "native_failure": error.native_failure(),
         })
     );
     let _ = stderr.write_all(line.as_bytes()).await;

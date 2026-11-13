@@ -6,7 +6,7 @@ import json
 from collections import Counter
 from contextlib import aclosing
 from copy import deepcopy
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from time import monotonic
@@ -22,6 +22,7 @@ from puripuly_heart.app.ports.agent_chat import (
 from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.services.agent_chat.modules import MODULE_DESCRIPTIONS
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
+from puripuly_heart.core.diagnostics import serialize_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.ui.components.agent_secure_entry import AgentSecureEntryController
 from puripuly_heart.ui.i18n import t_for_locale
@@ -248,7 +249,7 @@ class ConversationRecorder:
         self.seen_messages = len(snapshot.messages)
         for item in snapshot.tool_results:
             if (
-                (item.tool == "get_provider_setup" or item.result.get("controls_staged") is True)
+                item.result.get("controls_staged") is True
                 and item.status == "available"
                 and item.result.get("provider") in KEY_FIELDS
             ):
@@ -532,7 +533,11 @@ async def run_attempt(
                     break
                 messages += 1
                 turn_result = await owner.send(action["text"])
-                actions[-1]["result"] = asdict(turn_result)
+                actions[-1]["result"] = asdict(replace(turn_result, diagnostics=None))
+                if turn_result.diagnostics is not None:
+                    actions[-1]["result"]["diagnostics"] = serialize_diagnostics(
+                        turn_result.diagnostics
+                    )
                 if turn_result.status in {"failed", "service_unavailable", "unavailable"}:
                     result.update(
                         status="blocked", error=transport.last_error or turn_result.status
@@ -1081,32 +1086,6 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
 
     def tool(name: str, arguments: dict) -> dict:
         identity = f"smoke-{len(app.operations)}-{name}"
-        if name == "get_app_context":
-            family, request = "read_app", dict(arguments)
-        elif name == "control_app":
-            family, request = "execute_app", dict(arguments["request"])
-        elif name in {"change_settings", "propose_report"}:
-            family = "propose_app"
-            request = {"action": "settings" if name == "change_settings" else "report", **arguments}
-        else:
-            actions = {
-                "set_capture": "capture.set",
-                "set_translation": "translation.set",
-                "diagnose_microphone": "audio.diagnose",
-                "retry_osc_discovery": "osc.discovery.retry",
-                "probe_translation": "translation.probe",
-                "open_settings": "ui.settings",
-                "get_provider_setup": "ui.provider_setup",
-                "withdraw_confirmation": "confirmation.withdraw",
-            }
-            family = "execute_app"
-            if name in {"probe_self_recognition", "probe_peer_recognition"}:
-                request = {"action": "recognition.probe", "channel": name.split("_")[1]}
-            else:
-                request = {
-                    "action": actions[name],
-                    **{key: value for key, value in arguments.items() if value is not None},
-                }
         return {
             "status": "completed",
             "output": [
@@ -1114,8 +1093,8 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                     "type": "function_call",
                     "status": "completed",
                     "call_id": identity,
-                    "name": family,
-                    "arguments": json.dumps(request),
+                    "name": name,
+                    "arguments": json.dumps(arguments),
                 }
             ],
         }
@@ -1205,19 +1184,23 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
             result = answer("그건 내가 도와주는 범위 밖이야. 앱 사용 중 궁금한 건 같이 볼 수 있어.")
         elif cause == "pending_approval":
             result = (
-                tool("change_settings", {"changes": {"stt.provider": "soniox"}})
+                tool(
+                    "manage_proposal", {"action": "settings", "changes": {"stt.provider": "soniox"}}
+                )
                 if classifications == 1 and body["allow_tools"]
                 else answer("유료 변경은 적용하지 않았어. 원래 구성을 유지하려면 카드를 거절해 줘.")
             )
         elif app.scenario.category == "unsolvable":
             if not any(item.get("context", {}).get("view") == "diagnostics" for item in outputs):
-                result = tool("get_app_context", {"topic": "diagnostics"})
+                result = tool("read_app", {"topic": "diagnostics"})
             elif any(item.get("status") in {"pending", "offered"} for item in outputs):
                 result = answer(
                     "로컬 기록에서 반복되는 내부 오류를 확인했어. 설정으로 해결할 수 있는 원인은 찾지 못했어. 원하면 확인한 기록을 개발자에게 보낼 수 있어."
                 )
             else:
-                result = tool("propose_report", {"summary": "Synthetic internal failure"})
+                result = tool(
+                    "manage_proposal", {"action": "report", "summary": "Synthetic internal failure"}
+                )
         elif cause == "osc_discovery":
             if not any(
                 item.get("status") in {"observed", "unchanged"}
@@ -1225,12 +1208,12 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 and not item["context"].get("missing")
                 for item in outputs
             ):
-                result = tool("get_app_context", {"topic": "output"})
+                result = tool("read_app", {"topic": "output"})
             elif not any(
                 operation["command"] == "osc.discovery.retry"
                 for operation in app.operations.values()
             ):
-                result = tool("retry_osc_discovery", {})
+                result = tool("retry_app", {"target": "osc_discovery"})
             else:
                 receipt = next(
                     (
@@ -1253,7 +1236,7 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
             )
         elif cause in {"microphone_route", "microphone_host", "microphone_injection"}:
             if not app.diagnoses:
-                result = tool("diagnose_microphone", {})
+                result = tool("probe_app", {"target": "microphone"})
             elif not app.capture_has_speech("self"):
                 diagnosis = app.diagnoses[-1]
                 selected = next(
@@ -1263,23 +1246,24 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 )
                 result = (
                     tool(
-                        "change_settings",
+                        "manage_proposal",
                         {
+                            "action": "settings",
                             "changes": {
                                 "audio.input_host_api": selected["input_host_api"],
                                 "audio.input_device": selected["input_device"],
-                            }
+                            },
                         },
                     )
                     if body["allow_tools"]
                     else answer("검사에서 음성이 잡힌 입력 경로로 바꾸는 카드를 확인해 줘.")
                 )
             elif not app.capture_active["self"]:
-                result = tool("set_capture", {"channel": "self", "enabled": True})
+                result = tool("set_app", {"target": "capture.self", "enabled": True})
             else:
                 result = answer("입력 경로가 적용됐고 현재 받아쓰기 이벤트가 들어왔어.")
         elif cause == "capture_off" and not app.capture_active["self"]:
-            result = tool("set_capture", {"channel": "self", "enabled": True})
+            result = tool("set_app", {"target": "capture.self", "enabled": True})
         elif cause == "clipped_speech" and not app.recognition_usable("self"):
             if not any(
                 item.get("status") in {"observed", "unchanged"}
@@ -1287,7 +1271,7 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 and not item["context"].get("missing")
                 for item in outputs
             ):
-                result = tool("get_app_context", {"topic": "audio"})
+                result = tool("read_app", {"topic": "audio"})
             elif body["allow_tools"]:
                 samples = sorted(
                     {
@@ -1298,7 +1282,8 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 )
                 threshold = (samples[0] + samples[1]) / 2
                 result = tool(
-                    "change_settings", {"changes": {"self_vad.speech_threshold": threshold}}
+                    "manage_proposal",
+                    {"action": "settings", "changes": {"self_vad.speech_threshold": threshold}},
                 )
             else:
                 result = answer(
@@ -1312,7 +1297,7 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 and item.get("links")
                 for item in outputs
             ):
-                result = tool("get_provider_setup", {"provider": provider})
+                result = tool("open_app", {"view": "provider_setup", "provider": provider})
             elif provider not in app.verified:
                 result = answer(
                     "공식 키 발급 버튼을 눌러 로그인해 줘. 사용 가능한 프로젝트를 고르거나 만들고 API 키를 생성하면 돼. "
@@ -1320,7 +1305,10 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 )
             elif app.intent["stt"]["provider"] != "rolling_free":
                 result = (
-                    tool("change_settings", {"changes": {"stt.provider": "rolling_free"}})
+                    tool(
+                        "manage_proposal",
+                        {"action": "settings", "changes": {"stt.provider": "rolling_free"}},
+                    )
                     if body["allow_tools"]
                     else answer("무료 계층 자동 인식으로 바꾸는 카드야. 인식이 잠깐 끊길 수 있어.")
                 )
@@ -1330,7 +1318,10 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
             if app.intent["overlay"]["show_translation"]:
                 result = answer("번역 자막 표시 설정이 적용됐어.")
             elif body["allow_tools"]:
-                result = tool("change_settings", {"changes": {"overlay.translation.enabled": True}})
+                result = tool(
+                    "manage_proposal",
+                    {"action": "settings", "changes": {"overlay.translation.enabled": True}},
+                )
             else:
                 result = answer("번역 자막 표시를 켜는 변경 카드를 확인해 줘.")
         elif cause in {"recognition_auth", "translation_auth"}:
@@ -1339,7 +1330,9 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 result = (
                     answer("열린 보안 입력란에서 키를 확인해 줘.")
                     if last.get("type") == "function_call_output"
-                    else tool("open_settings", {"section": "api", "provider": provider})
+                    else tool(
+                        "open_app", {"view": "settings", "section": "api", "provider": provider}
+                    )
                 )
             elif any(
                 ("recognition_result" if cause == "recognition_auth" else "translation_result")
@@ -1349,23 +1342,26 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 result = answer("구성 요소 검사를 마쳤어. 실제 화면 결과와는 구분해서 볼게.")
             else:
                 result = tool(
-                    (
-                        "probe_self_recognition"
-                        if cause == "recognition_auth"
-                        else "probe_translation"
-                    ),
-                    {},
+                    "probe_app",
+                    {
+                        "target": (
+                            "recognition.self"
+                            if cause == "recognition_auth"
+                            else "translation.self"
+                        )
+                    },
                 )
         elif cause in {"slow_luna", "slow_gemma"}:
             replacement = "deepseek_v4_flash_41"
             result = (
                 tool(
-                    "change_settings",
+                    "manage_proposal",
                     {
+                        "action": "settings",
                         "changes": {
                             "translation.model": replacement,
                             "translation.connection": "openrouter",
-                        }
+                        },
                     },
                 )
                 if app.translation_times_out() and body["allow_tools"]
@@ -1393,7 +1389,7 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 and item.get("links")
                 for item in outputs
             ):
-                result = tool("get_provider_setup", {"provider": provider})
+                result = tool("open_app", {"view": "provider_setup", "provider": provider})
             elif provider not in app.verified:
                 result = answer(
                     "Open the displayed official key console, sign up or sign in, create an API key, "
@@ -1405,12 +1401,13 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
             ):
                 result = (
                     tool(
-                        "change_settings",
+                        "manage_proposal",
                         {
+                            "action": "settings",
                             "changes": {
                                 "translation.model": model,
                                 "translation.connection": connection,
-                            }
+                            },
                         },
                     )
                     if body["allow_tools"]
@@ -1421,7 +1418,7 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
         elif cause == "unused_translation_key":
             if "deepseek" not in app.verified:
                 result = (
-                    tool("open_settings", {"section": "api", "provider": "deepseek"})
+                    tool("open_app", {"view": "settings", "section": "api", "provider": "deepseek"})
                     if app.screen_provider != "deepseek"
                     else answer("가지고 있는 키를 열린 보안 입력란에 등록해 줘.")
                 )
@@ -1431,12 +1428,13 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
             ):
                 result = (
                     tool(
-                        "change_settings",
+                        "manage_proposal",
                         {
+                            "action": "settings",
                             "changes": {
                                 "translation.model": "deepseek_v4_flash_41",
                                 "translation.connection": "official_byok",
-                            }
+                            },
                         },
                     )
                     if body["allow_tools"]
@@ -1453,7 +1451,9 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
             result = (
                 answer("언어 변경 카드를 확인해 줘.")
                 if not body["allow_tools"]
-                else tool("change_settings", {"changes": {"languages": languages}})
+                else tool(
+                    "manage_proposal", {"action": "settings", "changes": {"languages": languages}}
+                )
             )
         else:
             result = answer(

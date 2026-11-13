@@ -26,6 +26,7 @@ from puripuly_heart.core.audio.ownership import (
     PeerAudioSegmentLedger,
 )
 from puripuly_heart.core.stt.backend import (
+    STTChannelAvailability,
     STTContributionConsumptionLedger,
     STTNativeProvenance,
     STTProviderEpochEnded,
@@ -1436,6 +1437,7 @@ async def test_unconfirmed_retry_safe_cleanup_keeps_resources_owned_until_reclai
         assert terminals[-1].failure_reason == "provider_not_ready"
 
         first.release.set()
+        await engine.abort(reason="toggle_off")
         await engine.handle_owned_vad_event(segments[2][0])
         await engine.handle_owned_vad_event(segments[2][2])
         terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
@@ -1559,7 +1561,10 @@ async def test_connection_cooldown_retries_new_audio_after_repeated_outages(caus
             await engine.handle_owned_vad_event(end)
         terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
         assert attempts == [0.0] * 3 + [30.0] * 3 + [60.0]
-        assert [(event.outcome, event.recovery_pending) for event in terminals] == [
+        assert [
+            (event.outcome, (event.channel_availability is STTChannelAvailability.RECOVERING))
+            for event in terminals
+        ] == [
             ("failed", True),
             ("failed", True),
             ("failed", True),
@@ -1628,7 +1633,10 @@ async def test_connection_cooldown_does_not_reopen_permanent_failures(cause: str
             await engine.handle_owned_vad_event(start)
             await engine.handle_owned_vad_event(end)
         terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
-        assert [(event.outcome, event.recovery_pending) for event in terminals] == [
+        assert [
+            (event.outcome, (event.channel_availability is STTChannelAvailability.RECOVERING))
+            for event in terminals
+        ] == [
             ("failed", False),
             ("failed", False),
         ]
@@ -1734,9 +1742,10 @@ async def test_stopping_cooldown_recovery_reclaims_late_connection(stop: str) ->
         await pending
         await wait_until(lambda: engine.cleanup_debt == 0)
         terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
-        assert [(event.outcome, event.recovery_pending) for event in terminals] == [
-            ("failed", True)
-        ]
+        assert [
+            (event.outcome, (event.channel_availability is STTChannelAvailability.RECOVERING))
+            for event in terminals
+        ] == [("failed", True)]
         assert late.requests == []
         assert ("close",) in late.calls
         assert failures == []
@@ -1761,6 +1770,7 @@ async def test_ready_then_failed_epochs_exhaust_one_recovery_episode() -> None:
                     orderly=False,
                     reason="ready_then_failed",
                     provider_turn_id=request.identity.provider_turn_id,
+                    failure_retryable=True,
                 )
             )
 
@@ -1851,7 +1861,10 @@ async def test_soniox_transient_recovers_next_utterance_without_replaying_failed
     sessions[1].terminal_on_seal = ("final", "recognized")
     await engine.handle_owned_vad_event(second_end)
     terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
-    assert [(item.outcome, item.recovery_pending) for item in terminals] == [
+    assert [
+        (item.outcome, (item.channel_availability is STTChannelAvailability.RECOVERING))
+        for item in terminals
+    ] == [
         ("failed", True),
         ("final", False),
     ]
@@ -1895,7 +1908,7 @@ async def test_soniox_write_timeout_cancels_write_and_recovers_new_epoch() -> No
     terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
     assert terminals[0].failure_reason == "provider_send_timeout"
     assert terminals[0].failure_retryable
-    assert terminals[0].recovery_pending
+    assert terminals[0].channel_availability is STTChannelAvailability.RECOVERING
     assert terminals[1].outcome == "final"
     assert len([call for call in sessions[0].calls if call[0] == "send_done"]) == 0
     assert len([call for call in sessions[1].calls if call[0] == "send"]) == 2
@@ -1941,7 +1954,9 @@ async def test_soniox_three_transient_turn_failures_exhaust_episode_and_final_re
             await engine.handle_owned_vad_event(end)
     terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
     assert len(sessions) == 3
-    assert [item.recovery_pending for item in terminals] == [True, True, False, False]
+    assert [
+        (item.channel_availability is STTChannelAvailability.RECOVERING) for item in terminals
+    ] == [True, True, False, False]
     assert [item.failure_reason for item in terminals[:3]] == ["soniox_receive_failed"] * 3
     assert delays == [0.8, 1.6]
     assert len(failures) == 1
@@ -1974,7 +1989,9 @@ async def test_soniox_three_transient_turn_failures_exhaust_episode_and_final_re
         if index != 1:
             await wait_until(lambda: ("close",) in reset_sessions[-1].calls)
     assert [
-        item.recovery_pending for item in reset_events if isinstance(item, STTProviderTurnTerminal)
+        (item.channel_availability is STTChannelAvailability.RECOVERING)
+        for item in reset_events
+        if isinstance(item, STTProviderTurnTerminal)
     ] == [True, False, True]
     await reset.close()
 
@@ -2014,7 +2031,9 @@ async def test_soniox_fatal_provider_terminal_never_opens_another_epoch(channel:
     terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
     assert len(sessions) == 1
     assert terminals[0].failure_reason == "soniox_request_failed"
-    assert not any(item.recovery_pending for item in terminals)
+    assert not any(
+        (item.channel_availability is STTChannelAvailability.RECOVERING) for item in terminals
+    )
     assert len(failures) == 1
     await engine.close()
 
@@ -2030,12 +2049,14 @@ def test_normalizer_preserves_provider_retryability_and_engine_recovery_metadata
             failure_reason="soniox_request_failed",
             epoch_disposition="retire",
             failure_retryable=True,
-            recovery_pending=True,
+            channel_availability=(
+                STTChannelAvailability.RECOVERING if True else STTChannelAvailability.UNAVAILABLE
+            ),
         )
     )
     assert normalized.failure_reason == "soniox_request_failed"
     assert normalized.failure_retryable is True
-    assert normalized.recovery_pending is True
+    assert (normalized.channel_availability is STTChannelAvailability.RECOVERING) is True
 
 
 @pytest.mark.asyncio
@@ -2436,9 +2457,10 @@ async def test_soniox_post_connect_error_releases_epochs_and_bounds_recovery(
                     assert [event.failure_retryable for event in terminals[:attempts]] == [
                         retryable
                     ] * attempts
-                    assert [event.recovery_pending for event in terminals[:attempts]] == (
-                        [True, True, False] if retryable else [False]
-                    )
+                    assert [
+                        (event.channel_availability is STTChannelAvailability.RECOVERING)
+                        for event in terminals[:attempts]
+                    ] == ([True, True, False] if retryable else [False])
                 assert delays == ([0.8, 1.6] if retryable else [])
                 assert authenticated == [True] * attempts
                 assert all("api_key" not in config for config in configurations)
@@ -4692,7 +4714,7 @@ async def test_independent_retirement_resumes_unsent_audio_without_new_local_tur
         assert terminals[0].outcome == ("failed" if open_turn else "submitted")
         assert terminals[0].independent_recognition
         if open_turn:
-            assert terminals[0].recovery_pending
+            assert terminals[0].channel_availability is STTChannelAvailability.RECOVERING
         assert failures == []
     finally:
         await engine.close()
@@ -5212,3 +5234,64 @@ async def test_failed_backend_teardown_remains_owned_and_retryable_until_resourc
     finally:
         fail = False
         await engine.close_backend_and_wait()
+
+
+async def test_readiness_exhaustion_keeps_each_attempt_without_changing_budget() -> None:
+    from puripuly_heart.core.stt.backend import STTChannelAvailability
+    from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+
+    attempts = []
+    delays = []
+    emitted = []
+    failures = []
+
+    async def factory(_settings, _epoch):
+        error = ConnectionError("PRIVATE_READINESS_DETAIL")
+        error.failure_diagnostics = recognition_failure_diagnostics(
+            error,
+            provider="soniox",
+            channel="peer",
+            operation="readiness",
+            reason="provider_not_ready",
+        )
+        error.failure_diagnostics = replace(
+            error.failure_diagnostics,
+            fields={
+                **error.failure_diagnostics.fields,
+                "channel_availability": "recovering",
+                "recovery_pending": True,
+            },
+        )
+        attempts.append(error.failure_diagnostics)
+        raise error
+
+    async def sleep(delay):
+        delays.append(delay)
+
+    engine = ScopedRecognitionEngine(
+        session_factory=factory,
+        event_sink=emitted.append,
+        terminal_failure_sink=failures.append,
+        watchdog_resolver=lambda _: STTRecognitionWatchdogs(),
+        sleep=sleep,
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
+    start, _, end = segment_events(ledger, start_sample=800, now=8.0)
+    try:
+        await engine.handle_owned_vad_event(start)
+        await engine.handle_owned_vad_event(end)
+        assert len(attempts) == 3 and delays == [0.8, 1.6]
+        aggregate = failures[0]
+        retained = {aggregate.diagnostic_id, *(cause.diagnostic_id for cause in aggregate.causes)}
+        assert {cause.diagnostic_id for cause in attempts} <= retained
+        terminal = next(event for event in emitted if isinstance(event, STTProviderTurnTerminal))
+        assert terminal.outcome == "failed"
+        assert terminal.channel_availability is STTChannelAvailability.UNAVAILABLE
+        assert terminal.failure_diagnostics.fields["channel_availability"] == "unavailable"
+        assert terminal.failure_diagnostics.fields["recovery_pending"] is False
+        assert aggregate.fields["channel_availability"] == "unavailable"
+        assert aggregate.fields["recovery_pending"] is False
+        assert any(cause.fields.get("recovery_pending") is True for cause in aggregate.causes)
+        assert "PRIVATE" not in repr(terminal.failure_diagnostics)
+    finally:
+        await engine.close()

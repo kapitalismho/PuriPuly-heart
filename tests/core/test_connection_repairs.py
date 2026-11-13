@@ -247,7 +247,7 @@ async def test_websocket_redirect_retains_tls_downgrade_rejection(certificates, 
         await destination.wait_closed()
 
 
-async def test_updater_actual_connection_failure_is_graceful(monkeypatch):
+async def test_updater_actual_connection_failure_preserves_unavailable_cause(monkeypatch):
     monkeypatch.setenv("NO_PROXY", "*")
     with socket.socket() as blocked:
         blocked.bind(("127.0.0.1", 0))
@@ -256,7 +256,14 @@ async def test_updater_actual_connection_failure_is_graceful(monkeypatch):
             "GITHUB_API_URL",
             f"http://127.0.0.1:{blocked.getsockname()[1]}/releases/latest",
         )
-        assert await updater.check_for_update() is None
+        with pytest.raises(updater.UpdateCheckError) as caught:
+            await updater.check_for_update()
+        assert isinstance(caught.value.__cause__, httpx.ConnectError)
+        diagnostics = caught.value.failure_diagnostics
+        assert diagnostics.code == "updater_check_failed"
+        assert diagnostics.category == "network"
+        assert diagnostics.status_code is None
+        assert diagnostics.fields["exception_class"] == "unclassified"
 
 
 async def test_updater_actual_release_request_succeeds(monkeypatch):

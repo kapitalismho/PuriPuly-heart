@@ -25,6 +25,12 @@ from puripuly_heart.core.audio.audio_test_vad import (
     AudioTestVadSettings,
 )
 from puripuly_heart.core.diagnostic_codes import AUDIO_DIAGNOSE_FAILURE_CODES
+from puripuly_heart.core.diagnostics import (
+    deserialize_diagnostics,
+    exception_diagnostics,
+    serialize_diagnostics,
+)
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.audio_test import AudioTestCaptureRuntime
 
@@ -53,6 +59,9 @@ def _idle_channel_snapshot() -> dict[str, object]:
         "state": "off",
         "failure_reason": None,
         "failure_type": None,
+        "diagnostics": None,
+        "secondary_diagnostics": [],
+        "recovery_diagnostics": [],
         "device": {},
         "meter_level": 0.0,
         "speech_probability": 0.0,
@@ -67,6 +76,10 @@ class _ChannelSession:
     state: str = "off"
     failure_reason: str | None = None
     failure_type: str | None = None
+    diagnostics: ErrorDiagnostics | None = None
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
+    recovery_diagnostics: tuple[ErrorDiagnostics, ...] = ()
     device: dict[str, object] = field(default_factory=dict)
     meter_level: float = 0.0
     speech_probability: float = 0.0
@@ -79,9 +92,29 @@ class _ChannelSession:
         self.state = "off"
         self.failure_reason = None
         self.failure_type = None
+        self.diagnostics = None
+        self.secondary_diagnostics = ()
+        self.secondary_omitted_count = 0
+        self.recovery_diagnostics = ()
         self.device = {}
         self.clear_observation()
         self.probe = None
+
+    def retain_failure(self, diagnostics: ErrorDiagnostics) -> None:
+        if self.diagnostics is None:
+            self.diagnostics = diagnostics
+        elif diagnostics.diagnostic_id != self.diagnostics.diagnostic_id:
+            self.retain_secondary(diagnostics)
+
+    def retain_secondary(self, diagnostics: ErrorDiagnostics) -> None:
+        if any(
+            item.diagnostic_id == diagnostics.diagnostic_id for item in self.secondary_diagnostics
+        ):
+            return
+        if len(self.secondary_diagnostics) < 4:
+            self.secondary_diagnostics += (diagnostics,)
+        else:
+            self.secondary_omitted_count += 1
 
     def clear_observation(self) -> None:
         self.meter_level = 0.0
@@ -97,6 +130,18 @@ class _ChannelSession:
             "state": self.state,
             "failure_reason": self.failure_reason,
             "failure_type": self.failure_type,
+            "diagnostics": (
+                serialize_diagnostics(self.diagnostics) if self.diagnostics is not None else None
+            ),
+            "secondary_diagnostics": [
+                serialize_diagnostics(item) for item in self.secondary_diagnostics
+            ],
+            "secondary_omitted_count": self.secondary_omitted_count,
+            "secondary_truncated": self.secondary_omitted_count > 0,
+            "device_metadata_availability": self.device.get("metadata_availability", "unknown"),
+            "recovery_diagnostics": [
+                serialize_diagnostics(item) for item in self.recovery_diagnostics
+            ],
             "device": dict(self.device),
             "meter_level": self.meter_level,
             "speech_probability": self.speech_probability,
@@ -278,7 +323,17 @@ class AudioTestSessionOwner:
                     try:
                         plan = self.plan_factory(channel)
                     except Exception as exc:
-                        self._fail_session(session, "unavailable", type(exc).__name__)
+                        self._fail_session(
+                            session,
+                            "unavailable",
+                            type(exc).__name__,
+                            exception_diagnostics(
+                                exc,
+                                component="audio_test",
+                                operation="audio.test",
+                                code="source_open_failed",
+                            ),
+                        )
                         self._emit("plan_failed", {"channel": channel}, exc)
                         continue
                     try:
@@ -372,6 +427,12 @@ class AudioTestSessionOwner:
                             raise
                         except Exception as exc:
                             item.failure_code = "session_start_failed"
+                            item.diagnostics = exception_diagnostics(
+                                exc,
+                                component="audio_test",
+                                operation="audio.test",
+                                code="session_start_failed",
+                            )
                             self._emit("diagnose_start_failed", {"channel": "self"}, exc)
                         finally:
                             item.elapsed_ms = int(
@@ -411,6 +472,18 @@ class AudioTestSessionOwner:
                         )
                 diagnosis["restoration"] = dict(self._restoration_status)
                 diagnosis["candidates"] = [item.snapshot() for item in evidence]
+                diagnosis["secondary_diagnostics"] = [
+                    serialize_diagnostics(item)
+                    for session in self._sessions.values()
+                    for item in (
+                        *((session.diagnostics,) if session.diagnostics is not None else ()),
+                        *session.secondary_diagnostics,
+                    )
+                ]
+                diagnosis["secondary_omitted_count"] = sum(
+                    session.secondary_omitted_count for session in self._sessions.values()
+                )
+                diagnosis["secondary_truncated"] = diagnosis["secondary_omitted_count"] > 0
                 selected = max(evidence, key=lambda item: item.selection_rank, default=None)
                 if selected is not None and selected.selection_rank:
                     diagnosis["selected_candidate_id"] = f"input-{selected.candidate.device_index}"
@@ -562,27 +635,42 @@ class AudioTestSessionOwner:
         generation: int,
         reason: str,
         error_type: str | None,
+        diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
         session = self._current(channel, generation)
         if session is None:
             return
-        self._fail_session(session, reason, error_type)
+        self._fail_session(session, reason, error_type, diagnostics)
         if self._diagnostic_evidence is not None and channel == "self":
             self._diagnostic_evidence.failure_code = self._diagnostic_evidence.failure_code or (
                 reason if reason in AUDIO_DIAGNOSE_FAILURE_CODES else "capture_failed"
             )
+            if diagnostics is not None:
+                self._diagnostic_evidence.retain_failure(diagnostics)
 
     def set_device(
         self,
         channel: AudioTestChannel,
         generation: int,
         device: Mapping[str, object],
+        recovery_diagnostics: tuple[ErrorDiagnostics, ...] = (),
     ) -> None:
         session = self._current(channel, generation)
         if session is not None:
-            session.device = dict(device)
+            session.device = {key: value for key, value in device.items() if key != "diagnostics"}
+            session.recovery_diagnostics = recovery_diagnostics
+            metadata_diagnostics = device.get("diagnostics")
+            if isinstance(metadata_diagnostics, Mapping):
+                metadata_diagnostics = deserialize_diagnostics(metadata_diagnostics)
+                session.retain_secondary(metadata_diagnostics)
             if self._diagnostic_evidence is not None and channel == "self":
                 self._diagnostic_evidence.opened = True
+                self._diagnostic_evidence.recovery_diagnostics = recovery_diagnostics
+                self._diagnostic_evidence.device_metadata_availability = device.get(
+                    "metadata_availability", "unknown"
+                )
+                if isinstance(metadata_diagnostics, ErrorDiagnostics):
+                    self._diagnostic_evidence.retain_secondary(metadata_diagnostics)
                 self._emit(
                     "diagnose_opened",
                     {
@@ -630,7 +718,15 @@ class AudioTestSessionOwner:
             try:
                 probe = await run_owned_thread_call(lambda: plan.probe_factory(settings))
             except Exception as exc:
-                self.mark_failure(channel, generation, "vad_unavailable", type(exc).__name__)
+                self.mark_failure(
+                    channel,
+                    generation,
+                    "vad_unavailable",
+                    type(exc).__name__,
+                    exception_diagnostics(
+                        exc, component="audio_test", operation="audio.test", code="vad_unavailable"
+                    ),
+                )
                 self._emit("vad_unavailable", {"channel": channel}, exc)
                 return
             if self._current(channel, generation) is None:
@@ -644,13 +740,16 @@ class AudioTestSessionOwner:
                     opener=plan.opener,
                     ready_on_open=plan.ready_on_open,
                     frame_timeout_s=plan.frame_timeout_s,
-                    opened_callback=lambda gen, device: self.set_device(channel, gen, device),
+                    opened_callback=lambda gen, device, recovery: self.set_device(
+                        channel, gen, device, recovery
+                    ),
                     ready_callback=lambda gen: self.mark_ready(channel, gen),
-                    failure_callback=lambda gen, reason, error_type: self.mark_failure(
+                    failure_callback=lambda gen, reason, error_type, diagnostics: self.mark_failure(
                         channel,
                         gen,
                         reason,
                         error_type,
+                        diagnostics,
                     ),
                     frame_callback=lambda gen, frame: self.observe_frame(channel, gen, frame),
                 ),
@@ -659,7 +758,15 @@ class AudioTestSessionOwner:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self.mark_failure(channel, generation, "capture_failed", type(exc).__name__)
+            self.mark_failure(
+                channel,
+                generation,
+                "capture_failed",
+                type(exc).__name__,
+                exception_diagnostics(
+                    exc, component="audio_test", operation="audio.test", code="capture_failed"
+                ),
+            )
             self._emit("session_failed", {"channel": channel}, exc)
         finally:
             self._end_session(channel, generation)
@@ -692,7 +799,17 @@ class AudioTestSessionOwner:
                         await session.runtime.stop()
                 except Exception as exc:
                     failures.append(exc)
-                    self._fail_session(session, "resource_release_incomplete", type(exc).__name__)
+                    self._fail_session(
+                        session,
+                        "resource_release_incomplete",
+                        type(exc).__name__,
+                        exception_diagnostics(
+                            exc,
+                            component="audio_test",
+                            operation="audio.test",
+                            code="resource_release_incomplete",
+                        ),
+                    )
                 else:
                     if session.runtime.has_resources:
                         self._fail_session(session, "resource_release_incomplete", None)
@@ -716,6 +833,12 @@ class AudioTestSessionOwner:
                     self._session(channel),
                     "resource_release_incomplete",
                     type(initial.close_exception).__name__,
+                    exception_diagnostics(
+                        initial.close_exception,
+                        component="audio_test",
+                        operation="audio.test",
+                        code="resource_release_incomplete",
+                    ),
                 )
                 return False
             if not initial.busy:
@@ -735,7 +858,15 @@ class AudioTestSessionOwner:
                     f"cause={type(exc).__name__}"
                 )
                 self._fail_session(
-                    self._session(channel), "capture_pause_failed", type(exc).__name__
+                    self._session(channel),
+                    "capture_pause_failed",
+                    type(exc).__name__,
+                    exception_diagnostics(
+                        exc,
+                        component="audio_test",
+                        operation="audio.test",
+                        code="capture_pause_failed",
+                    ),
                 )
                 return False
             finally:
@@ -781,6 +912,7 @@ class AudioTestSessionOwner:
                 self._restoration_status[channel] = "restored"
             except Exception as exc:
                 self._restoration_status[channel] = "failed"
+                self._emit("restore_failed", {"channel": channel}, exc)
                 self._log(
                     f"[AudioTest] channel={channel} failed to restore translation capture "
                     f"cause={type(exc).__name__}"
@@ -817,10 +949,28 @@ class AudioTestSessionOwner:
         return session
 
     @staticmethod
-    def _fail_session(session: _ChannelSession, reason: str, error_type: str | None) -> None:
+    def _fail_session(
+        session: _ChannelSession,
+        reason: str,
+        error_type: str | None,
+        diagnostics: ErrorDiagnostics | None = None,
+    ) -> None:
         session.state = "failed"
         session.failure_reason = reason
         session.failure_type = error_type
+        if diagnostics is None:
+            diagnostics = ErrorDiagnostics(
+                component="audio_test",
+                operation="audio.test",
+                code=reason if reason in AUDIO_DIAGNOSE_FAILURE_CODES else "capture_failed",
+                category="lifecycle",
+                visibility="diagnostic_only",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={},
+            )
+        session.retain_failure(diagnostics)
         session.clear_observation()
         session.settle(False)
 
@@ -847,7 +997,10 @@ class AudioTestSessionOwner:
 
     def _log(self, message: str) -> None:
         if self.log_sink is not None:
-            self.log_sink(message)
+            try:
+                self.log_sink(message)
+            except Exception:
+                pass
 
     def _emit(
         self,
@@ -855,6 +1008,23 @@ class AudioTestSessionOwner:
         metadata: Mapping[str, object],
         exception: BaseException | None = None,
     ) -> None:
+        if exception is not None:
+            channel = metadata.get("channel")
+            session = self._sessions.get(channel)
+            if session is not None and (
+                session.diagnostics is None
+                or event in {"diagnose_cleanup_failed", "cleanup_retry_failed", "restore_failed"}
+            ):
+                diagnostics = exception_diagnostics(
+                    exception,
+                    component="audio_test",
+                    operation="audio.test",
+                    code=event if event in AUDIO_DIAGNOSE_FAILURE_CODES else "capture_failed",
+                    fields={"channel": channel},
+                )
+                session.retain_failure(diagnostics)
+                if self._diagnostic_evidence is not None:
+                    self._diagnostic_evidence.retain_failure(diagnostics)
         if self.diagnostics_sink is None:
             return
         try:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import contextlib
 import logging
 import time
 from dataclasses import dataclass, field, replace
@@ -12,6 +11,7 @@ from typing import Any, AsyncIterator, Callable, Sequence
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
@@ -25,7 +25,11 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTSessionProjection,
 )
-from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+from puripuly_heart.core.stt.diagnostics import (
+    recognition_cleanup_failure,
+    recognition_failure_diagnostics,
+    retryable_transport_failure,
+)
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
@@ -246,6 +250,9 @@ class ElevenLabsScribeSTTBackend(STTBackend):
     connect_timeout_s: float = 10.0
     keepalive_interval_s: float = ELEVENLABS_SCRIBE_KEEPALIVE_INTERVAL_S
     scribe_connect_factory: Callable[[Any], Any] | None = None
+    _starting_sessions: list[STTBackendSession] = field(
+        init=False, default_factory=list, repr=False
+    )
 
     async def open_session(
         self,
@@ -261,6 +268,8 @@ class ElevenLabsScribeSTTBackend(STTBackend):
         if self.keepalive_interval_s <= 0:
             raise ValueError("keepalive_interval_s must be > 0")
 
+        if self._starting_sessions:
+            await self.close()
         session = _ElevenLabsScribeSession(
             api_key=self.api_key,
             language_code=scribe_language_code(self.language_code),
@@ -274,11 +283,31 @@ class ElevenLabsScribeSTTBackend(STTBackend):
         )
         try:
             await session.start()
-        except BaseException:
-            with contextlib.suppress(BaseException):
+        except BaseException as primary:
+            diagnostics = recognition_failure_diagnostics(
+                primary,
+                provider="elevenlabs_scribe",
+                channel=None,
+                operation="readiness",
+                reason="provider_not_ready",
+            )
+            primary.failure_diagnostics = diagnostics
+            session._failure_diagnostics = diagnostics
+            try:
                 await session.close()
+            except Exception as cleanup:
+                self._starting_sessions.append(session)
+                primary.failure_diagnostics = replace(
+                    diagnostics,
+                    causes=(*diagnostics.causes, cleanup.failure_diagnostics),
+                )
             raise
         return session
+
+    async def close(self) -> None:
+        for session in tuple(self._starting_sessions):
+            await session.close()
+            self._starting_sessions.remove(session)
 
     @staticmethod
     async def verify_api_key(
@@ -327,6 +356,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
     _pending_committed: tuple[STTProviderTurnIdentity, str, STTNativeProvenance] | None = field(
         init=False, default=None, repr=False
     )
+    _failure_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
@@ -563,6 +593,17 @@ class _ElevenLabsScribeSession(STTBackendSession):
             reason=reason,
             identity=identity,
         )
+        if self._failure_diagnostics is None and not orderly:
+            self._failure_diagnostics = diagnostics
+        retryable = reason in {
+            "scribe_session_time_limit_exceeded",
+            "scribe_insufficient_audio_activity",
+            "scribe_connection_closed",
+            "scribe_connection_ended",
+            "scribe_rate_limited",
+            "scribe_resource_exhausted",
+            "scribe_server_error",
+        } or retryable_transport_failure(exception)
         if identity is not None:
             self._event_projection.terminal(
                 STTProviderTurnTerminal(
@@ -571,6 +612,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
                     text_authority="none",
                     failure_reason=reason,
                     epoch_disposition="retire",
+                    failure_retryable=retryable,
                     provenance=tuple(self._scoped_provenance),
                     failure_diagnostics=diagnostics,
                 )
@@ -580,6 +622,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
             orderly=orderly,
             reason=reason,
             provider_turn_id=provider_turn_id,
+            failure_retryable=retryable,
             failure_diagnostics=diagnostics,
         )
 
@@ -762,10 +805,21 @@ class _ElevenLabsScribeSession(STTBackendSession):
             await asyncio.gather(*tasks, return_exceptions=True)
         self._put_event(None)
         if self._connection is not None:
-            with contextlib.suppress(Exception):
+            try:
                 result = self._connection.close()
                 if asyncio.iscoroutine(result):
                     await result
+            except Exception as exc:
+                diagnostics = recognition_cleanup_failure(
+                    exc,
+                    provider="elevenlabs_scribe",
+                    channel=self._event_projection.channel,
+                    primary=self._failure_diagnostics,
+                )
+                emit_failure(
+                    logger, diagnostics, severity="warning", disposition="degraded", stage="cleanup"
+                )
+                raise
             self._connection = None
         self._event_projection.close()
 

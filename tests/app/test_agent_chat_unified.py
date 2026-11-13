@@ -11,12 +11,15 @@ from puripuly_heart.app.services.agent_chat.execution import validate_app_reques
 from puripuly_heart.app.services.agent_chat.modules import model_context
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from tests.app.test_agent_chat import Records, Responses, answer
-from tests.app.test_agent_chat_control_execution import ExecutionControl
+from tests.app.test_agent_chat_control_execution import ExecutionControl, tools_for
 from tests.app.test_agent_chat_tools import catalog as catalog
+from tests.app.test_diagnostic_consumers import PRIVATE, HistorySink, failure
 
 
 def call(identity, family, action, **arguments):
-    key = "topic" if family == "read_app" else "action"
+    key = {"read_app": "topic", "open_app": "view", "manage_proposal": "action"}.get(
+        family, "target"
+    )
     return {
         "type": "function_call",
         "status": "completed",
@@ -31,30 +34,64 @@ def batch(*calls):
 
 
 @pytest.mark.asyncio
-async def test_three_topic_reads_keep_independent_results_on_partial_failure(catalog):
+@pytest.mark.parametrize("failure_mode", ["query", "exception", "cancelled"])
+async def test_three_topic_reads_keep_independent_results_on_partial_failure(
+    catalog, monkeypatch, failure_mode
+):
     control = Records()
     control.values["settings.choices"] = catalog
     control.fail.add("gpu.status")
+    original = failure()
     transport = Responses(
         batch(
             call("output", "read_app", "output"),
-            call("gpu", "read_app", "gpu", provider="soniox"),
+            call("gpu", "read_app", "gpu" if failure_mode == "query" else "general"),
             call("diagnostics", "read_app", "diagnostics"),
         ),
+        batch(call("report", "manage_proposal", "report", summary="Synthetic read failure.")),
         answer(),
     )
     owner = AgentChatOwner(control, transport, localize=str)
     await owner.start()
+    context = owner._context
+
+    async def controlled_context(**arguments):
+        if failure_mode != "query" and arguments.get("topic") == "general":
+            if failure_mode == "cancelled":
+                raise asyncio.CancelledError
+            error = RuntimeError(PRIVATE)
+            error.failure_diagnostics = original
+            raise error
+        return await context(**arguments)
+
+    monkeypatch.setattr(owner, "_context", controlled_context)
     try:
         result = await owner.send("Inspect OSC, GPU and diagnostics.")
         assert [(item.call_id, item.status) for item in result.tool_results] == [
             ("output", "unchanged"),
             ("gpu", "unavailable"),
             ("diagnostics", "observed"),
+            ("report", "pending"),
         ]
         diagnostics = result.tool_results[2].result["context"]
         assert diagnostics["view"] == "diagnostics" and "core" not in diagnostics
-        assert len(transport.requests) == 2
+        assert len(transport.requests) == 3
+        failed = result.tool_results[1].result
+        if failure_mode == "exception":
+            cause = failed["diagnostics"]
+            assert cause["code"] == "agent_tool_failed"
+            assert cause["fields"]["exception_class"] == "RuntimeError"
+            (origin,) = cause["causes"]
+            assert origin["diagnostic_id"] == original.diagnostic_id
+            assert origin["status_code"] == 403
+            assert cause["disposition"] == "failed"
+            assert cause["file_evidence"] == "unavailable"
+            assert original.diagnostic_id in json.dumps(transport.requests[1]["input"])
+        elif failure_mode == "cancelled":
+            assert "diagnostics" not in failed
+        assert all(request["allow_tools"] for request in transport.requests)
+        assert len(owner.snapshot.report_offers) == 1
+        assert PRIVATE not in json.dumps([item.result for item in result.tool_results])
     finally:
         await owner.close()
 
@@ -77,13 +114,13 @@ async def test_failed_read_blocks_later_action_and_recovers_on_next_turn(catalog
         batch(
             call("failed-gpu", "read_app", "gpu"),
             call("independent-before", "read_app", "general"),
-            call("blocked-overlay", "execute_app", "overlay.set", enabled=True),
+            call("blocked-overlay", "set_app", "overlay", enabled=True),
             call("independent-after", "read_app", "general"),
         ),
         answer(),
         batch(
             call("recovered-gpu", "read_app", "gpu"),
-            call("allowed-overlay", "execute_app", "overlay.set", enabled=True),
+            call("allowed-overlay", "set_app", "overlay", enabled=True),
         ),
         answer(),
     )
@@ -146,18 +183,17 @@ async def test_read_action_read_observes_order_and_proposal_stops_effects(catalo
     transport = Responses(
         batch(
             call("before", "read_app", "general"),
-            call("execute", "execute_app", "overlay.set", enabled=True, channel="self"),
+            call("execute", "set_app", "overlay", enabled=True),
             call("after", "read_app", "general"),
         ),
         batch(
             call(
                 "proposal",
-                "propose_app",
+                "manage_proposal",
                 "settings",
                 changes={"overlay.background_alpha": 0.4},
-                summary="Adjust overlay transparency",
             ),
-            call("blocked", "execute_app", "overlay.set", enabled=False),
+            call("blocked", "set_app", "overlay", enabled=False),
         ),
         answer(),
     )
@@ -184,8 +220,7 @@ async def test_read_action_read_observes_order_and_proposal_stops_effects(catalo
     ("provider", "canonical_provider", "secret_key"),
     [
         ("openrouter", "openrouter", "openrouter_api_key"),
-        ("google", "gemini", "gemini_api_key"),
-        ("gemini_transcribe", "gemini", "gemini_api_key"),
+        ("gemini", "gemini", "gemini_api_key"),
     ],
 )
 async def test_pure_provider_read_does_not_replace_staged_secure_entry(
@@ -193,7 +228,7 @@ async def test_pure_provider_read_does_not_replace_staged_secure_entry(
 ):
     control = ExecutionControl(catalog)
     transport = Responses(
-        batch(call("stage", "execute_app", "ui.provider_setup", provider=provider)),
+        batch(call("stage", "open_app", "provider_setup", provider=provider)),
         answer(),
         batch(call("read", "read_app", "provider_setup", provider="deepseek")),
         answer(),
@@ -226,16 +261,18 @@ async def test_pure_provider_read_does_not_replace_staged_secure_entry(
 @pytest.mark.asyncio
 async def test_flat_requests_reject_unknown_null_invalid_and_missing_values(catalog):
     for family, request in (
-        ("propose_app", {"action": "settings", "changes": {"overlay.background_alpha": None}}),
-        ("propose_app", {"action": "settings", "changes": {"private": "value"}}),
-        ("execute_app", {"action": "capture.set", "channel": "self"}),
-        ("execute_app", {"action": "recognition.probe", "channel": "both"}),
-        ("execute_app", {"action": "auth.login", "provider": "chatgpt"}),
+        ("manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": None}}),
+        ("manage_proposal", {"action": "settings", "changes": {"private": "value"}}),
+        ("manage_proposal", {"action": "secrets.delete", "name": "google_api_key"}),
+        ("manage_proposal", {"action": "secrets.delete", "name": "gemini_transcribe_api_key"}),
+        ("set_app", {"target": "capture.self"}),
+        ("probe_app", {"target": "recognition.both"}),
+        ("open_app", {"view": "auth.login", "provider": "chatgpt"}),
         ("read_app", {"topic": "settings.current"}),
         ("read_app", {"topic": "provider_setup"}),
         ("read_app", {"request": {"topic": "overview"}}),
         (
-            "propose_app",
+            "manage_proposal",
             {
                 "action": "settings",
                 "changes": {
@@ -248,7 +285,7 @@ async def test_flat_requests_reject_unknown_null_invalid_and_missing_values(cata
         with pytest.raises(ValueError):
             validate_app_request(family, request, catalog)
     assert validate_app_request(
-        "propose_app",
+        "manage_proposal",
         {
             "action": "settings",
             "changes": {
@@ -258,9 +295,18 @@ async def test_flat_requests_reject_unknown_null_invalid_and_missing_values(cata
         },
         catalog,
     )["changes"] == {"translation.model": "gemma4_26b_31b", "translation.connection": "openrouter"}
-    assert validate_app_request(
-        "execute_app", {"action": "ui.settings", "section": "api", "provider": None}, catalog
-    ) == {"action": "ui.settings", "section": "api"}
+    for request in (
+        {"view": "settings", "section": "api", "provider": None},
+        {"target": "overlay", "enabled": True, "channel": "self"},
+        {"action": "report", "summary": "Failure", "changes": {}},
+    ):
+        family = (
+            "open_app"
+            if "view" in request
+            else "set_app" if "target" in request else "manage_proposal"
+        )
+        with pytest.raises(ValueError):
+            validate_app_request(family, request, catalog)
 
 
 @pytest.mark.asyncio
@@ -289,13 +335,13 @@ async def test_flat_requests_reject_unknown_null_invalid_and_missing_values(cata
         ),
     ],
 )
-async def test_flat_approval_requests_ignore_other_actions_without_extra_effects(
+async def test_flat_approval_requests_reject_other_actions_without_extra_effects(
     catalog, action, arguments, expected
 ):
     control = ExecutionControl(catalog)
     control.accounts = {"chatgpt": {"signed_in": True}}
     transport = Responses(
-        batch(call("proposal", "propose_app", action, summary="Requested change", **arguments)),
+        batch(call("proposal", "manage_proposal", action, summary="Requested change", **arguments)),
         answer(),
         answer(),
     )
@@ -303,26 +349,9 @@ async def test_flat_approval_requests_ignore_other_actions_without_extra_effects
     await owner.start()
     try:
         result = await owner.send("Apply the requested change.")
-        assert [item.status for item in result.tool_results] == ["needs_confirmation"]
-        card = owner.snapshot.confirmation
-        assert card["changes"] == expected
+        assert [item.status for item in result.tool_results] == ["rejected"]
+        assert owner.snapshot.confirmation is None
         assert not control.submissions
-        applied = await owner.confirm(card["id"], True)
-        assert applied["status"] == "applied"
-        if action == "settings":
-            assert control.submissions == [{"changes": expected, "expected_revision": 11}]
-        else:
-            assert control.submissions == [
-                {
-                    "command": action,
-                    "arguments": {
-                        key: value
-                        for key, value in arguments.items()
-                        if key != "changes" and action != "overlay.position.reset"
-                    },
-                    "revision": 11,
-                }
-            ]
     finally:
         await owner.close()
 
@@ -362,9 +391,12 @@ async def test_stop_keeps_accepted_operation_once_and_rejects_late_results(catal
     control = Held(catalog)
     transport = Responses(
         batch(
-            call("accepted", "execute_app", "overlay.set", enabled=True),
+            call("accepted", "set_app", "overlay", enabled=True),
             call(
-                "unapproved", "propose_app", "settings", changes={"overlay.background_alpha": 0.4}
+                "unapproved",
+                "manage_proposal",
+                "settings",
+                changes={"overlay.background_alpha": 0.4},
             ),
         )
     )
@@ -402,16 +434,16 @@ async def test_uncertain_wait_reconciles_same_receipt_before_later_effects(catal
 
     control = Uncertain(catalog)
     transport = Responses(
-        batch(call("original", "execute_app", "recognition.probe", channel="self")),
+        batch(call("original", "probe_app", "recognition.self")),
         answer("The accepted operation is still pending."),
         batch(
             call("receipt", "read_app", "operation", operation_id="op-1"),
-            call("blocked", "execute_app", "translation.set", enabled=True),
+            call("blocked", "set_app", "translation", enabled=True),
         ),
-        answer("Wait for the existing operation, without resubmitting it."),
+        batch(call("independent", "set_app", "overlay", enabled=True)),
+        answer("The existing probe is pending; an unrelated switch remains available."),
         batch(
             call("completed", "read_app", "operation", operation_id="op-1"),
-            call("later", "execute_app", "translation.set", enabled=True),
         ),
         answer("The earlier receipt is complete; the next operation was accepted."),
     )
@@ -428,7 +460,11 @@ async def test_uncertain_wait_reconciles_same_receipt_before_later_effects(catal
         assert outputs["receipt"]["status"] == "pending"
         assert outputs["receipt"]["receipt"]["request_id"] == "original"
         assert outputs["blocked"]["status"] == "not_executed"
-        assert [item["command"] for item in control.submissions] == ["recognition.probe"]
+        assert outputs["independent"]["status"] == "pending"
+        assert [item["command"] for item in control.submissions] == [
+            "recognition.probe",
+            "overlay.set",
+        ]
         control.operations["op-1"].update(
             status="applied",
             terminal=True,
@@ -441,7 +477,7 @@ async def test_uncertain_wait_reconciles_same_receipt_before_later_effects(catal
         await owner.send("Now enable translation.")
         assert [item["command"] for item in control.submissions] == [
             "recognition.probe",
-            "translation.set",
+            "overlay.set",
         ]
         completed = next(
             json.loads(item["output"])
@@ -463,8 +499,8 @@ async def test_settings_ui_stops_dependent_actions_until_user_continuation(catal
     control = ExecutionControl(catalog)
     transport = Responses(
         batch(
-            call("settings", "execute_app", "ui.settings", section="api", provider="deepseek"),
-            call("premature", "execute_app", "translation.set", enabled=True),
+            call("settings", "open_app", "settings", section="api", provider="deepseek"),
+            call("premature", "set_app", "translation", enabled=True),
         ),
         answer("Use the displayed secure field before continuing."),
     )
@@ -487,3 +523,415 @@ async def test_settings_ui_stops_dependent_actions_until_user_continuation(catal
         assert control.submissions == []
     finally:
         await owner.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("compound", [False, True])
+async def test_failed_peer_owner_probe_continues_to_diagnostics_and_user_click_report(compound):
+    import httpx
+
+    from puripuly_heart.core.llm.fallback_racing import LLMProviderRaceError
+    from tests.app.test_agent_chat_report import ReportResponses, contents
+    from tests.app.test_translation_probe import ControlledBackend, control_for
+
+    errors = tuple(
+        httpx.HTTPStatusError(
+            PRIVATE,
+            request=httpx.Request("POST", "https://example.invalid/private"),
+            response=httpx.Response(status, json={"message": PRIVATE}),
+        )
+        for status in (403, 403, 404)
+    )
+    backend = ControlledBackend(
+        failure=LLMProviderRaceError(errors) if compound else httpx.ConnectError("PRIVATE-ENDPOINT")
+    )
+    production, runtime = control_for(
+        backend,
+        source_language="ko",
+        target_language="en",
+        secondary_target_language="de",
+        peer_source_language="ja",
+        peer_target_language="ko",
+    )
+    sink = HistorySink(production.instance_id)
+    production.application._runtime_logging = sink
+
+    class LinkedControl(Records):
+        async def query(self, name, arguments):
+            if name in {"diagnostics.history", "diagnostics.health"}:
+                self.queries.append((name, arguments))
+                return await production.query(name, arguments)
+            if name == "settings.choices":
+                self.queries.append((name, arguments))
+                raise RuntimeError("Settings catalog unavailable")
+            return await super().query(name, arguments)
+
+        async def submit(self, *args, **kwargs):
+            return await production.submit(*args, **kwargs)
+
+        async def wait(self, *args, **kwargs):
+            return await production.wait(*args, **kwargs)
+
+        async def operation(self, identity):
+            return await production.operation(identity)
+
+    control = LinkedControl()
+
+    class LinkedResponses(ReportResponses):
+        async def respond(self, **request):
+            catalog_counts.append(sum(name == "settings.choices" for name, _ in control.queries))
+            async for event in super().respond(**request):
+                yield event
+
+    catalog_counts = []
+    transport = LinkedResponses(
+        batch(
+            call("peer-0123456789abcdef", "probe_app", "translation.peer"),
+            call("dependent", "set_app", "overlay", enabled=True),
+            call("diagnostics", "read_app", "diagnostics"),
+        ),
+        batch(
+            call(
+                "report",
+                "manage_proposal",
+                "report",
+                summary="Peer translation failed during the isolated provider check.",
+            )
+        ),
+        answer(
+            "The isolated Peer check failed. Review the report card to send the retained evidence."
+        ),
+    )
+    owner = AgentChatOwner(
+        control, transport, localize=str, support_log_snapshot=lambda: b"synthetic log\n"
+    )
+    try:
+        await owner.start()
+        result = await owner.send(
+            "Check Peer translation, inspect the failure and offer a developer report."
+        )
+        assert [(item.call_id, item.status) for item in result.tool_results] == [
+            ("peer-0123456789abcdef", "failed"),
+            ("dependent", "not_executed"),
+            ("diagnostics", "observed"),
+            ("report", "pending"),
+        ]
+        receipt = result.tool_results[0].result["receipt"]
+        assert receipt["channel"] == "peer"
+        assert receipt["source_language"] == "ja" and receipt["target_languages"] == ["ko"]
+        assert receipt["translation_result"] == "failed"
+        assert receipt["failure_category"] == ("unknown" if compound else "network")
+        assert receipt["output_delivery"] == receipt["display"] == "not_exercised"
+        assert backend.requests[0].source_language == "ja"
+        assert backend.requests[0].target_language == "ko"
+        assert len(backend.requests) == 1
+        assert result.tool_results[2].result["context"]["view"] == "diagnostics"
+        cause = receipt["diagnostics"]
+        assert cause["code"] == ("provider.compound_failure" if compound else "provider.network")
+        assert cause["request_id"] == receipt["request_id"] == "peer-0123456789abcdef"
+        assert cause["operation_id"] == receipt["operation_id"]
+        assert cause["turn_id"] == str(backend.requests[0].utterance_id)
+        assert receipt["target_results"][0]["diagnostic_id"] == cause["diagnostic_id"]
+        history = await production.query(
+            "diagnostics.history", {"operation_id": receipt["operation_id"]}
+        )
+        assert history["records"] == [cause]
+        diagnostics = result.tool_results[2].result["context"]["diagnostics"]["records"]
+        compact = model_context(await owner._context(), modules=("core",))
+        (operation,) = compact["core"]["operations"]
+        assert operation["channel"] == "peer"
+        assert operation["tool"] == "translation.probe"
+        assert operation["operation_id"] == receipt["operation_id"]
+        assert operation["target_results"][0]["turn_id"] == cause["turn_id"]
+        assert all(request["allow_tools"] for request in transport.requests)
+        assert len(transport.requests) == 3
+        assert catalog_counts[1] == catalog_counts[2]
+        assert not transport.uploads
+        (offer,) = owner.snapshot.report_offers
+        assert offer.status == "offered"
+        assert owner.mark_report_displayed(offer.id)["status"] == "displayed"
+        uploaded = await owner.send_report(offer.id)
+        assert uploaded["status"] == "sent"
+        assert len(transport.uploads) == 1
+        meta = json.loads(contents(transport.uploads[0]["bundle"])["meta.json"])
+        assert meta["diagnostics"]["availability"] == "retained_current_run"
+        for projected in (
+            cause,
+            diagnostics[0],
+            operation["diagnostics"],
+            meta["diagnostics"]["records"][0],
+        ):
+            assert projected["diagnostic_id"] == cause["diagnostic_id"]
+            assert projected["operation_id"] == receipt["operation_id"]
+            assert projected["request_id"] == cause["request_id"]
+            assert projected["turn_id"] == cause["turn_id"]
+            assert [item["status_code"] for item in projected.get("causes", [])] == (
+                [403, 403, 404] if compound else []
+            )
+        assert PRIVATE not in json.dumps([history, compact, meta])
+        assert "configured_provider" not in receipt
+        assert "PRIVATE-" not in json.dumps([item.result for item in result.tool_results])
+    finally:
+        await owner.close()
+        production.freeze_ingress()
+        await production.drain_operations()
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("uncertainty", ["pending", "submit_unknown", "lookup_missing"])
+async def test_repeated_unresolved_signature_keeps_original_identity_and_independent_work(
+    catalog, uncertainty
+):
+    class Uncertain(ExecutionControl):
+        async def submit(self, command, arguments, **kwargs):
+            receipt = await super().submit(command, arguments, **kwargs)
+            if command == "overlay.set" and uncertainty == "submit_unknown":
+                raise ConnectionError("Submission acknowledgment lost")
+            return receipt
+
+        async def wait(self, identity, timeout=None):
+            if self.operations[identity]["request_id"] == "original":
+                raise TimeoutError()
+            return await super().wait(identity, timeout)
+
+        async def operation(self, identity):
+            if uncertainty == "lookup_missing":
+                return {}
+            return dict(self.operations[identity])
+
+    control = Uncertain(catalog)
+    transport = Responses(
+        batch(call("original", "set_app", "overlay", enabled=True)),
+        batch(
+            call("repeat", "set_app", "overlay", enabled=True),
+            call("independent-read", "read_app", "general"),
+        ),
+        batch(call("independent-command", "set_app", "translation", enabled=True)),
+        answer("The original work remains unresolved; the unrelated switch completed."),
+    )
+    owner = AgentChatOwner(control, transport, localize=str)
+    try:
+        await owner.start()
+        result = await owner.send("Enable the overlay, then inspect and enable translation.")
+        assert [item.call_id for item in result.tool_results] == [
+            "original",
+            "repeat",
+            "independent-read",
+            "independent-command",
+        ]
+        original, repeated, read, independent = result.tool_results
+        assert (
+            original.status
+            == repeated.status
+            == ("unavailable" if uncertainty == "submit_unknown" else "pending")
+        )
+        assert read.status == "observed" and independent.status == "applied"
+        assert [item["command"] for item in control.submissions] == [
+            "overlay.set",
+            "translation.set",
+        ]
+        assert control.operations["op-1"]["request_id"] == "original"
+        if uncertainty == "submit_unknown":
+            assert repeated.result["request_id"] == "original"
+        else:
+            assert repeated.result["receipt"]["operation_id"] == "op-1"
+            assert repeated.result["receipt"]["request_id"] == "original"
+        assert all(request["allow_tools"] for request in transport.requests)
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_retired_generation_before_submit_does_not_poison_next_turn_signature(catalog):
+    control = ExecutionControl(catalog)
+    tools, actions, _ = tools_for(control)
+    generation = 0
+
+    def require_current(expected):
+        if generation != expected:
+            raise asyncio.CancelledError
+
+    retired = asyncio.create_task(
+        tools.execute(
+            "set_app",
+            {"target": "overlay", "enabled": True},
+            require_current=lambda: require_current(0),
+            request_id="retired",
+        )
+    )
+    try:
+        await asyncio.sleep(0)
+        assert not retired.done()
+        assert not control.submissions
+        generation = 1
+        with pytest.raises(asyncio.CancelledError):
+            await retired
+        assert not control.submissions
+        assert not actions
+
+        current = await tools.execute(
+            "set_app",
+            {"target": "overlay", "enabled": True},
+            require_current=lambda: require_current(1),
+            request_id="current",
+        )
+        assert current["status"] == "applied"
+        assert current["receipt"]["terminal"] is True
+        assert current["receipt"]["request_id"] == "current"
+        assert control.submissions == [
+            {"command": "overlay.set", "arguments": {"enabled": True}, "revision": None}
+        ]
+        assert control.operations["op-1"]["request_id"] == "current"
+    finally:
+        await asyncio.gather(retired, return_exceptions=True)
+        await tools.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("observation", ["operation", "context"])
+async def test_terminal_observation_allows_new_probe_on_current_runtime(observation):
+    from tests.app.test_translation_probe import ControlledBackend, control_for
+
+    backend = ControlledBackend(hold=True)
+    replacement = ControlledBackend(hold=True)
+    production, runtime = control_for(backend)
+
+    class LinkedControl(Records):
+        def __init__(self):
+            super().__init__()
+            self.submitted = []
+            self.lookup_receipt = None
+
+        async def submit(self, *args, **kwargs):
+            self.submitted.append(kwargs["request_id"])
+            return await production.submit(*args, **kwargs)
+
+        async def wait(self, identity, timeout=None):
+            return await production.wait(identity, timeout=0)
+
+        async def operation(self, identity):
+            if self.lookup_receipt is not None:
+                return dict(self.lookup_receipt)
+            return await production.operation(identity)
+
+    control = LinkedControl()
+    owner = AgentChatOwner(control, None, localize=str)
+
+    async def invoke(identity):
+        frame = call(identity, "probe_app", "translation.self")
+        return await owner._execute_call(frame, owner._arguments(frame), owner._generation)
+
+    async def observe(identity, operation_id):
+        if observation == "operation":
+            frame = call(f"observe-{identity}", "read_app", "operation", operation_id=operation_id)
+            return await owner._execute_call(frame, owner._arguments(frame), owner._generation)
+        context = await owner._context()
+        return next(
+            item["result"] for item in context["agent_operations"] if item["action_id"] == identity
+        )
+
+    try:
+        original = await invoke("original")
+        assert original["status"] == "pending"
+        original_id = original["receipt"]["operation_id"]
+        await asyncio.wait_for(backend.entered.wait(), 1)
+        repeated = await invoke("unresolved-repeat")
+        assert repeated["status"] == "pending"
+        assert repeated["receipt"]["request_id"] == "original"
+        assert control.submitted == ["original"]
+
+        backend.release.set()
+        terminal = await production.wait(original_id, timeout=2)
+        assert terminal["status"] == "applied"
+        observed = await observe("original", original_id)
+        assert observed["status"] == "applied"
+        assert observed["receipt"]["request_id"] == "original"
+        assert observed["receipt"]["captured_generation"] == 0
+
+        await runtime.replace_provider(replacement, start=False)
+        assert backend.closed
+        assert runtime.provider is replacement
+        intentional = await invoke("intentional-new")
+        assert intentional["status"] == "pending"
+        current_id = intentional["receipt"]["operation_id"]
+        assert current_id != original_id
+        assert intentional["receipt"]["request_id"] == "intentional-new"
+        await asyncio.wait_for(replacement.entered.wait(), 1)
+        assert len(backend.requests) == len(replacement.requests) == 1
+
+        for index, mismatched in enumerate(
+            (terminal, {**terminal, "operation_id": current_id}, {})
+        ):
+            control.lookup_receipt = mismatched
+            observed = await observe("intentional-new", current_id)
+            assert observed["status"] == "pending"
+            assert observed["receipt"]["request_id"] == "intentional-new"
+            repeated = await invoke(f"mismatched-repeat-{index}")
+            assert repeated["status"] == "pending"
+            assert repeated["receipt"]["operation_id"] == current_id
+            assert repeated["receipt"]["request_id"] == "intentional-new"
+            assert control.submitted == ["original", "intentional-new"]
+
+        control.lookup_receipt = None
+        replacement.release.set()
+        completed = await production.wait(current_id, timeout=2)
+        assert completed["status"] == "applied"
+        observed = await observe("intentional-new", current_id)
+        assert observed["status"] == "applied"
+        assert observed["receipt"]["request_id"] == "intentional-new"
+        assert observed["receipt"]["captured_generation"] == runtime.generation == 1
+        assert len(backend.requests) == len(replacement.requests) == 1
+        assert control.submitted == ["original", "intentional-new"]
+        retained = owner._operations["original"]["result"]["receipt"]
+        assert retained["operation_id"] == original_id
+        assert retained["captured_generation"] == 0
+    finally:
+        backend.release.set()
+        replacement.release.set()
+        await owner.close()
+        production.freeze_ingress()
+        await production.drain_operations()
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_old_command_completion_does_not_retire_new_pending_identity(catalog):
+    class Delayed(ExecutionControl):
+        async def wait(self, identity, timeout=None):
+            if self.operations[identity]["request_id"] == "original":
+                self.entered.set()
+                await self.release.wait()
+            return dict(self.operations[identity])
+
+        async def operation(self, identity):
+            return dict(self.operations[identity])
+
+    control = Delayed(catalog)
+    tools, _, _ = tools_for(control)
+    original = asyncio.create_task(
+        tools.execute("set_app", {"target": "overlay", "enabled": True}, request_id="original")
+    )
+    try:
+        await asyncio.wait_for(control.entered.wait(), 1)
+        control.operations["op-1"].update(status="applied", terminal=True)
+        tools.observe_operation_receipt(control.operations["op-1"])
+        current = await tools.execute(
+            "set_app", {"target": "overlay", "enabled": True}, request_id="current"
+        )
+        assert current["status"] == "pending"
+        assert current["receipt"]["request_id"] == "current"
+        tools.observe_operation_receipt(control.operations["op-1"])
+        control.release.set()
+        assert (await original)["status"] == "applied"
+        repeated = await tools.execute(
+            "set_app", {"target": "overlay", "enabled": True}, request_id="repeat"
+        )
+        assert repeated["status"] == "pending"
+        assert repeated["receipt"]["operation_id"] == "op-2"
+        assert repeated["receipt"]["request_id"] == "current"
+        assert len(control.submissions) == 2
+    finally:
+        control.release.set()
+        await original
+        await tools.close()

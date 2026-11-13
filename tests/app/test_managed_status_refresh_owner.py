@@ -67,6 +67,9 @@ async def test_owner_contains_refresh_failure_and_reports_diagnostics() -> None:
         )
     ]
     assert owner.active_task_names == ()
+    assert owner.last_result.succeeded is False
+    assert owner.last_result.cancelled is False
+    assert owner.last_result.diagnostics.fields["exception_class"] == "RuntimeError"
 
     await owner.close()
 
@@ -124,4 +127,6 @@ async def test_refresh_keeps_admission_identity_and_secondary_notification_cause
     ]
     assert causes[-1].cause_id == diagnostic.diagnostic_id
     assert causes[-1].fields["exception_class"] == "TypeError"
+    assert owner.last_result.diagnostics is diagnostic
+    assert owner.last_result.secondary_diagnostics[-1].cause_id == diagnostic.diagnostic_id
     assert "synthetic_secret_provider_body" not in caplog.text

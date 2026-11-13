@@ -361,7 +361,13 @@ class AgentChatView(ft.Row):
             row: list[ft.Control] = []
             if item.busy:
                 row.append(
-                    ft.ProgressRing(width=16, height=16, stroke_width=2.5, color=COLOR_PRIMARY)
+                    ft.ProgressRing(
+                        width=18.5,
+                        height=18.5,
+                        stroke_width=2.5,
+                        stroke_align=-1,
+                        color=COLOR_PRIMARY,
+                    )
                 )
             row.append(ft.Text(item.lines[0], size=16, color=COLOR_NEUTRAL, expand=True))
             return ft.Row(row, spacing=8, opacity=opacity, key=item.key)

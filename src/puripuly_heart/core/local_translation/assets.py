@@ -3,12 +3,19 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from puripuly_heart.config.paths import default_models_dir
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
+    LocalSTTProvisioningLease,
+)
+
+if TYPE_CHECKING:
+    from puripuly_heart.core.messages import ErrorDiagnostics
 
 GEMMA_MODEL_ID = "gemma-4-e4b-it-qat-ud-q4-k-xl"
 GEMMA_REPO_ID = "unsloth/gemma-4-E4B-it-qat-GGUF"
@@ -171,6 +178,8 @@ class InstalledGemmaManifest:
     license: str
     license_url: str
     files: tuple[str, ...]
+    recovery_diagnostics: tuple[ErrorDiagnostics, ...] = field(default=(), compare=False)
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = field(default=(), compare=False)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -233,7 +242,7 @@ class GemmaInstallState:
     status: GemmaInstallStatus
     install_dir: Path
     manifest: InstalledGemmaManifest | None = None
-    error_message: str | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 def default_gemma_install_dir(spec: GemmaModelSpec | None = None) -> Path:
@@ -318,10 +327,18 @@ def inspect_gemma_install(
     except GemmaInstallMissingError:
         return GemmaInstallState(status="missing", install_dir=resolved)
     except GemmaInstallInvalidError as exc:
+        from puripuly_heart.core.diagnostics import exception_diagnostics
+
         return GemmaInstallState(
             status="invalid",
             install_dir=resolved,
-            error_message=str(exc),
+            failure_diagnostics=exception_diagnostics(
+                exc,
+                component="model_assets",
+                operation="inspection",
+                code="model_assets.inspect_failed",
+                fields={"model_id": resolved_spec.model_id},
+            ),
         )
     return GemmaInstallState(status="ready", install_dir=resolved, manifest=manifest)
 
@@ -386,6 +403,62 @@ def _remove_path(path: Path) -> None:
     shutil.rmtree(path)
 
 
+def cleanup_gemma_install_residue(
+    *,
+    models_dir: Path | None = None,
+    install_dirnames: tuple[str, ...] | None = None,
+    wait_for_lease: bool = False,
+    cancel_event: threading.Event | None = None,
+) -> tuple[Path, ...] | None:
+    resolved_root = (models_dir or default_models_dir()).resolve()
+    resolved_dirnames = install_dirnames or (
+        e4b_gemma_spec().install_dirname,
+        gemma_26b_spec().install_dirname,
+    )
+    normalized_dirnames = tuple(dict.fromkeys(resolved_dirnames))
+    if not normalized_dirnames or any(
+        not name
+        or name.startswith(".")
+        or Path(name).name != name
+        or any(not (character.isalnum() or character in "._-") for character in name)
+        for name in normalized_dirnames
+    ):
+        raise ValueError("install_dirnames must contain safe directory names")
+    if not resolved_root.is_dir():
+        return ()
+    candidates = [
+        residue
+        for dirname in normalized_dirnames
+        for pattern in (
+            f"{dirname}.staging-*",
+            f"{dirname}.backup-*",
+            f"{dirname}.deleting-*",
+        )
+        for residue in sorted(resolved_root.glob(pattern))
+    ]
+    if not candidates:
+        return ()
+    lease = LocalSTTProvisioningLease.acquire(
+        model_root=resolved_root,
+        wait=wait_for_lease,
+        cancel_event=cancel_event,
+    )
+    if lease is None:
+        return None
+    try:
+        removed: list[Path] = []
+        for residue in candidates:
+            if residue.exists() or residue.is_symlink():
+                if residue.is_symlink() or not residue.is_dir():
+                    residue.unlink(missing_ok=True)
+                else:
+                    shutil.rmtree(residue)
+                removed.append(residue)
+        return tuple(removed)
+    finally:
+        lease.close()
+
+
 __all__ = [
     "GEMMA_26B_MODEL_ID",
     "GEMMA_26B_REPO_ID",
@@ -413,6 +486,7 @@ __all__ = [
     "GemmaInstallState",
     "GemmaModelSpec",
     "InstalledGemmaManifest",
+    "cleanup_gemma_install_residue",
     "default_gemma_install_dir",
     "e4b_gemma_spec",
     "gemma_26b_spec",

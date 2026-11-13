@@ -279,7 +279,7 @@ def tool(call_id="call_1", *, arguments='{"topic":"output"}', status="completed"
         "type": "function_call",
         "id": f"fc_{call_id}",
         "call_id": call_id,
-        "name": "get_app_context",
+        "name": "read_app",
         "arguments": arguments,
         "status": status,
     }
@@ -501,9 +501,7 @@ async def test_targeted_diagnostics_find_older_evidence_and_expose_paging_and_ev
                     arguments=json.dumps(
                         {
                             "topic": "diagnostics",
-                            "diagnostic_id": None,
                             "operation_id": operation_id,
-                            "after": None,
                         }
                     ),
                 )
@@ -869,7 +867,7 @@ async def test_parallel_context_reads_wait_for_all_and_publish_in_call_order(
         assert result.status == "completed"
         assert [item.call_id for item in result.tool_results] == ["output-read", "accounts-read"]
         assert [item.topic for item in result.tool_results] == ["output", account_topic]
-        assert bool(owner.snapshot.setup_actions) is (account_topic == "accounts")
+        assert not owner.snapshot.setup_actions
         outputs = [
             item
             for item in transport.requests[1]["input"]

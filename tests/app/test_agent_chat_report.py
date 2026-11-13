@@ -22,15 +22,23 @@ from tests.app.test_agent_chat import Records, Responses, Tokens, answer, contex
 
 
 def proposal(summary="The supported next steps did not fix the synthetic failure."):
-    return {**tool(), "name": "propose_report", "arguments": json.dumps({"summary": summary})}
+    return {
+        **tool(),
+        "name": "manage_proposal",
+        "arguments": json.dumps({"action": "report", "summary": summary}),
+    }
 
 
-def contents(bundle):
+def contents(bundle, *, missing_log=False):
     import tarfile
 
     with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as archive:
         members = archive.getmembers()
-        assert [member.name for member in members] == ["meta.json", "puri_chat.json", "runtime.log"]
+        assert [member.name for member in members] == [
+            "meta.json",
+            "puri_chat.json",
+            *([] if missing_log else ["runtime.log"]),
+        ]
         assert all(member.isfile() for member in members)
         return {member.name: archive.extractfile(member).read() for member in members}
 
@@ -127,6 +135,8 @@ async def test_inline_consent_sends_complete_archive_and_static_receipt(tmp_path
             "agent_protocol",
             "summary",
             "diagnostic_codes",
+            "diagnostics",
+            "missing_material",
         }
         assert meta["ticket"] == sent.ticket and meta["agent_protocol"] == 3
         assert meta["app_version"] == transport.uploads[0]["app_version"]
@@ -256,7 +266,8 @@ async def test_invalid_proposal_never_creates_offer_or_reads_log(arguments):
     await owner.start()
     try:
         result = await owner.send("App help")
-        assert result.tool_results[0].result == {"status": "rejected", "code": "invalid_tool_call"}
+        assert result.tool_results[0].result["status"] == "rejected"
+        assert result.tool_results[0].result["code"] == "invalid_tool_call"
         assert not owner.snapshot.report_offers and not transport.uploads
     finally:
         await owner.close()
@@ -352,7 +363,8 @@ async def test_repeated_proposal_has_one_action_and_rejection_never_uploads():
         assert len(owner.snapshot.report_offers) == 1
         results = owner.snapshot.tool_results
         assert results[0].result == {"status": "pending", "offer_id": offer.id}
-        assert results[1].status == "not_executed"
+        assert results[1].status == "pending"
+        assert results[1].result["offer_id"] == results[0].result["offer_id"]
         assert owner.reject_report(offer.id) == {"status": "rejected", "offer_id": offer.id}
         assert (await owner.send_report(offer.id))["status"] == "rejected"
         assert not transport.uploads
@@ -440,25 +452,30 @@ async def test_failed_uncertain_delivery_retries_exact_bytes_after_new_input_and
 
 
 @pytest.mark.asyncio
-async def test_missing_log_is_retry_not_fabricated_empty_evidence():
+@pytest.mark.parametrize("missing_callback", (False, True))
+async def test_missing_optional_log_keeps_report_with_explicit_missing_material(missing_callback):
     attempts = []
 
     def read_log():
         attempts.append(1)
-        if len(attempts) == 1:
-            raise FileNotFoundError("Synthetic delayed-open log")
-        return b"now written"
+        raise FileNotFoundError("PRIVATE-PERSONAL-LOG-PATH")
 
     transport = ReportResponses({"status": "completed", "output": [proposal()]}, answer("Offer"))
-    owner = owner_for(transport, read_log)
+    owner = owner_for(transport, None if missing_callback else read_log)
     offer = await make_offer(owner)
     try:
-        assert (await owner.send_report(offer.id))["status"] == "failed"
-        failed = owner.snapshot.report_offers[0]
         assert not transport.uploads
         assert (await owner.send_report(offer.id))["status"] == "sent"
-        assert owner.snapshot.report_offers[0].ticket == failed.ticket
-        assert contents(transport.uploads[0]["bundle"])["runtime.log"] == b"now written"
+        assert len(transport.uploads) == 1
+        payload = contents(transport.uploads[0]["bundle"], missing_log=True)
+        meta = json.loads(payload["meta.json"])
+        assert meta["missing_material"]["runtime.log"] == (
+            "collection_unavailable" if missing_callback else "collection_failed"
+        )
+        assert meta["diagnostics"]["availability"] == "retained_current_run"
+        assert json.loads(payload["puri_chat.json"])
+        assert "PRIVATE" not in payload["meta.json"].decode()
+        assert attempts == ([] if missing_callback else [1])
     finally:
         await owner.close()
 
@@ -522,7 +539,10 @@ async def test_transport_requires_matching_receipt_and_preserves_binary_wire(rec
         ticket=ticket,
         app_version="2.10.0",
         summary="synthetic summary inside only",
-        diagnostic_codes=("provider.auth",),
+        diagnostics={
+            "availability": "retained_current_run",
+            "records": [{"code": "provider.auth"}],
+        },
         archive=({"role": "user", "content": "synthetic chat"},),
         log_snapshot=lambda: b"synthetic runtime",
     )

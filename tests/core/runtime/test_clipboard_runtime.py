@@ -185,10 +185,14 @@ async def test_clipboard_runtime_close_returns_when_submit_suppresses_cancellati
     close_task = asyncio.create_task(runtime.close())
     try:
         await asyncio.wait_for(asyncio.shield(close_task), timeout=0.2)
+        assert runtime.active_submit_task_count == 1
+        assert runtime.failure_diagnostics.code == "clipboard_submit_timeout"
+        assert runtime.failure_diagnostics.fields["cleanup_confirmed"] is False
     finally:
         release_stubborn_submit.set()
         with contextlib.suppress(Exception):
             await close_task
+        await _flush_loop()
 
     assert cancel_seen.is_set() is True
     assert watchers[0].stopped is True
@@ -267,3 +271,65 @@ async def test_clipboard_runtime_close_surfaces_stop_failure_after_gathering_sub
     assert submitted == ["pending close clipboard text"]
     assert runtime.active_submit_task_count == 0
     assert runtime.watcher is None
+
+
+@pytest.mark.asyncio
+async def test_submit_failure_retains_safe_original_cause_after_timeout() -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+    failures = []
+
+    async def submit(_text: str) -> None:
+        started.set()
+        while not release.is_set():
+            try:
+                await release.wait()
+            except asyncio.CancelledError:
+                continue
+        raise PermissionError(13, "private clipboard text")
+
+    runtime = ClipboardRuntime(
+        watcher_factory=FakeClipboardWatcher,
+        submit_handler=submit,
+        submit_gather_timeout_s=0.001,
+        failure_sink=failures.append,
+    )
+    await runtime.start()
+    runtime.submit_from_loop("private clipboard text")
+    await started.wait()
+    try:
+        await runtime.close()
+        assert runtime.active_submit_task_count == 1
+    finally:
+        release.set()
+        await asyncio.gather(*tuple(runtime._submit_tasks), return_exceptions=True)
+        await _flush_loop()
+    assert runtime.active_submit_task_count == 0
+    assert runtime.failure_diagnostics.fields["errno"] == 13
+    assert [item.code for item in failures] == ["clipboard_submit_timeout", "clipboard_failed"]
+    assert "private" not in repr(failures)
+
+
+@pytest.mark.asyncio
+async def test_non_strict_start_returns_connected_start_and_cleanup_failures():
+    class FailedWatcher(FakeClipboardWatcher):
+        def start(self):
+            raise PermissionError(13, "private startup content")
+
+        def stop(self):
+            raise OSError(5, "private cleanup content")
+
+    async def submit(_text):
+        return None
+
+    runtime = ClipboardRuntime(watcher_factory=FailedWatcher, submit_handler=submit)
+    diagnostics = await runtime.start()
+    assert diagnostics is runtime.failure_diagnostics
+    assert diagnostics.operation == "watcher_start"
+    assert diagnostics.fields["errno"] == 13
+    cleanup = diagnostics.causes[-1]
+    assert cleanup.operation == "watcher_stop"
+    assert cleanup.fields["errno"] == 5
+    assert cleanup.cause_id == diagnostics.diagnostic_id
+    assert runtime.watcher is None
+    assert "private" not in repr(diagnostics)

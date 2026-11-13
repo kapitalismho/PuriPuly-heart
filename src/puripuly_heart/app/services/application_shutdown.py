@@ -7,7 +7,11 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Final, Literal, TypeAlias
 
-from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
+from puripuly_heart.core.diagnostics import (
+    emit_failure,
+    exception_diagnostics,
+    safe_exception_fields,
+)
 from puripuly_heart.core.lifecycle import (
     LIFECYCLE_SHUTDOWN_PHASE_ORDER,
     LifecycleShutdownPhase,
@@ -163,6 +167,9 @@ class ApplicationShutdownCoordinator:
         self._shutdown_task: asyncio.Task[ApplicationLifecycleSnapshot] | None = None
         self._terminal_exception: BaseException | None = None
         self._timed_out_callback_tasks: set[asyncio.Task[None]] = set()
+        self._timed_out_task_owners: dict[
+            asyncio.Task[None], ApplicationShutdownCallback | ApplicationShutdownFailure
+        ] = {}
         self._shutdown_phases_completed = False
         self._active_callback: ApplicationShutdownCallback | None = None
         self._primary_failure_id: str | None = None
@@ -313,18 +320,20 @@ class ApplicationShutdownCoordinator:
                 )
                 if task not in done:
                     stall_diagnostic = self.capture_stall_diagnostic()
-                    await self._cancel_and_settle_timed_out_task(
+                    settled_failure = await self._cancel_and_settle_timed_out_task(
                         task,
                         timeout_seconds=callback.timeout_seconds,
+                        owner=callback,
                     )
                     raise TimeoutError(
                         "Application shutdown callback exceeded its coordinator deadline"
-                    )
+                    ) from settled_failure
                 await task
             except BaseException as exc:
                 if isinstance(exc, (KeyboardInterrupt, SystemExit)):
                     raise
-                diagnostics = ErrorDiagnostics(
+                diagnostics = exception_diagnostics(
+                    exc,
                     component="application_shutdown",
                     operation=callback.phase,
                     code=(
@@ -332,11 +341,6 @@ class ApplicationShutdownCoordinator:
                         if isinstance(exc, TimeoutError)
                         else "application_shutdown_failed"
                     ),
-                    category="lifecycle",
-                    visibility="basic",
-                    content_policy="metadata_only",
-                    status_code=None,
-                    retry_after_ms=None,
                     fields={
                         "phase": callback.phase,
                         "owner_name": callback.owner_name,
@@ -344,8 +348,10 @@ class ApplicationShutdownCoordinator:
                         "timed_out": isinstance(exc, TimeoutError),
                         "abandoned": bool(self._timed_out_callback_tasks),
                         "cleanup_confirmed": False,
-                        **safe_exception_fields(exc),
                     },
+                )
+                diagnostics = replace(
+                    diagnostics,
                     cause_id=self._primary_failure_id
                     or (
                         self._failures[0].summary.diagnostics.diagnostic_id
@@ -387,7 +393,8 @@ class ApplicationShutdownCoordinator:
         task: asyncio.Task[None],
         *,
         timeout_seconds: float,
-    ) -> None:
+        owner: ApplicationShutdownCallback | ApplicationShutdownFailure,
+    ) -> BaseException | None:
         settle_timeout = min(self._task_settle_timeout_seconds, timeout_seconds)
         for _attempt in range(2):
             task.cancel()
@@ -397,24 +404,61 @@ class ApplicationShutdownCoordinator:
                 return_when=asyncio.ALL_COMPLETED,
             )
             if task in done:
-                self._consume_task_result(task)
-                return
+                return self._task_exception(task)
         self._timed_out_callback_tasks.add(task)
+        self._timed_out_task_owners[task] = owner
         task.add_done_callback(self._on_timed_out_callback_done)
 
     def _on_timed_out_callback_done(self, task: asyncio.Task[None]) -> None:
         self._timed_out_callback_tasks.discard(task)
-        self._consume_task_result(task)
+        owner = self._timed_out_task_owners.pop(task)
+        exception = self._task_exception(task)
+        if exception is not None:
+            diagnostics = exception_diagnostics(
+                exception,
+                component="application_shutdown",
+                operation=owner.phase,
+                code=(
+                    "application_shutdown_diagnostic_delivery_failed"
+                    if owner.callback_name == "emit_diagnostic"
+                    else "application_shutdown_failed"
+                ),
+                fields={"phase": owner.phase, "cleanup_confirmed": False},
+            )
+            primary = next(
+                (
+                    failure.summary.diagnostics
+                    for failure in self._failures
+                    if failure.summary.phase == owner.phase
+                    and failure.summary.owner_name == owner.owner_name
+                    and failure.summary.callback_name == owner.callback_name
+                    and failure.summary.timed_out
+                ),
+                None,
+            )
+            diagnostics = replace(
+                diagnostics, cause_id=primary.diagnostic_id if primary is not None else None
+            )
+            self._failures.append(
+                _RecordedFailure(
+                    ApplicationShutdownFailure(
+                        owner.phase,
+                        owner.owner_name,
+                        owner.callback_name,
+                        type(exception).__name__,
+                        False,
+                        diagnostics,
+                    ),
+                    exception,
+                )
+            )
+            self._terminal_exception = _terminal_exception(self._failures)
+            emit_failure(logger, diagnostics, severity="warning", disposition="degraded")
         self._finalize_if_settled()
 
     @staticmethod
-    def _consume_task_result(task: asyncio.Task[None]) -> None:
-        if task.cancelled():
-            return
-        try:
-            task.exception()
-        except asyncio.CancelledError:
-            return
+    def _task_exception(task: asyncio.Task[None]) -> BaseException | None:
+        return None if task.cancelled() else task.exception()
 
     def _finalize_if_settled(self) -> None:
         if not self._shutdown_phases_completed or self._timed_out_callback_tasks:
@@ -453,13 +497,16 @@ class ApplicationShutdownCoordinator:
                     return_when=asyncio.ALL_COMPLETED,
                 )
                 if task not in done:
-                    await self._cancel_and_settle_timed_out_task(
+                    settled_failure = await self._cancel_and_settle_timed_out_task(
                         task,
                         timeout_seconds=self._diagnostics_timeout_seconds,
+                        owner=replace(
+                            failure, owner_name=self.owner_name, callback_name="emit_diagnostic"
+                        ),
                     )
                     raise TimeoutError(
                         "Application shutdown diagnostic delivery exceeded its coordinator deadline"
-                    )
+                    ) from settled_failure
                 await task
         except BaseException as exc:
             if isinstance(exc, (KeyboardInterrupt, SystemExit)):
@@ -481,7 +528,6 @@ class ApplicationShutdownCoordinator:
                 },
                 cause_id=failure.diagnostics.diagnostic_id if failure.diagnostics else None,
             )
-            emit_failure(logger, secondary, severity="warning", disposition="degraded")
             self._failures.append(
                 _RecordedFailure(
                     summary=ApplicationShutdownFailure(
@@ -495,6 +541,7 @@ class ApplicationShutdownCoordinator:
                     exception=exc,
                 )
             )
+            emit_failure(logger, secondary, severity="warning", disposition="degraded")
 
 
 def application_shutdown_callback(

@@ -1514,3 +1514,25 @@ async def test_qq_delivery_failure_retains_commit_identity_and_projection_second
     assert store.values[OPENROUTER_MANAGED_QQ_API_KEY_SECRET] == RAW_MANAGED_KEY
     assert broker.ack_requests == []
     _assert_no_raw_values(result)
+
+
+@pytest.mark.asyncio
+async def test_qq_recovery_persist_failure_retains_cause_and_authority():
+    state = _seeded_operation_state()
+    state.fail_persist_calls = 1
+    store = _seeded_operation_store()
+    service, broker, _, _ = _service(
+        _success_result(),
+        store=store,
+        state=state,
+        status_results=[_operation_status_result("RECONCILING", "wait")],
+    )
+
+    result = await service.authenticate(_request())
+
+    assert result.status == messages.TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
+    assert result.diagnostics.fields["exception_class"] == "RuntimeError"
+    assert state.pending_managed_operation_id == SEEDED_OPERATION_ID
+    assert store.values["openrouter_managed_operation_resume_token"] == SEEDED_RESUME_TOKEN
+    assert broker.requests == []
+    _assert_no_raw_values(result)
