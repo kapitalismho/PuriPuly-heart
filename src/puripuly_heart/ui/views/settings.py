@@ -4175,7 +4175,7 @@ class SettingsView(ft.Column):
         self._deepgram_key.visible = STTProviderName.DEEPGRAM in visible_cloud_free_tier
         gemini_key = getattr(self, "_gemini_key", None)
         if gemini_key is not None:
-            gemini_key.visible = True
+            gemini_key.visible = STTProviderName.GEMINI_TRANSCRIBE in visible_cloud_free_tier
         elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
         if elevenlabs_scribe_key is not None:
             elevenlabs_scribe_key.visible = (
@@ -4259,6 +4259,7 @@ class SettingsView(ft.Column):
                 )
                 if control is not None
             )
+            _update_control_if_mounted(api_keys_card)
         self._sync_cloud_free_tier_card(settings)
         self._sync_soniox_speaker_diarization_card(settings)
 

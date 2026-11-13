@@ -107,6 +107,7 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 
 - An enabled modal option applies on its first click. Single-select dialogs close after selection; multi-select dialogs stay open and retain at least one selection.
 - Puri can still open settings and reveal a provider's secure key field without changing the selected provider. Settings no longer show the temporary Puri guidance banner or its return button; use the main navigation to return to Puri.
+- API key fields follow the selected providers. The Gemini field appears when either recognition channel selects Gemini, when active free-cloud auto-selection includes Gemini, or when Puri explicitly opens its secure key field.
 
 ### Agent Chat Control
 

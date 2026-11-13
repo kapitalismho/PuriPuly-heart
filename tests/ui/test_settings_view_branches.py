@@ -6093,6 +6093,30 @@ def test_text_subtab_shell_can_render_without_title_and_pin_subtab_bar_to_bottom
     assert shell.controls == [shell.body_region, shell.subtab_bar]
 
 
+@pytest.mark.parametrize("channel", ["self", "peer"])
+def test_gemini_key_visibility_tracks_stt_selection(
+    monkeypatch: pytest.MonkeyPatch, settings_events, channel: str
+) -> None:
+    view, _ = _make_settings_view(
+        monkeypatch, settings_events, settings=AppSettingsVNext()
+    )
+    assert view._gemini_key.visible is False
+    assert view._api_keys_card.visible is False
+    select_provider = (
+        view._on_stt_selected if channel == "self" else view._on_peer_stt_selected
+    )
+
+    select_provider(STTProviderName.GEMINI_TRANSCRIBE.value)
+
+    assert view._gemini_key.visible is True
+    assert view._api_keys_card.visible is True
+
+    select_provider(STTProviderName.LOCAL_CPU_AUTO.value)
+
+    assert view._gemini_key.visible is False
+    assert view._api_keys_card.visible is False
+
+
 def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_rolling_on(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
@@ -6242,6 +6266,12 @@ def test_cloud_free_tier_selection_gates_member_api_keys(
         "settings.cloud_free_tier.count",
         count=2,
     )
+
+    view._on_cloud_free_tier_changed((STTProviderName.ELEVENLABS_SCRIBE.value,))
+
+    assert view._gemini_key.visible is False
+    assert view._elevenlabs_scribe_key.visible is True
+    assert view._deepgram_key.visible is False
 
 
 def test_cloud_free_tier_change_applies_providers(
