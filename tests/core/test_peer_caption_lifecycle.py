@@ -2305,6 +2305,8 @@ async def test_local_revision_zero_overflow_enters_fragments_without_extra_reque
         child = backend.calls[0].utterance_id
         assert child != source.utterance_id
         blocks = [block for block in presenter.snapshot().blocks if block.channel == "peer"]
+        assert blocks[0].secondary_text == source.text
+        assert blocks[0].secondary_enabled
         if self_contention:
             assert [block.id for block in blocks] == [f"peer:{child}"]
             first = presenter.peer_fragment_state(child, 0)
@@ -2323,11 +2325,15 @@ async def test_local_revision_zero_overflow_enters_fragments_without_extra_reque
             assert not tail.pending and tail.visible_since == 1
             assert surface.expirations[tail.id] == 9
             assert [block.primary_text for block in blocks] == [peer_translation_fragments(text)[1]]
+            assert blocks[0].secondary_text == ""
+            assert not blocks[0].secondary_enabled
         else:
             assert [block.primary_text for block in blocks] == list(
                 peer_translation_fragments(text)
             )
             assert len(blocks) == 2
+            assert blocks[1].secondary_text == ""
+            assert not blocks[1].secondary_enabled
         assert all(
             entry.peer_caption_revision == 0
             for entry in presenter._entries.values()
@@ -2400,7 +2406,10 @@ async def test_local_finals_enter_shared_display_in_translation_ready_order(
 
 
 @pytest.mark.asyncio
-async def test_l3_preview_to_ordinary_overflow_is_one_caption_and_one_history_entry():
+@pytest.mark.parametrize("overflow_preview", [False, True])
+async def test_l3_preview_to_ordinary_overflow_is_one_caption_and_one_history_entry(
+    overflow_preview,
+):
     from puripuly_heart.core.overlay.peer_caption_layout import peer_translation_fragments
 
     timeline = Timeline()
@@ -2414,14 +2423,22 @@ async def test_l3_preview_to_ordinary_overflow_is_one_caption_and_one_history_en
     preview = transcript("A preview source", 1)
     settled = replace(preview, text="A preview source becomes a complete final.")
     text = "가" * 56 + "나" * 20
-    backend.translations.update({preview.text: "short preview", settled.text: text})
+    preview_text = text if overflow_preview else "short preview"
+    backend.translations.update({preview.text: preview_text, settled.text: text})
     try:
         await harness.start()
         await partial(harness, preview)
         await timeline.advance(5)
         await harness.peer_owner.cloud_captions.check_previews()
         await idle(harness)
-        assert [block.primary_text for block in presenter.snapshot().blocks] == ["short preview"]
+        blocks = presenter.snapshot().blocks
+        assert [block.primary_text for block in blocks] == list(
+            peer_translation_fragments(preview_text)
+        )
+        assert [block.secondary_text for block in blocks] == [preview.text] + [""] * (
+            len(blocks) - 1
+        )
+        assert [block.secondary_enabled for block in blocks] == [True] + [False] * (len(blocks) - 1)
         await timeline.advance(0.2)
         await final(harness, settled)
         await idle(harness)
@@ -2429,6 +2446,8 @@ async def test_l3_preview_to_ordinary_overflow_is_one_caption_and_one_history_en
         assert [block.primary_text for block in presenter.snapshot().blocks] == list(
             peer_translation_fragments(text)
         )
+        assert [block.secondary_text for block in presenter.snapshot().blocks] == [settled.text, ""]
+        assert [block.secondary_enabled for block in presenter.snapshot().blocks] == [True, False]
         assert all(entry.peer_caption_revision == 2 for entry in presenter._entries.values())
         assert len(backend.calls) == 2
         assert backend.calls[0].utterance_id == backend.calls[1].utterance_id

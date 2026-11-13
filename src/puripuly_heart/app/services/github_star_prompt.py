@@ -133,9 +133,7 @@ class GithubStarPromptOwner:
 
     def is_eligible(self) -> bool:
         settings = self.settings_provider()
-        return bool(
-            settings is not None and _star_state(settings).translation_success_observed
-        )
+        return bool(settings is not None and _star_state(settings).translation_success_observed)
 
     def initial_launch_gate_satisfied(self, settings: GithubStarPromptSettings) -> bool:
         prompt = _star_state(settings)

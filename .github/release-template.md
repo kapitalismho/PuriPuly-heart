@@ -13,6 +13,7 @@ Download `{{INSTALLER_EXE}}` from the Assets section below, then run it.
 - Local CPU and GPU Peer recognition recover after audio-source discontinuities without restarting recognition. Failed input is discarded, started work is safely settled, and recovered finals retain independent translation and shared caption display.
 - Peer caption corrections update visible text without waiting behind unrelated captions and receive a fresh bounded native-render retry episode.
 - Cloud and local Peer captions use ordered, readable two-line continuation fragments instead of timed paging. Upper captions retain the ordinary eight-second idle lifetime; Self priority and the one-second replacement-wait limit still allow earlier replacement.
+- With Peer "show original" enabled, only the first translation fragment shows the complete original text. Continuation fragments remain translation-only, even after the first fragment departs.
 - Peer source-view and text-size changes respect the existing caption storage limit. A caption that cannot fit is retired instead of blocking Self captions.
 - Puri uses three app-tool families for observations, immediate actions, and user-approved proposals. Settings changes remain subject to approval.
 - Puri sends more compact app context and tool results, and uses revised recommendation guidance that distinguishes preferences from usable provider access.

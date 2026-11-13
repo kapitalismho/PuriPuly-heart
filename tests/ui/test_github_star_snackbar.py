@@ -220,9 +220,7 @@ def test_github_star_prompt_state_blocks_clicked_and_recent_shows(changes, expec
     days = prompt.pop("days_since_show", None)
     if days is not None:
         prompt["last_shown_at"] = _utc_z(now - timedelta(days=days))
-    controller = _eligible_backend(
-        _with_star(_settings_for_connection("public_api"), **prompt)
-    )
+    controller = _eligible_backend(_with_star(_settings_for_connection("public_api"), **prompt))
 
     assert controller.should_show_github_star_prompt(now=now) is expected
     assert _persisted_settings(controller).state.github_star_prompt == _star(controller)
