@@ -1316,6 +1316,7 @@ class AgentTools:
         require_current: Callable[[], None],
         request_id: str | None = None,
     ) -> dict:
+        require_current()
         signature = json.dumps([command, arguments], sort_keys=True, separators=(",", ":"))
         previous = self._command_requests.get(signature)
         retained = self._command_requests.setdefault(
@@ -1323,7 +1324,6 @@ class AgentTools:
         )
         request_id = retained["request_id"]
         receipt = retained.get("receipt")
-        require_current()
         if previous is not None and receipt is None:
             return deepcopy(retained.get("result", {"status": "pending", "request_id": request_id}))
         try:

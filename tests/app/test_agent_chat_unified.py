@@ -11,7 +11,7 @@ from puripuly_heart.app.services.agent_chat.execution import validate_app_reques
 from puripuly_heart.app.services.agent_chat.modules import model_context
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from tests.app.test_agent_chat import Records, Responses, answer
-from tests.app.test_agent_chat_control_execution import ExecutionControl
+from tests.app.test_agent_chat_control_execution import ExecutionControl, tools_for
 from tests.app.test_agent_chat_tools import catalog as catalog
 
 
@@ -623,3 +623,49 @@ async def test_repeated_unresolved_signature_keeps_original_identity_and_indepen
         assert all(request["allow_tools"] for request in transport.requests)
     finally:
         await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_retired_generation_before_submit_does_not_poison_next_turn_signature(catalog):
+    control = ExecutionControl(catalog)
+    tools, actions, _ = tools_for(control)
+    generation = 0
+
+    def require_current(expected):
+        if generation != expected:
+            raise asyncio.CancelledError
+
+    retired = asyncio.create_task(
+        tools.execute(
+            "set_app",
+            {"target": "overlay", "enabled": True},
+            require_current=lambda: require_current(0),
+            request_id="retired",
+        )
+    )
+    try:
+        await asyncio.sleep(0)
+        assert not retired.done()
+        assert not control.submissions
+        generation = 1
+        with pytest.raises(asyncio.CancelledError):
+            await retired
+        assert not control.submissions
+        assert not actions
+
+        current = await tools.execute(
+            "set_app",
+            {"target": "overlay", "enabled": True},
+            require_current=lambda: require_current(1),
+            request_id="current",
+        )
+        assert current["status"] == "applied"
+        assert current["receipt"]["terminal"] is True
+        assert current["receipt"]["request_id"] == "current"
+        assert control.submissions == [
+            {"command": "overlay.set", "arguments": {"enabled": True}, "revision": None}
+        ]
+        assert control.operations["op-1"]["request_id"] == "current"
+    finally:
+        await asyncio.gather(retired, return_exceptions=True)
+        await tools.close()
