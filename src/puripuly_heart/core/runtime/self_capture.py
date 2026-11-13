@@ -43,7 +43,11 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionState,
     SelfCaptureTerminalFailureHandler,
 )
-from puripuly_heart.core.stt.backend import STTProviderInputTerminal, STTProviderTurnTerminal
+from puripuly_heart.core.stt.backend import (
+    STTChannelAvailability,
+    STTProviderInputTerminal,
+    STTProviderTurnTerminal,
+)
 from puripuly_heart.core.stt.diagnostics import recognition_cause
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
@@ -778,7 +782,7 @@ class SelfCaptureSessionOwner:
             and not reason.startswith("recognition_admission_")
             and terminal.outcome not in ("final", "empty", "suppressed", "cancelled")
             and terminal.identity.segment.activation_generation == self._generation
-            and not terminal.recovery_pending
+            and terminal.channel_availability is STTChannelAvailability.UNAVAILABLE
         ):
             self.note_recognition_failure(reason, terminal=terminal)
 

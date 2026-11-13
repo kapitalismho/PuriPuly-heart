@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from enum import Enum
 from typing import AsyncIterator, Literal, Protocol, TypeVar, runtime_checkable
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
@@ -25,6 +26,12 @@ from puripuly_heart.domain.recognition import (
 
 class PermanentSTTScopedSessionError(RuntimeError):
     __slots__ = ()
+
+
+class STTChannelAvailability(str, Enum):
+    CONTINUE = "continue"
+    RECOVERING = "recovering"
+    UNAVAILABLE = "unavailable"
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,12 +121,17 @@ class STTProviderTurnTerminal:
     failure_reason: str | None = None
     epoch_disposition: Literal["reuse", "retire"] = "reuse"
     failure_retryable: bool = False
-    recovery_pending: bool = False
+    channel_availability: STTChannelAvailability = STTChannelAvailability.UNAVAILABLE
     provenance: tuple[STTNativeProvenance, ...] = ()
     included_contributions: tuple[STTTextContribution, ...] = ()
     failure_diagnostics: ErrorDiagnostics | None = None
     recognition_origins: tuple[RecognitionTextOrigin, ...] = ()
     is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
+    failure_resource_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.outcome in {"final", "empty", "suppressed", "cancelled"}:
+            object.__setattr__(self, "channel_availability", STTChannelAvailability.CONTINUE)
 
 
 class STTScopedWriteFailure(RuntimeError):
@@ -246,6 +258,11 @@ class STTProviderEpochEnded:
     provider_turn_id: str | None = None
     failure_retryable: bool = False
     failure_diagnostics: ErrorDiagnostics | None = None
+    channel_availability: STTChannelAvailability = STTChannelAvailability.UNAVAILABLE
+
+    def __post_init__(self) -> None:
+        if self.orderly and self.channel_availability is STTChannelAvailability.UNAVAILABLE:
+            object.__setattr__(self, "channel_availability", STTChannelAvailability.CONTINUE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,9 +272,13 @@ class STTProviderInputTerminal:
     channel: Literal["self", "peer"]
     failure_reason: str | None = None
     epoch_disposition: Literal["reuse", "retire"] = "reuse"
-    recovery_pending: bool = False
+    channel_availability: STTChannelAvailability = STTChannelAvailability.UNAVAILABLE
     failure_diagnostics: ErrorDiagnostics | None = None
     independent_recognition: bool = False
+
+    def __post_init__(self) -> None:
+        if self.outcome in {"submitted", "cancelled"}:
+            object.__setattr__(self, "channel_availability", STTChannelAvailability.CONTINUE)
 
 
 @dataclass(frozen=True, slots=True)

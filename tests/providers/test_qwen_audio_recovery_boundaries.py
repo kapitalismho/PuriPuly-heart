@@ -32,6 +32,7 @@ from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
 from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
 from puripuly_heart.core.runtime.local_asr_provider_runtime import LocalASRProviderRuntimeOwner
 from puripuly_heart.core.stt.backend import (
+    STTChannelAvailability,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTSessionProjection,
@@ -325,7 +326,7 @@ async def test_actual_peer_readiness_budget_cooldown_keeps_capture_and_later_sou
         assert transport.attempts == 0
         await utterance(env, 0.1)
         await wait_until(lambda: len(terminals(env)) == 1)
-        assert [(event.outcome, event.recovery_pending) for event in terminals(env)] == [
+        assert [(event.outcome, (event.channel_availability is STTChannelAvailability.RECOVERING)) for event in terminals(env)] == [
             ("failed", True)
         ]
         assert transport.attempts == 3
@@ -335,7 +336,7 @@ async def test_actual_peer_readiness_budget_cooldown_keeps_capture_and_later_sou
         await utterance(env, 0.2)
         await wait_until(lambda: len(terminals(env)) == 2)
         assert transport.attempts == 3
-        assert all(event.recovery_pending for event in terminals(env))
+        assert all((event.channel_availability is STTChannelAvailability.RECOVERING) for event in terminals(env))
         await env.factory.clock.advance_to(30)
         await asyncio.sleep(0.01)
         assert transport.attempts == 3
@@ -370,7 +371,7 @@ async def test_actual_peer_readiness_budget_cooldown_keeps_capture_and_later_sou
                     "cooldown_s": 30,
                     "source_times_s": [0, 29.999, 30],
                     "terminals": [
-                        (event.outcome, event.recovery_pending) for event in terminals(env)
+                        (event.outcome, (event.channel_availability is STTChannelAvailability.RECOVERING)) for event in terminals(env)
                     ],
                     "successful_pcm_bytes": sum(
                         len(value) for value in socket.sent if isinstance(value, bytes)
@@ -408,7 +409,7 @@ async def test_successor_readiness_failure_does_not_revoke_predecessor_or_clear_
             await finish(first, "legitimate predecessor tail")
         await wait_until(lambda: len(terminals(env)) == 2)
         assert [
-            (event.outcome, event.text, event.recovery_pending) for event in terminals(env)
+            (event.outcome, event.text, (event.channel_availability is STTChannelAvailability.RECOVERING)) for event in terminals(env)
         ] == [
             ("final", "legitimate predecessor tail", False),
             ("failed", "", True),
@@ -449,7 +450,7 @@ async def test_actual_native_nonrecoverable_readiness_does_not_retry_or_enter_co
         await wait_until(lambda: bool(terminals(env)))
         assert transport.attempts == 1
         assert env.factory.delays == []
-        assert not terminals(env)[0].recovery_pending
+        assert terminals(env)[0].channel_availability is not STTChannelAvailability.RECOVERING
         assert env.factory.engines[0]._connection_retry_at_s is None
 
 
@@ -464,7 +465,7 @@ async def test_actual_task_started_timeout_retries_without_pcm_or_duplicate_publ
         assert all(socket.closed for socket in sockets)
         assert all(not any(isinstance(value, bytes) for value in socket.sent) for socket in sockets)
         assert len({socket.task_ids[0] for socket in sockets}) == 3
-        assert terminals(env)[0].recovery_pending
+        assert (terminals(env)[0].channel_availability is STTChannelAvailability.RECOVERING)
         assert env.owner.snapshot.effective_active
 
 
@@ -477,7 +478,7 @@ async def test_uncertain_pcm_write_is_not_retried_as_readiness_or_replayed():
         await utterance(env)
         await wait_until(lambda: bool(terminals(env)))
         assert transport.attempts == 1
-        assert not terminals(env)[0].recovery_pending
+        assert terminals(env)[0].channel_availability is not STTChannelAvailability.RECOVERING
         assert not any(isinstance(value, bytes) for value in socket.sent)
         assert env.factory.delays == []
 

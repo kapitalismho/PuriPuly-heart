@@ -24,6 +24,7 @@ from puripuly_heart.core.stt.backend import (
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
+    STTChannelAvailability,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
@@ -254,6 +255,20 @@ class _LocalGpuSTTSession(STTBackendSession):
                 text_authority="authoritative" if outcome in ("final", "empty") else "none",
                 failure_reason=failure_reason,
                 epoch_disposition="retire" if retire else "reuse",
+                channel_availability=(
+                    STTChannelAvailability.RECOVERING
+                    if isinstance(exception, GpuASRDecodeDropped)
+                    else (
+                        STTChannelAvailability.CONTINUE
+                        if isinstance(exception, GpuASRWorkExpired)
+                        or (
+                            isinstance(exception, GpuASRWorkDiscarded)
+                            and exception.reason == "pending_capacity"
+                        )
+                        else STTChannelAvailability.UNAVAILABLE
+                    )
+                ),
+                failure_resource_id=getattr(exception, "failure_resource_id", None),
                 failure_diagnostics=(
                     recognition_failure_diagnostics(
                         exception,

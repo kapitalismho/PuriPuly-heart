@@ -175,6 +175,7 @@ _ENUM_FIELDS = {
     **QWEN_FAILURE_ENUM_FIELDS,
     **{key: frozenset(values) for key, values in QQ_ENUM_FIELDS.items()},
     "channel": frozenset({"self", "peer"}),
+    "channel_availability": frozenset({"continue", "recovering", "unavailable"}),
     "audio_failure_code": AUDIO_DIAGNOSE_FAILURE_CODES | {"none"},
     "audio_restore_self": frozenset(
         {"not_needed", "restored", "skipped", "failed", "cleanup_pending"}

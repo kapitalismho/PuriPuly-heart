@@ -305,6 +305,7 @@ _STT_STARTUP_FAILURE_CODES: Final = frozenset(
         "activation_cancelled",
         "backend_failure",
         "channel_cancel_timeout",
+        "decode_failure",
         "device_change_requires_quiesce",
         "device_unavailable",
         "download_failed",

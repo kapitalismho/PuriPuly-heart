@@ -25,7 +25,10 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTSessionProjection,
 )
-from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+from puripuly_heart.core.stt.diagnostics import (
+    recognition_failure_diagnostics,
+    retryable_transport_failure,
+)
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
@@ -563,6 +566,14 @@ class _ElevenLabsScribeSession(STTBackendSession):
             reason=reason,
             identity=identity,
         )
+        retryable = (
+            reason in {
+                "scribe_session_time_limit_exceeded", "scribe_insufficient_audio_activity",
+                "scribe_connection_closed", "scribe_connection_ended", "scribe_rate_limited",
+                "scribe_resource_exhausted", "scribe_server_error",
+            }
+            or retryable_transport_failure(exception)
+        )
         if identity is not None:
             self._event_projection.terminal(
                 STTProviderTurnTerminal(
@@ -571,6 +582,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
                     text_authority="none",
                     failure_reason=reason,
                     epoch_disposition="retire",
+                    failure_retryable=retryable,
                     provenance=tuple(self._scoped_provenance),
                     failure_diagnostics=diagnostics,
                 )
@@ -580,6 +592,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
             orderly=orderly,
             reason=reason,
             provider_turn_id=provider_turn_id,
+            failure_retryable=retryable,
             failure_diagnostics=diagnostics,
         )
 

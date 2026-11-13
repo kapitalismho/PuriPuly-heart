@@ -27,6 +27,7 @@ from puripuly_heart.core.stt.backend import (
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
+    STTChannelAvailability,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
@@ -79,6 +80,7 @@ class LocalOfflineSTTBackend(STTBackend):
     queue_clock: Callable[[], float] = field(default_factory=lambda: time.monotonic)
     attempt_log_sink: LocalASRAttemptLogSink | None = field(default=None, repr=False)
     _recognizer: object | None = field(init=False, default=None, repr=False)
+    _failed_recognizer: bool = field(init=False, default=False, repr=False)
     _load_lock: asyncio.Lock = field(init=False, repr=False)
     _decode_lock: asyncio.Lock = field(init=False, repr=False)
     _session_handoff_tail: asyncio.Event | None = field(init=False, default=None, repr=False)
@@ -139,8 +141,8 @@ class LocalOfflineSTTBackend(STTBackend):
         try:
             while True:
                 try:
-                    async with self._load_lock:
-                        async with self._decode_lock:
+                    async with self._decode_lock:
+                        async with self._load_lock:
                             if self._recognizer is not None:
                                 await self._close_resource(self._recognizer)
                             self._recognizer = None
@@ -161,14 +163,19 @@ class LocalOfflineSTTBackend(STTBackend):
     async def _ensure_recognizer(self) -> object:
         if self._closed:
             raise RuntimeError("Local STT backend is closed")
-        if self._recognizer is not None:
+        if self._recognizer is not None and not self._failed_recognizer:
             return self._recognizer
 
         async with self._load_lock:
             if self._closed:
                 raise RuntimeError("Local STT backend is closed")
-            if self._recognizer is not None:
+            if self._recognizer is not None and not self._failed_recognizer:
                 return self._recognizer
+            if self._failed_recognizer:
+                if self._recognizer is not None:
+                    await self._close_resource(self._recognizer)
+                self._recognizer = None
+                self._failed_recognizer = False
             await run_owned_thread_call(self._validate_runtime_assets)
             if self._closed:
                 raise RuntimeError("Local STT backend is closed")
@@ -198,23 +205,30 @@ class LocalOfflineSTTBackend(STTBackend):
         return await self.decode_f32(pcm16le_bytes_to_float32(pcm16le))
 
     async def decode_f32(self, samples_f32: np.ndarray) -> str:
-        recognizer = await self._ensure_recognizer()
         async with self._decode_lock:
-            if self._closed:
-                raise RuntimeError("Local STT backend is closed")
-            try:
-                return await run_owned_thread_call(
-                    partial(
-                        self._decode_f32_sync,
-                        recognizer,
-                        samples_f32,
-                    )
+            return await self._decode_owned(samples_f32)
+
+    async def _decode_owned(self, samples_f32: np.ndarray) -> str:
+        recognizer = await self._ensure_recognizer()
+        if self._closed:
+            raise RuntimeError("Local STT backend is closed")
+        try:
+            return await run_owned_thread_call(
+                partial(
+                    self._decode_f32_sync,
+                    recognizer,
+                    samples_f32,
                 )
-            except Exception as exc:
-                raise self._inference_error(exc) from exc
+            )
+        except Exception as exc:
+            self._failed_recognizer = True
+            raise self._inference_error(exc) from exc
 
     def _inference_error(self, exc: Exception) -> RuntimeError:
         return RuntimeError(str(exc))
+
+    def decode_failure_retryable(self, error: BaseException | None) -> bool:
+        return False
 
     def _decode_f32_sync(self, recognizer: object, samples_f32: np.ndarray) -> str:
         samples = np.asarray(samples_f32, dtype=np.float32).reshape(-1).copy()
@@ -424,6 +438,13 @@ class LocalOfflineSTTSession(STTBackendSession):
                 text_authority=authority,
                 failure_reason=failure_reason,
                 epoch_disposition="retire" if should_retire else "reuse",
+                channel_availability=(
+                    STTChannelAvailability.CONTINUE
+                    if outcome == "expired"
+                    else STTChannelAvailability.UNAVAILABLE
+                ),
+                failure_retryable=self.backend.decode_failure_retryable(exception),
+                failure_resource_id=getattr(exception, "failure_resource_id", None),
                 failure_diagnostics=(
                     recognition_failure_diagnostics(
                         exception,

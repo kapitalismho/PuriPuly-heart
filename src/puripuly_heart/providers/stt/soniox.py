@@ -389,6 +389,7 @@ class _SonioxSession(STTBackendSession):
         except websockets.exceptions.InvalidStatus as exc:
             status = _safe_code(exc.response.status_code, maximum=999999)
             if status in _RETRYABLE_SERVER_ERRORS:
+                exc.readiness_retryable = True
                 raise
             raise PermanentSTTScopedSessionError("soniox_connection_rejected") from exc
         except (
@@ -429,9 +430,11 @@ class _SonioxSession(STTBackendSession):
                         else RuntimeError("soniox_request_failed")
                     )
                     error.failure_diagnostics = self._failure_diagnostics
+                    error.readiness_retryable = not isinstance(error, PermanentSTTScopedSessionError)
                     raise error from exc
             if not _retryable_transport_failure("soniox_write_failed", exc, self._ws):
                 raise PermanentSTTScopedSessionError("soniox_connection_rejected") from exc
+            exc.readiness_retryable = True
             raise
         self._last_send_at = time.monotonic()
 
