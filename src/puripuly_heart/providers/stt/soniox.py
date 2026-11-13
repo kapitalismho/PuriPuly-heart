@@ -430,7 +430,9 @@ class _SonioxSession(STTBackendSession):
                         else RuntimeError("soniox_request_failed")
                     )
                     error.failure_diagnostics = self._failure_diagnostics
-                    error.readiness_retryable = not isinstance(error, PermanentSTTScopedSessionError)
+                    error.readiness_retryable = not isinstance(
+                        error, PermanentSTTScopedSessionError
+                    )
                     raise error from exc
             if not _retryable_transport_failure("soniox_write_failed", exc, self._ws):
                 raise PermanentSTTScopedSessionError("soniox_connection_rejected") from exc

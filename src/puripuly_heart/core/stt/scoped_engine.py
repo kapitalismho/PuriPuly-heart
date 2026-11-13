@@ -1543,10 +1543,9 @@ class ScopedRecognitionEngine:
                 except Exception as exc:
                     self._episode_failures += 1
                     last_error = exc
-                    if (
-                        self._generic_turn_recovery(settings)
-                        and not self._retryable_connection_error(exc, settings.provider_id)
-                    ):
+                    if self._generic_turn_recovery(
+                        settings
+                    ) and not self._retryable_connection_error(exc, settings.provider_id):
                         self._episode_failures = watchdogs.connect_attempts
                         raise
                 else:
@@ -2424,9 +2423,8 @@ class ScopedRecognitionEngine:
                     ),
                 )
                 self._recovery_backoff_pending = recovering
-            elif (
-                not turn.readiness_failure_counted
-                and not self._generic_turn_recovery(turn.settings)
+            elif not turn.readiness_failure_counted and not self._generic_turn_recovery(
+                turn.settings
             ):
                 self._episode_failures += 1
         if should_emit and terminal.outcome in ("failed", "degraded"):
@@ -2562,10 +2560,20 @@ class ScopedRecognitionEngine:
     def _generic_turn_recovery(settings: AudioSegmentSettingsSnapshot | str) -> bool:
         provider_id = settings if isinstance(settings, str) else settings.provider_id
         return provider_id in {
-            "soniox", "deepgram", "elevenlabs_scribe", "custom",
-            "custom_offline", "custom_realtime", "rolling_free",
-            "local_cpu_auto", "local_granite", "local_gigaam", "local_fun_asr_nano",
-            "local_fun_asr_mlt_nano", "local_parakeet_ja", "local_qwen_gpu",
+            "soniox",
+            "deepgram",
+            "elevenlabs_scribe",
+            "custom",
+            "custom_offline",
+            "custom_realtime",
+            "rolling_free",
+            "local_cpu_auto",
+            "local_granite",
+            "local_gigaam",
+            "local_fun_asr_nano",
+            "local_fun_asr_mlt_nano",
+            "local_parakeet_ja",
+            "local_qwen_gpu",
         }
 
     def _account_resource_failure(
@@ -2588,7 +2596,6 @@ class ScopedRecognitionEngine:
             self._counted_resource_failures.popitem(last=False)
         if not turn.readiness_failure_counted:
             self._episode_failures += 1
-
 
     def _can_start_turn(self, settings: AudioSegmentSettingsSnapshot) -> bool:
         if self._turn is not None:
@@ -2888,13 +2895,10 @@ class ScopedRecognitionEngine:
 
     async def _emit(self, event: STTProviderTurnEvent) -> None:
         if isinstance(event, STTProviderEpochEnded):
-            recovering = (
-                not self._terminal_failure_notified
-                and (
-                    self._recovery_backoff_pending
-                    or (self._stream_recovery is not None and self._stream_recovery.pending)
-                    or self._connection_retry_at_s is not None
-                )
+            recovering = not self._terminal_failure_notified and (
+                self._recovery_backoff_pending
+                or (self._stream_recovery is not None and self._stream_recovery.pending)
+                or self._connection_retry_at_s is not None
             )
             event = replace(
                 event,
@@ -2908,9 +2912,8 @@ class ScopedRecognitionEngine:
                     )
                 ),
             )
-        if (
-            isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal)
-            and not (isinstance(event, STTProviderTurnTerminal) and event.outcome == "cancelled")
+        if isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal) and not (
+            isinstance(event, STTProviderTurnTerminal) and event.outcome == "cancelled"
         ):
             generation = self._delivery_generation
             event = replace(event, is_current=lambda: generation == self._delivery_generation)

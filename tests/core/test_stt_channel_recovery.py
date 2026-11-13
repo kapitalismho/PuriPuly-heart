@@ -17,10 +17,19 @@ from tests.core.test_stt_scoped_engine import (
 )
 
 ORDINARY_PROVIDERS = (
-    "soniox", "deepgram", "elevenlabs_scribe", "custom", "rolling_free",
-    "custom_offline", "custom_realtime",
-    "local_cpu_auto", "local_granite", "local_gigaam", "local_fun_asr_nano",
-    "local_fun_asr_mlt_nano", "local_parakeet_ja",
+    "soniox",
+    "deepgram",
+    "elevenlabs_scribe",
+    "custom",
+    "rolling_free",
+    "custom_offline",
+    "custom_realtime",
+    "local_cpu_auto",
+    "local_granite",
+    "local_gigaam",
+    "local_fun_asr_nano",
+    "local_fun_asr_mlt_nano",
+    "local_parakeet_ja",
 )
 
 
@@ -38,10 +47,13 @@ async def test_ordinary_recovery_is_bounded_next_input_not_replay(channel, provi
         delays.append(delay)
 
     engine = ScopedRecognitionEngine(
-        session_factory=factory, channel=channel, event_sink=events.append,
+        session_factory=factory,
+        channel=channel,
+        event_sink=events.append,
         terminal_failure_sink=failures.append,
         watchdog_resolver=lambda _: watchdogs(connect_retry_base_s=0.8, connect_retry_max_s=1.6),
-        sleep=sleep, session_lifetime_enabled=False,
+        sleep=sleep,
+        session_lifetime_enabled=False,
     )
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings(provider_id))
     try:
@@ -50,17 +62,24 @@ async def test_ordinary_recovery_is_bounded_next_input_not_replay(channel, provi
             await engine.handle_owned_vad_event(start)
             if order < 3:
                 session = sessions[-1]
-                session.emit(STTProviderTurnTerminal(
-                    session.requests[-1].identity, "failed", failure_reason="local_decode_failed",
-                    failure_retryable=True, epoch_disposition="retire",
-                ))
+                session.emit(
+                    STTProviderTurnTerminal(
+                        session.requests[-1].identity,
+                        "failed",
+                        failure_reason="local_decode_failed",
+                        failure_retryable=True,
+                        epoch_disposition="retire",
+                    )
+                )
             await engine.handle_owned_vad_event(end)
             if order < 3:
                 await wait_until(lambda: ("close",) in sessions[-1].calls)
         terminals = [event for event in events if isinstance(event, STTProviderTurnTerminal)]
         assert [event.channel_availability for event in terminals] == [
-            STTChannelAvailability.RECOVERING, STTChannelAvailability.RECOVERING,
-            STTChannelAvailability.UNAVAILABLE, STTChannelAvailability.UNAVAILABLE,
+            STTChannelAvailability.RECOVERING,
+            STTChannelAvailability.RECOVERING,
+            STTChannelAvailability.UNAVAILABLE,
+            STTChannelAvailability.UNAVAILABLE,
         ]
         assert len(sessions) == 3
         assert [len(session.requests) for session in sessions] == [1, 1, 1]
@@ -85,8 +104,12 @@ async def test_correlated_failure_and_old_success_do_not_reset_new_failure(chann
         delays.append(delay)
 
     engine = ScopedRecognitionEngine(
-        session_factory=factory, channel=channel, event_sink=events.append,
-        terminal_failure_sink=failures.append, sleep=sleep, session_lifetime_enabled=False,
+        session_factory=factory,
+        channel=channel,
+        event_sink=events.append,
+        terminal_failure_sink=failures.append,
+        sleep=sleep,
+        session_lifetime_enabled=False,
         watchdog_resolver=lambda _: watchdogs(connect_retry_base_s=0.8, connect_retry_max_s=1.6),
     )
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("local_granite"))
@@ -101,10 +124,16 @@ async def test_correlated_failure_and_old_success_do_not_reset_new_failure(chann
         identities = [request.identity for request in sessions[0].requests]
         assert len(identities) == 3
         for identity in identities[1:]:
-            sessions[0].emit(STTProviderTurnTerminal(
-                identity, "failed", failure_reason="local_decode_failed", failure_retryable=True,
-                failure_resource_id="resource-generation-one", epoch_disposition="retire",
-            ))
+            sessions[0].emit(
+                STTProviderTurnTerminal(
+                    identity,
+                    "failed",
+                    failure_reason="local_decode_failed",
+                    failure_retryable=True,
+                    failure_resource_id="resource-generation-one",
+                    epoch_disposition="retire",
+                )
+            )
         await asyncio.sleep(0)
         sessions[0].emit(STTProviderTurnTerminal(identities[0], "final", text="Old queued success"))
         await asyncio.gather(*ends)
@@ -115,10 +144,15 @@ async def test_correlated_failure_and_old_success_do_not_reset_new_failure(chann
             start, _, end = segment_events(ledger, start_sample=order * 20, now=order)
             await engine.handle_owned_vad_event(start)
             session = sessions[-1]
-            session.emit(STTProviderTurnTerminal(
-                session.requests[-1].identity, "failed", failure_reason="local_decode_failed",
-                failure_retryable=True, epoch_disposition="retire",
-            ))
+            session.emit(
+                STTProviderTurnTerminal(
+                    session.requests[-1].identity,
+                    "failed",
+                    failure_reason="local_decode_failed",
+                    failure_retryable=True,
+                    epoch_disposition="retire",
+                )
+            )
             await engine.handle_owned_vad_event(end)
             await wait_until(lambda: ("close",) in session.calls)
         assert len(sessions) == 3
@@ -126,7 +160,11 @@ async def test_correlated_failure_and_old_success_do_not_reset_new_failure(chann
         assert len(failures) == 1
         assert events[-1].channel_availability is STTChannelAvailability.UNAVAILABLE
         assert [event.text for event in events if isinstance(event, STTProviderTurnTerminal)] == [
-            "Old queued success", "", "", "", "",
+            "Old queued success",
+            "",
+            "",
+            "",
+            "",
         ]
     finally:
         await engine.close()
@@ -148,19 +186,30 @@ async def test_recovery_backoff_cannot_restore_revoked_capture_authority(channel
         await release.wait()
 
     engine = ScopedRecognitionEngine(
-        session_factory=factory, channel=channel, event_sink=events.append,
-        watchdog_resolver=lambda _: watchdogs(), sleep=sleep, session_lifetime_enabled=False,
+        session_factory=factory,
+        channel=channel,
+        event_sink=events.append,
+        watchdog_resolver=lambda _: watchdogs(),
+        sleep=sleep,
+        session_lifetime_enabled=False,
     )
-    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("local_fun_asr_nano"))
+    ledger = PeerAudioSegmentLedger(
+        activation_generation=1, settings=settings("local_fun_asr_nano")
+    )
     pending = None
     try:
         start, _, end = segment_events(ledger, start_sample=0, now=0)
         await engine.handle_owned_vad_event(start)
         session = sessions[0]
-        session.emit(STTProviderTurnTerminal(
-            session.requests[0].identity, "failed", failure_reason="local_decode_failed",
-            failure_retryable=True, epoch_disposition="retire",
-        ))
+        session.emit(
+            STTProviderTurnTerminal(
+                session.requests[0].identity,
+                "failed",
+                failure_reason="local_decode_failed",
+                failure_retryable=True,
+                epoch_disposition="retire",
+            )
+        )
         await engine.handle_owned_vad_event(end)
         await wait_until(lambda: ("close",) in session.calls)
         next_start, _, _ = segment_events(ledger, start_sample=20, now=1)
@@ -171,16 +220,19 @@ async def test_recovery_backoff_cannot_restore_revoked_capture_authority(channel
         await pending
         assert len(sessions) == 1
         fresh = PeerAudioSegmentLedger(
-            activation_generation=2, settings=replace(settings("local_fun_asr_nano"), runtime_signature=("new",))
+            activation_generation=2,
+            settings=replace(settings("local_fun_asr_nano"), runtime_signature=("new",)),
         )
         fresh_start, _, fresh_end = segment_events(fresh, start_sample=40, now=2)
         await engine.handle_owned_vad_event(fresh_start)
         sessions[-1].terminal_on_seal = ("final", "Authorized new configuration")
         await engine.handle_owned_vad_event(fresh_end)
         assert len(sessions) == 2
-        assert [event.text for event in events if isinstance(event, STTProviderTurnTerminal) and event.text] == [
-            "Authorized new configuration"
-        ]
+        assert [
+            event.text
+            for event in events
+            if isinstance(event, STTProviderTurnTerminal) and event.text
+        ] == ["Authorized new configuration"]
     finally:
         release.set()
         if pending is not None:
@@ -189,7 +241,9 @@ async def test_recovery_backoff_cannot_restore_revoked_capture_authority(channel
 
 
 @pytest.mark.parametrize("channel", ["self", "peer"])
-@pytest.mark.parametrize("error", [RuntimeError("transient decode retryable"), PermissionError("blocked")])
+@pytest.mark.parametrize(
+    "error", [RuntimeError("transient decode retryable"), PermissionError("blocked")]
+)
 async def test_unknown_or_permanent_readiness_failure_never_uses_generic_retry(channel, error):
     attempts, failures, events = [], [], []
 
@@ -198,11 +252,16 @@ async def test_unknown_or_permanent_readiness_failure_never_uses_generic_retry(c
         raise error
 
     engine = ScopedRecognitionEngine(
-        session_factory=factory, channel=channel, event_sink=events.append,
-        terminal_failure_sink=failures.append, watchdog_resolver=lambda _: watchdogs(),
+        session_factory=factory,
+        channel=channel,
+        event_sink=events.append,
+        terminal_failure_sink=failures.append,
+        watchdog_resolver=lambda _: watchdogs(),
         session_lifetime_enabled=False,
     )
-    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("local_fun_asr_nano"))
+    ledger = PeerAudioSegmentLedger(
+        activation_generation=1, settings=settings("local_fun_asr_nano")
+    )
     try:
         for order in range(2):
             start, _, end = segment_events(ledger, start_sample=order * 20, now=order)
@@ -210,7 +269,9 @@ async def test_unknown_or_permanent_readiness_failure_never_uses_generic_retry(c
             await engine.handle_owned_vad_event(end)
         assert len(attempts) == 1
         assert len(failures) == 1
-        assert all(event.channel_availability is STTChannelAvailability.UNAVAILABLE for event in events)
+        assert all(
+            event.channel_availability is STTChannelAvailability.UNAVAILABLE for event in events
+        )
     finally:
         await engine.close()
 
@@ -229,8 +290,12 @@ async def test_ordinary_recovery_requires_new_recognition_progress(channel, prov
         delays.append(delay)
 
     engine = ScopedRecognitionEngine(
-        session_factory=factory, channel=channel, event_sink=events.append,
-        terminal_failure_sink=failures.append, sleep=sleep, session_lifetime_enabled=False,
+        session_factory=factory,
+        channel=channel,
+        event_sink=events.append,
+        terminal_failure_sink=failures.append,
+        sleep=sleep,
+        session_lifetime_enabled=False,
         watchdog_resolver=lambda _: watchdogs(connect_retry_base_s=0.8, connect_retry_max_s=1.6),
     )
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings(provider_id))
@@ -243,10 +308,15 @@ async def test_ordinary_recovery_requires_new_recognition_progress(channel, prov
                 session.terminal_on_seal = ("final", "New authorized recognition")
             else:
                 session.terminal_on_seal = None
-                session.emit(STTProviderTurnTerminal(
-                    session.requests[-1].identity, "failed", failure_reason="local_decode_failed",
-                    failure_retryable=True, epoch_disposition="retire",
-                ))
+                session.emit(
+                    STTProviderTurnTerminal(
+                        session.requests[-1].identity,
+                        "failed",
+                        failure_reason="local_decode_failed",
+                        failure_retryable=True,
+                        epoch_disposition="retire",
+                    )
+                )
             await engine.handle_owned_vad_event(end)
             if order != 1:
                 await wait_until(lambda: ("close",) in session.calls)

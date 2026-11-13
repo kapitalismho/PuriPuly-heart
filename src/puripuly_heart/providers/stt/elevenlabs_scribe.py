@@ -566,14 +566,15 @@ class _ElevenLabsScribeSession(STTBackendSession):
             reason=reason,
             identity=identity,
         )
-        retryable = (
-            reason in {
-                "scribe_session_time_limit_exceeded", "scribe_insufficient_audio_activity",
-                "scribe_connection_closed", "scribe_connection_ended", "scribe_rate_limited",
-                "scribe_resource_exhausted", "scribe_server_error",
-            }
-            or retryable_transport_failure(exception)
-        )
+        retryable = reason in {
+            "scribe_session_time_limit_exceeded",
+            "scribe_insufficient_audio_activity",
+            "scribe_connection_closed",
+            "scribe_connection_ended",
+            "scribe_rate_limited",
+            "scribe_resource_exhausted",
+            "scribe_server_error",
+        } or retryable_transport_failure(exception)
         if identity is not None:
             self._event_projection.terminal(
                 STTProviderTurnTerminal(

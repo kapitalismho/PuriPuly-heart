@@ -145,11 +145,16 @@ def retryable_transport_failure(exception: BaseException | None) -> bool:
     if exception is None:
         return False
     for cause in transport_exception_chain(exception):
-        if isinstance(cause, (FileNotFoundError, IsADirectoryError, NotADirectoryError, PermissionError)):
+        if isinstance(
+            cause, (FileNotFoundError, IsADirectoryError, NotADirectoryError, PermissionError)
+        ):
             return False
         diagnostics = getattr(cause, "failure_diagnostics", None)
         if isinstance(diagnostics, ErrorDiagnostics) and diagnostics.category in {
-            "auth", "quota", "configuration", "invalid_request"
+            "auth",
+            "quota",
+            "configuration",
+            "invalid_request",
         }:
             return False
         response = getattr(cause, "response", None)

@@ -421,7 +421,7 @@ async def test_failed_attempt_close_quarantines_socket_and_preserves_predecessor
             await finish(first, "Healthy predecessor retained.")
             await wait_until(lambda: len(terminals(env)) == 2)
             assert terminals(env)[0].text == "Healthy predecessor retained."
-            assert (terminals(env)[1].channel_availability is STTChannelAvailability.RECOVERING)
+            assert terminals(env)[1].channel_availability is STTChannelAvailability.RECOVERING
             assert env.owner.snapshot.effective_active
             await wait_until(lambda: not any(not task.done() for task in engine._cleanup_tasks))
             assert engine.cleanup_debt > 0

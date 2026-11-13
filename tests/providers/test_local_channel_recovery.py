@@ -74,8 +74,11 @@ async def test_fun_asr_decode_failure_crosses_capture_and_real_translation_consu
 ):
     workers = RecoveryWorkers(always_fail=always_fail)
     backend = LocalCppSTTBackend(
-        model_dir=tmp_path, model_id=FUN_ASR_NANO_MODEL_ID,
-        provider_id="local_fun_asr_nano", stream_label="self", process_factory=workers,
+        model_dir=tmp_path,
+        model_id=FUN_ASR_NANO_MODEL_ID,
+        provider_id="local_fun_asr_nano",
+        stream_label="self",
+        process_factory=workers,
     )
     monkeypatch.setattr(backend, "_validate_runtime_assets", lambda: None)
     terminals, delays = [], []
@@ -95,7 +98,10 @@ async def test_fun_asr_decode_failure_crosses_capture_and_real_translation_consu
         await callbacks.self_event_handler(event)
 
     engine = ScopedRecognitionEngine(
-        session_factory=factory, channel="self", event_sink=on_event, sleep=sleep,
+        session_factory=factory,
+        channel="self",
+        event_sink=on_event,
+        sleep=sleep,
         watchdog_resolver=lambda _: watchdogs(connect_retry_base_s=0.8, connect_retry_max_s=1.6),
         session_lifetime_enabled=False,
     )
@@ -107,7 +113,9 @@ async def test_fun_asr_decode_failure_crosses_capture_and_real_translation_consu
     callbacks.bind_self_capture(capture)
     capture_config = replace(config(local_cpu=True), provider_id="local_fun_asr_nano")
     engine.accepted_settings_scope = (
-        capture_config.provider_id, capture_config.provider_signature, capture_config.runtime_signature
+        capture_config.provider_id,
+        capture_config.provider_signature,
+        capture_config.runtime_signature,
     )
     try:
         await translation.start()
@@ -118,10 +126,13 @@ async def test_fun_asr_decode_failure_crosses_capture_and_real_translation_consu
         initial_loop = capture.loop_task
         for order in range(3 if always_fail else 2):
             segment_id = uuid4()
-            await guarded.handle_vad_event(SpeechStart(
-                segment_id, pre_roll=np.empty(0, dtype=np.float32),
-                chunk=np.full(160, 0.1 + order / 10, dtype=np.float32),
-            ))
+            await guarded.handle_vad_event(
+                SpeechStart(
+                    segment_id,
+                    pre_roll=np.empty(0, dtype=np.float32),
+                    chunk=np.full(160, 0.1 + order / 10, dtype=np.float32),
+                )
+            )
             await guarded.handle_vad_event(SpeechEnd(segment_id))
             await wait_until(lambda: len(terminals) == order + 1)
             if not always_fail or order < 2:
@@ -129,8 +140,11 @@ async def test_fun_asr_decode_failure_crosses_capture_and_real_translation_consu
                 assert capture.loop_task is initial_loop
         assert [worker.calls for worker in workers.workers] == [1] * len(workers.workers)
         assert all(worker.is_closed for worker in workers.workers[:-1])
-        assert all(event.failure_diagnostics.fields["native_classification"] == "decode_failure"
-                   for event in terminals if event.outcome == "failed")
+        assert all(
+            event.failure_diagnostics.fields["native_classification"] == "decode_failure"
+            for event in terminals
+            if event.outcome == "failed"
+        )
         assert terminals[0].channel_availability is STTChannelAvailability.RECOVERING
         if always_fail:
             await wait_until(lambda: not capture.snapshot.effective_active)
@@ -159,11 +173,16 @@ async def test_fun_asr_decode_failure_crosses_capture_and_real_translation_consu
 
 
 @pytest.mark.parametrize("channel", ["self", "peer"])
-async def test_cpu_replacement_refuses_unconfirmed_old_worker_cleanup(tmp_path, monkeypatch, channel):
+async def test_cpu_replacement_refuses_unconfirmed_old_worker_cleanup(
+    tmp_path, monkeypatch, channel
+):
     workers = RecoveryWorkers(unsafe_cleanup=True)
     backend = LocalCppSTTBackend(
-        model_dir=tmp_path, model_id=FUN_ASR_NANO_MODEL_ID,
-        provider_id="local_fun_asr_nano", stream_label=channel, process_factory=workers,
+        model_dir=tmp_path,
+        model_id=FUN_ASR_NANO_MODEL_ID,
+        provider_id="local_fun_asr_nano",
+        stream_label=channel,
+        process_factory=workers,
     )
     monkeypatch.setattr(backend, "_validate_runtime_assets", lambda: None)
     try:
@@ -186,7 +205,9 @@ async def test_cpu_replacement_refuses_unconfirmed_old_worker_cleanup(tmp_path, 
 
 @pytest.mark.parametrize("channel", ["self", "peer"])
 @pytest.mark.parametrize("replacement_fails", [False, True])
-async def test_gpu_owned_restart_drop_is_not_an_upper_layer_channel_stop(channel, replacement_fails):
+async def test_gpu_owned_restart_drop_is_not_an_upper_layer_channel_stop(
+    channel, replacement_fails
+):
     native_failure = ASRWorkerRequestError("decode_failure", attempt_started=True)
     first = FakeASRWorkerClient(transcribe_error=native_failure)
     replacement = FakeASRWorkerClient(
@@ -195,8 +216,11 @@ async def test_gpu_owned_restart_drop_is_not_an_upper_layer_channel_stop(channel
     factory = FakeASRWorkerFactory([first, replacement])
     runtime = SharedGpuASRRuntime(process_factory=factory)
     backend = LocalGpuSTTBackend(
-        runtime=runtime, channel=channel, model_path=Path("controlled-model.gguf"),
-        model_id="controlled-gpu", device_id="auto",
+        runtime=runtime,
+        channel=channel,
+        model_path=Path("controlled-model.gguf"),
+        model_id="controlled-gpu",
+        device_id="auto",
     )
     events, failures, delays = [], [], []
 
@@ -207,8 +231,12 @@ async def test_gpu_owned_restart_drop_is_not_an_upper_layer_channel_stop(channel
         delays.append(delay)
 
     engine = ScopedRecognitionEngine(
-        session_factory=open_session, channel=channel, event_sink=events.append,
-        terminal_failure_sink=failures.append, sleep=sleep, session_lifetime_enabled=False,
+        session_factory=open_session,
+        channel=channel,
+        event_sink=events.append,
+        terminal_failure_sink=failures.append,
+        sleep=sleep,
+        session_lifetime_enabled=False,
         watchdog_resolver=lambda _: watchdogs(final_timeout_s=1.0),
     )
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("local_qwen_gpu"))
@@ -222,7 +250,10 @@ async def test_gpu_owned_restart_drop_is_not_an_upper_layer_channel_stop(channel
                 assert events[0].outcome == "failed"
                 assert events[0].channel_availability is STTChannelAvailability.RECOVERING
                 assert not failures
-                assert events[0].failure_diagnostics.fields["native_classification"] == "decode_failure"
+                assert (
+                    events[0].failure_diagnostics.fields["native_classification"]
+                    == "decode_failure"
+                )
         assert first.is_closed
         assert len(first.transcribe_calls) == len(replacement.transcribe_calls) == 1
         assert factory.modes == ["persistent", "persistent"]

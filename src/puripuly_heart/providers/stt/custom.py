@@ -70,9 +70,13 @@ def _retryable_request_failure(exception: BaseException | None, reason: str | No
     if isinstance(exception, CustomSTTRequestError):
         return exception.category == CUSTOM_STT_VALIDATION_UNREACHABLE
     return reason in {
-        "offline_total_timeout", "native_transcription_failed", "connection_eof",
-        "provider_final_timeout", "final_timeout",
+        "offline_total_timeout",
+        "native_transcription_failed",
+        "connection_eof",
+        "provider_final_timeout",
+        "final_timeout",
     } or retryable_transport_failure(exception)
+
 
 _OFFLINE_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
 _OFFLINE_TOTAL_TIMEOUT_S = 50.0

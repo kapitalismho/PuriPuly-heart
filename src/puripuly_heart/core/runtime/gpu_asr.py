@@ -1413,9 +1413,7 @@ class SharedGpuASRRuntime:
                 fields[key] = value
         await self._emit("worker_lifecycle", fields)
 
-    def _discard_pending_locked(
-        self, reason: str, cause: BaseException | None = None
-    ) -> None:
+    def _discard_pending_locked(self, reason: str, cause: BaseException | None = None) -> None:
         while self._queue:
             work = heapq.heappop(self._queue)
             work.discard_reason = reason
