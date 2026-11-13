@@ -2081,7 +2081,9 @@ class ApplicationControlOwner:
                                         (languages.effective_peer_target,) if languages else ()
                                     )
                                 else:
-                                    source_language = languages.source_language if languages else None
+                                    source_language = (
+                                        languages.source_language if languages else None
+                                    )
                                     target_languages = (
                                         tuple(
                                             language
