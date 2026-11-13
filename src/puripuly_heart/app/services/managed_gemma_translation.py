@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import threading
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -152,13 +153,13 @@ class ManagedGemmaTranslationOwner:
                     "ModelDownload",
                     "cleanup",
                     "residue_removed",
+                    level=logging.INFO,
                 )
 
     async def prepare(
         self,
         selection: ManagedGemmaTranslationSelection,
     ) -> ManagedGemmaActivation:
-        self._ensure_startup_cleanup()
         backend = selection.backend
         if self._asset_task is not None:
             raise GemmaProvisioningError("Another model task is active", failure_code="task_busy")
@@ -189,9 +190,10 @@ class ManagedGemmaTranslationOwner:
                 )
 
             spec = resolve_gemma_spec(selection.model_id)
-            task = start_lifecycle_task(
-                self._task_scope,
-                self._runtime.prepare(
+
+            async def prepare_runtime() -> ManagedGemmaReadiness:
+                await run_owned_thread_call(self._ensure_startup_cleanup)
+                return await self._runtime.prepare(
                     backend=backend,
                     source_language=selection.source_language,
                     target_language=selection.target_language,
@@ -205,7 +207,11 @@ class ManagedGemmaTranslationOwner:
                         "spec": spec,
                         "locale": selection.locale,
                     },
-                ),
+                )
+
+            task = start_lifecycle_task(
+                self._task_scope,
+                prepare_runtime(),
                 name=f"prepare-{generation}",
             )
             self._prepare_task = task
@@ -300,7 +306,6 @@ class ManagedGemmaTranslationOwner:
     ) -> InstalledGemmaManifest:
         from puripuly_heart.core.feature_diagnostics import log_feature
 
-        self._ensure_startup_cleanup()
         if self._closed:
             raise RuntimeError("Model owner closed")
         if self._lock.locked() or self._asset_task is not None:
@@ -313,9 +318,9 @@ class ManagedGemmaTranslationOwner:
             else None if source == "local" else self._downloader
         )
 
-        task = start_lifecycle_task(
-            self._task_scope,
-            ensure_gemma_installed(
+        async def install() -> InstalledGemmaManifest:
+            await run_owned_thread_call(self._ensure_startup_cleanup)
+            return await ensure_gemma_installed(
                 source=source,
                 spec=spec,
                 downloader=downloader,
@@ -323,7 +328,11 @@ class ManagedGemmaTranslationOwner:
                 on_status=on_status,
                 locale=locale,
                 verify_existing_checksums=True,
-            ),
+            )
+
+        task = start_lifecycle_task(
+            self._task_scope,
+            install(),
             name="install-assets",
         )
         self._asset_task = task
@@ -358,7 +367,6 @@ class ManagedGemmaTranslationOwner:
             remove_model_install_dir,
         )
 
-        self._ensure_startup_cleanup()
         if self._asset_task is not None:
             raise GemmaProvisioningError("Another model task is active", failure_code="task_busy")
         lingering = self._cancel_linger()
@@ -378,6 +386,7 @@ class ManagedGemmaTranslationOwner:
                 raise ModelInstallInUseError("Model is loaded for translation")
             if self._active_generation is None:
                 await self._runtime.release()
+            await run_owned_thread_call(self._ensure_startup_cleanup)
             install_dir = default_gemma_install_dir(resolve_gemma_spec(model_id))
 
             def remove_install() -> None:

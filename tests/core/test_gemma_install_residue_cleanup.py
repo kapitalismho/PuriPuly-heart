@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
+import logging
+import threading
 import uuid
+from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from puripuly_heart.app.ports.managed_gemma_translation import (
+    ManagedGemmaTranslationSelection,
+)
 from puripuly_heart.app.services.managed_gemma_translation import (
     ManagedGemmaTranslationOwner,
 )
@@ -12,13 +22,27 @@ from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     LocalSTTProvisioningLease,
 )
 from puripuly_heart.core.local_translation import assets as gemma_assets
+from puripuly_heart.core.local_translation.provisioning import GemmaProvisioningCancelled
+from puripuly_heart.core.local_translation.runtime import ManagedGemmaReadiness
 
 GEMMA_E4B = gemma_assets.GEMMA_MODEL_ID
 GEMMA_26B = gemma_assets.GEMMA_26B_MODEL_ID
 
 
 class _StubRuntime:
+    async def prepare(self, *, backend: str, **kwargs: object) -> ManagedGemmaReadiness:
+        return ManagedGemmaReadiness(
+            requested_backend=backend,
+            effective_backend="cpu",
+            source_language="ko",
+            target_language="en",
+            prefix_identity="cleanup-test",
+        )
+
     async def release(self) -> None:
+        return None
+
+    async def close(self) -> None:
         return None
 
 
@@ -46,6 +70,76 @@ def models_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     root.mkdir()
     monkeypatch.setattr(gemma_assets, "default_models_dir", lambda: root)
     return root
+
+
+@pytest.fixture()
+def installed_model(models_root: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    pinned = gemma_assets.e4b_gemma_spec()
+    contents = b"verified-model"
+    spec = replace(
+        pinned,
+        draft_filename=None,
+        assets=(
+            gemma_assets.GemmaAsset(
+                pinned.model_filename, len(contents), hashlib.sha256(contents).hexdigest()
+            ),
+        ),
+    )
+    monkeypatch.setattr(gemma_assets, "e4b_gemma_spec", lambda: spec)
+    install = models_root / spec.install_dirname
+    install.mkdir()
+    (install / spec.model_filename).write_bytes(contents)
+    (install / gemma_assets.GEMMA_INSTALLED_MANIFEST_FILENAME).write_text(
+        json.dumps(gemma_assets.InstalledGemmaManifest.expected(spec).to_dict()),
+        encoding="utf-8",
+    )
+    return install
+
+
+@pytest.fixture()
+def blocked_cleanup(
+    models_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[tuple[Path, threading.Event, threading.Event]]:
+    staging = _residue(models_root, GEMMA_E4B, "staging")
+    entered = threading.Event()
+    release = threading.Event()
+    remove = gemma_assets.shutil.rmtree
+
+    def gated_remove(path, *args, **kwargs):
+        if Path(path) == staging:
+            entered.set()
+            assert release.wait(5)
+        return remove(path, *args, **kwargs)
+
+    monkeypatch.setattr(gemma_assets.shutil, "rmtree", gated_remove)
+    try:
+        yield staging, entered, release
+    finally:
+        release.set()
+
+
+async def _run_operation(owner: ManagedGemmaTranslationOwner, operation: str) -> object:
+    if operation == "prepare":
+        return await owner.prepare(
+            ManagedGemmaTranslationSelection(
+                backend="cpu",
+                source_language="ko",
+                target_language="en",
+                system_prompt="translate",
+                locale="en",
+            )
+        )
+    if operation == "install":
+        return await owner.install_assets(model_id=GEMMA_E4B)
+    return await owner.delete_assets(GEMMA_E4B)
+
+
+def _lease_available(models_root: Path) -> bool:
+    lease = LocalSTTProvisioningLease.acquire(model_root=models_root, wait=False)
+    if lease is None:
+        return False
+    lease.close()
+    return True
 
 
 def test_interrupted_delete_residue_is_reconciled_on_next_inspect(
@@ -122,8 +216,6 @@ def test_delete_assets_reconciles_preexisting_staging_residue(models_root: Path)
     staging = _residue(models_root, GEMMA_E4B, "staging")
     owner = _owner()
 
-    import asyncio
-
     asyncio.run(owner.delete_assets(GEMMA_E4B))
 
     assert not install.exists()
@@ -161,3 +253,119 @@ def test_cleanup_function_rejects_unsafe_dirnames(models_root: Path) -> None:
     for bad in (("",), (".hidden",), ("../escape",), ("a/b",)):
         with pytest.raises(ValueError):
             gemma_assets.cleanup_gemma_install_residue(install_dirnames=bad)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["prepare", "install", "delete"])
+@pytest.mark.parametrize("finish", ["success", "cancel", "close", "concurrent-inspection"])
+async def test_cleanup_preserves_responsiveness_and_operation_lifetime(
+    models_root: Path,
+    installed_model: Path,
+    blocked_cleanup: tuple[Path, threading.Event, threading.Event],
+    operation: str,
+    finish: str,
+) -> None:
+    staging, entered, release = blocked_cleanup
+    owner = _owner()
+    inspection = None
+    closing = None
+    task = None
+    try:
+        if finish == "concurrent-inspection":
+            inspection = asyncio.create_task(asyncio.to_thread(owner.install_status, GEMMA_26B))
+            assert await asyncio.to_thread(entered.wait, 5)
+        task = asyncio.create_task(_run_operation(owner, operation))
+        assert await asyncio.to_thread(entered.wait, 5)
+        for _ in range(5):
+            await asyncio.sleep(0)
+
+        assert not task.done()
+        assert staging.exists()
+        assert installed_model.exists()
+        assert not _lease_available(models_root)
+
+        if finish == "cancel":
+            for _ in range(2):
+                if operation == "prepare":
+                    assert owner.cancel()
+                elif operation == "install":
+                    assert owner.cancel_assets(GEMMA_E4B)
+                else:
+                    task.cancel()
+                for _ in range(5):
+                    await asyncio.sleep(0)
+            assert not task.done()
+            assert installed_model.exists()
+            assert not _lease_available(models_root)
+        elif finish == "close":
+            closing = asyncio.create_task(owner.close())
+            for _ in range(5):
+                await asyncio.sleep(0)
+            assert not closing.done()
+            assert owner.snapshot.state != "closed"
+            assert installed_model.exists()
+            assert not _lease_available(models_root)
+        elif inspection is not None:
+            assert not inspection.done()
+    finally:
+        release.set()
+        if task is not None:
+            result = (await asyncio.gather(task, return_exceptions=True))[0]
+        if inspection is not None:
+            inspection_result = await inspection
+        if closing is not None:
+            await closing
+        await owner.close()
+
+    assert not staging.exists()
+    assert _lease_available(models_root)
+    if finish == "cancel" or (finish == "close" and operation != "delete"):
+        assert isinstance(result, (asyncio.CancelledError, GemmaProvisioningCancelled))
+        gemma_assets.validate_gemma_install(installed_model)
+    elif operation == "delete":
+        assert result is None
+        assert not installed_model.exists()
+    elif operation == "install":
+        assert result == gemma_assets.InstalledGemmaManifest.expected()
+        gemma_assets.validate_gemma_install(installed_model)
+    else:
+        assert result.readiness.effective_backend == "cpu"
+        gemma_assets.validate_gemma_install(installed_model)
+    if inspection is not None:
+        assert inspection_result == "missing"
+    assert owner.snapshot.state == "closed"
+
+
+@pytest.mark.parametrize("failure", [False, True], ids=["success", "failure"])
+def test_cleanup_logs_success_as_info_and_failure_as_error(
+    models_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    failure: bool,
+) -> None:
+    staging = _residue(models_root, GEMMA_E4B, "staging")
+    if failure:
+
+        def deny_removal(path):
+            raise PermissionError("synthetic deletion failure")
+
+        monkeypatch.setattr(gemma_assets.shutil, "rmtree", deny_removal)
+
+    with caplog.at_level(logging.INFO, logger="puripuly_heart.core.feature_diagnostics"):
+        assert _owner().install_status(GEMMA_E4B) == "missing"
+
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "puripuly_heart.core.feature_diagnostics"
+    ]
+    assert len(records) == 1
+    if failure:
+        assert staging.exists()
+        assert records[0].levelno == logging.ERROR
+        assert "code=cleanup_failed" in records[0].getMessage()
+    else:
+        assert not staging.exists()
+        assert records[0].levelno == logging.INFO
+        assert "code=residue_removed" in records[0].getMessage()
+        assert "failure" not in records[0].getMessage()
