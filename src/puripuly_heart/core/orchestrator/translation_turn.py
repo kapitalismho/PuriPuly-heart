@@ -1971,13 +1971,22 @@ class TranslationTurnLifecycleOwner:
     ) -> None:
         if parent.closed or parent.execution_started:
             return
+        preserved_results = {
+            child.target_index: result
+            for child in parent.children
+            if (result := parent.results.get(child.target_index)) is not None
+            and result.outcome == "translated"
+            and result.output is not None
+        }
         if parent.draft_request is not None:
             parent.terminal_status = (
                 "expired" if failure_code == "translation_timeout" else "failed"
             )
             if outcome == "source_only":
                 parent.results = {
-                    child.target_index: TranslationTurnProcessResult("source_only")
+                    child.target_index: preserved_results.get(
+                        child.target_index, TranslationTurnProcessResult("source_only")
+                    )
                     for child in parent.children
                 }
                 parent.result_revisions = {
@@ -1989,31 +1998,34 @@ class TranslationTurnLifecycleOwner:
                 for child in parent.children:
                     if child.utterance_id in parent.completed_child_ids:
                         continue
-                    try:
-                        await self.output.submit_translation_output(
-                            TranslationOutputSubmission(
-                                parent_utterance_id=child.parent_utterance_id,
-                                child_utterance_id=child.utterance_id,
-                                sequence=child.sequence,
-                                channel=child.channel,
-                                source=child.source,
-                                source_text=child.transcript.text,
-                                source_language=child.detected_language,
-                                target_language=child.target_language,
-                                outcome="source_only",
-                                config_snapshot=child.config_snapshot,
-                                failure_code=failure_code,
-                                target_index=child.target_index,
-                                turn_generation=child.turn_generation,
-                                turn_order=child.turn_order,
-                                publication_generation=child.transcript.publication_generation,
-                                source_order=child.transcript.source_order,
-                                turn_kind=child.turn_kind,
-                                parent_output_count=child.parent_output_count,
-                                operation_id=child.operation_id,
-                                request_id=child.request_id,
-                            )
+                    preserved = preserved_results.get(child.target_index)
+                    if preserved is not None:
+                        submission = replace(preserved.output, source_text=child.transcript.text)
+                    else:
+                        submission = TranslationOutputSubmission(
+                            parent_utterance_id=child.parent_utterance_id,
+                            child_utterance_id=child.utterance_id,
+                            sequence=child.sequence,
+                            channel=child.channel,
+                            source=child.source,
+                            source_text=child.transcript.text,
+                            source_language=child.detected_language,
+                            target_language=child.target_language,
+                            outcome="source_only",
+                            config_snapshot=child.config_snapshot,
+                            failure_code=failure_code,
+                            target_index=child.target_index,
+                            turn_generation=child.turn_generation,
+                            turn_order=child.turn_order,
+                            publication_generation=child.transcript.publication_generation,
+                            source_order=child.transcript.source_order,
+                            turn_kind=child.turn_kind,
+                            parent_output_count=child.parent_output_count,
+                            operation_id=child.operation_id,
+                            request_id=child.request_id,
                         )
+                    try:
+                        await self.output.submit_translation_output(submission)
                     except Exception:
                         logger.exception("translation retirement output submission failed")
                     else:
