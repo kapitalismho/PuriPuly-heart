@@ -718,6 +718,8 @@ class OutputRuntime:
     async def publish_self_turn(
         self, snapshot: SelfTurnPresentation, configuration: TranslationRuntimeConfig
     ) -> None:
+        if self._state != "open":
+            return
         if snapshot.utterance_id in self._self_stream_completed:
             return
         state = self._self_streams.get(snapshot.utterance_id)
@@ -725,6 +727,9 @@ class OutputRuntime:
             state = _SelfStreamDelivery(snapshot, configuration)
             self._self_streams[snapshot.utterance_id] = state
             async with self._batch_admission.lock:
+                if self._state != "open":
+                    self._self_streams.pop(snapshot.utterance_id, None)
+                    return
                 self._batch_admission.admit_parent(
                     parent_id=str(snapshot.utterance_id),
                     channel="self",
