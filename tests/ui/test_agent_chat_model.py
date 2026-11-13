@@ -111,19 +111,17 @@ def test_command_cards_reuse_the_change_card_and_name_their_fixed_result_line():
     )
 
 
-def test_control_app_progress_lines_come_from_the_requested_action():
-    working = snapshot(
-        busy=True, phase="working", active_tool=("control_app", "query.overlay.status")
-    )
+def test_six_tool_progress_lines_come_from_the_requested_action():
+    working = snapshot(busy=True, phase="working", active_tool=("read_app", "overview"))
     overview = t("agent_chat.subject.overview")
     assert active_status(working).text == t("agent_chat.status.check.active", subject=overview)
-    retrying = snapshot(busy=True, phase="working", active_tool=("control_app", "audio.retry"))
+    retrying = snapshot(busy=True, phase="working", active_tool=("retry_app", "audio"))
     assert active_status(retrying).text == t("agent_chat.status.peer_retry.active")
     results = (
-        AgentToolResult("a", "overlay.set", "applied", {}, "control_app"),
-        AgentToolResult("b", "query.app.status", "observed", {}, "control_app"),
-        AgentToolResult("c", "secrets.delete", "needs_confirmation", {}, "control_app"),
-        AgentToolResult("d", "models.retry", "failed", {}, "control_app"),
+        AgentToolResult("a", "overlay", "applied", {}, "set_app"),
+        AgentToolResult("b", "overview", "observed", {}, "read_app"),
+        AgentToolResult("c", "secrets.delete", "needs_confirmation", {}, "manage_proposal"),
+        AgentToolResult("d", "gpu_activation", "failed", {}, "retry_app"),
     )
     assert done_status(results) == " · ".join(
         (
@@ -134,22 +132,22 @@ def test_control_app_progress_lines_come_from_the_requested_action():
 
 
 def test_progress_line_is_app_defined_and_never_model_text():
-    working = snapshot(busy=True, phase="working", active_tool=("get_app_context", "diagnostics"))
+    working = snapshot(busy=True, phase="working", active_tool=("read_app", "diagnostics"))
     assert active_status(working).text == "최근 오류 확인 중"
     assert active_status(working).busy is True
     assert active_status(snapshot(busy=True, phase="thinking")).text == "생각 중"
     results = (
-        AgentToolResult("a", "overview", "observed", {}),
-        AgentToolResult("b", "diagnostics", "observed", {}),
+        AgentToolResult("a", "overview", "observed", {}, "read_app"),
+        AgentToolResult("b", "diagnostics", "observed", {}, "read_app"),
         AgentToolResult(
             "c",
-            None,
+            "settings",
             "applied",
             {"changes": {"stt.provider": "gemini_transcribe"}},
-            "change_settings",
+            "manage_proposal",
         ),
-        AgentToolResult("d", None, "rejected", {}, "diagnose_microphone"),
-        AgentToolResult("e", None, "withdrawn", {}, "withdraw_confirmation"),
+        AgentToolResult("d", "microphone", "rejected", {}, "probe_app"),
+        AgentToolResult("e", "withdraw", "withdrawn", {}, "manage_proposal"),
     )
     assert done_status(results) == "앱 상태 · 최근 오류 확인함 · 음성 인식 바꿈"
     assert active_status(snapshot()) is None

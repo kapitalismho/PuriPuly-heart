@@ -81,10 +81,12 @@ async def run_translation_probe(
     *,
     source_language: str | None,
     target_languages: tuple[str, ...],
+    channel: str = "self",
 ) -> dict:
     runtime = runtime_provider()
     result = {
         **TRANSLATION_PROBE_METADATA,
+        "channel": channel,
         **translation_probe_direction(source_language, target_languages),
         "status": "action_required",
         "translation_result": "unavailable",

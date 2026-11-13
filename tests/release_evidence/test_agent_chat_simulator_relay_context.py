@@ -25,6 +25,17 @@ def test_manifest_preserves_emitted_prefix_cache_questions_and_options(
     source.write_text(json.dumps(relay_context_manifest), encoding="utf-8")
     loaded = load_relay_context(source, relay_build=relay_context_manifest["relay_build"])
     assert loaded == relay_context_manifest
+    assert loaded["agent_protocol"] == 7
+    tools = loaded["contexts"]["work"]["tools"]
+    assert [tool["name"] for tool in tools] == [
+        "read_app",
+        "set_app",
+        "probe_app",
+        "retry_app",
+        "open_app",
+        "manage_proposal",
+    ]
+    assert all(tool["strict"] is False and tool["parameters"] for tool in tools)
     loaded["contexts"]["work"]["input_prefix"].clear()
     assert relay_context_manifest["contexts"]["work"]["input_prefix"]
 
@@ -35,6 +46,7 @@ def test_manifest_preserves_emitted_prefix_cache_questions_and_options(
         lambda value: value.update(format="guessed-current-markdown"),
         lambda value: value.pop("agent_protocol"),
         lambda value: value.update(agent_protocol=3),
+        lambda value: value.update(agent_protocol=6),
         lambda value: value.update(relay_build="c" * 64),
         lambda value: value.pop("relay_build"),
         lambda value: value.update(bundle_hashes={}),

@@ -85,7 +85,7 @@ function samples() {
 }
 
 export async function exportRelayContext({ emitted, relayBuild, migrations = migrationsDefault,
-  compatibilityDate, compatibilityFlags = [], protocol = 6 }) {
+  compatibilityDate, compatibilityFlags = [], protocol = 7 }) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(compatibilityDate ?? '')
     || !Array.isArray(compatibilityFlags) || compatibilityFlags.some((flag) => typeof flag !== 'string')) {
     throw new Error('Supply the measured Worker compatibility date and flags explicitly.');
@@ -185,7 +185,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       emitted: { type: 'string' }, output: { type: 'string' }, 'relay-build': { type: 'string' },
       migrations: { type: 'string' }, 'compatibility-date': { type: 'string' },
       'compatibility-flag': { type: 'string', multiple: true },
-      protocol: { type: 'string', default: '6' },
+      protocol: { type: 'string', default: '7' },
     } });
     if (!values.emitted || !values.output) throw new Error('Use --emitted <Wrangler index.js> --output <new manifest.json> --compatibility-date <date> [--compatibility-flag <flag>] [--relay-build <expected entry SHA256>] [--migrations <directory>].');
     const manifest = await exportRelayContext({ emitted: values.emitted, relayBuild: values['relay-build'],

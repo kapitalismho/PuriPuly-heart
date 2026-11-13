@@ -188,7 +188,7 @@ COMMAND_ARGUMENTS = {
         "accept_terms": "optional boolean (true only for peer enabled; defaults false)",
     },
     "translation.set": {"enabled": "boolean"},
-    "translation.probe": {},
+    "translation.probe": {"channel": ["self", "peer"]},
     "recognition.probe": {"channel": ["self", "peer"]},
     "text.submit": {"text": "non-empty string (protected content)"},
     "audio.test": {"enabled": "boolean"},
@@ -1645,7 +1645,14 @@ class ApplicationControlOwner:
             "revision": self._current_revision(),
         }
         if command == "translation.probe":
-            receipt.update(TRANSLATION_PROBE_METADATA)
+            receipt.update(
+                TRANSLATION_PROBE_METADATA,
+                channel=(
+                    arguments.get("channel", "self")
+                    if arguments.get("channel", "self") in ("self", "peer")
+                    else None
+                ),
+            )
         if command == "recognition.probe":
             receipt.update(
                 RECOGNITION_PROBE_METADATA,
@@ -2047,33 +2054,52 @@ class ApplicationControlOwner:
                             _validate_command_args(
                                 command, arguments, locale_choices=self.locale_choices
                             )
+                            channel = arguments.get("channel", "self")
                             configuration = getattr(
                                 self.pipeline, "translation_runtime_configuration", None
                             )
                             if configuration is not None:
                                 languages = configuration.snapshot().value
-                                source_language = languages.source_language
-                                target_languages = languages.self_target_languages
+                                if channel == "peer":
+                                    source_language = (
+                                        languages.peer_source_language or languages.source_language
+                                    )
+                                    target_languages = (
+                                        languages.peer_target_language or languages.target_language,
+                                    )
+                                else:
+                                    source_language = languages.source_language
+                                    target_languages = languages.self_target_languages
                             else:
                                 canonical = self.application.compatibility_settings()
                                 languages = canonical.intent.languages if canonical else None
-                                source_language = languages.source_language if languages else None
-                                target_languages = (
-                                    tuple(
-                                        language
-                                        for language in (
-                                            languages.target_language,
-                                            languages.secondary_target_language,
-                                        )
-                                        if language
+                                if channel == "peer":
+                                    source_language = (
+                                        languages.effective_peer_source if languages else None
                                     )
-                                    if languages
-                                    else ()
-                                )
+                                    target_languages = (
+                                        (languages.effective_peer_target,) if languages else ()
+                                    )
+                                else:
+                                    source_language = (
+                                        languages.source_language if languages else None
+                                    )
+                                    target_languages = (
+                                        tuple(
+                                            language
+                                            for language in (
+                                                languages.target_language,
+                                                languages.secondary_target_language,
+                                            )
+                                            if language
+                                        )
+                                        if languages
+                                        else ()
+                                    )
                             operation.receipt.update(
                                 translation_probe_direction(source_language, target_languages)
                             )
-                            deferred = ("probe", (source_language, target_languages))
+                            deferred = ("probe", (source_language, target_languages, channel))
                         elif command == "recognition.probe":
                             _validate_command_args(
                                 command, arguments, locale_choices=self.locale_choices
@@ -2149,6 +2175,7 @@ class ApplicationControlOwner:
                                 lambda: getattr(self.pipeline, "llm_runtime", None),
                                 source_language=deferred[1][0],
                                 target_languages=deferred[1][1],
+                                channel=deferred[1][2],
                             )
                         elif deferred[0] == "recognition_probe":
                             result = await run_recognition_probe(
@@ -3524,6 +3551,9 @@ def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[st
     ):
         raise InvalidArgumentsError("directory must be a non-empty string")
 
+    if command == "translation.probe" and "channel" in args:
+        if type(args["channel"]) is not str or args["channel"] not in {"self", "peer"}:
+            raise InvalidArgumentsError("channel must be self or peer")
     if command == "recognition.probe":
         if type(args["channel"]) is not str or args["channel"] not in {"self", "peer"}:
             raise InvalidArgumentsError("channel must be self or peer")

@@ -22,7 +22,11 @@ from tests.app.test_agent_chat import Records, Responses, Tokens, answer, contex
 
 
 def proposal(summary="The supported next steps did not fix the synthetic failure."):
-    return {**tool(), "name": "propose_report", "arguments": json.dumps({"summary": summary})}
+    return {
+        **tool(),
+        "name": "manage_proposal",
+        "arguments": json.dumps({"action": "report", "summary": summary}),
+    }
 
 
 def contents(bundle):
@@ -256,7 +260,8 @@ async def test_invalid_proposal_never_creates_offer_or_reads_log(arguments):
     await owner.start()
     try:
         result = await owner.send("App help")
-        assert result.tool_results[0].result == {"status": "rejected", "code": "invalid_tool_call"}
+        assert result.tool_results[0].result["status"] == "rejected"
+        assert result.tool_results[0].result["code"] == "invalid_tool_call"
         assert not owner.snapshot.report_offers and not transport.uploads
     finally:
         await owner.close()
@@ -352,7 +357,8 @@ async def test_repeated_proposal_has_one_action_and_rejection_never_uploads():
         assert len(owner.snapshot.report_offers) == 1
         results = owner.snapshot.tool_results
         assert results[0].result == {"status": "pending", "offer_id": offer.id}
-        assert results[1].status == "not_executed"
+        assert results[1].status == "pending"
+        assert results[1].result["offer_id"] == results[0].result["offer_id"]
         assert owner.reject_report(offer.id) == {"status": "rejected", "offer_id": offer.id}
         assert (await owner.send_report(offer.id))["status"] == "rejected"
         assert not transport.uploads

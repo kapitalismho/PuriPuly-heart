@@ -2,7 +2,7 @@ export const appTools = [
   {
     "type": "function",
     "name": "read_app",
-    "description": "Observe current app state without UI or runtime effects. topic: a context module or overview; diagnostics with optional diagnostic_id, operation_id or after; gpu, models, auth or peer_consent status; provider_setup with provider; operation with operation_id for a retained receipt.",
+    "description": "Observe current app state without UI or runtime effects. Arguments: accounts; audio; general; languages; output; overview; recognition; translation; diagnostics(diagnostic_id?, operation_id?, after?); gpu; models; auth; peer_consent; provider_setup(provider); operation(operation_id). Retained receipt; resolve pending/uncertain work by its identity, not resubmission. Supply only the selected action's fields.",
     "strict": false,
     "parameters": {
       "type": "object",
@@ -12,17 +12,17 @@ export const appTools = [
           "enum": [
             "accounts",
             "audio",
-            "auth",
             "general",
-            "gpu",
             "languages",
-            "models",
             "output",
             "overview",
-            "peer_consent",
             "recognition",
             "translation",
             "diagnostics",
+            "gpu",
+            "models",
+            "auth",
+            "peer_consent",
             "provider_setup",
             "operation"
           ]
@@ -65,44 +65,94 @@ export const appTools = [
   },
   {
     "type": "function",
-    "name": "execute_app",
-    "description": "Run an immediate operation or stage existing UI controls. Parameters: capture.set channel and enabled; translation.set and overlay.set enabled; recognition.probe channel; ui.provider_setup provider; ui.settings section, optional provider; confirmation.withdraw card_id. Probes are active scoped checks, not proof of live capture or display; audio.diagnose measures local capture/VAD and never changes settings.",
+    "name": "set_app",
+    "description": "Set an existing runtime switch; no saved settings change. Arguments: capture.self(enabled); capture.peer(enabled); translation(enabled); overlay(enabled). Supply only the selected action's fields.",
     "strict": false,
     "parameters": {
       "type": "object",
       "properties": {
-        "action": {
+        "target": {
           "type": "string",
           "enum": [
-            "capture.set",
-            "translation.set",
-            "overlay.set",
-            "recognition.probe",
-            "translation.probe",
-            "audio.diagnose",
-            "audio.retry",
-            "osc.discovery.retry",
-            "ui.accounts",
-            "models.retry",
-            "ui.provider_setup",
-            "ui.settings",
-            "confirmation.withdraw"
-          ]
-        },
-        "channel": {
-          "type": "string",
-          "enum": [
-            "self",
-            "peer"
+            "capture.self",
+            "capture.peer",
+            "translation",
+            "overlay"
           ]
         },
         "enabled": {
           "type": "boolean"
-        },
-        "backend": {
+        }
+      },
+      "required": [
+        "target",
+        "enabled"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "probe_app",
+    "description": "Run an isolated scoped check, not live pipeline repair or output delivery. Arguments: recognition.self; recognition.peer; translation.self; translation.peer; microphone. Local capture/VAD only; no settings change. Supply only the selected action's fields.",
+    "strict": false,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "target": {
           "type": "string",
           "enum": [
-            "gpu"
+            "recognition.self",
+            "recognition.peer",
+            "translation.self",
+            "translation.peer",
+            "microphone"
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "retry_app",
+    "description": "Retry existing application recovery through its resource owner. Arguments: audio; osc_discovery; gpu_activation. Supply only the selected action's fields.",
+    "strict": false,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string",
+          "enum": [
+            "audio",
+            "osc_discovery",
+            "gpu_activation"
+          ]
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "open_app",
+    "description": "Stage existing app controls; staging is not display, click, verification or readiness. Arguments: accounts; provider_setup(provider); settings(section, provider?). Supply only the selected action's fields.",
+    "strict": false,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "view": {
+          "type": "string",
+          "enum": [
+            "accounts",
+            "provider_setup",
+            "settings"
           ]
         },
         "provider": {
@@ -128,23 +178,18 @@ export const appTools = [
             "overlay",
             "prompts"
           ]
-        },
-        "card_id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 64
         }
       },
       "required": [
-        "action"
+        "view"
       ],
       "additionalProperties": false
     }
   },
   {
     "type": "function",
-    "name": "propose_app",
-    "description": "Queue a user approval card: settings with sparse changes (only changed fields, never null placeholders), secrets.delete name, auth.logout provider, overlay.position.reset, or report summary, which offers a send button.",
+    "name": "manage_proposal",
+    "description": "Create or withdraw a user card, never approve or send it. Arguments: settings(changes). Sparse changes only; absent fields stay unchanged, never null placeholders; report(summary). Offers a send button; upload requires the user's click; auth.logout(provider); overlay.position.reset; secrets.delete(name); withdraw(card_id). Only the matching pending card; accepted application work is not cancelled. Supply only the selected action's fields.",
     "strict": false,
     "parameters": {
       "type": "object",
@@ -156,7 +201,8 @@ export const appTools = [
             "report",
             "auth.logout",
             "overlay.position.reset",
-            "secrets.delete"
+            "secrets.delete",
+            "withdraw"
           ]
         },
         "changes": {
@@ -479,6 +525,11 @@ export const appTools = [
             "alibaba_api_key_beijing",
             "alibaba_api_key_singapore"
           ]
+        },
+        "card_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
         }
       },
       "required": [

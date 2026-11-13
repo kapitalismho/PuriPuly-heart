@@ -700,7 +700,7 @@ def test_tool_ledger_correlates_by_call_id_in_archive_order_and_keeps_tool_only_
                 "status": "completed",
                 "tool_results": [
                     {"call_id": "second", "tool": "probe_component", "result": second},
-                    {"call_id": "first", "tool": "get_app_context", "result": first},
+                    {"call_id": "first", "tool": "read_app", "result": first},
                 ],
             },
         }
@@ -710,7 +710,7 @@ def test_tool_ledger_correlates_by_call_id_in_archive_order_and_keeps_tool_only_
         {
             "type": "function_call",
             "call_id": "first",
-            "name": "get_app_context",
+            "name": "read_app",
             "arguments": '{"topic":"audio","after":null}',
         },
         {
@@ -721,12 +721,7 @@ def test_tool_ledger_correlates_by_call_id_in_archive_order_and_keeps_tool_only_
         },
         {"type": "function_call_output", "call_id": "second", "output": json.dumps(second)},
         {"type": "function_call_output", "call_id": "first", "output": json.dumps(first)},
-        {
-            "type": "function_call",
-            "call_id": "notice-call",
-            "name": "get_app_context",
-            "arguments": "{}",
-        },
+        {"type": "function_call", "call_id": "notice-call", "name": "read_app", "arguments": "{}"},
         {
             "type": "function_call_output",
             "call_id": "notice-call",
@@ -838,9 +833,9 @@ def test_tool_ledger_preserves_conflicting_saved_results_instead_of_selecting_su
         {
             "type": "function_call",
             "call_id": "conflict",
-            "name": "change_settings",
+            "name": "manage_proposal",
             "status": "completed",
-            "arguments": "{}",
+            "arguments": '{"action":"settings"}',
         },
         {"type": "function_call_output", "call_id": "conflict", "output": '{"status":"pending"}'},
     ]
@@ -896,21 +891,21 @@ def test_approval_and_async_completion_do_not_rewrite_model_tool_status(tmp_path
         {
             "type": "function_call",
             "call_id": "settings",
-            "name": "change_settings",
+            "name": "manage_proposal",
             "status": "completed",
-            "arguments": '{"changes":{"translation.model":"managed_gemma"}}',
+            "arguments": '{"action":"settings","changes":{"translation.model":"managed_gemma"}}',
         },
         {"type": "function_call_output", "call_id": "settings", "output": json.dumps(confirmation)},
         {
             "type": "app_operation",
-            "tool": "change_settings",
+            "tool": "settings.apply",
             "action_id": "apply-1",
             "phase": "submitted",
             "receipt": {"operation_id": "op-1", "status": "accepted"},
         },
         {
             "type": "app_operation",
-            "tool": "change_settings",
+            "tool": "settings.apply",
             "action_id": "apply-1",
             "phase": "completed",
             "result": applied,
@@ -918,14 +913,14 @@ def test_approval_and_async_completion_do_not_rewrite_model_tool_status(tmp_path
         {
             "type": "function_call",
             "call_id": "probe",
-            "name": "probe_translation",
+            "name": "probe_app",
             "status": "completed",
-            "arguments": "{}",
+            "arguments": '{"target":"translation.self"}',
         },
         {"type": "function_call_output", "call_id": "probe", "output": json.dumps(pending)},
         {
             "type": "app_operation",
-            "tool": "probe_translation",
+            "tool": "translation.probe",
             "action_id": "probe-1",
             "phase": "completed",
             "result": completed,
@@ -1000,19 +995,15 @@ def test_microphone_summary_separates_frames_level_vad_and_unexercised_recogniti
         {
             "turn": 1,
             "action": "speak",
-            "result": {
-                "tool_results": [
-                    {"call_id": "mic", "tool": "diagnose_microphone", "result": result}
-                ]
-            },
+            "result": {"tool_results": [{"call_id": "mic", "tool": "probe_app", "result": result}]},
         }
     ]
     attempt["archive"] = [
         {
             "type": "function_call",
             "call_id": "mic",
-            "name": "diagnose_microphone",
-            "arguments": "{}",
+            "name": "probe_app",
+            "arguments": '{"target":"microphone"}',
         }
     ]
     attempt.update(controlled=False, measurement_origin={"kind": "fresh_dialogue"})
@@ -1109,7 +1100,7 @@ def test_legacy_notice_only_completion_keeps_its_own_turn_and_result(tmp_path, e
         archive=[
             {
                 "type": "app_operation",
-                "tool": "change_settings",
+                "tool": "settings.apply",
                 "phase": "completed",
                 "result": result,
             }

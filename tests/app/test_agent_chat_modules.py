@@ -139,7 +139,7 @@ def test_empty_device_and_language_values_are_not_reported_as_redacted():
 
 
 def test_every_context_topic_has_its_own_status_subject():
-    labels = {topic: tool_label(("get_app_context", topic), done=True) for topic in TOPICS}
+    labels = {topic: tool_label(("read_app", topic), done=True) for topic in TOPICS}
     assert len(set(labels.values())) == len(TOPICS)
 
 
@@ -169,7 +169,7 @@ async def test_selected_context_separates_omission_from_failed_observations(mode
 async def test_additional_reads_join_same_task_but_do_not_leak_into_new_task():
     transport = RoutedResponses(
         selected_decision("translation"),
-        call("get_app_context", {"topic": "audio"}),
+        call("read_app", {"topic": "audio"}),
         answer("Audio inspected."),
         answer("Language inspected."),
         answer("General settings inspected."),
@@ -260,13 +260,14 @@ async def test_queued_approval_notice_preserves_proposal_modules_across_a_detour
     transport = RoutedResponses(
         selected_decision("recognition"),
         call(
-            "change_settings",
+            "manage_proposal",
             {
+                "action": "settings",
                 "changes": {
                     "stt.provider": "deepgram",
                     "languages": {"source": "ja"},
                     "overlay.background_alpha": 0.3,
-                }
+                },
             },
         ),
         answer("Review the settings."),

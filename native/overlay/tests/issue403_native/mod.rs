@@ -96,6 +96,33 @@ impl OverlayFrameSubmitter for SceneSubmitter {
     }
 }
 
+#[derive(Clone, Default)]
+struct RecordingSink {
+    buffer: Arc<Mutex<Vec<u8>>>,
+}
+
+impl RecordingSink {
+    fn events(&self) -> Vec<Value> {
+        String::from_utf8(self.buffer.lock().unwrap().clone())
+            .unwrap()
+            .lines()
+            .filter_map(|line| line.strip_prefix("EVENT "))
+            .map(|event| serde_json::from_str(event).unwrap())
+            .collect()
+    }
+}
+
+impl std::io::Write for RecordingSink {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.buffer.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 async fn run_rows(rows: &[Value], label: &str) -> NativePresentationOwner<SceneSubmitter> {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -144,8 +171,9 @@ async fn run_rows(rows: &[Value], label: &str) -> NativePresentationOwner<SceneS
         CaptionRenderer::new_for_test().unwrap(),
         SceneSubmitter(captured.clone()),
     );
-    let log_dir = unique_log_dir(label);
-    let logger = OverlayLogger::open(&log_dir).await.unwrap();
+    let stdout = RecordingSink::default();
+    let stderr = RecordingSink::default();
+    let logger = OverlayLogger::from_streams(Box::new(stdout.clone()), Box::new(stderr.clone()));
     owner.run(&mut bridge, &logger).await.unwrap();
     server.await.unwrap();
     assert!(owner.resources_released());
@@ -206,7 +234,24 @@ async fn run_rows(rows: &[Value], label: &str) -> NativePresentationOwner<SceneS
         "ISSUE403 {label} audit={audit:?} execution={evidence:?} whole_scene_submissions={}",
         attempts.len()
     );
+    assert_eq!(logger.reliable_delivery_failures(), 0);
     logger.shutdown().unwrap();
+    let events = stdout.events();
+    assert_eq!(
+        events
+            .iter()
+            .map(|event| &event["type"])
+            .collect::<Vec<_>>(),
+        vec!["overlay_ready", "shutdown_complete"]
+    );
+    for event in &events {
+        assert_eq!(event["overlay_instance_id"], manifest.overlay_instance_id);
+        assert_eq!(event["runtime_generation"], 1);
+    }
+    assert_eq!(events[1]["stop_origin"], "parent");
+    assert_eq!(events[1]["stop_reason"], "app_requested");
+    assert_eq!(events[1]["cleanup_succeeded"], true);
+    assert!(stderr.events().is_empty());
     owner
 }
 
