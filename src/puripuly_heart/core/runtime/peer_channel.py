@@ -1258,6 +1258,7 @@ class PeerCaptureSessionOwner:
             self._state = PeerCaptureSessionState.PROVIDER_PENDING
             self._provider_status = PeerCaptureProviderStatus.PENDING
             self._last_failure = None
+            self._last_failure_unavailable_reason = None
             self._admission_reason = None
             self._notify_state_changed()
         async with self._activation_lock:
@@ -1628,6 +1629,7 @@ class PeerCaptureSessionOwner:
                         attachment_token, runtime_signature=config.runtime_signature
                     )
                     self._last_failure = None
+                    self._last_failure_unavailable_reason = None
                     self._rebind_segment_ledger(generation, config)
             if pending_failure is not None:
                 await self._fault_current_generation_locked(
@@ -1852,6 +1854,7 @@ class PeerCaptureSessionOwner:
                     self._provider_status = PeerCaptureProviderStatus.READY
                     self._state = PeerCaptureSessionState.RUNNING
                     self._last_failure = None
+                    self._last_failure_unavailable_reason = None
                     provider_ingress_ready.set()
             if should_release:
                 await self._provider.release(mode="abort")
