@@ -14,6 +14,7 @@ from puripuly_heart.core.audio.ownership import (
     AudioSegmentIdentity,
     AudioSegmentSettingsSnapshot,
 )
+from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.local_asr.local_stt_assets import (
     GIGAAM_MODEL_ID,
     GRANITE_MODEL_ID,
@@ -21,6 +22,7 @@ from puripuly_heart.core.local_asr.local_stt_assets import (
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
     InstalledLocalSTTManifest,
     LocalSTTInstallState,
+    LocalSTTManifestInvalidError,
     load_local_stt_asset_manifest,
 )
 from puripuly_heart.core.local_asr.local_stt_catalog import (
@@ -691,9 +693,16 @@ async def test_cpu_auto_rejects_partial_install_without_constructing_direct_back
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     snapshot = _ready_snapshot()
+    diagnostics = exception_diagnostics(
+        LocalSTTManifestInvalidError("checksum mismatch"),
+        component="model_assets",
+        operation="inspection",
+        code="local_asr.invalid_assets",
+        fields={"model_id": snapshot.models[0].model_id},
+    )
     invalid = LocalCPUModelInstall(
         model_id=snapshot.models[0].model_id,
-        state=LocalSTTInstallState(status="invalid", error_message="checksum mismatch"),
+        state=LocalSTTInstallState(status="invalid", failure_diagnostics=diagnostics),
     )
     partial = LocalCPUInstallSnapshot(models=(invalid, *snapshot.models[1:]))
     monkeypatch.setattr(
@@ -714,6 +723,8 @@ async def test_cpu_auto_rejects_partial_install_without_constructing_direct_back
         await backend.open_session()
 
     assert raised.value.snapshot is partial
+    assert raised.value.snapshot.state_for(invalid.model_id).failure_diagnostics is diagnostics
+    assert not raised.value.snapshot.cpu_auto_available
     assert backend.resolved_model_id is None
     await backend.close()
 

@@ -1475,6 +1475,9 @@ class ControlledSource:
         self.frame = asyncio.Event()
         self.closed = 0
 
+    def opened_input_metadata(self):
+        return {"name": "controlled", "host_api": "controlled-api"}
+
     async def frames(self):
         await self.frame.wait()
         samples = np.full(512 * 4, 0.75, dtype=np.float32)
@@ -1563,7 +1566,8 @@ async def test_control_audio_test_reports_channel_failures_pending_stop_and_live
                 route,
                 should_attempt_open=True,
                 resolved_device_idx=2,
-                resolved_device_name="controlled",
+                resolved_device_name="resolved-only",
+                failure_diagnostics=None,
             ),
         )
         monkeypatch.setattr(
@@ -1575,7 +1579,7 @@ async def test_control_audio_test_reports_channel_failures_pending_stop_and_live
                 preferred_capture_channels=1,
                 metadata=SoundDeviceInputMetadata(
                     device_idx=2,
-                    name="controlled",
+                    name="resolved-only",
                     max_input_channels=1,
                     default_samplerate=16000.0,
                     metadata_status="ok",
@@ -1622,6 +1626,8 @@ async def test_control_audio_test_reports_channel_failures_pending_stop_and_live
             assert observed["speech_detected"] is True
             assert observed["speech_threshold"] is not None
         assert status["channels"]["self"]["device"]["name"] == "controlled"
+        assert status["channels"]["self"]["device"]["host_api"] == "controlled-api"
+        assert status["channels"]["self"]["device_metadata_availability"] == "observed"
         off = await control.submit("audio.test", {"enabled": False}, request_id="stop")
         stopped = await control.wait(off["operation_id"], timeout=5)
         assert stopped["status"] == "applied"

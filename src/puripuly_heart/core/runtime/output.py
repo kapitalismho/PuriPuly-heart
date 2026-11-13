@@ -798,7 +798,11 @@ class OutputRuntime:
         self, message: OSCMessage, status: str, diagnostics: ErrorDiagnostics | None
     ) -> None:
         state = self._self_streams.get(message.utterance_id)
-        if state is None or message.presentation_revision != state.offered_revision:
+        if (
+            status == "page_send_failed"
+            or state is None
+            or message.presentation_revision != state.offered_revision
+        ):
             if diagnostics is not None:
                 self._observe_result(
                     status=OUTPUT_ROUTING_DECISION_SKIPPED,
@@ -808,9 +812,15 @@ class OutputRuntime:
                     reason=status,
                     metadata={
                         "channel": "self",
-                        "stage": "self_stream_delivery",
+                        "stage": (
+                            "chatbox_page_delivery"
+                            if status == "page_send_failed"
+                            else "self_stream_delivery"
+                        ),
                         "physical_ack": False,
                         "presentation_revision": message.presentation_revision,
+                        "turn_generation": message.turn_generation,
+                        "turn_order": message.turn_order,
                     },
                     diagnostics=diagnostics,
                 )

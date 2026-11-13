@@ -148,6 +148,16 @@ The composed Peer flow uses production diagnostic history, one controlled `ja` â
 
 The CI-defined locked Ruff and Black checks passed across the repository after integration; Black reported 1,257 unchanged files. Test-selection validation covered 589 offline files with ten intentional opt-in integration exclusions. Mechanical formatting preserved non-import ASTs; import changes were ordering, explicit fixture exports and removal of one unused import. Remote CI and independent publication review are recorded on the issue/PR.
 
+## First remote CI repair
+
+PR #426 run `43418302222`, attempt 1, checked out synthetic merge `e1bb267c28a9e856263b54554127412bfc8c96f8` (head `87b56f78bc7ea65a9ce3c2792847b8ce994f8420` into the publication baseline). Lint, Architecture, UI and Broker passed; five other jobs exposed 15 failed cases. Overlay graphics/process stages did not execute after its deterministic-test failure. This failed run remains evidence, not a successful retry.
+
+Most failures were unmigrated contracts: structured install causes replaced obsolete scalar/message fields; HTTP 308 was already retained in the originating child rather than the lifecycle aggregate; successful audio fixtures lacked actual opened-device metadata; Gemma fixtures returned an obsolete text-only value; updater/probe failures now propagate typed evidence; native events gained a structured field; and a process-watch fixture omitted terminal callback arguments. Corrections retain rejection, privacy, cause identity, actual observations and exact retry/cleanup assertions. The unused installer exception status slot was removed rather than preserved as a compatibility alias.
+
+One output defect was corrected: a later failed chatbox page was counted again as the parent stream's first-page disposition. First-page `self_stream_delivery` receipts now remain distinct from correlated `chatbox_page_delivery` failures. Both safe causes survive; receipt/admission ownership, no-replay behavior and genuine first-success latency remain unchanged.
+
+Focused repair evidence comprises 41 installer/asset cases, 21 application/service cases across a 19-pass/one-new-assertion-failure run and a corrected two-case run, 166 output cases, 24 process-isolation cases and seven Windows native cases. Intermediate assertion/formatting failures remain recorded. The native checks used the current Cargo-built executable; output/process checks used controlled resources, not physical output or GUI qualification. Exact repository Ruff/Black and test-selection checks passed after integration. Independent repair review and subsequent remote outcomes are recorded on the PR.
+
 ## Limits and protected guidance
 
 - No real microphone/loopback qualification, paid provider request, private audio, real model download, native inference, physical GPU-driver failure, SteamVR display, remote UDP receipt, or full installed-package qualification is claimed.

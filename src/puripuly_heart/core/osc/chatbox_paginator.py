@@ -98,7 +98,7 @@ class ChatboxPaginator:
                     disposition="degraded",
                     stage="routing_observer",
                 )
-        if status not in {"first_page_sent", "output_send_failed"}:
+        if status not in {"first_page_sent", "output_send_failed", "page_send_failed"}:
             self._stream_final_revisions.pop(
                 (message.utterance_id, message.presentation_revision), None
             )
@@ -534,7 +534,11 @@ class ChatboxPaginator:
                 stage="chatbox_page",
             )
             if self._active_message is not None:
-                self._notify_delivery(self._active_message, "output_send_failed", diagnostics)
+                self._notify_delivery(
+                    self._active_message,
+                    "output_send_failed" if self._active_page_index == 0 else "page_send_failed",
+                    diagnostics,
+                )
             if mode == "queued" and remaining_parts == 0:
                 active = self._active_message
                 self._record_stage(

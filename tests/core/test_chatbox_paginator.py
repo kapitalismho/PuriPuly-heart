@@ -277,6 +277,10 @@ def test_failed_page_is_dropped_without_retrying_or_blocking_later_pages(
         runtime_logging=runtime_logging,
     )
 
+    deliveries = []
+    paginator.bind_delivery_observer(
+        lambda message, status, diagnostics: deliveries.append((status, diagnostics))
+    )
     paginator.enqueue(_message("abcdefghijklmnop", clock))
     assert sender.attempted == ["abcde"]
     assert sender.sent == ["abcde"]
@@ -309,6 +313,11 @@ def test_failed_page_is_dropped_without_retrying_or_blocking_later_pages(
     assert failure["fields"]["remote_delivery"] == "unacknowledged"
     assert failure["fields"]["publication_id"] is not None
     assert failure["severity"] == "warning"
+    assert [status for status, _diagnostics in deliveries] == [
+        "first_page_sent",
+        "page_send_failed",
+    ]
+    assert deliveries[1][1].diagnostic_id == failure["diagnostic_id"]
 
 
 def test_send_immediate_failure_returns_false_and_logs_basic_warning(

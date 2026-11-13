@@ -219,11 +219,13 @@ fn cli_reports_invalid_handoff_experiment_without_value_disclosure() {
         .output()
         .unwrap();
     std::fs::remove_file(path).unwrap();
+    let events = parse_event_payloads(&output.stderr);
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(!output.status.success());
-    assert!(
-        stderr.contains(r#"EVENT {"failure_reason":"manifest_invalid","type":"startup_error"}"#)
-    );
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["type"], "startup_error");
+    assert_eq!(events[0]["failure_reason"], "manifest_invalid");
+    assert!(events[0].get("native_failure").unwrap().is_null());
     assert!(!stderr.contains("private-invalid-arm"));
 }
 
@@ -256,11 +258,13 @@ fn cli_reports_invalid_quiet_tail_profile_as_structured_manifest_error() {
         .output()
         .unwrap();
     std::fs::remove_file(path).unwrap();
+    let events = parse_event_payloads(&output.stderr);
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(!output.status.success());
-    assert!(
-        stderr.contains(r#"EVENT {"failure_reason":"manifest_invalid","type":"startup_error"}"#)
-    );
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["type"], "startup_error");
+    assert_eq!(events[0]["failure_reason"], "manifest_invalid");
+    assert!(events[0].get("native_failure").unwrap().is_null());
     assert!(!stderr.contains("invalid-secret-value"));
 }
 
@@ -2107,7 +2111,10 @@ async fn forced_readiness_terminal_failures_never_submit_and_are_typed() {
         ),
         (
             ReadinessOutcome::NativeFailed(NativeFailure::new("gpu_query_poll", Some(-2005270523))),
-            RuntimeFailure::ReadinessNative(NativeFailure::new("gpu_query_poll", Some(-2005270523))),
+            RuntimeFailure::ReadinessNative(NativeFailure::new(
+                "gpu_query_poll",
+                Some(-2005270523),
+            )),
             PresentationOutcome::Failure,
         ),
     ] {

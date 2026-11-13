@@ -204,12 +204,10 @@ class LocalSTTRuntimeInstallError(LocalSTTAssetError):
         message: str,
         *,
         failure_code: str = "unknown",
-        status_code=None,
         failure_diagnostics: ErrorDiagnostics | None = None,
     ):
         super().__init__(message)
         self.failure_code = failure_code
-        self.status_code = status_code
         self.failure_diagnostics = failure_diagnostics
 
 
