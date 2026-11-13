@@ -28,7 +28,10 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTSessionProjection,
 )
-from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+from puripuly_heart.core.stt.diagnostics import (
+    recognition_failure_diagnostics,
+    retryable_transport_failure,
+)
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
@@ -257,6 +260,7 @@ class _DeepgramSDKSession(STTBackendSession):
         *,
         provenance: STTNativeProvenance | None = None,
         epoch_disposition: str,
+        failure_retryable: bool = False,
         degraded_reason: str | None = None,
         empty_is_success: bool = True,
         failure_diagnostics: ErrorDiagnostics | None = None,
@@ -297,6 +301,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 text_authority=authority,
                 failure_reason=degraded_reason,
                 epoch_disposition=epoch_disposition,
+                failure_retryable=failure_retryable,
                 provenance=tuple(self._scoped_provenance),
                 failure_diagnostics=failure_diagnostics,
             )
@@ -337,11 +342,13 @@ class _DeepgramSDKSession(STTBackendSession):
                     degraded_reason=reason,
                     empty_is_success=False,
                     failure_diagnostics=diagnostics,
+                    failure_retryable=retryable_transport_failure(exception),
                 )
         self._event_projection.end_epoch(
             orderly=orderly,
             reason=reason,
             provider_turn_id=provider_turn_id,
+            failure_retryable=retryable_transport_failure(exception),
             failure_diagnostics=diagnostics,
         )
 

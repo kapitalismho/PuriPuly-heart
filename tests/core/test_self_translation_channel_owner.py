@@ -27,6 +27,7 @@ from puripuly_heart.core.orchestrator.translation_turn import TranslationOutputS
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.stt.backend import (
+    STTChannelAvailability,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
     STTProviderTurnIdentity,
@@ -1181,7 +1182,9 @@ async def test_recoverable_self_terminal_restores_streaming_without_user_error()
             "failed",
             failure_reason="soniox_receive_failed",
             failure_retryable=True,
-            recovery_pending=True,
+            channel_availability=(
+                STTChannelAvailability.RECOVERING if True else STTChannelAvailability.UNAVAILABLE
+            ),
             epoch_disposition="retire",
         )
     )
@@ -1264,7 +1267,9 @@ async def test_old_self_terminal_cannot_disconnect_reactivated_session_state() -
         STTProviderTurnIdentity(AudioSegmentIdentity(1, 1, uuid4(), 1), "old-epoch", "old-turn"),
         "failed",
         failure_reason="soniox_receive_failed",
-        recovery_pending=True,
+        channel_availability=(
+            STTChannelAvailability.RECOVERING if True else STTChannelAvailability.UNAVAILABLE
+        ),
     )
     await callbacks.self_event_handler(old_terminal)
     assert capture.terminals == [old_terminal]

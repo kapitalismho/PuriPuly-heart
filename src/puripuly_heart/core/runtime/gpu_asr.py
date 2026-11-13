@@ -195,6 +195,8 @@ class SharedGpuASRRuntime:
         self._discovery_state = GpuDiscoveryState.IDLE
         self._last_failure_code: str | None = None
         self._decode_recovery_armed = False
+        self._resource_id = uuid4().hex
+        self._recovery_cause: ASRWorkerRequestError | None = None
         self._closed = False
 
     @property
@@ -1141,6 +1143,7 @@ class SharedGpuASRRuntime:
                 self._state = GpuASRRuntimeState.STARTING
                 self._last_failure_code = exception.code
                 self._decode_recovery_armed = True
+                self._recovery_cause = exception
                 self._generation += 1
                 recovery_generation = self._generation
                 stale_tasks = tuple(
@@ -1171,6 +1174,7 @@ class SharedGpuASRRuntime:
                 self._activation_task = recovery_task
                 if not work.future.done():
                     dropped = GpuASRDecodeDropped(exception.code)
+                    dropped.failure_resource_id = f"{self._resource_id}:{generation}"
                     dropped.__cause__ = exception
                     work.future.set_exception(dropped)
                 if self._active_work is work:
@@ -1242,6 +1246,8 @@ class SharedGpuASRRuntime:
         *,
         failure_code: str | None = None,
     ) -> _ActivationOutcome:
+        if exception.__cause__ is None and self._recovery_cause is not exception:
+            exception.__cause__ = self._recovery_cause
         resolved_failure_code = failure_code or _failure_code(exception)
         async with self._lock:
             if generation != self._generation:
@@ -1254,7 +1260,7 @@ class SharedGpuASRRuntime:
             self._reaper_task = None
             self._state = GpuASRRuntimeState.FAILED
             self._last_failure_code = resolved_failure_code
-            self._discard_pending_locked("worker_recovery_failed")
+            self._discard_pending_locked("worker_recovery_failed", exception)
             self._queue_event.set()
         diagnostic_fields = _failure_diagnostic_fields(exception)
         diagnostic_fields["failure"] = resolved_failure_code
@@ -1299,9 +1305,10 @@ class SharedGpuASRRuntime:
         async with self._lock:
             if not self._is_current_generation(generation, client):
                 return
+            exception.failure_resource_id = f"{self._resource_id}:{generation}"
             self._state = GpuASRRuntimeState.FAILED
             self._last_failure_code = _failure_code(exception)
-            self._discard_pending_locked("worker_failed")
+            self._discard_pending_locked("worker_failed", exception)
             active = self._active_work
             if active is not None and not active.future.done():
                 active.future.set_exception(exception)
@@ -1406,12 +1413,17 @@ class SharedGpuASRRuntime:
                 fields[key] = value
         await self._emit("worker_lifecycle", fields)
 
-    def _discard_pending_locked(self, reason: str) -> None:
+    def _discard_pending_locked(self, reason: str, cause: BaseException | None = None) -> None:
         while self._queue:
             work = heapq.heappop(self._queue)
             work.discard_reason = reason
             if not work.future.done():
-                work.future.set_exception(GpuASRWorkDiscarded(reason))
+                failure = GpuASRWorkDiscarded(reason)
+                failure.failure_resource_id = getattr(
+                    cause, "failure_resource_id", f"{self._resource_id}:{self._generation}"
+                )
+                failure.__cause__ = cause or self._recovery_cause
+                work.future.set_exception(failure)
             work.settled.set()
 
     def _discard_channel_pending_locked(

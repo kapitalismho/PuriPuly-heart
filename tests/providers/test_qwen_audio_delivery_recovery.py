@@ -26,6 +26,7 @@ from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
 from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
 from puripuly_heart.core.runtime.local_asr_provider_runtime import LocalASRProviderRuntimeOwner
 from puripuly_heart.core.stt.backend import (
+    STTChannelAvailability,
     STTContributionConsumptionLedger,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
@@ -347,7 +348,7 @@ async def test_self_initial_exhaustion_is_three_attempts_and_no_peer_cooldown(fa
         assert not env.owner.snapshot.effective_active
         assert len(terminals(env)) == 1
         assert terminals(env)[0].outcome == "failed"
-        assert not terminals(env)[0].recovery_pending
+        assert terminals(env)[0].channel_availability is not STTChannelAvailability.RECOVERING
         assert not final_sources(env)
         assert not any(
             isinstance(value, bytes) for socket in transport.sockets for value in socket.sent
@@ -369,7 +370,7 @@ async def test_self_later_successor_failure_keeps_nonrecovery_policy_without_new
         assert transport.attempts == 2
         assert env.factory.delays == []
         assert transport.outcomes == [unused]
-        assert not terminals(env)[-1].recovery_pending
+        assert terminals(env)[-1].channel_availability is not STTChannelAvailability.RECOVERING
         assert env.factory.engines[0]._connection_retry_at_s is None
         assert not env.owner.snapshot.effective_active
 
@@ -420,7 +421,7 @@ async def test_failed_attempt_close_quarantines_socket_and_preserves_predecessor
             await finish(first, "Healthy predecessor retained.")
             await wait_until(lambda: len(terminals(env)) == 2)
             assert terminals(env)[0].text == "Healthy predecessor retained."
-            assert terminals(env)[1].recovery_pending
+            assert terminals(env)[1].channel_availability is STTChannelAvailability.RECOVERING
             assert env.owner.snapshot.effective_active
             await wait_until(lambda: not any(not task.done() for task in engine._cleanup_tasks))
             assert engine.cleanup_debt > 0

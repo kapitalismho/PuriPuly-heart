@@ -153,6 +153,8 @@ The GUI dashboard's “Ready!” means Self/TALK capture is active and its recog
 
 Use the terminal operation receipt together with `providers.status`, `models status`, `overlay status`, `osc status`, or the relevant owner's query. Correct the reported cause before explicitly retrying. A failed/cancelled current translation warmup turns effective translation off while retaining the selection and failure details.
 
+A failed recognition utterance does not necessarily stop capture. Use the channel's current state to distinguish recovery from terminal unavailability; a failed utterance is not replayed.
+
 An explicit SteamVR runtime shutdown turns CAPTIONS off after native cleanup, without a Desktop fallback or automatic restart. The saved VR target and calibration remain unchanged; capture and translation continue independently. Start SteamVR and use `overlay set on` to enable captions again. Initial enable without SteamVR retains the existing Desktop fallback; genuine crashes and cleanup failures remain failures. If runtime shutdown interrupts an enable operation, its receipt can be `degraded` because ON was not reached; use `overlay status` to distinguish the resulting clean OFF state from an overlay failure.
 
 Matching `translation set off` or `capture set <channel> off` can revoke pending startup. Shared model demand may keep resources alive for another channel. Runtime stops are distinct from cancelling an explicit model download/import.

@@ -223,11 +223,12 @@ class STTScopedTurnNormalizer:
             failure_reason=failure_reason,
             epoch_disposition=terminal.epoch_disposition,
             failure_retryable=terminal.failure_retryable,
-            recovery_pending=terminal.recovery_pending,
+            channel_availability=terminal.channel_availability,
             provenance=tuple(self._provenance),
             included_contributions=tuple(self._contributions),
             failure_diagnostics=terminal.failure_diagnostics,
             recognition_origins=self._recognition_origins,
+            failure_resource_id=terminal.failure_resource_id,
         )
         return self._terminal
 

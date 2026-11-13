@@ -57,10 +57,26 @@ from puripuly_heart.core.stt.custom_connection import (
     pcm16le_to_wav,
     safe_body_excerpt,
 )
-from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+from puripuly_heart.core.stt.diagnostics import (
+    recognition_failure_diagnostics,
+    retryable_transport_failure,
+)
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
+
+
+def _retryable_request_failure(exception: BaseException | None, reason: str | None) -> bool:
+    if isinstance(exception, CustomSTTRequestError):
+        return exception.category == CUSTOM_STT_VALIDATION_UNREACHABLE
+    return reason in {
+        "offline_total_timeout",
+        "native_transcription_failed",
+        "connection_eof",
+        "provider_final_timeout",
+        "final_timeout",
+    } or retryable_transport_failure(exception)
+
 
 _OFFLINE_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
 _OFFLINE_TOTAL_TIMEOUT_S = 50.0
@@ -369,6 +385,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                 text_authority="authoritative" if outcome in ("final", "empty") else "none",
                 failure_reason=failure_reason,
                 epoch_disposition="retire" if retire else "reuse",
+                failure_retryable=_retryable_request_failure(exception, failure_reason),
                 failure_diagnostics=diagnostics,
             )
         )
@@ -377,6 +394,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                 orderly=False,
                 reason=failure_reason or outcome,
                 provider_turn_id=identity.provider_turn_id,
+                failure_retryable=_retryable_request_failure(exception, failure_reason),
                 failure_diagnostics=diagnostics,
             )
 
@@ -645,13 +663,14 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         try:
             async with self._send_lock:
                 await self._send_json({"type": "input_audio_buffer.commit"})
-        except Exception:
+        except Exception as exc:
             self._pending_finals = 0
             self._final_ready.set()
             self._terminalize_scoped(
                 identity,
                 outcome="failed",
                 failure_reason="commit_write_failed",
+                exception=exc,
                 retire=True,
                 provenance=STTNativeProvenance(barrier="commit_write"),
             )
@@ -731,6 +750,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 text_authority="authoritative" if outcome in ("final", "empty") else "none",
                 failure_reason=failure_reason,
                 epoch_disposition="retire" if retire else "reuse",
+                failure_retryable=_retryable_request_failure(exception, failure_reason),
                 provenance=(provenance,),
                 failure_diagnostics=diagnostics,
             )
@@ -741,6 +761,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 orderly=False,
                 reason=failure_reason or outcome,
                 provider_turn_id=identity.provider_turn_id,
+                failure_retryable=_retryable_request_failure(exception, failure_reason),
                 failure_diagnostics=diagnostics,
             )
 

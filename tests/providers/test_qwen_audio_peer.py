@@ -8,6 +8,7 @@ import pytest
 from puripuly_heart.core.audio.ownership import PeerAudioSegmentLedger
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.stt.backend import (
+    STTChannelAvailability,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTSessionProjection,
@@ -272,7 +273,7 @@ async def test_failed_predecessor_releases_completed_successor_before_physical_c
     engine.watchdog_resolver = lambda _: watchdogs(final_timeout_s=60)
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("qwen_audio"))
     segments = [
-        segment_events(ledger, start_sample=index * 100, now=float(index)) for index in range(4)
+        segment_events(ledger, start_sample=index * 100, now=float(index)) for index in range(2)
     ]
 
     def terminals():
@@ -304,6 +305,9 @@ async def test_failed_predecessor_releases_completed_successor_before_physical_c
             (segments[1][0].segment.identity, "final", "completed B"),
         ]
         assert terminals()[0].failure_reason == "provider_task_failed"
+        assert terminals()[0].channel_availability is STTChannelAvailability.UNAVAILABLE
+        assert terminals()[1].channel_availability is STTChannelAvailability.CONTINUE
+        assert engine._terminal_failure_notified
         assert not any(socket.release.is_set() for socket in old)
         assert open_sockets() == 2
         await asyncio.wait_for(b.close_entered.wait(), timeout=1)
@@ -313,8 +317,12 @@ async def test_failed_predecessor_releases_completed_successor_before_physical_c
             [value for value in socket.sent if isinstance(value, bytes)] for socket in old
         ]
 
-        await engine.handle_owned_vad_event(segments[2][0])
-        await engine.handle_owned_vad_event(segments[2][2])
+        await engine.abort_for_toggle_off()
+        ledger.rebind(activation_generation=2, settings=ledger.settings)
+        assert not engine._terminal_failure_notified
+        blocked, _, blocked_end = segment_events(ledger, start_sample=200, now=2)
+        await engine.handle_owned_vad_event(blocked)
+        await engine.handle_owned_vad_event(blocked_end)
         assert len(sessions) == 1 and len(factory.sockets) == 2
         assert open_sockets() == 2 and engine.cleanup_debt == 1
         assert [(event.outcome, event.text) for event in terminals()] == [
@@ -323,6 +331,9 @@ async def test_failed_predecessor_releases_completed_successor_before_physical_c
             ("failed", ""),
         ]
         assert terminals()[-1].failure_reason == "provider_not_ready"
+        assert terminals()[-1].identity.segment == blocked.segment.identity
+        assert terminals()[-1].channel_availability is STTChannelAvailability.UNAVAILABLE
+        assert engine._terminal_failure_notified
         assert [
             [value for value in socket.sent if isinstance(value, bytes)] for socket in old
         ] == audio_before_retry
@@ -331,17 +342,33 @@ async def test_failed_predecessor_releases_completed_successor_before_physical_c
             await sessions[0].inject_event(control(socket.task_ids[0], "task-finished"))
             socket.release.set()
 
-        await engine.handle_owned_vad_event(segments[3][0])
-        await engine.handle_owned_vad_event(segments[3][2])
+        assert await engine._reclaim_quarantined_session(0.5)
+        assert all(socket.closed for socket in old) and engine.cleanup_debt == 0
+        stopped, _, stopped_end = segment_events(ledger, start_sample=300, now=3)
+        await engine.handle_owned_vad_event(stopped)
+        await engine.handle_owned_vad_event(stopped_end)
+        assert len(sessions) == 1 and len(factory.sockets) == 2
+        assert open_sockets() == 0
+        assert len(terminals()) == 4
+        assert terminals()[-1].identity.segment == stopped.segment.identity
+        assert terminals()[-1].outcome == "failed"
+        assert terminals()[-1].channel_availability is STTChannelAvailability.UNAVAILABLE
+
+        await engine.abort_for_toggle_off()
+        ledger.rebind(activation_generation=3, settings=ledger.settings)
+        fresh_start, _, fresh_end = segment_events(ledger, start_sample=400, now=4)
+        await engine.handle_owned_vad_event(fresh_start)
+        await engine.handle_owned_vad_event(fresh_end)
         assert len(sessions) == 2 and len(factory.sockets) == 3
         assert all(socket.closed for socket in old) and open_sockets() == 1
         fresh = factory.sockets[-1]
         await fresh.push(native(fresh.task_ids[0], text="fresh"))
         await fresh.push(control(fresh.task_ids[0], "task-finished"))
-        await wait_until(lambda: len(terminals()) == 4)
+        await wait_until(lambda: len(terminals()) == 5)
         assert [(event.identity.segment, event.outcome, event.text) for event in terminals()][
             -1
-        ] == (segments[3][0].segment.identity, "final", "fresh")
+        ] == (fresh_start.segment.identity, "final", "fresh")
+        assert terminals()[-1].channel_availability is STTChannelAvailability.CONTINUE
         assert not any(
             "obsolete" in event.text
             for event in emitted
@@ -527,9 +554,41 @@ async def test_idle_close_cancellation_requires_confirmed_release_before_fresh_r
                 isinstance(event, STTProviderTurnTerminal) and event.outcome == "failed"
                 for event in events
             )
+            blocked_terminal = [
+                event for event in events if isinstance(event, STTProviderTurnTerminal)
+            ][-1]
+            assert blocked_terminal.identity.segment == blocked.segment.identity
+            assert blocked_terminal.channel_availability is STTChannelAvailability.UNAVAILABLE
+            await engine.abort_for_toggle_off()
+            ledger.rebind(activation_generation=2, settings=ledger.settings)
+            renewed, _, renewed_end = segment_events(ledger, start_sample=300, now=60)
+            await engine.handle_owned_vad_event(renewed)
+            await engine.handle_owned_vad_event(renewed_end)
+            assert len(factory.sockets) == 2 and not any(socket.closed for socket in sockets)
+            assert engine.cleanup_debt == 1
+            renewed_terminal = [
+                event for event in events if isinstance(event, STTProviderTurnTerminal)
+            ][-1]
+            assert renewed_terminal.identity.segment == renewed.segment.identity
+            assert renewed_terminal.outcome == "failed"
+            assert renewed_terminal.channel_availability is STTChannelAvailability.UNAVAILABLE
             for socket in sockets:
                 socket.release.set()
-        fresh_start, _, fresh_end = segment_events(ledger, start_sample=300, now=60)
+            assert await engine._reclaim_quarantined_session(0.5)
+            assert all(socket.closed for socket in sockets) and engine.cleanup_debt == 0
+            stopped, _, stopped_end = segment_events(ledger, start_sample=400, now=60)
+            await engine.handle_owned_vad_event(stopped)
+            await engine.handle_owned_vad_event(stopped_end)
+            assert len(factory.sockets) == 2
+            stopped_terminal = [
+                event for event in events if isinstance(event, STTProviderTurnTerminal)
+            ][-1]
+            assert stopped_terminal.identity.segment == stopped.segment.identity
+            assert stopped_terminal.outcome == "failed"
+            assert stopped_terminal.channel_availability is STTChannelAvailability.UNAVAILABLE
+            await engine.abort_for_toggle_off()
+            ledger.rebind(activation_generation=3, settings=ledger.settings)
+        fresh_start, _, fresh_end = segment_events(ledger, start_sample=500, now=60)
         await engine.handle_owned_vad_event(fresh_start)
         await engine.handle_owned_vad_event(fresh_end)
         fresh = factory.sockets[-1]
@@ -542,6 +601,11 @@ async def test_idle_close_cancellation_requires_confirmed_release_before_fresh_r
                 for event in events
             )
         )
+        fresh_terminal = [event for event in events if isinstance(event, STTProviderTurnTerminal)][
+            -1
+        ]
+        assert fresh_terminal.identity.segment == fresh_start.segment.identity
+        assert fresh_terminal.channel_availability is STTChannelAvailability.CONTINUE
         assert [
             event.text
             for event in events

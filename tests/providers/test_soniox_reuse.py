@@ -8,6 +8,7 @@ import pytest
 
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity, AudioSegmentSettingsSnapshot
 from puripuly_heart.core.stt.backend import (
+    STTChannelAvailability,
     STTProviderEpochEnded,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
@@ -140,7 +141,7 @@ async def test_soniox_reuses_one_transport_for_ordered_final_identical_and_empty
     assert isinstance(first_terminal, STTProviderTurnTerminal)
     assert (first_terminal.text, first_terminal.epoch_disposition) == ("same", "reuse")
     assert first_terminal.failure_retryable is False
-    assert first_terminal.recovery_pending is False
+    assert (first_terminal.channel_availability is STTChannelAvailability.RECOVERING) is False
     assert [
         (run.text, run.speaker_id, run.session_scope) for run in first_terminal.final_speaker_runs
     ] == [("same", "7", scope)]
@@ -395,7 +396,7 @@ async def test_soniox_server_error_retryability_is_carried_on_turn_and_idle_epoc
         assert isinstance(terminal, STTProviderTurnTerminal)
         assert terminal.failure_reason == "soniox_request_failed"
         assert terminal.failure_retryable is retryable
-        assert terminal.recovery_pending is False
+        assert (terminal.channel_availability is STTChannelAvailability.RECOVERING) is False
     ended = await _next(session)
     assert isinstance(ended, STTProviderEpochEnded)
     assert ended.reason == "soniox_request_failed"
