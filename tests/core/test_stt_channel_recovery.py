@@ -18,6 +18,7 @@ from tests.core.test_stt_scoped_engine import (
 
 ORDINARY_PROVIDERS = (
     "soniox", "deepgram", "elevenlabs_scribe", "custom", "rolling_free",
+    "custom_offline", "custom_realtime",
     "local_cpu_auto", "local_granite", "local_gigaam", "local_fun_asr_nano",
     "local_fun_asr_mlt_nano", "local_parakeet_ja",
 )

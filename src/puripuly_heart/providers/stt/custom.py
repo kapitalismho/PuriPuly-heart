@@ -71,7 +71,7 @@ def _retryable_request_failure(exception: BaseException | None, reason: str | No
         return exception.category == CUSTOM_STT_VALIDATION_UNREACHABLE
     return reason in {
         "offline_total_timeout", "native_transcription_failed", "connection_eof",
-        "provider_final_timeout",
+        "provider_final_timeout", "final_timeout",
     } or retryable_transport_failure(exception)
 
 _OFFLINE_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
@@ -659,13 +659,14 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         try:
             async with self._send_lock:
                 await self._send_json({"type": "input_audio_buffer.commit"})
-        except Exception:
+        except Exception as exc:
             self._pending_finals = 0
             self._final_ready.set()
             self._terminalize_scoped(
                 identity,
                 outcome="failed",
                 failure_reason="commit_write_failed",
+                exception=exc,
                 retire=True,
                 provenance=STTNativeProvenance(barrier="commit_write"),
             )

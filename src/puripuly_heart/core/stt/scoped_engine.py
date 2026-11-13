@@ -2112,7 +2112,8 @@ class ScopedRecognitionEngine:
                 if turn.settings.provider_id == "soniox" or turn.independent_recognition:
                     task.cancel()
                 turn.write_failed = True
-                self._retire_current_session(turn.watchdogs)
+                if not turn.independent_recognition:
+                    self._retire_current_session(turn.watchdogs)
             return False
         operations.discard(task)
         if not operations:
@@ -2124,6 +2125,7 @@ class ScopedRecognitionEngine:
                 recovered = False
                 if (
                     self._generic_turn_recovery(turn.settings)
+                    and not turn.independent_recognition
                     and isinstance(exc, STTScopedWriteFailure)
                     and exc.terminal.identity == turn.identity
                 ):
@@ -2144,7 +2146,8 @@ class ScopedRecognitionEngine:
                         failure_retryable=retryable_transport_failure(exc),
                     )
                 turn.write_failed = True
-                self._retire_current_session(turn.watchdogs)
+                if not turn.independent_recognition:
+                    self._retire_current_session(turn.watchdogs)
             return False
         return self._has_write_authority(session, turn)
 
@@ -2392,14 +2395,10 @@ class ScopedRecognitionEngine:
             self._connection_retry_at_s = None
         elif (
             terminal.outcome not in ("final", "empty", "submitted", "cancelled")
+            and not turn.independent_recognition
             and not (
                 terminal.channel_availability is STTChannelAvailability.RECOVERING
                 and self._connection_retry_at_s is not None
-            )
-            and not (
-                turn.independent_recognition
-                and self._stream_recovery is not None
-                and self._stream_recovery.pending
             )
         ):
             if (
@@ -2451,6 +2450,15 @@ class ScopedRecognitionEngine:
                 turn.watchdogs,
                 reason=terminal.failure_reason or "provider_session_lifetime_exceeded",
                 resume_stream=True,
+                failed=(
+                    terminal.outcome in {"failed", "expired"}
+                    and terminal.failure_reason
+                    not in {
+                        "gemini_go_away",
+                        "provider_session_lifetime_exceeded",
+                        "provider_idle_timeout",
+                    }
+                ),
             )
         if (
             turn.independent_recognition
@@ -2554,7 +2562,8 @@ class ScopedRecognitionEngine:
     def _generic_turn_recovery(settings: AudioSegmentSettingsSnapshot | str) -> bool:
         provider_id = settings if isinstance(settings, str) else settings.provider_id
         return provider_id in {
-            "soniox", "deepgram", "elevenlabs_scribe", "custom", "rolling_free",
+            "soniox", "deepgram", "elevenlabs_scribe", "custom",
+            "custom_offline", "custom_realtime", "rolling_free",
             "local_cpu_auto", "local_granite", "local_gigaam", "local_fun_asr_nano",
             "local_fun_asr_mlt_nano", "local_parakeet_ja", "local_qwen_gpu",
         }
