@@ -80,6 +80,7 @@ def test_unencodable_tail_page_is_dropped_and_pagination_continues() -> None:
 
 async def test_output_runtime_chatbox_survives_unencodable_page_and_close_succeeds() -> None:
     sender, receiver = _capture()
+    runtime: OutputRuntime | None = None
     try:
         runtime = OutputRuntime(
             chatbox=ChatboxPaginator(sender=sender, clock=SystemClock(), page_interval_s=0.1),
@@ -102,16 +103,26 @@ async def test_output_runtime_chatbox_survives_unencodable_page_and_close_succee
             translation_text=None,
             include_source=False,
         )
-        await asyncio.sleep(1.2)
+        receiver.setblocking(False)
+        loop = asyncio.get_running_loop()
+        good_pages: list[bytes] = []
+        async with asyncio.timeout(5.0):
+            while len(good_pages) < 3:
+                payload, _ = await loop.sock_recvfrom(receiver, 65535)
+                if b"yyyy" in payload:
+                    good_pages.append(payload)
 
-        payloads = _drain(receiver)
-        good_pages = [payload for payload in payloads if b"yyyy" in payload]
+        receiver.settimeout(0.2)
+        good_pages.extend(payload for payload in _drain(receiver) if b"yyyy" in payload)
         assert len(good_pages) == 3
 
-        await runtime.close()
     finally:
-        sender.close()
-        receiver.close()
+        try:
+            if runtime is not None:
+                await asyncio.wait_for(runtime.close(), timeout=1.0)
+        finally:
+            sender.close()
+            receiver.close()
 
 
 def test_send_failures_outside_oserror_are_reported_not_raised() -> None:
