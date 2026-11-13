@@ -28,6 +28,7 @@ from puripuly_heart.core.chatgpt.oauth import (
 from puripuly_heart.core.chatgpt.session import ChatGptSession
 from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +50,12 @@ class ChatGptAccountOwner:
     _pending_listeners: dict[int, ChatGptOAuthLoopbackListener] = field(
         init=False, default_factory=dict, repr=False
     )
+    _connect_task: asyncio.Task[object] | None = field(init=False, default=None, repr=False)
+    _cancel_requested: bool = field(init=False, default=False, repr=False)
 
     @property
     def in_progress(self) -> bool:
-        return self._listener is not None
+        return self._connect_task is not None or self._listener is not None
 
     def snapshot(self) -> ChatGptAccountSnapshot:
         status = self.session.status()
@@ -76,7 +79,7 @@ class ChatGptAccountOwner:
         open_browser: bool = True,
         authorization_url_sink: Callable[[str], None] | None = None,
     ) -> ChatGptConnectResult:
-        if self._listener is not None:
+        if self._connect_task is not None or self._listener is not None:
             secondary = ()
             if open_browser:
                 try:
@@ -100,22 +103,27 @@ class ChatGptAccountOwner:
             )
         self._phase = "secret_read"
         self._cleanup_diagnostics = ()
+        self._cancel_requested = False
+        self._connect_task = asyncio.current_task()
         try:
-            result = await self._connect(
-                open_browser=open_browser,
-                authorization_url_sink=authorization_url_sink,
-            )
+            try:
+                result = await self._connect(
+                    open_browser=open_browser,
+                    authorization_url_sink=authorization_url_sink,
+                )
+            except (ChatGptOAuthLoopbackClosedError, asyncio.CancelledError) as exc:
+                if isinstance(exc, asyncio.CancelledError) and not self._cancel_requested:
+                    raise
+                for cause in self._cleanup_diagnostics:
+                    emit_failure(logger, cause, severity="warning", disposition="degraded")
+                return ChatGptConnectResult(
+                    succeeded=False,
+                    failure_code="cancelled",
+                    secondary_diagnostics=self._cleanup_diagnostics,
+                )
             for cause in result.secondary_diagnostics:
                 emit_failure(logger, cause, severity="warning", disposition="degraded")
             return result
-        except ChatGptOAuthLoopbackClosedError:
-            for cause in self._cleanup_diagnostics:
-                emit_failure(logger, cause, severity="warning", disposition="degraded")
-            return ChatGptConnectResult(
-                succeeded=False,
-                failure_code="cancelled",
-                secondary_diagnostics=self._cleanup_diagnostics,
-            )
         except Exception as exc:
             code = (
                 exc.code
@@ -174,6 +182,9 @@ class ChatGptAccountOwner:
                     exc.secondary_omitted_count if isinstance(exc, ChatGptAuthError) else 0
                 ),
             )
+        finally:
+            self._connect_task = None
+            self._cancel_requested = False
 
     async def sign_out(self) -> ChatGptSignOutResult:
         result = await self.session.sign_out()
@@ -186,12 +197,31 @@ class ChatGptAccountOwner:
         )
 
     def cancel(self) -> None:
+        self._cancel_requested = True
         listener = self._listener
         if listener is not None:
             listener.close()
+        task = self._connect_task
+        if (
+            task is not None
+            and task is not asyncio.current_task()
+            and not task.done()
+            and self._phase != "credential_store"
+        ):
+            task.cancel()
 
     async def close(self) -> None:
         failures: list[Exception] = []
+        self._cancel_requested = True
+        connecting = self._connect_task
+        if (
+            connecting is not None
+            and connecting is not asyncio.current_task()
+            and not connecting.done()
+        ):
+            if self._phase != "credential_store":
+                connecting.cancel()
+            await asyncio.gather(connecting, return_exceptions=True)
         listeners = dict(self._pending_listeners)
         if self._listener is not None:
             listeners[id(self._listener)] = self._listener
@@ -321,11 +351,12 @@ class ChatGptAccountOwner:
         if not tokens.plan_usage_granted:
             raise ChatGptAuthError("plan_scope_missing")
         self._phase = "credential_store"
-        await asyncio.to_thread(
-            self.session.store_sign_in,
-            client_id=client_id,
-            tokens=tokens,
-            identity=identity,
+        await run_owned_thread_call(
+            lambda: self.session.store_sign_in(
+                client_id=client_id,
+                tokens=tokens,
+                identity=identity,
+            )
         )
         return ChatGptConnectResult(
             succeeded=True,
