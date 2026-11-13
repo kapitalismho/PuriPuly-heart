@@ -7,7 +7,11 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Final, Literal, TypeAlias
 
-from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics, safe_exception_fields
+from puripuly_heart.core.diagnostics import (
+    emit_failure,
+    exception_diagnostics,
+    safe_exception_fields,
+)
 from puripuly_heart.core.lifecycle import (
     LIFECYCLE_SHUTDOWN_PHASE_ORDER,
     LifecycleShutdownPhase,
@@ -438,8 +442,12 @@ class ApplicationShutdownCoordinator:
             self._failures.append(
                 _RecordedFailure(
                     ApplicationShutdownFailure(
-                        owner.phase, owner.owner_name, owner.callback_name,
-                        type(exception).__name__, False, diagnostics,
+                        owner.phase,
+                        owner.owner_name,
+                        owner.callback_name,
+                        type(exception).__name__,
+                        False,
+                        diagnostics,
                     ),
                     exception,
                 )

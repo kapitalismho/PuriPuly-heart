@@ -9,6 +9,7 @@ from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity, AudioSegmentSettingsSnapshot
 from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.stt.backend import (
     STTIndependentRecognitionSession,
     STTProviderEpochEnded,
@@ -26,7 +27,6 @@ from puripuly_heart.core.stt.scoped_engine import (
     STTProbeSessionFactory,
     STTRecognitionWatchdogs,
 )
-from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 
 
@@ -228,7 +228,9 @@ async def recognize_probe_audio(
                     if isinstance(primary_error, asyncio.CancelledError)
                     else asyncio.CancelledError()
                 )
-                if primary_error is not None and not isinstance(primary_error, asyncio.CancelledError):
+                if primary_error is not None and not isinstance(
+                    primary_error, asyncio.CancelledError
+                ):
                     cancellation.failure_diagnostics = exception_diagnostics(
                         primary_error,
                         component="recognition_probe",

@@ -4,7 +4,11 @@ import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, replace
 
-from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics, safe_exception_fields
+from puripuly_heart.core.diagnostics import (
+    emit_failure,
+    exception_diagnostics,
+    safe_exception_fields,
+)
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.openrouter.openrouter_handoff import is_effectively_exhausted
 from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
@@ -50,7 +54,9 @@ class ManagedUsageMetadataResult:
         excess = max(0, len(self.secondary_diagnostics) - 4)
         if excess:
             object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
-            object.__setattr__(self, "secondary_omitted_count", self.secondary_omitted_count + excess)
+            object.__setattr__(
+                self, "secondary_omitted_count", self.secondary_omitted_count + excess
+            )
 
 
 @dataclass(slots=True)
@@ -191,11 +197,16 @@ class ManagedUsageOwner:
             *result.secondary_diagnostics,
         ):
             emit_failure(
-                logging.getLogger(__name__), diagnostics, severity="warning", disposition="superseded"
+                logging.getLogger(__name__),
+                diagnostics,
+                severity="warning",
+                disposition="superseded",
             )
         return False
 
-    def current_result(self, state: ManagedUsageState | None = None) -> ManagedUsageMetadataResult | None:
+    def current_result(
+        self, state: ManagedUsageState | None = None
+    ) -> ManagedUsageMetadataResult | None:
         result = self.last_result
         current = state or self.state_provider()
         return (
@@ -273,7 +284,8 @@ class ManagedUsageOwner:
                 )
             observation = next(
                 (
-                    result for result in (self.last_result, self.superseded_result)
+                    result
+                    for result in (self.last_result, self.superseded_result)
                     if result is not None
                     and result.diagnostics is not None
                     and result.diagnostics.diagnostic_id == diagnostics.diagnostic_id

@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
-import math
 import logging
+import math
 import os
 import secrets
 import sys
@@ -897,11 +897,7 @@ class _DefaultASRWorkerClient(ASRWorkerClientPort):
             fields={
                 "worker_session_id": self.session_id,
                 "native_classification": failure_code,
-                **{
-                    key: fields[key]
-                    for key in ("native_reason", "native_status")
-                    if key in fields
-                },
+                **{key: fields[key] for key in ("native_reason", "native_status") if key in fields},
             },
             exception=error,
             severity="info" if failure_code == "cancelled" else "error",
@@ -1035,9 +1031,15 @@ def _worker_failure_fields(payload: object) -> tuple[dict[str, object], int]:
         {key: payload[key] for key in ("native_reason", "native_status") if key in payload}
     )
     rejected += sum(
-        key not in {
-            "native_reason", "native_status", "audio_seconds", "decode_seconds", "rtf",
-            "channel", "backend",
+        key
+        not in {
+            "native_reason",
+            "native_status",
+            "audio_seconds",
+            "decode_seconds",
+            "rtf",
+            "channel",
+            "backend",
         }
         for key in payload
     )
@@ -1045,7 +1047,11 @@ def _worker_failure_fields(payload: object) -> tuple[dict[str, object], int]:
         if key not in payload:
             continue
         value = payload[key]
-        if type(value) in {int, float} and 0 <= value <= sys.float_info.max and math.isfinite(value):
+        if (
+            type(value) in {int, float}
+            and 0 <= value <= sys.float_info.max
+            and math.isfinite(value)
+        ):
             fields[key] = value
         else:
             rejected += 1

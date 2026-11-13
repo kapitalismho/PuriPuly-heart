@@ -306,9 +306,7 @@ async def test_submit_failure_retains_safe_original_cause_after_timeout() -> Non
         await _flush_loop()
     assert runtime.active_submit_task_count == 0
     assert runtime.failure_diagnostics.fields["errno"] == 13
-    assert [item.code for item in failures] == [
-        "clipboard_submit_timeout", "clipboard_failed"
-    ]
+    assert [item.code for item in failures] == ["clipboard_submit_timeout", "clipboard_failed"]
     assert "private" not in repr(failures)
 
 

@@ -113,7 +113,8 @@ class DesktopLoopbackAudioSource:
                 if selection_failures:
                     failure.failure_diagnostics = exception_diagnostics(
                         ExceptionGroup("loopback device resolution failed", selection_failures),
-                        component="capture.peer", operation="device_resolution",
+                        component="capture.peer",
+                        operation="device_resolution",
                         code="capture.peer.source_open_failed",
                     )
                 raise failure
@@ -183,7 +184,9 @@ class DesktopLoopbackAudioSource:
             try:
                 self._close_native_resources()
             except Exception as cleanup_exc:
-                failure = ExceptionGroup("desktop capture setup and cleanup failed", [exc, cleanup_exc])
+                failure = ExceptionGroup(
+                    "desktop capture setup and cleanup failed", [exc, cleanup_exc]
+                )
                 failure.failure_diagnostics = exception_diagnostics(
                     failure,
                     component="capture.peer",
@@ -271,17 +274,15 @@ class DesktopLoopbackAudioSource:
             return
         self._closed = True
 
-
         try:
             await run_owned_thread_call(self._close_native_resources)
         finally:
             try:
                 self._queue.sync_q.put_nowait(None)
-            except (queue.Full, janus.SyncQueueShutDown):
+            except queue.Full, janus.SyncQueueShutDown:
                 pass
             self._queue.close()
             await self._queue.wait_closed()
-
 
     def _close_native_resources(self) -> None:
         failures: list[Exception] = []

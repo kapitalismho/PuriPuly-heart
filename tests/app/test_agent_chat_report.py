@@ -35,7 +35,9 @@ def contents(bundle, *, missing_log=False):
     with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as archive:
         members = archive.getmembers()
         assert [member.name for member in members] == [
-            "meta.json", "puri_chat.json", *([] if missing_log else ["runtime.log"])
+            "meta.json",
+            "puri_chat.json",
+            *([] if missing_log else ["runtime.log"]),
         ]
         assert all(member.isfile() for member in members)
         return {member.name: archive.extractfile(member).read() for member in members}
@@ -538,7 +540,8 @@ async def test_transport_requires_matching_receipt_and_preserves_binary_wire(rec
         app_version="2.10.0",
         summary="synthetic summary inside only",
         diagnostics={
-            "availability": "retained_current_run", "records": [{"code": "provider.auth"}]
+            "availability": "retained_current_run",
+            "records": [{"code": "provider.auth"}],
         },
         archive=({"role": "user", "content": "synthetic chat"},),
         log_snapshot=lambda: b"synthetic runtime",

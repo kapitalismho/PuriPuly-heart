@@ -217,7 +217,9 @@ async def test_provider_verifier_adapter_returns_verified_port_result(
 
 
 @pytest.mark.asyncio
-async def test_actual_verification_error_preserves_http_cause_with_failed_sink_and_allows_success(monkeypatch):
+async def test_actual_verification_error_preserves_http_cause_with_failed_sink_and_allows_success(
+    monkeypatch,
+):
     import httpx
 
     from puripuly_heart.core import network_clients
@@ -232,7 +234,8 @@ async def test_actual_verification_error_preserves_http_cause_with_failed_sink_a
         return httpx.Response(status, json={"error": {"message": "private upstream content"}})
 
     monkeypatch.setattr(
-        network_clients, "external_async_client",
+        network_clients,
+        "external_async_client",
         lambda **kwargs: httpx.AsyncClient(transport=httpx.MockTransport(respond), **kwargs),
     )
 
@@ -242,8 +245,11 @@ async def test_actual_verification_error_preserves_http_cause_with_failed_sink_a
     monkeypatch.setattr(adapter_module.logger, "log", broken_sink)
     adapter = adapter_module.ProviderVerifierAdapter()
     request = ProviderVerificationRequest(
-        provider="deepseek", secret_key="providers.deepseek.api_key",
-        secret_value="private-key", secret_revision="revision-1", context={},
+        provider="deepseek",
+        secret_key="providers.deepseek.api_key",
+        secret_value="private-key",
+        secret_revision="revision-1",
+        context={},
     )
     failure = await adapter.verify_provider_secret(request)
     assert failure.status == PROVIDER_VERIFICATION_STATUS_FAILED

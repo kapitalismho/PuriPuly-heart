@@ -1137,9 +1137,7 @@ async def test_rolling_startup_cleanup_debt_reaches_runtime_close_and_rebind_gat
     failed = _prepared_rolling_definition(
         name=STTProviderName.ELEVENLABS_SCRIBE,
         api_key="synthetic-old-key",
-        build=lambda key: ElevenLabsScribeSTTBackend(
-            api_key=key, scribe_connect_factory=connect
-        ),
+        build=lambda key: ElevenLabsScribeSTTBackend(api_key=key, scribe_connect_factory=connect),
     )
     alternate = _prepared_rolling_definition(
         name=STTProviderName.DEEPGRAM,

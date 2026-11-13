@@ -479,7 +479,11 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                         primary=self.failure_diagnostics,
                     )
                     emit_failure(
-                        logger, diagnostics, severity="warning", disposition="degraded", stage="cleanup"
+                        logger,
+                        diagnostics,
+                        severity="warning",
+                        disposition="degraded",
+                        stage="cleanup",
                     )
                     raise
                 self._client = None
@@ -1182,20 +1186,14 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
             self._terminal_native_event_ids.add(native_event_id)
 
 
-def _native_request_failure(
-    native: object, *, category: str, reason: str
-) -> CustomSTTRequestError:
+def _native_request_failure(native: object, *, category: str, reason: str) -> CustomSTTRequestError:
     failure = CustomSTTRequestError("Custom STT realtime provider failed", category=category)
     diagnostics = recognition_failure_diagnostics(
         failure, provider="custom", channel=None, operation="receive", reason=reason
     )
     values = native if isinstance(native, Mapping) else {}
     fields, rejected = sanitize_diagnostic_fields(
-        {
-            f"openai_error_{key}": values[key]
-            for key in ("code", "type", "param")
-            if key in values
-        }
+        {f"openai_error_{key}": values[key] for key in ("code", "type", "param") if key in values}
     )
     failure.failure_diagnostics = replace(
         diagnostics,

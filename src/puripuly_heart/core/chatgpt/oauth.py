@@ -15,8 +15,8 @@ import httpx
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.diagnostics import exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 CHATGPT_ISSUER: Final = "https://auth.openai.com"
 CHATGPT_AUTHORIZE_URL: Final = f"{CHATGPT_ISSUER}/api/accounts/authorize"
@@ -262,7 +262,9 @@ async def refresh_access_token(
         },
     )
     if response.status_code == 200:
-        payload = _response_payload(response, operation="refresh_response", code="token_response_invalid")
+        payload = _response_payload(
+            response, operation="refresh_response", code="token_response_invalid"
+        )
         _validate_token_response(
             response, payload, operation="refresh_response", previous_refresh_token=refresh_token
         )
@@ -292,7 +294,10 @@ def _validate_token_response(
             content_policy="metadata_only",
             status_code=response.status_code,
             retry_after_ms=None,
-            fields={"response_shape": "malformed_success", "dispatch_certainty": "response_received"},
+            fields={
+                "response_shape": "malformed_success",
+                "dispatch_certainty": "response_received",
+            },
         )
         raise ChatGptAuthError(
             "token_response_invalid", status_code=response.status_code, diagnostics=diagnostics
@@ -398,7 +403,9 @@ class ChatGptIdTokenVerifier:
         response = await self.http.get(self.jwks_url)
         if response.status_code != 200:
             raise ChatGptAuthError("jwks_unavailable", status_code=response.status_code)
-        payload = _response_payload(response, operation="identity_verification", code="jwks_unavailable")
+        payload = _response_payload(
+            response, operation="identity_verification", code="jwks_unavailable"
+        )
         keys = payload.get("keys") if isinstance(payload, dict) else None
         if not isinstance(keys, list):
             raise ChatGptAuthError("jwks_unavailable", status_code=response.status_code)

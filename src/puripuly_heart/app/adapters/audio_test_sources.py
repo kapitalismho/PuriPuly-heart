@@ -7,13 +7,13 @@ from puripuly_heart.app.ports.audio_test import (
     AudioTestOpenedSource,
     AudioTestSourceUnavailable,
 )
-from puripuly_heart.core.diagnostics import exception_diagnostics, serialize_diagnostics
-from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.audio.source import (
     AudioSourceOpenFailure,
     MicrophoneTestRouteObservation,
     SelfMicCaptureChannelDecision,
 )
+from puripuly_heart.core.diagnostics import exception_diagnostics, serialize_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.peer_capture import (
     PeerCaptureResolvedTarget,
@@ -55,7 +55,8 @@ class MicrophoneAudioTestSourceOpener:
                     "input_route_unavailable",
                     (
                         observation.failure_diagnostics.fields.get("exception_class")
-                        if observation.failure_diagnostics is not None else None
+                        if observation.failure_diagnostics is not None
+                        else None
                     ),
                     failure_diagnostics=observation.failure_diagnostics,
                 )
@@ -74,7 +75,8 @@ class MicrophoneAudioTestSourceOpener:
                 source = exc.source
                 raise
             return AudioTestOpenedSource(
-                source=source, device=self._device(source, observation),
+                source=source,
+                device=self._device(source, observation),
                 recovery_diagnostics=recovery,
             )
 
@@ -118,7 +120,9 @@ class MicrophoneAudioTestSourceOpener:
             except AudioSourceOpenFailure as failure:
                 failure.failure_diagnostics = exception_diagnostics(
                     ExceptionGroup("Audio test source attempts failed", [exc, failure]),
-                    component="audio_test", operation="audio.test", code="source_open_failed",
+                    component="audio_test",
+                    operation="audio.test",
+                    code="source_open_failed",
                 )
                 raise
             except Exception as failure:

@@ -89,12 +89,12 @@ from puripuly_heart.config.translation_values import (
 )
 from puripuly_heart.core.diagnostics import (
     deserialize_diagnostics,
-    exception_diagnostics,
-    project_diagnostic_record,
-    serialize_diagnostics,
     diagnostic_operation,
+    exception_diagnostics,
     normalize_diagnostic,
+    project_diagnostic_record,
     sanitize_diagnostic_fields,
+    serialize_diagnostics,
 )
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.local_translation.provisioning import (
@@ -497,7 +497,8 @@ def _accounts_status(application: object, retain: Callable[..., dict]) -> dict:
             elif isinstance(diagnostics, Mapping):
                 managed["diagnostics"] = project_diagnostic_record(diagnostics)
             secondary = tuple(
-                item for item in source.get("secondary_diagnostics", ())
+                item
+                for item in source.get("secondary_diagnostics", ())
                 if isinstance(item, ErrorDiagnostics)
             )
             if secondary:
@@ -1615,8 +1616,11 @@ class ApplicationControlOwner:
             assets = await self.application.refresh_model_assets()
             return {
                 **base,
-                "state": self._snapshot_json(getattr(owner, "snapshot", None))
-                if owner is not None else None,
+                "state": (
+                    self._snapshot_json(getattr(owner, "snapshot", None))
+                    if owner is not None
+                    else None
+                ),
                 "gemma": self._snapshot_json(gemma.snapshot) if gemma is not None else None,
                 "assets": [self._snapshot_json(entry.to_dict()) for entry in assets],
             }
@@ -1888,7 +1892,9 @@ class ApplicationControlOwner:
             ):
                 if isinstance(value.get(key), list):
                     value[key] = [
-                        retain(item, disposition) for item in value[key] if isinstance(item, Mapping)
+                        retain(item, disposition)
+                        for item in value[key]
+                        if isinstance(item, Mapping)
                     ]
 
         retain_evidence(diagnosis)
@@ -2360,7 +2366,9 @@ class ApplicationControlOwner:
                                 disposition=disposition,
                             ),
                             diagnostic_disposition=(
-                                status if status in {"failed", "degraded", "cancelled"} else "unknown"
+                                status
+                                if status in {"failed", "degraded", "cancelled"}
+                                else "unknown"
                             ),
                         )
                         operation.receipt.update({k: v for k, v in result.items() if k != "status"})
@@ -2387,9 +2395,7 @@ class ApplicationControlOwner:
                 operation.receipt.update(
                     {key: value for key, value in result.items() if key != "status"}
                 )
-                self._retain_audio_diagnosis(
-                    result, operation_id, operation.receipt["request_id"]
-                )
+                self._retain_audio_diagnosis(result, operation_id, operation.receipt["request_id"])
         except PeerCaptureTargetUnavailable:
             operation.receipt.update(
                 status="action_required", error={"code": "capture_target_unavailable"}
@@ -2411,7 +2417,8 @@ class ApplicationControlOwner:
             if owning_cause is not None:
                 operation.receipt["cause_diagnostics"] = owning_cause
             secondaries = tuple(
-                item for item in getattr(exc, "secondary_diagnostics", ())
+                item
+                for item in getattr(exc, "secondary_diagnostics", ())
                 if isinstance(item, ErrorDiagnostics)
             )
             if secondaries:

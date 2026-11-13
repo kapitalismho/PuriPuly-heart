@@ -13,9 +13,6 @@ from puripuly_heart.app.ports.managed_gemma_translation import (
 )
 from puripuly_heart.core.diagnostics import current_diagnostic_operation, sanitize_diagnostics
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
-from puripuly_heart.core.messages import ErrorDiagnostics
-from puripuly_heart.core.model_asset_diagnostics import model_asset_failure_diagnostics
-from puripuly_heart.core.network_diagnostics import transport_exception_chain
 from puripuly_heart.core.local_asr.local_stt_download_port import (
     HuggingFaceDownloadPort,
     LocalSTTDownloadPortError,
@@ -44,6 +41,9 @@ from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaRuntimeOwner,
     ManagedGemmaRuntimeVersionError,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.model_asset_diagnostics import model_asset_failure_diagnostics
+from puripuly_heart.core.network_diagnostics import transport_exception_chain
 from puripuly_heart.core.observability import DiagnosticEvent
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 
@@ -131,8 +131,7 @@ class ManagedGemmaTranslationOwner:
         elif isinstance(error, ManagedGemmaRuntimeError):
             operation, code = "runtime", "model_assets.runtime_failed"
         elif not isinstance(error, BaseExceptionGroup) and any(
-            isinstance(item, LocalSTTDownloadPortError)
-            for item in transport_exception_chain(error)
+            isinstance(item, LocalSTTDownloadPortError) for item in transport_exception_chain(error)
         ):
             operation, code = "download", "model_assets.install_failed"
         else:
@@ -147,7 +146,10 @@ class ManagedGemmaTranslationOwner:
                 )
             )
         error.failure_diagnostics = diagnostics
-        if not self._diagnostics or self._diagnostics[-1].diagnostic_id != diagnostics.diagnostic_id:
+        if (
+            not self._diagnostics
+            or self._diagnostics[-1].diagnostic_id != diagnostics.diagnostic_id
+        ):
             self._diagnostics_truncated |= len(self._diagnostics) == self._diagnostics.maxlen
             self._diagnostics.append(diagnostics)
         return diagnostics
@@ -174,7 +176,10 @@ class ManagedGemmaTranslationOwner:
             value for value in self.diagnostics if value.diagnostic_id not in excluded
         )
         truncated = snapshot.secondary_diagnostics_truncated or self._diagnostics_truncated
-        if secondary == snapshot.secondary_diagnostics and truncated == snapshot.secondary_diagnostics_truncated:
+        if (
+            secondary == snapshot.secondary_diagnostics
+            and truncated == snapshot.secondary_diagnostics_truncated
+        ):
             return snapshot
         return replace(
             snapshot,
@@ -296,7 +301,9 @@ class ManagedGemmaTranslationOwner:
                     raise
                 history = getattr(exc, "secondary_diagnostics", ())
                 self._publish(
-                    "cancelled", backend=backend, progress_percent=None,
+                    "cancelled",
+                    backend=backend,
+                    progress_percent=None,
                     secondary_diagnostics=history,
                 )
                 cancelled = GemmaProvisioningCancelled("Gemma model provisioning cancelled")
@@ -304,7 +311,9 @@ class ManagedGemmaTranslationOwner:
                 raise cancelled from exc
             except GemmaProvisioningCancelled as exc:
                 self._publish(
-                    "cancelled", backend=backend, progress_percent=None,
+                    "cancelled",
+                    backend=backend,
+                    progress_percent=None,
                     secondary_diagnostics=exc.secondary_diagnostics,
                 )
                 raise
@@ -375,6 +384,7 @@ class ManagedGemmaTranslationOwner:
         locale: str | None = None,
     ) -> InstalledGemmaManifest:
         from puripuly_heart.core.feature_diagnostics import log_feature
+
         identity = current_diagnostic_operation()
 
         if self._closed:
@@ -642,8 +652,6 @@ class ManagedGemmaTranslationOwner:
                 )
                 self._diagnostics_truncated |= len(self._diagnostics) == self._diagnostics.maxlen
                 self._diagnostics.append(diagnostics)
-
-
 
 
 __all__ = [

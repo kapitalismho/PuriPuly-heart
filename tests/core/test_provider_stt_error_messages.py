@@ -6,16 +6,16 @@ import importlib.util
 import pytest
 
 from puripuly_heart.core import diagnostic_validation, error_messages, messages
-from puripuly_heart.core.http_extensions import (
-    HttpExtensionConfigurationError,
-    HttpExtensionResponseError,
-)
-from puripuly_heart.core.llm.fallback_racing import LLMProviderRaceError
 from puripuly_heart.core.diagnostics import (
     DiagnosticHistory,
     project_diagnostic_record,
     serialize_diagnostics,
 )
+from puripuly_heart.core.http_extensions import (
+    HttpExtensionConfigurationError,
+    HttpExtensionResponseError,
+)
+from puripuly_heart.core.llm.fallback_racing import LLMProviderRaceError
 from puripuly_heart.core.messages import (
     DIAGNOSTIC_CATEGORY_AUTH,
     DIAGNOSTIC_CATEGORY_INVALID_RESPONSE,
@@ -255,9 +255,7 @@ def test_format_error_report_for_log_falls_back_when_diagnostics_are_unsafe() ->
 def test_mixed_provider_attempts_keep_each_refusal_without_false_consensus():
     errors = tuple(OpenRouterResponseError(status) for status in (403, 403, 404))
     failure = LLMProviderRaceError(errors)
-    report = error_messages.provider_failure_report(
-        failure, provider="llm", operation="translate"
-    )
+    report = error_messages.provider_failure_report(failure, provider="llm", operation="translate")
     value = serialize_diagnostics(report.diagnostics)
     history = DiagnosticHistory()
     retained, _ = history.retain(report.diagnostics, severity="error", disposition="failed")

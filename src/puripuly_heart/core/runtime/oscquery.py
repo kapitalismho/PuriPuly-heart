@@ -6,8 +6,8 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Final, Literal
 
-from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
+from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.osc.oscquery_contract import (
     OscQueryAdvertisement,

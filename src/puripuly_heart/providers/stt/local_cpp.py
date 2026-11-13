@@ -20,12 +20,8 @@ from puripuly_heart.core.asr_worker import (
     ASRWorkerProcessFactoryPort,
     ASRWorkerRequestError,
 )
-from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.diagnostics import emit_failure
-from puripuly_heart.core.stt.diagnostics import (
-    recognition_cleanup_failure,
-    recognition_failure_diagnostics,
-)
+from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr.local_stt_assets import (
     GIGAAM_MODEL_ID,
     GRANITE_MODEL_ID,
@@ -33,6 +29,10 @@ from puripuly_heart.core.local_asr.local_stt_assets import (
 )
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
+from puripuly_heart.core.stt.diagnostics import (
+    recognition_cleanup_failure,
+    recognition_failure_diagnostics,
+)
 from puripuly_heart.providers.stt.local_session import LocalOfflineSTTBackend
 
 _T = TypeVar("_T")

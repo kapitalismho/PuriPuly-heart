@@ -215,6 +215,7 @@ class LocalSTTRuntimeInstallError(LocalSTTAssetError):
 
 class LocalSTTRuntimeInstallCancelled(LocalSTTAssetError):
     """Raised when runtime local STT provisioning is cancelled."""
+
     secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
 
 
@@ -371,10 +372,9 @@ async def _cleanup_failed_download(
             download_task.result()
         except (asyncio.CancelledError, LocalSTTRuntimeInstallCancelled) as cancelled:
             if cancelled is not primary_failure:
-                primary_failure.secondary_diagnostics = (
-                    getattr(primary_failure, "secondary_diagnostics", ())
-                    + getattr(cancelled, "secondary_diagnostics", ())
-                )
+                primary_failure.secondary_diagnostics = getattr(
+                    primary_failure, "secondary_diagnostics", ()
+                ) + getattr(cancelled, "secondary_diagnostics", ())
         except BaseException as cleanup_failure:
             if cleanup_failure is not primary_failure:
                 if isinstance(cleanup_failure, BaseExceptionGroup):
@@ -638,7 +638,9 @@ def _promote_staging_install(
         except Exception as exc:
             cleanup_diagnostics.append(
                 model_asset_failure_diagnostics(
-                    exc, operation="cleanup", code="local_asr.cleanup_failed",
+                    exc,
+                    operation="cleanup",
+                    code="local_asr.cleanup_failed",
                     fields={"cleanup_complete": False},
                 )
             )
@@ -972,9 +974,8 @@ async def _ensure_local_stt_installed_with_lease(
                         **diagnostics.fields,
                         "asset_failure_code": model_asset_failure_code(callback),
                     },
-                    causes=diagnostics.causes + (
-                        model_asset_failure_diagnostics(callback, operation="models.install"),
-                    ),
+                    causes=diagnostics.causes
+                    + (model_asset_failure_diagnostics(callback, operation="models.install"),),
                 )
             )
         else:

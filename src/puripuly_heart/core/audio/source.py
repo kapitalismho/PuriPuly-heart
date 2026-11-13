@@ -265,7 +265,8 @@ def _microphone_test_observation(
                 operation="device_resolution",
                 code="capture.self.device_resolution_failed",
             )
-            if resolution_exception is not None else None
+            if resolution_exception is not None
+            else None
         ),
         should_attempt_open=should_attempt_open,
         wasapi_auto_convert=wasapi_auto_convert,

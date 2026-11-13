@@ -378,8 +378,9 @@ class ListenDeliveryController:
         for task in (self._four_second_task, self._five_second_task, self._hard_task):
             self._timer_tasks.add(task)
             task.add_done_callback(
-                lambda completed, segment_id=segment_id, generation=generation:
-                    self._observe_timer_result(completed, segment_id, generation)
+                lambda completed, segment_id=segment_id, generation=generation: self._observe_timer_result(
+                    completed, segment_id, generation
+                )
             )
 
     def _observe_timer_result(
@@ -393,10 +394,14 @@ class ListenDeliveryController:
             return
         diagnostics = replace(
             exception_diagnostics(
-                exception, component="capture.peer", operation="segmentation",
+                exception,
+                component="capture.peer",
+                operation="segmentation",
                 code="capture.peer.delivery_failed",
             ),
-            channel="peer", turn_id=str(segment_id), generation=generation,
+            channel="peer",
+            turn_id=str(segment_id),
+            generation=generation,
         )
         self._failures.append(diagnostics)
         self._ledger.retain_delivery_failure(diagnostics)

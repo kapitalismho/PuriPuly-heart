@@ -137,8 +137,10 @@ class ClipboardRuntime:
                     await asyncio.to_thread(watcher.stop)  # type: ignore[attr-defined]
                 except Exception as cleanup_exc:
                     cleanup = exception_diagnostics(
-                        cleanup_exc, component="clipboard",
-                        operation="watcher_stop", code="clipboard_failed",
+                        cleanup_exc,
+                        component="clipboard",
+                        operation="watcher_stop",
+                        code="clipboard_failed",
                     )
                     cleanup = replace(cleanup, cause_id=diagnostics.diagnostic_id)
                     cleanup_exc.failure_diagnostics = cleanup

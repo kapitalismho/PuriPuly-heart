@@ -21,11 +21,6 @@ import httpx
 
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.diagnostics import sanitize_diagnostics
-from puripuly_heart.core.messages import ErrorDiagnostics
-from puripuly_heart.core.model_asset_diagnostics import (
-    model_asset_failure_code,
-    model_asset_failure_diagnostics,
-)
 from puripuly_heart.core.feature_diagnostics import log_feature
 from puripuly_heart.core.local_asr.local_stt_download_port import (
     HuggingFaceDownloadPort,
@@ -49,6 +44,11 @@ from puripuly_heart.core.local_translation.assets import (
     e4b_gemma_spec,
     inspect_gemma_install,
     validate_gemma_install,
+)
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.model_asset_diagnostics import (
+    model_asset_failure_code,
+    model_asset_failure_diagnostics,
 )
 from puripuly_heart.core.model_download_sources import (
     HF_MIRROR_ENDPOINT,
@@ -675,7 +675,9 @@ async def _ensure_gemma_installed_with_lease(
                             **diagnostics.fields,
                             "model_id": spec.model_id,
                             "source_kind": (
-                                "huggingface_mirror" if source_label == "hf_mirror" else source_label
+                                "huggingface_mirror"
+                                if source_label == "hf_mirror"
+                                else source_label
                             ),
                             "source_attempt": source_attempt,
                         },
@@ -780,20 +782,26 @@ async def _ensure_gemma_installed_with_lease(
             failure = exc
         if isinstance(failure, (asyncio.CancelledError, GemmaProvisioningCancelled)):
             history = getattr(failure, "secondary_diagnostics", ())
-            failure.secondary_diagnostics = tuple(failures) + tuple(recoveries) + tuple(
-                sanitize_diagnostics(
-                    replace(
-                        item,
-                        fields={
-                            **item.fields,
-                            "source_kind": (
-                                "huggingface_mirror" if source_label == "hf_mirror" else source_label
-                            ),
-                            "source_attempt": source_attempt,
-                        },
+            failure.secondary_diagnostics = (
+                tuple(failures)
+                + tuple(recoveries)
+                + tuple(
+                    sanitize_diagnostics(
+                        replace(
+                            item,
+                            fields={
+                                **item.fields,
+                                "source_kind": (
+                                    "huggingface_mirror"
+                                    if source_label == "hf_mirror"
+                                    else source_label
+                                ),
+                                "source_attempt": source_attempt,
+                            },
+                        )
                     )
+                    for item in history
                 )
-                for item in history
             )
         if staging_dir is not None:
             _remove_owned_staging(staging_dir, primary_failure=failure)

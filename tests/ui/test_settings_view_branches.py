@@ -7063,7 +7063,9 @@ def test_secret_load_evidence_reaches_real_render_transaction(
 ):
     from puripuly_heart.app.services import settings_secrets as secret_module
     from puripuly_heart.app.services.settings.settings_projection import SettingsProjectionOwner
-    from puripuly_heart.app.services.settings.settings_transaction_result import SettingsTransactionResultOwner
+    from puripuly_heart.app.services.settings.settings_transaction_result import (
+        SettingsTransactionResultOwner,
+    )
     from puripuly_heart.core.messages import (
         TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
         TransactionResult,
@@ -7083,7 +7085,8 @@ def test_secret_load_evidence_reaches_real_render_transaction(
     view.on_settings_changed = settings_events.record_immediate
     view.on_prompt_apply_settings = settings_events.record_prompt
     monkeypatch.setattr(
-        view, "_emit_runtime_basic",
+        view,
+        "_emit_runtime_basic",
         lambda *_args, **_kwargs: pytest.fail("secret evidence must not add notifications"),
     )
 
@@ -7108,7 +7111,9 @@ def test_secret_load_evidence_reaches_real_render_transaction(
             )
         )
         rendered = projection.render(settings)
-        assert rendered.loaded is True, rendered.diagnostics.fields if rendered.diagnostics else None
+        assert rendered.loaded is True, (
+            rendered.diagnostics.fields if rendered.diagnostics else None
+        )
         assert rendered.diagnostics is None
         assert len(captured.current.secondary_diagnostics) == (2 if failure == "migration" else 1)
     assert captured.current.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
@@ -7125,7 +7130,9 @@ def test_store_creation_and_basic_log_cofailure_preserves_secret_render_evidence
     monkeypatch, settings_events, pkce
 ):
     from puripuly_heart.app.services.settings.settings_projection import SettingsProjectionOwner
-    from puripuly_heart.app.services.settings.settings_transaction_result import SettingsTransactionResultOwner
+    from puripuly_heart.app.services.settings.settings_transaction_result import (
+        SettingsTransactionResultOwner,
+    )
     from puripuly_heart.core.diagnostics import exception_diagnostics
     from puripuly_heart.core.messages import (
         TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -7141,7 +7148,9 @@ def test_store_creation_and_basic_log_cofailure_preserves_secret_render_evidence
 
     upstream = exception_diagnostics(
         OSError(5, "synthetic-private-upstream"),
-        component="settings_secrets", operation="secret_read", code="settings_secret_failed",
+        component="settings_secrets",
+        operation="secret_read",
+        code="settings_secret_failed",
     )
     method = "load_openrouter_pkce" if pkce else "load"
     original_load = getattr(SettingsSecretsOwner, method)
@@ -7179,7 +7188,8 @@ def test_store_creation_and_basic_log_cofailure_preserves_secret_render_evidence
         results.set(
             TransactionResult(
                 status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
-                message=None, diagnostics=None,
+                message=None,
+                diagnostics=None,
             )
         )
         if pkce:

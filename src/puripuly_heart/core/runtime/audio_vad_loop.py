@@ -668,8 +668,11 @@ async def run_audio_vad_loop(
                 await delivery_controller.close()
             except Exception as cleanup_exception:
                 diagnostics = exception_diagnostics(
-                    cleanup_exception, component="capture.peer", operation="cleanup",
-                    code="capture.peer.cleanup_failed", fields={"cleanup_confirmed": False},
+                    cleanup_exception,
+                    component="capture.peer",
+                    operation="cleanup",
+                    code="capture.peer.cleanup_failed",
+                    fields={"cleanup_confirmed": False},
                 )
                 cleanup_exception.failure_diagnostics = diagnostics
                 if primary_exception is None:
@@ -678,10 +681,13 @@ async def run_audio_vad_loop(
                     primary_exception.failure_diagnostics = diagnostics
                 else:
                     primary = exception_diagnostics(
-                        primary_exception, component="capture.peer", operation="source_read",
+                        primary_exception,
+                        component="capture.peer",
+                        operation="source_read",
                         code="capture.peer.source_failure",
                     )
                     primary_exception.failure_diagnostics = replace(
-                        primary, causes=(*primary.causes, diagnostics),
+                        primary,
+                        causes=(*primary.causes, diagnostics),
                     )
                 emit_failure(logger, diagnostics, disposition="degraded", stage="cleanup")

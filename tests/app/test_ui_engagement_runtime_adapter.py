@@ -24,6 +24,7 @@ class RecordingTelemetryClient:
 
 class CommittedResults:
     current = None
+
     def committed(self) -> bool:
         return True
 

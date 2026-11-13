@@ -311,9 +311,10 @@ async def test_foundation_observes_failed_task_and_future_without_sensitive_text
     future = Future()
     page = SimpleNamespace(run_task=lambda *_args: future) if concurrent_future else TaskPage()
     runtime = FletFoundationRuntime(
-        page, FletFoundationAdapter(
+        page,
+        FletFoundationAdapter(
             RecordingApplication(), RecordingPresentation(debug_ui_preview=False)
-        )
+        ),
     )
     runtime.bind_application_lifecycle(ApplicationShutdownCoordinator())
 
@@ -350,10 +351,16 @@ async def test_headless_observes_failure_without_turning_cancellation_into_failu
     presentation.schedule_task(cancelled)
     await asyncio.sleep(0)
     await asyncio.sleep(0)
-    assert len([
-        record for record in caplog.records
-        if getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE, None) is not None
-    ]) == 1
+    assert (
+        len(
+            [
+                record
+                for record in caplog.records
+                if getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE, None) is not None
+            ]
+        )
+        == 1
+    )
     assert presentation.failure_diagnostics.fields["errno"] == 13
     assert "private" not in repr(presentation.failure_diagnostics)
     await presentation.close_after_launch_tasks()

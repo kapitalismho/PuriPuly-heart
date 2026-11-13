@@ -15,10 +15,10 @@ from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     ProviderRuntimeBuildRequest,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.stt.recognition_probe import recognize_probe_audio
 from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
-from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.runtime_layout import current_runtime_layout
 
 RECOGNITION_PROBE_METADATA = {
@@ -204,7 +204,8 @@ async def run_recognition_probe(
     except Exception as exc:
         failure = exc
         result["secondary_diagnostics"] = tuple(
-            item for item in getattr(exc, "secondary_diagnostics", ())
+            item
+            for item in getattr(exc, "secondary_diagnostics", ())
             if isinstance(item, ErrorDiagnostics)
         )
     current = runtime_provider()

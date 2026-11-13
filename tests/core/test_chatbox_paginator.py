@@ -583,7 +583,9 @@ def test_newer_pending_revision_replaces_in_place_behind_system_message() -> Non
     paginator.enqueue(_message("system!!", clock))
     receipts: list[tuple[int, str]] = []
     paginator.bind_delivery_observer(
-        lambda message, status, diagnostics: receipts.append((message.presentation_revision, status))
+        lambda message, status, diagnostics: receipts.append(
+            (message.presentation_revision, status)
+        )
     )
     paginator.enqueue(
         _message(

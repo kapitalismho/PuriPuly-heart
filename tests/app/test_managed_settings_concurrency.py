@@ -424,7 +424,9 @@ async def test_runtime_failure_compensation_preserves_overlapping_managed_commit
     committed = owner.commit_delta(base, _locale(base, "ja"))
     effects = RuntimeEffects(owner)
     projection = SettingsProjectionOwner(
-        presentation=SimpleNamespace(render_settings=lambda *args, **kwargs: SettingsRenderResult(True)),
+        presentation=SimpleNamespace(
+            render_settings=lambda *args, **kwargs: SettingsRenderResult(True)
+        ),
         config_path=owner.path,
         current_settings=lambda: owner.canonical,
     )

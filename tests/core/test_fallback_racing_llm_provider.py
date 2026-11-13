@@ -569,9 +569,7 @@ async def test_successful_fallback_carries_original_evidence_when_sink_fails(mon
         fallback=FakeLLM(translated_text="winner"),
         fallback_timeout_ms=100,
     )
-    monkeypatch.setattr(
-        "puripuly_heart.core.llm.fallback_racing.logger", BrokenLogger()
-    )
+    monkeypatch.setattr("puripuly_heart.core.llm.fallback_racing.logger", BrokenLogger())
     turn_id = uuid4()
     result = await provider.translate(**_translation_kwargs(utterance_id=turn_id))
     await provider.close()
@@ -615,9 +613,7 @@ async def test_cleanup_failure_is_degraded_without_replacing_success(caplog):
 async def test_cancelled_request_keeps_late_failure_as_history_not_terminal_outcome(caplog):
     primary = HeldCancelLLM(error=OpenRouterResponseError(403), gate=asyncio.Event())
     provider = FallbackRacingLLMProvider(primary=primary)
-    operation = asyncio.create_task(
-        provider.translate(**_translation_kwargs(utterance_id=uuid4()))
-    )
+    operation = asyncio.create_task(provider.translate(**_translation_kwargs(utterance_id=uuid4())))
     await asyncio.wait_for(primary.translate_started.wait(), 0.2)
     operation.cancel()
     with pytest.raises(asyncio.CancelledError):
@@ -662,7 +658,8 @@ async def test_fallback_preserves_winner_secondary_evidence_and_collection_loss_
     await provider.close()
     assert result.text == "winner"
     assert [item["diagnostic_id"] for item in result.recovered_failures] == [
-        recovered.diagnostic_id, primary_error.failure_diagnostics.diagnostic_id
+        recovered.diagnostic_id,
+        primary_error.failure_diagnostics.diagnostic_id,
     ]
     assert [item["diagnostic_id"] for item in result.secondary_diagnostics] == [
         secondary.diagnostic_id

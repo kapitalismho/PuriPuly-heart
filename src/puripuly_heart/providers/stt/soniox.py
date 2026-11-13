@@ -184,7 +184,9 @@ class SonioxRealtimeSTTBackend(STTBackend):
     enable_speaker_diarization: bool = True
     language_hints_strict: bool = False
     connect_timeout_s: float = 5.0
-    _starting_sessions: list[STTBackendSession] = field(init=False, default_factory=list, repr=False)
+    _starting_sessions: list[STTBackendSession] = field(
+        init=False, default_factory=list, repr=False
+    )
 
     async def open_session(
         self,
@@ -1374,6 +1376,3 @@ class _SonioxSession(STTBackendSession):
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         async for event in self._event_projection.events():
             yield event
-
-
-import contextlib  # placed at bottom to keep the main logic compact

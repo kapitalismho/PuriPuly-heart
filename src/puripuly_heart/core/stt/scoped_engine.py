@@ -3142,11 +3142,14 @@ class ScopedRecognitionEngine:
                 secondary = replace(
                     secondary,
                     cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None,
-                    causes=(*secondary.causes, *((self._episode_cause,) if self._episode_cause else ())),
+                    causes=(
+                        *secondary.causes,
+                        *((self._episode_cause,) if self._episode_cause else ()),
+                    ),
                 )
-                self.secondary_diagnostics = (
-                    *self.secondary_diagnostics, secondary
-                )[-DIAGNOSTIC_CAUSE_MAX_COUNT:]
+                self.secondary_diagnostics = (*self.secondary_diagnostics, secondary)[
+                    -DIAGNOSTIC_CAUSE_MAX_COUNT:
+                ]
                 emit_failure(
                     logger, secondary, severity="warning", disposition="degraded", stage="readiness"
                 )
@@ -3201,7 +3204,10 @@ class ScopedRecognitionEngine:
                 diagnostics,
                 cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None,
                 fields={**diagnostics.fields, "cleanup_confirmed": False},
-                causes=(*diagnostics.causes, *((self._episode_cause,) if self._episode_cause else ())),
+                causes=(
+                    *diagnostics.causes,
+                    *((self._episode_cause,) if self._episode_cause else ()),
+                ),
             ),
             severity="warning",
             disposition="degraded",
@@ -3256,7 +3262,8 @@ class ScopedRecognitionEngine:
         self._episode_cause = replace(
             first,
             causes=(*first.causes, diagnostics)[:DIAGNOSTIC_CAUSE_MAX_COUNT],
-            causes_truncated=first.causes_truncated or len(first.causes) >= DIAGNOSTIC_CAUSE_MAX_COUNT,
+            causes_truncated=first.causes_truncated
+            or len(first.causes) >= DIAGNOSTIC_CAUSE_MAX_COUNT,
         )
 
     def _notify_terminal_failure(self, failure: Exception | ErrorDiagnostics | None) -> None:
@@ -3306,7 +3313,11 @@ class ScopedRecognitionEngine:
                 },
                 causes=(
                     first_cause,
-                    *((diagnostics,) if diagnostics.diagnostic_id != first_cause.diagnostic_id else ()),
+                    *(
+                        (diagnostics,)
+                        if diagnostics.diagnostic_id != first_cause.diagnostic_id
+                        else ()
+                    ),
                 ),
             ),
             stage="recovery",
@@ -3352,9 +3363,9 @@ class ScopedRecognitionEngine:
             cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None,
             causes=(*diagnostics.causes, *((self._episode_cause,) if self._episode_cause else ())),
         )
-        self.secondary_diagnostics = (
-            *self.secondary_diagnostics, diagnostics
-        )[-DIAGNOSTIC_CAUSE_MAX_COUNT:]
+        self.secondary_diagnostics = (*self.secondary_diagnostics, diagnostics)[
+            -DIAGNOSTIC_CAUSE_MAX_COUNT:
+        ]
         emit_failure(
             logger,
             replace(

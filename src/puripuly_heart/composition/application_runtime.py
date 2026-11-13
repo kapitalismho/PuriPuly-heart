@@ -552,7 +552,8 @@ def compose_application_runtime(
         nonlocal managed_gemma_basic_state
         diagnostics = snapshot.failure_diagnostics
         basic_state = (
-            snapshot.state, snapshot.backend,
+            snapshot.state,
+            snapshot.backend,
             diagnostics.diagnostic_id if diagnostics is not None else None,
         )
         if basic_state != managed_gemma_basic_state:
@@ -561,7 +562,10 @@ def compose_application_runtime(
                 fields = [f"state={snapshot.state}"]
                 if snapshot.backend is not None:
                     fields.append(f"backend={snapshot.backend}")
-                if diagnostics is not None and diagnostics.fields.get("exception_class") is not None:
+                if (
+                    diagnostics is not None
+                    and diagnostics.fields.get("exception_class") is not None
+                ):
                     fields.append(f"cause={diagnostics.fields['exception_class']}")
                 log_basic(
                     "[ManagedGemma] " + " ".join(fields),
@@ -596,7 +600,8 @@ def compose_application_runtime(
                         "runtime": "runtime",
                         "prefix": "runtime",
                     }.get(diagnostics.operation, "runtime")
-                    if diagnostics is not None else None
+                    if diagnostics is not None
+                    else None
                 ),
             )
         )

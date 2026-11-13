@@ -1429,7 +1429,9 @@ async def test_executable_version_rejects_unpinned_build_or_commit(
     if valid:
         await runtime_module.validate_gemma_runtime_version(executable)
     else:
-        with pytest.raises(ManagedGemmaRuntimeError, match="Incompatible llama.cpp executable") as caught:
+        with pytest.raises(
+            ManagedGemmaRuntimeError, match="Incompatible llama.cpp executable"
+        ) as caught:
             await runtime_module.validate_gemma_runtime_version(executable)
         diagnostics = caught.value.failure_diagnostics
         assert diagnostics.operation == "runtime_version"

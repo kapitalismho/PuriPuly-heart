@@ -95,7 +95,9 @@ class LocalDecodeCoordinator:
     _failed: bool = field(init=False, default=False, repr=False)
     _close_complete: asyncio.Event = field(init=False, repr=False)
     failure_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
-    delivery_failure_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
+    delivery_failure_diagnostics: ErrorDiagnostics | None = field(
+        init=False, default=None, repr=False
+    )
 
     def __post_init__(self) -> None:
         if self.sample_rate_hz <= 0:

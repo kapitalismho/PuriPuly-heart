@@ -15,8 +15,8 @@ from typing import Any
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-from puripuly_heart.core.external_network import ProxyPolicy, select_tls
 from puripuly_heart.core.diagnostics import sanitize_diagnostics
+from puripuly_heart.core.external_network import ProxyPolicy, select_tls
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.model_asset_diagnostics import model_asset_failure_diagnostics
 from puripuly_heart.runtime_layout import current_runtime_layout
@@ -265,11 +265,13 @@ class HuggingFaceXetDownloadAdapter:
                 )
             except LocalSTTDownloadPortError as last_failure:
                 first = model_asset_failure_diagnostics(
-                    first_failure, operation="download",
+                    first_failure,
+                    operation="download",
                     fields={"source_kind": "huggingface", "source_attempt": 1},
                 )
                 last = model_asset_failure_diagnostics(
-                    last_failure, operation="download",
+                    last_failure,
+                    operation="download",
                     fields={"source_kind": "huggingface", "source_attempt": 2},
                 )
                 last_failure.failure_diagnostics = sanitize_diagnostics(
@@ -288,7 +290,8 @@ class HuggingFaceXetDownloadAdapter:
                 )
                 raise
             recovered = model_asset_failure_diagnostics(
-                first_failure, operation="download",
+                first_failure,
+                operation="download",
                 fields={"source_kind": "huggingface", "source_attempt": 1},
             )
             self._recovery_diagnostics.append(recovered)
@@ -300,7 +303,8 @@ class HuggingFaceXetDownloadAdapter:
                 if first_failure is not None:
                     failure.secondary_diagnostics = (
                         model_asset_failure_diagnostics(
-                            first_failure, operation="download",
+                            first_failure,
+                            operation="download",
                             fields={"source_kind": "huggingface", "source_attempt": 1},
                         ),
                     )

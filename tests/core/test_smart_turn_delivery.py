@@ -923,5 +923,6 @@ async def test_timer_delivery_failure_is_retained_with_segment_identity_and_clos
     assert not harness.controller._timer_tasks
     assert harness.ledger.snapshots[0].delivery_failure_diagnostics is failures[0]
     from dataclasses import replace
+
     assert not harness.ledger.retain_delivery_failure(replace(failures[0], generation=8))
     assert harness.ledger.snapshots[0].delivery_failure_diagnostics is failures[0]

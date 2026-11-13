@@ -547,8 +547,12 @@ def project_diagnostic_evidence(value: object) -> dict:
     result = {
         key: project_diagnostic_record(source[key])
         for key in (
-            "diagnostics", "cause_diagnostics", "failure_diagnostics",
-            "query_diagnostics", "discovery_diagnostics", "avatar_diagnostics",
+            "diagnostics",
+            "cause_diagnostics",
+            "failure_diagnostics",
+            "query_diagnostics",
+            "discovery_diagnostics",
+            "avatar_diagnostics",
             "source_open_diagnostics",
         )
         if isinstance(source.get(key), Mapping)
@@ -558,16 +562,36 @@ def project_diagnostic_evidence(value: object) -> dict:
             result[key] = source[key]
     for key, bound, count_key, flag_key in (
         ("secondary_diagnostics", 4, "secondary_omitted_count", "secondary_truncated"),
-        ("recovered_diagnostics", DIAGNOSTIC_CAUSE_MAX_COUNT,
-         "recovered_diagnostics_omitted_count", "recovered_failures_truncated"),
-        ("recovery_diagnostics", DIAGNOSTIC_CAUSE_MAX_COUNT,
-         "recovery_diagnostics_omitted_count", "recovery_diagnostics_truncated"),
-        ("runtime_failures", DIAGNOSTIC_CAUSE_MAX_COUNT,
-         "runtime_failures_omitted_count", "runtime_failures_truncated"),
-        ("service_failures", DIAGNOSTIC_CAUSE_MAX_COUNT,
-         "service_failures_omitted_count", "service_failures_truncated"),
-        ("dispatch_failures", DIAGNOSTIC_CAUSE_MAX_COUNT,
-         "dispatch_failures_omitted_count", "dispatch_failures_truncated"),
+        (
+            "recovered_diagnostics",
+            DIAGNOSTIC_CAUSE_MAX_COUNT,
+            "recovered_diagnostics_omitted_count",
+            "recovered_failures_truncated",
+        ),
+        (
+            "recovery_diagnostics",
+            DIAGNOSTIC_CAUSE_MAX_COUNT,
+            "recovery_diagnostics_omitted_count",
+            "recovery_diagnostics_truncated",
+        ),
+        (
+            "runtime_failures",
+            DIAGNOSTIC_CAUSE_MAX_COUNT,
+            "runtime_failures_omitted_count",
+            "runtime_failures_truncated",
+        ),
+        (
+            "service_failures",
+            DIAGNOSTIC_CAUSE_MAX_COUNT,
+            "service_failures_omitted_count",
+            "service_failures_truncated",
+        ),
+        (
+            "dispatch_failures",
+            DIAGNOSTIC_CAUSE_MAX_COUNT,
+            "dispatch_failures_omitted_count",
+            "dispatch_failures_truncated",
+        ),
     ):
         if type(source.get(flag_key)) is bool:
             result[flag_key] = source[flag_key]
@@ -597,8 +621,16 @@ def project_capture_channel(value: object) -> dict:
         "capture": {
             **safe_fields(
                 capture,
-                ("state", "generation", "desired_active", "effective_active", "has_source",
-                 "cleanup_debt", "closed", "source_open_recovered"),
+                (
+                    "state",
+                    "generation",
+                    "desired_active",
+                    "effective_active",
+                    "has_source",
+                    "cleanup_debt",
+                    "closed",
+                    "source_open_recovered",
+                ),
             ),
             **project_diagnostic_evidence(capture),
         },

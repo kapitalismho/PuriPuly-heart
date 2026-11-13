@@ -142,7 +142,8 @@ class VrchatSceneLogTailer:
     def scan_candidates(self) -> tuple[VrchatSceneLogCandidate, ...]:
         try:
             paths = tuple(
-                path for path in self.log_directory.iterdir()
+                path
+                for path in self.log_directory.iterdir()
                 if path.name.startswith("output_log_") and path.suffix == ".txt"
             )
         except FileNotFoundError:
@@ -165,7 +166,6 @@ class VrchatSceneLogTailer:
                 )
             )
         return tuple(found)
-
 
     def begin_replay(self, path: Path) -> list[str]:
         self._path = path

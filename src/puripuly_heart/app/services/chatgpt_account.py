@@ -26,7 +26,11 @@ from puripuly_heart.core.chatgpt.oauth import (
     token_set_from_response,
 )
 from puripuly_heart.core.chatgpt.session import ChatGptSession
-from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics, safe_exception_fields
+from puripuly_heart.core.diagnostics import (
+    emit_failure,
+    exception_diagnostics,
+    safe_exception_fields,
+)
 from puripuly_heart.core.messages import ErrorDiagnostics
 
 logger = logging.getLogger(__name__)
@@ -138,9 +142,9 @@ class ChatGptAccountOwner:
                 operation=self._phase,
                 code=f"chatgpt_{code}",
                 category=(
-                    "auth" if isinstance(exc, ChatGptAuthError)
-                    else "lifecycle" if isinstance(exc, (OSError, httpx.HTTPError))
-                    else "unknown"
+                    "auth"
+                    if isinstance(exc, ChatGptAuthError)
+                    else "lifecycle" if isinstance(exc, (OSError, httpx.HTTPError)) else "unknown"
                 ),
                 fields={"phase": self._phase},
             )

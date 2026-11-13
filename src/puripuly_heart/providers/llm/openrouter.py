@@ -401,7 +401,9 @@ class OpenRouterLLMProvider:
 
         if not isinstance(payload, dict):
             raise LLMResponseError(
-                "OpenRouter key metadata was not an object", provider="openrouter", operation="probe"
+                "OpenRouter key metadata was not an object",
+                provider="openrouter",
+                operation="probe",
             )
         data = payload.get("data")
         if not isinstance(data, dict):

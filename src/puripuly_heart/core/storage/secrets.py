@@ -207,6 +207,4 @@ def _atomic_write_json(path: Path, data: object) -> None:
                 category="transaction",
                 fields={"secret_write_succeeded": False},
             )
-            failure.diagnostics = replace(
-                primary, causes=(*primary.causes, cleanup)
-            )
+            failure.diagnostics = replace(primary, causes=(*primary.causes, cleanup))

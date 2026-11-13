@@ -233,9 +233,7 @@ class GithubStarPromptRuntime:
             exception = TimeoutError(
                 f"{self.owner_name} timed out cancelling {task_name} task during close"
             )
-            self.record_failure(
-                exception, task_name, code="github_star_prompt_task_cancel_timeout"
-            )
+            self.record_failure(exception, task_name, code="github_star_prompt_task_cancel_timeout")
             return [exception]
         return []
 

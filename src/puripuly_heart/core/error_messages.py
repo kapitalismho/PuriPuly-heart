@@ -167,7 +167,9 @@ def openrouter_auth_failure_report(
         )
     return UserErrorReport(
         message=UserMessageRef(key=failure.message_key, params={}, severity=SEVERITY_ERROR),
-        diagnostics=replace(diagnostics, status_code=failure.status_code or diagnostics.status_code),
+        diagnostics=replace(
+            diagnostics, status_code=failure.status_code or diagnostics.status_code
+        ),
     )
 
 

@@ -73,7 +73,9 @@ class AudioDiagnosticEvidence:
             self.retain_secondary(diagnostics)
 
     def retain_secondary(self, diagnostics: ErrorDiagnostics) -> None:
-        if any(item.diagnostic_id == diagnostics.diagnostic_id for item in self.secondary_diagnostics):
+        if any(
+            item.diagnostic_id == diagnostics.diagnostic_id for item in self.secondary_diagnostics
+        ):
             return
         if len(self.secondary_diagnostics) < 4:
             self.secondary_diagnostics += (diagnostics,)
@@ -126,9 +128,15 @@ class AudioDiagnosticEvidence:
         diagnostics = self.diagnostics
         if diagnostics is None and self.failure_code not in {None, "cancelled"}:
             diagnostics = ErrorDiagnostics(
-                component="audio_diagnosis", operation="audio.diagnose", code=self.failure_code,
-                category="lifecycle", visibility="diagnostic_only", content_policy="metadata_only",
-                status_code=None, retry_after_ms=None, fields={},
+                component="audio_diagnosis",
+                operation="audio.diagnose",
+                code=self.failure_code,
+                category="lifecycle",
+                visibility="diagnostic_only",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={},
             )
         return {
             "id": f"input-{candidate.device_index}",

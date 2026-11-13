@@ -41,8 +41,11 @@ class FakeProvisioning:
         self.release = asyncio.Event()
         self.started = asyncio.Event()
         self.result = SimpleNamespace(
-            cancelled=False, failed_model_ids=(), failure_codes=(),
-            failure_diagnostics=None, recovery_diagnostics=(),
+            cancelled=False,
+            failed_model_ids=(),
+            failure_codes=(),
+            failure_diagnostics=None,
+            recovery_diagnostics=(),
             secondary_diagnostics=(),
         )
         self.snapshot = SimpleNamespace(
@@ -59,8 +62,11 @@ class FakeProvisioning:
     async def cancel_install(self, backend, *, origin=None):
         self.cancelled.append((backend, origin))
         self.result = SimpleNamespace(
-            cancelled=True, failed_model_ids=(), failure_codes=(),
-            failure_diagnostics=None, recovery_diagnostics=(),
+            cancelled=True,
+            failed_model_ids=(),
+            failure_codes=(),
+            failure_diagnostics=None,
+            recovery_diagnostics=(),
             secondary_diagnostics=(),
         )
         self.release.set()
@@ -180,8 +186,11 @@ async def test_failure_is_recorded_on_the_entry_and_cleared_by_the_next_attempt(
     assert caught.value.failure_diagnostics is diagnostics
     assert service.entry(GRANITE_MODEL_ID).failure_diagnostics is diagnostics
     provisioning.result = SimpleNamespace(
-        cancelled=False, failed_model_ids=(), failure_codes=(),
-        failure_diagnostics=None, recovery_diagnostics=(),
+        cancelled=False,
+        failed_model_ids=(),
+        failure_codes=(),
+        failure_diagnostics=None,
+        recovery_diagnostics=(),
         secondary_diagnostics=(),
     )
     await service.download(GRANITE_MODEL_ID)

@@ -35,6 +35,11 @@ from puripuly_heart.config.provider_values import (
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
 )
+from puripuly_heart.core.diagnostics import (
+    DIAGNOSTIC_CAUSE_MAX_COUNT,
+    exception_diagnostics,
+    serialize_diagnostics,
+)
 from puripuly_heart.core.discord.discord_managed_oauth import (
     DiscordOAuthBrowserLaunchError,
     DiscordOAuthStateError,
@@ -48,11 +53,6 @@ from puripuly_heart.core.discord.discord_oauth_loopback import (
     bind_first_available,
 )
 from puripuly_heart.core.error_messages import provider_failure_report
-from puripuly_heart.core.diagnostics import (
-    DIAGNOSTIC_CAUSE_MAX_COUNT,
-    exception_diagnostics,
-    serialize_diagnostics,
-)
 from puripuly_heart.core.hardware_fingerprint import compute_hardware_hash
 from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.managed_credential import (
@@ -225,7 +225,9 @@ class ManagedOpenRouterReleaseResult:
         excess = max(0, len(self.secondary_diagnostics) - 4)
         if excess:
             object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
-            object.__setattr__(self, "secondary_omitted_count", self.secondary_omitted_count + excess)
+            object.__setattr__(
+                self, "secondary_omitted_count", self.secondary_omitted_count + excess
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -496,7 +498,10 @@ class ManagedOpenRouterReleaseService:
             try:
                 result = await coro
                 diagnostics = result.diagnostics
-                if evidence.diagnostics and result.behavior != ManagedOpenRouterReleaseBehavior.READY:
+                if (
+                    evidence.diagnostics
+                    and result.behavior != ManagedOpenRouterReleaseBehavior.READY
+                ):
                     if diagnostics is None:
                         diagnostics = ManagedOpenRouterReleaseDiagnostics()
                     if diagnostics.failure_diagnostics is None:
@@ -1795,7 +1800,8 @@ class ManagedOpenRouterUserFacingError(RuntimeError):
                 causes=(
                     *primary.causes,
                     *(
-                        cause for cause in self.secondary_diagnostics
+                        cause
+                        for cause in self.secondary_diagnostics
                         if cause.diagnostic_id != primary.diagnostic_id
                     ),
                 ),
@@ -1841,7 +1847,9 @@ class ManagedOpenRouterLLMProvider(LLMProvider):
     delegate_factory: ManagedOpenRouterDelegateFactory
     on_delegate_ready: Callable[[], object] | None = None
     _delegate: LLMProvider | None = field(init=False, default=None, repr=False)
-    _activation_result: ManagedOpenRouterReleaseResult | None = field(init=False, default=None, repr=False)
+    _activation_result: ManagedOpenRouterReleaseResult | None = field(
+        init=False, default=None, repr=False
+    )
     _delegate_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
 
     @property

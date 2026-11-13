@@ -16,12 +16,12 @@ from puripuly_heart.core.local_asr.local_stt_assets import (
     inspect_local_stt_install_state,
     load_local_stt_asset_manifest,
 )
-from puripuly_heart.core.model_download_sources import MODEL_DOWNLOAD_SOURCES
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.model_asset_diagnostics import (
     model_asset_failure_code,
     model_asset_failure_diagnostics,
 )
+from puripuly_heart.core.model_download_sources import MODEL_DOWNLOAD_SOURCES
 
 MODEL_ASSETS_ORIGIN = "model_assets"
 _INTEGRITY_STATUS = {"ready": "installed", "missing": "missing", "invalid": "invalid"}
@@ -139,7 +139,8 @@ class ModelAssetsApplication:
                     required_files=choice.required_files,
                     failure_diagnostics=self._failure_diagnostics.get(choice.model_id),
                     recovery_diagnostics=self._recoveries.get(choice.model_id, ()),
-                    secondary_diagnostics=self._secondaries.get(choice.model_id, ()) + (
+                    secondary_diagnostics=self._secondaries.get(choice.model_id, ())
+                    + (
                         (self._inspection_diagnostics[choice.model_id],)
                         if choice.model_id in self._inspection_diagnostics
                         else ()

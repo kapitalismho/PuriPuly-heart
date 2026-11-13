@@ -570,7 +570,9 @@ async def test_completion_rejects_stale_async_save_failure_and_allows_retry(
     else:
         assert [item[:3] for item in completed] == [("openrouter", False, "verification_failed")]
         assert completed[0][3].code == "verification_save_failed"
-        assert completed[0][3].fields["exception_class"] == ("OSError" if raises else "RuntimeError")
+        assert completed[0][3].fields["exception_class"] == (
+            "OSError" if raises else "RuntimeError"
+        )
         assert field.controller.status == "error"
         field._handle_blur(None)
         await field._run_verification()

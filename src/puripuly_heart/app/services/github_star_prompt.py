@@ -8,8 +8,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
 
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, GithubStarPromptState
-from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 
 GITHUB_STAR_PROMPT_ELIGIBLE_LAUNCH_THRESHOLD = 5
 GITHUB_STAR_PROMPT_RECENCY_WINDOW = timedelta(days=14)

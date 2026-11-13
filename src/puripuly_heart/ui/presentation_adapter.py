@@ -16,7 +16,11 @@ from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationState,
     OverlayPeerPresentationState,
 )
-from puripuly_heart.app.ports.ui_presentation import SettingsRenderResult, UIEventBridgePort, UiPresentationPort
+from puripuly_heart.app.ports.ui_presentation import (
+    SettingsRenderResult,
+    UIEventBridgePort,
+    UiPresentationPort,
+)
 from puripuly_heart.ui.event_bridge import (
     AppDashboardEventDestination,
     AppHistoryEventDestination,

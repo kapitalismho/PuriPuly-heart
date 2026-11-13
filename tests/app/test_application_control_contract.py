@@ -1529,7 +1529,9 @@ async def test_control_audio_test_reports_channel_failures_pending_stop_and_live
             resolved_device_idx=None,
             resolved_device_name=None,
             failure_diagnostics=exception_diagnostics(
-                RuntimeError(), component="capture.self", operation="source_open",
+                RuntimeError(),
+                component="capture.self",
+                operation="source_open",
                 code="source_open_failed",
             ),
             should_attempt_open=False,
@@ -2202,8 +2204,10 @@ async def test_control_model_commands_download_import_delete_cancel_and_report_a
             self.started.set()
             await self.release.wait()
             return SimpleNamespace(
-                cancelled=self.cancelled, failed_model_ids=(),
-                failure_diagnostics=None, recovery_diagnostics=(),
+                cancelled=self.cancelled,
+                failed_model_ids=(),
+                failure_diagnostics=None,
+                recovery_diagnostics=(),
                 secondary_diagnostics=(),
             )
 

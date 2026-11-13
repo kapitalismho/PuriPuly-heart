@@ -140,7 +140,7 @@ class _PsutilProcessIdentityWatch:
             return True
         except self.psutil.AccessDenied as exc:
             return self._set_terminal("identity_unavailable", exc)
-        except (self.psutil.NoSuchProcess, self.psutil.ZombieProcess):
+        except self.psutil.NoSuchProcess, self.psutil.ZombieProcess:
             return self._set_terminal("target_exited")
 
     def _still_matches_running_identity(self) -> bool:
@@ -152,7 +152,7 @@ class _PsutilProcessIdentityWatch:
             return True
         except self.psutil.AccessDenied as exc:
             return self._set_terminal("identity_unavailable", exc)
-        except (self.psutil.NoSuchProcess, self.psutil.ZombieProcess):
+        except self.psutil.NoSuchProcess, self.psutil.ZombieProcess:
             return self._set_terminal("target_exited")
 
     def _wait_for_exit(self) -> None:
@@ -160,7 +160,9 @@ class _PsutilProcessIdentityWatch:
             if not self._still_matches_running_identity():
                 break
         if not self._closed.is_set():
-            self.on_terminal(self.terminal_reason or "identity_unavailable", self.failure_diagnostics)
+            self.on_terminal(
+                self.terminal_reason or "identity_unavailable", self.failure_diagnostics
+            )
 
 
 @dataclass(frozen=True, slots=True)

@@ -39,6 +39,7 @@ class UpdateCheckError(RuntimeError):
         self.failure_diagnostics = diagnostics
         super().__init__("Update availability could not be checked")
 
+
 def _parse_version(version_str: str) -> tuple[int, ...]:
     """Parse version string like '0.1.0' or 'v0.1.0' into tuple of ints."""
     clean = version_str.lstrip("v")

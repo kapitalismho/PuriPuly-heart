@@ -729,7 +729,10 @@ class TranslationUiMessageQueue:
                         raise
                     except Exception as exc:
                         self._reject_event(
-                            batch, event, publication_id, "destination_publish_failed",
+                            batch,
+                            event,
+                            publication_id,
+                            "destination_publish_failed",
                             exception=exc,
                         )
                     else:

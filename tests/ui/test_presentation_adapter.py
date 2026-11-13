@@ -150,10 +150,12 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     )
     settings = SimpleNamespace(
         set_gpu_devices=lambda **kwargs: events.append(("gpu-devices", kwargs)),
-        load_from_settings=lambda *args, **kwargs: events.append(("load-settings", args, kwargs)) or SettingsRenderResult(True),
+        load_from_settings=lambda *args, **kwargs: events.append(("load-settings", args, kwargs))
+        or SettingsRenderResult(True),
         refresh_after_openrouter_pkce_success=lambda *args, **kwargs: events.append(
             ("pkce-refresh", args, kwargs)
-        ) or SettingsRenderResult(True),
+        )
+        or SettingsRenderResult(True),
         set_overlay_calibration=lambda value: events.append(("calibration", value)),
         refresh_loopback_capture_target=lambda value: events.append(("capture-target", value)),
         set_local_cpu_auto_available=lambda value: events.append(("cpu-auto", value)),

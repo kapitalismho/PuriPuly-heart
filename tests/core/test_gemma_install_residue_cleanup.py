@@ -448,9 +448,7 @@ async def test_inspection_cleanup_failure_is_immediately_visible_without_worker_
 
     monkeypatch.setattr(gemma_assets.shutil, "rmtree", deny_removal)
     monkeypatch.setattr(feature_diagnostics, "emit_basic_log", fail_log)
-    owner = ManagedGemmaTranslationOwner(
-        runtime=_StubRuntime(), status_sink=fail_status
-    )
+    owner = ManagedGemmaTranslationOwner(runtime=_StubRuntime(), status_sink=fail_status)
     try:
         state = await asyncio.to_thread(owner.install_state, GEMMA_E4B)
         assert state.status == "ready"

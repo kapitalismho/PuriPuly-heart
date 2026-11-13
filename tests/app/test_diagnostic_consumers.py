@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 import asyncio
+import json
 from dataclasses import dataclass, replace
 from types import SimpleNamespace
 from uuid import uuid4
@@ -12,7 +12,11 @@ import pytest
 from puripuly_heart.app.ports.agent_chat import AgentServiceError, AgentTransportError
 from puripuly_heart.app.services.agent_chat.context import AgentActivity, collect_agent_context
 from puripuly_heart.app.services.agent_chat.execution import project_query, safe_receipt
-from puripuly_heart.app.services.agent_chat.modules import model_context, model_receipt, operation_header
+from puripuly_heart.app.services.agent_chat.modules import (
+    model_context,
+    model_receipt,
+    operation_header,
+)
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.app.services.agent_chat.report import build_support_bundle, recent_diagnostics
 from puripuly_heart.app.services.agent_chat.tools import AgentTools, project_operation_receipt
@@ -34,10 +38,16 @@ PRIVATE = "PRIVATE-CREDENTIAL-BODY-CONTENT-C:/Users/private"
 
 def failure(*, causes=()):
     return ErrorDiagnostics(
-        component="translation_request", operation="translation_probe", code="provider.auth",
-        category="auth", visibility="diagnostic_only", content_policy="metadata_only",
-        status_code=403, retry_after_ms=None,
-        fields={"provider": "openrouter", "body": PRIVATE, "path": PRIVATE}, causes=causes,
+        component="translation_request",
+        operation="translation_probe",
+        code="provider.auth",
+        category="auth",
+        visibility="diagnostic_only",
+        content_policy="metadata_only",
+        status_code=403,
+        retry_after_ms=None,
+        fields={"provider": "openrouter", "body": PRIVATE, "path": PRIVATE},
+        causes=causes,
     )
 
 
@@ -61,7 +71,9 @@ async def test_compound_probe_cause_survives_receipt_history_tools_summary_and_b
     errors = tuple(
         httpx.HTTPStatusError(
             PRIVATE,
-            request=httpx.Request("POST", "https://example.invalid/private", headers={"authorization": PRIVATE}),
+            request=httpx.Request(
+                "POST", "https://example.invalid/private", headers={"authorization": PRIVATE}
+            ),
             response=httpx.Response(status, json={"message": PRIVATE}),
         )
         for status in (403, 403, 404)
@@ -81,25 +93,39 @@ async def test_compound_probe_cause_survives_receipt_history_tools_summary_and_b
         assert cause["request_id"] == receipt["request_id"]
         assert cause["turn_id"] == str(backend.requests[0].utterance_id)
         assert receipt["target_results"][0]["diagnostic_id"] == cause["diagnostic_id"]
-        history = await control.query("diagnostics.history", {"operation_id": receipt["operation_id"]})
+        history = await control.query(
+            "diagnostics.history", {"operation_id": receipt["operation_id"]}
+        )
         assert len(history["records"]) == 1
         assert history["records"][0] == cause
         context = await collect_agent_context(
-            control, activity=AgentActivity(), topic="diagnostics", operation_id=receipt["operation_id"]
+            control,
+            activity=AgentActivity(),
+            topic="diagnostics",
+            operation_id=receipt["operation_id"],
         )
-        tool_receipt = project_operation_receipt(receipt, "probe_translation")
-        summary = operation_header({"tool": "probe_translation", "result": {"receipt": tool_receipt}})
+        tool_receipt = project_operation_receipt(receipt, "translation.probe")
+        summary = operation_header(
+            {"tool": "translation.probe", "result": {"receipt": tool_receipt}}
+        )
         direct = safe_receipt(receipt)
         read = await project_query("diagnostics.history", history, control, str)
         evidence = await recent_diagnostics(control)
         bundle = build_support_bundle(
-            ticket="PP-0123456789ABCDEF", app_version="synthetic", summary="Synthetic failure",
-            diagnostics=evidence, archive=(), log_snapshot=None,
+            ticket="PP-0123456789ABCDEF",
+            app_version="synthetic",
+            summary="Synthetic failure",
+            diagnostics=evidence,
+            archive=(),
+            log_snapshot=None,
         )
         meta = json.loads(contents(bundle, missing_log=True)["meta.json"])
         projected = [
-            context["recent_diagnostics"][0], tool_receipt["diagnostics"],
-            summary["diagnostics"], direct["diagnostics"], read["records"][0],
+            context["recent_diagnostics"][0],
+            tool_receipt["diagnostics"],
+            summary["diagnostics"],
+            direct["diagnostics"],
+            read["records"][0],
             meta["diagnostics"]["records"][0],
         ]
         for value in projected:
@@ -139,7 +165,9 @@ async def test_failed_sink_keeps_original_failure_and_truthful_unretained_refere
 
 @pytest.mark.asyncio
 async def test_compound_overflow_is_not_reported_as_absence_and_missing_history_is_explicit():
-    original = replace(failure(), code="provider.compound_failure", causes=tuple(failure() for _ in range(100)))
+    original = replace(
+        failure(), code="provider.compound_failure", causes=tuple(failure() for _ in range(100))
+    )
     error = RuntimeError(PRIVATE)
     error.failure_diagnostics = original
     control, runtime = control_for(ControlledBackend(failure=error))
@@ -156,8 +184,12 @@ async def test_compound_overflow_is_not_reported_as_absence_and_missing_history_
         unavailable = await recent_diagnostics(records)
         assert unavailable == {"availability": "query_failed", "records": []}
         bundle = build_support_bundle(
-            ticket="PP-0123456789ABCDEF", app_version="synthetic", summary="Synthetic failure",
-            diagnostics=unavailable, archive=(), log_snapshot=None,
+            ticket="PP-0123456789ABCDEF",
+            app_version="synthetic",
+            summary="Synthetic failure",
+            diagnostics=unavailable,
+            archive=(),
+            log_snapshot=None,
         )
         meta = json.loads(contents(bundle, missing_log=True)["meta.json"])
         assert meta["missing_material"]["diagnostics"] == "query_failed"
@@ -174,7 +206,8 @@ async def test_successful_fallback_keeps_recovered_cause_without_failed_probe():
         async def translate(self, request):
             self.requests.append(request)
             return Translation(
-                utterance_id=request.utterance_id, text="Synthetic translated text",
+                utterance_id=request.utterance_id,
+                text="Synthetic translated text",
                 recovered_failures=(serialize_diagnostics(recovered),),
             )
 
@@ -189,7 +222,7 @@ async def test_successful_fallback_keeps_recovered_cause_without_failed_probe():
         assert record["diagnostic_id"] == recovered.diagnostic_id
         assert record["disposition"] == "recovered"
         assert sink.diagnostic_history({})["records"] == [record]
-        projected = project_operation_receipt(receipt, "probe_translation")
+        projected = project_operation_receipt(receipt, "translation.probe")
         assert projected["recovered_diagnostics"][0]["diagnostic_id"] == recovered.diagnostic_id
         assert PRIVATE not in json.dumps(projected)
     finally:
@@ -204,12 +237,16 @@ async def test_successful_fallback_keeps_recovered_cause_without_failed_probe():
         (AgentServiceError("service_allowance_exhausted"), "agent_service_failed"),
     ],
 )
-async def test_chat_response_failure_returns_safe_typed_cause_without_changing_allowance(error, code):
+async def test_chat_response_failure_returns_safe_typed_cause_without_changing_allowance(
+    error, code
+):
     owner = AgentChatOwner(Records(), Responses(error), localize=str)
     await owner.start()
     try:
         result = await owner.send("Synthetic application question")
-        assert result.status == ("service_unavailable" if isinstance(error, AgentServiceError) else "failed")
+        assert result.status == (
+            "service_unavailable" if isinstance(error, AgentServiceError) else "failed"
+        )
         assert isinstance(result.diagnostics, ErrorDiagnostics)
         assert result.diagnostics.code == code
         assert owner._allowance_exhausted is isinstance(error, AgentServiceError)
@@ -314,8 +351,11 @@ def test_control_error_event_keeps_failure_when_recorder_fails():
     events.publish_ui(
         UIEvent(
             UIEventType.ERROR,
-            payload=provider_failure_report(original, provider="translation", operation="translation_probe"),
-            channel="self", utterance_id=uuid4(),
+            payload=provider_failure_report(
+                original, provider="translation", operation="translation_probe"
+            ),
+            channel="self",
+            utterance_id=uuid4(),
         )
     )
     (event,) = events.history
@@ -326,7 +366,9 @@ def test_control_error_event_keeps_failure_when_recorder_fails():
 
 
 @pytest.mark.asyncio
-async def test_audio_diagnosis_keeps_failed_route_and_successful_route_in_shared_consumers(monkeypatch):
+async def test_audio_diagnosis_keeps_failed_route_and_successful_route_in_shared_consumers(
+    monkeypatch,
+):
     from puripuly_heart.app.services import audio_test
     from tests.app.test_audio_diagnosis import candidate, diagnose
     from tests.app.test_audio_test_session_owner import FeedSource, Harness, Opener
@@ -376,7 +418,9 @@ async def test_audio_diagnosis_keeps_failed_route_and_successful_route_in_shared
             {"recent_agent_actions": [action], "agent_operations": [action]}, modules=("core",)
         )
         for view in (
-            reply["receipt"], summary, context["core"]["recent_actions"][0],
+            reply["receipt"],
+            summary,
+            context["core"]["recent_actions"][0],
             context["core"]["operations"][0],
         ):
             candidate_view = view["diagnosis"]["candidates"][0]
@@ -387,8 +431,14 @@ async def test_audio_diagnosis_keeps_failed_route_and_successful_route_in_shared
             assert candidate_view["diagnostics"]["operation_id"] == operation_id
             assert candidate_view["diagnostics"]["request_id"] == request_id
             assert candidate_view["failure_code"] == "source_open_failed"
-            assert candidate_view["secondary_diagnostics"][0]["diagnostic_id"] == secondary.diagnostic_id
-            assert candidate_view["recovery_diagnostics"][0]["diagnostic_id"] == recovered_cause.diagnostic_id
+            assert (
+                candidate_view["secondary_diagnostics"][0]["diagnostic_id"]
+                == secondary.diagnostic_id
+            )
+            assert (
+                candidate_view["recovery_diagnostics"][0]["diagnostic_id"]
+                == recovered_cause.diagnostic_id
+            )
             assert candidate_view["secondary_truncated"] is True
             assert candidate_view["secondary_diagnostics_truncated"] is True
             assert candidate_view["recovery_diagnostics_truncated"] is True
@@ -422,9 +472,7 @@ async def test_generic_operation_sink_failure_keeps_original_exception_and_cause
     try:
         receipt = await submit_probe(control)
         assert receipt["terminal"] and receipt["status"] == "failed"
-        assert receipt["error"] == {
-            "code": "application_operation_failed", "type": "RuntimeError"
-        }
+        assert receipt["error"] == {"code": "application_operation_failed", "type": "RuntimeError"}
         assert receipt["cause_diagnostics"]["diagnostic_id"] == original.diagnostic_id
         assert receipt["diagnostics"]["causes"][0]["diagnostic_id"] == original.diagnostic_id
         assert receipt["diagnostics"]["operation_id"] == receipt["operation_id"]
@@ -438,8 +486,13 @@ async def test_generic_operation_sink_failure_keeps_original_exception_and_cause
 @pytest.mark.asyncio
 async def test_presentation_secondary_survives_operation_without_transaction():
     presentation = replace(
-        failure(), component="application_notification", operation="snapshot_notification",
-        code="presentation_sync_failed", category="lifecycle", status_code=None, fields={},
+        failure(),
+        component="application_notification",
+        operation="snapshot_notification",
+        code="presentation_sync_failed",
+        category="lifecycle",
+        status_code=None,
+        fields={},
     )
 
     class Backend(ControlledBackend):
@@ -454,7 +507,7 @@ async def test_presentation_secondary_survives_operation_without_transaction():
         assert receipt["secondary_diagnostics"][0]["diagnostic_id"] == presentation.diagnostic_id
         assert receipt["secondary_omitted_count"] == 0
         assert receipt["secondary_truncated"] is False
-        projected = project_operation_receipt(receipt, "probe_translation")
+        projected = project_operation_receipt(receipt, "translation.probe")
         assert projected["secondary_diagnostics"][0]["code"] == "presentation_sync_failed"
     finally:
         await runtime.close()
@@ -527,8 +580,11 @@ async def test_successful_probe_keeps_cleanup_secondaries_distinct_from_recovere
             self.requests.append(request)
             recovered = failure()
             secondary = replace(
-                failure(), code="provider.cleanup_failed", category="lifecycle",
-                operation="cleanup", status_code=None,
+                failure(),
+                code="provider.cleanup_failed",
+                category="lifecycle",
+                operation="cleanup",
+                status_code=None,
             )
             self.recovered.append(recovered)
             self.secondary.append(secondary)
@@ -557,9 +613,10 @@ async def test_successful_probe_keeps_cleanup_secondaries_distinct_from_recovere
         assert {item["disposition"] for item in receipt["secondary_diagnostics"]} == {"degraded"}
         for target, request in zip(receipt["target_results"], backend.requests, strict=True):
             assert target["secondary_diagnostics"][0]["turn_id"] == str(request.utterance_id)
-        projected = project_operation_receipt(receipt, "probe_translation")
+        projected = project_operation_receipt(receipt, "translation.probe")
         assert [item["code"] for item in projected["secondary_diagnostics"]] == [
-            "provider.cleanup_failed", "provider.cleanup_failed"
+            "provider.cleanup_failed",
+            "provider.cleanup_failed",
         ]
         assert len(sink.diagnostic_history({})["records"]) == 4
         assert PRIVATE not in json.dumps([receipt, projected])
@@ -586,10 +643,11 @@ async def test_probe_preserves_empty_but_truncated_producer_collections_across_t
         assert receipt["recovered_failures_truncated"] is True
         assert receipt["secondary_diagnostics_truncated"] is True
         assert [item["secondary_diagnostics_truncated"] for item in receipt["target_results"]] == [
-            True, False
+            True,
+            False,
         ]
-        projected = project_operation_receipt(receipt, "probe_translation")
-        summary = operation_header({"tool": "probe_translation", "result": {"receipt": projected}})
+        projected = project_operation_receipt(receipt, "translation.probe")
+        summary = operation_header({"tool": "translation.probe", "result": {"receipt": projected}})
         for value in (projected, summary):
             assert value["recovered_failures_truncated"] is True
             assert value["secondary_diagnostics_truncated"] is True
@@ -652,8 +710,11 @@ async def test_managed_activation_cleanup_survives_actual_cancelled_probe_and_sh
     if linked_origin:
         cleanups = tuple(
             replace(
-                diagnostic, operation_id=uuid4().hex, request_id=uuid4().hex,
-                turn_id=uuid4().hex, generation=19,
+                diagnostic,
+                operation_id=uuid4().hex,
+                request_id=uuid4().hex,
+                turn_id=uuid4().hex,
+                generation=19,
             )
             for diagnostic in cleanups
         )
@@ -694,6 +755,7 @@ async def test_managed_activation_cleanup_survives_actual_cancelled_probe_and_sh
     control, runtime = control_for(LlmTranslationBackend(provider))
     sink = HistorySink(control.instance_id)
     if broken_sink:
+
         def broken(*args, **kwargs):
             raise OSError(PRIVATE)
 
@@ -701,11 +763,12 @@ async def test_managed_activation_cleanup_survives_actual_cancelled_probe_and_sh
     control.application._runtime_logging = sink
     actions = []
     tools = AgentTools(
-        control, changed=lambda: pytest.fail("probe changed settings"),
+        control,
+        changed=lambda: pytest.fail("probe changed settings"),
         record_action=actions.append,
         emit_event=lambda _: pytest.fail("probe requested confirmation"),
     )
-    task = asyncio.create_task(tools.execute("probe_translation", {}))
+    task = asyncio.create_task(tools.execute("probe_app", {"target": "translation.self"}))
     try:
         await asyncio.wait_for(delegate.entered.wait(), 1)
         operation_id = actions[-1]["receipt"]["operation_id"]
@@ -724,24 +787,33 @@ async def test_managed_activation_cleanup_survives_actual_cancelled_probe_and_sh
         summary = operation_header(actions[-1])
         history = await control.query("diagnostics.history", {})
         read = await project_query("diagnostics.history", history, control, str)
-        context = await collect_agent_context(control, activity=AgentActivity(), topic="diagnostics")
+        context = await collect_agent_context(
+            control, activity=AgentActivity(), topic="diagnostics"
+        )
         model = model_context(
             {
-                **context, "recent_agent_actions": actions[-1:],
+                **context,
+                "recent_agent_actions": actions[-1:],
                 "agent_operations": actions[-1:],
             },
             modules=("core",),
         )
         views = (
-            receipt, reply["receipt"], model_reply["receipt"], summary,
-            model["core"]["recent_actions"][0], model["core"]["operations"][0],
+            receipt,
+            reply["receipt"],
+            model_reply["receipt"],
+            summary,
+            model["core"]["recent_actions"][0],
+            model["core"]["operations"][0],
         )
         expected = activation.secondary_diagnostics
         expected_ids = [diagnostic.diagnostic_id for diagnostic in expected]
         omitted = activation.secondary_omitted_count
         for view in views:
             assert view["status"] == view["translation_result"] == "cancelled"
-            assert not {"error", "diagnostics", "diagnostic_id", "failure_diagnostics"} & view.keys()
+            assert (
+                not {"error", "diagnostics", "diagnostic_id", "failure_diagnostics"} & view.keys()
+            )
             assert view["secondary_omitted_count"] == omitted
             assert view["secondary_truncated"] is (omitted > 0)
             assert view["secondary_diagnostics_truncated"] is (omitted > 0)
@@ -772,17 +844,26 @@ async def test_managed_activation_cleanup_survives_actual_cancelled_probe_and_sh
             assert {record["diagnostic_id"] for record in collection} == retained_ids
         evidence = await recent_diagnostics(control)
         bundle = build_support_bundle(
-            ticket="PP-0123456789ABCDEF", app_version="synthetic", summary="Synthetic cancellation",
-            diagnostics=evidence, archive=tuple(actions), log_snapshot=None,
+            ticket="PP-0123456789ABCDEF",
+            app_version="synthetic",
+            summary="Synthetic cancellation",
+            diagnostics=evidence,
+            archive=tuple(actions),
+            log_snapshot=None,
         )
         members = contents(bundle, missing_log=True)
         meta = json.loads(members["meta.json"])
         archive = json.loads(members["puri_chat.json"])
-        assert {record["diagnostic_id"] for record in meta["diagnostics"]["records"]} == retained_ids
+        assert {
+            record["diagnostic_id"] for record in meta["diagnostics"]["records"]
+        } == retained_ids
         assert meta["missing_material"]["runtime.log"] == "collection_unavailable"
-        assert archive[-1]["result"]["receipt"]["secondary_diagnostics"] == reply["receipt"]["secondary_diagnostics"]
+        assert (
+            archive[-1]["result"]["receipt"]["secondary_diagnostics"]
+            == reply["receipt"]["secondary_diagnostics"]
+        )
         assert archive[-1]["result"]["receipt"]["secondary_omitted_count"] == omitted
-        following = await tools.execute("probe_translation", {})
+        following = await tools.execute("probe_app", {"target": "translation.self"})
         assert following["status"] == "applied"
         assert following["receipt"]["translation_result"] == "succeeded"
         assert following["receipt"]["secondary_diagnostics"] == []
@@ -790,7 +871,9 @@ async def test_managed_activation_cleanup_survives_actual_cancelled_probe_and_sh
         assert following["receipt"]["secondary_truncated"] is False
         assert following["receipt"]["secondary_diagnostics_truncated"] is False
         assert activation_calls == [True] and len(delegate.requests) == 2
-        assert PRIVATE not in json.dumps([views, history, read, context, model, meta, archive, following])
+        assert PRIVATE not in json.dumps(
+            [views, history, read, context, model, meta, archive, following]
+        )
         assert "Synthetic translation" not in json.dumps(following)
     finally:
         await tools.close()
@@ -810,12 +893,16 @@ async def test_cancelled_probe_bounds_aggregate_without_losing_failed_target_cle
     from puripuly_heart.core.translation_backend import LlmTranslationBackend
 
     preceding = tuple(
-        serialize_diagnostics(replace(failure(), code="provider.cleanup_failed", category="lifecycle"))
+        serialize_diagnostics(
+            replace(failure(), code="provider.cleanup_failed", category="lifecycle")
+        )
         for _ in range(DIAGNOSTIC_CAUSE_MAX_COUNT)
     )
     cleanup = exception_diagnostics(
-        PermissionError(13, PRIVATE), component="managed_openrouter_release",
-        operation="managed_operation_clear", code="managed_release_failed",
+        PermissionError(13, PRIVATE),
+        component="managed_openrouter_release",
+        operation="managed_operation_clear",
+        code="managed_release_failed",
     )
     entered = asyncio.Event()
     requests = []
@@ -829,7 +916,8 @@ async def test_cancelled_probe_bounds_aggregate_without_losing_failed_target_cle
         requests.append(kwargs)
         if len(requests) == 1:
             return Translation(
-                utterance_id=kwargs["utterance_id"], text="Synthetic translation",
+                utterance_id=kwargs["utterance_id"],
+                text="Synthetic translation",
                 secondary_diagnostics=preceding,
             )
         entered.set()
@@ -860,16 +948,23 @@ async def test_cancelled_probe_bounds_aggregate_without_losing_failed_target_cle
         assert receipt["secondary_omitted_count"] == 3
         assert receipt["secondary_truncated"] and receipt["secondary_diagnostics_truncated"]
         assert [target["translation_result"] for target in receipt["target_results"]] == [
-            "succeeded", "cancelled"
+            "succeeded",
+            "cancelled",
         ]
-        projected = project_operation_receipt(receipt, "probe_translation")
+        projected = project_operation_receipt(receipt, "translation.probe")
         reply = model_receipt({"status": "cancelled", "receipt": projected})
-        summary = operation_header({"tool": "probe_translation", "result": reply})
+        summary = operation_header({"tool": "translation.probe", "result": reply})
         context = model_context(
-            {"agent_operations": [{"tool": "probe_translation", "result": reply}]},
+            {"agent_operations": [{"tool": "translation.probe", "result": reply}]},
             modules=("core",),
         )
-        for view in (receipt, projected, reply["receipt"], summary, context["core"]["operations"][0]):
+        for view in (
+            receipt,
+            projected,
+            reply["receipt"],
+            summary,
+            context["core"]["operations"][0],
+        ):
             assert view["status"] == view["translation_result"] == "cancelled"
             target = view["target_results"][1]
             assert target["secondary_diagnostics"][0]["diagnostic_id"] == cleanup.diagnostic_id
@@ -882,12 +977,16 @@ async def test_cancelled_probe_bounds_aggregate_without_losing_failed_target_cle
         assert [record["diagnostic_id"] for record in projected["secondary_diagnostics"]] == [
             record["diagnostic_id"] for record in preceding[:4]
         ]
-        history = await control.query("diagnostics.history", {"diagnostic_id": cleanup.diagnostic_id})
+        history = await control.query(
+            "diagnostics.history", {"diagnostic_id": cleanup.diagnostic_id}
+        )
         retained = history["records"]
         read = await project_query("diagnostics.history", history, control, str)
         assert len(retained) == 1 and retained[0]["fields"]["errno"] == 13
         assert retained[0]["disposition"] == read["records"][0]["disposition"] == "degraded"
-        assert PRIVATE not in json.dumps([receipt, projected, reply, summary, context, retained, read])
+        assert PRIVATE not in json.dumps(
+            [receipt, projected, reply, summary, context, retained, read]
+        )
     finally:
         control.freeze_ingress()
         await control.drain_operations()
@@ -909,8 +1008,10 @@ async def test_nested_install_result_and_snapshot_preserve_owning_evidence_roles
         secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
 
     source_context = {
-        "operation_id": uuid4().hex, "request_id": uuid4().hex,
-        "turn_id": uuid4().hex, "generation": 7,
+        "operation_id": uuid4().hex,
+        "request_id": uuid4().hex,
+        "turn_id": uuid4().hex,
+        "generation": 7,
     }
     primary, recovered, recovery, secondary = (
         replace(failure(), **source_context) for _ in range(4)
@@ -918,9 +1019,14 @@ async def test_nested_install_result_and_snapshot_preserve_owning_evidence_roles
     snapshot = LocalASRProvisioningSnapshot(
         (
             DetailedModelState(
-                "synthetic-model", "cpu", "ready", operation="cancelled",
-                failure_diagnostics=primary, recovered_diagnostics=(recovered,),
-                recovery_diagnostics=(recovery,), secondary_diagnostics=(secondary,),
+                "synthetic-model",
+                "cpu",
+                "ready",
+                operation="cancelled",
+                failure_diagnostics=primary,
+                recovered_diagnostics=(recovered,),
+                recovery_diagnostics=(recovery,),
+                secondary_diagnostics=(secondary,),
             ),
         ),
         ("synthetic-model",),
@@ -947,7 +1053,9 @@ async def test_nested_install_result_and_snapshot_preserve_owning_evidence_roles
         standalone = control._snapshot_json(snapshot)
         sink = HistorySink(control.instance_id)
         control.application._runtime_logging = sink
-        accepted = await control.submit("models.install", {"backend": "cpu"}, request_id=uuid4().hex)
+        accepted = await control.submit(
+            "models.install", {"backend": "cpu"}, request_id=uuid4().hex
+        )
         receipt = await control.wait(accepted["operation_id"], timeout=2)
         assert receipt["terminal"] and receipt["status"] == "cancelled"
         assert len(provisioning.requests) == 1
@@ -977,7 +1085,9 @@ async def test_nested_install_result_and_snapshot_preserve_owning_evidence_roles
             secondary.diagnostic_id: "degraded",
         }
         for records in (history["records"], read["records"]):
-            assert {record["diagnostic_id"]: record["disposition"] for record in records} == expected
+            assert {
+                record["diagnostic_id"]: record["disposition"] for record in records
+            } == expected
             for record in records:
                 assert record["instance_id"] == control.instance_id
                 for key, value in source_context.items():

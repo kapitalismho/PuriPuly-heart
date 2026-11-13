@@ -146,6 +146,7 @@ def _prepare_gemini_resources_sync(
         config=config,
     )
 
+
 def _close_failed_preparation(
     primary: BaseException, closers: tuple[Callable[[], Any], ...]
 ) -> None:
@@ -169,10 +170,7 @@ def _close_failed_preparation(
                 )
             )
     primary._gemini_cleanup_retry = tuple(failed)
-    primary.failure_diagnostics = replace(
-        diagnostics, causes=(*diagnostics.causes, *secondary)
-    )
-
+    primary.failure_diagnostics = replace(diagnostics, causes=(*diagnostics.causes, *secondary))
 
 
 def gemini_transcribe_language_codes(source_language: str | None) -> list[str]:
@@ -282,7 +280,9 @@ class GeminiTranscribeSTTBackend(STTBackend):
     connect_timeout_s: float = 10.0
     drain_timeout_s: float = GEMINI_TRANSCRIBE_DRAIN_TIMEOUT_S
     live_connect_factory: Callable[[str, Any], Any] | None = None
-    _starting_sessions: list[STTBackendSession] = field(init=False, default_factory=list, repr=False)
+    _starting_sessions: list[STTBackendSession] = field(
+        init=False, default_factory=list, repr=False
+    )
 
     async def open_session(
         self,
@@ -494,9 +494,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         self._recv_task = asyncio.create_task(self._recv_loop())
 
     def _start_teardown(self) -> asyncio.Task[None] | None:
-        if not self._teardown_done and (
-            self._teardown_task is None or self._teardown_task.done()
-        ):
+        if not self._teardown_done and (self._teardown_task is None or self._teardown_task.done()):
             self._teardown_task = asyncio.create_task(self._teardown_body())
         return self._teardown_task
 
@@ -511,7 +509,9 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 continue
         task.result()
         if self._cleanup_errors:
-            failure = ExceptionGroup("Gemini resource cleanup incomplete", tuple(self._cleanup_errors))
+            failure = ExceptionGroup(
+                "Gemini resource cleanup incomplete", tuple(self._cleanup_errors)
+            )
             failure.failure_diagnostics = recognition_cleanup_failure(
                 failure,
                 provider="gemini_transcribe",

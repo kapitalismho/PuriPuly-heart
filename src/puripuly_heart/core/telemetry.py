@@ -101,9 +101,7 @@ class HttpAppActiveDayTelemetryClient:
                 category="invalid_response",
                 fields={"response_shape": "non_json", "dispatch_certainty": "response_received"},
             )
-            raise TelemetryRequestError(
-                replace(cause, status_code=response.status_code)
-            ) from exc
+            raise TelemetryRequestError(replace(cause, status_code=response.status_code)) from exc
         if not isinstance(payload, Mapping) or payload.get("ok") is not True:
             raise TelemetryRequestError(
                 ErrorDiagnostics(
@@ -116,7 +114,9 @@ class HttpAppActiveDayTelemetryClient:
                     status_code=response.status_code,
                     retry_after_ms=None,
                     fields={
-                        "response_shape": "malformed_success" if isinstance(payload, Mapping) else "non_object",
+                        "response_shape": (
+                            "malformed_success" if isinstance(payload, Mapping) else "non_object"
+                        ),
                         "dispatch_certainty": "response_received",
                     },
                 )
@@ -225,8 +225,10 @@ class AppActiveDayTelemetryService:
         secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
         secondary_omitted_count: int = 0,
     ) -> AppActiveDayTelemetryResult:
-        metadata = {"diagnostics": diagnostics} if diagnostics is not None else (
-            {"reason": reason} if reason is not None else {}
+        metadata = (
+            {"diagnostics": diagnostics}
+            if diagnostics is not None
+            else ({"reason": reason} if reason is not None else {})
         )
         if self._diagnostics_sink is not None:
             try:

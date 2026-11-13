@@ -1937,7 +1937,9 @@ async def test_gpu_projection_preserves_shared_failure_value_and_relationships()
 
     owner, _, _, _ = _owner()
     failure = recognition_failure_diagnostics(
-        ASRWorkerRequestError("decode_failure", {"native_reason": "input_too_long", "native_status": 12}),
+        ASRWorkerRequestError(
+            "decode_failure", {"native_reason": "input_too_long", "native_status": 12}
+        ),
         provider="local_qwen_gpu",
         channel="self",
         operation="decode",

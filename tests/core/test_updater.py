@@ -161,11 +161,14 @@ async def test_update_transport_preparation_failure_is_best_effort(monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("malformed", [
-    {"private": "private release body"},
-    {"tag_name": "not-a-version", "body": "private release body"},
-    ["private release body"],
-])
+@pytest.mark.parametrize(
+    "malformed",
+    [
+        {"private": "private release body"},
+        {"tag_name": "not-a-version", "body": "private release body"},
+        ["private release body"],
+    ],
+)
 async def test_successful_no_update_is_distinct_from_malformed_release(monkeypatch, malformed):
     monkeypatch.setattr(updater, "__version__", "1.2.3")
     response = DummyResponse(200, {"tag_name": "v1.2.3"})

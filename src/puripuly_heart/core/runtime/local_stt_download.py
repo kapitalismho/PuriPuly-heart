@@ -195,7 +195,8 @@ class LocalSTTDownloadRuntime:
                 self._state_changed(self)
             except Exception as failure:
                 self.failure_diagnostics = model_asset_failure_diagnostics(
-                    failure, operation="state_delivery",
+                    failure,
+                    operation="state_delivery",
                     code="model_assets.state_delivery_failed",
                 )
 

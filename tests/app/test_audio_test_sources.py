@@ -30,9 +30,13 @@ def _route(*, attempt: bool = True, error: str | None = None) -> MicrophoneTestR
         resolved_device_name="Desk Mic" if attempt else None,
         failure_diagnostics=(
             exception_diagnostics(
-                LookupError(error), component="capture.self", operation="source_open",
+                LookupError(error),
+                component="capture.self",
+                operation="source_open",
                 code="source_open_failed",
-            ) if error else None
+            )
+            if error
+            else None
         ),
         should_attempt_open=attempt,
     )
@@ -239,7 +243,9 @@ async def test_opened_metadata_failure_preserves_existing_open_success_without_f
 @pytest.mark.asyncio
 async def test_missing_opened_metadata_is_unavailable_not_an_observed_route_name():
     source = object()
-    opened = await _microphone(_route(), lambda **kwargs: source).open(on_acquired=lambda value: None)
+    opened = await _microphone(_route(), lambda **kwargs: source).open(
+        on_acquired=lambda value: None
+    )
     assert opened.source is source
     assert opened.device["metadata_availability"] == "unavailable"
     assert opened.device["name"] is None

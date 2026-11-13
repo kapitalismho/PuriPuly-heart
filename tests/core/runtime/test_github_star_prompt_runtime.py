@@ -224,6 +224,7 @@ async def test_github_star_prompt_runtime_rejects_duplicate_active_launch_schedu
 @pytest.mark.asyncio
 async def test_optional_prompt_task_retains_original_cause_when_diagnostic_sink_fails():
     delivered = []
+
     def unavailable_sink(_event, _metadata):
         delivered.append(_metadata["diagnostics"])
         raise RuntimeError("private sink content")

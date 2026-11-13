@@ -718,12 +718,15 @@ class OutputRuntime:
         self._drain_completed_task_failures(failures)
         if failures:
             failure = (
-                failures[0] if len(failures) == 1
+                failures[0]
+                if len(failures) == 1
                 else ExceptionGroup("OutputRuntime close failed", failures)
             )
             self.cleanup_failure_diagnostics = exception_diagnostics(
                 failure,
-                component="output_runtime", operation="close", code="output_cleanup_failed",
+                component="output_runtime",
+                operation="close",
+                code="output_cleanup_failed",
                 fields={"close_complete": False},
             )
             failure.failure_diagnostics = self.cleanup_failure_diagnostics
@@ -1156,7 +1159,9 @@ class OutputRuntime:
     def _emit_typing_failure(self, operation: str, exception: Exception) -> None:
         diagnostics = replace(
             exception_diagnostics(
-                exception, component="output_runtime", operation=operation,
+                exception,
+                component="output_runtime",
+                operation=operation,
                 code="destination_publish_failed",
                 fields={"destination": OUTPUT_ROUTE_SELF_CHATBOX},
             ),
@@ -2440,8 +2445,11 @@ class OutputRuntime:
         emit_failure(
             logger,
             exception_diagnostics(
-                exception, component="output_runtime", operation="close",
-                code="output_cleanup_failed", fields={"close_complete": False},
+                exception,
+                component="output_runtime",
+                operation="close",
+                code="output_cleanup_failed",
+                fields={"close_complete": False},
             ),
             stage=stage,
             exception=exception,
@@ -2772,15 +2780,23 @@ class OutputRuntime:
                     "publication_id": metadata.get("utterance_id", publication_id),
                     "publication_kind": publication_kind,
                 },
-                channel=diagnostics.channel or (
+                channel=diagnostics.channel
+                or (
                     metadata.get("channel") if metadata.get("channel") in {"self", "peer"} else None
                 ),
-                generation=diagnostics.generation if diagnostics.generation is not None else metadata.get(
-                    "publication_generation", metadata.get("turn_generation")
+                generation=(
+                    diagnostics.generation
+                    if diagnostics.generation is not None
+                    else metadata.get("publication_generation", metadata.get("turn_generation"))
                 ),
-                operation_id=diagnostics.operation_id or metadata.get("operation_id") or origin["operation_id"],
-                request_id=diagnostics.request_id or metadata.get("request_id") or origin["request_id"],
-                turn_id=diagnostics.turn_id or metadata.get("parent_utterance_id", metadata.get("utterance_id")),
+                operation_id=diagnostics.operation_id
+                or metadata.get("operation_id")
+                or origin["operation_id"],
+                request_id=diagnostics.request_id
+                or metadata.get("request_id")
+                or origin["request_id"],
+                turn_id=diagnostics.turn_id
+                or metadata.get("parent_utterance_id", metadata.get("utterance_id")),
             )
             emit_failure(logger, diagnostics, disposition="degraded", stage="destination_delivery")
         decision = OutputRoutingDecision(
@@ -2826,8 +2842,6 @@ class OutputRuntime:
                         exception=exc,
                     )
         return decision
-
-
 
 
 def _redact_chatbox_disclosure_text(text: str) -> str:

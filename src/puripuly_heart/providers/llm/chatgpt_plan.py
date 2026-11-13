@@ -704,7 +704,8 @@ class ChatGptPlanLLMProvider(LLMProvider):
                     length += len(delta)
                     if length > self.max_output_chars:
                         raise LLMResponseError(
-                            "ChatGPT plan response was truncated by length limit", provider="chatgpt"
+                            "ChatGPT plan response was truncated by length limit",
+                            provider="chatgpt",
                         )
             elif kind == "response.completed":
                 if observation is not None:

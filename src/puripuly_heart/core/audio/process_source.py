@@ -94,10 +94,15 @@ class ProcTapProcessAudioCaptureFactory:
             try:
                 capture.close()
             except Exception as cleanup_exc:
-                failure = ExceptionGroup("process capture verification and cleanup failed", [exc, cleanup_exc])
+                failure = ExceptionGroup(
+                    "process capture verification and cleanup failed", [exc, cleanup_exc]
+                )
                 failure.failure_diagnostics = exception_diagnostics(
-                    failure, component="capture.peer", operation="source_open",
-                    code="capture.peer.source_open_failed", fields={"cleanup_confirmed": False},
+                    failure,
+                    component="capture.peer",
+                    operation="source_open",
+                    code="capture.peer.source_open_failed",
+                    fields={"cleanup_confirmed": False},
                 )
                 raise AudioSourceOpenFailure(capture, failure) from None
             if isinstance(exc, ProcessAudioCaptureSetupError):
@@ -181,7 +186,9 @@ class ProcessAudioCaptureSource:
             try:
                 self._release_native_resources()
             except Exception as cleanup_exc:
-                failure = ExceptionGroup("process capture setup and cleanup failed", [exc, cleanup_exc])
+                failure = ExceptionGroup(
+                    "process capture setup and cleanup failed", [exc, cleanup_exc]
+                )
                 failure.failure_diagnostics = exception_diagnostics(
                     failure,
                     component="capture.peer",
@@ -280,8 +287,11 @@ class ProcessAudioCaptureSource:
         self._signal_terminal_failure(reason, diagnostics=diagnostics)
 
     def _signal_terminal_failure(
-        self, reason: str, exception: BaseException | None = None,
-        *, diagnostics: ErrorDiagnostics | None = None,
+        self,
+        reason: str,
+        exception: BaseException | None = None,
+        *,
+        diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
         with self._lock:
             if self._terminal_reason is not None:

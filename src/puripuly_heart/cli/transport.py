@@ -329,7 +329,10 @@ class ControlServer:
             self.failure_diagnostics = diagnostics
             emit_failure(logger, diagnostics)
             await self._send_error(
-                writer, request_id, "operation_error", "Control request could not complete",
+                writer,
+                request_id,
+                "operation_error",
+                "Control request could not complete",
                 diagnostics=diagnostics,
             )
         finally:
@@ -348,8 +351,13 @@ class ControlServer:
         await asyncio.wait_for(writer.drain(), WRITE_TIMEOUT)
 
     async def _send_error(
-        self, writer: asyncio.StreamWriter, request_id: str | None, code: str, message: str,
-        *, diagnostics: ErrorDiagnostics | None = None,
+        self,
+        writer: asyncio.StreamWriter,
+        request_id: str | None,
+        code: str,
+        message: str,
+        *,
+        diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
         try:
             await self._send(
@@ -361,7 +369,11 @@ class ControlServer:
                     "error": {
                         "code": code,
                         "message": message,
-                        **({"diagnostics": serialize_diagnostics(diagnostics)} if diagnostics else {}),
+                        **(
+                            {"diagnostics": serialize_diagnostics(diagnostics)}
+                            if diagnostics
+                            else {}
+                        ),
                     },
                 },
             )
@@ -479,8 +491,13 @@ async def follow(record: Any, arguments: dict[str, Any]) -> AsyncIterator[dict[s
                 if not isinstance(error, dict):
                     raise ControlTransportError("malformed_response", "Invalid control error")
                 raise ControlTransportError(
-                    str(error.get("code")), str(error.get("message")),
-                    error.get("diagnostics") if isinstance(error.get("diagnostics"), dict) else None,
+                    str(error.get("code")),
+                    str(error.get("message")),
+                    (
+                        error.get("diagnostics")
+                        if isinstance(error.get("diagnostics"), dict)
+                        else None
+                    ),
                 )
             if "event" in response:
                 yield response["event"]

@@ -67,9 +67,16 @@ async def recent_diagnostics(control: ApplicationControl) -> dict:
             "coverage": {
                 key: value
                 for key, value in history.items()
-                if key in {
-                    "instance_id", "lookup", "oldest_sequence", "latest_sequence",
-                    "next_after", "gap", "evicted_records", "truncated",
+                if key
+                in {
+                    "instance_id",
+                    "lookup",
+                    "oldest_sequence",
+                    "latest_sequence",
+                    "next_after",
+                    "gap",
+                    "evicted_records",
+                    "truncated",
                 }
                 and (value is None or type(value) in (str, int, bool))
             },
@@ -84,9 +91,7 @@ async def recent_diagnostics(control: ApplicationControl) -> dict:
 
 
 def diagnostic_codes(diagnostics: dict | None) -> tuple[str, ...]:
-    return tuple(
-        dict.fromkeys(record["code"] for record in (diagnostics or {}).get("records", []))
-    )
+    return tuple(dict.fromkeys(record["code"] for record in (diagnostics or {}).get("records", [])))
 
 
 def build_support_bundle(

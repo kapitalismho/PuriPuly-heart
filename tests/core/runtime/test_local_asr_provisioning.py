@@ -492,7 +492,9 @@ async def test_install_failure_retains_admission_identity_and_safe_native_cause(
             assert result.failed_model_ids == (FUN_ASR_NANO_MODEL_ID,)
             assert result.snapshot.state_for(FUN_ASR_NANO_MODEL_ID).status == "download_failed"
             diagnostics = result.failure_diagnostics
-            assert diagnostics is result.snapshot.state_for(FUN_ASR_NANO_MODEL_ID).failure_diagnostics
+            assert (
+                diagnostics is result.snapshot.state_for(FUN_ASR_NANO_MODEL_ID).failure_diagnostics
+            )
             assert diagnostics.operation_id == operation
             assert diagnostics.request_id == request
             assert len(records) == 1

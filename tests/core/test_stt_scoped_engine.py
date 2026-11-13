@@ -5237,8 +5237,8 @@ async def test_failed_backend_teardown_remains_owned_and_retryable_until_resourc
 
 
 async def test_readiness_exhaustion_keeps_each_attempt_without_changing_budget() -> None:
-    from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
     from puripuly_heart.core.stt.backend import STTChannelAvailability
+    from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 
     attempts = []
     delays = []

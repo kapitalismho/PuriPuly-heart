@@ -10,8 +10,8 @@ from puripuly_heart.app.ports.ui_presentation import SettingsRenderResult
 from puripuly_heart.app.services.application_shutdown import application_shutdown_callback
 from puripuly_heart.composition.application_runtime import compose_application_runtime
 from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
-from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime_logging import (
     RuntimeLoggingSinks,
     install_headless_console_privacy_filter,

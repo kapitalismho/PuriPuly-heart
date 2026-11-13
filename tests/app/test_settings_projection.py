@@ -119,7 +119,9 @@ def test_pkce_refresh_uses_specialized_projection_path() -> None:
 
 def test_render_failure_is_secondary_without_changing_committed_outcome():
     from puripuly_heart.app.services.settings.settings_application import SettingsApplicationOwner
-    from puripuly_heart.app.services.settings.settings_transaction_result import SettingsTransactionResultOwner
+    from puripuly_heart.app.services.settings.settings_transaction_result import (
+        SettingsTransactionResultOwner,
+    )
     from puripuly_heart.core.messages import (
         TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
         TransactionResult,
@@ -156,7 +158,10 @@ def test_render_failure_is_secondary_without_changing_committed_outcome():
         )
         rendered = projection.render(settings)
         assert rendered.loaded is False
-        assert scope.current.secondary_diagnostics[0].diagnostic_id == rendered.diagnostics.diagnostic_id
+        assert (
+            scope.current.secondary_diagnostics[0].diagnostic_id
+            == rendered.diagnostics.diagnostic_id
+        )
         results.set(
             TransactionResult(
                 status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -165,13 +170,17 @@ def test_render_failure_is_secondary_without_changing_committed_outcome():
             )
         )
     assert scope.current.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-    assert scope.current.secondary_diagnostics[0].diagnostic_id == rendered.diagnostics.diagnostic_id
+    assert (
+        scope.current.secondary_diagnostics[0].diagnostic_id == rendered.diagnostics.diagnostic_id
+    )
     assert scope.current.secondary_diagnostics[0].fields["errno"] == 13
     assert "synthetic-private" not in str(scope.current)
 
 
 def test_pending_presentation_evidence_transfers_into_next_capture_without_replay():
-    from puripuly_heart.app.services.settings.settings_transaction_result import SettingsTransactionResultOwner
+    from puripuly_heart.app.services.settings.settings_transaction_result import (
+        SettingsTransactionResultOwner,
+    )
     from puripuly_heart.core.diagnostics import exception_diagnostics
     from puripuly_heart.core.messages import (
         TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -193,6 +202,7 @@ def test_pending_presentation_evidence_transfers_into_next_capture_without_repla
     with owner.capture() as empty:
         assert empty.current is None
     import asyncio
+
     import pytest
 
     with pytest.raises(asyncio.CancelledError):
@@ -216,7 +226,9 @@ def test_pending_presentation_evidence_transfers_into_next_capture_without_repla
 
 
 def test_empty_nested_capture_preserves_evidence_for_parent_transaction():
-    from puripuly_heart.app.services.settings.settings_transaction_result import SettingsTransactionResultOwner
+    from puripuly_heart.app.services.settings.settings_transaction_result import (
+        SettingsTransactionResultOwner,
+    )
     from puripuly_heart.core.diagnostics import exception_diagnostics
     from puripuly_heart.core.messages import (
         TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -233,7 +245,9 @@ def test_empty_nested_capture_preserves_evidence_for_parent_transaction():
     with owner.capture() as parent:
         with owner.capture():
             owner.add_presentation_result(
-                SettingsRenderResult(True, secondary_diagnostics=(cause,), secondary_omitted_count=2)
+                SettingsRenderResult(
+                    True, secondary_diagnostics=(cause,), secondary_omitted_count=2
+                )
             )
         owner.set(
             TransactionResult(

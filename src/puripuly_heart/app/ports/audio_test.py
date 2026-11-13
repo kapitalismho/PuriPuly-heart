@@ -53,9 +53,9 @@ class AudioTestCaptureRequest:
     opener: AudioTestSourceOpener
     ready_on_open: bool = False
     frame_timeout_s: float | None = None
-    opened_callback: Callable[
-        [int, Mapping[str, object], tuple[ErrorDiagnostics, ...]], None
-    ] | None = field(
+    opened_callback: (
+        Callable[[int, Mapping[str, object], tuple[ErrorDiagnostics, ...]], None] | None
+    ) = field(
         default=None,
         repr=False,
     )

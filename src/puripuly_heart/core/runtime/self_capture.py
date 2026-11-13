@@ -1623,9 +1623,7 @@ class SelfCaptureSessionOwner:
                 fields={"cleanup_confirmed": False},
             )
             self._retain_secondary_failure(diagnostics)
-            emit_failure(
-                logger, diagnostics, disposition="degraded", stage="capture_background"
-            )
+            emit_failure(logger, diagnostics, disposition="degraded", stage="capture_background")
 
     def _retain_secondary_failure(self, diagnostics: ErrorDiagnostics) -> None:
         primary = self._primary_failure
@@ -2112,44 +2110,40 @@ class SelfCaptureSessionOwner:
         if self._diagnostic_sink is None:
             return
         diagnostic = SelfCaptureDiagnostic(
-                event=event,
-                generation=generation,
-                state=self._state,
-                provider_id=self._config.provider_id if self._config is not None else None,
-                reason=reason,
-                detail=detail,
-                failure_code=failure_code,
-                failure_type=failure_type,
-                failure_stage=failure_stage,
-                failure_diagnostics=failure_diagnostics,
-                recognition_reason=recognition_reason,
-                utterance_id=(
-                    terminal.identity.segment.segment_id if terminal is not None else None
-                ),
-                epoch=terminal.identity.provider_epoch_id if terminal is not None else None,
-                turn=terminal.identity.provider_turn_id if terminal is not None else None,
-                activation_generation=(
-                    terminal.identity.segment.activation_generation
-                    if terminal is not None
-                    else None
-                ),
-                desired_active_before=(
-                    self._desired_active
-                    if desired_active_before is None and event is SelfCaptureDiagnosticEvent.FAILURE
-                    else desired_active_before
-                ),
-                desired_active_after=(
-                    self._desired_active
-                    if desired_active_after is None and event is SelfCaptureDiagnosticEvent.FAILURE
-                    else desired_active_after
-                ),
-                action=action,
-                target_state=(
-                    self._state
-                    if target_state is None and event is SelfCaptureDiagnosticEvent.FAILURE
-                    else target_state
-                ),
-            )
+            event=event,
+            generation=generation,
+            state=self._state,
+            provider_id=self._config.provider_id if self._config is not None else None,
+            reason=reason,
+            detail=detail,
+            failure_code=failure_code,
+            failure_type=failure_type,
+            failure_stage=failure_stage,
+            failure_diagnostics=failure_diagnostics,
+            recognition_reason=recognition_reason,
+            utterance_id=(terminal.identity.segment.segment_id if terminal is not None else None),
+            epoch=terminal.identity.provider_epoch_id if terminal is not None else None,
+            turn=terminal.identity.provider_turn_id if terminal is not None else None,
+            activation_generation=(
+                terminal.identity.segment.activation_generation if terminal is not None else None
+            ),
+            desired_active_before=(
+                self._desired_active
+                if desired_active_before is None and event is SelfCaptureDiagnosticEvent.FAILURE
+                else desired_active_before
+            ),
+            desired_active_after=(
+                self._desired_active
+                if desired_active_after is None and event is SelfCaptureDiagnosticEvent.FAILURE
+                else desired_active_after
+            ),
+            action=action,
+            target_state=(
+                self._state
+                if target_state is None and event is SelfCaptureDiagnosticEvent.FAILURE
+                else target_state
+            ),
+        )
         try:
             self._diagnostic_sink(diagnostic)
         except Exception as exc:

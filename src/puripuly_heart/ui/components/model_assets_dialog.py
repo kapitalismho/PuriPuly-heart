@@ -126,7 +126,9 @@ class ModelAssetsDialog:
         )
         self.failure_diagnostics = diagnostics
         self.secondary_diagnostics = ()
-        emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage=operation)
+        emit_failure(
+            logger, diagnostics, severity="warning", disposition="degraded", stage=operation
+        )
 
     @property
     def dialog(self) -> ft.AlertDialog | None:

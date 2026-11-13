@@ -553,13 +553,15 @@ async def test_shutdown_retains_late_cleanup_failure_after_timeout():
         raise original
 
     coordinator = ApplicationShutdownCoordinator(
-        (application_shutdown_callback(
-            phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-            owner_name="PeerCaptureSessionOwner",
-            callback_name="close",
-            callback=stubborn,
-            timeout_seconds=0.001,
-        ),),
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="PeerCaptureSessionOwner",
+                callback_name="close",
+                callback=stubborn,
+                timeout_seconds=0.001,
+            ),
+        ),
         task_settle_timeout_seconds=0.001,
     )
     try:
@@ -576,7 +578,9 @@ async def test_shutdown_retains_late_cleanup_failure_after_timeout():
     assert snapshot.outstanding_task_names == ()
     assert snapshot.failures[0].timed_out is True
     assert snapshot.failures[1].diagnostics.fields["errno"] == 13
-    assert snapshot.failures[1].diagnostics.cause_id == snapshot.failures[0].diagnostics.diagnostic_id
+    assert (
+        snapshot.failures[1].diagnostics.cause_id == snapshot.failures[0].diagnostics.diagnostic_id
+    )
     assert "private" not in repr(snapshot.failures)
     with pytest.raises(ExceptionGroup) as caught:
         await coordinator.shutdown()
@@ -604,11 +608,14 @@ async def test_shutdown_original_survives_failed_logging_and_optional_sink(monke
         (
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="PeerCaptureSessionOwner", callback_name="close", callback=fail_owner,
+                owner_name="PeerCaptureSessionOwner",
+                callback_name="close",
+                callback=fail_owner,
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
-                owner_name="RuntimeLoggingService", callback_name="close",
+                owner_name="RuntimeLoggingService",
+                callback_name="close",
                 callback=lambda: delivered.append("closed"),
             ),
         ),

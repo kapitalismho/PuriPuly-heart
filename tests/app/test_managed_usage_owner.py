@@ -240,7 +240,9 @@ def test_managed_account_snapshot_preserves_failed_usage_observation():
         ),
         dashboard_action=lambda: "idle",
     )
-    result = UiManagedRuntimeAdapter(SimpleNamespace(auth=auth, usage=usage)).managed_account_snapshot()
+    result = UiManagedRuntimeAdapter(
+        SimpleNamespace(auth=auth, usage=usage)
+    ).managed_account_snapshot()
     assert result["diagnostics"] is diagnostics
     assert result["credential_present"] is True
     assert result["budget"]["remaining_percent"] is None
@@ -282,12 +284,18 @@ async def test_retired_usage_failure_is_scoped_history_not_current_account(raise
     await work
     auth = SimpleNamespace(
         state_provider=lambda: SimpleNamespace(
-            settings_available=True, managed_selected=True, managed_china=False,
-            release_service_available=True, ingress_frozen=False, local_key_available=True,
+            settings_available=True,
+            managed_selected=True,
+            managed_china=False,
+            release_service_available=True,
+            ingress_frozen=False,
+            local_key_available=True,
         ),
         dashboard_action=lambda: "idle",
     )
-    current = UiManagedRuntimeAdapter(SimpleNamespace(auth=auth, usage=owner)).managed_account_snapshot()
+    current = UiManagedRuntimeAdapter(
+        SimpleNamespace(auth=auth, usage=owner)
+    ).managed_account_snapshot()
     assert current["diagnostics"] is None
     assert current["secondary_diagnostics"] == ()
     assert current["budget"]["remaining_percent"] is None
@@ -341,12 +349,18 @@ async def test_warning_delivery_failure_remains_with_originating_usage_scope(new
         await old
         auth = SimpleNamespace(
             state_provider=lambda: SimpleNamespace(
-                settings_available=True, managed_selected=True, managed_china=False,
-                release_service_available=True, ingress_frozen=False, local_key_available=True,
+                settings_available=True,
+                managed_selected=True,
+                managed_china=False,
+                release_service_available=True,
+                ingress_frozen=False,
+                local_key_available=True,
             ),
             dashboard_action=lambda: "idle",
         )
-        snapshot = UiManagedRuntimeAdapter(SimpleNamespace(auth=auth, usage=owner)).managed_account_snapshot()
+        snapshot = UiManagedRuntimeAdapter(
+            SimpleNamespace(auth=auth, usage=owner)
+        ).managed_account_snapshot()
         if newer_scope:
             assert owner.current_result() is current_before_warning
             assert snapshot["diagnostics"] is None

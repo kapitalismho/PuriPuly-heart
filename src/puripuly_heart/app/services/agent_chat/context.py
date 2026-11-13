@@ -9,10 +9,10 @@ from puripuly_heart.app.ports.application_control import ApplicationControl
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
 from puripuly_heart.app.services.agent_chat.execution import (
     model_safe_catalog,
-    project_capture_channel,
-    project_overlay_output,
     project_audio_test,
+    project_capture_channel,
     project_catalog,
+    project_overlay_output,
 )
 from puripuly_heart.app.services.agent_chat.modules import TOPICS, topic_queries
 from puripuly_heart.app.services.agent_chat.provider_setup import (
@@ -357,9 +357,7 @@ async def collect_agent_context(
                 "lookup": target.get("lookup") if target else "query_failed",
             }
         result["recent_diagnostics"] = [
-            project_diagnostic_record(item)
-            for item in records[:10]
-            if isinstance(item, Mapping)
+            project_diagnostic_record(item) for item in records[:10] if isinstance(item, Mapping)
         ]
         result["diagnostic_coverage"] = {
             "scope": "filtered_current_instance" if filters else "recent_current_instance",

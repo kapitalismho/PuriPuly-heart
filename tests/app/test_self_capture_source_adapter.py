@@ -182,6 +182,7 @@ def test_partial_native_open_cleanup_debt_prevents_mono_and_route_fallbacks():
 
 def test_all_microphone_causes_survive_mono_routes_and_failed_logging() -> None:
     from dataclasses import replace
+
     from puripuly_heart.core.diagnostics import serialize_diagnostics
 
     calls = []
@@ -205,8 +206,12 @@ def test_all_microphone_causes_survive_mono_routes_and_failed_logging() -> None:
     assert len(calls) == 6
     assert [cause.fields["errno"] for cause in diagnostics.causes] == list(range(1, 7))
     assert [cause.fields["capture_attempt"] for cause in diagnostics.causes] == [
-        "primary", "primary_mono_retry", "name_fallback", "name_fallback_mono_retry",
-        "system_default", "system_default_mono_retry",
+        "primary",
+        "primary_mono_retry",
+        "name_fallback",
+        "name_fallback_mono_retry",
+        "system_default",
+        "system_default_mono_retry",
     ]
     assert "private" not in repr(serialize_diagnostics(diagnostics))
 
@@ -227,7 +232,8 @@ def test_successful_microphone_fallback_remains_success_when_logging_fails() -> 
         raise RuntimeError("private log detail")
 
     adapter = AdapterHarness(
-        resolve_device=lambda **kwargs: 7, source_factory=create_source,
+        resolve_device=lambda **kwargs: 7,
+        source_factory=create_source,
         preferred_channels=2,
     ).adapter()
     adapter = replace(adapter, log_diagnostic=fail_log)

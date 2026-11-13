@@ -1297,7 +1297,9 @@ async def test_stream_onset_context_is_real_bounded_and_permission_scoped(
 
 
 @pytest.mark.asyncio
-async def test_retired_listen_timer_keeps_failure_on_owned_segment_without_failing_audio_loop(monkeypatch):
+async def test_retired_listen_timer_keeps_failure_on_owned_segment_without_failing_audio_loop(
+    monkeypatch,
+):
     from puripuly_heart.core.audio.listen_delivery import ListenDeliveryController
     from puripuly_heart.core.runtime import audio_vad_loop as loop_module
 
@@ -1312,8 +1314,10 @@ async def test_retired_listen_timer_keeps_failure_on_owned_segment_without_faili
 
     monkeypatch.setattr(loop_module, "ListenDeliveryController", ImmediateController)
     vad = create_peer_vad_gating(
-        SequenceVadEngine([0.9] * 3), sample_rate_hz=16000,
-        ring_buffer_ms=64, hangover_ms=500,
+        SequenceVadEngine([0.9] * 3),
+        sample_rate_hz=16000,
+        ring_buffer_ms=64,
+        hangover_ms=500,
     )
 
     def fail_seal(*args, **kwargs):
@@ -1323,10 +1327,16 @@ async def test_retired_listen_timer_keeps_failure_on_owned_segment_without_faili
     ledger = PeerAudioSegmentLedger(
         activation_generation=7,
         settings=AudioSegmentSettingsSnapshot(
-            provider_id="test", provider_signature=("test",), runtime_signature=("test",),
-            source_mode="desktop", source_language="en", expected_languages=(),
-            target_sample_rate_hz=16000, vad_speech_threshold=0.5,
-            vad_hangover_ms=500, vad_pre_roll_ms=64,
+            provider_id="test",
+            provider_signature=("test",),
+            runtime_signature=("test",),
+            source_mode="desktop",
+            source_language="en",
+            expected_languages=(),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.5,
+            vad_hangover_ms=500,
+            vad_pre_roll_ms=64,
         ),
     )
     delivered = []
@@ -1339,10 +1349,14 @@ async def test_retired_listen_timer_keeps_failure_on_owned_segment_without_faili
         async def frames(self):
             for index in range(3):
                 yield AudioFrameF32(
-                    samples=np.ones(512, dtype=np.float32), sample_rate_hz=16000,
+                    samples=np.ones(512, dtype=np.float32),
+                    sample_rate_hz=16000,
                     capture=AudioCaptureSpan(
-                        capture_epoch=1, callback_sequence=index, source_sample_rate_hz=16000,
-                        source_start_sample=index * 512, source_end_sample=(index + 1) * 512,
+                        capture_epoch=1,
+                        callback_sequence=index,
+                        source_sample_rate_hz=16000,
+                        source_start_sample=index * 512,
+                        source_end_sample=(index + 1) * 512,
                         source_start_monotonic_s=index * 0.032,
                         source_end_monotonic_s=(index + 1) * 0.032,
                     ),
@@ -1351,8 +1365,12 @@ async def test_retired_listen_timer_keeps_failure_on_owned_segment_without_faili
 
     await asyncio.wait_for(
         run_audio_vad_loop(
-            source=Source(), vad=vad, sink=Sink(), target_sample_rate_hz=16000,
-            segment_ledger=ledger, monotonic_clock=lambda: 0.0,
+            source=Source(),
+            vad=vad,
+            sink=Sink(),
+            target_sample_rate_hz=16000,
+            segment_ledger=ledger,
+            monotonic_clock=lambda: 0.0,
         ),
         timeout=1.0,
     )

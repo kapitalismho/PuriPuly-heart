@@ -33,7 +33,9 @@ OPENROUTER_MANAGED_USER_ID_MAX_LENGTH = 256
 class ManagedAuthClaimGuard:
     managed_state: ManagedIdentityStatePort
     secret_store: SecretStorePort
-    observation_diagnostics: list[ErrorDiagnostics] = field(default_factory=list, repr=False, compare=False)
+    observation_diagnostics: list[ErrorDiagnostics] = field(
+        default_factory=list, repr=False, compare=False
+    )
 
     async def preflight(self, requested_source: str) -> TransactionResult | None:
         self.observation_diagnostics.clear()

@@ -80,9 +80,7 @@ class ManualTypingOwner:
             results = await asyncio.gather(task, return_exceptions=True)
             for result in results:
                 if isinstance(result, Exception):
-                    self._record_failure(
-                        "manual_completion_wait", result, disposition="degraded"
-                    )
+                    self._record_failure("manual_completion_wait", result, disposition="degraded")
         output = self.output_provider()
         if output is not None:
             output.clear_self_chatbox_typing_reasons()
@@ -141,9 +139,7 @@ class ManualTypingOwner:
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError as exc:
-            self._record_failure(
-                "manual_typing_idle_schedule", exc, disposition="degraded"
-            )
+            self._record_failure("manual_typing_idle_schedule", exc, disposition="degraded")
             return
         self._idle_task = loop.create_task(self._idle_timeout())
 

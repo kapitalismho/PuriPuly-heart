@@ -376,6 +376,7 @@ def operation_header(operation: Mapping) -> dict:
                 "diagnosis",
                 "output",
                 "recognition_result",
+                "channel",
                 "recognition_scope",
                 "translation_result",
                 "failure_category",

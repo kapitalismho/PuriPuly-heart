@@ -57,12 +57,12 @@ from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     cleanup_local_stt_install_residue,
     ensure_local_stt_installed,
 )
-from puripuly_heart.core.model_install_removal import remove_model_install_dir
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.model_asset_diagnostics import (
     model_asset_failure_code,
     model_asset_failure_diagnostics,
 )
+from puripuly_heart.core.model_install_removal import remove_model_install_dir
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.local_stt_download import LocalSTTDownloadRuntime
 
@@ -414,7 +414,8 @@ class LocalASRProvisioningOwner:
                         outcome="failed",
                         failure_type=type(exc).__name__,
                         failure_diagnostics=model_asset_failure_diagnostics(
-                            exc, operation="diagnostic_delivery",
+                            exc,
+                            operation="diagnostic_delivery",
                             code="model_assets.diagnostic_delivery_failed",
                         ),
                     )
@@ -435,7 +436,8 @@ class LocalASRProvisioningOwner:
                         outcome="failed",
                         failure_type=type(exc).__name__,
                         failure_diagnostics=model_asset_failure_diagnostics(
-                            exc, operation="diagnostic_delivery",
+                            exc,
+                            operation="diagnostic_delivery",
                             code="model_assets.diagnostic_delivery_failed",
                         ),
                     )
@@ -463,7 +465,8 @@ class LocalASRProvisioningOwner:
                         event="result_delivery",
                         outcome="failed",
                         failure_diagnostics=model_asset_failure_diagnostics(
-                            failure, operation="diagnostic_delivery",
+                            failure,
+                            operation="diagnostic_delivery",
                             code="model_assets.diagnostic_delivery_failed",
                         ),
                     )

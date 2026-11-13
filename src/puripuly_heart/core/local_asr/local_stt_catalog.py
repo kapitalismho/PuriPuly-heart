@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from puripuly_heart.core.diagnostics import exception_diagnostics
+
 from .local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
     FUN_ASR_NANO_MODEL_ID,

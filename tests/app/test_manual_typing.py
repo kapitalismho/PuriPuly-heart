@@ -122,7 +122,9 @@ def test_typing_output_port_exposes_only_self_channel_operations() -> None:
 
 
 @pytest.mark.asyncio
-async def test_failed_completion_retains_cause_without_changing_admission_or_cancellation(monkeypatch) -> None:
+async def test_failed_completion_retains_cause_without_changing_admission_or_cancellation(
+    monkeypatch,
+) -> None:
     import puripuly_heart.app.services.manual_typing as module
 
     def broken_sink(*args, **kwargs):

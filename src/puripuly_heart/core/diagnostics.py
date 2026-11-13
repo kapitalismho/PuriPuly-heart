@@ -902,54 +902,126 @@ _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset(
     {"native_status", "native_code", "requested_channels"}
 )
 _COMPONENTS = _COMPONENTS | frozenset(
-    {"github_star_prompt", "control.host", "recognition_probe", "secret_store", "overlay_application"}
+    {
+        "github_star_prompt",
+        "control.host",
+        "recognition_probe",
+        "secret_store",
+        "overlay_application",
+    }
 )
 _BOUNDARIES = _BOUNDARIES | frozenset(
     {
-        "state_delivery", "diagnostic_delivery", "inspection", "error_presented",
-        "launch_prompt", "translation_success", "prompt_persist", "prompt_rollback",
-        "endpoint_close", "host_start", "host_close", "readiness_cleanup",
-        "capture_observer", "capture_background", "routing_observer", "observe",
-        "recognition_probe", "process_lifecycle", "diagnostic_sink",
+        "state_delivery",
+        "diagnostic_delivery",
+        "inspection",
+        "error_presented",
+        "launch_prompt",
+        "translation_success",
+        "prompt_persist",
+        "prompt_rollback",
+        "endpoint_close",
+        "host_start",
+        "host_close",
+        "readiness_cleanup",
+        "capture_observer",
+        "capture_background",
+        "routing_observer",
+        "observe",
+        "recognition_probe",
+        "process_lifecycle",
+        "diagnostic_sink",
         "preflight_managed_auth_claim",
-        "avatar_query", "host_info", "discovery_monitor", "unadvertise_receiver",
-        "receiver_stop", "service_stop", "control_dispatch", "transport_write",
-        "replacement_start", "recovery_state",
+        "avatar_query",
+        "host_info",
+        "discovery_monitor",
+        "unadvertise_receiver",
+        "receiver_stop",
+        "service_stop",
+        "control_dispatch",
+        "transport_write",
+        "replacement_start",
+        "recovery_state",
     }
 )
 _ENUM_FIELDS.update(
     {
         "asset_failure_code": frozenset(
             {
-                "unknown", "install_failed", "download_failed", "download_timeout",
-                "proxy_failed", "connection_failed", "source_unavailable", "disk_full",
-                "checksum_failed", "file_size_mismatch", "mirror_unavailable",
-                "mirror_redirect_external", "range_invalid", "network_configuration_failed",
-                "worker_spawn_failed", "worker_protocol_failed", "worker_reported_failure",
-                "worker_exited", "worker_import_failed", "status_callback_failed",
-                "unsupported_source", "missing_file", "import_failed", "task_busy",
-                "model_in_use", "model_owner_unavailable", "unknown_model", "cancelled",
+                "unknown",
+                "install_failed",
+                "download_failed",
+                "download_timeout",
+                "proxy_failed",
+                "connection_failed",
+                "source_unavailable",
+                "disk_full",
+                "checksum_failed",
+                "file_size_mismatch",
+                "mirror_unavailable",
+                "mirror_redirect_external",
+                "range_invalid",
+                "network_configuration_failed",
+                "worker_spawn_failed",
+                "worker_protocol_failed",
+                "worker_reported_failure",
+                "worker_exited",
+                "worker_import_failed",
+                "status_callback_failed",
+                "unsupported_source",
+                "missing_file",
+                "import_failed",
+                "task_busy",
+                "model_in_use",
+                "model_owner_unavailable",
+                "unknown_model",
+                "cancelled",
                 "inspect_failed",
             }
         ),
         "capture_attempt": frozenset(
             {
-                "device_resolution", "primary", "primary_mono_retry", "name_fallback",
-                "name_fallback_mono_retry", "system_default", "system_default_mono_retry",
+                "device_resolution",
+                "primary",
+                "primary_mono_retry",
+                "name_fallback",
+                "name_fallback_mono_retry",
+                "system_default",
+                "system_default_mono_retry",
             }
         ),
         "native_reason": frozenset(
             {
-                "invalid_argument", "not_implemented", "model_file_not_found", "model_load",
-                "out_of_memory", "backend", "unsupported", "bad_struct_size", "input_too_long",
-                "aborted", "output_truncated", "output_repetition", "unsupported_role",
-                "input_too_short", "version_mismatch", "nul", "busy", "other",
+                "invalid_argument",
+                "not_implemented",
+                "model_file_not_found",
+                "model_load",
+                "out_of_memory",
+                "backend",
+                "unsupported",
+                "bad_struct_size",
+                "input_too_long",
+                "aborted",
+                "output_truncated",
+                "output_repetition",
+                "unsupported_role",
+                "input_too_short",
+                "version_mismatch",
+                "nul",
+                "busy",
+                "other",
             }
         ),
         "native_classification": frozenset(
             {
-                "decode_failure", "audio_invalid", "cancelled", "worker_busy",
-                "protocol_invalid", "mode_rejected", "request_rejected", "worker_failure",
+                "decode_failure",
+                "audio_invalid",
+                "cancelled",
+                "worker_busy",
+                "protocol_invalid",
+                "mode_rejected",
+                "request_rejected",
+                "worker_failure",
             }
         ),
     }
@@ -957,48 +1029,82 @@ _ENUM_FIELDS.update(
 _OVERLAY_NATIVE_STAGES = frozenset(
     {
         "unknown",
-        "renderer_init", "hardware_device", "draw", "openvr_init", "adapter_selection",
-        "submit", "calibration", "render_frame", "reanchor", "submit_frame",
-        "show_overlay", "hide_overlay", "reconcile_visibility", "cleanup_hide",
-        "cleanup_release", "acknowledge_quit", "event_process_quit",
+        "renderer_init",
+        "hardware_device",
+        "draw",
+        "openvr_init",
+        "adapter_selection",
+        "submit",
+        "calibration",
+        "render_frame",
+        "reanchor",
+        "submit_frame",
+        "show_overlay",
+        "hide_overlay",
+        "reconcile_visibility",
+        "cleanup_hide",
+        "cleanup_release",
+        "acknowledge_quit",
+        "event_process_quit",
     }
 )
-_ENUM_FIELDS.update(
-    {"native_stage": _OVERLAY_NATIVE_STAGES}
-)
+_ENUM_FIELDS.update({"native_stage": _OVERLAY_NATIVE_STAGES})
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"runtime_build"})
 _BOOLEAN_FIELDS = _BOOLEAN_FIELDS | frozenset({"build_match", "commit_match"})
 _COMPONENTS = _COMPONENTS | frozenset({"audio_test", "stt.provider_runtime"})
 _BOUNDARIES = _BOUNDARIES | frozenset(
     {
-        "audio.test", "device_metadata", "device_resolution", "smart_turn_prepare",
-        "smart_turn_predict", "smart_turn_completion", "segmentation",
-        "runtime_version", "runtime_files", "runtime_startup", "runtime",
-        "prefix", "prefix_restore", "prefix_save", "slot_cleanup",
+        "audio.test",
+        "device_metadata",
+        "device_resolution",
+        "smart_turn_prepare",
+        "smart_turn_predict",
+        "smart_turn_completion",
+        "segmentation",
+        "runtime_version",
+        "runtime_files",
+        "runtime_startup",
+        "runtime",
+        "prefix",
+        "prefix_restore",
+        "prefix_save",
+        "slot_cleanup",
         "state_changed",
     }
 )
 _ENUM_FIELDS["native_stage"] = _ENUM_FIELDS["native_stage"] | {"gpu_query_create", "gpu_query_poll"}
 _ENUM_FIELDS["native_classification"] = _ENUM_FIELDS["native_classification"] | {
-    "worker_operation_panicked", "worker_operation_cancelled",
-    "worker_unload_panicked", "worker_unload_cancelled",
-    "worker_reader_failed", "worker_writer_failed",
+    "worker_operation_panicked",
+    "worker_operation_cancelled",
+    "worker_unload_panicked",
+    "worker_unload_cancelled",
+    "worker_reader_failed",
+    "worker_writer_failed",
     "worker_unload_failed",
     "worker_connection_closed",
 }
 _ENUM_FIELDS["reason"] = frozenset(
     {
-        "transport", "metadata_unavailable", "credential_unavailable",
-        "observation_unavailable", "owned_work_failed", "settings_unavailable",
-        "credential_not_current", "metadata_invalid",
+        "transport",
+        "metadata_unavailable",
+        "credential_unavailable",
+        "observation_unavailable",
+        "owned_work_failed",
+        "settings_unavailable",
+        "credential_not_current",
+        "metadata_invalid",
     }
 )
 _ENUM_FIELDS["deepgram_code"] = frozenset({"DATA-0000", "NET-0000", "NET-0001", "NET-0002"})
 _ENUM_FIELDS["owner_name"] = _ENUM_FIELDS["owner_name"] | {
-    "self_audio", "provider_runtime", "runtime_logging",
+    "self_audio",
+    "provider_runtime",
+    "runtime_logging",
 }
 _ENUM_FIELDS["callback_name"] = _ENUM_FIELDS["callback_name"] | {
-    "drain_cancel", "close_provider", "final_summary",
+    "drain_cancel",
+    "close_provider",
+    "final_summary",
 }
 _BOUNDARIES = _BOUNDARIES | {"accounts.status"}
 _ID_FIELDS = _ID_FIELDS | {"provider_request_id"}
@@ -1033,7 +1139,9 @@ def emit_failure(
                 else logging.WARNING if severity == "warning" else logging.ERROR
             ),
             "[Failure] structured_failure",
-            extra={DIAGNOSTIC_RECORD_ATTRIBUTE: (diagnostics, severity, disposition, stage, exception)},
+            extra={
+                DIAGNOSTIC_RECORD_ATTRIBUTE: (diagnostics, severity, disposition, stage, exception)
+            },
         )
     except Exception:
         return
@@ -1090,9 +1198,10 @@ def exception_diagnostics(
             current.exceptions
             if isinstance(current, BaseExceptionGroup)
             else (
-                (current.__cause__ or (
-                    None if current.__suppress_context__ else current.__context__
-                )),
+                (
+                    current.__cause__
+                    or (None if current.__suppress_context__ else current.__context__)
+                ),
             )
         )
         for child in children:
@@ -1108,9 +1217,13 @@ def exception_diagnostics(
             causes.append(build(child, depth + 1))
         transport_kind = classify_transport_error(current)
         effective_category = category
-        if category == "lifecycle" and transport_kind is not None and (
-            transport_kind in {"timeout", "tls", "proxy"}
-            or isinstance(current, (httpx.HTTPError, ConnectionError))
+        if (
+            category == "lifecycle"
+            and transport_kind is not None
+            and (
+                transport_kind in {"timeout", "tls", "proxy"}
+                or isinstance(current, (httpx.HTTPError, ConnectionError))
+            )
         ):
             effective_category = "timeout" if transport_kind == "timeout" else "network"
         status_code = next(
@@ -1543,7 +1656,9 @@ def _bound_diagnostic_record(record: dict) -> None:
             return True
         return False
 
-    while len(json.dumps(record, separators=(",", ":")).encode()) + 64 > DIAGNOSTIC_RECORD_MAX_BYTES:
+    while (
+        len(json.dumps(record, separators=(",", ":")).encode()) + 64 > DIAGNOSTIC_RECORD_MAX_BYTES
+    ):
         if prune_causes(record) or prune_fields(record):
             continue
         if record["causes"]:
@@ -1613,9 +1728,7 @@ def _diagnostics_from_mapping(
 
 def serialize_diagnostics(diagnostics: ErrorDiagnostics) -> dict:
     return _diagnostic_value(
-        normalize_diagnostic(
-            diagnostics, instance_id=None, severity="error", disposition="unknown"
-        )
+        normalize_diagnostic(diagnostics, instance_id=None, severity="error", disposition="unknown")
     )
 
 

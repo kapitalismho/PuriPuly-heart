@@ -7,11 +7,16 @@ import pytest
 
 from puripuly_heart.core.diagnostics import exception_diagnostics
 from tests.app import test_control_repair_behavior as control_cases
-from tests.app.test_control_repair_behavior import isolated_composed_logging, offline
+from tests.app.test_control_repair_behavior import (
+    isolated_composed_logging as isolated_composed_logging,
+)
+from tests.app.test_control_repair_behavior import offline as offline
 
 
 @pytest.mark.asyncio
-async def test_pending_evidence_survives_nonsettings_probe_until_completed_settings_receipt(offline):
+async def test_pending_evidence_survives_nonsettings_probe_until_completed_settings_receipt(
+    offline,
+):
     persisted = json.loads(offline.read_text(encoding="utf-8"))
     persisted["intent"]["telemetry"]["enabled"] = False
     offline.write_text(json.dumps(persisted), encoding="utf-8")

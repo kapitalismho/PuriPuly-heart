@@ -250,7 +250,9 @@ class ElevenLabsScribeSTTBackend(STTBackend):
     connect_timeout_s: float = 10.0
     keepalive_interval_s: float = ELEVENLABS_SCRIBE_KEEPALIVE_INTERVAL_S
     scribe_connect_factory: Callable[[Any], Any] | None = None
-    _starting_sessions: list[STTBackendSession] = field(init=False, default_factory=list, repr=False)
+    _starting_sessions: list[STTBackendSession] = field(
+        init=False, default_factory=list, repr=False
+    )
 
     async def open_session(
         self,

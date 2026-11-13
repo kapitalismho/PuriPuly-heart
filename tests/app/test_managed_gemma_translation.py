@@ -196,7 +196,11 @@ async def test_failed_prepare_exposes_bounded_download_diagnostics() -> None:
     ("failure", "phase", "code"),
     [
         (ManagedGemmaRuntimeMissingError("server is missing"), "runtime_files", "runtime_missing"),
-        (ManagedGemmaRuntimeVersionError("incompatible"), "runtime_version", "runtime_incompatible"),
+        (
+            ManagedGemmaRuntimeVersionError("incompatible"),
+            "runtime_version",
+            "runtime_incompatible",
+        ),
         (ManagedGemmaRuntimeError("exited during startup"), "runtime", "runtime_failed"),
     ],
 )
@@ -244,7 +248,8 @@ async def test_combined_cancellation_and_cleanup_failure_is_terminal_and_bounded
     diagnostics = owner.snapshot.failure_diagnostics
     assert diagnostics.operation == "gemma_install"
     assert [value.fields["exception_class"] for value in diagnostics.causes] == [
-        "unclassified", "PermissionError"
+        "unclassified",
+        "PermissionError",
     ]
     assert all(snapshot.state != "ready" for snapshot in statuses)
     assert "sensitive staging path" not in repr(owner.snapshot)
@@ -515,7 +520,9 @@ async def test_modelscope_http_failure_preserves_download_status_metadata(
         assert diagnostics.status_code is None
         assert [value.status_code for value in diagnostics.causes] == [503, 503, 503]
         assert [value.fields["source_kind"] for value in diagnostics.causes] == [
-            "huggingface", "modelscope", "huggingface_mirror"
+            "huggingface",
+            "modelscope",
+            "huggingface_mirror",
         ]
         assert "primary download unavailable" not in str(serialize_diagnostics(diagnostics))
     finally:

@@ -412,7 +412,9 @@ class OverlayProcessManager:
                 self._primary_diagnostics.diagnostic_id if self._primary_diagnostics else None
             ),
             "failure_diagnostics": (
-                serialize_diagnostics(self._primary_diagnostics) if self._primary_diagnostics else None
+                serialize_diagnostics(self._primary_diagnostics)
+                if self._primary_diagnostics
+                else None
             ),
             "native_primary_failure_reason": self.native_primary_failure_reason,
             "native_cleanup_failure_reason": self.native_cleanup_failure_reason,
@@ -423,7 +425,8 @@ class OverlayProcessManager:
             ),
             "cleanup_diagnostics": (
                 serialize_diagnostics(self._native_cleanup_diagnostics)
-                if self._native_cleanup_diagnostics else None
+                if self._native_cleanup_diagnostics
+                else None
             ),
             "native_evidence_state": self.native_evidence_state,
             "failures": [serialize_diagnostics(failure) for failure in self.failures],
@@ -589,7 +592,10 @@ class OverlayProcessManager:
             executable_path, manifest_path, process = await spawn_task
         except Exception as exc:
             self._emit_failure(
-                "spawn_failed", stage="cleanup", fields={}, exception=exc,
+                "spawn_failed",
+                stage="cleanup",
+                fields={},
+                exception=exc,
                 cause=self._primary_diagnostics,
             )
             return
@@ -614,7 +620,8 @@ class OverlayProcessManager:
             )
             self._set_shutdown_failure(
                 self._late_spawn_cleanup_failure,
-                fields={"cleanup_stage": "cleanup"}, exception=exc,
+                fields={"cleanup_stage": "cleanup"},
+                exception=exc,
             )
             self.state = "failed"
             return
@@ -732,7 +739,8 @@ class OverlayProcessManager:
                         cause = "termination_unconfirmed"
                     self._set_shutdown_failure(
                         cause,
-                        fields={"cleanup_stage": "process_terminate"}, exception=exc,
+                        fields={"cleanup_stage": "process_terminate"},
+                        exception=exc,
                     )
                     self.restart_scheduled = False
                     self._record_process(
@@ -784,7 +792,8 @@ class OverlayProcessManager:
         except Exception as exc:
             self._set_shutdown_failure(
                 "shutdown_cleanup_failed",
-                fields={"cleanup_stage": "cleanup"}, exception=exc,
+                fields={"cleanup_stage": "cleanup"},
+                exception=exc,
             )
             self.state = "failed"
             self._current_phase = "failed"
@@ -1128,7 +1137,8 @@ class OverlayProcessManager:
             except Exception as exc:
                 self._set_shutdown_failure(
                     "shutdown_cleanup_failed",
-                    fields={"cleanup_stage": "cleanup"}, exception=exc,
+                    fields={"cleanup_stage": "cleanup"},
+                    exception=exc,
                 )
         self.runtime_stop_completed = (
             readers_settled
@@ -1824,8 +1834,10 @@ class OverlayProcessManager:
                 request_failed = True
                 self._shutdown_graceful_request = "failed"
                 self._emit_failure(
-                    "shutdown_cleanup_failed", stage="cleanup",
-                    fields={"cleanup_stage": "cleanup"}, exception=exc,
+                    "shutdown_cleanup_failed",
+                    stage="cleanup",
+                    fields={"cleanup_stage": "cleanup"},
+                    exception=exc,
                     cause=self._primary_diagnostics,
                 )
                 self._record_process(
@@ -1915,8 +1927,10 @@ class OverlayProcessManager:
                         events = ack_task.result()
                     except Exception as exc:
                         self._emit_failure(
-                            "shutdown_cleanup_failed", stage="cleanup",
-                            fields={"cleanup_stage": "cleanup"}, exception=exc,
+                            "shutdown_cleanup_failed",
+                            stage="cleanup",
+                            fields={"cleanup_stage": "cleanup"},
+                            exception=exc,
                             cause=self._primary_diagnostics,
                         )
                         break
@@ -2105,7 +2119,8 @@ class OverlayProcessManager:
                 except Exception as exc:
                     self._set_shutdown_failure(
                         "termination_unconfirmed",
-                        fields={"cleanup_stage": "process_terminate"}, exception=exc,
+                        fields={"cleanup_stage": "process_terminate"},
+                        exception=exc,
                     )
                     self.restart_scheduled = False
                     self._record_process(
@@ -2230,7 +2245,8 @@ class OverlayProcessManager:
             diagnostics = self._emit_failure(
                 "overlay_reader_cleanup_failed",
                 stage="reader_cleanup",
-                fields={"cleanup_stage": "reader_cleanup"}, exception=exc,
+                fields={"cleanup_stage": "reader_cleanup"},
+                exception=exc,
                 cause=self._primary_diagnostics,
             )
             self._set_shutdown_failure("shutdown_cleanup_failed", diagnostics=diagnostics)
@@ -2343,16 +2359,32 @@ class OverlayProcessManager:
             native_fields = {key: value for key, value in native.items() if key != "secondary"}
             secondary = native.get("secondary")
             native_cause = ErrorDiagnostics(
-                component="overlay_process", operation="process_lifecycle", code=code,
-                category="lifecycle", visibility="basic", content_policy="metadata_only",
-                status_code=None, retry_after_ms=None, fields=native_fields,
+                component="overlay_process",
+                operation="process_lifecycle",
+                code=code,
+                category="lifecycle",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields=native_fields,
                 causes=(
-                    ErrorDiagnostics(
-                        component="overlay_process", operation="process_lifecycle", code=code,
-                        category="lifecycle", visibility="basic", content_policy="metadata_only",
-                        status_code=None, retry_after_ms=None, fields=secondary,
-                    ),
-                ) if isinstance(secondary, dict) else (),
+                    (
+                        ErrorDiagnostics(
+                            component="overlay_process",
+                            operation="process_lifecycle",
+                            code=code,
+                            category="lifecycle",
+                            visibility="basic",
+                            content_policy="metadata_only",
+                            status_code=None,
+                            retry_after_ms=None,
+                            fields=secondary,
+                        ),
+                    )
+                    if isinstance(secondary, dict)
+                    else ()
+                ),
             )
             children = (*children, native_cause)
         diagnostics = ErrorDiagnostics(
@@ -2396,12 +2428,18 @@ class OverlayProcessManager:
         )
         if exception is not None:
             source = exception_diagnostics(
-                exception, component="overlay_process", operation="process_lifecycle",
-                code=code, fields=diagnostics.fields,
+                exception,
+                component="overlay_process",
+                operation="process_lifecycle",
+                code=code,
+                fields=diagnostics.fields,
             )
             diagnostics = replace(
-                diagnostics, fields=source.fields, status_code=source.status_code,
-                retry_after_ms=source.retry_after_ms, causes=(*children, *source.causes),
+                diagnostics,
+                fields=source.fields,
+                status_code=source.status_code,
+                retry_after_ms=source.retry_after_ms,
+                causes=(*children, *source.causes),
                 causes_truncated=source.causes_truncated,
             )
         diagnostics = sanitize_diagnostics(diagnostics)
@@ -2476,7 +2514,8 @@ class OverlayProcessManager:
             },
         }
         status_key = tuple(fields.values()) + (
-            event.get("rejected_records"), event.get("cleanup_native_failure"),
+            event.get("rejected_records"),
+            event.get("cleanup_native_failure"),
             event.get("cleanup_diagnostics"),
         )
         if status_key == self._last_native_status:
@@ -2492,19 +2531,17 @@ class OverlayProcessManager:
                 fields=fields,
                 cause=self._primary_diagnostics,
             )
-        if (
-            self.native_cleanup_failure_reason is not None
-            and (
-                self._native_cleanup_diagnostics is None
-                or event.get("cleanup_native_failure") is not None
-                or event.get("cleanup_diagnostics") is not None
-            )
+        if self.native_cleanup_failure_reason is not None and (
+            self._native_cleanup_diagnostics is None
+            or event.get("cleanup_native_failure") is not None
+            or event.get("cleanup_diagnostics") is not None
         ):
             self._native_cleanup_diagnostics = self._emit_failure(
                 self.native_cleanup_failure_reason,
                 stage="cleanup",
                 fields={
-                    **fields, "native_failure": event.get("cleanup_native_failure"),
+                    **fields,
+                    "native_failure": event.get("cleanup_native_failure"),
                     "cleanup_diagnostics": event.get("cleanup_diagnostics"),
                 },
                 cause=self._primary_diagnostics,

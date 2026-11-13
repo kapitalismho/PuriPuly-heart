@@ -248,7 +248,13 @@ def project_osc_output(value: object) -> dict:
     if isinstance(source.get("state_publication"), Mapping):
         result["state_publication"] = _pick(
             source["state_publication"],
-            ("diagnostic_id", "code", "local_send_completed", "local_send_requested", "disposition"),
+            (
+                "diagnostic_id",
+                "code",
+                "local_send_completed",
+                "local_send_requested",
+                "disposition",
+            ),
         )
     listener = _mapping(source.get("local_listener"))
     if listener:
@@ -283,7 +289,15 @@ def project_osc_output(value: object) -> dict:
 def _safe_osc_receipt(receipt: dict) -> dict:
     result = _pick(
         receipt,
-        ("instance_id", "operation_id", "request_id", "status", "terminal", "revision", "diagnostic_id"),
+        (
+            "instance_id",
+            "operation_id",
+            "request_id",
+            "status",
+            "terminal",
+            "revision",
+            "diagnostic_id",
+        ),
     )
     result.update(project_diagnostic_evidence(receipt))
     reason = receipt.get("reason")

@@ -8,6 +8,7 @@ from uuid import uuid4
 from puripuly_heart.core.diagnostics import DIAGNOSTIC_CAUSE_MAX_COUNT, deserialize_diagnostics
 from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.language import get_language_info, get_llm_language_name
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.translation_backend import (
     TranslationBackend,
@@ -15,7 +16,6 @@ from puripuly_heart.core.translation_backend import (
     TranslationProbePreparationRequired,
     translation_probe_scope,
 )
-from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.domain.models import Translation
 
 TRANSLATION_PROBE_SAMPLES = {
@@ -133,11 +133,18 @@ async def run_translation_probe(
                 {
                     key: value
                     for key, value in outcome.items()
-                    if key in {
-                        "translation_result", "turn_id", "diagnostics", "diagnostic_id",
-                        "recovered_diagnostics", "secondary_diagnostics",
-                        "recovered_failures_truncated", "secondary_diagnostics_truncated",
-                        "secondary_omitted_count", "secondary_truncated",
+                    if key
+                    in {
+                        "translation_result",
+                        "turn_id",
+                        "diagnostics",
+                        "diagnostic_id",
+                        "recovered_diagnostics",
+                        "secondary_diagnostics",
+                        "recovered_failures_truncated",
+                        "secondary_diagnostics_truncated",
+                        "secondary_omitted_count",
+                        "secondary_truncated",
                     }
                 }
             )
@@ -154,11 +161,16 @@ async def run_translation_probe(
             result["secondary_diagnostics_truncated"] |= result["secondary_truncated"]
             result.update(
                 {
-                    key: value for key, value in outcome.items()
-                    if key not in {
-                        "recovered_diagnostics", "secondary_diagnostics",
-                        "recovered_failures_truncated", "secondary_diagnostics_truncated",
-                        "secondary_omitted_count", "secondary_truncated",
+                    key: value
+                    for key, value in outcome.items()
+                    if key
+                    not in {
+                        "recovered_diagnostics",
+                        "secondary_diagnostics",
+                        "recovered_failures_truncated",
+                        "secondary_diagnostics_truncated",
+                        "secondary_omitted_count",
+                        "secondary_truncated",
                     }
                 }
             )
@@ -188,7 +200,9 @@ async def _run_translation_target_probe(
             replace(
                 diagnostic,
                 turn_id=diagnostic.turn_id or str(request.utterance_id),
-                generation=diagnostic.generation if diagnostic.generation is not None else generation,
+                generation=(
+                    diagnostic.generation if diagnostic.generation is not None else generation
+                ),
             )
             for diagnostic in getattr(exc, "secondary_diagnostics", ())
             if isinstance(diagnostic, ErrorDiagnostics)
@@ -264,9 +278,7 @@ async def _run_translation_target_probe(
         or not isinstance(translation.text, str)
         or not translation.text.strip()
     ):
-        diagnostics = _probe_diagnostics(
-            "translation_probe_invalid_response", request, generation
-        )
+        diagnostics = _probe_diagnostics("translation_probe_invalid_response", request, generation)
         return {
             **result,
             "status": "failed",

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import threading
 import json
-from uuid import uuid4
+import threading
 from dataclasses import replace
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -13,8 +13,7 @@ import pytest
 from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTranslationOwner
 from puripuly_heart.app.services.model_assets import ModelAssetsApplication, ModelAssetsError
 from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice
-from puripuly_heart.core import network_clients
-from puripuly_heart.core import feature_diagnostics
+from puripuly_heart.core import feature_diagnostics, network_clients
 from puripuly_heart.core.diagnostics import diagnostic_operation, serialize_diagnostics
 from puripuly_heart.core.local_asr import local_stt_runtime_installer as installer
 from puripuly_heart.core.local_asr.local_stt_assets import (
@@ -631,7 +630,9 @@ async def test_cancelled_deletion_retains_real_lease_until_worker_settles(
 
 
 @pytest.mark.parametrize("kind", ["asr", "gemma"])
-async def test_source_causes_reach_asset_results_when_optional_sinks_fail(tmp_path, monkeypatch, kind):
+async def test_source_causes_reach_asset_results_when_optional_sinks_fail(
+    tmp_path, monkeypatch, kind
+):
     private = "private-source-body-url-and-credential"
     operation_id, request_id = uuid4().hex, uuid4().hex
 
@@ -709,9 +710,9 @@ async def test_source_causes_reach_asset_results_when_optional_sinks_fail(tmp_pa
         assert diagnostics.operation_id == operation_id
         assert diagnostics.request_id == request_id
         assert diagnostics.status_code is None
-        assert [cause.status_code for cause in diagnostics.causes] == expected_statuses, (
-            serialize_diagnostics(diagnostics)
-        )
+        assert [
+            cause.status_code for cause in diagnostics.causes
+        ] == expected_statuses, serialize_diagnostics(diagnostics)
         assert [cause.fields["source_kind"] for cause in diagnostics.causes] == expected_sources
         assert [cause.fields["source_attempt"] for cause in diagnostics.causes] == list(
             range(1, len(expected_sources) + 1)
@@ -732,7 +733,9 @@ async def test_source_causes_reach_asset_results_when_optional_sinks_fail(tmp_pa
 
 
 @pytest.mark.parametrize("kind", ["asr", "gemma"])
-async def test_cancelled_provisioning_keeps_prior_source_cause_without_advancing(tmp_path, monkeypatch, kind):
+async def test_cancelled_provisioning_keeps_prior_source_cause_without_advancing(
+    tmp_path, monkeypatch, kind
+):
     from tests.core.test_local_stt_huggingface_xet_adapter import _gpu_manifest
 
     cancellation = threading.Event()

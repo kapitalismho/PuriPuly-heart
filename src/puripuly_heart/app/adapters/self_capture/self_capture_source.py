@@ -6,7 +6,11 @@ from dataclasses import dataclass, field
 
 from puripuly_heart.config.audio_host_api import InputHostApiProfile
 from puripuly_heart.core.audio.source import AudioSourceOpenFailure, SelfMicCaptureChannelDecision
-from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure, exception_diagnostics
+from puripuly_heart.core.diagnostics import (
+    current_diagnostic_operation,
+    emit_failure,
+    exception_diagnostics,
+)
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
 
@@ -100,9 +104,7 @@ class SelfCaptureSourceAdapter:
                         host_api_for_log="",
                         device_for_log=config.input_device,
                     )
-                    self._log(
-                        f"[STT] Microphone opened with fallback: device_idx={fallback_idx}"
-                    )
+                    self._log(f"[STT] Microphone opened with fallback: device_idx={fallback_idx}")
                 except AudioSourceOpenFailure as exc:
                     self.last_open_diagnostics = exc.failure_diagnostics
                     raise
@@ -291,7 +293,9 @@ class SelfCaptureSourceAdapter:
             self.log_diagnostic(message, level=level)
         except Exception as exc:
             self.diagnostic_delivery_failure = exception_diagnostics(
-                exc, component="capture.self", operation="observe",
+                exc,
+                component="capture.self",
+                operation="observe",
                 code="capture.self.diagnostic_sink_failed",
             )
 

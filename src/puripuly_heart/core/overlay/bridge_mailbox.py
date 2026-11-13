@@ -27,7 +27,9 @@ class SceneEnvelope:
     message: str
     block_expirations: Mapping[str, float | None]
     admitted_at: float
-    operation_identity: Mapping[str, str | None] = field(default_factory=current_diagnostic_operation)
+    operation_identity: Mapping[str, str | None] = field(
+        default_factory=current_diagnostic_operation
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +37,9 @@ class ControlEnvelope:
     key: str
     message: str
     payload_type: str
-    operation_identity: Mapping[str, str | None] = field(default_factory=current_diagnostic_operation)
+    operation_identity: Mapping[str, str | None] = field(
+        default_factory=current_diagnostic_operation
+    )
 
 
 @dataclass(frozen=True, slots=True)

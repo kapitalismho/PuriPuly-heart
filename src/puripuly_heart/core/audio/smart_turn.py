@@ -362,8 +362,10 @@ class SmartTurnInferenceOwner:
             outcome = "complete" if math.isfinite(score) else "nonfinite"
             if outcome == "nonfinite":
                 diagnostics = self._record_failure(
-                    ValueError(), operation="smart_turn_predict",
-                    identity=identity, code="capture.peer.smart_turn_nonfinite",
+                    ValueError(),
+                    operation="smart_turn_predict",
+                    identity=identity,
+                    code="capture.peer.smart_turn_nonfinite",
                 )
         except asyncio.CancelledError:
             self._active_request = None
@@ -388,36 +390,49 @@ class SmartTurnInferenceOwner:
             await completion(result)
         except Exception as exc:
             self._record_failure(
-                exc, operation="smart_turn_completion", identity=identity,
+                exc,
+                operation="smart_turn_completion",
+                identity=identity,
                 secondary=diagnostics is not None,
             )
         finally:
             self._execution_task = None
 
     def _record_failure(
-        self, exception: BaseException, *, operation: str,
+        self,
+        exception: BaseException,
+        *,
+        operation: str,
         identity: SmartTurnRequestIdentity | None = None,
         code: str = "capture.peer.smart_turn_failed",
         secondary: bool = False,
     ) -> ErrorDiagnostics:
         diagnostics = exception_diagnostics(
-            exception, component="capture.peer", operation=operation, code=code,
+            exception,
+            component="capture.peer",
+            operation=operation,
+            code=code,
         )
         if identity is not None:
             diagnostics = replace(
-                diagnostics, generation=identity.activation_generation,
-                turn_id=str(identity.segment_id), channel="peer",
+                diagnostics,
+                generation=identity.activation_generation,
+                turn_id=str(identity.segment_id),
+                channel="peer",
             )
         self._last_error = diagnostics.fields.get("exception_class", "unclassified")
         if secondary and self._last_failure is not None:
             previous = self._last_failure
             self._last_failure = replace(
-                previous, causes=(*previous.causes[-15:], diagnostics),
+                previous,
+                causes=(*previous.causes[-15:], diagnostics),
                 causes_truncated=previous.causes_truncated or len(previous.causes) >= 16,
             )
         else:
             self._last_failure = diagnostics
-        emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage=operation)
+        emit_failure(
+            logger, diagnostics, severity="warning", disposition="degraded", stage=operation
+        )
         return diagnostics
 
     def _observe_task_result(self, task: asyncio.Task[None]) -> None:

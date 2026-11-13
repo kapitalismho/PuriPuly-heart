@@ -82,7 +82,9 @@ class ChatboxPaginator:
             except Exception as exc:
                 self.delivery_observer_failure = replace(
                     exception_diagnostics(
-                        exc, component="output_runtime", operation="observe",
+                        exc,
+                        component="output_runtime",
+                        operation="observe",
                         code="output_observer_failed",
                         fields={"publication_id": str(message.utterance_id)},
                     ),
@@ -90,8 +92,11 @@ class ChatboxPaginator:
                     visibility="diagnostic_only",
                 )
                 emit_failure(
-                    logger, self.delivery_observer_failure,
-                    severity="warning", disposition="degraded", stage="routing_observer",
+                    logger,
+                    self.delivery_observer_failure,
+                    severity="warning",
+                    disposition="degraded",
+                    stage="routing_observer",
                 )
         if status not in {"first_page_sent", "output_send_failed"}:
             self._stream_final_revisions.pop(
@@ -522,7 +527,11 @@ class ChatboxPaginator:
             diagnostics = self._local_send_diagnostics(exc, message=self._active_message)
             self.last_failure_diagnostics = diagnostics
             emit_failure(
-                logger, diagnostics, severity="warning", disposition="degraded", stage="chatbox_page"
+                logger,
+                diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="chatbox_page",
             )
             if self._active_message is not None:
                 self._notify_delivery(self._active_message, "output_send_failed", diagnostics)
@@ -612,8 +621,12 @@ class ChatboxPaginator:
         if active is not None:
             fields["publication_id"] = str(active.utterance_id)
         diagnostics = exception_diagnostics(
-            exception, component="osc_control", operation=operation,
-            code="osc_local_send_failed", category="network", fields=fields,
+            exception,
+            component="osc_control",
+            operation=operation,
+            code="osc_local_send_failed",
+            category="network",
+            fields=fields,
         )
         return replace(
             diagnostics,

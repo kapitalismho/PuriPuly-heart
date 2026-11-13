@@ -15,8 +15,8 @@ from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationState,
     OverlayPeerPresentationState,
 )
-from puripuly_heart.core.runtime.output import UIEventBridgePort
 from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.runtime.output import UIEventBridgePort
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,7 +30,9 @@ class SettingsRenderResult:
         excess = max(0, len(self.secondary_diagnostics) - 4)
         if excess:
             object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
-            object.__setattr__(self, "secondary_omitted_count", self.secondary_omitted_count + excess)
+            object.__setattr__(
+                self, "secondary_omitted_count", self.secondary_omitted_count + excess
+            )
 
 
 class UiPresentationPort(Protocol):

@@ -1008,6 +1008,7 @@ async def test_cleanup_evidence_preserves_primary_or_success_without_reclassifyi
     original_close = provisioning.LocalSTTProvisioningLease.close
     original_rmtree = provisioning.shutil.rmtree
     if boundary == "lease":
+
         def close(lease):
             original_close(lease)
             raise PermissionError(13, private)
@@ -1029,12 +1030,11 @@ async def test_cleanup_evidence_preserves_primary_or_success_without_reclassifyi
         assert diagnostics.causes[1].fields["exception_class"] == "PermissionError"
         assert diagnostics.causes[1].fields["errno"] == 13
         assert (install_dir / "previous").read_bytes() == b"preserved"
-        lease = provisioning.LocalSTTProvisioningLease.acquire(
-            model_root=tmp_path, wait=False
-        )
+        lease = provisioning.LocalSTTProvisioningLease.acquire(model_root=tmp_path, wait=False)
         assert lease is not None
         original_close(lease)
     else:
+
         def remove(path, *args, **kwargs):
             if ".backup-" in path.name:
                 raise PermissionError(13, private)

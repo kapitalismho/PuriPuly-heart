@@ -47,7 +47,9 @@ class AudioSettings:
             category="lifecycle",
         )
         self._failures[operation] = diagnostics
-        emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage=operation)
+        emit_failure(
+            logger, diagnostics, severity="warning", disposition="degraded", stage=operation
+        )
 
     @property
     def host_api(self) -> str:

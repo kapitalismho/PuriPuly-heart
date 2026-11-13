@@ -5,6 +5,7 @@ import contextlib
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any
+
 from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
 
@@ -54,7 +55,9 @@ class OverlayTransportExecutor:
                 send_task=send_task,
                 cause="write_timeout",
                 diagnostics=exception_diagnostics(
-                    exc, component="overlay_bridge", operation="transport_write",
+                    exc,
+                    component="overlay_bridge",
+                    operation="transport_write",
                     code="destination_write_timeout",
                 ),
             )
@@ -64,7 +67,9 @@ class OverlayTransportExecutor:
                 send_task=send_task,
                 cause=type(exc).__name__,
                 diagnostics=exception_diagnostics(
-                    exc, component="overlay_bridge", operation="transport_write",
+                    exc,
+                    component="overlay_bridge",
+                    operation="transport_write",
                     code="destination_write_failed",
                 ),
             )

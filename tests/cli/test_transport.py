@@ -476,7 +476,9 @@ async def test_unexpected_query_failure_reaches_client_with_safe_cause_and_ident
         async def query(self, _name, _arguments):
             raise PermissionError(13, "private query content")
 
-    server = ControlServer(FailedControl(), instance_id="correct-instance", token="local-secret-token")
+    server = ControlServer(
+        FailedControl(), instance_id="correct-instance", token="local-secret-token"
+    )
     port = await server.start()
     try:
         with pytest.raises(ControlTransportError) as caught:

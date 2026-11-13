@@ -15,8 +15,6 @@ from pathlib import Path
 from typing import Protocol, TypeVar
 
 from puripuly_heart.core.diagnostics import sanitize_diagnostics
-from puripuly_heart.core.messages import ErrorDiagnostics
-from puripuly_heart.core.model_asset_diagnostics import model_asset_failure_diagnostics
 from puripuly_heart.core.local_translation.assets import (
     GEMMA_26B_MODEL_ID,
     GemmaModelSpec,
@@ -35,6 +33,8 @@ from puripuly_heart.core.local_translation.runtime_profile import (
     build_gemma_server_command,
     default_gemma_runtime_paths,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.model_asset_diagnostics import model_asset_failure_diagnostics
 from puripuly_heart.core.translation_backend import require_translation_preparation_allowed
 
 GEMMA_PROMPT_TEMPLATE_VERSION = "translation-prefix-v1"
@@ -345,11 +345,12 @@ class ManagedGemmaRuntimeOwner:
             operation, code = "runtime_files", "model_assets.runtime_missing"
         else:
             code = "model_assets.runtime_failed"
-        diagnostics = model_asset_failure_diagnostics(
-            failure, operation=operation, code=code
-        )
+        diagnostics = model_asset_failure_diagnostics(failure, operation=operation, code=code)
         failure.failure_diagnostics = diagnostics
-        if not self._diagnostics or self._diagnostics[-1].diagnostic_id != diagnostics.diagnostic_id:
+        if (
+            not self._diagnostics
+            or self._diagnostics[-1].diagnostic_id != diagnostics.diagnostic_id
+        ):
             self._diagnostics_truncated |= len(self._diagnostics) == self._diagnostics.maxlen
             self._diagnostics.append(diagnostics)
         return diagnostics
@@ -650,10 +651,7 @@ class ManagedGemmaRuntimeOwner:
                         await self._stop_after_failure(exc)
                         if isinstance(exc, ManagedGemmaRuntimeVersionError):
                             raise
-                        if (
-                            backend != "gpu"
-                            or resolved_spec.model_id == GEMMA_26B_MODEL_ID
-                        ):
+                        if backend != "gpu" or resolved_spec.model_id == GEMMA_26B_MODEL_ID:
                             raise ManagedGemmaRuntimeError(
                                 f"managed Gemma {backend} startup failed; "
                                 "check the runtime and GPU resources or explicitly select E4B CPU"
@@ -1066,9 +1064,7 @@ class ManagedGemmaRuntimeOwner:
                 timeout=self._shutdown_timeout_s,
             )
             if done:
-                self._retain_settled_results(
-                    await asyncio.gather(*done, return_exceptions=True)
-                )
+                self._retain_settled_results(await asyncio.gather(*done, return_exceptions=True))
             if pending:
                 await self._stop_locked()
                 for work in tuple(self._server_tasks):
@@ -1202,9 +1198,7 @@ class ManagedGemmaRuntimeOwner:
                     result.close()
                 raise TypeError("managed Gemma log sink must be synchronous")
         except Exception as failure:
-            self._retain_secondary(
-                self._record_failure(failure, operation="diagnostic_delivery")
-            )
+            self._retain_secondary(self._record_failure(failure, operation="diagnostic_delivery"))
 
 
 __all__ = [

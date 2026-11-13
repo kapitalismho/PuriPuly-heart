@@ -107,7 +107,9 @@ class _ChannelSession:
             self.retain_secondary(diagnostics)
 
     def retain_secondary(self, diagnostics: ErrorDiagnostics) -> None:
-        if any(item.diagnostic_id == diagnostics.diagnostic_id for item in self.secondary_diagnostics):
+        if any(
+            item.diagnostic_id == diagnostics.diagnostic_id for item in self.secondary_diagnostics
+        ):
             return
         if len(self.secondary_diagnostics) < 4:
             self.secondary_diagnostics += (diagnostics,)
@@ -322,9 +324,13 @@ class AudioTestSessionOwner:
                         plan = self.plan_factory(channel)
                     except Exception as exc:
                         self._fail_session(
-                            session, "unavailable", type(exc).__name__,
+                            session,
+                            "unavailable",
+                            type(exc).__name__,
                             exception_diagnostics(
-                                exc, component="audio_test", operation="audio.test",
+                                exc,
+                                component="audio_test",
+                                operation="audio.test",
                                 code="source_open_failed",
                             ),
                         )
@@ -422,7 +428,9 @@ class AudioTestSessionOwner:
                         except Exception as exc:
                             item.failure_code = "session_start_failed"
                             item.diagnostics = exception_diagnostics(
-                                exc, component="audio_test", operation="audio.test",
+                                exc,
+                                component="audio_test",
+                                operation="audio.test",
                                 code="session_start_failed",
                             )
                             self._emit("diagnose_start_failed", {"channel": "self"}, exc)
@@ -711,7 +719,10 @@ class AudioTestSessionOwner:
                 probe = await run_owned_thread_call(lambda: plan.probe_factory(settings))
             except Exception as exc:
                 self.mark_failure(
-                    channel, generation, "vad_unavailable", type(exc).__name__,
+                    channel,
+                    generation,
+                    "vad_unavailable",
+                    type(exc).__name__,
                     exception_diagnostics(
                         exc, component="audio_test", operation="audio.test", code="vad_unavailable"
                     ),
@@ -748,7 +759,10 @@ class AudioTestSessionOwner:
             raise
         except Exception as exc:
             self.mark_failure(
-                channel, generation, "capture_failed", type(exc).__name__,
+                channel,
+                generation,
+                "capture_failed",
+                type(exc).__name__,
                 exception_diagnostics(
                     exc, component="audio_test", operation="audio.test", code="capture_failed"
                 ),
@@ -786,9 +800,13 @@ class AudioTestSessionOwner:
                 except Exception as exc:
                     failures.append(exc)
                     self._fail_session(
-                        session, "resource_release_incomplete", type(exc).__name__,
+                        session,
+                        "resource_release_incomplete",
+                        type(exc).__name__,
                         exception_diagnostics(
-                            exc, component="audio_test", operation="audio.test",
+                            exc,
+                            component="audio_test",
+                            operation="audio.test",
                             code="resource_release_incomplete",
                         ),
                     )
@@ -817,7 +835,8 @@ class AudioTestSessionOwner:
                     type(initial.close_exception).__name__,
                     exception_diagnostics(
                         initial.close_exception,
-                        component="audio_test", operation="audio.test",
+                        component="audio_test",
+                        operation="audio.test",
                         code="resource_release_incomplete",
                     ),
                 )
@@ -839,9 +858,13 @@ class AudioTestSessionOwner:
                     f"cause={type(exc).__name__}"
                 )
                 self._fail_session(
-                    self._session(channel), "capture_pause_failed", type(exc).__name__,
+                    self._session(channel),
+                    "capture_pause_failed",
+                    type(exc).__name__,
                     exception_diagnostics(
-                        exc, component="audio_test", operation="audio.test",
+                        exc,
+                        component="audio_test",
+                        operation="audio.test",
                         code="capture_pause_failed",
                     ),
                 )

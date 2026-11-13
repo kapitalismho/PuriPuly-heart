@@ -44,10 +44,15 @@ def _session_diagnostics(
     category = (
         "network"
         if code in {"refresh_network_error", "chatgpt_refresh_network_error"}
-        else "auth" if isinstance(exception, ChatGptAuthError)
-        else "lifecycle" if isinstance(exception, (TimeoutError, httpx.HTTPError))
-        else "transaction" if isinstance(exception, OSError)
-        else "unknown"
+        else (
+            "auth"
+            if isinstance(exception, ChatGptAuthError)
+            else (
+                "lifecycle"
+                if isinstance(exception, (TimeoutError, httpx.HTTPError))
+                else "transaction" if isinstance(exception, OSError) else "unknown"
+            )
+        )
     )
     if exception is not None:
         diagnostic = exception_diagnostics(

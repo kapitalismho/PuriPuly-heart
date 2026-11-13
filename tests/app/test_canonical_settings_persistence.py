@@ -1059,7 +1059,9 @@ def test_failed_backup_write_retains_cleanup_failure(tmp_path, monkeypatch):
         compat.create_pre_migration_backup(
             tmp_path / "settings.json", b"synthetic-private-settings", previous_schema_version="0"
         )
-    error = compat.safe_persistence_error(compat.SettingsPersistenceStatus.BACKUP_FAILED, raised.value)
+    error = compat.safe_persistence_error(
+        compat.SettingsPersistenceStatus.BACKUP_FAILED, raised.value
+    )
     assert error.diagnostics.fields["errno"] == 13
     assert error.secondary_diagnostics[0].fields["errno"] == 5
     assert error.secondary_diagnostics[0].cause_id == error.diagnostics.diagnostic_id

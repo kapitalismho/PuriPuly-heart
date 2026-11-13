@@ -21,14 +21,15 @@ from puripuly_heart.core.llm.provider import (
     LLMRequestAdmissionPort,
     LLMRequestExecution,
 )
-from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 if TYPE_CHECKING:
     from puripuly_heart.domain.models import Translation
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True, slots=True)
 class LLMProviderAttempt:
@@ -535,7 +536,11 @@ class FallbackRacingLLMProvider(LLMProvider):
     def _record_recovered(outcome: _BranchOutcome) -> None:
         if outcome.failure is not None and not outcome.recorded:
             emit_failure(
-                logger, outcome.failure, severity="warning", disposition="recovered", stage="translate"
+                logger,
+                outcome.failure,
+                severity="warning",
+                disposition="recovered",
+                stage="translate",
             )
             outcome.recorded = True
 

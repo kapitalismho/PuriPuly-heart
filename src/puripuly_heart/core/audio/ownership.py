@@ -294,19 +294,22 @@ class PeerAudioSegmentLedger:
     def retain_delivery_failure(self, diagnostics: ErrorDiagnostics) -> bool:
         try:
             segment_id = UUID(diagnostics.turn_id)
-        except (TypeError, ValueError, AttributeError):
+        except TypeError, ValueError, AttributeError:
             return False
         segment = self._segments.get(segment_id)
         receipt = (
             segment.terminal if segment is not None else self._retired_receipts.get(segment_id)
         )
-        identity = segment.identity if segment is not None else (
-            receipt.identity if receipt is not None else None
+        identity = (
+            segment.identity
+            if segment is not None
+            else (receipt.identity if receipt is not None else None)
         )
         if identity is None or diagnostics.generation != identity.activation_generation:
             return False
         previous = (
-            segment.delivery_failure_diagnostics if segment is not None
+            segment.delivery_failure_diagnostics
+            if segment is not None
             else receipt.segment.delivery_failure_diagnostics
         )
         if previous is not None:
@@ -315,7 +318,8 @@ class PeerAudioSegmentLedger:
             ):
                 return True
             diagnostics = replace(
-                previous, causes=(*previous.causes[-15:], diagnostics),
+                previous,
+                causes=(*previous.causes[-15:], diagnostics),
                 causes_truncated=previous.causes_truncated or len(previous.causes) >= 16,
             )
         if segment is not None:

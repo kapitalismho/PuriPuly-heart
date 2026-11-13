@@ -160,7 +160,9 @@ class FletFoundationRuntime:
 
     def _on_task_done(self, task: object, operation: str) -> None:
         tasks = (
-            self._application_shutdown_tasks if operation == "shutdown_task" else self._tracked_tasks
+            self._application_shutdown_tasks
+            if operation == "shutdown_task"
+            else self._tracked_tasks
         )
         if task not in tasks:
             return

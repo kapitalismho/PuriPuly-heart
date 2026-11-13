@@ -66,8 +66,8 @@ from puripuly_heart.core.diagnostics import (
     serialize_diagnostics,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope
-from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 
 @dataclass(frozen=True, slots=True)
@@ -319,9 +319,7 @@ class AgentChatOwner:
             file_evidence="unavailable",
         )
 
-    def _failure(
-        self, exception: Exception, *, code: str, operation: str
-    ) -> ErrorDiagnostics:
+    def _failure(self, exception: Exception, *, code: str, operation: str) -> ErrorDiagnostics:
         return exception_diagnostics(
             exception,
             component="application_control",
@@ -1370,10 +1368,18 @@ class AgentChatOwner:
                             function_calls, reads, contexts, strict=True
                         ):
                             if isinstance(context, BaseException):
+                                failure = {"status": "unavailable", "code": "tool_unavailable"}
+                                if isinstance(context, Exception):
+                                    failure["diagnostics"] = self._failure_evidence(
+                                        context,
+                                        code="agent_tool_failed",
+                                        operation="agent_tool",
+                                        stage="tool_dispatch",
+                                    )
                                 self._record_result(
                                     call,
                                     arguments["topic"],
-                                    {"status": "unavailable", "code": "tool_unavailable"},
+                                    failure,
                                 )
                             else:
                                 self._record_context_result(

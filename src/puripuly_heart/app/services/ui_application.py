@@ -1327,8 +1327,10 @@ class UiApplicationBoundary:
         diagnostics = metadata.get("diagnostics") if isinstance(metadata, dict) else None
         if isinstance(diagnostics, ErrorDiagnostics):
             emit_failure(
-                logging.getLogger(__name__), diagnostics,
-                severity="warning", disposition="degraded",
+                logging.getLogger(__name__),
+                diagnostics,
+                severity="warning",
+                disposition="degraded",
             )
         else:
             self.log_diagnostic(

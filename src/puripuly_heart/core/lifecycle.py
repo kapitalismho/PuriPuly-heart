@@ -79,7 +79,9 @@ class LifecycleDiagnosticsUnavailableError(RuntimeError):
             status_code=None,
             retry_after_ms=None,
             fields={},
-            causes=tuple(event.diagnostics for event in diagnostics if event.diagnostics is not None),
+            causes=tuple(
+                event.diagnostics for event in diagnostics if event.diagnostics is not None
+            ),
         )
         super().__init__(
             "Lifecycle diagnostics unavailable "

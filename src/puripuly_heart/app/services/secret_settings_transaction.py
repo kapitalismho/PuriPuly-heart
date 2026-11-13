@@ -21,7 +21,11 @@ from puripuly_heart.app.services.operational_state_payloads import (
     ProviderVerificationEvidence,
     provider_verification_state_values,
 )
-from puripuly_heart.core.diagnostics import exception_diagnostics, safe_exception_fields, sanitize_diagnostics
+from puripuly_heart.core.diagnostics import (
+    exception_diagnostics,
+    safe_exception_fields,
+    sanitize_diagnostics,
+)
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_TRANSACTION,
@@ -282,8 +286,12 @@ class SecretSettingsTransaction:
                     message=None,
                     exception=exc,
                 ),
-                secondary_diagnostics=getattr(self.settings_repository, "secondary_diagnostics", ()),
-                secondary_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
+                secondary_diagnostics=getattr(
+                    self.settings_repository, "secondary_diagnostics", ()
+                ),
+                secondary_omitted_count=getattr(
+                    self.settings_repository, "secondary_omitted_count", 0
+                ),
             )
 
         if not commit_result.succeeded or commit_result.snapshot is None:
@@ -299,8 +307,12 @@ class SecretSettingsTransaction:
                     provider=request.provider,
                     secret_key=request.secret_key,
                 ),
-                secondary_diagnostics=getattr(self.settings_repository, "secondary_diagnostics", ()),
-                secondary_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
+                secondary_diagnostics=getattr(
+                    self.settings_repository, "secondary_diagnostics", ()
+                ),
+                secondary_omitted_count=getattr(
+                    self.settings_repository, "secondary_omitted_count", 0
+                ),
             )
 
         if verification_result.status == PROVIDER_VERIFICATION_STATUS_VERIFIED:
@@ -308,8 +320,12 @@ class SecretSettingsTransaction:
                 status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
                 message=verification_result.message or commit_result.message,
                 diagnostics=commit_result.diagnostics,
-                secondary_diagnostics=getattr(self.settings_repository, "secondary_diagnostics", ()),
-                secondary_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
+                secondary_diagnostics=getattr(
+                    self.settings_repository, "secondary_diagnostics", ()
+                ),
+                secondary_omitted_count=getattr(
+                    self.settings_repository, "secondary_omitted_count", 0
+                ),
             )
 
         return TransactionResult(
@@ -576,25 +592,27 @@ def _provider_verification_failed_result(
         diagnostics=(
             sanitize_diagnostics(diagnostics)
             if diagnostics is not None
-            else exception_diagnostics(
-                exception,
-                component="secret_settings_transaction",
-                operation="verify_provider_secret",
-                code=code,
-                category=DIAGNOSTIC_CATEGORY_TRANSACTION,
-                fields=fields,
-            )
-            if exception is not None
-            else ErrorDiagnostics(
-                component="secret_settings_transaction",
-                operation="verify_provider_secret",
-                code=code,
-                category=DIAGNOSTIC_CATEGORY_TRANSACTION,
-                visibility=DIAGNOSTIC_VISIBILITY_BASIC,
-                content_policy=CONTENT_POLICY_METADATA_ONLY,
-                status_code=None,
-                retry_after_ms=None,
-                fields=fields,
+            else (
+                exception_diagnostics(
+                    exception,
+                    component="secret_settings_transaction",
+                    operation="verify_provider_secret",
+                    code=code,
+                    category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+                    fields=fields,
+                )
+                if exception is not None
+                else ErrorDiagnostics(
+                    component="secret_settings_transaction",
+                    operation="verify_provider_secret",
+                    code=code,
+                    category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+                    visibility=DIAGNOSTIC_VISIBILITY_BASIC,
+                    content_policy=CONTENT_POLICY_METADATA_ONLY,
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields=fields,
+                )
             )
         ),
     )

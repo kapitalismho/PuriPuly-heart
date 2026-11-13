@@ -4,7 +4,11 @@ import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 
-from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics, safe_exception_fields
+from puripuly_heart.core.diagnostics import (
+    emit_failure,
+    exception_diagnostics,
+    safe_exception_fields,
+)
 from puripuly_heart.core.messages import DiagnosticFieldValue, ErrorDiagnostics
 from puripuly_heart.core.output.chatbox import (
     SelfChatboxOutputPort,
@@ -226,7 +230,8 @@ class OutputRouter:
                     "publication_id": publication_id,
                     "publication_kind": publication_kind,
                 },
-                channel=diagnostics.channel or (
+                channel=diagnostics.channel
+                or (
                     metadata.get("channel") if metadata.get("channel") in {"self", "peer"} else None
                 ),
             )

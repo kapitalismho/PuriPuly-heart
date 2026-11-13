@@ -775,7 +775,9 @@ async def test_invalid_ca_prevents_worker_launch(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("recovered", [False, True])
-async def test_worker_evidence_is_validated_and_transfer_attempts_survive(tmp_path, monkeypatch, recovered):
+async def test_worker_evidence_is_validated_and_transfer_attempts_survive(
+    tmp_path, monkeypatch, recovered
+):
     from puripuly_heart.core.diagnostics import serialize_diagnostics
 
     monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
@@ -804,7 +806,13 @@ else:
 """
     adapter = HuggingFaceXetDownloadAdapter(
         worker_command_factory=lambda request, request_path, event_path: [
-            sys.executable, "-c", script, str(request_path), str(event_path), str(recovered), private
+            sys.executable,
+            "-c",
+            script,
+            str(request_path),
+            str(event_path),
+            str(recovered),
+            private,
         ]
     )
     recoveries = []

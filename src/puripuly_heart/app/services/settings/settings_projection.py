@@ -28,7 +28,6 @@ from .settings_mutation_legacy import (
 )
 
 
-
 @dataclass(frozen=True, slots=True)
 class SettingsViewSettingsChange:
     values_by_path: Mapping[str, object]
@@ -146,7 +145,10 @@ class SettingsProjectionOwner:
                 SettingsRenderResult(
                     False,
                     exception_diagnostics(
-                        exc, component="settings_projection", operation="render_settings", code="settings_render_failed"
+                        exc,
+                        component="settings_projection",
+                        operation="render_settings",
+                        code="settings_render_failed",
                     ),
                 )
             )

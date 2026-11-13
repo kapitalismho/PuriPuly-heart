@@ -348,6 +348,7 @@ async def test_ready_release_cleanup_evidence_survives_successful_translation_on
         )
 
     delegate_results = []
+
     async def translated(**kwargs):
         translation = Translation(
             utterance_id=kwargs["utterance_id"], text="translated", recovered_failures=(recovered,)
@@ -360,7 +361,11 @@ async def test_ready_release_cleanup_evidence_survives_successful_translation_on
         delegate_factory=lambda _key: SimpleNamespace(translate=translated),
     )
     result = await provider.translate(
-        utterance_id=uuid4(), text="input", system_prompt="", source_language="en", target_language="ko"
+        utterance_id=uuid4(),
+        text="input",
+        system_prompt="",
+        source_language="en",
+        target_language="ko",
     )
     assert result.text == "translated"
     assert result.recovered_failures == delegate_results[0].recovered_failures
@@ -368,7 +373,11 @@ async def test_ready_release_cleanup_evidence_survives_successful_translation_on
     assert result.secondary_diagnostics_truncated is True
     assert "synthetic-private" not in str(result.secondary_diagnostics)
     following = await provider.translate(
-        utterance_id=uuid4(), text="input", system_prompt="", source_language="en", target_language="ko"
+        utterance_id=uuid4(),
+        text="input",
+        system_prompt="",
+        source_language="en",
+        target_language="ko",
     )
     assert following.secondary_diagnostics == ()
 
@@ -376,7 +385,9 @@ async def test_ready_release_cleanup_evidence_survives_successful_translation_on
 @pytest.mark.asyncio
 @pytest.mark.parametrize("cancelled", [False, True])
 @pytest.mark.parametrize("readiness", [False, True])
-async def test_ready_release_evidence_transfers_to_first_terminal_exception_without_replay(cancelled, readiness):
+async def test_ready_release_evidence_transfers_to_first_terminal_exception_without_replay(
+    cancelled, readiness
+):
     import asyncio
     from types import SimpleNamespace
     from uuid import uuid4
@@ -433,7 +444,11 @@ async def test_ready_release_evidence_transfers_to_first_terminal_exception_with
         on_delegate_ready=notify_ready if readiness else None,
     )
     kwargs = dict(
-        utterance_id=uuid4(), text="input", system_prompt="", source_language="en", target_language="ko"
+        utterance_id=uuid4(),
+        text="input",
+        system_prompt="",
+        source_language="en",
+        target_language="ko",
     )
     work = asyncio.create_task(provider.translate(**kwargs))
     await entered.wait()

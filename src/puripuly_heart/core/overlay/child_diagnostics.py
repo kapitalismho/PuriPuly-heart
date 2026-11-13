@@ -3,6 +3,7 @@ from __future__ import annotations
 import builtins
 import math
 from collections.abc import Mapping
+
 from puripuly_heart.core.diagnostics import (
     deserialize_diagnostics,
     sanitize_diagnostic_fields,
@@ -358,9 +359,9 @@ def project_child_failure(message: Mapping[str, object]) -> dict[str, object]:
 def _project_native_failure(value: object, *, secondary: bool = False) -> tuple[dict, int]:
     if not isinstance(value, Mapping):
         return {}, 1
-    fields, rejected = sanitize_diagnostic_fields({
-        key: value[key] for key in ("native_stage", "native_code") if key in value
-    })
+    fields, rejected = sanitize_diagnostic_fields(
+        {key: value[key] for key in ("native_stage", "native_code") if key in value}
+    )
     rejected += len(set(value) - {"native_stage", "native_code", "secondary"})
     child = value.get("secondary")
     if child is not None:

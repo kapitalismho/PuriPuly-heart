@@ -51,7 +51,9 @@ def test_unencodable_tail_page_is_dropped_and_pagination_continues() -> None:
         paginator = ChatboxPaginator(sender=sender, clock=clock)
         statuses: list[tuple[str, str]] = []
         paginator.bind_delivery_observer(
-            lambda message, status, diagnostics: statuses.append((str(message.utterance_id), status))
+            lambda message, status, diagnostics: statuses.append(
+                (str(message.utterance_id), status)
+            )
         )
 
         bad_id = uuid4()

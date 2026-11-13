@@ -26,8 +26,8 @@ from puripuly_heart.core.diagnostics import (
     current_diagnostic_operation,
     emit_failure,
     exception_diagnostics,
-    serialize_diagnostics,
     safe_exception_fields,
+    serialize_diagnostics,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.messages import ErrorDiagnostics
@@ -252,25 +252,32 @@ class OscControlIntegrationOwner:
             "query_failure": self._query_failure,
             "query_diagnostics": (
                 serialize_diagnostics(self._query_diagnostics)
-                if self._query_diagnostics is not None else None
+                if self._query_diagnostics is not None
+                else None
             ),
             "discovery_observation": getattr(query.service, "discovery_observation", "unknown"),
             "avatar_observation": getattr(query.service, "avatar_observation", "unknown"),
             "discovery_diagnostics": (
                 serialize_diagnostics(failure)
-                if isinstance(failure := getattr(query.service, "discovery_failure", None), ErrorDiagnostics)
+                if isinstance(
+                    failure := getattr(query.service, "discovery_failure", None), ErrorDiagnostics
+                )
                 else None
             ),
             "avatar_diagnostics": (
                 serialize_diagnostics(failure)
-                if isinstance(failure := getattr(query.service, "avatar_failure", None), ErrorDiagnostics)
+                if isinstance(
+                    failure := getattr(query.service, "avatar_failure", None), ErrorDiagnostics
+                )
                 else None
             ),
             "runtime_failures": [serialize_diagnostics(failure) for failure in query.failures],
             "service_failures": [
                 serialize_diagnostics(failure) for failure in getattr(query.service, "failures", ())
             ],
-            "dispatch_failures": [serialize_diagnostics(failure) for failure in self.router.failures],
+            "dispatch_failures": [
+                serialize_diagnostics(failure) for failure in self.router.failures
+            ],
             "destination_source": (
                 "off"
                 if self._mode == "off" or self._closed
@@ -466,7 +473,12 @@ class OscControlIntegrationOwner:
                             if reason is None:
                                 self._query_failure = None
                                 self._query_diagnostics = None
-                                if getattr(self.query_runtime.service, "discovery_observation", None) == "unavailable":
+                                if (
+                                    getattr(
+                                        self.query_runtime.service, "discovery_observation", None
+                                    )
+                                    == "unavailable"
+                                ):
                                     reason = "oscquery_unavailable"
                                     self._query_diagnostics = getattr(
                                         self.query_runtime.service, "discovery_failure", None
@@ -673,8 +685,12 @@ class OscControlIntegrationOwner:
 
     def _discovery_failure(self, exc: Exception, operation: str) -> ErrorDiagnostics:
         diagnostics = exception_diagnostics(
-            exc, component="osc_control", operation=operation, code="oscquery_unavailable",
-            category="network", fields={"remote_delivery": "unacknowledged"},
+            exc,
+            component="osc_control",
+            operation=operation,
+            code="oscquery_unavailable",
+            category="network",
+            fields={"remote_delivery": "unacknowledged"},
         )
         emit_failure(logger, diagnostics, severity="warning", disposition="degraded")
         return diagnostics

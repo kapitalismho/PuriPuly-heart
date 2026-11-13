@@ -477,9 +477,7 @@ def _reject_nonstandard_json_constant(value: str) -> object:
 def _failed_load(
     error: SettingsPersistenceError, *, backup_path: Path | None = None
 ) -> VNextSettingsLoadResult:
-    result = VNextSettingsLoadResult(
-        status=error.stage, backup_path=backup_path, error=error
-    )
+    result = VNextSettingsLoadResult(status=error.stage, backup_path=backup_path, error=error)
     if error.diagnostics is not None:
         emit_failure(logger, error.diagnostics, severity="warning")
     for secondary in error.secondary_diagnostics:

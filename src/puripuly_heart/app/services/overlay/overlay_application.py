@@ -340,7 +340,8 @@ class OverlayApplicationOwner:
             "failure_reason": snapshot.failure_reason,
             "failure_diagnostics": (
                 serialize_diagnostics(self._failure_diagnostics)
-                if self._failure_diagnostics is not None else None
+                if self._failure_diagnostics is not None
+                else None
             ),
             "auto_restart_scheduled": snapshot.auto_restart_scheduled,
             "fallback_active": snapshot.fallback_active,
@@ -1761,19 +1762,24 @@ class OverlayApplicationOwner:
             primary is None
             and current is not None
             and self._failure_diagnostics is not None
-            and self._failure_diagnostics.fields.get("overlay_instance_id") == current.overlay_instance_id
+            and self._failure_diagnostics.fields.get("overlay_instance_id")
+            == current.overlay_instance_id
         ):
             primary = self._failure_diagnostics
         diagnostics = exception_diagnostics(
-            exception, component="overlay_application", operation=operation,
+            exception,
+            component="overlay_application",
+            operation=operation,
             code="worker_startup_failed",
             fields={"overlay_instance_id": current.overlay_instance_id} if current else None,
         )
         if isinstance(primary, ErrorDiagnostics):
             diagnostics = replace(
-                diagnostics, causes=(primary, *diagnostics.causes),
+                diagnostics,
+                causes=(primary, *diagnostics.causes),
                 cause_id=primary.diagnostic_id,
-                operation_id=primary.operation_id, request_id=primary.request_id,
+                operation_id=primary.operation_id,
+                request_id=primary.request_id,
             )
         diagnostics = sanitize_diagnostics(diagnostics)
         self._failure_diagnostics = diagnostics

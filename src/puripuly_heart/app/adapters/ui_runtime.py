@@ -295,8 +295,12 @@ class UiManagedRuntimeAdapter:
                 "freshness": "unknown",
             },
             "diagnostics": observation.diagnostics if observation is not None else None,
-            "secondary_diagnostics": observation.secondary_diagnostics if observation is not None else (),
-            "secondary_omitted_count": observation.secondary_omitted_count if observation is not None else 0,
+            "secondary_diagnostics": (
+                observation.secondary_diagnostics if observation is not None else ()
+            ),
+            "secondary_omitted_count": (
+                observation.secondary_omitted_count if observation is not None else 0
+            ),
         }
 
     async def start_qq_managed_auth_from_dialog(self, **kwargs: object) -> object:
@@ -364,13 +368,13 @@ class UiSettingsRuntimeAdapter:
             return False
         provider, general, prompt, overlay = settings_view_surface_snapshots(settings)
         return self.projection.render_surfaces(
-                provider=provider,
-                general=general,
-                prompt=prompt,
-                overlay=overlay,
-                compatibility_settings=settings,
-                preserve_custom_vocab_draft=preserve_custom_vocab_draft,
-            ).loaded
+            provider=provider,
+            general=general,
+            prompt=prompt,
+            overlay=overlay,
+            compatibility_settings=settings,
+            preserve_custom_vocab_draft=preserve_custom_vocab_draft,
+        ).loaded
 
     def refresh_settings_after_openrouter_pkce_success(self) -> bool:
         settings = self.settings.canonical
@@ -378,10 +382,10 @@ class UiSettingsRuntimeAdapter:
             return False
         provider, _general, prompt, _overlay = settings_view_surface_snapshots(settings)
         return self.projection.refresh_after_openrouter_pkce_success(
-                provider=provider,
-                prompt=prompt,
-                compatibility_settings=settings,
-            ).loaded
+            provider=provider,
+            prompt=prompt,
+            compatibility_settings=settings,
+        ).loaded
 
     def merge_settings_tab_apply_with_current_languages(
         self,

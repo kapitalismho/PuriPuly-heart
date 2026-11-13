@@ -29,11 +29,11 @@ from puripuly_heart.core.audio.format import pcm16le_bytes_to_float32
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.diagnostic_validation import stt_startup_failure_code
 from puripuly_heart.core.diagnostics import (
-    current_diagnostic_operation,
     DIAGNOSTIC_CAUSE_MAX_COUNT,
+    current_diagnostic_operation,
     emit_failure,
-    safe_exception_fields,
     exception_diagnostics,
+    safe_exception_fields,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.messages import ErrorDiagnostics
@@ -793,9 +793,9 @@ class SharedGpuASRRuntime:
             diagnostics = recognition_cleanup_failure(
                 exc, provider="local_qwen_gpu", channel=None, primary=cause
             )
-            self.cleanup_diagnostics = (
-                *self.cleanup_diagnostics, diagnostics
-            )[-DIAGNOSTIC_CAUSE_MAX_COUNT:]
+            self.cleanup_diagnostics = (*self.cleanup_diagnostics, diagnostics)[
+                -DIAGNOSTIC_CAUSE_MAX_COUNT:
+            ]
             await self._emit(
                 "worker_cleanup_failed",
                 {"failure": _failure_code(exc)},
@@ -1279,7 +1279,9 @@ class SharedGpuASRRuntime:
         except BaseException as cleanup_exception:
             if not previous_client.is_closed:
                 self._retain_client_cleanup(previous_client)
-            if not isinstance(getattr(cleanup_exception, "failure_diagnostics", None), ErrorDiagnostics):
+            if not isinstance(
+                getattr(cleanup_exception, "failure_diagnostics", None), ErrorDiagnostics
+            ):
                 recognition_cleanup_failure(
                     cleanup_exception,
                     provider="local_qwen_gpu",
@@ -1296,7 +1298,8 @@ class SharedGpuASRRuntime:
             return await self._finish_decode_recovery_failure(
                 generation,
                 config,
-                outcome.failure or GpuASRRuntimeError(outcome.failure_code or "worker_recovery_failed"),
+                outcome.failure
+                or GpuASRRuntimeError(outcome.failure_code or "worker_recovery_failed"),
                 failure_code=outcome.failure_code,
                 failure_diagnostics=outcome.failure_diagnostics,
             )
@@ -1676,11 +1679,18 @@ class SharedGpuASRRuntime:
             secondary = replace(
                 secondary,
                 cause_id=failure_diagnostics.diagnostic_id if failure_diagnostics else None,
-                causes=(*secondary.causes, *((failure_diagnostics,) if failure_diagnostics else ())),
+                causes=(
+                    *secondary.causes,
+                    *((failure_diagnostics,) if failure_diagnostics else ()),
+                ),
             )
             self._diagnostic_delivery_failure = self._diagnostic_delivery_failure or secondary
             emit_failure(
-                logger, secondary, severity="warning", disposition="degraded", stage="diagnostic_sink"
+                logger,
+                secondary,
+                severity="warning",
+                disposition="degraded",
+                stage="diagnostic_sink",
             )
 
 

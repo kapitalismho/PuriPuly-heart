@@ -9,10 +9,10 @@ from dataclasses import dataclass, replace
 from puripuly_heart.app.ports.ui_presentation import SettingsRenderResult
 from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.messages import (
-    ErrorDiagnostics,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED,
+    ErrorDiagnostics,
     TransactionResult,
 )
 
@@ -43,7 +43,8 @@ class _ResultScope:
                         cause,
                         cause_id=(
                             result.diagnostics.diagnostic_id
-                            if result.diagnostics is not None else cause.cause_id
+                            if result.diagnostics is not None
+                            else cause.cause_id
                         ),
                     )
                     for cause in self.secondary_diagnostics
@@ -91,14 +92,14 @@ class SettingsTransactionResultOwner:
                 if parent is not None:
                     combined = (*parent.secondary_diagnostics, *scope.secondary_diagnostics)
                     parent.secondary_diagnostics = combined[:4]
-                    parent.secondary_omitted_count += (
-                        scope.secondary_omitted_count + max(0, len(combined) - 4)
+                    parent.secondary_omitted_count += scope.secondary_omitted_count + max(
+                        0, len(combined) - 4
                     )
                 else:
                     combined = (*scope.secondary_diagnostics, *self._pending_diagnostics)
                     self._pending_diagnostics = combined[:4]
-                    self._pending_omitted_count += (
-                        scope.secondary_omitted_count + max(0, len(combined) - 4)
+                    self._pending_omitted_count += scope.secondary_omitted_count + max(
+                        0, len(combined) - 4
                     )
 
     def set(self, result: TransactionResult) -> None:
@@ -107,7 +108,8 @@ class SettingsTransactionResultOwner:
             result = replace(
                 result,
                 secondary_diagnostics=(*result.secondary_diagnostics, *self._pending_diagnostics),
-                secondary_omitted_count=result.secondary_omitted_count + self._pending_omitted_count,
+                secondary_omitted_count=result.secondary_omitted_count
+                + self._pending_omitted_count,
             )
             self._pending_diagnostics = ()
             self._pending_omitted_count = 0
@@ -181,7 +183,8 @@ class SettingsTransactionResultOwner:
                             diagnostics,
                             cause_id=(
                                 current.diagnostics.diagnostic_id
-                                if current.diagnostics is not None else diagnostics.cause_id
+                                if current.diagnostics is not None
+                                else diagnostics.cause_id
                             ),
                         ),
                     ),

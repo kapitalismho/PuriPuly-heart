@@ -141,7 +141,9 @@ class Transcript:
 
 def _freeze_diagnostic_value(value: object) -> object:
     if isinstance(value, Mapping):
-        return MappingProxyType({key: _freeze_diagnostic_value(item) for key, item in value.items()})
+        return MappingProxyType(
+            {key: _freeze_diagnostic_value(item) for key, item in value.items()}
+        )
     if isinstance(value, (tuple, list)):
         return tuple(_freeze_diagnostic_value(item) for item in value)
     return value

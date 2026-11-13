@@ -406,15 +406,20 @@ async def test_system_disclosure_port_failure_records_safe_skip_and_continues_ro
 @pytest.mark.asyncio
 async def test_router_preserves_accepted_composite_cause_when_recording_fails(monkeypatch):
     from dataclasses import replace
+
     from puripuly_heart.core.diagnostics import exception_diagnostics, serialize_diagnostics
     from puripuly_heart.core.output import router as router_module
 
     first = exception_diagnostics(
-        OSError(5, "private first"), component="capture.peer", operation="source_read",
+        OSError(5, "private first"),
+        component="capture.peer",
+        operation="source_read",
         code="capture.peer.source_failure",
     )
     second = exception_diagnostics(
-        OSError(13, "private second"), component="capture.peer", operation="source_read",
+        OSError(13, "private second"),
+        component="capture.peer",
+        operation="source_read",
         code="capture.peer.source_failure",
     )
     accepted = replace(first, causes=(second,))
@@ -434,7 +439,9 @@ async def test_router_preserves_accepted_composite_cause_when_recording_fails(mo
     publication = SystemDisclosurePublication(
         disclosure_id="compound-output",
         message=messages.UserMessageRef(
-            key="runtime.disclosure", params={}, severity=messages.SEVERITY_INFO,
+            key="runtime.disclosure",
+            params={},
+            severity=messages.SEVERITY_INFO,
         ),
         metadata={},
     )

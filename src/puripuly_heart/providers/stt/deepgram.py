@@ -41,7 +41,9 @@ _DEEPGRAM_KEYTERM_MODEL = "nova-3"
 
 
 def _sdk_failure(error: object, *, close: bool = False) -> BaseException:
-    failure = error if isinstance(error, BaseException) else RuntimeError("Deepgram transport failed")
+    failure = (
+        error if isinstance(error, BaseException) else RuntimeError("Deepgram transport failed")
+    )
     diagnostics = recognition_failure_diagnostics(
         failure,
         provider="deepgram",
@@ -50,9 +52,11 @@ def _sdk_failure(error: object, *, close: bool = False) -> BaseException:
         reason=(
             "deepgram_connection_closed"
             if close
-            else "deepgram_protocol_failed"
-            if isinstance(failure, json.JSONDecodeError)
-            else "deepgram_transport_error"
+            else (
+                "deepgram_protocol_failed"
+                if isinstance(failure, json.JSONDecodeError)
+                else "deepgram_transport_error"
+            )
         ),
     )
     get = error.get if isinstance(error, dict) else lambda key: getattr(error, key, None)
@@ -72,7 +76,9 @@ def _sdk_failure(error: object, *, close: bool = False) -> BaseException:
     status = get("status_code")
     failure.failure_diagnostics = replace(
         diagnostics,
-        status_code=status if type(status) is int and 100 <= status <= 599 else diagnostics.status_code,
+        status_code=(
+            status if type(status) is int and 100 <= status <= 599 else diagnostics.status_code
+        ),
         fields={**diagnostics.fields, **fields},
         rejected_fields=diagnostics.rejected_fields + rejected,
     )

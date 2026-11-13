@@ -196,9 +196,11 @@ class ApiKeyVerificationController:
             emit_failure(logger, report.diagnostics, stage="key_verification")
             self._emit_message(
                 "snackbar.verification_error",
-                message=self._failure_message(ProviderCredentialVerificationOutcome(
-                    status="error", provider=self._provider, diagnostics=report.diagnostics
-                )),
+                message=self._failure_message(
+                    ProviderCredentialVerificationOutcome(
+                        status="error", provider=self._provider, diagnostics=report.diagnostics
+                    )
+                ),
             )
             self._emit_completion(
                 False,
@@ -284,7 +286,7 @@ class ApiKeyVerificationController:
                 return OpenRouterAuthenticationError(
                     stage="key_verification", reason=reason
                 ).message_key
-            except (KeyError, ValueError):
+            except KeyError, ValueError:
                 return "error.openrouter_auth.unknown"
         report = provider_failure_report(
             diagnostics, provider=self._provider, operation="key_verification"

@@ -98,7 +98,6 @@ from puripuly_heart.core.qq_auth_diagnostics import (
     safe_fields,
 )
 
-
 _operation_evidence: ContextVar[tuple[ErrorDiagnostics, ...]] = ContextVar(
     "qq_managed_evidence", default=()
 )
@@ -153,10 +152,17 @@ def _qq_exception_diagnostics(
             operation=phase,
             code=f"broker_{kind}" if phase == "broker_issue" and transport else code,
             category=(
-                "timeout" if kind == "timeout"
-                else "network" if transport
-                else "unknown" if isinstance(exception, (TypeError, ValueError, KeyError, RuntimeError))
-                else DIAGNOSTIC_CATEGORY_TRANSACTION
+                "timeout"
+                if kind == "timeout"
+                else (
+                    "network"
+                    if transport
+                    else (
+                        "unknown"
+                        if isinstance(exception, (TypeError, ValueError, KeyError, RuntimeError))
+                        else DIAGNOSTIC_CATEGORY_TRANSACTION
+                    )
+                )
             ),
             fields=fields,
         ),
@@ -232,9 +238,12 @@ class QqManagedAuthService:
                 secondary_diagnostics=(
                     *result.secondary_diagnostics,
                     *(
-                        cause for cause in _operation_evidence.get()
-                        if cause.diagnostic_id not in {
-                            value.diagnostic_id for value in (
+                        cause
+                        for cause in _operation_evidence.get()
+                        if cause.diagnostic_id
+                        not in {
+                            value.diagnostic_id
+                            for value in (
                                 *((result.diagnostics,) if result.diagnostics is not None else ()),
                                 *result.secondary_diagnostics,
                             )

@@ -4109,7 +4109,8 @@ class SettingsView(ft.Column):
                     *((result.diagnostics,) if result.diagnostics is not None else ()),
                     *result.secondary_diagnostics,
                 )
-                if result is not None else ()
+                if result is not None
+                else ()
             ),
             secondary_omitted_count=result.secondary_omitted_count if result is not None else 0,
         )

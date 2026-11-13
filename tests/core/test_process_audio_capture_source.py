@@ -542,7 +542,9 @@ async def test_process_close_failure_retains_capture_and_typed_cause_for_retry()
     factory = SimpleNamespace(create=lambda **kwargs: capture)
     watcher = FakeWatcher()
     source = ProcessAudioCaptureSource(
-        identity=_identity(), watcher=watcher, capture_factory=factory,
+        identity=_identity(),
+        watcher=watcher,
+        capture_factory=factory,
         platform_availability=_supported,
     )
     with pytest.raises(ExceptionGroup) as raised:
@@ -568,7 +570,8 @@ def test_process_identity_access_denied_is_unknown_not_observed_exit():
     callbacks = []
     watch = _PsutilProcessIdentityWatch(
         process=SimpleNamespace(pid=100, create_time=denied),
-        identity=_identity(), psutil=psutil,
+        identity=_identity(),
+        psutil=psutil,
         on_terminal=lambda *args: callbacks.append(args),
     )
     assert watch.identity_verified is False

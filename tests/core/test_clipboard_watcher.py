@@ -112,7 +112,8 @@ def test_start_timeout_requests_stop_and_joins_thread(
 )
 @pytest.mark.parametrize("window_created", [False, True])
 def test_message_loop_unregisters_class_when_window_creation_fails(
-    monkeypatch: pytest.MonkeyPatch, window_created: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    window_created: bool,
 ) -> None:
     hinstance = 9876
 
@@ -158,7 +159,8 @@ def test_message_loop_unregisters_class_when_window_creation_fails(
     fake_windll = FakeWindll()
     monkeypatch.setattr(watcher_module.ctypes, "windll", fake_windll, raising=False)
     monkeypatch.setattr(
-        watcher_module.ctypes, "WinError",
+        watcher_module.ctypes,
+        "WinError",
         lambda: PermissionError(13, "private native failure"),
     )
     watcher = create_clipboard_watcher(lambda _text: None)

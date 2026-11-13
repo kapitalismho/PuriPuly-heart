@@ -240,7 +240,9 @@ def test_run_gui_logs_actionable_ui_startup_failure(monkeypatch, tmp_path, caplo
     monkeypatch.setitem(sys.modules, "puripuly_heart.ui.fonts", fake_fonts)
 
     with caplog.at_level(logging.ERROR, logger=main_module.__name__):
-        with pytest.raises(RuntimeError, match="application boundary construction failed") as caught:
+        with pytest.raises(
+            RuntimeError, match="application boundary construction failed"
+        ) as caught:
             main_module._run_gui(
                 tmp_path / "settings.json",
                 debug_ui_preview=False,
@@ -250,7 +252,10 @@ def test_run_gui_logs_actionable_ui_startup_failure(monkeypatch, tmp_path, caplo
     diagnostics = caught.value.failure_diagnostics
     assert diagnostics.code == "gui_runtime_failed"
     assert diagnostics.causes[0].code == "gui_startup_failed"
-    assert all("application boundary construction failed" not in record.getMessage() for record in caplog.records)
+    assert all(
+        "application boundary construction failed" not in record.getMessage()
+        for record in caplog.records
+    )
 
 
 def test_run_gui_debug_preview_constructs_vrchat_presence(monkeypatch, tmp_path) -> None:

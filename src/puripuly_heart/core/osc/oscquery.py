@@ -11,10 +11,14 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
 from urllib.parse import urlsplit
 
-from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics, sanitize_diagnostics
-from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.diagnostics import (
+    emit_failure,
+    exception_diagnostics,
+    sanitize_diagnostics,
+)
 from puripuly_heart.core.http_client_logging import suppress_http_client_logs
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.osc.control_schema import (
     OSC_MUTE_SELF_ADDRESS,
     OSC_PARAMETER_DEFINITIONS,
@@ -164,10 +168,13 @@ class ZeroconfOscQueryService(OscQueryServicePort):
             if resolved is not None and self._services.get(candidate.service_id) is candidate:
                 self.discovery_observation = "available"
                 if failures:
-                    self.discovery_failure = sanitize_diagnostics(replace(
-                        failures[0], causes=(*failures[0].causes, *failures[1:]),
-                        causes_truncated=truncated,
-                    ))
+                    self.discovery_failure = sanitize_diagnostics(
+                        replace(
+                            failures[0],
+                            causes=(*failures[0].causes, *failures[1:]),
+                            causes_truncated=truncated,
+                        )
+                    )
                     emit_failure(logger, self.discovery_failure, disposition="recovered")
                 return resolved
             if self.discovery_failure is not None:
@@ -176,10 +183,13 @@ class ZeroconfOscQueryService(OscQueryServicePort):
                 else:
                     truncated = True
         if failures:
-            self.discovery_failure = sanitize_diagnostics(replace(
-                failures[0], causes=(*failures[0].causes, *failures[1:]),
-                causes_truncated=truncated,
-            ))
+            self.discovery_failure = sanitize_diagnostics(
+                replace(
+                    failures[0],
+                    causes=(*failures[0].causes, *failures[1:]),
+                    causes_truncated=truncated,
+                )
+            )
             self.discovery_observation = "unavailable"
         return None
 

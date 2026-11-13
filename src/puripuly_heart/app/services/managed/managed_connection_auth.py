@@ -68,6 +68,7 @@ def _retain_secondary(diagnostics: ErrorDiagnostics) -> None:
     else:
         _operation_omitted.set(_operation_omitted.get() + 1)
 
+
 from .managed_auth_claims import (
     MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
     OPENROUTER_MANAGED_USER_ID_MAX_LENGTH,
@@ -171,9 +172,12 @@ class ManagedConnectionAuthService:
                 secondary_diagnostics=(
                     *result.secondary_diagnostics,
                     *(
-                        cause for cause in _operation_evidence.get()
-                        if cause.diagnostic_id not in {
-                            value.diagnostic_id for value in (
+                        cause
+                        for cause in _operation_evidence.get()
+                        if cause.diagnostic_id
+                        not in {
+                            value.diagnostic_id
+                            for value in (
                                 *((result.diagnostics,) if result.diagnostics is not None else ()),
                                 *result.secondary_diagnostics,
                             )

@@ -849,5 +849,8 @@ async def test_optional_opened_metadata_failure_stays_secondary_to_successful_ca
     assert diagnostic["operation"] == "device_metadata"
     assert diagnostic["fields"]["errno"] == 5
     projected = project_operation_receipt(result, "diagnose_microphone")
-    assert projected["diagnosis"]["candidates"][0]["secondary_diagnostics"][0]["code"] == diagnostic["code"]
+    assert (
+        projected["diagnosis"]["candidates"][0]["secondary_diagnostics"][0]["code"]
+        == diagnostic["code"]
+    )
     assert "PRIVATE" not in json.dumps([result, projected])

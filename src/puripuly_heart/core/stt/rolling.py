@@ -172,7 +172,6 @@ class RollingMemberBinding:
         self._backend_used = True
         return self.backend
 
-
     async def prepare_backend(self) -> None:
         for backend in tuple(self._retired_backends):
             await _close_backend(backend)

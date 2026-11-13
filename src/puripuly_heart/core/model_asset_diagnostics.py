@@ -16,6 +16,7 @@ from puripuly_heart.core.diagnostics import (
 from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.messages import ErrorDiagnostics
 
+
 def _asset_exception_chain(error: BaseException) -> Iterator[BaseException]:
     current: BaseException | None = error
     seen: set[int] = set()
@@ -25,7 +26,6 @@ def _asset_exception_chain(error: BaseException) -> Iterator[BaseException]:
         seen.add(id(current))
         yield current
         current = current.__cause__
-
 
 
 def model_asset_failure_code(error: BaseException) -> str:
@@ -99,8 +99,12 @@ def model_asset_failure_diagnostics(
             or error.__cause__ is not None
         )
         else exception_diagnostics(
-            error, component=component, operation=operation, code=code,
-            category="unknown", fields=fields,
+            error,
+            component=component,
+            operation=operation,
+            code=code,
+            category="unknown",
+            fields=fields,
         )
     )
     technical: dict[str, object] = {}
@@ -115,7 +119,10 @@ def model_asset_failure_diagnostics(
         cause_type, _ = sanitize_diagnostic_fields(
             {"cause_class_1": getattr(item, "cause_type", None)}
         )
-        if native.fields.get("cause_class_1") in {None, "unclassified"} and "cause_class_1" not in technical:
+        if (
+            native.fields.get("cause_class_1") in {None, "unclassified"}
+            and "cause_class_1" not in technical
+        ):
             technical.update(cause_type)
     failure_code = model_asset_failure_code(error)
     category = native.category

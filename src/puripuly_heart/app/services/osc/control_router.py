@@ -19,9 +19,13 @@ from puripuly_heart.app.ports.osc_control import (
     decode_control_message,
 )
 from puripuly_heart.app.ports.ui_models import OscControlPresentationName
-from puripuly_heart.core.diagnostics import deserialize_diagnostics, emit_failure, exception_diagnostics
-from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.diagnostics import (
+    deserialize_diagnostics,
+    emit_failure,
+    exception_diagnostics,
+)
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 logger = logging.getLogger(__name__)
 
@@ -310,7 +314,10 @@ class OscControlRouter:
                     self._invocation_generations.pop(invocation_task, None)
         except Exception as exc:
             diagnostics = exception_diagnostics(
-                exc, component="osc_control", operation="control_dispatch", code="osc_dispatch_failed"
+                exc,
+                component="osc_control",
+                operation="control_dispatch",
+                code="osc_dispatch_failed",
             )
             emit_failure(logger, diagnostics)
             self.failures = (*self.failures[-7:], diagnostics)
@@ -341,7 +348,10 @@ class OscControlRouter:
                 value = getattr(result, "diagnostics", None)
                 diagnostics = deserialize_diagnostics(value) if isinstance(value, Mapping) else None
             return OscDispatchResult(
-                False, message.name, error="application_rejected", diagnostics=diagnostics,
+                False,
+                message.name,
+                error="application_rejected",
+                diagnostics=diagnostics,
                 operation_id=getattr(result, "operation_id", None),
                 request_id=getattr(result, "request_id", None),
             )
@@ -456,7 +466,10 @@ class OscControlRouter:
 
     def _retain_projection_failure(self, exc: Exception) -> None:
         diagnostics = exception_diagnostics(
-            exc, component="osc_control", operation="control_dispatch", code="output_observer_failed"
+            exc,
+            component="osc_control",
+            operation="control_dispatch",
+            code="output_observer_failed",
         )
         self.failures = (*self.failures[-7:], diagnostics)
         emit_failure(logger, diagnostics, severity="warning", disposition="degraded")

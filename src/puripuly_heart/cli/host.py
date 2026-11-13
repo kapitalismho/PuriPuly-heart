@@ -31,16 +31,15 @@ def _record_failure(exception: BaseException, operation: str) -> ErrorDiagnostic
     )
     exception.failure_diagnostics = diagnostics
     emit_failure(
-        logger, diagnostics,
+        logger,
+        diagnostics,
         severity="info" if isinstance(exception, asyncio.CancelledError) else "error",
         disposition="cancelled" if isinstance(exception, asyncio.CancelledError) else "failed",
     )
     return diagnostics
 
 
-def _retain_secondary(
-    primary: BaseException, secondary: BaseException, operation: str
-) -> None:
+def _retain_secondary(primary: BaseException, secondary: BaseException, operation: str) -> None:
     diagnostics = getattr(primary, "failure_diagnostics", None)
     if not isinstance(diagnostics, ErrorDiagnostics):
         diagnostics = _record_failure(primary, operation)
@@ -52,9 +51,7 @@ def _retain_secondary(
     cleanup = replace(cleanup, cause_id=diagnostics.diagnostic_id)
     secondary.failure_diagnostics = cleanup
     emit_failure(logger, cleanup, severity="warning", disposition="degraded")
-    primary.failure_diagnostics = replace(
-        diagnostics, causes=(*diagnostics.causes, cleanup)
-    )
+    primary.failure_diagnostics = replace(diagnostics, causes=(*diagnostics.causes, cleanup))
 
 
 class HostedApplication:
@@ -192,8 +189,11 @@ async def run_headless(config_path: Path, *, ready_file: Path | None = None) -> 
             try:
                 _write_ready(
                     ready_file,
-                    {"state": "failed", "reason": type(exc).__name__,
-                     "diagnostics": serialize_diagnostics(diagnostics)},
+                    {
+                        "state": "failed",
+                        "reason": type(exc).__name__,
+                        "diagnostics": serialize_diagnostics(diagnostics),
+                    },
                 )
             except BaseException as cleanup:
                 _retain_secondary(exc, cleanup, "readiness")

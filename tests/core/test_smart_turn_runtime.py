@@ -961,7 +961,9 @@ async def test_owner_cancel_during_production_prepare_abandons_owned_attempt(
 
 
 @pytest.mark.asyncio
-async def test_optional_inference_and_callback_failures_retain_typed_evidence_and_next_success(tmp_path):
+async def test_optional_inference_and_callback_failures_retain_typed_evidence_and_next_success(
+    tmp_path,
+):
     class Inference:
         fail = True
 
@@ -972,14 +974,20 @@ async def test_optional_inference_and_callback_failures_retain_typed_evidence_an
             return 0.9
 
     owner = SmartTurnInferenceOwner(
-        model_path=tmp_path / "synthetic.onnx", inference_factory=lambda path: Inference(),
+        model_path=tmp_path / "synthetic.onnx",
+        inference_factory=lambda path: Inference(),
     )
     owner.request_prepare()
     await owner._prepare_task
     identity = SmartTurnRequestIdentity(
-        activation_generation=7, segment_id=uuid4(), pause_id=1, context_revision=1,
-        input_revision=SMART_TURN_INPUT_REVISION, source_frontier=3584,
-        probe_frontier_monotonic_s=0.224, complete_deadline_monotonic_s=0.512,
+        activation_generation=7,
+        segment_id=uuid4(),
+        pause_id=1,
+        context_revision=1,
+        input_revision=SMART_TURN_INPUT_REVISION,
+        source_frontier=3584,
+        probe_frontier_monotonic_s=0.224,
+        complete_deadline_monotonic_s=0.512,
     )
     completions = []
 

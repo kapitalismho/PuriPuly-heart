@@ -58,23 +58,27 @@ def unknown_managed_allowance(
 ) -> IndexManagedAllowanceObservation:
     return IndexManagedAllowanceObservation(
         "unknown",
-        exception_diagnostics(
-            exception,
-            component="index_selection",
-            operation="managed_allowance",
-            code="index_managed_allowance_unknown",
-            category="unknown",
-            fields={"reason": reason},
-        ) if exception is not None else ErrorDiagnostics(
-            component="index_selection",
-            operation="managed_allowance",
-            code="index_managed_allowance_unknown",
-            category="unknown",
-            visibility="basic",
-            content_policy="metadata_only",
-            status_code=None,
-            retry_after_ms=None,
-            fields={"reason": reason},
+        (
+            exception_diagnostics(
+                exception,
+                component="index_selection",
+                operation="managed_allowance",
+                code="index_managed_allowance_unknown",
+                category="unknown",
+                fields={"reason": reason},
+            )
+            if exception is not None
+            else ErrorDiagnostics(
+                component="index_selection",
+                operation="managed_allowance",
+                code="index_managed_allowance_unknown",
+                category="unknown",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={"reason": reason},
+            )
         ),
     )
 

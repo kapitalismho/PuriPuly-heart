@@ -3010,9 +3010,14 @@ class DesktopOverlayRenderer:
 
     def _note_cleanup_failure(self, stage: str, exception: Exception) -> None:
         diagnostics = exception_diagnostics(
-            exception, component="overlay_process", operation="process_lifecycle",
+            exception,
+            component="overlay_process",
+            operation="process_lifecycle",
             code="shutdown_cleanup_failed",
-            fields={"cleanup_stage": stage, "overlay_instance_id": self.manifest.overlay_instance_id},
+            fields={
+                "cleanup_stage": stage,
+                "overlay_instance_id": self.manifest.overlay_instance_id,
+            },
         )
         self._cleanup_failures = (*self._cleanup_failures[-7:], diagnostics)
         if self._cleanup_failure_reason is None:

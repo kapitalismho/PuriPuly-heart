@@ -256,7 +256,9 @@ class WindowsClipboardWatcher:
             wndclass.hInstance = kernel32.GetModuleHandleW(None)
             wndclass.lpszClassName = self._class_name
             if not user32.RegisterClassW(ctypes.byref(wndclass)):
-                raise ClipboardWatcherError("failed to register clipboard watcher class") from ctypes.WinError()
+                raise ClipboardWatcherError(
+                    "failed to register clipboard watcher class"
+                ) from ctypes.WinError()
             self._registered_class_hinstance = wndclass.hInstance
 
             hwnd = user32.CreateWindowExW(
@@ -274,14 +276,18 @@ class WindowsClipboardWatcher:
                 None,
             )
             if not hwnd:
-                raise ClipboardWatcherError("failed to create clipboard watcher window") from ctypes.WinError()
+                raise ClipboardWatcherError(
+                    "failed to create clipboard watcher window"
+                ) from ctypes.WinError()
 
             self._hwnd = hwnd
             if self._stop_requested.is_set():
                 self._cleanup_window(hwnd)
                 return
             if not user32.AddClipboardFormatListener(hwnd):
-                raise ClipboardWatcherError("failed to register clipboard listener") from ctypes.WinError()
+                raise ClipboardWatcherError(
+                    "failed to register clipboard listener"
+                ) from ctypes.WinError()
             if self._stop_requested.is_set():
                 self._cleanup_window(hwnd)
                 return

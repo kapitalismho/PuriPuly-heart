@@ -15,7 +15,10 @@ from websockets.exceptions import ConnectionClosed
 
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.diagnostics import (
-    current_diagnostic_operation, emit_failure, exception_diagnostics, sanitize_diagnostics,
+    current_diagnostic_operation,
+    emit_failure,
+    exception_diagnostics,
+    sanitize_diagnostics,
 )
 from puripuly_heart.core.messages import ErrorDiagnostics
 
@@ -689,7 +692,9 @@ class OverlayBridge:
             )
         except TransportWriteCancelled as exc:
             self._retain_unresolved_task(
-                exc.send_task, connection=connection, scene_revision=scene_revision,
+                exc.send_task,
+                connection=connection,
+                scene_revision=scene_revision,
                 connection_epoch=epoch,
                 operation_identity=operation_identity,
             )
@@ -701,7 +706,10 @@ class OverlayBridge:
                     connection_epoch=epoch,
                 )
             await self._retire_connection(
-                connection, epoch, cause="write_cancelled", operation_identity=operation_identity,
+                connection,
+                epoch,
+                cause="write_cancelled",
+                operation_identity=operation_identity,
             )
             raise
         if result.outcome != "written":
@@ -719,8 +727,11 @@ class OverlayBridge:
                 emit_failure(logger, self.last_failure, disposition="degraded")
             if not result.send_task.done():
                 self._retain_unresolved_task(
-                    result.send_task, connection=connection, scene_revision=scene_revision,
-                    connection_epoch=epoch, origin=self.last_failure,
+                    result.send_task,
+                    connection=connection,
+                    scene_revision=scene_revision,
+                    connection_epoch=epoch,
+                    origin=self.last_failure,
                     operation_identity=operation_identity,
                 )
             if scene_revision is not None:
@@ -740,7 +751,9 @@ class OverlayBridge:
                     removed=True,
                 )
             await self._retire_connection(
-                connection, epoch, cause=cause,
+                connection,
+                epoch,
+                cause=cause,
                 origin=self.last_failure if result.diagnostics is not None else None,
                 operation_identity=operation_identity,
             )
@@ -791,7 +804,9 @@ class OverlayBridge:
         if epoch is not None and self._mailbox.startup_barrier_epoch == epoch:
             self._mailbox.startup_barrier_epoch = None
         failure = await self._bounded_close_connection(
-            connection, origin=origin, operation_identity=operation_identity,
+            connection,
+            origin=origin,
+            operation_identity=operation_identity,
         )
         if failure is not None:
             self._unresolved_connections.add(connection)
@@ -829,12 +844,17 @@ class OverlayBridge:
         self._connection_close_tasks[connection] = result.close_task
         if result.failure is not None:
             diagnostics = self._retain_transport_failure(
-                result.failure, "cleanup", origin=origin, operation_identity=operation_identity,
+                result.failure,
+                "cleanup",
+                origin=origin,
+                operation_identity=operation_identity,
             )
             self._unresolved_connections.add(connection)
             if isinstance(result.failure, TimeoutError):
                 self._retain_unresolved_task(
-                    result.close_task, connection=connection, origin=diagnostics,
+                    result.close_task,
+                    connection=connection,
+                    origin=diagnostics,
                 )
             return result.failure
         self._connection_close_tasks.pop(connection, None)
@@ -865,8 +885,11 @@ class OverlayBridge:
             operation_identity = current_diagnostic_operation()
         task.add_done_callback(
             lambda completed: self._resolve_unresolved_task(
-                connection, completed, scene_revision=scene_revision,
-                connection_epoch=connection_epoch, origin=origin,
+                connection,
+                completed,
+                scene_revision=scene_revision,
+                connection_epoch=connection_epoch,
+                origin=origin,
                 operation_identity=operation_identity,
             )
         )
@@ -884,12 +907,18 @@ class OverlayBridge:
         self._unresolved_transport_tasks.discard(task)
         if not task.cancelled() and (failure := task.exception()) is not None:
             diagnostics = self._retain_transport_failure(
-                failure, "transport_write", origin=origin, operation_identity=operation_identity,
+                failure,
+                "transport_write",
+                origin=origin,
+                operation_identity=operation_identity,
             )
             if scene_revision is not None:
                 self._mailbox.record_delivery(
-                    outcome="ambiguous", scene_revision=scene_revision,
-                    connection_epoch=connection_epoch, cause="write_failed", diagnostics=diagnostics,
+                    outcome="ambiguous",
+                    scene_revision=scene_revision,
+                    connection_epoch=connection_epoch,
+                    cause="write_failed",
+                    diagnostics=diagnostics,
                 )
         if connection is None:
             return
@@ -904,12 +933,22 @@ class OverlayBridge:
                     self._session_health.token_consumed = False
 
     def _retain_transport_failure(
-        self, failure: Exception, operation: str, *, origin: ErrorDiagnostics | None = None,
+        self,
+        failure: Exception,
+        operation: str,
+        *,
+        origin: ErrorDiagnostics | None = None,
         operation_identity: Mapping[str, str | None] | None = None,
     ) -> ErrorDiagnostics:
         diagnostics = exception_diagnostics(
-            failure, component="overlay_bridge", operation=operation,
-            code="destination_write_failed" if operation == "transport_write" else "shutdown_cleanup_failed",
+            failure,
+            component="overlay_bridge",
+            operation=operation,
+            code=(
+                "destination_write_failed"
+                if operation == "transport_write"
+                else "shutdown_cleanup_failed"
+            ),
             fields={
                 "overlay_instance_id": self.overlay_instance_id,
                 "runtime_generation": self.runtime_generation,
@@ -917,9 +956,11 @@ class OverlayBridge:
         )
         if origin is not None:
             diagnostics = replace(
-                diagnostics, causes=(origin, *diagnostics.causes),
+                diagnostics,
+                causes=(origin, *diagnostics.causes),
                 cause_id=origin.diagnostic_id,
-                operation_id=origin.operation_id, request_id=origin.request_id,
+                operation_id=origin.operation_id,
+                request_id=origin.request_id,
             )
         elif operation_identity is not None:
             diagnostics = replace(diagnostics, **operation_identity)

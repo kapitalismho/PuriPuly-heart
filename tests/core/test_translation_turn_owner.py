@@ -993,17 +993,32 @@ async def test_dual_target_precomputed_translation_is_normalized_to_primary_chil
     from puripuly_heart.core.diagnostics import serialize_diagnostics
     from puripuly_heart.core.messages import ErrorDiagnostics
 
-    recovered = serialize_diagnostics(ErrorDiagnostics(
-        component="provider.llm", operation="translate", code="provider.auth",
-        category="auth", status_code=403,
-        visibility="basic", content_policy="metadata_only", retry_after_ms=None, fields={},
-    ))
-    cleanup = serialize_diagnostics(ErrorDiagnostics(
-        component="provider.llm", operation="cleanup", code="provider.unknown",
-        category="unknown", status_code=None,
-        visibility="basic", content_policy="metadata_only", retry_after_ms=None,
-        fields={"exception_class": "OSError"},
-    ))
+    recovered = serialize_diagnostics(
+        ErrorDiagnostics(
+            component="provider.llm",
+            operation="translate",
+            code="provider.auth",
+            category="auth",
+            status_code=403,
+            visibility="basic",
+            content_policy="metadata_only",
+            retry_after_ms=None,
+            fields={},
+        )
+    )
+    cleanup = serialize_diagnostics(
+        ErrorDiagnostics(
+            component="provider.llm",
+            operation="cleanup",
+            code="provider.unknown",
+            category="unknown",
+            status_code=None,
+            visibility="basic",
+            content_policy="metadata_only",
+            retry_after_ms=None,
+            fields={"exception_class": "OSError"},
+        )
+    )
 
     async def process(child: TranslationTurnChild, _cancellation_requested):
         observed.append(child)
@@ -1046,9 +1061,18 @@ async def test_dual_target_precomputed_translation_is_normalized_to_primary_chil
     assert primary.precomputed_translation.logical_turn_key == f"self:{parent_id}"
     assert primary.precomputed_translation.recovered_failures[0]["status_code"] == 403
     assert request.precomputed_translation is not None
-    assert primary.precomputed_translation.recovered_failures == request.precomputed_translation.recovered_failures
-    assert primary.precomputed_translation.secondary_diagnostics == request.precomputed_translation.secondary_diagnostics
-    assert primary.precomputed_translation.secondary_diagnostics[0]["diagnostic_id"] == cleanup["diagnostic_id"]
+    assert (
+        primary.precomputed_translation.recovered_failures
+        == request.precomputed_translation.recovered_failures
+    )
+    assert (
+        primary.precomputed_translation.secondary_diagnostics
+        == request.precomputed_translation.secondary_diagnostics
+    )
+    assert (
+        primary.precomputed_translation.secondary_diagnostics[0]["diagnostic_id"]
+        == cleanup["diagnostic_id"]
+    )
     assert primary.precomputed_translation.recovered_failures_truncated is recovered_truncated
     assert primary.precomputed_translation.secondary_diagnostics_truncated is secondary_truncated
     assert primary.target_index == 0
@@ -2400,12 +2424,14 @@ async def test_retirement_output_failure_is_secondary_and_other_waiting_work_pro
     ids = [uuid4() for _ in range(3)]
     try:
         for parent_id in ids:
-            await owner.submit(replace(
-                _request(parent_id=parent_id, turn_kind="peer"),
-                config_snapshot=TranslationRuntimeConfigSnapshot(
-                    revision=0, value=TranslationRuntimeConfig(concurrency_limit=1)
-                ),
-            ))
+            await owner.submit(
+                replace(
+                    _request(parent_id=parent_id, turn_kind="peer"),
+                    config_snapshot=TranslationRuntimeConfigSnapshot(
+                        revision=0, value=TranslationRuntimeConfig(concurrency_limit=1)
+                    ),
+                )
+            )
         release.set()
         await owner.wait_for_idle()
     finally:
