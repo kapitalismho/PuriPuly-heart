@@ -89,6 +89,7 @@ from puripuly_heart.core.telemetry import (
     AppActiveDayTelemetryResult,
     AppActiveDayTelemetryService,
     AppActiveDayTelemetryState,
+    TelemetryPersistenceResult,
 )
 
 
@@ -264,6 +265,7 @@ class UiManagedRuntimeAdapter:
         )
         metadata = usage.usage_metadata
         remaining = usage.remaining_percent if scope_matches else None
+        observation = usage.current_result(usage_state)
         return {
             "provider": (
                 ("qq" if state.managed_china else "discord")
@@ -292,6 +294,13 @@ class UiManagedRuntimeAdapter:
                 ),
                 "freshness": "unknown",
             },
+            "diagnostics": observation.diagnostics if observation is not None else None,
+            "secondary_diagnostics": (
+                observation.secondary_diagnostics if observation is not None else ()
+            ),
+            "secondary_omitted_count": (
+                observation.secondary_omitted_count if observation is not None else 0
+            ),
         }
 
     async def start_qq_managed_auth_from_dialog(self, **kwargs: object) -> object:
@@ -358,29 +367,25 @@ class UiSettingsRuntimeAdapter:
         if settings is None:
             return False
         provider, general, prompt, overlay = settings_view_surface_snapshots(settings)
-        return bool(
-            self.projection.render_surfaces(
-                provider=provider,
-                general=general,
-                prompt=prompt,
-                overlay=overlay,
-                compatibility_settings=settings,
-                preserve_custom_vocab_draft=preserve_custom_vocab_draft,
-            )
-        )
+        return self.projection.render_surfaces(
+            provider=provider,
+            general=general,
+            prompt=prompt,
+            overlay=overlay,
+            compatibility_settings=settings,
+            preserve_custom_vocab_draft=preserve_custom_vocab_draft,
+        ).loaded
 
     def refresh_settings_after_openrouter_pkce_success(self) -> bool:
         settings = self.settings.canonical
         if settings is None:
             return False
         provider, _general, prompt, _overlay = settings_view_surface_snapshots(settings)
-        return bool(
-            self.projection.refresh_after_openrouter_pkce_success(
-                provider=provider,
-                prompt=prompt,
-                compatibility_settings=settings,
-            )
-        )
+        return self.projection.refresh_after_openrouter_pkce_success(
+            provider=provider,
+            prompt=prompt,
+            compatibility_settings=settings,
+        ).loaded
 
     def merge_settings_tab_apply_with_current_languages(
         self,
@@ -792,10 +797,10 @@ class UiEngagementRuntimeAdapter:
             broker_base_url=(canonical.intent.translation.openrouter_broker_base_url),
         )
 
-        async def persist(updated: AppActiveDayTelemetryState) -> bool:
+        async def persist(updated: AppActiveDayTelemetryState) -> TelemetryPersistenceResult:
             current = self.settings.canonical
             if current is None:
-                return False
+                return TelemetryPersistenceResult(False)
             next_settings = replace(
                 current,
                 state=replace(
@@ -807,7 +812,13 @@ class UiEngagementRuntimeAdapter:
                 ),
             )
             await self.settings_application.apply(next_settings)
-            return self.settings_application.results.committed()
+            result = self.settings_application.results.current
+            return TelemetryPersistenceResult(
+                self.settings_application.results.committed(),
+                result.diagnostics if result is not None else None,
+                result.secondary_diagnostics if result is not None else (),
+                result.secondary_omitted_count if result is not None else 0,
+            )
 
         return await self.telemetry.record_app_active_day(
             state,

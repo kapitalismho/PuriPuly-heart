@@ -214,3 +214,49 @@ async def test_provider_verifier_adapter_returns_verified_port_result(
     assert result.diagnostics is None
     assert result.evidence["verifier"] == "provider_adapter"
     assert "not-logged" not in repr(result)
+
+
+@pytest.mark.asyncio
+async def test_actual_verification_error_preserves_http_cause_with_failed_sink_and_allows_success(
+    monkeypatch,
+):
+    import httpx
+
+    from puripuly_heart.core import network_clients
+
+    adapter_module = importlib.import_module("puripuly_heart.app.adapters.provider_verifier")
+    statuses = iter((403, 200))
+    calls = []
+
+    def respond(request):
+        status = next(statuses)
+        calls.append(status)
+        return httpx.Response(status, json={"error": {"message": "private upstream content"}})
+
+    monkeypatch.setattr(
+        network_clients,
+        "external_async_client",
+        lambda **kwargs: httpx.AsyncClient(transport=httpx.MockTransport(respond), **kwargs),
+    )
+
+    def broken_sink(*args, **kwargs):
+        raise OSError("private sink path")
+
+    monkeypatch.setattr(adapter_module.logger, "log", broken_sink)
+    adapter = adapter_module.ProviderVerifierAdapter()
+    request = ProviderVerificationRequest(
+        provider="deepseek",
+        secret_key="providers.deepseek.api_key",
+        secret_value="private-key",
+        secret_revision="revision-1",
+        context={},
+    )
+    failure = await adapter.verify_provider_secret(request)
+    assert failure.status == PROVIDER_VERIFICATION_STATUS_FAILED
+    assert failure.diagnostics.status_code == 403
+    assert failure.diagnostics.category == "auth"
+    assert "private" not in repr(failure)
+    success = await adapter.verify_provider_secret(request)
+    assert success.status == PROVIDER_VERIFICATION_STATUS_VERIFIED
+    assert success.diagnostics is None
+    assert calls == [403, 200]

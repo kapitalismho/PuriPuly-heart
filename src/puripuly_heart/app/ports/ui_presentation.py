@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -14,7 +15,24 @@ from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationState,
     OverlayPeerPresentationState,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.output import UIEventBridgePort
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsRenderResult:
+    loaded: bool
+    diagnostics: ErrorDiagnostics | None = None
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
+
+    def __post_init__(self) -> None:
+        excess = max(0, len(self.secondary_diagnostics) - 4)
+        if excess:
+            object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
+            object.__setattr__(
+                self, "secondary_omitted_count", self.secondary_omitted_count + excess
+            )
 
 
 class UiPresentationPort(Protocol):
@@ -126,7 +144,7 @@ class UiPresentationPort(Protocol):
         overlay: OverlaySettingsSnapshot,
         config_path: Path,
         preserve_custom_vocab_draft: bool = False,
-    ) -> bool: ...
+    ) -> SettingsRenderResult: ...
 
     def refresh_settings_after_openrouter_pkce_success(
         self,
@@ -134,7 +152,7 @@ class UiPresentationPort(Protocol):
         provider: ProviderSettingsSnapshot,
         prompt: PromptSettingsSnapshot,
         config_path: Path,
-    ) -> bool: ...
+    ) -> SettingsRenderResult: ...
 
     def set_settings_overlay_calibration(self, calibration: object) -> None: ...
 

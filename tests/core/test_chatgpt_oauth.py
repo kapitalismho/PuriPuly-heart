@@ -188,3 +188,23 @@ async def test_refresh_classifies_terminal_and_transient_failures(
             await refresh_access_token(http, client_id="oaiapp_client", refresh_token="r")
     assert type(exc_info.value) is expected
     assert exc_info.value.code == error
+
+
+async def test_exchange_malformed_success_object_retains_received_response():
+    from puripuly_heart.core.chatgpt.oauth import exchange_authorization_code
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={}))
+    ) as client:
+        with pytest.raises(ChatGptAuthError) as raised:
+            await exchange_authorization_code(
+                client,
+                client_id="synthetic-client",
+                code="synthetic-code",
+                code_verifier="synthetic-verifier",
+                redirect_uri="http://127.0.0.1/synthetic",
+            )
+    assert raised.value.diagnostics.category == "invalid_response"
+    assert raised.value.diagnostics.status_code == 200
+    assert raised.value.diagnostics.fields["response_shape"] == "malformed_success"
+    assert "synthetic" not in str(raised.value.diagnostics)

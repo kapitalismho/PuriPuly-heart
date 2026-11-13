@@ -119,3 +119,38 @@ def test_typing_output_port_exposes_only_self_channel_operations() -> None:
         "set_self_chatbox_typing_reason",
         "clear_self_chatbox_typing_reasons",
     }
+
+
+@pytest.mark.asyncio
+async def test_failed_completion_retains_cause_without_changing_admission_or_cancellation(
+    monkeypatch,
+) -> None:
+    import puripuly_heart.app.services.manual_typing as module
+
+    def broken_sink(*args, **kwargs):
+        raise OSError("private sink path")
+
+    monkeypatch.setattr(module.logger, "log", broken_sink)
+    output = RecordingSelfTypingOutput()
+
+    async def fail():
+        raise PermissionError(13, "private completion content")
+
+    completion = asyncio.create_task(fail())
+    owner, _, _ = _owner(output, completion_provider=lambda _: completion)
+
+    async def submit():
+        return TextSubmissionAdmission("admitted", uuid4(), ())
+
+    admission = await owner.submit(submit)
+    assert admission.status == "admitted"
+    assert output.reasons == set()
+    assert owner.failure_diagnostics.fields["exception_class"] == "PermissionError"
+    assert owner.failure_diagnostics.fields["errno"] == 13
+    assert "private" not in repr(owner.failure_diagnostics)
+
+    cancelled = asyncio.create_task(asyncio.sleep(0))
+    cancelled.cancel()
+    recovered, _, _ = _owner(output, completion_provider=lambda _: cancelled)
+    assert (await recovered.submit(submit)).status == "admitted"
+    assert recovered.failure_diagnostics is None

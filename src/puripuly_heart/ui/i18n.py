@@ -4,8 +4,9 @@ import json
 import logging
 from typing import Any
 
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
 from puripuly_heart.core.language import get_language_info
-from puripuly_heart.core.messages import UserMessageRef
+from puripuly_heart.core.messages import ErrorDiagnostics, UserMessageRef
 from puripuly_heart.runtime_layout import current_runtime_layout
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,27 @@ _LOCALE_DISPLAY_RANK = {code: index for index, code in enumerate(_LOCALE_DISPLAY
 _current_locale = _DEFAULT_LOCALE
 _bundles: dict[str, dict[str, str]] = {}
 _locale_cache: tuple[str, ...] | None = None
+_failures: dict[str, ErrorDiagnostics] = {}
+
+
+def localization_diagnostics() -> tuple[ErrorDiagnostics, ...]:
+    return tuple(_failures.values())
+
+
+def _record_failure(operation: str, error: Exception) -> None:
+    diagnostics = exception_diagnostics(
+        error,
+        component="ui_i18n",
+        operation=operation,
+        code=(
+            "localization_format_failed"
+            if operation == "message_format"
+            else "localization_resource_failed"
+        ),
+        category="invalid_response" if operation == "message_format" else "lifecycle",
+    )
+    _failures[operation] = diagnostics
+    emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage=operation)
 
 
 def _locale_display_sort_key(locale_code: str) -> tuple[int, str]:
@@ -35,20 +57,16 @@ def _load_bundle(locale: str) -> dict[str, str]:
     data: dict[str, str] = {}
     try:
         bundle_path = current_runtime_layout().package_resource(_I18N_DIR, f"{locale}.json")
-        if bundle_path.is_file():
-            raw = json.loads(bundle_path.read_text(encoding="utf-8"))
-            if isinstance(raw, dict):
-                data = {
-                    str(key): value
-                    for key, value in raw.items()
-                    if isinstance(key, str) and isinstance(value, str)
-                }
+        raw = json.loads(bundle_path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError("invalid_localization_bundle")
+        data = {
+            key: value
+            for key, value in raw.items()
+            if isinstance(key, str) and isinstance(value, str)
+        }
     except Exception as exc:
-        logger.warning(
-            "Failed to load i18n bundle for locale '%s' · Cause %s",
-            locale,
-            type(exc).__name__,
-        )
+        _record_failure("bundle_load", exc)
 
     _bundles[locale] = data
     return data
@@ -68,7 +86,8 @@ def available_locales() -> tuple[str, ...]:
             name = entry.name
             if name.endswith(".json"):
                 locales.append(name[:-5])
-    except Exception:
+    except Exception as exc:
+        _record_failure("locale_discovery", exc)
         locales = []
 
     if not locales:
@@ -113,8 +132,8 @@ def t(key: str, *, default: str | None = None, **params: Any) -> str:
     if params:
         try:
             return value.format(**params)
-        except Exception:
-            logger.debug("Failed to format i18n key '%s' with params %s", key, params)
+        except Exception as exc:
+            _record_failure("message_format", exc)
     return value
 
 
@@ -134,13 +153,8 @@ def t_for_locale(
     if params:
         try:
             return value.format(**params)
-        except Exception:
-            logger.debug(
-                "Failed to format i18n key '%s' for locale '%s' with params %s",
-                key,
-                resolved_locale,
-                params,
-            )
+        except Exception as exc:
+            _record_failure("message_format", exc)
     return value
 
 

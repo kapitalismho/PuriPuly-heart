@@ -10,10 +10,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Sequence
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.diagnostics import emit_failure, sanitize_diagnostic_fields
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
@@ -29,6 +30,7 @@ from puripuly_heart.core.stt.backend import (
     STTSessionProjection,
 )
 from puripuly_heart.core.stt.diagnostics import (
+    recognition_cleanup_failure,
     recognition_failure_diagnostics,
     retryable_transport_failure,
 )
@@ -36,6 +38,51 @@ from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
 _DEEPGRAM_KEYTERM_MODEL = "nova-3"
+
+
+def _sdk_failure(error: object, *, close: bool = False) -> BaseException:
+    failure = (
+        error if isinstance(error, BaseException) else RuntimeError("Deepgram transport failed")
+    )
+    diagnostics = recognition_failure_diagnostics(
+        failure,
+        provider="deepgram",
+        channel=None,
+        operation="receive",
+        reason=(
+            "deepgram_connection_closed"
+            if close
+            else (
+                "deepgram_protocol_failed"
+                if isinstance(failure, json.JSONDecodeError)
+                else "deepgram_transport_error"
+            )
+        ),
+    )
+    get = error.get if isinstance(error, dict) else lambda key: getattr(error, key, None)
+    code = get("code")
+    native = get("err_code") or (get("reason") if close else code)
+    fields, rejected = sanitize_diagnostic_fields(
+        {
+            key: value
+            for key, value in {
+                "deepgram_code": native,
+                "ws_close_code" if close else "provider_code": code,
+                "provider_request_id": get("request_id"),
+            }.items()
+            if value is not None
+        }
+    )
+    status = get("status_code")
+    failure.failure_diagnostics = replace(
+        diagnostics,
+        status_code=(
+            status if type(status) is int and 100 <= status <= 599 else diagnostics.status_code
+        ),
+        fields={**diagnostics.fields, **fields},
+        rejected_fields=diagnostics.rejected_fields + rejected,
+    )
+    return failure
 
 
 @dataclass(slots=True)
@@ -142,6 +189,9 @@ class _DeepgramSDKSession(STTBackendSession):
     _scoped_close_sent: bool = field(init=False, default=False, repr=False)
     _scoped_drain_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _drain_tasks: set[asyncio.Task[None]] = field(init=False, default_factory=set, repr=False)
+    _failure_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
+    _cleanup_error: BaseException | None = field(init=False, default=None, repr=False)
+    cleanup_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
@@ -328,6 +378,8 @@ class _DeepgramSDKSession(STTBackendSession):
                 identity=self._event_projection.active_identity,
             )
         )
+        if diagnostics is not None and self._failure_diagnostics is None:
+            self._failure_diagnostics = diagnostics
         identity = self._event_projection.active_identity
         provider_turn_id = identity.provider_turn_id if identity is not None else None
         if identity is not None:
@@ -371,9 +423,6 @@ class _DeepgramSDKSession(STTBackendSession):
                 await asyncio.wait_for(self._startup_done.wait(), self.connect_timeout_s)
             except TimeoutError as cause:
                 exc = RuntimeError("Deepgram SDK connection timeout")
-                logger.warning(
-                    "[STT] Deepgram connection timeout after %.1fs", self.connect_timeout_s
-                )
                 self._report_error(exc)
                 raise exc from cause
             if self._startup_error is not None:
@@ -412,6 +461,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 deepgram_listen_connect(
                     AsyncDeepgramClient(api_key=self.api_key, httpx_client=http_client),
                     _close_deadline=self._begin_close,
+                    _cleanup_callback=self._record_recovered_cleanup,
                     **connect_kwargs,
                 ) as connection,
             ):
@@ -421,12 +471,7 @@ class _DeepgramSDKSession(STTBackendSession):
 
                 def on_error(error: Any) -> None:
                     if not self._stopped:
-                        exc = (
-                            error
-                            if isinstance(error, BaseException)
-                            else RuntimeError("Deepgram transport failed")
-                        )
-                        logger.warning("Deepgram transport failed")
+                        exc = _sdk_failure(error)
                         self._report_error(exc)
                         self._scoped_transport_end(
                             False,
@@ -440,11 +485,11 @@ class _DeepgramSDKSession(STTBackendSession):
                         self._stopped = True
 
                 def on_close(close_event: Any) -> None:
-                    _ = close_event
                     orderly = self._scoped_close_sent or self._stopped
-                    self._scoped_transport_end(orderly, "deepgram_connection_closed")
+                    exc = _sdk_failure(close_event, close=True)
+                    self._scoped_transport_end(orderly, "deepgram_connection_closed", exc)
                     if not orderly:
-                        self._report_error(RuntimeError("Deepgram connection closed"))
+                        self._report_error(exc)
                     self._stopped = True
 
                 def on_open(open_event: Any) -> None:
@@ -479,7 +524,8 @@ class _DeepgramSDKSession(STTBackendSession):
         except asyncio.CancelledError:
             raise
         except BaseException as exc:
-            logger.warning("Deepgram SDK failed cause=%s", type(exc).__name__)
+            if self._scoped_close_sent:
+                self._cleanup_error = exc
             if not self._connected.is_set():
                 self._startup_error = exc
             self._report_error(exc)
@@ -531,7 +577,6 @@ class _DeepgramSDKSession(STTBackendSession):
             )
             raise
         except Exception as exc:
-            logger.warning("Deepgram writer failed cause=%s", type(exc).__name__)
             self._resolve_write(getattr(data, "completion", None), exc)
             self._report_error(exc)
             self._scoped_transport_end(False, "deepgram_write_failed", exc)
@@ -736,8 +781,27 @@ class _DeepgramSDKSession(STTBackendSession):
             if self._send_task is None or self._send_task.done():
                 self._fail_pending_writes()
 
+    def _record_recovered_cleanup(self, exception: Exception) -> None:
+        diagnostics = recognition_cleanup_failure(
+            exception,
+            provider="deepgram",
+            channel=self._event_projection.channel or self.stream_label,
+            primary=self._failure_diagnostics,
+        )
+        self.cleanup_diagnostics = replace(
+            diagnostics, fields={**diagnostics.fields, "cleanup_confirmed": True}
+        )
+        emit_failure(
+            logger,
+            self.cleanup_diagnostics,
+            severity="warning",
+            disposition="recovered",
+            stage="cleanup",
+        )
+
     async def close(self) -> None:
         deadline = self._begin_close()
+        timeout_failure: TimeoutError | None = None
         try:
             try:
                 async with asyncio.timeout_at(deadline):
@@ -758,8 +822,9 @@ class _DeepgramSDKSession(STTBackendSession):
                         except asyncio.CancelledError:
                             if asyncio.current_task().cancelling():
                                 raise
-            except TimeoutError:
-                pass
+            except TimeoutError as exc:
+                self._cleanup_error = exc
+                timeout_failure = exc
         finally:
             task = self._run_task
             if task is not None and not task.done():
@@ -768,6 +833,30 @@ class _DeepgramSDKSession(STTBackendSession):
             self._run_task = None
             self._fail_pending_writes()
             self._event_projection.close()
+        if self._cleanup_error is not None:
+            exception = self._cleanup_error
+            self._cleanup_error = None
+            diagnostics = recognition_cleanup_failure(
+                exception,
+                provider="deepgram",
+                channel=self._event_projection.channel or self.stream_label,
+                primary=self._failure_diagnostics,
+            )
+            recovered = exception is timeout_failure
+            diagnostics = replace(
+                diagnostics,
+                fields={**diagnostics.fields, "cleanup_confirmed": recovered},
+            )
+            self.cleanup_diagnostics = diagnostics
+            emit_failure(
+                logger,
+                diagnostics,
+                severity="warning",
+                disposition="recovered" if recovered else "degraded",
+                stage="cleanup",
+            )
+            if not recovered:
+                raise exception
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         async for event in self._event_projection.events():

@@ -3,16 +3,19 @@ from __future__ import annotations
 import asyncio
 import wave
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Literal
 
 import numpy as np
 
 from puripuly_heart.core.audio.format import float32_to_pcm16le_bytes, resample_f32_linear
+from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     ProviderRuntimeBuildRequest,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.stt.recognition_probe import recognize_probe_audio
 from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
@@ -125,8 +128,18 @@ async def run_recognition_probe(
                         pcm = await run_owned_thread_call(
                             lambda: load_recognition_probe_audio(settings.target_sample_rate_hz)
                         )
-                    except OSError, ValueError, wave.Error:
-                        result["error"] = {"code": "recognition_probe_asset_unavailable"}
+                    except (OSError, ValueError, wave.Error) as exc:
+                        diagnostics = exception_diagnostics(
+                            exc,
+                            component="recognition_probe",
+                            operation="recognition_probe",
+                            code="recognition_probe_asset_unavailable",
+                        )
+                        result.update(
+                            error={"code": "recognition_probe_asset_unavailable"},
+                            diagnostics=diagnostics,
+                            diagnostic_id=diagnostics.diagnostic_id,
+                        )
                     else:
                         outcome = await recognize_probe_audio(
                             engine.probe_session_factory,
@@ -137,24 +150,64 @@ async def run_recognition_probe(
                             engine.probe_sessions,
                         )
                         result.update(
-                            status="applied" if outcome.result == "succeeded" else "failed",
-                            recognition_result=outcome.result,
+                            status=(
+                                "applied"
+                                if outcome.result == "succeeded" and outcome.cleanup_complete
+                                else "failed"
+                            ),
+                            recognition_result=(
+                                outcome.result if outcome.cleanup_complete else "failed"
+                            ),
+                            recognition_execution_result=outcome.result,
                             final_event=outcome.final_event,
                             exercised_provider=outcome.exercised_provider,
                             input_samples=len(pcm) // 2,
                             sample_rate_hz=settings.target_sample_rate_hz,
+                            cleanup_complete=outcome.cleanup_complete,
+                            secondary_diagnostics=outcome.secondary_diagnostics,
                         )
-                        if outcome.result == "succeeded":
+                        if outcome.result == "succeeded" and outcome.cleanup_complete:
                             result.pop("error", None)
                         else:
                             result["error"] = {"code": "recognition_probe_no_final_result"}
-                        if outcome.failure_category is not None:
-                            result["failure_category"] = outcome.failure_category
-    except asyncio.CancelledError:
+                        diagnostics = outcome.diagnostics
+                        if diagnostics is None and outcome.result != "succeeded":
+                            diagnostics = ErrorDiagnostics(
+                                component="recognition_probe",
+                                operation="recognition_probe",
+                                code="recognition_probe_no_final_result",
+                                category="invalid_response",
+                                visibility="diagnostic_only",
+                                content_policy="metadata_only",
+                                status_code=None,
+                                retry_after_ms=None,
+                                fields={},
+                            )
+                        if diagnostics is not None:
+                            diagnostics = replace(diagnostics, channel=channel)
+                            result.update(
+                                diagnostics=diagnostics,
+                                diagnostic_id=diagnostics.diagnostic_id,
+                                failure_category=diagnostics.category,
+                            )
+    except asyncio.CancelledError as exc:
         result.update(status="cancelled", recognition_result="cancelled")
         result.pop("error", None)
+        result["secondary_diagnostics"] = tuple(
+            item
+            for item in (
+                getattr(exc, "failure_diagnostics", None),
+                *getattr(exc, "secondary_diagnostics", ()),
+            )
+            if isinstance(item, ErrorDiagnostics)
+        )
     except Exception as exc:
         failure = exc
+        result["secondary_diagnostics"] = tuple(
+            item
+            for item in getattr(exc, "secondary_diagnostics", ())
+            if isinstance(item, ErrorDiagnostics)
+        )
     current = runtime_provider()
     result["current_generation"] = (
         current.recognition_probe_handle(channel).generation if current is not None else None
@@ -163,6 +216,21 @@ async def run_recognition_probe(
         settings_revision_provider() if settings_revision_provider is not None else None
     )
     result["current_settings_revision"] = current_revision
+    if failure is not None:
+        diagnostics = stt_failure_report(
+            failure,
+            provider=settings.provider_id if settings is not None else "recognition",
+            channel=channel,
+            operation="recognition_probe",
+        ).diagnostics
+        result.update(
+            status="failed",
+            recognition_result="failed",
+            error={"code": "recognition_probe_failed"},
+            failure_category=diagnostics.category,
+            diagnostics=diagnostics,
+            diagnostic_id=diagnostics.diagnostic_id,
+        )
     task = asyncio.current_task()
     if result["status"] == "cancelled" or (task is not None and task.cancelling()):
         result.update(status="cancelled", recognition_result="cancelled")
@@ -181,19 +249,5 @@ async def run_recognition_probe(
             "status": "failed",
             "recognition_result": "stale",
             "error": {"code": "stale_provider_completion"},
-        }
-    if failure is not None:
-        diagnostics = stt_failure_report(
-            failure,
-            provider=settings.provider_id if settings is not None else "recognition",
-            channel=channel,
-            operation="recognition_probe",
-        ).diagnostics
-        return {
-            **result,
-            "status": "failed",
-            "recognition_result": "failed",
-            "error": {"code": "recognition_probe_failed"},
-            "failure_category": diagnostics.category,
         }
     return result

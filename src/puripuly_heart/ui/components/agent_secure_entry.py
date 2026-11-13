@@ -6,8 +6,10 @@ from collections.abc import Callable
 
 from puripuly_heart.app.ports.agent_chat import AgentSecureEntryRequest
 from puripuly_heart.app.services.agent_chat.provider_setup import PROVIDER_SETUPS
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.ui.components.settings.api_key_verification_controller import (
     ApiKeyVerificationController,
+    CompletionHandler,
     SaveHandler,
     VerifyHandler,
 )
@@ -46,7 +48,7 @@ class AgentSecureEntryController:
         value: str,
         *,
         is_current: Callable[[], bool],
-        complete: Callable[[str, bool, str | None], None],
+        complete: CompletionHandler,
     ) -> dict:
         setup = PROVIDER_SETUPS.get(request.provider)
         if setup is None or not value or not is_current():
@@ -82,11 +84,13 @@ class AgentSecureEntryController:
             self._persist_verification(provider, credential, result.status == "verified")
             return result
 
-        def on_complete(provider: str, success: bool, code: str | None) -> None:
+        def on_complete(
+            provider: str, success: bool, code: str | None, diagnostics: ErrorDiagnostics | None
+        ) -> None:
             if not current() or completion:
                 return
             completion.update(status="verified" if success else "failed")
-            complete(provider, success, code)
+            complete(provider, success, code, diagnostics)
 
         controller = ApiKeyVerificationController(
             secret_key=setup.secret_key.value,

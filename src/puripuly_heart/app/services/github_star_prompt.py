@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
 
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, GithubStarPromptState
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 
 GITHUB_STAR_PROMPT_ELIGIBLE_LAUNCH_THRESHOLD = 5
@@ -124,6 +125,21 @@ class GithubStarPromptOwner:
             self._persistence_lock = asyncio.Lock()
         return self._persistence_lock
 
+    @property
+    def failure_diagnostics(self) -> ErrorDiagnostics | None:
+        return self._runtime.failure_diagnostics if self._runtime is not None else None
+
+    def _record_save_failure(self, context: str, exception: Exception) -> None:
+        self.get_runtime().record_failure(
+            exception,
+            "prompt_rollback" if context == "open state rollback" else "prompt_persist",
+            code="github_star_prompt_save_failed",
+        )
+        try:
+            self.log_save_failure(context, exception)
+        except Exception:
+            pass
+
     def get_runtime(self) -> GithubStarPromptRuntime:
         if self._runtime is None:
             self._runtime = GithubStarPromptRuntime(
@@ -183,7 +199,7 @@ class GithubStarPromptOwner:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                self.log_save_failure(failure_context, exc)
+                self._record_save_failure(failure_context, exc)
                 return False
 
     async def persist_opened(
@@ -212,7 +228,7 @@ class GithubStarPromptOwner:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                self.log_save_failure("open state", exc)
+                self._record_save_failure("open state", exc)
                 return False
             if not persisted:
                 return False
@@ -226,7 +242,7 @@ class GithubStarPromptOwner:
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
-                    self.log_save_failure("open state rollback", exc)
+                    self._record_save_failure("open state rollback", exc)
                 return False
             return True
 

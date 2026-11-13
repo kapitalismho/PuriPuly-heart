@@ -486,12 +486,20 @@ async def test_install_failure_retains_admission_identity_and_safe_native_cause(
             assert result.failed_model_ids == ()
             assert records == []
             assert events == []
+            assert result.failure_diagnostics is None
         else:
             assert result.cancelled is False
             assert result.failed_model_ids == (FUN_ASR_NANO_MODEL_ID,)
             assert result.snapshot.state_for(FUN_ASR_NANO_MODEL_ID).status == "download_failed"
+            diagnostics = result.failure_diagnostics
+            assert (
+                diagnostics is result.snapshot.state_for(FUN_ASR_NANO_MODEL_ID).failure_diagnostics
+            )
+            assert diagnostics.operation_id == operation
+            assert diagnostics.request_id == request
             assert len(records) == 1
             record = records[0]
+            assert record["diagnostic_id"] == diagnostics.diagnostic_id
             assert record["component"] == "local_asr_provisioning"
             assert record["operation"] == "models.install"
             assert record["stage"] == "installation"
@@ -893,6 +901,11 @@ async def test_composed_installer_failure_reconciles_results_safe_diagnostics_an
             assert secondary["fields"]["exception_class"] == "PermissionError"
             assert secondary["fields"]["errno"] == errno.EACCES
             assert secondary["fields"]["model_id"] == manifest.model_id
+            assert result.failure_diagnostics is not None
+            retained = result.failure_diagnostics
+            cleanup = retained if mode == "cancel" else retained.causes[-1]
+            assert cleanup.fields["exception_class"] == "PermissionError"
+            assert cleanup.fields["errno"] == errno.EACCES
             assert secondary["request_id"] == request_id
             assert secondary["disposition"] == "failed"
             assert (

@@ -726,7 +726,12 @@ def _stream_latency_snapshot(utterance_id, *, final):
 @pytest.mark.asyncio
 async def test_managed_failed_first_page_releases_guard_but_retains_first_success_latency():
     class SelectiveSender(FakeSender):
+        def __init__(self):
+            super().__init__()
+            self.attempted = []
+
         def send_chatbox(self, text):
+            self.attempted.append(text)
             if text != "ijkl":
                 raise OSError("send failed")
             super().send_chatbox(text)
@@ -765,16 +770,51 @@ async def test_managed_failed_first_page_releases_guard_but_retains_first_succes
             if decision.metadata.get("stage") == "self_stream_delivery"
         ]
         assert dispositions == ["output_send_failed"]
+        page_failures = [
+            decision
+            for decision in runtime.routing_decisions
+            if decision.metadata.get("stage") == "chatbox_page_delivery"
+        ]
+        assert len(page_failures) == 1
+        assert page_failures[0].reason == "page_send_failed"
+        stream_failure = next(
+            decision
+            for decision in runtime.routing_decisions
+            if decision.metadata.get("stage") == "self_stream_delivery"
+        )
+        assert stream_failure.publication_id == page_failures[0].publication_id == str(utterance_id)
+        assert stream_failure.metadata["presentation_revision"] == (
+            page_failures[0].metadata["presentation_revision"]
+        )
+        assert stream_failure.diagnostics.code == "osc_local_send_failed"
+        assert page_failures[0].diagnostics.code == "osc_local_send_failed"
+        assert (
+            stream_failure.diagnostics.diagnostic_id != page_failures[0].diagnostics.diagnostic_id
+        )
+        assert page_failures[0].diagnostics.diagnostic_id == (
+            paginator.last_failure_diagnostics.diagnostic_id
+        )
+        assert sender.attempted == ["abcd", "efgh", "ijkl"]
+        assert "send failed" not in repr([stream_failure, *page_failures])
         assert owner.snapshot().timeline_keys == frozenset()
     finally:
         await runtime.close()
 
 
 @pytest.mark.asyncio
-async def test_promoted_preview_measures_final_acceptance_without_inventing_final_send():
+@pytest.mark.parametrize("fail_later_page", [False, True])
+async def test_promoted_preview_measures_final_acceptance_without_inventing_final_send(
+    fail_later_page,
+):
+    class SelectiveSender(FakeSender):
+        def send_chatbox(self, text):
+            if fail_later_page and text == "efgh":
+                raise OSError("private-page-failure")
+            super().send_chatbox(text)
+
     clock = FakeClock(_now=10.0)
     logging = RuntimeLogging()
-    sender = FakeSender()
+    sender = SelectiveSender()
     owner, paginator, runtime, projection = _stream_latency_projection(clock, logging, sender)
     pages = []
 
@@ -822,8 +862,30 @@ async def test_promoted_preview_measures_final_acceptance_without_inventing_fina
         assert len(logging.basic) == 1
         clock.advance(3.0)
         paginator.process_due()
-        assert sender.sent == ["abcd", "efgh"]
-        assert pages == [(0, True, False), (1, False, True)]
+        assert sender.sent == (["abcd"] if fail_later_page else ["abcd", "efgh"])
+        assert pages == (
+            [(0, True, False)] if fail_later_page else [(0, True, False), (1, False, True)]
+        )
+        page_failures = [
+            decision
+            for decision in runtime.routing_decisions
+            if decision.metadata.get("stage") == "chatbox_page_delivery"
+        ]
+        assert len(page_failures) == int(fail_later_page)
+        if fail_later_page:
+            assert page_failures[0].reason == "page_send_failed"
+            assert page_failures[0].publication_id == str(utterance_id)
+            assert page_failures[0].diagnostics.code == "osc_local_send_failed"
+            assert "private-page-failure" not in repr(page_failures)
+        assert [
+            decision.reason
+            for decision in runtime.routing_decisions
+            if decision.metadata.get("stage") == "self_stream_delivery"
+        ] == ["first_page_sent"]
+        clock.advance(3.0)
+        paginator.process_due()
+        assert sender.sent == (["abcd", "ijkl"] if fail_later_page else ["abcd", "efgh", "ijkl"])
+        assert pages[-1] == (2, False, True)
         assert len(logging.basic) == 1
         assert owner.snapshot().timeline_keys == frozenset()
     finally:

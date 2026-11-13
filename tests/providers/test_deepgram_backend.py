@@ -707,6 +707,10 @@ async def test_deepgram_unanswered_close_terminates_real_transport_within_owner_
             assert protocol.connection_lost_waiter.done()
             assert websocket_keepalive_task.done()
             assert all(client.is_closed for client in created_http_clients)
+            if not cancel:
+                assert session.cleanup_diagnostics is not None
+                assert session.cleanup_diagnostics.fields["cleanup_confirmed"] is True
+                assert session.cleanup_diagnostics.category == "timeout"
             assert session._run_task is None
             assert all(
                 task.done()

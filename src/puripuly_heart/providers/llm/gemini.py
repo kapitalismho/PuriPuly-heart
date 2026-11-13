@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -143,6 +144,7 @@ class GeminiLLMProvider:
         client = None
         http_options = None
         primary_failure = None
+        primary_exception = None
         try:
             from google import genai  # type: ignore
 
@@ -152,19 +154,32 @@ class GeminiLLMProvider:
             async for entry in await client.aio.models.list(config={"page_size": 1000}):
                 if not requested_model or _model_entry_matches(entry, requested_model):
                     return True
-            primary_failure = record_probe_failure(None, provider="gemini")
-            return False
+            raise LLMResponseError(
+                "Gemini key probe did not list the requested model",
+                provider="gemini",
+                operation="probe",
+            )
+        except asyncio.CancelledError as exc:
+            primary_exception = exc
+            raise
         except Exception as exc:
+            primary_exception = exc
             primary_failure = record_probe_failure(exc, provider="gemini")
-            return False
+            exc.failure_diagnostics = primary_failure
+            raise
         finally:
             try:
                 await _close_owned_client(client, http_options)
             except Exception as exc:
-                record_probe_cleanup_failure(
+                cleanup_failure = record_probe_cleanup_failure(
                     exc, provider="gemini", primary_failure=primary_failure
                 )
-                if primary_failure is None:
+                if primary_failure is not None:
+                    primary_exception.failure_diagnostics = replace(
+                        primary_failure, causes=(*primary_failure.causes, cleanup_failure)
+                    )
+                elif primary_exception is None:
+                    exc.failure_diagnostics = cleanup_failure
                     raise
 
 

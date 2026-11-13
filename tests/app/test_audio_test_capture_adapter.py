@@ -54,6 +54,7 @@ class Recorder:
         self.events: list[tuple[object, ...]] = []
         self.frames = 0
         self.ready = asyncio.Event()
+        self.diagnostics = []
 
     def request(
         self,
@@ -79,10 +80,13 @@ class Recorder:
             opener=opener,
             ready_on_open=ready_on_open,
             frame_timeout_s=frame_timeout_s,
-            opened_callback=lambda gen, device: self.events.append(("opened", gen, device)),
+            opened_callback=lambda gen, device, recovery: self.events.append(
+                ("opened", gen, device)
+            ),
             ready_callback=on_ready,
-            failure_callback=lambda gen, reason, cause: self.events.append(
-                ("failed", gen, reason, cause)
+            failure_callback=lambda gen, reason, cause, diagnostics: (
+                self.events.append(("failed", gen, reason, cause)),
+                self.diagnostics.append(diagnostics),
             ),
             frame_callback=on_frame,
         )
@@ -169,6 +173,9 @@ async def test_open_failures_are_reported_without_readiness_or_source(error, exp
     assert not recorder.ready.is_set()
     assert runtime.source is None
     assert any(f"reason={expected[0]}" in line for line in logs)
+    assert len(recorder.diagnostics) == 1
+    assert recorder.diagnostics[0].code in {"source_open_failed", expected[0]}
+    assert "device busy" not in repr(recorder.diagnostics[0])
 
 
 @pytest.mark.asyncio
@@ -225,4 +232,27 @@ async def test_stale_generation_closes_opened_source_without_reporting() -> None
 
     assert source.closed.is_set()
     assert recorder.events == []
+    assert runtime.source is None
+
+
+@pytest.mark.asyncio
+async def test_failed_log_sink_cannot_replace_source_failure_or_callback():
+    runtime = AudioTestCaptureRuntime(cancel_timeout_s=0.5)
+    recorder = Recorder()
+
+    def broken_log(message):
+        raise OSError("PRIVATE-LOG-PATH")
+
+    adapter = AudioTestCaptureAdapter(log_sink=broken_log)
+    task = runtime.start(
+        lambda generation: adapter.capture(
+            recorder.request(Opener(PermissionError("PRIVATE-SOURCE-PATH")), generation),
+            runtime=runtime,
+        )
+    )
+    await task
+    assert recorder.failures() == [("failed", 1, "source_open_failed", "PermissionError")]
+    assert recorder.diagnostics[0].code == "source_open_failed"
+    assert recorder.diagnostics[0].fields["exception_class"] == "PermissionError"
+    assert "PRIVATE" not in repr(recorder.diagnostics)
     assert runtime.source is None

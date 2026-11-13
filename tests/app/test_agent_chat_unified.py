@@ -13,6 +13,7 @@ from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from tests.app.test_agent_chat import Records, Responses, answer
 from tests.app.test_agent_chat_control_execution import ExecutionControl, tools_for
 from tests.app.test_agent_chat_tools import catalog as catalog
+from tests.app.test_diagnostic_consumers import PRIVATE, HistorySink, failure
 
 
 def call(identity, family, action, **arguments):
@@ -33,30 +34,64 @@ def batch(*calls):
 
 
 @pytest.mark.asyncio
-async def test_three_topic_reads_keep_independent_results_on_partial_failure(catalog):
+@pytest.mark.parametrize("failure_mode", ["query", "exception", "cancelled"])
+async def test_three_topic_reads_keep_independent_results_on_partial_failure(
+    catalog, monkeypatch, failure_mode
+):
     control = Records()
     control.values["settings.choices"] = catalog
     control.fail.add("gpu.status")
+    original = failure()
     transport = Responses(
         batch(
             call("output", "read_app", "output"),
-            call("gpu", "read_app", "gpu"),
+            call("gpu", "read_app", "gpu" if failure_mode == "query" else "general"),
             call("diagnostics", "read_app", "diagnostics"),
         ),
+        batch(call("report", "manage_proposal", "report", summary="Synthetic read failure.")),
         answer(),
     )
     owner = AgentChatOwner(control, transport, localize=str)
     await owner.start()
+    context = owner._context
+
+    async def controlled_context(**arguments):
+        if failure_mode != "query" and arguments.get("topic") == "general":
+            if failure_mode == "cancelled":
+                raise asyncio.CancelledError
+            error = RuntimeError(PRIVATE)
+            error.failure_diagnostics = original
+            raise error
+        return await context(**arguments)
+
+    monkeypatch.setattr(owner, "_context", controlled_context)
     try:
         result = await owner.send("Inspect OSC, GPU and diagnostics.")
         assert [(item.call_id, item.status) for item in result.tool_results] == [
             ("output", "unchanged"),
             ("gpu", "unavailable"),
             ("diagnostics", "observed"),
+            ("report", "pending"),
         ]
         diagnostics = result.tool_results[2].result["context"]
         assert diagnostics["view"] == "diagnostics" and "core" not in diagnostics
-        assert len(transport.requests) == 2
+        assert len(transport.requests) == 3
+        failed = result.tool_results[1].result
+        if failure_mode == "exception":
+            cause = failed["diagnostics"]
+            assert cause["code"] == "agent_tool_failed"
+            assert cause["fields"]["exception_class"] == "RuntimeError"
+            (origin,) = cause["causes"]
+            assert origin["diagnostic_id"] == original.diagnostic_id
+            assert origin["status_code"] == 403
+            assert cause["disposition"] == "failed"
+            assert cause["file_evidence"] == "unavailable"
+            assert original.diagnostic_id in json.dumps(transport.requests[1]["input"])
+        elif failure_mode == "cancelled":
+            assert "diagnostics" not in failed
+        assert all(request["allow_tools"] for request in transport.requests)
+        assert len(owner.snapshot.report_offers) == 1
+        assert PRIVATE not in json.dumps([item.result for item in result.tool_results])
     finally:
         await owner.close()
 
@@ -461,23 +496,41 @@ async def test_settings_ui_stops_dependent_actions_until_user_continuation(catal
 
 
 @pytest.mark.asyncio
-async def test_failed_peer_owner_probe_continues_to_diagnostics_and_user_click_report():
+@pytest.mark.parametrize("compound", [False, True])
+async def test_failed_peer_owner_probe_continues_to_diagnostics_and_user_click_report(compound):
     import httpx
 
-    from tests.app.test_agent_chat_report import ReportResponses
+    from puripuly_heart.core.llm.fallback_racing import LLMProviderRaceError
+    from tests.app.test_agent_chat_report import ReportResponses, contents
     from tests.app.test_translation_probe import ControlledBackend, control_for
 
-    backend = ControlledBackend(failure=httpx.ConnectError("PRIVATE-ENDPOINT"))
+    errors = tuple(
+        httpx.HTTPStatusError(
+            PRIVATE,
+            request=httpx.Request("POST", "https://example.invalid/private"),
+            response=httpx.Response(status, json={"message": PRIVATE}),
+        )
+        for status in (403, 403, 404)
+    )
+    backend = ControlledBackend(
+        failure=LLMProviderRaceError(errors) if compound else httpx.ConnectError("PRIVATE-ENDPOINT")
+    )
     production, runtime = control_for(
         backend,
         source_language="ko",
         target_language="en",
+        secondary_target_language="de",
         peer_source_language="ja",
         peer_target_language="ko",
     )
+    sink = HistorySink(production.instance_id)
+    production.application._runtime_logging = sink
 
     class LinkedControl(Records):
         async def query(self, name, arguments):
+            if name in {"diagnostics.history", "diagnostics.health"}:
+                self.queries.append((name, arguments))
+                return await production.query(name, arguments)
             if name == "settings.choices":
                 self.queries.append((name, arguments))
                 raise RuntimeError("Settings catalog unavailable")
@@ -503,7 +556,7 @@ async def test_failed_peer_owner_probe_continues_to_diagnostics_and_user_click_r
     catalog_counts = []
     transport = LinkedResponses(
         batch(
-            call("peer", "probe_app", "translation.peer"),
+            call("peer-0123456789abcdef", "probe_app", "translation.peer"),
             call("dependent", "set_app", "overlay", enabled=True),
             call("diagnostics", "read_app", "diagnostics"),
         ),
@@ -512,7 +565,7 @@ async def test_failed_peer_owner_probe_continues_to_diagnostics_and_user_click_r
                 "report",
                 "manage_proposal",
                 "report",
-                summary="Peer translation failed during the isolated network check.",
+                summary="Peer translation failed during the isolated provider check.",
             )
         ),
         answer(
@@ -527,22 +580,39 @@ async def test_failed_peer_owner_probe_continues_to_diagnostics_and_user_click_r
         result = await owner.send(
             "Check Peer translation, inspect the failure and offer a developer report."
         )
-        assert [item.status for item in result.tool_results] == [
-            "failed",
-            "not_executed",
-            "observed",
-            "pending",
+        assert [(item.call_id, item.status) for item in result.tool_results] == [
+            ("peer-0123456789abcdef", "failed"),
+            ("dependent", "not_executed"),
+            ("diagnostics", "observed"),
+            ("report", "pending"),
         ]
         receipt = result.tool_results[0].result["receipt"]
         assert receipt["channel"] == "peer"
         assert receipt["source_language"] == "ja" and receipt["target_languages"] == ["ko"]
         assert receipt["translation_result"] == "failed"
-        assert receipt["failure_category"] == "network"
+        assert receipt["failure_category"] == ("unknown" if compound else "network")
         assert receipt["output_delivery"] == receipt["display"] == "not_exercised"
         assert backend.requests[0].source_language == "ja"
         assert backend.requests[0].target_language == "ko"
         assert len(backend.requests) == 1
         assert result.tool_results[2].result["context"]["view"] == "diagnostics"
+        cause = receipt["diagnostics"]
+        assert cause["code"] == ("provider.compound_failure" if compound else "provider.network")
+        assert cause["request_id"] == receipt["request_id"] == "peer-0123456789abcdef"
+        assert cause["operation_id"] == receipt["operation_id"]
+        assert cause["turn_id"] == str(backend.requests[0].utterance_id)
+        assert receipt["target_results"][0]["diagnostic_id"] == cause["diagnostic_id"]
+        history = await production.query(
+            "diagnostics.history", {"operation_id": receipt["operation_id"]}
+        )
+        assert history["records"] == [cause]
+        diagnostics = result.tool_results[2].result["context"]["diagnostics"]["records"]
+        compact = model_context(await owner._context(), modules=("core",))
+        (operation,) = compact["core"]["operations"]
+        assert operation["channel"] == "peer"
+        assert operation["tool"] == "translation.probe"
+        assert operation["operation_id"] == receipt["operation_id"]
+        assert operation["target_results"][0]["turn_id"] == cause["turn_id"]
         assert all(request["allow_tools"] for request in transport.requests)
         assert len(transport.requests) == 3
         assert catalog_counts[1] == catalog_counts[2]
@@ -553,6 +623,23 @@ async def test_failed_peer_owner_probe_continues_to_diagnostics_and_user_click_r
         uploaded = await owner.send_report(offer.id)
         assert uploaded["status"] == "sent"
         assert len(transport.uploads) == 1
+        meta = json.loads(contents(transport.uploads[0]["bundle"])["meta.json"])
+        assert meta["diagnostics"]["availability"] == "retained_current_run"
+        for projected in (
+            cause,
+            diagnostics[0],
+            operation["diagnostics"],
+            meta["diagnostics"]["records"][0],
+        ):
+            assert projected["diagnostic_id"] == cause["diagnostic_id"]
+            assert projected["operation_id"] == receipt["operation_id"]
+            assert projected["request_id"] == cause["request_id"]
+            assert projected["turn_id"] == cause["turn_id"]
+            assert [item["status_code"] for item in projected.get("causes", [])] == (
+                [403, 403, 404] if compound else []
+            )
+        assert PRIVATE not in json.dumps([history, compact, meta])
+        assert "configured_provider" not in receipt
         assert "PRIVATE-" not in json.dumps([item.result for item in result.tool_results])
     finally:
         await owner.close()

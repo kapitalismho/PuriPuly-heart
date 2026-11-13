@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
@@ -618,6 +619,8 @@ async def test_real_worker_activation_failure_retains_locked_audio_directory_unt
         primary = caught.value.failure_diagnostics
         assert primary is not None
         assert primary.operation_id == operation_id and primary.request_id == request_id
+        assert len(primary.fields["provider_request_id"]) == 32
+        assert primary.fields["provider_request_id"] != request_id
         assert primary.fields["native_classification"] == "out_of_memory"
         assert runtime.state == GpuASRRuntimeState.FAILED
         assert runtime.startup_cleanup_snapshot["pending_temporary_directories"] == 1
@@ -692,3 +695,61 @@ async def test_first_real_startup_failure_is_retained_with_explicit_admission_id
     finally:
         await runtime.close()
         finish(root, sinks, service)
+
+
+@pytest.mark.parametrize(
+    "native",
+    [
+        {"native_reason": "output_repetition", "native_status": 15},
+        {"native_reason": "PRIVATE_NATIVE_BODY", "native_status": True},
+        {"native_reason": "input_too_long", "native_status": 2**40},
+    ],
+)
+async def test_native_response_retains_validated_cause_when_logging_fails(
+    tmp_path, monkeypatch, native
+):
+    import json
+
+    from puripuly_heart.core.diagnostics import serialize_diagnostics
+    from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+
+    monkeypatch.setenv("FAKE_ASR_WORKER_STARTED_FAILURE", "1")
+    monkeypatch.setenv(
+        "FAKE_ASR_WORKER_FAILURE_FIELDS",
+        json.dumps({**native, "message": "PRIVATE_NATIVE_BODY", "partial": "PRIVATE_TRANSCRIPT"}),
+    )
+    client = await _factory().start(mode="persistent")
+    request_id = uuid4().hex
+    try:
+        await client.next_event()
+
+        def fail_log(*args, **kwargs):
+            raise OSError(28, "PRIVATE_LOG_PATH")
+
+        monkeypatch.setattr(asr_worker_process_module.logger, "log", fail_log)
+        with pytest.raises(ASRWorkerRequestError) as caught:
+            await client.transcribe(
+                request_id=request_id, channel="self", audio_path=tmp_path / "synthetic.wav"
+            )
+        primary = caught.value.failure_diagnostics
+        diagnostics = recognition_failure_diagnostics(
+            caught.value,
+            provider="local_fun_asr_nano",
+            channel="self",
+            operation="decode",
+            reason="local_decode_failed",
+        )
+        assert diagnostics.diagnostic_id == primary.diagnostic_id
+        assert diagnostics.request_id == request_id
+        assert diagnostics.fields["worker_session_id"] == client.session_id
+        assert diagnostics.fields["native_classification"] == "decode_failure"
+        if native["native_reason"] != "PRIVATE_NATIVE_BODY":
+            assert diagnostics.fields["native_reason"] == native["native_reason"]
+        if type(native["native_status"]) is int and native["native_status"] < 2**31:
+            assert diagnostics.fields["native_status"] == native["native_status"]
+        else:
+            assert "native_status" not in diagnostics.fields
+        assert "PRIVATE" not in repr(serialize_diagnostics(diagnostics))
+        assert "message" not in caught.value.fields and "partial" not in caught.value.fields
+    finally:
+        await client.close()

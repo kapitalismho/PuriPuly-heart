@@ -617,3 +617,188 @@ async def test_setup_ready_cancel_race_releases_exactly_once(
         assert len(made) == 1
         _assert_resources_released_once(made[0])
         assert stt._teardown_done is True
+
+
+async def test_cleanup_failure_keeps_primary_and_retries_only_unconfirmed_resource(monkeypatch):
+    from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+
+    made = []
+    _patch_prepare(monkeypatch, made)
+    session = _direct_session(_RecordingFactory(_FakeLiveSession()))
+    await session.start()
+    primary = recognition_failure_diagnostics(
+        TimeoutError("PRIVATE_PROVIDER_DETAIL"),
+        provider="gemini_transcribe",
+        channel="self",
+        operation="receive",
+        reason="gemini_receive_failed",
+    )
+    session._failure_diagnostics = primary
+    resources = made[0]
+    close = resources.async_transport.aclose
+    attempts = 0
+
+    async def fail_once():
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise PermissionError(13, "PRIVATE_RESOURCE_PATH")
+        await close()
+
+    resources.async_transport.aclose = fail_once
+    with pytest.raises(ExceptionGroup) as caught:
+        await session.close()
+    assert session._teardown_done is False
+    assert caught.value.failure_diagnostics.cause_id == primary.diagnostic_id
+    assert "PRIVATE" not in repr(caught.value.failure_diagnostics)
+    assert resources.client.close_calls == 1
+    assert resources.sync_transport.close_calls == 1
+    assert not resources.async_transport.closed
+    await session.close()
+    assert attempts == 2 and resources.async_transport.closed
+    assert session._teardown_done
+    assert resources.client.close_calls == resources.sync_transport.close_calls == 1
+
+
+async def test_cancelled_close_keeps_cancellation_and_failed_resource_debt(monkeypatch):
+    from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+
+    made = []
+    _patch_prepare(monkeypatch, made)
+    session = _direct_session(_RecordingFactory(_FakeLiveSession()))
+    await session.start()
+    primary = recognition_failure_diagnostics(
+        TimeoutError("PRIVATE_PRIMARY"),
+        provider="gemini_transcribe",
+        channel="self",
+        operation="receive",
+        reason="gemini_receive_failed",
+    )
+    session._failure_diagnostics = primary
+    resources = made[0]
+    close = resources.async_transport.aclose
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    fail = True
+
+    async def controlled_close():
+        entered.set()
+        await release.wait()
+        if fail:
+            raise PermissionError(13, "PRIVATE_CLEANUP")
+        await close()
+
+    resources.async_transport.aclose = controlled_close
+    closing = asyncio.create_task(session.close())
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        closing.cancel()
+        await asyncio.sleep(0)
+        closing.cancel()
+        assert not closing.done()
+        release.set()
+        with pytest.raises(asyncio.CancelledError) as caught:
+            await closing
+        assert closing.cancelled()
+        diagnostics = caught.value.failure_diagnostics
+        assert diagnostics.cause_id == primary.diagnostic_id
+        assert diagnostics.fields["cleanup_confirmed"] is False
+        assert "PRIVATE" not in repr(diagnostics)
+        assert isinstance(caught.value.__cause__, ExceptionGroup)
+        assert len(session._cleanup_retry) == 1 and not session._teardown_done
+        assert not resources.async_transport.closed
+        fail = False
+        await session.close()
+        assert session._teardown_done and not session._cleanup_retry
+        _assert_resources_released_once(resources)
+    finally:
+        fail = False
+        release.set()
+        await asyncio.gather(closing, return_exceptions=True)
+        await session.close()
+
+
+async def test_startup_cleanup_debt_blocks_new_gemini_setup_until_confirmed(monkeypatch):
+    made = []
+    fail = True
+
+    def prepare(api_key, language_codes, custom_vocabulary):
+        resources = _stub_resources(language_codes, custom_vocabulary)
+        close = resources.async_transport.aclose
+
+        async def controlled_close():
+            if fail:
+                raise PermissionError(13, "PRIVATE_STARTUP_CLEANUP")
+            await close()
+
+        resources.async_transport.aclose = controlled_close
+        made.append(resources)
+        return resources
+
+    def reject_live(*, model, config):
+        raise ValueError("PRIVATE_STARTUP_FAILURE")
+
+    monkeypatch.setattr(gemini_module, "_prepare_gemini_resources_sync", prepare)
+    backend = GeminiTranscribeSTTBackend(api_key="synthetic-key", live_connect_factory=reject_live)
+    try:
+        with pytest.raises(ValueError):
+            await backend.open_session()
+        assert len(made) == len(backend._starting_sessions) == 1
+        with pytest.raises(ExceptionGroup):
+            await backend.open_session()
+        assert len(made) == len(backend._starting_sessions) == 1
+        fail = False
+        await backend.close()
+        assert not backend._starting_sessions
+        _assert_resources_released_once(made[0])
+    finally:
+        fail = False
+        await backend.close()
+
+
+async def test_cancelled_failed_startup_keeps_debt_owned_by_backend(monkeypatch):
+    made = []
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    fail = True
+
+    def prepare(api_key, language_codes, custom_vocabulary):
+        resources = _stub_resources(language_codes, custom_vocabulary)
+        close = resources.async_transport.aclose
+
+        async def controlled_close():
+            entered.set()
+            await release.wait()
+            if fail:
+                raise PermissionError(13, "PRIVATE_CANCELLED_STARTUP_CLEANUP")
+            await close()
+
+        resources.async_transport.aclose = controlled_close
+        made.append(resources)
+        return resources
+
+    def reject_live(*, model, config):
+        raise ValueError("PRIVATE_STARTUP_FAILURE")
+
+    monkeypatch.setattr(gemini_module, "_prepare_gemini_resources_sync", prepare)
+    backend = GeminiTranscribeSTTBackend(api_key="synthetic-key", live_connect_factory=reject_live)
+    opening = asyncio.create_task(backend.open_session())
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        opening.cancel()
+        release.set()
+        with pytest.raises(asyncio.CancelledError) as caught:
+            await opening
+        assert opening.cancelled()
+        assert caught.value.failure_diagnostics.fields["cleanup_confirmed"] is False
+        assert len(backend._starting_sessions) == len(made) == 1
+        assert not made[0].async_transport.closed
+        fail = False
+        await backend.close()
+        assert not backend._starting_sessions
+        _assert_resources_released_once(made[0])
+    finally:
+        fail = False
+        release.set()
+        await asyncio.gather(opening, return_exceptions=True)
+        await backend.close()

@@ -7,6 +7,7 @@ import tempfile
 import time
 import webbrowser
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -45,6 +46,7 @@ from puripuly_heart.config.provider_values import QwenRegion
 from puripuly_heart.core.diagnostics import (
     diagnostic_operation,
     emit_failure,
+    exception_diagnostics,
     safe_exception_fields,
 )
 from puripuly_heart.core.discord.discord_oauth_loopback import (
@@ -118,6 +120,15 @@ from puripuly_heart.ui.views.settings import SettingsView
 
 logger = logging.getLogger(__name__)
 
+
+def _ui_failure(operation: str, error: Exception) -> ErrorDiagnostics:
+    diagnostics = exception_diagnostics(
+        error, component="ui_application", operation=operation, code="ui_boundary_failed"
+    )
+    emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage=operation)
+    return diagnostics
+
+
 DEFAULT_WINDOW_WIDTH = FOUNDATION_DESIGN_TOKENS.window.width
 DEFAULT_WINDOW_HEIGHT = FOUNDATION_DESIGN_TOKENS.window.height
 APP_CONTENT_PADDING = FOUNDATION_DESIGN_TOKENS.spacing.page
@@ -176,20 +187,19 @@ class _AgentDictationSource:
         return restore
 
 
-async def _prepare_and_show_main_window(page: ft.Page) -> None:
+async def _prepare_and_show_main_window(page: ft.Page) -> ErrorDiagnostics | None:
+    diagnostics = None
     try:
         page.update()
 
         await page.window.wait_until_ready_to_show()
         await page.window.center()
-    except Exception:
-        logger.warning(
-            "Failed to center the main window before showing it",
-            exc_info=True,
-        )
+    except Exception as exc:
+        diagnostics = _ui_failure("window_center", exc)
     finally:
         page.window.visible = True
         page.update()
+    return diagnostics
 
 
 def founder_readme_url_for_locale(locale: str | None) -> str:
@@ -367,6 +377,19 @@ class TranslatorApp:
     def application(self) -> UiApplicationPort:
         return self._ui_application
 
+    @property
+    def boundary_diagnostics(self) -> tuple[ErrorDiagnostics, ...]:
+        return tuple(getattr(self, "_boundary_failures", {}).values())
+
+    def _retain_ui_failure(self, operation: str, error: Exception) -> None:
+        self._retain_ui_diagnostics(operation, _ui_failure(operation, error))
+
+    def _retain_ui_diagnostics(self, operation: str, diagnostics: ErrorDiagnostics | None) -> None:
+        if diagnostics is not None:
+            if not hasattr(self, "_boundary_failures"):
+                self._boundary_failures: dict[str, ErrorDiagnostics] = {}
+            self._boundary_failures[operation] = diagnostics
+
     def _effective_osc_ports(self) -> tuple[int | None, int | None]:
         try:
             value = self.application.effective_osc_ports()
@@ -494,7 +517,7 @@ class TranslatorApp:
             self.page.window.visible = False
             self.page.update()
         except Exception as exc:
-            logger.warning("Failed to hide the main window during shutdown: %s", type(exc).__name__)
+            self._retain_ui_failure("window_hide", exc)
         self._ensure_foundation_runtime().run_application_shutdown_task(
             self._close_after_window_request
         )
@@ -752,10 +775,7 @@ class TranslatorApp:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._log_diagnostic(
-                f"[Startup] GitHub star prompt failed: {exc!r}",
-                level=logging.WARNING,
-            )
+            self._retain_ui_failure("star_prompt", exc)
 
     async def _refresh_openrouter_usage_after_launch(self) -> bool:
         try:
@@ -763,14 +783,11 @@ class TranslatorApp:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._log_diagnostic(
-                f"[Startup] OpenRouter usage refresh failed: {exc!r}",
-                level=logging.WARNING,
-            )
+            self._retain_ui_failure("usage_refresh", exc)
             return False
 
     async def _check_for_update_after_launch(self) -> None:
-        update_kwargs = {"log_diagnostic": self._log_diagnostic}
+        update_kwargs = {}
         try:
             update_parameters = inspect.signature(_check_and_notify_update).parameters
         except TypeError, ValueError:
@@ -788,14 +805,12 @@ class TranslatorApp:
                 self._mark_launch_high_priority_feedback_shown("update", snackbar)
             )
         try:
-            await _check_and_notify_update(self.page, **update_kwargs)
+            diagnostics = await _check_and_notify_update(self.page, **update_kwargs)
+            self._retain_ui_diagnostics("update_check", diagnostics)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._log_diagnostic(
-                f"[Startup] Update check failed: {exc!r}",
-                level=logging.WARNING,
-            )
+            self._retain_ui_failure("update_check", exc)
 
     async def _run_after_launch_runtime_preparation(self) -> None:
         try:
@@ -803,10 +818,7 @@ class TranslatorApp:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._log_diagnostic(
-                f"[Startup] Runtime preparation failed: {exc!r}",
-                level=logging.WARNING,
-            )
+            self._retain_ui_failure("runtime_preparation", exc)
 
     async def _close_ui_task_handle(self, attribute_name: str) -> None:
         handle = getattr(self, attribute_name, None)
@@ -816,15 +828,18 @@ class TranslatorApp:
             handle.cancel()
         try:
             if isinstance(handle, asyncio.Future):
-                await asyncio.gather(handle, return_exceptions=True)
+                results = await asyncio.gather(handle, return_exceptions=True)
+                for result in results:
+                    if isinstance(result, Exception):
+                        self._retain_ui_failure("ui_task_cleanup", result)
             elif inspect.isawaitable(handle):
                 await handle
             else:
                 await asyncio.wrap_future(handle)
         except asyncio.CancelledError:
             pass
-        except Exception:
-            pass
+        except Exception as exc:
+            self._retain_ui_failure("ui_task_cleanup", exc)
         finally:
             if getattr(self, attribute_name, None) is handle:
                 setattr(self, attribute_name, None)
@@ -1954,7 +1969,8 @@ class TranslatorApp:
                 task_name=f"{source}-managed-auth-dialog",
                 generation=generation,
             )
-        except Exception:
+        except Exception as exc:
+            self._retain_ui_failure("managed_auth_admission", exc)
             setattr(self, f"_{source}_managed_auth_generation", previous_generation)
             setattr(self, f"_{source}_managed_auth_cancelled", previous_cancelled)
             set_error = getattr(dialog, "set_error", None)
@@ -2105,7 +2121,8 @@ class TranslatorApp:
                 try:
                     enable_result = await application.set_translation_enabled(True)
                     translation_ready = application.translation_enable_succeeded(enable_result)
-                except Exception:
+                except Exception as exc:
+                    self._retain_ui_failure("discord_translation_start", exc)
                     translation_ready = False
                 if not self._is_current_discord_managed_auth_generation(generation):
                     return
@@ -2122,7 +2139,8 @@ class TranslatorApp:
             except asyncio.CancelledError:
                 if self._is_current_discord_managed_auth_generation(generation):
                     self.mark_discord_managed_auth_failed(generation)
-            except Exception:
+            except Exception as exc:
+                self._retain_ui_failure("discord_auth", exc)
                 self.mark_discord_managed_auth_failed(generation)
             finally:
                 if generation == getattr(self, "_discord_managed_auth_generation", None):
@@ -2679,21 +2697,35 @@ async def main_gui(
     page.on_disconnect = app._on_page_lifecycle_end
     page.on_close = app._on_page_lifecycle_end
     try:
-        await _prepare_and_show_main_window(page)
+        app._window_preparation_diagnostics = await _prepare_and_show_main_window(page)
         await app.application.start()
-    except BaseException:
-        with contextlib.suppress(BaseException):
+    except BaseException as primary:
+        try:
             await app.shutdown()
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            app._startup_cleanup_diagnostics = _ui_failure("startup_cleanup", exc)
+            diagnostics = exception_diagnostics(
+                primary,
+                component="ui_application",
+                operation="gui_startup",
+                code="ui_boundary_failed",
+            )
+            primary.failure_diagnostics = replace(
+                diagnostics,
+                causes=(*diagnostics.causes, app._startup_cleanup_diagnostics),
+            )
         raise
     app.schedule_after_launch_tasks()
 
 
 async def _check_and_notify_update(
     page: ft.Page,
-    log_diagnostic=None,
+    *,
     on_launch_snackbar_shown=None,
     load_update_info=None,
-) -> None:
+) -> ErrorDiagnostics | None:
     """Check for updates and show notification as a toast."""
     try:
         if not callable(load_update_info):
@@ -2750,11 +2782,10 @@ async def _check_and_notify_update(
             on_launch_snackbar_shown(snackbar)
 
     except Exception as exc:
-        message = f"[Update] Check notification failed: {exc}"
-        if callable(log_diagnostic):
-            log_diagnostic(message)
-            return
-        logger.debug(message)
+        diagnostics = getattr(exc, "failure_diagnostics", None)
+        if isinstance(diagnostics, ErrorDiagnostics):
+            return diagnostics
+        return _ui_failure("update_notification", exc)
 
 
 def _chatgpt_failure_message_key(failure_code: str | None) -> str:

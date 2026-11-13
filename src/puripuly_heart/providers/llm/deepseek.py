@@ -12,7 +12,7 @@ from puripuly_heart.core import network_clients
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
-from puripuly_heart.providers.llm.error_details import LLMResponseError, record_probe_failure
+from puripuly_heart.providers.llm.error_details import LLMResponseError
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
@@ -155,29 +155,28 @@ class DeepSeekLLMProvider:
     ) -> bool:
         if not api_key:
             return False
-        try:
-            async with network_clients.external_async_client(timeout=10.0) as client:
-                response = await client.post(
-                    f"{base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": model,
-                        "messages": [{"role": "user", "content": "ping"}],
-                        "thinking": {"type": "disabled"},
-                        "max_tokens": 1,
-                    },
+        async with network_clients.external_async_client(timeout=10.0) as client:
+            response = await client.post(
+                f"{base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": "ping"}],
+                    "thinking": {"type": "disabled"},
+                    "max_tokens": 1,
+                },
+            )
+            if response.status_code != 200:
+                raise LLMResponseError(
+                    "DeepSeek key probe failed",
+                    provider="deepseek",
+                    status_code=response.status_code,
+                    operation="probe",
                 )
-                if response.status_code != 200:
-                    record_probe_failure(
-                        None, provider="deepseek", status_code=response.status_code
-                    )
-                return response.status_code == 200
-        except Exception as exc:
-            record_probe_failure(exc, provider="deepseek")
-            return False
+            return True
 
 
 @dataclass(slots=True)

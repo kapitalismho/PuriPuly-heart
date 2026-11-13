@@ -709,3 +709,33 @@ async def test_router_rechecks_generation_after_outbound_publication() -> None:
     assert result.error == "router_disabled"
     assert projected == []
     await router.close()
+
+
+@pytest.mark.asyncio
+async def test_router_default_logger_failure_does_not_replace_command_failure(monkeypatch) -> None:
+    class FailingApplication(FakeApplication):
+        async def set_translation(self, enabled: bool) -> object:
+            raise PermissionError(13, "command unavailable")
+
+    warning_calls = []
+
+    def fail_warning(*args, **kwargs) -> None:
+        warning_calls.append(args)
+        raise OSError(28, "logging unavailable")
+
+    monkeypatch.setattr(
+        "puripuly_heart.app.services.osc.control_router.logger.warning",
+        fail_warning,
+    )
+    router = OscControlRouter(FailingApplication())
+    try:
+        result = await router.dispatch_packet("/avatar/parameters/PuriPuly_Trans", True)
+
+        assert result.applied is False
+        assert result.error == "PermissionError"
+        assert result.diagnostics is not None
+        assert result.diagnostics.fields["errno"] == 13
+        assert router.failures == (result.diagnostics,)
+        assert len(warning_calls) == 1
+    finally:
+        await router.close()

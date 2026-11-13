@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice, model_asset_choices
+from puripuly_heart.core.diagnostics import serialize_diagnostics
 from puripuly_heart.core.feature_diagnostics import log_feature
 from puripuly_heart.core.local_asr.local_asr_provisioning import LocalASRInstallRequest
 from puripuly_heart.core.local_asr.local_stt_assets import (
@@ -15,6 +16,11 @@ from puripuly_heart.core.local_asr.local_stt_assets import (
     inspect_local_stt_install_state,
     load_local_stt_asset_manifest,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.model_asset_diagnostics import (
+    model_asset_failure_code,
+    model_asset_failure_diagnostics,
+)
 from puripuly_heart.core.model_download_sources import MODEL_DOWNLOAD_SOURCES
 
 MODEL_ASSETS_ORIGIN = "model_assets"
@@ -22,9 +28,21 @@ _INTEGRITY_STATUS = {"ready": "installed", "missing": "missing", "invalid": "inv
 
 
 class ModelAssetsError(RuntimeError):
-    def __init__(self, message: str, *, failure_code: str) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        failure_code: str,
+        failure_diagnostics: ErrorDiagnostics | None = None,
+    ) -> None:
         super().__init__(message)
         self.failure_code = failure_code
+        self.failure_diagnostics = (
+            failure_diagnostics
+            if failure_diagnostics is not None
+            else model_asset_failure_diagnostics(self)
+        )
+        self.secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +57,9 @@ class ModelAssetEntry:
     failure_code: str | None = None
     importable: bool = False
     required_files: tuple[str, ...] = ()
+    failure_diagnostics: ErrorDiagnostics | None = None
+    recovery_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -51,6 +72,17 @@ class ModelAssetEntry:
             "failure_code": self.failure_code,
             "importable": self.importable,
             "required_files": list(self.required_files),
+            "failure_diagnostics": (
+                serialize_diagnostics(self.failure_diagnostics)
+                if self.failure_diagnostics is not None
+                else None
+            ),
+            "recovery_diagnostics": [
+                serialize_diagnostics(value) for value in self.recovery_diagnostics
+            ],
+            "secondary_diagnostics": [
+                serialize_diagnostics(value) for value in self.secondary_diagnostics
+            ],
         }
 
 
@@ -62,10 +94,7 @@ class _Operation:
 
 
 def _failure_code(error: BaseException) -> str:
-    code = getattr(error, "failure_code", None)
-    if isinstance(code, str) and code.isascii() and code.replace("_", "").isalnum():
-        return code
-    return "unknown"
+    return model_asset_failure_code(error)
 
 
 @dataclass(slots=True)
@@ -78,6 +107,10 @@ class ModelAssetsApplication:
     choices: tuple[ModelAssetChoice, ...] = field(default_factory=model_asset_choices)
     _integrity: dict[str, str] = field(init=False, default_factory=dict)
     _failures: dict[str, str] = field(init=False, default_factory=dict)
+    _failure_diagnostics: dict[str, ErrorDiagnostics] = field(init=False, default_factory=dict)
+    _recoveries: dict[str, tuple[ErrorDiagnostics, ...]] = field(init=False, default_factory=dict)
+    _secondaries: dict[str, tuple[ErrorDiagnostics, ...]] = field(init=False, default_factory=dict)
+    _inspection_diagnostics: dict[str, ErrorDiagnostics] = field(init=False, default_factory=dict)
     _operation: _Operation | None = field(init=False, default=None)
     _cancel_requested: bool = field(init=False, default=False)
 
@@ -104,6 +137,14 @@ class ModelAssetsApplication:
                     failure_code=self._failures.get(choice.model_id),
                     importable=choice.importable,
                     required_files=choice.required_files,
+                    failure_diagnostics=self._failure_diagnostics.get(choice.model_id),
+                    recovery_diagnostics=self._recoveries.get(choice.model_id, ()),
+                    secondary_diagnostics=self._secondaries.get(choice.model_id, ())
+                    + (
+                        (self._inspection_diagnostics[choice.model_id],)
+                        if choice.model_id in self._inspection_diagnostics
+                        else ()
+                    ),
                 )
             )
         return tuple(entries)
@@ -116,7 +157,13 @@ class ModelAssetsApplication:
         return self._operation is not None
 
     async def refresh(self) -> tuple[ModelAssetEntry, ...]:
-        self._integrity.update(await asyncio.to_thread(self._inspect_all))
+        inspections = await asyncio.to_thread(self._inspect_all)
+        for model_id, (status, diagnostics) in inspections.items():
+            self._integrity[model_id] = status
+            if diagnostics is not None:
+                self._inspection_diagnostics[model_id] = diagnostics
+            else:
+                self._inspection_diagnostics.pop(model_id, None)
         return self.entries()
 
     async def download(self, model_id: str, *, source: str | None = None) -> ModelAssetEntry:
@@ -136,9 +183,11 @@ class ModelAssetsApplication:
         if missing:
             self._failures[model_id] = "missing_file"
             log_feature("ModelDownload", "preflight", "missing_file")
-            raise ModelAssetsError(
+            error = ModelAssetsError(
                 "Missing model files: " + ", ".join(missing), failure_code="missing_file"
             )
+            self._failure_diagnostics[model_id] = error.failure_diagnostics
+            raise error
         return await self._run(choice, "import", source="local", files=files)
 
     async def cancel(self, model_id: str) -> bool:
@@ -161,7 +210,9 @@ class ModelAssetsApplication:
         choice = self._choice(model_id)
         if model_id in self.active_model_ids():
             self._failures[model_id] = "model_in_use"
-            raise ModelAssetsError("Model is in use", failure_code="model_in_use")
+            error = ModelAssetsError("Model is in use", failure_code="model_in_use")
+            self._failure_diagnostics[model_id] = error.failure_diagnostics
+            raise error
         return await self._run(choice, "delete")
 
     async def _run(
@@ -177,6 +228,11 @@ class ModelAssetsApplication:
         self._operation = _Operation(choice.model_id, kind, 0 if kind != "delete" else None)
         self._cancel_requested = False
         self._failures.pop(choice.model_id, None)
+        self._failure_diagnostics.pop(choice.model_id, None)
+        self._recoveries.pop(choice.model_id, None)
+        self._secondaries.pop(choice.model_id, None)
+        self._inspection_diagnostics.pop(choice.model_id, None)
+        failure: ModelAssetsError | None = None
         try:
             if kind == "delete":
                 await self._delete(choice)
@@ -185,23 +241,56 @@ class ModelAssetsApplication:
             else:
                 await self._install_asr(choice, source=source)
         except ModelAssetsError as error:
+            failure = error
+            error.secondary_diagnostics = self._secondaries.get(choice.model_id, ())
             if error.failure_code != "cancelled":
                 self._failures[choice.model_id] = error.failure_code
+                self._failure_diagnostics[choice.model_id] = error.failure_diagnostics
             raise
         except Exception as error:
             code = "cancelled" if self._cancel_requested else _failure_code(error)
             if code != "cancelled":
                 self._failures[choice.model_id] = code
+            failure = ModelAssetsError(
+                "Model task cancelled" if code == "cancelled" else "Model asset operation failed",
+                failure_code=code,
+                failure_diagnostics=model_asset_failure_diagnostics(
+                    error,
+                    operation="remove" if kind == "delete" else "gemma_install",
+                    code=(
+                        "model_assets.remove_failed"
+                        if kind == "delete"
+                        else "model_assets.install_failed"
+                    ),
+                    fields={"model_id": choice.model_id},
+                ),
+            )
+            failure.secondary_diagnostics = getattr(error, "secondary_diagnostics", ())
+            self._secondaries[choice.model_id] = failure.secondary_diagnostics
+            if code != "cancelled":
+                self._failure_diagnostics[choice.model_id] = failure.failure_diagnostics
                 log_feature("ModelDownload", kind, code, error=error)
-            raise ModelAssetsError(str(error) or code, failure_code=code) from error
+            raise failure from error
         finally:
             self._operation = None
             self._cancel_requested = False
             try:
-                self._integrity[choice.model_id] = await asyncio.to_thread(
-                    self._inspect_one, choice
-                )
+                status, diagnostics = await asyncio.to_thread(self._inspect_one, choice)
+                self._integrity[choice.model_id] = status
+                if diagnostics is not None:
+                    self._inspection_diagnostics[choice.model_id] = diagnostics
+                    if failure is not None:
+                        failure.secondary_diagnostics += (diagnostics,)
             except Exception as error:
+                diagnostics = model_asset_failure_diagnostics(
+                    error,
+                    operation="inspection",
+                    code="model_assets.inspect_failed",
+                    fields={"model_id": choice.model_id},
+                )
+                self._inspection_diagnostics[choice.model_id] = diagnostics
+                if failure is not None:
+                    failure.secondary_diagnostics += (diagnostics,)
                 log_feature(
                     "ModelDownload",
                     "inspection",
@@ -237,11 +326,21 @@ class ModelAssetsApplication:
             ),
             on_status=on_status,
         )
+        self._secondaries[choice.model_id] = result.secondary_diagnostics
         if result.cancelled:
-            raise ModelAssetsError("Model task cancelled", failure_code="cancelled")
+            raise ModelAssetsError(
+                "Model task cancelled",
+                failure_code="cancelled",
+                failure_diagnostics=result.failure_diagnostics,
+            )
         if result.failed_model_ids:
             code = result.failure_codes[0] if result.failure_codes else "unknown"
-            raise ModelAssetsError("Model installation failed", failure_code=code)
+            raise ModelAssetsError(
+                "Model installation failed",
+                failure_code=code,
+                failure_diagnostics=result.failure_diagnostics,
+            )
+        self._recoveries[choice.model_id] = result.recovery_diagnostics
 
     async def _install_gemma(
         self,
@@ -264,13 +363,15 @@ class ModelAssetsApplication:
             if total:
                 self._operation.progress_percent = min(100, int(done * 100 / total))
 
-        await owner.install_assets(
+        result = await owner.install_assets(
             model_id=choice.model_id,
             source=source,
             files=files,
             on_status=on_status,
             locale=self.locale(),
         )
+        self._recoveries[choice.model_id] = result.recovery_diagnostics
+        self._secondaries[choice.model_id] = result.secondary_diagnostics
 
     async def _delete(self, choice: ModelAssetChoice) -> None:
         if choice.purpose == "translation":
@@ -288,23 +389,30 @@ class ModelAssetsApplication:
             )
         await owner.delete_model(choice.model_id)
 
-    def _inspect_all(self) -> dict[str, str]:
+    def _inspect_all(self) -> dict[str, tuple[str, ErrorDiagnostics | None]]:
         return {choice.model_id: self._inspect_one(choice) for choice in self.choices}
 
-    def _inspect_one(self, choice: ModelAssetChoice) -> str:
-        if choice.purpose == "translation":
-            owner = self.gemma()
-            if owner is None:
-                return "missing"
-            status = owner.install_status(choice.model_id)
-        else:
-            manifest = load_local_stt_asset_manifest(choice.model_id)
-            root = self.model_root or default_local_stt_model_root()
-            status = inspect_local_stt_install_state(
-                root / manifest.install_dirname,
-                manifest=manifest,
-            ).status
-        return _INTEGRITY_STATUS.get(status, "invalid")
+    def _inspect_one(self, choice: ModelAssetChoice) -> tuple[str, ErrorDiagnostics | None]:
+        try:
+            if choice.purpose == "translation":
+                owner = self.gemma()
+                if owner is None:
+                    return "missing", None
+                state = owner.install_state(choice.model_id)
+            else:
+                manifest = load_local_stt_asset_manifest(choice.model_id)
+                root = self.model_root or default_local_stt_model_root()
+                state = inspect_local_stt_install_state(
+                    root / manifest.install_dirname, manifest=manifest
+                )
+            return _INTEGRITY_STATUS.get(state.status, "invalid"), state.failure_diagnostics
+        except Exception as error:
+            return "invalid", model_asset_failure_diagnostics(
+                error,
+                operation="inspection",
+                code="model_assets.inspect_failed",
+                fields={"model_id": choice.model_id},
+            )
 
     def _choice(self, model_id: str) -> ModelAssetChoice:
         for choice in self.choices:

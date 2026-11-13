@@ -990,3 +990,73 @@ async def test_26b_chinese_install_downloads_modelscope_and_keeps_hf_revision(
     assert modelscope_server.requests[0][1]["Revision"] == [assets.GEMMA_26B_MODELSCOPE_REVISION]
     assert modelscope_server.requests[0][1]["FilePath"] == [pinned.model_filename]
     assert (install_dir / pinned.model_filename).read_bytes() == content
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("boundary", ["lease", "backup"])
+async def test_cleanup_evidence_preserves_primary_or_success_without_reclassifying_recovery(
+    tmp_path, monkeypatch, boundary
+):
+    from puripuly_heart.core.diagnostics import serialize_diagnostics
+
+    private = "private-install-and-cleanup-detail"
+    contents = _pin_small_assets(monkeypatch)
+    spec = assets.e4b_gemma_spec()
+    install_dir = tmp_path / "gemma"
+    install_dir.mkdir()
+    (install_dir / "previous").write_bytes(b"preserved")
+    original_close = provisioning.LocalSTTProvisioningLease.close
+    original_rmtree = provisioning.shutil.rmtree
+    if boundary == "lease":
+
+        def close(lease):
+            original_close(lease)
+            raise PermissionError(13, private)
+
+        monkeypatch.setattr(provisioning.LocalSTTProvisioningLease, "close", close)
+        request = httpx.Request("GET", "https://example.invalid/" + private)
+        downloader = FailedDownloader(
+            contents,
+            httpx.HTTPStatusError(
+                private, request=request, response=httpx.Response(403, request=request)
+            ),
+        )
+        with pytest.raises(BaseExceptionGroup) as caught:
+            await provisioning.ensure_gemma_installed(
+                downloader=downloader, install_dir=install_dir, spec=spec, source="huggingface"
+            )
+        diagnostics = caught.value.failure_diagnostics
+        assert diagnostics.causes[0].status_code == 403
+        assert diagnostics.causes[1].fields["exception_class"] == "PermissionError"
+        assert diagnostics.causes[1].fields["errno"] == 13
+        assert (install_dir / "previous").read_bytes() == b"preserved"
+        lease = provisioning.LocalSTTProvisioningLease.acquire(model_root=tmp_path, wait=False)
+        assert lease is not None
+        original_close(lease)
+    else:
+
+        def remove(path, *args, **kwargs):
+            if ".backup-" in path.name:
+                raise PermissionError(13, private)
+            return original_rmtree(path, *args, **kwargs)
+
+        monkeypatch.setattr(provisioning.shutil, "rmtree", remove)
+        installed = await provisioning.ensure_gemma_installed(
+            downloader=FakeDownloader(contents),
+            install_dir=install_dir,
+            spec=spec,
+            source="huggingface",
+        )
+        assert assets.validate_gemma_install(install_dir, spec=spec) == installed
+        assert installed.recovery_diagnostics == ()
+        assert len(installed.secondary_diagnostics) == 1
+        diagnostics = installed.secondary_diagnostics[0]
+        assert diagnostics.operation == "cleanup"
+        assert diagnostics.fields["exception_class"] == "PermissionError"
+        assert diagnostics.fields["errno"] == 13
+        backups = tuple(tmp_path.glob("gemma.backup-*"))
+        assert len(backups) == 1
+        assert (backups[0] / "previous").read_bytes() == b"preserved"
+        original_rmtree(backups[0])
+    assert private not in str(serialize_diagnostics(diagnostics))
+    assert str(tmp_path) not in str(serialize_diagnostics(diagnostics))

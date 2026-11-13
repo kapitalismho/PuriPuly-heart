@@ -7055,3 +7055,162 @@ def test_qwen_api_host_change_reverifies_region_key_after_apply(
     asyncio.run(verification())
     assert verified == [("alibaba_singapore", "sk-singapore")]
     assert view._alibaba_key_singapore._current_status == "success"
+
+
+@pytest.mark.parametrize("failure", ["migration", "read"])
+def test_secret_load_evidence_reaches_real_render_transaction(
+    monkeypatch, settings_events, failure
+):
+    from puripuly_heart.app.services import settings_secrets as secret_module
+    from puripuly_heart.app.services.settings.settings_projection import SettingsProjectionOwner
+    from puripuly_heart.app.services.settings.settings_transaction_result import (
+        SettingsTransactionResultOwner,
+    )
+    from puripuly_heart.core.messages import (
+        TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+        TransactionResult,
+    )
+    from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+
+    class Store(DummySecretStore):
+        def set(self, key, value):
+            if failure == "migration":
+                raise PermissionError(13, "synthetic-private-path")
+            super().set(key, value)
+
+    store = Store({"alibaba_api_key": "synthetic-private-key"})
+    if failure == "read":
+        store.get_failure_key = "deepgram_api_key"
+    view, _ = _make_settings_view(monkeypatch, settings_events, store=store)
+    view.on_settings_changed = settings_events.record_immediate
+    view.on_prompt_apply_settings = settings_events.record_prompt
+    monkeypatch.setattr(
+        view,
+        "_emit_runtime_basic",
+        lambda *_args, **_kwargs: pytest.fail("secret evidence must not add notifications"),
+    )
+
+    def fail_sink(*_args, **_kwargs):
+        raise RuntimeError("synthetic sink failure")
+
+    monkeypatch.setattr(secret_module.logger, "log", fail_sink)
+    settings = AppSettingsVNext()
+    results = SettingsTransactionResultOwner()
+    projection = SettingsProjectionOwner(
+        presentation=FletUiPresentationAdapter(SimpleNamespace(view_settings=view)),
+        config_path=Path("settings.json"),
+        current_settings=lambda: settings,
+        failure_sink=results.add_presentation_result,
+    )
+    with results.capture() as captured:
+        results.set(
+            TransactionResult(
+                status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+                message=None,
+                diagnostics=None,
+            )
+        )
+        rendered = projection.render(settings)
+        assert rendered.loaded is True, (
+            rendered.diagnostics.fields if rendered.diagnostics else None
+        )
+        assert rendered.diagnostics is None
+        assert len(captured.current.secondary_diagnostics) == (2 if failure == "migration" else 1)
+    assert captured.current.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+    assert projection.capture(settings).can_rebase is True
+    if failure == "migration":
+        assert view._alibaba_key_beijing.value == "synthetic-private-key"
+        assert view._alibaba_key_singapore.value == "synthetic-private-key"
+    assert "synthetic-private" not in str(rendered)
+    assert "synthetic-private" not in str(captured.current)
+
+
+@pytest.mark.parametrize("pkce", [False, True])
+def test_store_creation_and_basic_log_cofailure_preserves_secret_render_evidence(
+    monkeypatch, settings_events, pkce
+):
+    from puripuly_heart.app.services.settings.settings_projection import SettingsProjectionOwner
+    from puripuly_heart.app.services.settings.settings_transaction_result import (
+        SettingsTransactionResultOwner,
+    )
+    from puripuly_heart.core.diagnostics import exception_diagnostics
+    from puripuly_heart.core.messages import (
+        TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+        TransactionResult,
+    )
+    from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+
+    settings = AppSettingsVNext()
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
+
+    def fail_store():
+        raise PermissionError(13, "synthetic-private-store")
+
+    upstream = exception_diagnostics(
+        OSError(5, "synthetic-private-upstream"),
+        component="settings_secrets",
+        operation="secret_read",
+        code="settings_secret_failed",
+    )
+    method = "load_openrouter_pkce" if pkce else "load"
+    original_load = getattr(SettingsSecretsOwner, method)
+    original_results = []
+
+    def observed_load(owner):
+        result = original_load(owner)
+        original_results.append(result)
+        return replace(
+            result,
+            secondary_diagnostics=(
+                replace(upstream, cause_id=result.diagnostics.diagnostic_id),
+                *result.secondary_diagnostics,
+            ),
+        )
+
+    monkeypatch.setattr(SettingsSecretsOwner, method, observed_load)
+    view._settings_secrets = SettingsSecretsOwner(fail_store)
+    warnings = []
+
+    def fail_basic_log(message, **_kwargs):
+        warnings.append(message)
+        raise RuntimeError("synthetic-private-logger")
+
+    view.runtime_log_basic = fail_basic_log
+    view.show_snackbar = lambda *_args: pytest.fail("cofailure must not add a notification")
+    results = SettingsTransactionResultOwner()
+    projection = SettingsProjectionOwner(
+        presentation=FletUiPresentationAdapter(SimpleNamespace(view_settings=view)),
+        config_path=Path("settings.json"),
+        current_settings=lambda: settings,
+        failure_sink=results.add_presentation_result,
+    )
+    with results.capture() as captured:
+        results.set(
+            TransactionResult(
+                status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+                message=None,
+                diagnostics=None,
+            )
+        )
+        if pkce:
+            provider, _, prompt, _ = settings_view_surface_snapshots(settings)
+            rendered = projection.refresh_after_openrouter_pkce_success(
+                provider=provider, prompt=prompt, compatibility_settings=settings
+            )
+        else:
+            rendered = projection.render(settings)
+        assert rendered.loaded is True
+        assert rendered.diagnostics is None
+        retained = captured.current.secondary_diagnostics
+        assert retained[0].diagnostic_id == original_results[0].diagnostics.diagnostic_id
+        assert retained[0].code == "settings_secret_failed"
+        assert retained[0].fields["errno"] == 13
+        assert retained[1].diagnostic_id == upstream.diagnostic_id
+        assert retained[2].code == "settings_failure_notification_failed"
+        assert retained[2].cause_id == retained[0].diagnostic_id
+        assert retained[2].fields["exception_class"] == "RuntimeError"
+        assert captured.current.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+    assert len(warnings) == 1
+    assert projection.capture(settings).can_rebase is True
+    assert "synthetic-private" not in str(rendered)
+    assert "synthetic-private" not in str(captured.current)

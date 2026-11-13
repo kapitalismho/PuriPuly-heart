@@ -273,3 +273,21 @@ async def test_interrupted_server_start_closes_endpoint_without_publication(
     host.lease.publish.assert_not_called()
     host.server.close.assert_awaited_once()
     host.lease.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_startup_failure_survives_endpoint_and_lease_cleanup_failures(controlled_host):
+    host = controlled_host
+    original = PermissionError(13, "private startup content")
+    host.boundary.start.side_effect = original
+    host.server.close.side_effect = OSError(5, "private endpoint cleanup")
+    host.lease.close.side_effect = RuntimeError("private lease cleanup")
+    with pytest.raises(PermissionError) as caught:
+        await host.start()
+    assert caught.value is original
+    diagnostics = original.failure_diagnostics
+    assert diagnostics.fields["errno"] == 13
+    assert diagnostics.causes[-1].fields["errno"] == 5
+    assert diagnostics.causes[-1].causes[-1].fields["exception_class"] == "RuntimeError"
+    assert "private" not in repr(diagnostics)
+    host.lease.close.assert_called_once()

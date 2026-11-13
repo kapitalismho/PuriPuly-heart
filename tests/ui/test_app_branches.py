@@ -1785,10 +1785,7 @@ def _make_fake_main_gui_app(seen: dict[str, object]) -> type:
 
         def schedule_after_launch_tasks(self) -> None:
             async def run() -> None:
-                await app_module._check_and_notify_update(
-                    self.page,
-                    log_diagnostic=self._log_diagnostic,
-                )
+                await app_module._check_and_notify_update(self.page)
 
             seen["after_launch_task"] = asyncio.create_task(run())
 
@@ -1796,15 +1793,15 @@ def _make_fake_main_gui_app(seen: dict[str, object]) -> type:
 
 
 @pytest.mark.asyncio
-async def test_main_gui_routes_update_check_through_app_log_helper(
+async def test_main_gui_schedules_update_check_after_start(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     page = DummyPage()
     seen: dict[str, object] = {}
     FakeApp = _make_fake_main_gui_app(seen)
 
-    async def fake_check_and_notify_update(incoming_page, *, log_diagnostic=None) -> None:
-        seen["check"] = (incoming_page, log_diagnostic)
+    async def fake_check_and_notify_update(incoming_page) -> None:
+        seen["check"] = incoming_page
 
     monkeypatch.setattr(app_module, "TranslatorApp", FakeApp)
     monkeypatch.setattr(app_module, "_check_and_notify_update", fake_check_and_notify_update)
@@ -1817,9 +1814,7 @@ async def test_main_gui_routes_update_check_through_app_log_helper(
     await seen["after_launch_task"]
 
     assert seen["started"] is True
-    assert seen["check"][0] is page
-    assert getattr(seen["check"][1], "__self__", None) is seen["app"]
-    assert getattr(seen["check"][1], "__func__", None) is FakeApp._log_diagnostic
+    assert seen["check"] is page
     assert seen["init"] == (page, Path("settings.json"), False)
 
 
@@ -1831,8 +1826,8 @@ async def test_main_gui_forwards_debug_ui_preview_flag(
     seen: dict[str, object] = {}
     FakeApp = _make_fake_main_gui_app(seen)
 
-    async def fake_check_and_notify_update(incoming_page, *, log_diagnostic=None) -> None:
-        seen["check"] = (incoming_page, log_diagnostic)
+    async def fake_check_and_notify_update(incoming_page) -> None:
+        seen["check"] = incoming_page
 
     monkeypatch.setattr(app_module, "TranslatorApp", FakeApp)
     monkeypatch.setattr(app_module, "_check_and_notify_update", fake_check_and_notify_update)
@@ -1847,7 +1842,7 @@ async def test_main_gui_forwards_debug_ui_preview_flag(
 
     assert seen["started"] is True
     assert seen["init"] == (page, Path("settings.json"), True)
-    assert seen["check"][0] is page
+    assert seen["check"] is page
 
 
 def test_debug_preview_gpu_states_cycle_in_memory() -> None:
@@ -3877,14 +3872,13 @@ async def test_check_and_notify_update_swallows_exceptions(monkeypatch: pytest.M
     async def raise_error():
         raise RuntimeError("network down")
 
-    await _check_and_notify_update(
-        page,
-        log_diagnostic=app._log_diagnostic,
-        load_update_info=raise_error,
-    )
+    diagnostics = await _check_and_notify_update(page, load_update_info=raise_error)
     assert page.opened == []
     assert controller.basic_messages == []
-    assert controller.detailed_messages == ["[Update] Check notification failed: network down"]
+    assert controller.detailed_messages == []
+    assert diagnostics.code == "ui_boundary_failed"
+    assert diagnostics.fields["exception_class"] == "RuntimeError"
+    assert "network down" not in repr(diagnostics)
 
 
 @pytest.mark.asyncio

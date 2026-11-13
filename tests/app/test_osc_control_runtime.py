@@ -418,6 +418,8 @@ async def test_discovery_retry_failure_remains_visible_and_retryable() -> None:
             assert result["status"] == "degraded"
             assert result["effect"] == "discovery_unavailable"
             assert result["reason"] == "oscquery_unavailable"
+            assert result["diagnostics"]["code"] == "oscquery_unavailable"
+            assert result["diagnostics"]["fields"]["exception_class"] == "OSError"
             await integration.wait_automatic_query_start()
             observed = integration.output_snapshot()
             assert observed["query_failure"] == "oscquery_unavailable"

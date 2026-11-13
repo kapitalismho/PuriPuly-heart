@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
 from puripuly_heart.app.ports.secret_store import SecretStorePort
+from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_AUTH,
@@ -32,8 +33,12 @@ OPENROUTER_MANAGED_USER_ID_MAX_LENGTH = 256
 class ManagedAuthClaimGuard:
     managed_state: ManagedIdentityStatePort
     secret_store: SecretStorePort
+    observation_diagnostics: list[ErrorDiagnostics] = field(
+        default_factory=list, repr=False, compare=False
+    )
 
     async def preflight(self, requested_source: str) -> TransactionResult | None:
+        self.observation_diagnostics.clear()
         normalized_requested_source = normalize_managed_claim_source(requested_source)
         if normalized_requested_source is None:
             return _blocked_result(
@@ -47,7 +52,7 @@ class ManagedAuthClaimGuard:
         if changed:
             try:
                 self.managed_state.persist()
-            except Exception:
+            except Exception as exc:
                 return _blocked_result(
                     requested_source=normalized_requested_source,
                     blocking_source="unknown",
@@ -55,6 +60,16 @@ class ManagedAuthClaimGuard:
                     message_key=_message_key_for_block(
                         normalized_requested_source,
                         "unknown",
+                    ),
+                    causes=(
+                        exception_diagnostics(
+                            exc,
+                            component="managed_auth_claims",
+                            operation="preflight_managed_auth_claim",
+                            code="managed_auth_claim_backfill_persist_failed",
+                            category="transaction",
+                        ),
+                        *self.observation_diagnostics,
                     ),
                 )
 
@@ -69,6 +84,7 @@ class ManagedAuthClaimGuard:
             blocking_source=blocking_source,
             code="managed_auth_claim_source_blocked",
             message_key=_message_key_for_block(normalized_requested_source, blocking_source),
+            causes=tuple(self.observation_diagnostics),
         )
 
     async def backfill_from_local_secrets(self) -> bool:
@@ -91,8 +107,20 @@ class ManagedAuthClaimGuard:
     async def _secret_available(self, key: str) -> bool:
         try:
             result = await self.secret_store.get_secret(key)
-        except Exception:
+        except Exception as exc:
+            self.observation_diagnostics.append(
+                exception_diagnostics(
+                    exc,
+                    component="managed_auth_claims",
+                    operation="preflight_managed_auth_claim",
+                    code="managed_auth_claim_observation_failed",
+                    category="transaction",
+                    fields={"observation_succeeded": False},
+                )
+            )
             return False
+        if result.diagnostics is not None:
+            self.observation_diagnostics.append(result.diagnostics)
         value = result.value
         return isinstance(value, str) and bool(value.strip())
 
@@ -162,6 +190,7 @@ def _blocked_result(
     blocking_source: str,
     code: str,
     message_key: str,
+    causes: tuple[ErrorDiagnostics, ...] = (),
 ) -> TransactionResult:
     return TransactionResult(
         status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
@@ -179,6 +208,7 @@ def _blocked_result(
                 "requested_source": requested_source,
                 "blocking_source": blocking_source,
             },
+            causes=causes,
         ),
     )
 

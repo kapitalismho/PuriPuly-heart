@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.diagnostics import exception_diagnostics
+from puripuly_heart.core.llm.index_translate import IndexServiceUnavailableError
 from puripuly_heart.core.messages import ErrorDiagnostics, TransactionResult
 
 _INDEX_SELECTION = ("index_translate_35b", "public_api")
@@ -134,7 +136,7 @@ class IndexSelectionOwner:
                     fields={"reason": "timeout"},
                 )
                 self.failure_diagnostics = diagnostics
-                self.diagnostic_sink(diagnostics)
+                self._publish_diagnostic(diagnostics)
             work.cancel()
 
     def _work_settled(self, work: asyncio.Task[None]) -> None:
@@ -142,19 +144,14 @@ class IndexSelectionOwner:
         if not work.cancelled():
             exception = work.exception()
             if exception is not None:
-                self.diagnostic_sink(
-                    ErrorDiagnostics(
-                        component="index_selection",
-                        operation="owned_work_cleanup",
-                        code="index_selection_cleanup_failed",
-                        category="lifecycle",
-                        visibility="basic",
-                        content_policy="metadata_only",
-                        status_code=None,
-                        retry_after_ms=None,
-                        fields={"reason": "owned_work_failed"},
-                    )
+                diagnostics = exception_diagnostics(
+                    exception,
+                    component="index_selection",
+                    operation="owned_work_cleanup",
+                    code="index_selection_cleanup_failed",
                 )
+                self.failure_diagnostics = diagnostics
+                self._publish_diagnostic(diagnostics)
 
     def _authorized(self, generation: int) -> bool:
         return not self._stopped and generation == self._authority_generation
@@ -226,35 +223,39 @@ class IndexSelectionOwner:
         if not self._current(generation):
             return
         self.availability = "unavailable"
-        self.failure_diagnostics = ErrorDiagnostics(
+        self.failure_diagnostics = exception_diagnostics(
+            exception,
             component="index_selection",
             operation="availability",
             code="index_service_unavailable",
             category="service_unavailable",
-            visibility="basic",
-            content_policy="metadata_only",
-            status_code=getattr(exception, "status_code", None),
-            retry_after_ms=None,
-            fields={"reason": getattr(exception, "reason", "unknown")},
+            fields=(
+                {"reason": exception.reason}
+                if isinstance(exception, IndexServiceUnavailableError)
+                else {}
+            ),
         )
-        self.diagnostic_sink(self.failure_diagnostics)
+        if isinstance(exception, IndexServiceUnavailableError):
+            status_code = exception.status_code
+            if type(status_code) is int and 100 <= status_code <= 599:
+                self.failure_diagnostics = replace(
+                    self.failure_diagnostics, status_code=status_code
+                )
+        self._publish_diagnostic(self.failure_diagnostics)
         try:
             async with asyncio.timeout(self.deadline_seconds):
                 observation = await self.observe_allowance()
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
             observation = IndexManagedAllowanceObservation(
                 "unknown",
-                ErrorDiagnostics(
+                exception_diagnostics(
+                    exc,
                     component="index_selection",
                     operation="managed_allowance",
                     code="index_managed_allowance_unknown",
                     category="unknown",
-                    visibility="basic",
-                    content_policy="metadata_only",
-                    status_code=None,
-                    retry_after_ms=None,
                     fields={"reason": "observation_unavailable"},
                 ),
             )
@@ -262,7 +263,7 @@ class IndexSelectionOwner:
             return
         self.allowance_observation = observation
         if observation.diagnostics is not None:
-            self.diagnostic_sink(observation.diagnostics)
+            self._publish_diagnostic(observation.diagnostics)
         self._committing = True
         try:
             result = await self.commit_fallback(
@@ -272,8 +273,15 @@ class IndexSelectionOwner:
             )
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
             self.availability = "transition_failed"
+            self.failure_diagnostics = exception_diagnostics(
+                exc,
+                component="index_selection",
+                operation="fallback_commit",
+                code="index_fallback_commit_failed",
+            )
+            self._publish_diagnostic(self.failure_diagnostics)
             return
         finally:
             self._committing = False
@@ -293,6 +301,12 @@ class IndexSelectionOwner:
             self.message_sink(f"messages.index_api_fallback_{connection}")
         elif self._current(generation):
             self.availability = "transition_failed"
+
+    def _publish_diagnostic(self, diagnostics: ErrorDiagnostics) -> None:
+        try:
+            self.diagnostic_sink(diagnostics)
+        except Exception:
+            pass
 
     def stop_ingress(self) -> None:
         self._stopped = True

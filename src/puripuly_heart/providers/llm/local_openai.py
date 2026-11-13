@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Mapping, Protocol
 from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
@@ -385,6 +385,7 @@ class LocalOpenAICompatibleLLMProvider:
     ) -> bool:
         client: HttpxLocalOpenAIClient | None = None
         primary_failure = None
+        primary_exception = None
         try:
             client = HttpxLocalOpenAIClient(
                 base_url=base_url,
@@ -402,18 +403,26 @@ class LocalOpenAICompatibleLLMProvider:
                 text="ping", system_prompt="", source_language="", target_language=""
             )
             return True
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as exc:
+            primary_exception = exc
             raise
         except Exception as exc:
+            primary_exception = exc
             primary_failure = record_probe_failure(exc, provider="local_llm")
-            return False
+            exc.failure_diagnostics = primary_failure
+            raise
         finally:
             if client is not None:
                 try:
                     await client.close()
                 except Exception as exc:
-                    record_probe_cleanup_failure(
+                    cleanup_failure = record_probe_cleanup_failure(
                         exc, provider="local_llm", primary_failure=primary_failure
                     )
-                    if primary_failure is None:
+                    if primary_failure is not None:
+                        primary_exception.failure_diagnostics = replace(
+                            primary_failure, causes=(*primary_failure.causes, cleanup_failure)
+                        )
+                    elif primary_exception is None:
+                        exc.failure_diagnostics = cleanup_failure
                         raise

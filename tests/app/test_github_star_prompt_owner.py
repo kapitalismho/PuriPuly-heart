@@ -192,3 +192,22 @@ def test_owner_enforces_launch_gate_recency_and_eligibility() -> None:
     current[0] = _with_prompt(current[0], last_shown_at="2026-07-10T00:00:00Z")
     assert owner.should_show(now=datetime(2026, 7, 20, tzinfo=timezone.utc)) is False
     assert owner.should_show(now=datetime(2026, 7, 25, tzinfo=timezone.utc)) is True
+
+
+@pytest.mark.asyncio
+async def test_optional_save_failure_retains_cause_when_notice_callback_fails():
+    original = PermissionError(13, "private prompt storage")
+
+    async def failed_persist(_base, _updated):
+        raise original
+
+    def failed_notice(_context, _error):
+        raise RuntimeError("private notice sink")
+
+    owner, _ = _owner([_settings()], persist=failed_persist)
+    owner.log_save_failure = failed_notice
+    assert await owner.persist_translation_success_observed() is False
+    assert owner.failure_diagnostics.code == "github_star_prompt_save_failed"
+    assert owner.failure_diagnostics.fields["errno"] == 13
+    assert original.failure_diagnostics is owner.failure_diagnostics
+    assert "private" not in repr(owner.failure_diagnostics)

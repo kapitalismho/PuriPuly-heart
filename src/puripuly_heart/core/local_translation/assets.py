@@ -5,14 +5,17 @@ import json
 import shutil
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from puripuly_heart.config.paths import default_models_dir
 from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     LocalSTTProvisioningLease,
 )
+
+if TYPE_CHECKING:
+    from puripuly_heart.core.messages import ErrorDiagnostics
 
 GEMMA_MODEL_ID = "gemma-4-e4b-it-qat-ud-q4-k-xl"
 GEMMA_REPO_ID = "unsloth/gemma-4-E4B-it-qat-GGUF"
@@ -175,6 +178,8 @@ class InstalledGemmaManifest:
     license: str
     license_url: str
     files: tuple[str, ...]
+    recovery_diagnostics: tuple[ErrorDiagnostics, ...] = field(default=(), compare=False)
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = field(default=(), compare=False)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -237,7 +242,7 @@ class GemmaInstallState:
     status: GemmaInstallStatus
     install_dir: Path
     manifest: InstalledGemmaManifest | None = None
-    error_message: str | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 def default_gemma_install_dir(spec: GemmaModelSpec | None = None) -> Path:
@@ -322,10 +327,18 @@ def inspect_gemma_install(
     except GemmaInstallMissingError:
         return GemmaInstallState(status="missing", install_dir=resolved)
     except GemmaInstallInvalidError as exc:
+        from puripuly_heart.core.diagnostics import exception_diagnostics
+
         return GemmaInstallState(
             status="invalid",
             install_dir=resolved,
-            error_message=str(exc),
+            failure_diagnostics=exception_diagnostics(
+                exc,
+                component="model_assets",
+                operation="inspection",
+                code="model_assets.inspect_failed",
+                fields={"model_id": resolved_spec.model_id},
+            ),
         )
     return GemmaInstallState(status="ready", install_dir=resolved, manifest=manifest)
 

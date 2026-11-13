@@ -145,7 +145,7 @@ async def test_real_secure_field_completion_keeps_settings_in_place_and_unbinds(
 
     assert owner.calls[-1] == (
         "completion",
-        ("openrouter", success, None if success else "verification_failed"),
+        ("openrouter", success, None if success else "verification_failed", None),
     )
     assert opened == ["settings"]
     assert view._provider_snapshot.translation == before.translation

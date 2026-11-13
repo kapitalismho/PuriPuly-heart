@@ -18,6 +18,7 @@ from puripuly_heart.app.ports.managed_gemma_translation import (
 from puripuly_heart.app.services.managed_gemma_translation import (
     ManagedGemmaTranslationOwner,
 )
+from puripuly_heart.core.diagnostics import serialize_diagnostics
 from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     LocalSTTProvisioningLease,
 )
@@ -148,7 +149,7 @@ def test_interrupted_delete_residue_is_reconciled_on_next_inspect(
     trash = _residue(models_root, GEMMA_E4B, "deleting")
 
     owner = _owner()
-    status = owner.install_status(GEMMA_E4B)
+    status = owner.install_state(GEMMA_E4B).status
 
     assert status == "missing"
     assert not trash.exists()
@@ -161,7 +162,7 @@ def test_interrupted_provisioning_and_promote_residue_is_reconciled(
     backup = _residue(models_root, GEMMA_26B, "backup")
 
     owner = _owner()
-    _ = owner.install_status(GEMMA_26B)
+    _ = owner.install_state(GEMMA_26B)
 
     assert not staging.exists()
     assert not backup.exists()
@@ -182,7 +183,7 @@ def test_residue_reconcile_keeps_current_install_and_unrelated_content(
     keeper.write_text("notes")
 
     owner = _owner()
-    _ = owner.install_status(GEMMA_E4B)
+    _ = owner.install_state(GEMMA_E4B)
 
     assert not own_trash.exists()
     assert not own_staging.exists()
@@ -202,12 +203,12 @@ def test_residue_reconcile_retries_after_provisioning_lease_is_released(
     lease = LocalSTTProvisioningLease.acquire(model_root=models_root, wait=False)
     assert lease is not None
     try:
-        _ = owner.install_status(GEMMA_E4B)
+        _ = owner.install_state(GEMMA_E4B)
         assert trash.exists()
     finally:
         lease.close()
 
-    _ = owner.install_status(GEMMA_E4B)
+    _ = owner.install_state(GEMMA_E4B)
     assert not trash.exists()
 
 
@@ -272,7 +273,7 @@ async def test_cleanup_preserves_responsiveness_and_operation_lifetime(
     task = None
     try:
         if finish == "concurrent-inspection":
-            inspection = asyncio.create_task(asyncio.to_thread(owner.install_status, GEMMA_26B))
+            inspection = asyncio.create_task(asyncio.to_thread(owner.install_state, GEMMA_26B))
             assert await asyncio.to_thread(entered.wait, 5)
         task = asyncio.create_task(_run_operation(owner, operation))
         assert await asyncio.to_thread(entered.wait, 5)
@@ -332,7 +333,7 @@ async def test_cleanup_preserves_responsiveness_and_operation_lifetime(
         assert result.readiness.effective_backend == "cpu"
         gemma_assets.validate_gemma_install(installed_model)
     if inspection is not None:
-        assert inspection_result == "missing"
+        assert inspection_result.status == "missing"
     assert owner.snapshot.state == "closed"
 
 
@@ -350,9 +351,10 @@ def test_cleanup_logs_success_as_info_and_failure_as_error(
             raise PermissionError("synthetic deletion failure")
 
         monkeypatch.setattr(gemma_assets.shutil, "rmtree", deny_removal)
+    owner = _owner()
 
     with caplog.at_level(logging.INFO, logger="puripuly_heart.core.feature_diagnostics"):
-        assert _owner().install_status(GEMMA_E4B) == "missing"
+        assert owner.install_state(GEMMA_E4B).status == "missing"
 
     records = [
         record
@@ -364,6 +366,9 @@ def test_cleanup_logs_success_as_info_and_failure_as_error(
         assert staging.exists()
         assert records[0].levelno == logging.ERROR
         assert "code=cleanup_failed" in records[0].getMessage()
+        assert owner.snapshot.secondary_diagnostics[0] is owner.diagnostics[0]
+        assert owner.snapshot.secondary_diagnostics[0].code == "model_assets.cleanup_failed"
+        assert _lease_available(models_root)
     else:
         assert not staging.exists()
         assert records[0].levelno == logging.INFO
@@ -380,7 +385,7 @@ async def test_close_drains_inspection_cleanup_and_prevents_new_cleanup(
 ) -> None:
     staging, entered, release = blocked_cleanup
     owner = _owner()
-    inspection = asyncio.create_task(asyncio.to_thread(owner.install_status, GEMMA_26B))
+    inspection = asyncio.create_task(asyncio.to_thread(owner.install_state, GEMMA_26B))
     closing = None
     try:
         assert await asyncio.to_thread(entered.wait, 5)
@@ -406,11 +411,72 @@ async def test_close_drains_inspection_cleanup_and_prevents_new_cleanup(
     if cancel_inspection:
         assert isinstance(result, asyncio.CancelledError)
     else:
-        assert result == "missing"
+        assert result.status == "missing"
     assert not staging.exists()
     assert _lease_available(models_root)
     assert owner.snapshot.state == "closed"
 
     later_residue = _residue(models_root, GEMMA_E4B, "staging")
-    assert owner.install_status(GEMMA_26B) == "missing"
+    assert owner.install_state(GEMMA_26B).status == "missing"
     assert later_residue.exists()
+
+
+@pytest.mark.asyncio
+async def test_inspection_cleanup_failure_is_immediately_visible_without_worker_notifications(
+    models_root: Path, installed_model: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from puripuly_heart.core import feature_diagnostics
+
+    private = "private-residue-path-and-credential"
+    staging = _residue(models_root, GEMMA_E4B, "staging")
+    cleanup_calls = []
+    sink_threads = []
+    log_calls = []
+    owner_thread = threading.get_ident()
+
+    def deny_removal(path):
+        cleanup_calls.append(threading.get_ident())
+        raise PermissionError(13, private, str(staging))
+
+    def fail_log(*args, **kwargs):
+        log_calls.append(True)
+        raise RuntimeError(private)
+
+    def fail_status(snapshot):
+        sink_threads.append(threading.get_ident())
+        raise RuntimeError(private)
+
+    monkeypatch.setattr(gemma_assets.shutil, "rmtree", deny_removal)
+    monkeypatch.setattr(feature_diagnostics, "emit_basic_log", fail_log)
+    owner = ManagedGemmaTranslationOwner(runtime=_StubRuntime(), status_sink=fail_status)
+    try:
+        state = await asyncio.to_thread(owner.install_state, GEMMA_E4B)
+        assert state.status == "ready"
+        assert state.manifest is not None
+        assert installed_model.is_dir()
+        assert staging.is_dir()
+        assert cleanup_calls and cleanup_calls[0] != owner_thread
+        assert log_calls == [True]
+        assert sink_threads == []
+        snapshot = owner.snapshot
+        assert snapshot.state == "idle"
+        assert snapshot.failure_diagnostics is None
+        assert snapshot.recovery_diagnostics == ()
+        assert len(snapshot.secondary_diagnostics) == 1
+        cause = snapshot.secondary_diagnostics[0]
+        assert cause is owner.diagnostics[0]
+        assert cause.code == "model_assets.cleanup_failed"
+        assert cause.operation == "cleanup"
+        assert cause.fields["exception_class"] == "PermissionError"
+        assert cause.fields["errno"] == 13
+        assert cause.fields["cleanup_complete"] is False
+        assert snapshot.secondary_diagnostics_truncated is False
+        assert owner.snapshot.secondary_diagnostics == (cause,)
+        assert sink_threads == []
+        assert _lease_available(models_root)
+        serialized = json.dumps(serialize_diagnostics(cause))
+        assert private not in serialized
+        assert str(models_root) not in serialized
+    finally:
+        await owner.close()
+    assert sink_threads == [owner_thread]

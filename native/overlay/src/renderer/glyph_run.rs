@@ -174,7 +174,7 @@ pub(crate) fn render_text_layout_to_command_list(
     let command_list = unsafe {
         cache_context
             .CreateCommandList()
-            .map_err(|error| CaptionRenderError::Draw(error.to_string()))?
+            .map_err(|error| CaptionRenderError::from_windows("draw", error))?
     };
     unsafe {
         cache_context.SetTarget(&command_list);
@@ -192,12 +192,12 @@ pub(crate) fn render_text_layout_to_command_list(
     let draw_result = unsafe {
         text_layout
             .Draw(None, &text_renderer, 0.0, 0.0)
-            .map_err(|error| CaptionRenderError::Draw(error.to_string()))
+            .map_err(|error| CaptionRenderError::from_windows("draw", error))
     };
     let end_draw_result = unsafe {
         cache_context
             .EndDraw(None, None)
-            .map_err(|error| CaptionRenderError::Draw(error.to_string()))
+            .map_err(|error| CaptionRenderError::from_windows("draw", error))
     };
     unsafe {
         cache_context.SetTarget(previous_target.as_ref());
@@ -208,7 +208,7 @@ pub(crate) fn render_text_layout_to_command_list(
         (Ok(()), Ok(())) => unsafe {
             command_list
                 .Close()
-                .map_err(|error| CaptionRenderError::Draw(error.to_string()))?;
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))?;
         },
     }
 

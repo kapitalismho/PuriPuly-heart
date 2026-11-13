@@ -20,7 +20,7 @@ from puripuly_heart.core.audio.ownership import (
     OwnedStreamInput,
     OwnedVadEvent,
 )
-from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_CAUSE_MAX_COUNT, emit_failure
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.network_diagnostics import (
     classify_transport_error,
@@ -317,6 +317,7 @@ class ScopedRecognitionEngine:
     _terminal_failure_notified: bool = field(init=False, default=False, repr=False)
     _episode_failures: int = field(init=False, default=0, repr=False)
     _episode_cause: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = field(init=False, default=(), repr=False)
     _recovery_backoff_pending: bool = field(init=False, default=False, repr=False)
     _connection_retry_at_s: float | None = field(init=False, default=None, repr=False)
     _failure_version: int = field(init=False, default=0, repr=False)
@@ -754,7 +755,7 @@ class ScopedRecognitionEngine:
         if failure is None:
             return session is self._session and not self._closed
         diagnostics = self._failure_diagnostics(exception, failure, "send")
-        self._episode_cause = self._episode_cause or diagnostics
+        self._retain_episode_cause(diagnostics)
         emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage="send")
         generation = self._authority_generation
         failures = self._episode_failures
@@ -1517,22 +1518,33 @@ class ScopedRecognitionEngine:
                 self._schedule_late_factory_reclaim(task, watchdogs)
                 last_error = TimeoutError("provider_readiness_timeout")
                 if settings.provider_id in self.exclusive_provider_ids:
+                    self._retain_episode_cause(
+                        recognition_failure_diagnostics(
+                            last_error,
+                            provider=settings.provider_id,
+                            channel=self.channel,
+                            operation="readiness",
+                            reason="provider_readiness_timeout",
+                        )
+                    )
                     break
             else:
                 self._factory_tasks.discard(task)
                 try:
                     session = task.result()
                 except PermanentSTTScopedSessionError as exc:
-                    self._episode_cause = recognition_failure_diagnostics(
+                    diagnostics = recognition_failure_diagnostics(
                         exc,
                         provider=settings.provider_id,
                         channel=self.channel,
                         operation="readiness",
                         reason="provider_not_ready",
                     )
-                    self._episode_cause = replace(
-                        self._episode_cause,
-                        fields={**self._episode_cause.fields, "provider_epoch_id": epoch_id},
+                    self._retain_episode_cause(
+                        replace(
+                            diagnostics,
+                            fields={**diagnostics.fields, "provider_epoch_id": epoch_id},
+                        )
                     )
                     self._episode_failures = (
                         self._episode_failures + 1
@@ -1576,21 +1588,23 @@ class ScopedRecognitionEngine:
                     )
                     self._schedule_lifetime_check()
                     return
-            if self._episode_cause is None and last_error is not None:
-                self._episode_cause = recognition_failure_diagnostics(
+            if last_error is not None:
+                diagnostics = recognition_failure_diagnostics(
                     last_error,
                     provider=settings.provider_id,
                     channel=self.channel,
                     operation="readiness",
                     reason="provider_not_ready",
                 )
-                self._episode_cause = replace(
-                    self._episode_cause,
-                    fields={**self._episode_cause.fields, "provider_epoch_id": epoch_id},
+                self._retain_episode_cause(
+                    replace(
+                        diagnostics,
+                        fields={**diagnostics.fields, "provider_epoch_id": epoch_id},
+                    )
                 )
                 emit_failure(
                     logger,
-                    self._episode_cause,
+                    diagnostics,
                     severity="warning",
                     disposition="degraded",
                     stage="readiness",
@@ -1607,7 +1621,9 @@ class ScopedRecognitionEngine:
             settings, watchdogs, last_error
         ):
             return
-        raise RuntimeError("provider_recovery_exhausted") from last_error
+        failure = RuntimeError("provider_recovery_exhausted")
+        failure.failure_diagnostics = self._episode_cause
+        raise failure from last_error
 
     def _retryable_connection_error(self, error: BaseException, provider_id: str) -> bool:
         diagnostics = recognition_failure_diagnostics(
@@ -1731,23 +1747,23 @@ class ScopedRecognitionEngine:
             if not retry_safe:
                 self._quarantined_session = session
             self._episode_failures = attempt + 1
-            if first_cause is None:
-                first_cause = recognition_failure_diagnostics(
-                    last_error,
-                    provider=turn.settings.provider_id,
-                    channel=self.channel,
-                    operation="readiness",
-                    reason="provider_not_ready",
-                    identity=turn.identity,
-                )
-                emit_failure(
-                    logger,
-                    first_cause,
-                    severity="warning",
-                    disposition="degraded",
-                    stage="readiness",
-                )
-            self._episode_cause = first_cause
+            diagnostics = recognition_failure_diagnostics(
+                last_error,
+                provider=turn.settings.provider_id,
+                channel=self.channel,
+                operation="readiness",
+                reason="provider_not_ready",
+                identity=turn.identity,
+            )
+            self._retain_episode_cause(diagnostics)
+            first_cause = self._episode_cause
+            emit_failure(
+                logger,
+                diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="readiness",
+            )
             if not self._retryable_connection_error(last_error, turn.settings.provider_id):
                 break
             if not retry_safe:
@@ -1867,7 +1883,7 @@ class ScopedRecognitionEngine:
                             event.reason or "provider_epoch_ended",
                             "receive",
                         )
-                        self._episode_cause = self._episode_cause or native
+                        self._retain_episode_cause(native)
                         emit_failure(
                             logger,
                             native,
@@ -2483,7 +2499,7 @@ class ScopedRecognitionEngine:
                     identity=turn.identity,
                 )
                 first_cause = self._episode_cause
-                self._episode_cause = first_cause or diagnostics
+                self._retain_episode_cause(diagnostics)
                 diagnostics = replace(
                     diagnostics,
                     cause_id=(
@@ -2791,7 +2807,7 @@ class ScopedRecognitionEngine:
             return
         if failed:
             failure_diagnostics = self._failure_diagnostics(failure_diagnostics, reason, "receive")
-            self._episode_cause = self._episode_cause or failure_diagnostics
+            self._retain_episode_cause(failure_diagnostics)
             emit_failure(
                 logger,
                 failure_diagnostics,
@@ -3119,7 +3135,24 @@ class ScopedRecognitionEngine:
         async def reclaim() -> None:
             try:
                 session = await task
-            except BaseException:
+            except asyncio.CancelledError:
+                return
+            except Exception as exc:
+                secondary = self._failure_diagnostics(exc, "provider_begin_failed", "readiness")
+                secondary = replace(
+                    secondary,
+                    cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None,
+                    causes=(
+                        *secondary.causes,
+                        *((self._episode_cause,) if self._episode_cause else ()),
+                    ),
+                )
+                self.secondary_diagnostics = (*self.secondary_diagnostics, secondary)[
+                    -DIAGNOSTIC_CAUSE_MAX_COUNT:
+                ]
+                emit_failure(
+                    logger, secondary, severity="warning", disposition="degraded", stage="readiness"
+                )
                 return
             finally:
                 self._factory_tasks.discard(task)
@@ -3171,6 +3204,10 @@ class ScopedRecognitionEngine:
                 diagnostics,
                 cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None,
                 fields={**diagnostics.fields, "cleanup_confirmed": False},
+                causes=(
+                    *diagnostics.causes,
+                    *((self._episode_cause,) if self._episode_cause else ()),
+                ),
             ),
             severity="warning",
             disposition="degraded",
@@ -3213,6 +3250,22 @@ class ScopedRecognitionEngine:
             },
         )
 
+    def _retain_episode_cause(self, diagnostics: ErrorDiagnostics) -> None:
+        first = self._episode_cause
+        if first is None:
+            self._episode_cause = diagnostics
+            return
+        if diagnostics.diagnostic_id == first.diagnostic_id or any(
+            cause.diagnostic_id == diagnostics.diagnostic_id for cause in first.causes
+        ):
+            return
+        self._episode_cause = replace(
+            first,
+            causes=(*first.causes, diagnostics)[:DIAGNOSTIC_CAUSE_MAX_COUNT],
+            causes_truncated=first.causes_truncated
+            or len(first.causes) >= DIAGNOSTIC_CAUSE_MAX_COUNT,
+        )
+
     def _notify_terminal_failure(self, failure: Exception | ErrorDiagnostics | None) -> None:
         if self._terminal_failure_notified:
             return
@@ -3250,18 +3303,22 @@ class ScopedRecognitionEngine:
                 operation_id=diagnostics.operation_id,
                 request_id=diagnostics.request_id,
                 fields={
+                    **first_cause.fields,
+                    **diagnostics.fields,
                     **exhausted.fields,
-                    **{
-                        key: value
-                        for key, value in diagnostics.fields.items()
-                        if key
-                        in {"provider", "provider_epoch_id", "provider_turn_id", "capture_epoch"}
-                    },
                     "attempts": self._episode_failures,
                     "outcome": "failed",
                     "channel_availability": STTChannelAvailability.UNAVAILABLE.value,
                     "recovery_pending": False,
                 },
+                causes=(
+                    first_cause,
+                    *(
+                        (diagnostics,)
+                        if diagnostics.diagnostic_id != first_cause.diagnostic_id
+                        else ()
+                    ),
+                ),
             ),
             stage="recovery",
         )
@@ -3301,6 +3358,14 @@ class ScopedRecognitionEngine:
                 reason="provider_event_delivery_failed",
                 identity=identity,
             )
+        diagnostics = replace(
+            diagnostics,
+            cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None,
+            causes=(*diagnostics.causes, *((self._episode_cause,) if self._episode_cause else ())),
+        )
+        self.secondary_diagnostics = (*self.secondary_diagnostics, diagnostics)[
+            -DIAGNOSTIC_CAUSE_MAX_COUNT:
+        ]
         emit_failure(
             logger,
             replace(
@@ -3319,9 +3384,10 @@ class ScopedRecognitionEngine:
             result = self.diagnostic_sink(diagnostic)
         except Exception as exc:
             self._record_delivery_failure(exc)
-            raise
+            return
         if inspect.isawaitable(result):
             task = asyncio.create_task(result)
+            self._notification_tasks.add(task)
             task.add_done_callback(self._notification_done)
 
     def _event_provider(self, event: object) -> object | None:

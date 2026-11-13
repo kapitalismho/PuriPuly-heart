@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import textwrap
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 from uuid import UUID
 
@@ -14,7 +14,7 @@ from puripuly_heart.core.diagnostic_validation import (
     DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED,
     redact_text_for_sink,
 )
-from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.osc.sender import OscSender
 from puripuly_heart.core.output.chatbox import SelfUtterancePublication, SystemDisclosurePublication
@@ -47,12 +47,14 @@ class ChatboxPaginator:
     _typing_reasons: set[str] = field(default_factory=set, init=False, repr=False)
     _legacy_typing_active: bool = field(default=False, init=False, repr=False)
     _last_typing_state: bool = field(default=False, init=False, repr=False)
-    _delivery_observer: Callable[[OSCMessage, str], None] | None = field(
+    _delivery_observer: Callable[[OSCMessage, str, ErrorDiagnostics | None], None] | None = field(
         default=None, init=False, repr=False
     )
     _stream_final_revisions: dict[tuple[UUID, int], bool] = field(
         default_factory=dict, init=False, repr=False
     )
+    last_failure_diagnostics: ErrorDiagnostics | None = field(default=None, init=False)
+    delivery_observer_failure: ErrorDiagnostics | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         if self.max_chars <= 0:
@@ -66,13 +68,37 @@ class ChatboxPaginator:
         self._pending_pages = []
         self._pending_messages = []
 
-    def bind_delivery_observer(self, observer: Callable[[OSCMessage, str], None]) -> None:
+    def bind_delivery_observer(
+        self, observer: Callable[[OSCMessage, str, ErrorDiagnostics | None], None]
+    ) -> None:
         self._delivery_observer = observer
 
-    def _notify_delivery(self, message: OSCMessage, status: str) -> None:
+    def _notify_delivery(
+        self, message: OSCMessage, status: str, diagnostics: ErrorDiagnostics | None = None
+    ) -> None:
         if self._delivery_observer is not None:
-            self._delivery_observer(message, status)
-        if status not in {"first_page_sent", "output_send_failed"}:
+            try:
+                self._delivery_observer(message, status, diagnostics)
+            except Exception as exc:
+                self.delivery_observer_failure = replace(
+                    exception_diagnostics(
+                        exc,
+                        component="output_runtime",
+                        operation="observe",
+                        code="output_observer_failed",
+                        fields={"publication_id": str(message.utterance_id)},
+                    ),
+                    cause_id=diagnostics.diagnostic_id if diagnostics else None,
+                    visibility="diagnostic_only",
+                )
+                emit_failure(
+                    logger,
+                    self.delivery_observer_failure,
+                    severity="warning",
+                    disposition="degraded",
+                    stage="routing_observer",
+                )
+        if status not in {"first_page_sent", "output_send_failed", "page_send_failed"}:
             self._stream_final_revisions.pop(
                 (message.utterance_id, message.presentation_revision), None
             )
@@ -498,9 +524,21 @@ class ChatboxPaginator:
         try:
             self.sender.send_chatbox(text)
         except Exception as exc:
-            if self._active_message is not None and self._active_page_index == 0:
-                self._notify_delivery(self._active_message, "output_send_failed")
-            self._emit_send_failure(mode=mode, exc=exc)
+            diagnostics = self._local_send_diagnostics(exc, message=self._active_message)
+            self.last_failure_diagnostics = diagnostics
+            emit_failure(
+                logger,
+                diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="chatbox_page",
+            )
+            if self._active_message is not None:
+                self._notify_delivery(
+                    self._active_message,
+                    "output_send_failed" if self._active_page_index == 0 else "page_send_failed",
+                    diagnostics,
+                )
             if mode == "queued" and remaining_parts == 0:
                 active = self._active_message
                 self._record_stage(
@@ -563,11 +601,6 @@ class ChatboxPaginator:
             **fields,
         )
 
-    def _emit_send_failure(self, *, mode: str, exc: BaseException) -> None:
-        self._emit_local_send_failure(
-            "chatbox_page", exc, message=self._active_message if mode == "queued" else None
-        )
-
     def _emit_local_send_failure(
         self,
         stage: str,
@@ -577,6 +610,7 @@ class ChatboxPaginator:
         operation: str = "publish",
     ) -> None:
         diagnostics = self._local_send_diagnostics(exception, message=message, operation=operation)
+        self.last_failure_diagnostics = diagnostics
         emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage=stage)
 
     @staticmethod
@@ -587,20 +621,19 @@ class ChatboxPaginator:
         fields = {
             "destination": "self_chatbox",
             "remote_delivery": "unacknowledged",
-            **safe_exception_fields(exception),
         }
         if active is not None:
             fields["publication_id"] = str(active.utterance_id)
-        return ErrorDiagnostics(
+        diagnostics = exception_diagnostics(
+            exception,
             component="osc_control",
             operation=operation,
             code="osc_local_send_failed",
             category="network",
-            visibility="basic",
-            content_policy="metadata_only",
-            status_code=None,
-            retry_after_ms=None,
             fields=fields,
+        )
+        return replace(
+            diagnostics,
             channel="self" if active is not None else None,
             turn_id=str(active.utterance_id) if active is not None else None,
             generation=active.turn_generation if active is not None else None,

@@ -205,18 +205,17 @@ def test_run_gui_logs_actionable_flet_runtime_startup_failure(
     monkeypatch.setitem(sys.modules, "puripuly_heart.ui.fonts", fake_fonts)
 
     with caplog.at_level(logging.ERROR, logger=main_module.__name__):
-        with pytest.raises(FileNotFoundError, match="bundled Flet archive missing"):
+        with pytest.raises(FileNotFoundError, match="bundled Flet archive missing") as caught:
             main_module._run_gui(
                 tmp_path / "settings.json",
                 debug_ui_preview=False,
                 runtime_logging_sinks=object(),
             )
 
-    message = next(record.getMessage() for record in caplog.records)
-    assert message == (
-        "The application window stopped after a runtime failure · Cause FileNotFoundError"
-    )
-    assert "bundled Flet archive missing" not in message
+    diagnostics = caught.value.failure_diagnostics
+    assert diagnostics.code == "gui_runtime_failed"
+    assert diagnostics.fields["exception_class"] == "FileNotFoundError"
+    assert "bundled Flet archive missing" not in repr(diagnostics) + caplog.text
 
 
 def test_run_gui_logs_actionable_ui_startup_failure(monkeypatch, tmp_path, caplog) -> None:
@@ -241,19 +240,22 @@ def test_run_gui_logs_actionable_ui_startup_failure(monkeypatch, tmp_path, caplo
     monkeypatch.setitem(sys.modules, "puripuly_heart.ui.fonts", fake_fonts)
 
     with caplog.at_level(logging.ERROR, logger=main_module.__name__):
-        with pytest.raises(RuntimeError, match="application boundary construction failed"):
+        with pytest.raises(
+            RuntimeError, match="application boundary construction failed"
+        ) as caught:
             main_module._run_gui(
                 tmp_path / "settings.json",
                 debug_ui_preview=False,
                 runtime_logging_sinks=object(),
             )
 
-    messages = [record.getMessage() for record in caplog.records]
-    assert messages == [
-        "The application window failed to start · Cause RuntimeError",
-        "The application window stopped after a runtime failure · Cause RuntimeError",
-    ]
-    assert all("application boundary construction failed" not in message for message in messages)
+    diagnostics = caught.value.failure_diagnostics
+    assert diagnostics.code == "gui_runtime_failed"
+    assert diagnostics.causes[0].code == "gui_startup_failed"
+    assert all(
+        "application boundary construction failed" not in record.getMessage()
+        for record in caplog.records
+    )
 
 
 def test_run_gui_debug_preview_constructs_vrchat_presence(monkeypatch, tmp_path) -> None:
@@ -994,10 +996,14 @@ def test_load_settings_or_default_redacts_invalid_setting_value(tmp_path) -> Non
     raw["intent"]["overlay"]["calibration"]["anchor"] = sentinel
     settings_path.write_text(json.dumps(raw), encoding="utf-8")
 
-    with pytest.raises(RuntimeError, match="migration_failed:ValueError") as exc_info:
+    with pytest.raises(RuntimeError, match="Settings could not be loaded") as exc_info:
         main_module._load_settings_or_default(settings_path)
 
     assert sentinel not in str(exc_info.value)
+    diagnostics = exc_info.value.failure_diagnostics
+    assert diagnostics.code == "settings_migration_failed"
+    assert diagnostics.fields["exception_class"] == "ValueError"
+    assert sentinel not in repr(diagnostics)
 
 
 def test_settings_config_path_marks_default_as_implicit(monkeypatch, tmp_path) -> None:

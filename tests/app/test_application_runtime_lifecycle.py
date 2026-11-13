@@ -645,3 +645,34 @@ async def test_shutdown_stops_only_existing_self_capture_and_propagates_real_fai
     else:
         await adapter.stop_self_capture_ingress()
     assert calls == ([] if state == "absent" else ["stop"])
+
+
+def test_managed_gemma_lifecycle_wiring_forwards_shared_failure_without_reprojection():
+    from puripuly_heart.composition.application_runtime import (
+        _emit_managed_gemma_lifecycle_diagnostic,
+    )
+    from puripuly_heart.core.diagnostics import exception_diagnostics
+    from puripuly_heart.core.observability import DiagnosticEvent
+
+    original = PermissionError(13, "private model path")
+    diagnostics = exception_diagnostics(
+        original,
+        component="lifecycle.scope",
+        operation="task_done",
+        code="lifecycle_exception",
+    )
+    event = DiagnosticEvent(
+        category="lifecycle",
+        severity="error",
+        visibility="diagnostic_only",
+        content_policy="metadata_only",
+        correlation_id=None,
+        diagnostics=diagnostics,
+        fields={},
+    )
+    recorded = []
+    _emit_managed_gemma_lifecycle_diagnostic(event, record_failure=recorded.append)
+    assert recorded == [diagnostics]
+    assert recorded[0] is diagnostics
+    assert recorded[0].fields["errno"] == 13
+    assert "private" not in repr(recorded)

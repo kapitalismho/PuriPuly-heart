@@ -18,6 +18,7 @@ from puripuly_heart.app.services.agent_chat.execution import (
     AppAction,
     private_fields,
     project_catalog,
+    project_diagnostic_evidence,
     project_query,
     safe_receipt,
     select_app_action,
@@ -101,6 +102,8 @@ _OSC_ENUMS = {
     "configured_mode": frozenset({"automatic", "manual", "off", None}),
     "effective_mode": frozenset({"automatic", "manual", "off"}),
     "query_failure": frozenset({"oscquery_unavailable", None}),
+    "discovery_observation": frozenset({"unknown", "available", "absent", "unavailable"}),
+    "avatar_observation": frozenset({"unknown", "available", "unsupported", "unavailable"}),
     "local_availability": frozenset(
         {"closed", "off", "receiver_unavailable", "sender_unavailable", "starting", "available"}
     ),
@@ -175,6 +178,7 @@ def project_accounts(value: object) -> dict:
                 for key in ("available", "signed_in", "in_progress", "sign_in_required")
             },
             "usage": {"availability": "unavailable", "remaining_percent": None},
+            **safe_receipt(chatgpt),
         },
         "managed": {
             "provider": (
@@ -190,6 +194,7 @@ def project_accounts(value: object) -> dict:
                 "availability": availability,
                 "freshness": "unknown",
             },
+            **safe_receipt(managed),
         },
         "puri": {
             "allowance": {
@@ -239,6 +244,18 @@ def project_osc_output(value: object) -> dict:
         }
     )
     result["remote_delivery"] = "unacknowledged"
+    result.update(project_diagnostic_evidence(source))
+    if isinstance(source.get("state_publication"), Mapping):
+        result["state_publication"] = _pick(
+            source["state_publication"],
+            (
+                "diagnostic_id",
+                "code",
+                "local_send_completed",
+                "local_send_requested",
+                "disposition",
+            ),
+        )
     listener = _mapping(source.get("local_listener"))
     if listener:
         status = listener.get("status")
@@ -272,8 +289,17 @@ def project_osc_output(value: object) -> dict:
 def _safe_osc_receipt(receipt: dict) -> dict:
     result = _pick(
         receipt,
-        ("instance_id", "operation_id", "request_id", "status", "terminal", "revision"),
+        (
+            "instance_id",
+            "operation_id",
+            "request_id",
+            "status",
+            "terminal",
+            "revision",
+            "diagnostic_id",
+        ),
     )
+    result.update(project_diagnostic_evidence(receipt))
     reason = receipt.get("reason")
     if type(reason) is str and reason in {
         "lifecycle_stopped",
@@ -417,6 +443,7 @@ def project_audio_diagnosis(value: object) -> dict:
             "failure_code",
         ),
     )
+    result.update(safe_receipt(source))
     result["current_route"] = {
         key: safe_audio_device_label(item)
         for key, item in _mapping(source.get("current_route")).items()
@@ -444,9 +471,11 @@ def project_audio_diagnosis(value: object) -> dict:
                     "speech_threshold",
                     "elapsed_ms",
                     "failure_code",
+                    "device_metadata_availability",
                     "cleanup_complete",
                 ),
             )
+            projected.update(safe_receipt(candidate))
             samples = _mapping(candidate).get("observed_speech_probabilities")
             if isinstance(samples, list):
                 projected["observed_speech_probabilities"] = [
@@ -468,57 +497,29 @@ def project_audio_diagnosis(value: object) -> dict:
 
 
 def _safe_receipt(receipt: dict) -> dict:
-    result = _pick(
-        receipt,
-        (
-            "instance_id",
-            "operation_id",
-            "request_id",
-            "status",
-            "terminal",
-            "revision",
-            "reason",
-            "diagnostic_id",
-            "action",
-            "translation_enabled",
-            "runtime_ready",
-            "recognition",
-            "settings_changed",
-        ),
+    result = safe_receipt(receipt)
+    result.update(
+        _pick(
+            receipt,
+            (
+                "instance_id",
+                "operation_id",
+                "request_id",
+                "status",
+                "terminal",
+                "revision",
+                "reason",
+                "diagnostic_id",
+                "action",
+                "translation_enabled",
+                "runtime_ready",
+                "recognition",
+                "settings_changed",
+            ),
+        )
     )
     if isinstance(receipt.get("error"), Mapping):
         result["error"] = _pick(receipt["error"], ("code", "type", "current_revision"))
-    diagnostic_fields = ("diagnostic_id", "code", "category", "disposition", "operation")
-    if isinstance(receipt.get("diagnostics"), Mapping):
-        result["diagnostics"] = _pick(receipt["diagnostics"], diagnostic_fields)
-    if isinstance(receipt.get("transaction"), Mapping):
-        transaction = receipt["transaction"]
-        result["transaction"] = _pick(transaction, ("status",))
-        if isinstance(transaction.get("diagnostics"), Mapping):
-            result["transaction"]["diagnostics"] = _pick(
-                transaction["diagnostics"], diagnostic_fields
-            )
-    if isinstance(receipt.get("runtime_observation"), Mapping):
-        result["runtime_observation"] = _pick(receipt["runtime_observation"], ("status", "reason"))
-    if isinstance(receipt.get("channel"), Mapping):
-        state = receipt["channel"]
-        result["channel"] = _pick(
-            state,
-            (
-                "selected_provider",
-                "runtime_provider",
-                "capture_attached_provider",
-                "desired_active",
-                "effective_active",
-                "pending_handoff",
-                "failure_reason",
-                "provider_status",
-            ),
-        )
-        result["channel"]["capture"] = _pick(
-            state.get("capture"),
-            ("generation", "state", "desired_active", "effective_active", "has_source"),
-        )
     if isinstance(receipt.get("diagnosis"), Mapping):
         result["diagnosis"] = project_audio_diagnosis(receipt["diagnosis"])
     return result
@@ -534,6 +535,7 @@ def project_operation_receipt(receipt: dict, tool: str) -> dict:
             (
                 "translation_result",
                 "recognition_result",
+                "recognition_execution_result",
                 "channel",
                 "captured_settings_revision",
                 "current_settings_revision",
@@ -567,7 +569,10 @@ def project_operation_receipt(receipt: dict, tool: str) -> dict:
         ]
     if isinstance(receipt.get("target_results"), list):
         result["target_results"] = [
-            _pick(target, ("target_language", "translation_result"))
+            {
+                **safe_receipt(target),
+                **_pick(target, ("target_language", "translation_result", "turn_id")),
+            }
             for target in receipt["target_results"][:2]
             if isinstance(target, Mapping)
         ]

@@ -85,11 +85,11 @@ class FakeWatcher:
         watch = FakeWatch(identity_verified=self.identity_verified)
         self.watches.append(watch)
         if self.terminal_during_watch:
-            on_terminal()
+            on_terminal("target_exited", None)
         return watch
 
     def emit_terminal(self) -> None:
-        self.callbacks[-1]()
+        self.callbacks[-1]("target_exited", None)
 
 
 def _supported() -> ProcessCapturePlatformAvailability:
@@ -526,3 +526,56 @@ async def test_process_source_close_stops_real_identity_watch_thread_while_targe
     finally:
         child.terminate()
         child.wait(timeout=5)
+
+
+@pytest.mark.asyncio
+async def test_process_close_failure_retains_capture_and_typed_cause_for_retry():
+    class Capture(FakeCapture):
+        fail_close = True
+
+        def close(self):
+            if self.fail_close:
+                raise OSError(13, "private process close detail")
+            super().close()
+
+    capture = Capture(on_data=lambda *args: None)
+    factory = SimpleNamespace(create=lambda **kwargs: capture)
+    watcher = FakeWatcher()
+    source = ProcessAudioCaptureSource(
+        identity=_identity(),
+        watcher=watcher,
+        capture_factory=factory,
+        platform_availability=_supported,
+    )
+    with pytest.raises(ExceptionGroup) as raised:
+        await source.close()
+    assert source._capture is capture
+    assert source._watch is None
+    assert source.terminal_diagnostics is raised.value.failure_diagnostics
+    assert raised.value.failure_diagnostics.causes[0].fields["errno"] == 13
+    assert "private" not in repr(source.terminal_diagnostics)
+    capture.fail_close = False
+    await source.close()
+    assert source._capture is None
+
+
+def test_process_identity_access_denied_is_unknown_not_observed_exit():
+    from puripuly_heart.core.audio.process_identity import _PsutilProcessIdentityWatch
+
+    psutil = pytest.importorskip("psutil")
+
+    def denied():
+        raise psutil.AccessDenied(pid=100)
+
+    callbacks = []
+    watch = _PsutilProcessIdentityWatch(
+        process=SimpleNamespace(pid=100, create_time=denied),
+        identity=_identity(),
+        psutil=psutil,
+        on_terminal=lambda *args: callbacks.append(args),
+    )
+    assert watch.identity_verified is False
+    assert watch.terminal_reason == "identity_unavailable"
+    assert watch.failure_diagnostics.code == "capture.peer.identity_unavailable"
+    assert callbacks == []
+    watch.close()

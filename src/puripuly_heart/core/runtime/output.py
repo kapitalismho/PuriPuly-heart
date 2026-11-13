@@ -19,6 +19,7 @@ from puripuly_heart.core.diagnostic_validation import (
 from puripuly_heart.core.diagnostics import (
     current_diagnostic_operation,
     emit_failure,
+    exception_diagnostics,
     safe_exception_fields,
 )
 from puripuly_heart.core.messages import ErrorDiagnostics
@@ -70,7 +71,9 @@ logger = logging.getLogger(__name__)
 
 
 class ChatboxQueue(Protocol):
-    def bind_delivery_observer(self, observer: Callable[[OSCMessage, str], None]) -> None: ...
+    def bind_delivery_observer(
+        self, observer: Callable[[OSCMessage, str, ErrorDiagnostics | None], None]
+    ) -> None: ...
     def enqueue_self_turn(self, message: OSCMessage, *, final: bool) -> OSCMessage | None: ...
     def promote_self_turn(self, utterance_id: UUID, revision: int) -> None: ...
     def enqueue(self, message: OSCMessage) -> OSCMessage | None: ...
@@ -202,6 +205,8 @@ class OutputRuntime:
     _observer_failure_count: int = field(init=False, default=0)
     _last_observer_failure_type: str | None = field(init=False, default=None)
     _observer_failure_diagnostics: ErrorDiagnostics | None = field(init=False, default=None)
+    last_typing_failure_diagnostics: ErrorDiagnostics | None = field(default=None, init=False)
+    cleanup_failure_diagnostics: ErrorDiagnostics | None = field(default=None, init=False)
     _self_streams: OrderedDict[UUID, _SelfStreamDelivery] = field(default_factory=OrderedDict)
     _self_stream_completed: OrderedDict[UUID, None] = field(default_factory=OrderedDict)
     _self_stream_flush_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
@@ -712,7 +717,20 @@ class OutputRuntime:
         await self._close_ui_event_bridge_adapter(failures)
         self._drain_completed_task_failures(failures)
         if failures:
-            _raise_output_runtime_failures(failures)
+            failure = (
+                failures[0]
+                if len(failures) == 1
+                else ExceptionGroup("OutputRuntime close failed", failures)
+            )
+            self.cleanup_failure_diagnostics = exception_diagnostics(
+                failure,
+                component="output_runtime",
+                operation="close",
+                code="output_cleanup_failed",
+                fields={"close_complete": False},
+            )
+            failure.failure_diagnostics = self.cleanup_failure_diagnostics
+            raise failure
         self._state = "closed"
 
     async def publish_self_turn(
@@ -776,9 +794,36 @@ class OutputRuntime:
                 )
         await self._flush_self_streams()
 
-    def _observe_self_stream_delivery(self, message: OSCMessage, status: str) -> None:
+    def _observe_self_stream_delivery(
+        self, message: OSCMessage, status: str, diagnostics: ErrorDiagnostics | None
+    ) -> None:
         state = self._self_streams.get(message.utterance_id)
-        if state is None or message.presentation_revision != state.offered_revision:
+        if (
+            status == "page_send_failed"
+            or state is None
+            or message.presentation_revision != state.offered_revision
+        ):
+            if diagnostics is not None:
+                self._observe_result(
+                    status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                    route=OUTPUT_ROUTE_SELF_CHATBOX,
+                    publication_id=str(message.utterance_id),
+                    publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
+                    reason=status,
+                    metadata={
+                        "channel": "self",
+                        "stage": (
+                            "chatbox_page_delivery"
+                            if status == "page_send_failed"
+                            else "self_stream_delivery"
+                        ),
+                        "physical_ack": False,
+                        "presentation_revision": message.presentation_revision,
+                        "turn_generation": message.turn_generation,
+                        "turn_order": message.turn_order,
+                    },
+                    diagnostics=diagnostics,
+                )
             return
         state.receipt = status
         if status == "first_page_sent":
@@ -801,6 +846,7 @@ class OutputRuntime:
                 "turn_generation": message.turn_generation,
                 "turn_order": message.turn_order,
             },
+            diagnostics=diagnostics,
         )
         if self._self_stream_delivery_observer is not None:
             self._self_stream_delivery_observer(result.decision)
@@ -1069,6 +1115,7 @@ class OutputRuntime:
                     **safe_exception_fields(exc),
                     **publication_metadata,
                 },
+                exception=exc,
             )
         self._remember_delivered_publication(publication_key)
         if evicted is not None:
@@ -1119,26 +1166,18 @@ class OutputRuntime:
         except Exception as exc:
             self._emit_typing_failure("typing_clear", exc)
 
-    @staticmethod
-    def _emit_typing_failure(operation: str, exception: Exception) -> None:
-        origin = current_diagnostic_operation()
-        diagnostics = ErrorDiagnostics(
-            component="output_runtime",
-            operation=operation,
-            code="destination_publish_failed",
-            category="lifecycle",
-            visibility="basic",
-            content_policy="metadata_only",
-            status_code=None,
-            retry_after_ms=None,
-            fields={
-                "destination": OUTPUT_ROUTE_SELF_CHATBOX,
-                **safe_exception_fields(exception),
-            },
+    def _emit_typing_failure(self, operation: str, exception: Exception) -> None:
+        diagnostics = replace(
+            exception_diagnostics(
+                exception,
+                component="output_runtime",
+                operation=operation,
+                code="destination_publish_failed",
+                fields={"destination": OUTPUT_ROUTE_SELF_CHATBOX},
+            ),
             channel="self",
-            operation_id=origin["operation_id"],
-            request_id=origin["request_id"],
         )
+        self.last_typing_failure_diagnostics = diagnostics
         emit_failure(logger, diagnostics, disposition="degraded", stage="typing_state")
 
     def publish_system_disclosure_chatbox(
@@ -1195,6 +1234,7 @@ class OutputRuntime:
                     "error_type": safe_exception_fields(exc)["exception_class"],
                     **safe_exception_fields(exc),
                 },
+                exception=exc,
             )
         self._remember_delivered_publication(publication_key)
         return self._observe_result(
@@ -1263,6 +1303,7 @@ class OutputRuntime:
                     "error_type": safe_exception_fields(exc)["exception_class"],
                     **safe_exception_fields(exc),
                 },
+                exception=exc,
             )
         if diagnostics is not None:
             origin = current_diagnostic_operation()
@@ -1494,6 +1535,7 @@ class OutputRuntime:
                     "stage": "application_accepted",
                     "outcome": "not_applied",
                 },
+                exception=exc,
             )
         finally:
             self._active_delivery_tasks.discard(current_task)
@@ -1655,9 +1697,8 @@ class OutputRuntime:
             self._publications_in_flight.add(publication_key)
             worker = self._peer_overlay_worker
             if worker is None or worker.done():
-                self._peer_overlay_worker = asyncio.create_task(
-                    self._run_peer_overlay_writer(),
-                    name="OutputRuntime:peer-overlay-writer",
+                self._peer_overlay_worker = self._create_task(
+                    self._run_peer_overlay_writer(), task_name="peer-overlay-writer"
                 )
         return self._observe_result(
             status=OUTPUT_ROUTING_DECISION_PUBLISHED,
@@ -1964,6 +2005,7 @@ class OutputRuntime:
                         reason="destination_publish_failed",
                         error_type=safe_exception_fields(exc)["exception_class"],
                         pacing_metadata={**pacing_outcome(), **safe_exception_fields(exc)},
+                        exception=exc,
                     )
                 else:
                     resolved_receipt = receipt or OverlayApplicationReceipt(
@@ -2115,6 +2157,7 @@ class OutputRuntime:
         error_type: str | None = None,
         scene_revision: int | None = None,
         pacing_metadata: Mapping[str, str | int | float | bool | None] | None = None,
+        exception: BaseException | None = None,
     ) -> None:
         self._publications_in_flight.discard(publication_key)
         if reason != "peer_caption_superseded":
@@ -2146,6 +2189,7 @@ class OutputRuntime:
             publication_kind=PUBLICATION_KIND_PEER_SUBTITLE,
             reason=reason,
             metadata=metadata,
+            exception=exception,
         )
         observer = self._peer_overlay_delivery_observer
         if observer is not None:
@@ -2410,15 +2454,11 @@ class OutputRuntime:
     def _emit_cleanup_failure(stage: str, exception: Exception) -> None:
         emit_failure(
             logger,
-            ErrorDiagnostics(
+            exception_diagnostics(
+                exception,
                 component="output_runtime",
                 operation="close",
                 code="output_cleanup_failed",
-                category="lifecycle",
-                visibility="basic",
-                content_policy="metadata_only",
-                status_code=None,
-                retry_after_ms=None,
                 fields={"close_complete": False},
             ),
             stage=stage,
@@ -2553,6 +2593,7 @@ class OutputRuntime:
         ui_queue_submitted: bool,
         operation_id: str | None = None,
         request_id: str | None = None,
+        exception: BaseException | None = None,
     ) -> OutputPublicationResult:
         return self._observe_result(
             status=status,
@@ -2580,6 +2621,7 @@ class OutputRuntime:
                 "ui_queue_submitted": ui_queue_submitted,
                 "physical_ack": False,
             },
+            exception=exception,
         )
 
     def _observe_result(
@@ -2593,6 +2635,7 @@ class OutputRuntime:
         metadata: dict[str, str | int | float | bool | None],
         message: OSCMessage | None = None,
         diagnostics: ErrorDiagnostics | None = None,
+        exception: BaseException | None = None,
     ) -> OutputPublicationResult:
         return OutputPublicationResult(
             decision=self._observe_decision(
@@ -2603,6 +2646,7 @@ class OutputRuntime:
                 reason=reason,
                 metadata=metadata,
                 diagnostics=diagnostics,
+                exception=exception,
             ),
             message=message,
         )
@@ -2697,7 +2741,16 @@ class OutputRuntime:
         reason: str | None,
         metadata: dict[str, str | int | float | bool | None],
         diagnostics: ErrorDiagnostics | None = None,
+        exception: BaseException | None = None,
     ) -> OutputRoutingDecision:
+        if diagnostics is None and exception is not None:
+            diagnostics = exception_diagnostics(
+                exception,
+                component="output_runtime",
+                operation="publish",
+                code=reason or "destination_publish_failed",
+                category="timeout" if isinstance(exception, TimeoutError) else "lifecycle",
+            )
         if diagnostics is None and reason in {
             "destination_publish_failed",
             "destination_write_timeout",
@@ -2709,19 +2762,6 @@ class OutputRuntime:
                 "publication_id": metadata.get("utterance_id", publication_id),
                 "publication_kind": publication_kind,
             }
-            for key in (
-                "exception_class",
-                "cause_class_1",
-                "cause_class_2",
-                "cause_class_3",
-                "cause_class_4",
-                "errno",
-                "winerror",
-            ):
-                if key in metadata:
-                    fields[key] = metadata[key]
-            if "exception_class" not in fields and "error_type" in metadata:
-                fields["exception_class"] = metadata["error_type"]
             diagnostics = ErrorDiagnostics(
                 component="output_runtime",
                 operation="publish",
@@ -2741,6 +2781,33 @@ class OutputRuntime:
                 turn_id=metadata.get("parent_utterance_id", metadata.get("utterance_id")),
             )
         if diagnostics is not None:
+            origin = current_diagnostic_operation()
+            diagnostics = replace(
+                diagnostics,
+                fields={
+                    **diagnostics.fields,
+                    "destination": route,
+                    "publication_id": metadata.get("utterance_id", publication_id),
+                    "publication_kind": publication_kind,
+                },
+                channel=diagnostics.channel
+                or (
+                    metadata.get("channel") if metadata.get("channel") in {"self", "peer"} else None
+                ),
+                generation=(
+                    diagnostics.generation
+                    if diagnostics.generation is not None
+                    else metadata.get("publication_generation", metadata.get("turn_generation"))
+                ),
+                operation_id=diagnostics.operation_id
+                or metadata.get("operation_id")
+                or origin["operation_id"],
+                request_id=diagnostics.request_id
+                or metadata.get("request_id")
+                or origin["request_id"],
+                turn_id=diagnostics.turn_id
+                or metadata.get("parent_utterance_id", metadata.get("utterance_id")),
+            )
             emit_failure(logger, diagnostics, disposition="degraded", stage="destination_delivery")
         decision = OutputRoutingDecision(
             decision=status,
@@ -2761,21 +2828,20 @@ class OutputRuntime:
                 self._observer_failure_count += 1
                 self._last_observer_failure_type = safe_exception_fields(exc)["exception_class"]
                 if self._observer_failure_count == 1:
-                    self._observer_failure_diagnostics = ErrorDiagnostics(
-                        component="output_runtime",
-                        operation="observe",
-                        code="output_observer_failed",
-                        category="lifecycle",
-                        visibility="diagnostic_only",
-                        content_policy="metadata_only",
-                        status_code=None,
-                        retry_after_ms=None,
-                        fields={
-                            "destination": route,
-                            "publication_id": metadata.get("utterance_id", publication_id),
-                            "count": self._observer_failure_count,
-                        },
+                    self._observer_failure_diagnostics = replace(
+                        exception_diagnostics(
+                            exc,
+                            component="output_runtime",
+                            operation="observe",
+                            code="output_observer_failed",
+                            fields={
+                                "destination": route,
+                                "publication_id": metadata.get("utterance_id", publication_id),
+                                "count": self._observer_failure_count,
+                            },
+                        ),
                         cause_id=diagnostics.diagnostic_id if diagnostics else None,
+                        visibility="diagnostic_only",
                     )
                     emit_failure(
                         logger,
@@ -2786,14 +2852,6 @@ class OutputRuntime:
                         exception=exc,
                     )
         return decision
-
-
-def _raise_output_runtime_failures(failures: list[Exception]) -> None:
-    if not failures:
-        return
-    if len(failures) == 1:
-        raise failures[0]
-    raise ExceptionGroup("OutputRuntime close failed", failures)
 
 
 def _redact_chatbox_disclosure_text(text: str) -> str:

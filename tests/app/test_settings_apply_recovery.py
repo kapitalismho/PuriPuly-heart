@@ -6,6 +6,7 @@ import pytest
 
 from puripuly_heart.app.adapters.ui_runtime import UiSettingsRuntimeAdapter
 from puripuly_heart.app.ports.settings_view import LocaleSettingsIntent
+from puripuly_heart.app.ports.ui_presentation import SettingsRenderResult
 from puripuly_heart.app.services.canonical_settings_persistence import compose_settings_owner
 from puripuly_heart.app.services.settings.settings_application import SettingsApplicationOwner
 from puripuly_heart.app.services.settings.settings_projection import SettingsProjectionOwner
@@ -102,7 +103,7 @@ def persistent_application(tmp_path, effects):
     settings.start()
     settings.set_peer_translation_enabled(True)
     projection = SettingsProjectionOwner(
-        presentation=SimpleNamespace(render_settings=lambda **_kwargs: True),
+        presentation=SimpleNamespace(render_settings=lambda **_kwargs: SettingsRenderResult(True)),
         config_path=settings.path,
         current_settings=lambda: settings.canonical,
     )

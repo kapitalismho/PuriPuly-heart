@@ -928,6 +928,8 @@ def _prepared_rolling_definition(
         build_backend=binding.build_backend,
         is_configured=binding.is_configured,
         rebind=binding.apply_key,
+        prepare_backend=binding.prepare_backend,
+        close_backend=binding.close,
     )
 
 

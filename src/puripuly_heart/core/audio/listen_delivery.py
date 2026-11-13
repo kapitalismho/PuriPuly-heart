@@ -4,7 +4,9 @@ import asyncio
 import contextlib
 import logging
 import math
+from collections import deque
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from typing import Literal
 from uuid import UUID
 
@@ -19,6 +21,8 @@ from puripuly_heart.core.audio.smart_turn import (
     SmartTurnInferenceOwner,
     SmartTurnRequestIdentity,
 )
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.vad.gating import (
     PEER_HARD_ROLLOVER_PRE_ROLL_MS,
     SpeechChunk,
@@ -86,6 +90,8 @@ class ListenDeliveryController:
         self._four_second_task: asyncio.Task[None] | None = None
         self._five_second_task: asyncio.Task[None] | None = None
         self._hard_task: asyncio.Task[None] | None = None
+        self._timer_tasks: set[asyncio.Task[None]] = set()
+        self._failures: deque[ErrorDiagnostics] = deque(maxlen=16)
         self._closed = False
         self._seal_lock = asyncio.Lock()
 
@@ -96,6 +102,10 @@ class ListenDeliveryController:
     @property
     def capture_frame_lock(self) -> asyncio.Lock:
         return self._seal_lock
+
+    @property
+    def failure_diagnostics(self) -> tuple[ErrorDiagnostics, ...]:
+        return tuple(self._failures)
 
     async def handle_vad_event(self, event: object) -> None:
         if isinstance(event, SpeechChunk | SpeechEnd) and self._ledger.is_segment_terminal(
@@ -237,7 +247,8 @@ class ListenDeliveryController:
 
     async def close(self) -> None:
         self._closed = True
-        tasks = self._cancel_timers()
+        self._cancel_timers()
+        tasks = tuple(self._timer_tasks)
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         if self._owns_smart_turn_owner:
@@ -362,6 +373,39 @@ class ListenDeliveryController:
             self._run_hard_timer(segment_id, max(0.0, opened_at_s + self._hard_limit_s - now)),
             name="listen-deadline",
         )
+        snapshot = self._current_snapshot(segment_id)
+        generation = snapshot.identity.activation_generation if snapshot is not None else None
+        for task in (self._four_second_task, self._five_second_task, self._hard_task):
+            self._timer_tasks.add(task)
+            task.add_done_callback(
+                lambda completed, segment_id=segment_id, generation=generation: self._observe_timer_result(
+                    completed, segment_id, generation
+                )
+            )
+
+    def _observe_timer_result(
+        self, task: asyncio.Task[None], segment_id: UUID, generation: int | None
+    ) -> None:
+        self._timer_tasks.discard(task)
+        if task.cancelled():
+            return
+        exception = task.exception()
+        if exception is None:
+            return
+        diagnostics = replace(
+            exception_diagnostics(
+                exception,
+                component="capture.peer",
+                operation="segmentation",
+                code="capture.peer.delivery_failed",
+            ),
+            channel="peer",
+            turn_id=str(segment_id),
+            generation=generation,
+        )
+        self._failures.append(diagnostics)
+        self._ledger.retain_delivery_failure(diagnostics)
+        emit_failure(logger, diagnostics, disposition="degraded", stage="segmentation")
 
     async def _run_pause_step_timer(
         self,

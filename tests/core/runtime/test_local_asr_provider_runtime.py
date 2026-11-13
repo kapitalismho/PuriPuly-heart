@@ -1929,3 +1929,34 @@ async def test_provider_startup_failure_preserves_phase_and_current_provider(
         assert "private-model-path" not in repr(failures)
     finally:
         await owner.close()
+
+
+async def test_gpu_projection_preserves_shared_failure_value_and_relationships():
+    from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnostic
+    from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+
+    owner, _, _, _ = _owner()
+    failure = recognition_failure_diagnostics(
+        ASRWorkerRequestError(
+            "decode_failure", {"native_reason": "input_too_long", "native_status": 12}
+        ),
+        provider="local_qwen_gpu",
+        channel="self",
+        operation="decode",
+        reason="local_decode_failed",
+    )
+    try:
+        await owner._on_gpu_diagnostic(
+            GpuASRDiagnostic(
+                kind="worker_failed",
+                fields={"failure": "decode_failure", "channel": "self"},
+                failure_diagnostics=failure,
+            ),
+            generation=owner._gpu_generation,
+        )
+        projected = next(item for item in owner.diagnostics if item.event == "worker_failed")
+        assert projected.failure_diagnostics is failure
+        assert projected.failure_diagnostics.fields["native_reason"] == "input_too_long"
+        assert projected.failure_diagnostics.fields["native_status"] == 12
+    finally:
+        await owner.close()

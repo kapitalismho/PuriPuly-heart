@@ -30,6 +30,7 @@ from puripuly_heart.config.runtime_resolution import (
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
+from puripuly_heart.core.local_translation.runtime import ManagedGemmaMetrics, ManagedGemmaResponse
 from puripuly_heart.core.managed_credential import (
     ManagedCredentialBinding,
     credential_binding_secret,
@@ -435,7 +436,10 @@ async def test_managed_factory_leaves_gpu_admission_to_shared_runtime_even_with_
             if len(calls) == 2:
                 both_entered.set()
             await finish.wait()
-            return SimpleNamespace(text=kwargs["user_message"])
+            return ManagedGemmaResponse(
+                text=kwargs["user_message"],
+                metrics=ManagedGemmaMetrics(1, 1, 1, 1.0, 1.0, 1.0),
+            )
 
     provider = create_llm_provider_from_resolved_config(
         resolve_llm_config(
@@ -468,6 +472,8 @@ async def test_managed_factory_leaves_gpu_admission_to_shared_runtime_even_with_
         results = await asyncio.gather(*tasks)
         assert [result.utterance_id for result in results] == identities
         assert results[0].text != results[1].text
+        assert all(result.recovered_failures == () for result in results)
+        assert all(result.secondary_diagnostics == () for result in results)
     finally:
         finish.set()
         await asyncio.gather(*tasks, return_exceptions=True)

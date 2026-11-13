@@ -4,6 +4,7 @@ import asyncio
 import hmac
 import json
 import logging
+import math
 import os
 import secrets
 import sys
@@ -26,7 +27,12 @@ from puripuly_heart.app.ports.asr_worker import (
     ASRWorkerRequestError,
     ASRWorkerTranscription,
 )
-from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
+from puripuly_heart.core.diagnostics import (
+    emit_failure,
+    exception_diagnostics,
+    safe_exception_fields,
+    sanitize_diagnostic_fields,
+)
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.runtime_layout import current_runtime_layout
@@ -872,23 +878,34 @@ class _DefaultASRWorkerClient(ASRWorkerClientPort):
             return
         code = payload.get("error_code")
         response_payload = payload.get("payload")
-        failure_code = code if isinstance(code, str) else "worker_failure"
+        classification, rejected_code = sanitize_diagnostic_fields({"native_classification": code})
+        failure_code = str(classification.get("native_classification") or "worker_failure")
         if failure_code == "cancelled":
             self._stderr_line_count = 0
         else:
             await asyncio.sleep(_STDERR_FAILURE_FLUSH_SECONDS)
             self._log_failure_stderr(failure_code=failure_code)
-        future.set_exception(
-            ASRWorkerRequestError(
-                failure_code,
-                (
-                    cast(dict[str, object], response_payload)
-                    if isinstance(response_payload, dict)
-                    else None
-                ),
-                attempt_started=payload.get("attempt_started") is True,
-            )
+        fields, rejected_fields = _worker_failure_fields(response_payload)
+        error = ASRWorkerRequestError(
+            failure_code,
+            fields,
+            attempt_started=payload.get("attempt_started") is True,
         )
+        error.failure_diagnostics = _emit_asr_failure(
+            "worker_request_failed",
+            stage="runtime",
+            fields={
+                "worker_session_id": self.session_id,
+                "native_classification": failure_code,
+                **{key: fields[key] for key in ("native_reason", "native_status") if key in fields},
+            },
+            exception=error,
+            severity="info" if failure_code == "cancelled" else "error",
+            disposition="cancelled" if failure_code == "cancelled" else "failed",
+            request_id=request_id,
+            rejected_fields=rejected_fields + rejected_code,
+        )
+        future.set_exception(error)
 
     async def _handle_event(self, payload: dict[str, object]) -> None:
         name = payload.get("event")
@@ -960,6 +977,18 @@ class _DefaultASRWorkerClient(ASRWorkerClientPort):
             fields={
                 "worker_session_id": self.session_id,
                 **({"exit_code": error.exit_code} if error.exit_code is not None else {}),
+                **(
+                    {
+                        "native_classification": {
+                            12: "worker_unload_failed",
+                            13: "worker_connection_closed",
+                            14: "worker_writer_failed",
+                            15: "worker_reader_failed",
+                        }[error.exit_code]
+                    }
+                    if error.exit_code in {12, 13, 14, 15}
+                    else {}
+                ),
             },
             exception=error,
             cause=previous,
@@ -979,17 +1008,62 @@ class _DefaultASRWorkerClient(ASRWorkerClientPort):
         self._stderr_line_count = 0
         if not stderr_line_count:
             return
-        logger.error(
-            "[ASRWorker][Failure] failure_code=%s exit_code=%s stderr_line_count=%s",
-            failure_code,
-            exit_code if exit_code is not None else "none",
-            stderr_line_count,
-        )
+        try:
+            logger.error(
+                "[ASRWorker][Failure] failure_code=%s exit_code=%s stderr_line_count=%s",
+                failure_code,
+                exit_code if exit_code is not None else "none",
+                stderr_line_count,
+            )
+        except Exception:
+            return
 
     def _fail_pending(self, error: BaseException) -> None:
         for future in tuple(self._pending.values()):
             if not future.done():
                 future.set_exception(error)
+
+
+def _worker_failure_fields(payload: object) -> tuple[dict[str, object], int]:
+    if not isinstance(payload, dict):
+        return {}, 1
+    fields, rejected = sanitize_diagnostic_fields(
+        {key: payload[key] for key in ("native_reason", "native_status") if key in payload}
+    )
+    rejected += sum(
+        key
+        not in {
+            "native_reason",
+            "native_status",
+            "audio_seconds",
+            "decode_seconds",
+            "rtf",
+            "channel",
+            "backend",
+        }
+        for key in payload
+    )
+    for key in ("audio_seconds", "decode_seconds", "rtf"):
+        if key not in payload:
+            continue
+        value = payload[key]
+        if (
+            type(value) in {int, float}
+            and 0 <= value <= sys.float_info.max
+            and math.isfinite(value)
+        ):
+            fields[key] = value
+        else:
+            rejected += 1
+    for key, accepted in (("channel", {"self", "peer"}), ("backend", {"cpu", "Vulkan"})):
+        if key not in payload:
+            continue
+        value = payload[key]
+        if isinstance(value, str) and value in accepted:
+            fields[key] = value
+        else:
+            rejected += 1
+    return fields, rejected
 
 
 def _emit_asr_failure(
@@ -1003,7 +1077,18 @@ def _emit_asr_failure(
     disposition: str = "failed",
     operation_id: str | None = None,
     request_id: str | None = None,
+    rejected_fields: int = 0,
 ) -> ErrorDiagnostics:
+    causes = (
+        exception_diagnostics(
+            exception,
+            component="asr_worker",
+            operation="process_lifecycle",
+            code=code,
+        ).causes
+        if exception is not None
+        else ()
+    )
     diagnostics = ErrorDiagnostics(
         component="asr_worker",
         operation="process_lifecycle",
@@ -1013,10 +1098,15 @@ def _emit_asr_failure(
         content_policy="metadata_only",
         status_code=None,
         retry_after_ms=None,
-        fields={key: value for key, value in (fields or {}).items() if value is not None},
+        fields={
+            **(safe_exception_fields(exception) if exception is not None else {}),
+            **{key: value for key, value in (fields or {}).items() if value is not None},
+        },
         cause_id=cause.diagnostic_id if cause else None,
         operation_id=cause.operation_id if cause is not None else operation_id,
         request_id=cause.request_id if cause is not None else request_id,
+        causes=(*causes, *((cause,) if cause is not None else ())),
+        rejected_fields=rejected_fields,
     )
     emit_failure(
         logger,

@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import threading
 import time
+from collections import deque
 from collections.abc import Callable, Sequence
 from functools import partial
 from pathlib import Path
@@ -14,7 +15,10 @@ from typing import Any
 from urllib.parse import urlsplit
 from uuid import uuid4
 
+from puripuly_heart.core.diagnostics import sanitize_diagnostics
 from puripuly_heart.core.external_network import ProxyPolicy, select_tls
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.model_asset_diagnostics import model_asset_failure_diagnostics
 from puripuly_heart.runtime_layout import current_runtime_layout
 
 from .local_stt_download_port import (
@@ -176,6 +180,11 @@ class HuggingFaceXetDownloadAdapter:
     def __init__(self, *, worker_command_factory: WorkerCommandFactory | None = None) -> None:
         self._worker_command_factory = worker_command_factory or _default_worker_command
         self._active_workers: dict[int, str] = {}
+        self._recovery_diagnostics: deque[ErrorDiagnostics] = deque(maxlen=8)
+
+    @property
+    def recovery_diagnostics(self) -> tuple[ErrorDiagnostics, ...]:
+        return tuple(self._recovery_diagnostics)
 
     @property
     def child_states(self) -> tuple[str, ...]:
@@ -192,6 +201,7 @@ class HuggingFaceXetDownloadAdapter:
         on_progress: HuggingFaceProgressCallback | None,
     ) -> Path:
         acquired = False
+        first_failure: LocalSTTDownloadPortError | None = None
         try:
             while not acquired:
                 if cancel_event is not None and cancel_event.is_set():
@@ -242,15 +252,74 @@ class HuggingFaceXetDownloadAdapter:
             except LocalSTTDownloadPortError as exc:
                 if http_only or exc.failure_code != "download_failed":
                     raise
+                first_failure = exc
             shutil.rmtree(request.local_dir / ".cache", ignore_errors=True)
             if cancel_event is not None and cancel_event.is_set():
                 raise LocalSTTDownloadPortCancelled("Hugging Face/Xet download cancelled")
-            return await self._download_attempt(
-                request,
-                cancel_event=cancel_event,
-                on_progress=on_progress,
-                environment={**environment, "HF_HUB_DISABLE_XET": "1"},
+            try:
+                result = await self._download_attempt(
+                    request,
+                    cancel_event=cancel_event,
+                    on_progress=on_progress,
+                    environment={**environment, "HF_HUB_DISABLE_XET": "1"},
+                )
+            except LocalSTTDownloadPortError as last_failure:
+                first = model_asset_failure_diagnostics(
+                    first_failure,
+                    operation="download",
+                    fields={"source_kind": "huggingface", "source_attempt": 1},
+                )
+                last = model_asset_failure_diagnostics(
+                    last_failure,
+                    operation="download",
+                    fields={"source_kind": "huggingface", "source_attempt": 2},
+                )
+                last_failure.failure_diagnostics = sanitize_diagnostics(
+                    ErrorDiagnostics(
+                        component="model_assets",
+                        operation="download",
+                        code="local_asr.download_failed",
+                        category="lifecycle",
+                        visibility="diagnostic_only",
+                        content_policy="metadata_only",
+                        status_code=None,
+                        retry_after_ms=None,
+                        fields={},
+                        causes=(first, last),
+                    )
+                )
+                raise
+            recovered = model_asset_failure_diagnostics(
+                first_failure,
+                operation="download",
+                fields={"source_kind": "huggingface", "source_attempt": 1},
             )
+            self._recovery_diagnostics.append(recovered)
+            if request.on_recovery is not None:
+                request.on_recovery(recovered)
+            return result
+        except BaseException as failure:
+            if isinstance(failure, (asyncio.CancelledError, LocalSTTDownloadPortCancelled)):
+                if first_failure is not None:
+                    failure.secondary_diagnostics = (
+                        model_asset_failure_diagnostics(
+                            first_failure,
+                            operation="download",
+                            fields={"source_kind": "huggingface", "source_attempt": 1},
+                        ),
+                    )
+            elif isinstance(failure, (Exception, BaseExceptionGroup)):
+                failure.failure_diagnostics = model_asset_failure_diagnostics(
+                    failure,
+                    operation="download",
+                    code="local_asr.download_failed",
+                    fields={
+                        "source_kind": (
+                            "huggingface_mirror" if request.endpoint is not None else "huggingface"
+                        ),
+                    },
+                )
+            raise
         finally:
             if acquired:
                 _XET_TRANSFER_LOCK.release()
@@ -267,6 +336,7 @@ class HuggingFaceXetDownloadAdapter:
         ipc_id = uuid4().hex
         request_path = request.local_dir / f".hf-xet-request-{ipc_id}.json"
         event_path = request.local_dir / f".hf-xet-events-{ipc_id}.jsonl"
+        primary_failure: BaseException | None = None
         try:
             request_path.write_text(json.dumps(_worker_payload(request)), encoding="utf-8")
             event_path.touch()
@@ -290,7 +360,6 @@ class HuggingFaceXetDownloadAdapter:
                     cause_type=type(exc).__name__,
                     os_error_code=_os_error_code(exc),
                 ) from exc
-            error_message: str | None = None
             error_failure_code: str | None = None
             error_cause_type: str | None = None
             error_status_code: int | None = None
@@ -322,37 +391,54 @@ class HuggingFaceXetDownloadAdapter:
                             failure_code="worker_protocol_failed",
                             cause_type=type(exc).__name__,
                         ) from exc
+                    if not isinstance(message, dict):
+                        raise LocalSTTDownloadPortError(
+                            "Invalid model download worker response",
+                            failure_code="worker_protocol_failed",
+                        )
                     message_type = message.get("type")
                     if message_type == "progress" and on_progress is not None:
-                        if int(message["downloaded_bytes"]) > last_bytes:
+                        downloaded_bytes = message.get("downloaded_bytes")
+                        total_bytes = message.get("total_bytes")
+                        if (
+                            type(downloaded_bytes) is not int
+                            or not 0 <= downloaded_bytes < 2**63
+                            or (
+                                total_bytes is not None
+                                and (type(total_bytes) is not int or not 0 <= total_bytes < 2**63)
+                            )
+                        ):
+                            raise LocalSTTDownloadPortError(
+                                "Invalid model download worker progress",
+                                failure_code="worker_protocol_failed",
+                            )
+                        if downloaded_bytes > last_bytes:
                             last_progress = time.monotonic()
-                            last_bytes = int(message["downloaded_bytes"])
+                            last_bytes = downloaded_bytes
                         on_progress(
                             HuggingFaceDownloadProgress(
-                                downloaded_bytes=max(0, int(message["downloaded_bytes"])),
-                                total_bytes=(
-                                    int(message["total_bytes"])
-                                    if message.get("total_bytes") is not None
-                                    else None
-                                ),
+                                downloaded_bytes=downloaded_bytes,
+                                total_bytes=total_bytes,
                             )
                         )
                     elif message_type == "complete":
                         completed_path = Path(str(message["path"]))
                     elif message_type == "error":
-                        error_message = str(
-                            message.get("message") or "Hugging Face/Xet worker failed"
+                        native = LocalSTTDownloadPortError(
+                            "Model download worker reported failure",
+                            failure_code=message.get("failure_code"),
+                            cause_type=message.get("error_type"),
+                            status_code=message.get("status_code"),
+                            os_error_code=message.get("os_error_code"),
                         )
-                        error_failure_code = str(
-                            message.get("failure_code") or "worker_reported_failure"
-                        )
-                        error_cause_type = str(message.get("error_type") or "unavailable")
-                        error_status_code = _optional_int(message.get("status_code"))
-                        error_os_code = _optional_int(message.get("os_error_code"))
+                        error_failure_code = native.failure_code
+                        error_cause_type = native.cause_type
+                        error_status_code = native.status_code
+                        error_os_code = native.os_error_code
 
             return_code = await process.wait()
             if return_code != 0 or completed_path is None:
-                detail = error_message or f"worker exited with code {return_code}"
+                detail = "Model download worker failed"
                 raise LocalSTTDownloadPortError(
                     detail,
                     failure_code=error_failure_code or "worker_exited",
@@ -362,21 +448,42 @@ class HuggingFaceXetDownloadAdapter:
                     os_error_code=error_os_code,
                 )
             return completed_path
-        except asyncio.CancelledError:
-            if process is not None:
-                await _stop_worker(process)
-            raise
-        except LocalSTTDownloadPortCancelled:
-            if process is not None:
-                await _stop_worker(process)
+        except BaseException as exc:
+            primary_failure = exc
             raise
         finally:
+            cleanup_failures: list[BaseException] = []
+            interrupted: asyncio.CancelledError | None = None
             if process is not None and process.returncode is None:
-                await _stop_worker(process)
-            if process is not None and process.pid is not None:
+                stop_task = asyncio.create_task(_stop_worker(process))
+                while not stop_task.done():
+                    try:
+                        await asyncio.shield(stop_task)
+                    except asyncio.CancelledError as cancellation:
+                        interrupted = cancellation
+                    except BaseException:
+                        break
+                try:
+                    stop_task.result()
+                except BaseException as cleanup:
+                    cleanup_failures.append(cleanup)
+            if process is not None and process.pid is not None and process.returncode is not None:
                 self._active_workers.pop(int(process.pid), None)
-            request_path.unlink(missing_ok=True)
-            event_path.unlink(missing_ok=True)
+            for path in (request_path, event_path):
+                try:
+                    path.unlink(missing_ok=True)
+                except BaseException as cleanup:
+                    cleanup_failures.append(cleanup)
+            if cleanup_failures:
+                if primary_failure is not None or interrupted is not None:
+                    original = primary_failure or interrupted
+                    raise BaseExceptionGroup(
+                        "Model download and worker cleanup failed",
+                        (original, *cleanup_failures),
+                    ) from original
+                raise BaseExceptionGroup("Model download worker cleanup failed", cleanup_failures)
+            if interrupted is not None and primary_failure is None:
+                raise interrupted
 
 
 class _WorkerProgress:
@@ -429,12 +536,7 @@ def _write_worker_message(message: dict[str, object]) -> None:
 
 
 def _optional_int(value: object) -> int | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        return int(value)
-    except TypeError, ValueError:
-        return None
+    return value if type(value) is int and -(2**31) <= value < 2**31 else None
 
 
 def _os_error_code(exc: BaseException) -> int | None:

@@ -57,6 +57,11 @@ TASK_CREATION_REVIEWS = (
         "ASR worker client retains close and writer-close tasks; shielded close or force-close owns terminal resource cleanup",
     ),
     *_reviews(
+        "core/local_asr/local_stt_huggingface_xet_adapter.py",
+        {"HuggingFaceXetDownloadAdapter._download_attempt": 1},
+        "Each download attempt owns one worker-stop task in its finally block, shields and drains it through repeated cancellation, observes its result, and retains unconfirmed worker ownership",
+    ),
+    *_reviews(
         "app/services/application_control.py",
         {"ApplicationControlOwner.submit": 1},
         "ApplicationControlOwner retains each operation independently of its client; freeze_ingress interrupts operations and drain_operations gathers them",

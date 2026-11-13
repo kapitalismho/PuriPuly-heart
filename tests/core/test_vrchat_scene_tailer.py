@@ -292,3 +292,17 @@ def test_missing_file_read_raises_os_error() -> None:
 
         with pytest.raises(OSError):
             tailer.read_new_lines()
+
+
+def test_scan_distinguishes_missing_directory_from_failed_observation(tmp_path, monkeypatch):
+    missing = VrchatSceneLogTailer(tmp_path / "missing")
+    assert missing.scan_candidates() == ()
+    original = PermissionError(13, "private scene log directory")
+
+    def unavailable(_path):
+        raise original
+
+    monkeypatch.setattr(Path, "iterdir", unavailable)
+    with pytest.raises(PermissionError) as caught:
+        VrchatSceneLogTailer(tmp_path).scan_candidates()
+    assert caught.value is original

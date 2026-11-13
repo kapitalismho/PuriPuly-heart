@@ -16,6 +16,7 @@ from puripuly_heart.config.llm_profiles import (
     OPENROUTER_MODEL_GPT_6_LUNA,
 )
 from puripuly_heart.core import network_clients
+from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
@@ -376,8 +377,6 @@ class OpenRouterLLMProvider:
             ) from None
         if response.status_code == 200:
             return True
-        if response.status_code == 401:
-            return False
         raise OpenRouterAuthenticationError.from_status(
             response.status_code, stage="key_verification"
         )
@@ -394,14 +393,25 @@ class OpenRouterLLMProvider:
                 )
                 response.raise_for_status()
                 payload = response.json()
-        except Exception:
-            return None
+        except Exception as exc:
+            exc.failure_diagnostics = provider_failure_report(
+                exc, provider="openrouter", operation="probe"
+            ).diagnostics
+            raise
 
         if not isinstance(payload, dict):
-            return None
+            raise LLMResponseError(
+                "OpenRouter key metadata was not an object",
+                provider="openrouter",
+                operation="probe",
+            )
         data = payload.get("data")
         if not isinstance(data, dict):
-            return None
+            raise LLMResponseError(
+                "OpenRouter key metadata did not contain data",
+                provider="openrouter",
+                operation="probe",
+            )
         return OpenRouterKeyMetadata(
             limit_usd=_optional_number(data.get("limit")),
             remaining_usd=_optional_number(data.get("limit_remaining")),

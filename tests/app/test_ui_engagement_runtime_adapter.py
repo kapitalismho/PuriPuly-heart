@@ -23,6 +23,8 @@ class RecordingTelemetryClient:
 
 
 class CommittedResults:
+    current = None
+
     def committed(self) -> bool:
         return True
 
@@ -60,3 +62,50 @@ async def test_active_day_success_persists_date_in_canonical_telemetry_state() -
     assert len(settings_application.applied) == 1
     assert initial.state.telemetry.last_sent_date_utc is None
     assert settings.canonical.state.telemetry.last_sent_date_utc == "2026-09-03"
+
+
+async def test_active_day_persistence_receipt_preserves_original_diagnostics():
+    from puripuly_heart.core.diagnostics import exception_diagnostics
+    from puripuly_heart.core.messages import (
+        TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED,
+        TransactionResult,
+    )
+
+    initial = AppSettingsVNext()
+    settings = SimpleNamespace(canonical=initial)
+    diagnostics = exception_diagnostics(
+        PermissionError(13, "synthetic-private-path"),
+        component="settings_repository",
+        operation="save",
+        code="settings_save_failed",
+        category="transaction",
+    )
+
+    async def fail_apply(_settings):
+        return False
+
+    application = SimpleNamespace(
+        apply=fail_apply,
+        results=SimpleNamespace(
+            committed=lambda: False,
+            current=TransactionResult(
+                status=TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED,
+                message=None,
+                diagnostics=diagnostics,
+            ),
+        ),
+    )
+    adapter = UiEngagementRuntimeAdapter(
+        settings=settings,
+        settings_application=application,
+        github_prompt=None,
+        telemetry=AppActiveDayTelemetryService(RecordingTelemetryClient()),
+        after_launch=None,
+    )
+
+    result = await adapter.record_app_active_day("2026-09-03")
+
+    assert result.status == "persist_failed"
+    assert result.diagnostics is diagnostics
+    assert settings.canonical.state.telemetry.last_sent_date_utc is None
+    assert "synthetic-private" not in str(result)

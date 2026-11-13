@@ -11,7 +11,7 @@ import threading
 import time
 from collections.abc import Awaitable, Callable
 from concurrent.futures import Future
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TypeVar
 from urllib.parse import quote
@@ -20,6 +20,7 @@ from uuid import uuid4
 import httpx
 
 from puripuly_heart.core import network_clients
+from puripuly_heart.core.diagnostics import sanitize_diagnostics
 from puripuly_heart.core.feature_diagnostics import log_feature
 from puripuly_heart.core.local_asr.local_stt_download_port import (
     HuggingFaceDownloadPort,
@@ -44,6 +45,11 @@ from puripuly_heart.core.local_translation.assets import (
     inspect_gemma_install,
     validate_gemma_install,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.model_asset_diagnostics import (
+    model_asset_failure_code,
+    model_asset_failure_diagnostics,
+)
 from puripuly_heart.core.model_download_sources import (
     HF_MIRROR_ENDPOINT,
     MODEL_DOWNLOAD_SOURCES,
@@ -52,13 +58,20 @@ from puripuly_heart.core.model_download_sources import (
 
 
 class GemmaProvisioningError(RuntimeError):
-    def __init__(self, message: str, *, failure_code: str = "install_failed") -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        failure_code: str = "install_failed",
+        failure_diagnostics: ErrorDiagnostics | None = None,
+    ) -> None:
         super().__init__(message)
         self.failure_code = failure_code
+        self.failure_diagnostics = failure_diagnostics
 
 
 class GemmaProvisioningCancelled(GemmaProvisioningError):
-    pass
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
 
 
 class _GemmaSourceError(GemmaProvisioningError):
@@ -250,6 +263,7 @@ async def _download_asset(
     total_bytes: int,
     cancel_event: threading.Event | None,
     on_status: GemmaProvisioningCallback | None,
+    recoveries: list[ErrorDiagnostics],
     endpoint: str | None = None,
 ) -> int:
     loop = asyncio.get_running_loop()
@@ -316,6 +330,7 @@ async def _download_asset(
                     local_dir=staging_dir,
                     expected_size_bytes=asset.size_bytes,
                     endpoint=endpoint,
+                    on_recovery=recoveries.append,
                 ),
                 cancel_event=cancel_event,
                 on_progress=on_progress,
@@ -343,10 +358,18 @@ async def _download_asset(
                 "checksum_failed",
             }
         ):
-            _raise_if_cancelled(cancel_event)
+            if cancel_event is not None and cancel_event.is_set():
+                cancelled = GemmaProvisioningCancelled("Gemma model provisioning cancelled")
+                cancelled.secondary_diagnostics = (
+                    model_asset_failure_diagnostics(download_failure, operation="download"),
+                )
+                raise cancelled from download_failure
             raise _GemmaSourceError(
-                str(download_failure),
-                failure_code=getattr(download_failure, "failure_code", "download_failed"),
+                "Model source download failed",
+                failure_code=model_asset_failure_code(download_failure),
+                failure_diagnostics=model_asset_failure_diagnostics(
+                    download_failure, operation="download"
+                ),
             ) from download_failure
         raise
     progress_failures = await drain_progress()
@@ -361,7 +384,7 @@ async def _download_asset(
     return completed_bytes + asset.size_bytes
 
 
-def _promote(staging_dir: Path, install_dir: Path) -> None:
+def _promote(staging_dir: Path, install_dir: Path) -> tuple[ErrorDiagnostics, ...]:
     backup_dir = install_dir.with_name(f"{install_dir.name}.backup-{uuid4().hex}")
     install_dir.parent.mkdir(parents=True, exist_ok=True)
     existing = install_dir.exists()
@@ -369,14 +392,33 @@ def _promote(staging_dir: Path, install_dir: Path) -> None:
         install_dir.rename(backup_dir)
     try:
         staging_dir.rename(install_dir)
-    except Exception:
+    except Exception as primary:
+        failures: list[BaseException] = [primary]
         if install_dir.exists():
-            shutil.rmtree(install_dir, ignore_errors=True)
+            try:
+                shutil.rmtree(install_dir)
+            except Exception as cleanup:
+                failures.append(cleanup)
         if existing and backup_dir.exists():
-            backup_dir.rename(install_dir)
+            try:
+                backup_dir.rename(install_dir)
+            except Exception as restore:
+                failures.append(restore)
+        if len(failures) > 1:
+            raise ExceptionGroup("Gemma promotion and restoration failed", failures) from primary
         raise
     else:
-        shutil.rmtree(backup_dir, ignore_errors=True)
+        try:
+            shutil.rmtree(backup_dir)
+        except FileNotFoundError:
+            pass
+        except Exception as cleanup:
+            return (
+                model_asset_failure_diagnostics(
+                    cleanup, operation="cleanup", code="local_asr.cleanup_failed"
+                ),
+            )
+    return ()
 
 
 def _source_plans(
@@ -420,6 +462,7 @@ async def ensure_gemma_installed(
     cancellation = cancel_event if cancel_event is not None else threading.Event()
     _raise_if_cancelled(cancellation)
     lease = None
+    primary_failure: BaseException | None = None
 
     async def acquire_lease() -> LocalSTTProvisioningLease | None:
         nonlocal lease
@@ -448,12 +491,33 @@ async def ensure_gemma_installed(
             locale=locale,
             verify_existing_checksums=verify_existing_checksums,
         )
+    except BaseException as exc:
+        primary_failure = exc
+        if not isinstance(exc, (asyncio.CancelledError, GemmaProvisioningCancelled)):
+            exc.failure_diagnostics = model_asset_failure_diagnostics(
+                exc, fields={"model_id": resolved_spec.model_id}
+            )
+        raise
     finally:
         if lease is not None:
-            await _await_download_cleanup(
-                asyncio.to_thread(lease.close),
-                cancel_event=cancellation,
-            )
+            try:
+                await _await_download_cleanup(
+                    asyncio.to_thread(lease.close),
+                    cancel_event=cancellation,
+                )
+            except BaseException as cleanup:
+                if isinstance(cleanup, (Exception, BaseExceptionGroup)):
+                    cleanup.failure_diagnostics = model_asset_failure_diagnostics(
+                        cleanup, operation="cleanup", code="model_assets.cleanup_failed"
+                    )
+                if primary_failure is not None:
+                    combined = BaseExceptionGroup(
+                        "Gemma installation and lease cleanup failed",
+                        (primary_failure, cleanup),
+                    )
+                    combined.failure_diagnostics = model_asset_failure_diagnostics(combined)
+                    raise combined from primary_failure
+                raise
 
 
 async def _ensure_gemma_installed_with_lease(
@@ -486,7 +550,11 @@ async def _ensure_gemma_installed_with_lease(
             )
             log_feature("ModelDownload", "preflight", code, error=error)
             raise GemmaProvisioningError(
-                "Imported files do not match the pinned model", failure_code=code
+                "Imported files do not match the pinned model",
+                failure_code=code,
+                failure_diagnostics=model_asset_failure_diagnostics(
+                    error, fields={"model_id": spec.model_id}
+                ),
             ) from error
     state = await _owned_io(
         inspect_gemma_install,
@@ -514,10 +582,11 @@ async def _ensure_gemma_installed_with_lease(
 
     staging_dir = None
     completed_bytes = 0
-    failures: list[_GemmaSourceError] = []
+    failures: list[ErrorDiagnostics] = []
+    recoveries: list[ErrorDiagnostics] = []
     stage = "preflight"
     try:
-        for source_name, endpoint, source_label in source_plans:
+        for source_attempt, (source_name, endpoint, source_label) in enumerate(source_plans, 1):
             _raise_if_cancelled(cancel_event)
             log_feature("ModelDownload", "source", "attempt_" + source_label, level=logging.INFO)
             asset_source = (
@@ -562,6 +631,7 @@ async def _ensure_gemma_installed_with_lease(
                         total_bytes=total_bytes,
                         cancel_event=cancel_event,
                         on_status=on_status,
+                        recoveries=recoveries,
                         endpoint=endpoint,
                     )
                     await _emit(
@@ -592,15 +662,35 @@ async def _ensure_gemma_installed_with_lease(
                         cancel_event=cancel_event,
                     )
                 except GemmaInstallInvalidError as exc:
-                    raise _GemmaSourceError(str(exc), failure_code="checksum_failed") from exc
+                    raise _GemmaSourceError(
+                        "Downloaded files failed integrity validation",
+                        failure_code="checksum_failed",
+                    ) from exc
             except _GemmaSourceError as exc:
+                diagnostics = model_asset_failure_diagnostics(exc, operation="download")
+                diagnostics = sanitize_diagnostics(
+                    replace(
+                        diagnostics,
+                        fields={
+                            **diagnostics.fields,
+                            "model_id": spec.model_id,
+                            "source_kind": (
+                                "huggingface_mirror"
+                                if source_label == "hf_mirror"
+                                else source_label
+                            ),
+                            "source_attempt": source_attempt,
+                        },
+                    )
+                )
+                exc.failure_diagnostics = diagnostics
+                failures.append(diagnostics)
                 _raise_if_cancelled(cancel_event)
                 if source is not None:
                     raise
                 failed_staging = staging_dir
                 staging_dir = None
                 _remove_owned_staging(failed_staging, primary_failure=exc)
-                failures.append(exc)
                 log_feature(
                     "ModelDownload",
                     "source",
@@ -617,7 +707,9 @@ async def _ensure_gemma_installed_with_lease(
                 downloaded_bytes=completed_bytes,
                 total_bytes=total_bytes,
             )
-            await _owned_io(_promote, staging_dir, resolved, cancel_event=cancel_event)
+            promotion_diagnostics = await _owned_io(
+                _promote, staging_dir, resolved, cancel_event=cancel_event
+            )
             log_feature("ModelDownload", "source", "completed_" + source_label, level=logging.INFO)
             await _emit(
                 on_status,
@@ -625,16 +717,34 @@ async def _ensure_gemma_installed_with_lease(
                 downloaded_bytes=total_bytes,
                 total_bytes=total_bytes,
             )
-            return manifest
+            return replace(
+                manifest,
+                recovery_diagnostics=tuple(failures) + tuple(recoveries),
+                secondary_diagnostics=promotion_diagnostics or (),
+            )
         raise GemmaProvisioningError(
-            "Gemma model provisioning failed for all sources: "
-            + "; ".join(str(failure) for failure in failures),
-            failure_code=failures[-1].failure_code,
-        ) from failures[-1]
+            "Gemma model provisioning failed for all sources",
+            failure_code=str(failures[-1].fields.get("asset_failure_code", "install_failed")),
+            failure_diagnostics=sanitize_diagnostics(
+                ErrorDiagnostics(
+                    component="model_assets",
+                    operation="download",
+                    code="model_assets.install_failed",
+                    category="lifecycle",
+                    visibility="diagnostic_only",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={"model_id": spec.model_id},
+                    causes=tuple(failures),
+                )
+            ),
+        )
     except BaseException as exc:
         if isinstance(exc, LocalSTTDownloadPortCancelled):
             failure = GemmaProvisioningCancelled("Gemma model provisioning cancelled")
             failure.__cause__ = exc
+            failure.secondary_diagnostics = exc.secondary_diagnostics
         elif isinstance(exc, Exception) and not isinstance(
             exc, (GemmaProvisioningCancelled, BaseExceptionGroup)
         ):
@@ -664,8 +774,35 @@ async def _ensure_gemma_installed_with_lease(
             )
             if failure is not exc:
                 failure.__cause__ = exc
+            if failure.failure_diagnostics is None:
+                failure.failure_diagnostics = model_asset_failure_diagnostics(
+                    exc, fields={"model_id": spec.model_id}
+                )
         else:
             failure = exc
+        if isinstance(failure, (asyncio.CancelledError, GemmaProvisioningCancelled)):
+            history = getattr(failure, "secondary_diagnostics", ())
+            failure.secondary_diagnostics = (
+                tuple(failures)
+                + tuple(recoveries)
+                + tuple(
+                    sanitize_diagnostics(
+                        replace(
+                            item,
+                            fields={
+                                **item.fields,
+                                "source_kind": (
+                                    "huggingface_mirror"
+                                    if source_label == "hf_mirror"
+                                    else source_label
+                                ),
+                                "source_attempt": source_attempt,
+                            },
+                        )
+                    )
+                    for item in history
+                )
+            )
         if staging_dir is not None:
             _remove_owned_staging(staging_dir, primary_failure=failure)
         if isinstance(failure, Exception) and not isinstance(

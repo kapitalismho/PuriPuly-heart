@@ -146,6 +146,13 @@ def assert_no_output(result):
     assert not {"text", "translation", "prompt", "context", "provider", "model"} & result.keys()
 
 
+def target_outcomes(result):
+    return [
+        {key: item[key] for key in ("target_language", "translation_result")}
+        for item in result["target_results"]
+    ]
+
+
 async def test_probe_invokes_current_backend_and_retains_metadata_only_terminal_receipt():
     backend = ControlledBackend()
     control, runtime = control_for(backend)
@@ -159,7 +166,7 @@ async def test_probe_invokes_current_backend_and_retains_metadata_only_terminal_
         assert result["source_language"] == "ko"
         assert result["target_language"] == "en"
         assert result["target_languages"] == ["en"]
-        assert result["target_results"] == [
+        assert target_outcomes(result) == [
             {"target_language": "en", "translation_result": "succeeded"}
         ]
         assert len(backend.requests) == 1
@@ -305,7 +312,10 @@ async def test_probe_strict_arguments_reject_before_backend_invocation(arguments
         await runtime.close()
 
 
-async def test_probe_does_not_prepare_managed_local_model_or_release_managed_credentials(tmp_path):
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_probe_does_not_prepare_managed_local_model_or_release_managed_credentials(
+    tmp_path, channel
+):
     calls = []
 
     async def provision(**kwargs):
@@ -334,7 +344,7 @@ async def test_probe_does_not_prepare_managed_local_model_or_release_managed_cre
     for backend in (local_backend, managed_backend):
         control, runtime = control_for(backend)
         try:
-            result = await submit_probe(control)
+            result = await submit_probe(control, {"channel": channel})
             assert_no_output(result)
             assert result["status"] == "action_required"
             assert result["translation_result"] == "unavailable"
@@ -372,7 +382,7 @@ async def test_agent_probe_waits_for_actual_terminal_receipt_without_settings_ac
         assert result["receipt"]["translation_result"] == "succeeded"
         assert result["receipt"]["source_language"] == "ko"
         assert result["receipt"]["target_languages"] == ["en", "ja"]
-        assert result["receipt"]["target_results"] == [
+        assert target_outcomes(result["receipt"]) == [
             {"target_language": "en", "translation_result": "succeeded"},
             {"target_language": "ja", "translation_result": "succeeded"},
         ]
@@ -537,7 +547,7 @@ async def test_probe_exercises_both_self_targets_with_separate_isolated_requests
         assert result["translation_result"] == "succeeded"
         assert result["target_language"] == "en"
         assert result["target_languages"] == ["en", "ja"]
-        assert result["target_results"] == [
+        assert target_outcomes(result) == [
             {"target_language": "en", "translation_result": "succeeded"},
             {"target_language": "ja", "translation_result": "succeeded"},
         ]
@@ -564,7 +574,7 @@ async def test_probe_reports_each_target_without_claiming_partial_success(failed
         assert result["status"] == "failed"
         assert result["translation_result"] == "failed"
         assert result["target_languages"] == ["en", "ja"]
-        assert result["target_results"] == [
+        assert target_outcomes(result) == [
             {
                 "target_language": "en",
                 "translation_result": "failed" if failed_target == "en" else "succeeded",
@@ -715,7 +725,7 @@ async def test_peer_probe_uses_actual_direction_and_retains_isolated_failure_sco
         assert result["source_language"] == source
         assert result["target_language"] == target
         assert result["target_languages"] == [target]
-        assert result["target_results"] == [
+        assert target_outcomes(result) == [
             {
                 "target_language": target,
                 "translation_result": "failed" if fails else "succeeded",
@@ -724,6 +734,7 @@ async def test_peer_probe_uses_actual_direction_and_retains_isolated_failure_sco
         assert result["captured_generation"] == result["current_generation"] == 0
         assert len(backend.requests) == 1
         request = backend.requests[0]
+        assert result["target_results"][0]["turn_id"] == str(request.utterance_id)
         assert request.source_language == source
         assert request.target_language == target
         assert request.context == ""
@@ -733,6 +744,10 @@ async def test_peer_probe_uses_actual_direction_and_retains_isolated_failure_sco
         if fails:
             assert result["error"]["code"] == "translation_probe_failed"
             assert result["failure_category"] == "network"
+            assert (
+                result["target_results"][0]["diagnostic_id"]
+                == result["diagnostics"]["diagnostic_id"]
+            )
         assert await control.operation(result["operation_id"]) == result
         assert [event["topic"] for event in control.events.history] == ["operation"]
     finally:

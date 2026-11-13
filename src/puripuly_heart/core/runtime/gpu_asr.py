@@ -7,7 +7,7 @@ import logging
 import tempfile
 import wave
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
 from typing import Literal
@@ -29,13 +29,19 @@ from puripuly_heart.core.audio.format import pcm16le_bytes_to_float32
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.diagnostic_validation import stt_startup_failure_code
 from puripuly_heart.core.diagnostics import (
+    DIAGNOSTIC_CAUSE_MAX_COUNT,
     current_diagnostic_operation,
     emit_failure,
+    exception_diagnostics,
     safe_exception_fields,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
+from puripuly_heart.core.stt.diagnostics import (
+    recognition_cleanup_failure,
+    recognition_failure_diagnostics,
+)
 
 GPU_PENDING_TTL_SECONDS = 12.0
 GPU_PENDING_LIMIT_PER_CHANNEL = 8
@@ -94,6 +100,7 @@ class GpuASRWorkDiscarded(GpuASRRuntimeError):
 class GpuASRDiagnostic:
     kind: str
     fields: Mapping[str, object]
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,6 +159,9 @@ class SharedGpuASRRuntime:
         self._pending_ttl_seconds = pending_ttl_seconds
         self._discovery_pending_seconds = discovery_pending_seconds
         self._force_close_seconds = force_close_seconds
+        self._diagnostic_delivery_failure: ErrorDiagnostics | None = None
+        self._file_cleanup_diagnostics: ErrorDiagnostics | None = None
+        self.cleanup_diagnostics: tuple[ErrorDiagnostics, ...] = ()
         if pending_limit_per_channel < 1:
             raise ValueError("pending_limit_per_channel must be positive")
         self._pending_limit_per_channel = pending_limit_per_channel
@@ -575,6 +585,7 @@ class SharedGpuASRRuntime:
         self._last_failure_code = None
         self._activation_failure_diagnostics = None
         self._file_cleanup_failure = None
+        self._file_cleanup_diagnostics = None
         self._decode_recovery_armed = False
         self._generation += 1
         generation = self._generation
@@ -645,6 +656,12 @@ class SharedGpuASRRuntime:
                     },
                     generation=generation,
                     **origin,
+                    causes=exception_diagnostics(
+                        exc,
+                        component="asr_worker",
+                        operation="process_lifecycle",
+                        code="worker_activation_failed",
+                    ).causes,
                 )
                 emit_failure(
                     logger,
@@ -655,6 +672,24 @@ class SharedGpuASRRuntime:
                         "cancelled" if isinstance(exc, asyncio.CancelledError) else "failed"
                     ),
                 )
+            application_origin = {key: value for key, value in origin.items() if value is not None}
+            if application_origin:
+                primary = replace(
+                    primary,
+                    **application_origin,
+                    generation=generation,
+                    fields={
+                        **primary.fields,
+                        **(
+                            {"provider_request_id": primary.request_id}
+                            if origin.get("request_id") is not None
+                            and primary.request_id is not None
+                            and primary.request_id != origin["request_id"]
+                            else {}
+                        ),
+                    },
+                )
+            exc.failure_diagnostics = primary
             if event_task is not None:
                 event_task.cancel()
             if (
@@ -663,7 +698,7 @@ class SharedGpuASRRuntime:
                 and (self._client is not client or generation == self._generation)
             ):
                 try:
-                    await self._close_unowned_client(client)
+                    await self._close_unowned_client(client, cause=primary)
                 except Exception:
                     self._retain_client_cleanup(client)
             if event_task is not None:
@@ -693,6 +728,7 @@ class SharedGpuASRRuntime:
                     "backend": "Vulkan",
                     **_failure_diagnostic_fields(exc),
                 },
+                failure_diagnostics=primary,
             )
             return _ActivationOutcome(
                 failure_code=failure_code,
@@ -748,8 +784,24 @@ class SharedGpuASRRuntime:
         )
         return _ActivationOutcome(activation=activation)
 
-    async def _close_unowned_client(self, client: ASRWorkerClientPort) -> None:
-        await client.close()
+    async def _close_unowned_client(
+        self, client: ASRWorkerClientPort, *, cause: ErrorDiagnostics | None = None
+    ) -> None:
+        try:
+            await client.close()
+        except Exception as exc:
+            diagnostics = recognition_cleanup_failure(
+                exc, provider="local_qwen_gpu", channel=None, primary=cause
+            )
+            self.cleanup_diagnostics = (*self.cleanup_diagnostics, diagnostics)[
+                -DIAGNOSTIC_CAUSE_MAX_COUNT:
+            ]
+            await self._emit(
+                "worker_cleanup_failed",
+                {"failure": _failure_code(exc)},
+                failure_diagnostics=diagnostics,
+            )
+            raise
 
     def _retain_client_cleanup(self, client: ASRWorkerClientPort) -> None:
         if client not in self._retired_clients:
@@ -797,6 +849,7 @@ class SharedGpuASRRuntime:
             cause_id=cause.diagnostic_id if cause is not None else None,
             operation_id=cause.operation_id if cause is not None else None,
             request_id=cause.request_id if cause is not None else None,
+            causes=(cause,) if cause is not None else (),
         )
         if self._temporary_cleanup_diagnostics is None:
             self._temporary_cleanup_diagnostics = diagnostics
@@ -929,9 +982,9 @@ class SharedGpuASRRuntime:
             while True:
                 await self._await_file_cleanup()
                 if self._file_cleanup_failure is not None:
-                    await self._fail_worker(
-                        generation, client, GpuASRRuntimeError("wav_cleanup_failed")
-                    )
+                    failure = GpuASRRuntimeError("wav_cleanup_failed")
+                    failure.failure_diagnostics = self._file_cleanup_diagnostics
+                    await self._fail_worker(generation, client, failure)
                     return
                 initial_expiry: tuple[_PendingWork, float, str] | None = None
                 async with self._lock:
@@ -1016,6 +1069,14 @@ class SharedGpuASRRuntime:
                         and isinstance(exc, ASRWorkerRequestError)
                         and exc.code == "cancelled"
                     )
+                    if not expected_discard:
+                        exc.failure_diagnostics = recognition_failure_diagnostics(
+                            exc,
+                            provider="local_qwen_gpu",
+                            channel=work.channel,
+                            operation="decode",
+                            reason="local_decode_failed",
+                        )
                     if isinstance(exc, ASRWorkerRequestError) and exc.attempt_started:
                         await self._emit_attempt_failure(
                             work=work,
@@ -1033,6 +1094,7 @@ class SharedGpuASRRuntime:
                                 **_failure_diagnostic_fields(exc),
                                 "queue_wait_seconds": queue_wait,
                             },
+                            failure_diagnostics=getattr(exc, "failure_diagnostics", None),
                         )
                     recoverable_decode_failure = (
                         not expected_discard
@@ -1176,6 +1238,7 @@ class SharedGpuASRRuntime:
                     dropped = GpuASRDecodeDropped(exception.code)
                     dropped.failure_resource_id = f"{self._resource_id}:{generation}"
                     dropped.__cause__ = exception
+                    dropped.failure_diagnostics = getattr(exception, "failure_diagnostics", None)
                     work.future.set_exception(dropped)
                 if self._active_work is work:
                     self._active_work = None
@@ -1190,6 +1253,7 @@ class SharedGpuASRRuntime:
                 "retry": "restart_only",
                 "utterance_retry": False,
             },
+            failure_diagnostics=getattr(exception, "failure_diagnostics", None),
         )
 
     async def _run_decode_recovery(
@@ -1202,7 +1266,9 @@ class SharedGpuASRRuntime:
         exception: ASRWorkerRequestError,
     ) -> _ActivationOutcome:
         try:
-            await self._close_unowned_client(previous_client)
+            await self._close_unowned_client(
+                previous_client, cause=getattr(exception, "failure_diagnostics", None)
+            )
             if stale_tasks:
                 await asyncio.gather(*stale_tasks, return_exceptions=True)
             if temporary_directory is not None:
@@ -1213,6 +1279,15 @@ class SharedGpuASRRuntime:
         except BaseException as cleanup_exception:
             if not previous_client.is_closed:
                 self._retain_client_cleanup(previous_client)
+            if not isinstance(
+                getattr(cleanup_exception, "failure_diagnostics", None), ErrorDiagnostics
+            ):
+                recognition_cleanup_failure(
+                    cleanup_exception,
+                    provider="local_qwen_gpu",
+                    channel=None,
+                    primary=getattr(exception, "failure_diagnostics", None),
+                )
             return await self._finish_decode_recovery_failure(
                 generation,
                 config,
@@ -1220,13 +1295,14 @@ class SharedGpuASRRuntime:
             )
         outcome = await self._run_activation(generation, config, {})
         if outcome.activation is None:
-            await self._finish_decode_recovery_failure(
+            return await self._finish_decode_recovery_failure(
                 generation,
                 config,
-                GpuASRRuntimeError(outcome.failure_code or "worker_recovery_failed"),
+                outcome.failure
+                or GpuASRRuntimeError(outcome.failure_code or "worker_recovery_failed"),
                 failure_code=outcome.failure_code,
+                failure_diagnostics=outcome.failure_diagnostics,
             )
-            return outcome
         await self._emit(
             "worker_recovery_ready",
             {
@@ -1235,6 +1311,7 @@ class SharedGpuASRRuntime:
                 "device": outcome.activation.device.device_id,
                 "utterance_retry": False,
             },
+            failure_diagnostics=getattr(exception, "failure_diagnostics", None),
         )
         return outcome
 
@@ -1245,13 +1322,43 @@ class SharedGpuASRRuntime:
         exception: BaseException,
         *,
         failure_code: str | None = None,
+        failure_diagnostics: ErrorDiagnostics | None = None,
     ) -> _ActivationOutcome:
         if exception.__cause__ is None and self._recovery_cause is not exception:
             exception.__cause__ = self._recovery_cause
         resolved_failure_code = failure_code or _failure_code(exception)
+        diagnostics = failure_diagnostics or recognition_failure_diagnostics(
+            exception,
+            provider="local_qwen_gpu",
+            channel="unknown",
+            operation="recovery",
+            reason="local_decode_unavailable",
+        )
+        recovery_diagnostics = getattr(self._recovery_cause, "failure_diagnostics", None)
+        if (
+            isinstance(recovery_diagnostics, ErrorDiagnostics)
+            and recovery_diagnostics.diagnostic_id != diagnostics.diagnostic_id
+            and all(
+                cause.diagnostic_id != recovery_diagnostics.diagnostic_id
+                for cause in diagnostics.causes
+            )
+        ):
+            diagnostics = replace(
+                diagnostics,
+                causes=(*diagnostics.causes, recovery_diagnostics)[:DIAGNOSTIC_CAUSE_MAX_COUNT],
+                causes_truncated=(
+                    diagnostics.causes_truncated
+                    or len(diagnostics.causes) >= DIAGNOSTIC_CAUSE_MAX_COUNT
+                ),
+            )
+        exception.failure_diagnostics = diagnostics
         async with self._lock:
             if generation != self._generation:
-                return _ActivationOutcome(failure_code=resolved_failure_code, failure=exception)
+                return _ActivationOutcome(
+                    failure_code=resolved_failure_code,
+                    failure=exception,
+                    failure_diagnostics=diagnostics,
+                )
             self._activation_task = None
             self._client = None
             self._activation = None
@@ -1260,7 +1367,10 @@ class SharedGpuASRRuntime:
             self._reaper_task = None
             self._state = GpuASRRuntimeState.FAILED
             self._last_failure_code = resolved_failure_code
-            self._discard_pending_locked("worker_recovery_failed", exception)
+            self._activation_failure_diagnostics = diagnostics
+            self._discard_pending_locked(
+                "worker_recovery_failed", exception, diagnostics=diagnostics
+            )
             self._queue_event.set()
         diagnostic_fields = _failure_diagnostic_fields(exception)
         diagnostic_fields["failure"] = resolved_failure_code
@@ -1274,6 +1384,7 @@ class SharedGpuASRRuntime:
                 "fallback": "none",
                 "utterance_retry": False,
             },
+            failure_diagnostics=diagnostics,
         )
         await self._emit(
             "worker_failed",
@@ -1283,8 +1394,13 @@ class SharedGpuASRRuntime:
                 "retry": "manual",
                 "fallback": "none",
             },
+            failure_diagnostics=diagnostics,
         )
-        return _ActivationOutcome(failure_code=resolved_failure_code, failure=exception)
+        return _ActivationOutcome(
+            failure_code=resolved_failure_code,
+            failure=exception,
+            failure_diagnostics=diagnostics,
+        )
 
     async def _consume_events(self, generation: int, client: ASRWorkerClientPort) -> None:
         try:
@@ -1302,20 +1418,28 @@ class SharedGpuASRRuntime:
         client: ASRWorkerClientPort,
         exception: BaseException,
     ) -> None:
+        diagnostics = recognition_failure_diagnostics(
+            exception,
+            provider="local_qwen_gpu",
+            channel="unknown",
+            operation="decode",
+            reason="local_decode_unavailable",
+        )
         async with self._lock:
             if not self._is_current_generation(generation, client):
                 return
             exception.failure_resource_id = f"{self._resource_id}:{generation}"
             self._state = GpuASRRuntimeState.FAILED
             self._last_failure_code = _failure_code(exception)
-            self._discard_pending_locked("worker_failed", exception)
+            self._activation_failure_diagnostics = diagnostics
+            self._discard_pending_locked("worker_failed", exception, diagnostics=diagnostics)
             active = self._active_work
             if active is not None and not active.future.done():
                 active.future.set_exception(exception)
             self._active_work = None
             self._activation = None
             try:
-                await self._close_unowned_client(client)
+                await self._close_unowned_client(client, cause=diagnostics)
             except Exception:
                 self._retain_client_cleanup(client)
             else:
@@ -1330,6 +1454,7 @@ class SharedGpuASRRuntime:
                     "retry": "manual",
                     "fallback": "none",
                 },
+                failure_diagnostics=diagnostics,
             )
 
     async def _emit_attempt_failure(
@@ -1353,7 +1478,11 @@ class SharedGpuASRRuntime:
             value = exception.fields.get(key)
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 fields[key] = float(value)
-        await self._emit("decode_attempt", fields)
+        await self._emit(
+            "decode_attempt",
+            fields,
+            failure_diagnostics=getattr(exception, "failure_diagnostics", None),
+        )
 
     async def _emit_work_expired(
         self,
@@ -1413,16 +1542,25 @@ class SharedGpuASRRuntime:
                 fields[key] = value
         await self._emit("worker_lifecycle", fields)
 
-    def _discard_pending_locked(self, reason: str, cause: BaseException | None = None) -> None:
+    def _discard_pending_locked(
+        self,
+        reason: str,
+        cause: BaseException | None = None,
+        *,
+        diagnostics: ErrorDiagnostics | None = None,
+    ) -> None:
+        cause = cause or self._recovery_cause
+        diagnostics = diagnostics or getattr(cause, "failure_diagnostics", None)
         while self._queue:
             work = heapq.heappop(self._queue)
             work.discard_reason = reason
             if not work.future.done():
                 failure = GpuASRWorkDiscarded(reason)
+                failure.failure_diagnostics = diagnostics
                 failure.failure_resource_id = getattr(
                     cause, "failure_resource_id", f"{self._resource_id}:{self._generation}"
                 )
-                failure.__cause__ = cause or self._recovery_cause
+                failure.__cause__ = cause
                 work.future.set_exception(failure)
             work.settled.set()
 
@@ -1451,6 +1589,13 @@ class SharedGpuASRRuntime:
         except Exception as exc:
             failure = type(exc).__name__
             self._file_cleanup_failure = failure
+            self._file_cleanup_diagnostics = exception_diagnostics(
+                exc,
+                component="asr_worker",
+                operation="process_lifecycle",
+                code="worker_cleanup_failed",
+                fields={"cleanup_stage": "temp_cleanup", "cleanup_complete": False},
+            )
         try:
             await self._emit(
                 "file_cleanup",
@@ -1459,6 +1604,7 @@ class SharedGpuASRRuntime:
                     "file_cleanup_seconds": max(0.0, self._clock.now() - started),
                     "failure": failure,
                 },
+                failure_diagnostics=self._file_cleanup_diagnostics,
             )
         except Exception:
             pass
@@ -1504,12 +1650,48 @@ class SharedGpuASRRuntime:
         if self._closed:
             raise GpuASRRuntimeError("GPU runtime is closed")
 
-    async def _emit(self, kind: str, fields: Mapping[str, object]) -> None:
+    async def _emit(
+        self,
+        kind: str,
+        fields: Mapping[str, object],
+        *,
+        failure_diagnostics: ErrorDiagnostics | None = None,
+    ) -> None:
         if self._diagnostic_sink is None:
             return
-        result = self._diagnostic_sink(GpuASRDiagnostic(kind=kind, fields=fields))
-        if inspect.isawaitable(result):
-            await result
+        try:
+            result = self._diagnostic_sink(
+                GpuASRDiagnostic(
+                    kind=kind,
+                    fields=fields,
+                    failure_diagnostics=failure_diagnostics,
+                )
+            )
+            if inspect.isawaitable(result):
+                await result
+        except Exception as exc:
+            secondary = exception_diagnostics(
+                exc,
+                component="asr_worker",
+                operation="process_lifecycle",
+                code="diagnostic_sink_failed",
+            )
+            secondary = replace(
+                secondary,
+                cause_id=failure_diagnostics.diagnostic_id if failure_diagnostics else None,
+                causes=(
+                    *secondary.causes,
+                    *((failure_diagnostics,) if failure_diagnostics else ()),
+                ),
+            )
+            self._diagnostic_delivery_failure = self._diagnostic_delivery_failure or secondary
+            emit_failure(
+                logger,
+                secondary,
+                severity="warning",
+                disposition="degraded",
+                stage="diagnostic_sink",
+            )
 
 
 def _write_pcm16_wav(path: Path, samples_f32: np.ndarray | bytes) -> None:

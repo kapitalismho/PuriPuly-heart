@@ -14,7 +14,7 @@ from puripuly_heart.core.audio.ownership import (
     OwnedStreamInput,
     OwnedVadEvent,
 )
-from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
 from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
@@ -1562,6 +1562,7 @@ class LocalASRProviderRuntimeOwner:
                 rtf=_optional_float(fields.get("rtf")),
                 queue_wait_seconds=_optional_float(fields.get("queue_wait_seconds")),
                 worker_exit_code=_optional_int(fields.get("exit_code")),
+                failure_diagnostics=diagnostic.failure_diagnostics,
             )
         )
         await self._publish_state()
@@ -1710,6 +1711,12 @@ class LocalASRProviderRuntimeOwner:
                     event="state_changed_sink",
                     outcome="failed",
                     failure_type=type(exc).__name__,
+                    failure_diagnostics=exception_diagnostics(
+                        exc,
+                        component="stt.provider_runtime",
+                        operation="state_changed",
+                        code="diagnostic_sink_failed",
+                    ),
                 )
             )
 
@@ -1725,6 +1732,12 @@ class LocalASRProviderRuntimeOwner:
                     event="state_changed_sink",
                     outcome="failed",
                     failure_type=type(exc).__name__,
+                    failure_diagnostics=exception_diagnostics(
+                        exc,
+                        component="stt.provider_runtime",
+                        operation="state_changed",
+                        code="diagnostic_sink_failed",
+                    ),
                 )
             )
             return
@@ -1757,6 +1770,12 @@ class LocalASRProviderRuntimeOwner:
                     event="state_changed_sink",
                     outcome="failed",
                     failure_type=type(exception).__name__,
+                    failure_diagnostics=exception_diagnostics(
+                        exception,
+                        component="stt.provider_runtime",
+                        operation="state_changed",
+                        code="diagnostic_sink_failed",
+                    ),
                 )
             )
 

@@ -9,6 +9,8 @@ from puripuly_heart.app.ports.audio_test import (
     AudioTestRuntimePort,
     AudioTestSourceUnavailable,
 )
+from puripuly_heart.core.diagnostic_codes import AUDIO_DIAGNOSE_FAILURE_CODES
+from puripuly_heart.core.diagnostics import exception_diagnostics
 
 AudioTestLogSink = Callable[[str], None]
 
@@ -34,10 +36,10 @@ class AudioTestCaptureAdapter:
             except asyncio.CancelledError:
                 raise
             except AudioTestSourceUnavailable as exc:
-                self._fail(request, exc.reason, exc.cause)
+                self._fail(request, exc.reason, exc.cause, exc)
                 return
             except Exception as exc:
-                self._fail(request, "source_open_failed", type(exc).__name__)
+                self._fail(request, "source_open_failed", type(exc).__name__, exc)
                 return
 
             if not runtime.attach_source(opened.source, generation=generation):
@@ -45,7 +47,9 @@ class AudioTestCaptureAdapter:
                 return
             source = opened.source
             if request.opened_callback is not None:
-                request.opened_callback(generation, dict(opened.device))
+                request.opened_callback(
+                    generation, dict(opened.device), opened.recovery_diagnostics
+                )
             if request.ready_on_open and request.ready_callback is not None:
                 request.ready_callback(generation)
 
@@ -83,10 +87,10 @@ class AudioTestCaptureAdapter:
             raise
         except TimeoutError as exc:
             end_exception = exc
-            self._fail(request, "no_audio_frames", None)
+            self._fail(request, "no_audio_frames", None, exc)
         except Exception as exc:
             end_exception = exc
-            self._fail(request, "capture_failed", type(exc).__name__)
+            self._fail(request, "capture_failed", type(exc).__name__, exc)
         finally:
             cleanup_failures: list[Exception] = []
             source = source or runtime.source
@@ -100,24 +104,38 @@ class AudioTestCaptureAdapter:
                     await runtime.close_source(source)
                 except Exception as exc:
                     cleanup_failures.append(exc)
-                    if request.failure_callback is not None:
-                        request.failure_callback(
-                            generation,
-                            "source_close_failed",
-                            type(exc).__name__,
-                        )
+                    self._fail(request, "source_close_failed", type(exc).__name__, exc)
                 if end_exception is None:
-                    self.log_sink(
-                        f"[AudioTest] channel={request.channel} completed frames={frame_count}"
-                    )
+                    try:
+                        self.log_sink(
+                            f"[AudioTest] channel={request.channel} completed frames={frame_count}"
+                        )
+                    except Exception:
+                        pass
             self._raise_cleanup_failures(cleanup_failures)
 
-    def _fail(self, request: AudioTestCaptureRequest, reason: str, cause: str | None) -> None:
-        self.log_sink(
-            f"[AudioTest] channel={request.channel} failed reason={reason} cause={cause or 'none'}"
+    def _fail(
+        self,
+        request: AudioTestCaptureRequest,
+        reason: str,
+        cause: str | None,
+        exception: BaseException | None = None,
+    ) -> None:
+        diagnostics = exception_diagnostics(
+            exception or RuntimeError(),
+            component="audio_test",
+            operation="audio.test",
+            code=reason if reason in AUDIO_DIAGNOSE_FAILURE_CODES else "source_open_failed",
+            fields={"channel": request.channel},
         )
+        try:
+            self.log_sink(
+                f"[AudioTest] channel={request.channel} failed reason={reason} cause={cause or 'none'}"
+            )
+        except Exception:
+            pass
         if request.failure_callback is not None:
-            request.failure_callback(request.generation, reason, cause)
+            request.failure_callback(request.generation, reason, cause, diagnostics)
 
     @staticmethod
     def _raise_cleanup_failures(failures: list[Exception]) -> None:

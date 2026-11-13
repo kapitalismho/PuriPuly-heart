@@ -78,6 +78,7 @@ from puripuly_heart.app.ports.settings_view import (
     VrcMicInterceptSettingsIntent,
 )
 from puripuly_heart.app.ports.ui_models import OscControlPresentationState
+from puripuly_heart.app.ports.ui_presentation import SettingsRenderResult
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
@@ -127,6 +128,7 @@ from puripuly_heart.config.translation_values import (
     default_translation_connection,
     supported_translation_connections,
 )
+from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.http_extensions import http_extension_secret_key
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.stt.custom import (
@@ -3642,7 +3644,7 @@ class SettingsView(ft.Column):
         overlay: OverlaySettingsSnapshot,
         config_path: Path,
         preserve_custom_vocab_draft: bool = False,
-    ) -> None:
+    ) -> SettingsRenderResult:
         """Load current settings into the UI."""
         previous = self._build_settings_with_provider_draft()
         selection_changed = (
@@ -3786,13 +3788,14 @@ class SettingsView(ft.Column):
         )
 
         # Load secrets
-        self._load_secrets(provider, config_path)
+        secret_result = self._load_secrets(provider, config_path)
         for control, value, error in raw_drafts:
             control.value = value
             control.error = error
 
         if is_control_mounted(self):
             self.update()
+        return self._secret_render_result(secret_result)
 
     def refresh_after_openrouter_pkce_success(
         self,
@@ -3800,7 +3803,7 @@ class SettingsView(ft.Column):
         provider: ProviderSettingsSnapshot,
         prompt: PromptSettingsSnapshot,
         config_path: Path,
-    ) -> None:
+    ) -> SettingsRenderResult:
         self._provider_snapshot = provider
         self._provider_draft = None
         self._provider_edits.clear()
@@ -3838,9 +3841,10 @@ class SettingsView(ft.Column):
             if self._settings_secrets is not None
             else None
         )
+        result = self._report_secret_load(
+            result, operation="refresh_settings_after_openrouter_pkce_success"
+        )
         if result is not None:
-            if result.error_message is not None:
-                self._emit_runtime_basic(result.error_message, level=logging.WARNING)
             snapshot = result.snapshot
             if snapshot is not None:
                 if snapshot.openrouter_api_key is not None:
@@ -3852,6 +3856,7 @@ class SettingsView(ft.Column):
 
         if is_control_mounted(self):
             self.update()
+        return self._secret_render_result(result)
 
     def sync_telemetry_settings(self, settings: GeneralSettingsSnapshot) -> None:
         self._general_snapshot = settings
@@ -4015,12 +4020,14 @@ class SettingsView(ft.Column):
         if control == "PuriPuly_Translator" and (TranslationSelectionEdit in self._provider_edits):
             self._record_provider_edit(self._translation_selection_edit(draft.translation))
 
-    def _load_secrets(self, settings: ProviderSettingsSnapshot, config_path: Path) -> None:
+    def _load_secrets(
+        self, settings: ProviderSettingsSnapshot, config_path: Path
+    ) -> SettingsSecretLoadResult[SettingsSecretSnapshot] | None:
         """Load secret values into fields."""
         _ = config_path
         result = self._load_secret_snapshot()
         if result is None or result.snapshot is None:
-            return
+            return result
         snapshot = result.snapshot
 
         if snapshot.google_api_key is not None:
@@ -4056,6 +4063,7 @@ class SettingsView(ft.Column):
 
         # Restore verification status icons from saved settings
         self._restore_api_key_icons(settings)
+        return result
 
     def _load_secret_snapshot(
         self,
@@ -4063,9 +4071,49 @@ class SettingsView(ft.Column):
         if self._settings_secrets is None:
             return None
         result = self._settings_secrets.load()
-        if result.error_message is not None:
+        return self._report_secret_load(result, operation="render_settings")
+
+    def _report_secret_load[SnapshotT](
+        self,
+        result: SettingsSecretLoadResult[SnapshotT] | None,
+        *,
+        operation: str,
+    ) -> SettingsSecretLoadResult[SnapshotT] | None:
+        if result is None or result.error_message is None:
+            return result
+        try:
             self._emit_runtime_basic(result.error_message, level=logging.WARNING)
+        except Exception as exc:
+            diagnostics = exception_diagnostics(
+                exc,
+                component="settings_projection",
+                operation=operation,
+                code="settings_failure_notification_failed",
+                fields={"notification_delivered": False},
+            )
+            if result.diagnostics is not None:
+                diagnostics = replace(diagnostics, cause_id=result.diagnostics.diagnostic_id)
+            return replace(
+                result, secondary_diagnostics=(*result.secondary_diagnostics, diagnostics)
+            )
         return result
+
+    @staticmethod
+    def _secret_render_result[SnapshotT](
+        result: SettingsSecretLoadResult[SnapshotT] | None,
+    ) -> SettingsRenderResult:
+        return SettingsRenderResult(
+            True,
+            secondary_diagnostics=(
+                (
+                    *((result.diagnostics,) if result.diagnostics is not None else ()),
+                    *result.secondary_diagnostics,
+                )
+                if result is not None
+                else ()
+            ),
+            secondary_omitted_count=result.secondary_omitted_count if result is not None else 0,
+        )
 
     def _restore_api_key_icons(self, settings: ProviderSettingsSnapshot) -> None:
         """Restore API key field icons based on saved verification status."""

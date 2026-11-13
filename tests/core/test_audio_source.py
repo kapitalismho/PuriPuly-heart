@@ -291,8 +291,7 @@ def test_observe_microphone_test_route_true_auto_allows_system_default_without_q
     assert observation.hostapi_index is None
     assert observation.resolved_device_idx is None
     assert observation.resolved_device_name is None
-    assert observation.resolution_exception_class is None
-    assert observation.resolution_exception_message is None
+    assert observation.failure_diagnostics is None
     assert observation.should_attempt_open is True
     assert observation.wasapi_auto_convert is False
     assert observation.wasapi_exclusive is False
@@ -348,8 +347,7 @@ def test_observe_microphone_test_route_host_api_default_miss_does_not_open_globa
     assert observation.resolved_device_idx is None
     assert observation.resolved_device_name is None
     assert observation.should_attempt_open is False
-    assert observation.resolution_exception_class is None
-    assert observation.resolution_exception_message is None
+    assert observation.failure_diagnostics is None
 
 
 def test_observe_microphone_test_route_explicit_device_miss_does_not_open_global_default(
@@ -375,8 +373,7 @@ def test_observe_microphone_test_route_explicit_device_miss_does_not_open_global
     assert observation.resolved_device_idx is None
     assert observation.resolved_device_name is None
     assert observation.should_attempt_open is False
-    assert observation.resolution_exception_class is None
-    assert observation.resolution_exception_message is None
+    assert observation.failure_diagnostics is None
 
 
 @pytest.mark.parametrize(
@@ -468,8 +465,8 @@ def test_observe_microphone_test_route_records_resolution_exception(
     assert observation.resolved_device_idx is None
     assert observation.resolved_device_name is None
     assert observation.should_attempt_open is False
-    assert observation.resolution_exception_class == "RuntimeError"
-    assert observation.resolution_exception_message == "portaudio unavailable"
+    assert observation.failure_diagnostics.fields["exception_class"] == "RuntimeError"
+    assert "portaudio unavailable" not in repr(observation.failure_diagnostics)
 
 
 @pytest.mark.parametrize(
@@ -529,7 +526,7 @@ def test_determine_self_mic_capture_channels_uses_positive_metadata(
             max_input_channels=None,
             default_samplerate=None,
             metadata_status="query_failed",
-            metadata_error="boom",
+            failure_diagnostics=audio_source_module._metadata_failure(RuntimeError("boom")),
         ),
     ],
 )
@@ -580,7 +577,7 @@ def test_query_sounddevice_input_metadata_for_explicit_device(monkeypatch):
     assert metadata.max_input_channels == 2
     assert metadata.default_samplerate == 44100.0
     assert metadata.metadata_status == "ok"
-    assert metadata.metadata_error is None
+    assert metadata.failure_diagnostics is None
 
 
 def test_query_sounddevice_input_metadata_for_default_input(monkeypatch):
@@ -612,7 +609,7 @@ def test_query_sounddevice_input_metadata_reports_invalid_explicit_device(monkey
     assert metadata.device_idx == 99
     assert metadata.max_input_channels is None
     assert metadata.metadata_status == "invalid"
-    assert "99" in (metadata.metadata_error or "")
+    assert metadata.failure_diagnostics.fields["exception_class"] == "IndexError"
 
 
 def test_query_sounddevice_input_metadata_reports_query_failure(monkeypatch):
@@ -627,7 +624,8 @@ def test_query_sounddevice_input_metadata_reports_query_failure(monkeypatch):
     assert metadata.device_idx is None
     assert metadata.max_input_channels is None
     assert metadata.metadata_status == "query_failed"
-    assert metadata.metadata_error == "no devices"
+    assert metadata.failure_diagnostics.fields["exception_class"] == "RuntimeError"
+    assert "no devices" not in repr(metadata.failure_diagnostics)
 
 
 def test_resolve_sounddevice_input_device_by_index_with_hostapi(monkeypatch):

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
+from concurrent.futures import Future
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,11 +15,15 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCoordinator,
     application_shutdown_callback,
 )
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.ui.foundation.adapter import FletFoundationAdapter
 from puripuly_heart.ui.foundation.resources import (
     DEFAULT_FOUNDATION_RESOURCES,
     FoundationResourceLocator,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +51,7 @@ class FletFoundationRuntime:
         self._tracked_tasks: set[object] = set()
         self._application_shutdown_tasks: set[object] = set()
         self._close_completed = False
+        self.failure_diagnostics: ErrorDiagnostics | None = None
 
     @property
     def snapshot(self) -> FoundationRuntimeSnapshot:
@@ -102,10 +109,12 @@ class FletFoundationRuntime:
                 close()
             return None
         task = self._page.run_task(coroutine, *args)
+        if task is None:
+            return None
         self._tracked_tasks.add(task)
         add_done_callback = getattr(task, "add_done_callback", None)
         if callable(add_done_callback):
-            add_done_callback(self._tracked_tasks.discard)
+            add_done_callback(lambda done: self._on_task_done(done, "page_task"))
         return task
 
     def run_application_shutdown_task(
@@ -121,7 +130,7 @@ class FletFoundationRuntime:
         self._application_shutdown_tasks.add(task)
         add_done_callback = getattr(task, "add_done_callback", None)
         if callable(add_done_callback):
-            add_done_callback(self._application_shutdown_tasks.discard)
+            add_done_callback(lambda done: self._on_task_done(done, "shutdown_task"))
         return task
 
     async def close(self) -> None:
@@ -137,11 +146,37 @@ class FletFoundationRuntime:
             cancel = getattr(task, "cancel", None)
             if callable(cancel):
                 cancel()
-        awaitables = tuple(task for task in tasks if inspect.isawaitable(task))
+        awaitables = tuple(
+            asyncio.wrap_future(task) if isinstance(task, Future) else task
+            for task in tasks
+            if isinstance(task, Future) or inspect.isawaitable(task)
+        )
         if awaitables:
             await asyncio.gather(*awaitables, return_exceptions=True)
-        self._tracked_tasks.difference_update(tasks)
+        for task in tuple(self._tracked_tasks):
+            if getattr(task, "done", lambda: False)():
+                self._on_task_done(task, "page_task")
         self._close_completed = True
+
+    def _on_task_done(self, task: object, operation: str) -> None:
+        tasks = (
+            self._application_shutdown_tasks
+            if operation == "shutdown_task"
+            else self._tracked_tasks
+        )
+        if task not in tasks:
+            return
+        tasks.discard(task)
+        if getattr(task, "cancelled", lambda: False)():
+            return
+        exception = getattr(task, "exception", lambda: None)()
+        if exception is None:
+            return
+        diagnostics = exception_diagnostics(
+            exception, component="ui.foundation", operation=operation, code="ui_task_failed"
+        )
+        self.failure_diagnostics = diagnostics
+        emit_failure(logger, diagnostics)
 
 
 __all__ = ["FletFoundationRuntime", "FoundationRuntimeSnapshot"]

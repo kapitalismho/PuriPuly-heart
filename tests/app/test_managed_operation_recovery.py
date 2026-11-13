@@ -639,3 +639,24 @@ async def test_owner_records_action_required_failure_kind() -> None:
     assert await owner.start_discord() is False
     assert owner.last_failure_kind == "action_required"
     assert owner.last_message_key == "discord_auth.error.action_required"
+
+
+@pytest.mark.asyncio
+async def test_recovery_state_persist_failure_retains_cause_without_new_issue(monkeypatch):
+    state = FakeState()
+    secrets = FakeSecrets()
+    operation_id, token = _seed_operation(state, secrets)
+    broker = FakeBroker(statuses=[_status("RECONCILING", "wait")])
+
+    def fail_persist():
+        raise PermissionError(13, "synthetic-private-path")
+
+    monkeypatch.setattr(state, "persist", fail_persist)
+    result = await _service(broker, secrets, FakeSettings(), state).authorize(_request())
+
+    assert result.status == messages.TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
+    assert result.diagnostics.causes[0].fields["errno"] == 13
+    assert state.pending_managed_operation_id == operation_id
+    assert secrets.values[RESUME_TOKEN_SECRET] == token
+    assert broker.issue_calls == []
+    assert "synthetic-private" not in str(result)

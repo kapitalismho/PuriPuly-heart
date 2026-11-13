@@ -8,7 +8,7 @@ import os
 from collections import OrderedDict
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
@@ -88,9 +88,13 @@ from puripuly_heart.config.translation_values import (
     supported_translation_connections,
 )
 from puripuly_heart.core.diagnostics import (
+    deserialize_diagnostics,
     diagnostic_operation,
+    exception_diagnostics,
     normalize_diagnostic,
+    project_diagnostic_record,
     sanitize_diagnostic_fields,
+    serialize_diagnostics,
 )
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.local_translation.provisioning import (
@@ -423,7 +427,7 @@ def _effective_secret_presence(
     return presence
 
 
-def _accounts_status(application: object) -> dict:
+def _accounts_status(application: object, retain: Callable[..., dict]) -> dict:
     chatgpt = {"available": False, "signed_in": None, "in_progress": None, "sign_in_required": None}
     account = getattr(application, "chatgpt_account_snapshot", None)
     if callable(account):
@@ -438,10 +442,24 @@ def _accounts_status(application: object) -> dict:
                     required() if callable(required) and type(snapshot.signed_in) is bool else None
                 ),
             )
+            if isinstance(getattr(snapshot, "diagnostics", None), ErrorDiagnostics):
+                chatgpt["diagnostics"] = retain(
+                    snapshot.diagnostics, disposition="degraded", severity="warning"
+                )
+                chatgpt["diagnostic_id"] = chatgpt["diagnostics"]["diagnostic_id"]
             if type(chatgpt["sign_in_required"]) is not bool:
                 chatgpt["sign_in_required"] = None
-        except Exception:
+        except Exception as exc:
             chatgpt["available"] = None
+            chatgpt["diagnostics"] = retain(
+                exception_diagnostics(
+                    exc,
+                    component="application_control",
+                    operation="accounts.status",
+                    code="application_operation_failed",
+                ),
+                disposition="unknown",
+            )
     managed = {}
     accessor = getattr(application, "managed_account_snapshot", None)
     if callable(accessor):
@@ -471,8 +489,40 @@ def _accounts_status(application: object) -> dict:
                 "remaining_percent": remaining if availability == "cached" else None,
                 "freshness": "unknown",
             }
-        except Exception:
-            managed = {}
+            diagnostics = source.get("diagnostics")
+            if isinstance(diagnostics, ErrorDiagnostics):
+                managed["diagnostics"] = retain(
+                    diagnostics, disposition="degraded", severity="warning"
+                )
+            elif isinstance(diagnostics, Mapping):
+                managed["diagnostics"] = project_diagnostic_record(diagnostics)
+            secondary = tuple(
+                item
+                for item in source.get("secondary_diagnostics", ())
+                if isinstance(item, ErrorDiagnostics)
+            )
+            if secondary:
+                managed["secondary_diagnostics"] = [
+                    retain(item, disposition="degraded", severity="warning")
+                    for item in secondary[:4]
+                ]
+                managed["secondary_omitted_count"] = source.get("secondary_omitted_count", 0) + max(
+                    0, len(secondary) - 4
+                )
+                managed["secondary_truncated"] = managed["secondary_omitted_count"] > 0
+        except Exception as exc:
+            managed = {
+                "availability": "unknown",
+                "diagnostics": retain(
+                    exception_diagnostics(
+                        exc,
+                        component="application_control",
+                        operation="accounts.status",
+                        code="application_operation_failed",
+                    ),
+                    disposition="unknown",
+                ),
+            }
     return {"chatgpt": chatgpt, "managed": managed}
 
 
@@ -482,31 +532,59 @@ def _known_secret(application: UiApplicationBoundary, name: str) -> str:
     return name
 
 
+_DIAGNOSTIC_COLLECTION_DISPOSITIONS = {
+    "secondary_diagnostics": "degraded",
+    "recovered_diagnostics": "recovered",
+    "recovery_diagnostics": "recovered",
+}
+
+
 def _json(
-    value: object, *, diagnostic_projector: Callable[[ErrorDiagnostics], dict] | None = None
+    value: object,
+    *,
+    diagnostic_projector: Callable[[ErrorDiagnostics, str], dict] | None = None,
+    diagnostic_disposition: str = "unknown",
 ) -> object:
     from dataclasses import fields, is_dataclass
     from enum import Enum
 
     if isinstance(value, ErrorDiagnostics):
         if diagnostic_projector is not None:
-            return diagnostic_projector(value)
-        return normalize_diagnostic(
-            value, instance_id=None, severity="error", disposition="unknown"
-        )
+            return diagnostic_projector(value, diagnostic_disposition)
+        return serialize_diagnostics(value)
     if isinstance(value, Enum):
         return value.value
     if is_dataclass(value):
         return {
-            item.name: _json(getattr(value, item.name), diagnostic_projector=diagnostic_projector)
+            item.name: _json(
+                getattr(value, item.name),
+                diagnostic_projector=diagnostic_projector,
+                diagnostic_disposition=_DIAGNOSTIC_COLLECTION_DISPOSITIONS.get(
+                    item.name, diagnostic_disposition
+                ),
+            )
             for item in fields(value)
         }
     if isinstance(value, Mapping):
         return {
-            str(k): _json(v, diagnostic_projector=diagnostic_projector) for k, v in value.items()
+            str(k): _json(
+                v,
+                diagnostic_projector=diagnostic_projector,
+                diagnostic_disposition=_DIAGNOSTIC_COLLECTION_DISPOSITIONS.get(
+                    str(k), diagnostic_disposition
+                ),
+            )
+            for k, v in value.items()
         }
     if isinstance(value, (tuple, list, set, frozenset)):
-        return [_json(v, diagnostic_projector=diagnostic_projector) for v in value]
+        return [
+            _json(
+                v,
+                diagnostic_projector=diagnostic_projector,
+                diagnostic_disposition=diagnostic_disposition,
+            )
+            for v in value
+        ]
     if isinstance(value, (str, bool, int, float)) or value is None:
         return value
     return str(value)
@@ -904,8 +982,8 @@ class ApplicationControlOwner:
     def _snapshot_json(self, value: object) -> object:
         return _json(
             value,
-            diagnostic_projector=lambda diagnostic: self._retain_diagnostic(
-                diagnostic, disposition="unknown"
+            diagnostic_projector=lambda diagnostic, disposition: self._retain_diagnostic(
+                diagnostic, disposition=disposition
             ),
         )
 
@@ -1538,9 +1616,13 @@ class ApplicationControlOwner:
             assets = await self.application.refresh_model_assets()
             return {
                 **base,
-                "state": _json(getattr(owner, "snapshot", None)) if owner is not None else None,
-                "gemma": _json(gemma.snapshot) if gemma is not None else None,
-                "assets": [entry.to_dict() for entry in assets],
+                "state": (
+                    self._snapshot_json(getattr(owner, "snapshot", None))
+                    if owner is not None
+                    else None
+                ),
+                "gemma": self._snapshot_json(gemma.snapshot) if gemma is not None else None,
+                "assets": [self._snapshot_json(entry.to_dict()) for entry in assets],
             }
         if name == "overlay.status":
             output = self.application.output_status()
@@ -1559,7 +1641,7 @@ class ApplicationControlOwner:
                 "output": _json(output["osc"]),
             }
         if name == "accounts.status":
-            return {**base, **_accounts_status(self.application)}
+            return {**base, **_accounts_status(self.application, self._retain_diagnostic)}
         if name == "auth.status":
             return {
                 **base,
@@ -1763,28 +1845,62 @@ class ApplicationControlOwner:
         exception: BaseException | None = None,
         severity: str = "error",
     ) -> dict:
-        runtime_logging = getattr(self.application, "_runtime_logging", None)
-        if runtime_logging is not None:
-            return runtime_logging.emit_failure(
-                diagnostics,
-                disposition=disposition,
-                stage=stage,
-                exception=exception,
-                severity=severity,
-            )
-        return normalize_diagnostic(
+        diagnostic = normalize_diagnostic(
             diagnostics,
             instance_id=self.instance_id,
             severity=severity,
             disposition=disposition,
             stage=stage,
             exception=exception,
+            file_evidence="unavailable",
         )
+        runtime_logging = getattr(self.application, "_runtime_logging", None)
+        if runtime_logging is not None:
+            try:
+                return runtime_logging.emit_failure(
+                    diagnostics,
+                    disposition=disposition,
+                    stage=stage,
+                    exception=exception,
+                    severity=severity,
+                )
+            except Exception:
+                pass
+        return diagnostic
 
-    def _retain_audio_diagnosis(self, result: dict) -> None:
+    def _retain_audio_diagnosis(self, result: dict, operation_id: str, request_id: str) -> None:
         diagnosis = result["diagnosis"]
+
+        def retain_evidence(value: dict) -> None:
+            def retain(source: Mapping, disposition: str) -> dict:
+                diagnostic = deserialize_diagnostics(source)
+                return self._retain_diagnostic(
+                    replace(
+                        diagnostic,
+                        operation_id=diagnostic.operation_id or operation_id,
+                        request_id=diagnostic.request_id or request_id,
+                    ),
+                    disposition=disposition,
+                )
+
+            if isinstance(value.get("diagnostics"), Mapping):
+                value["diagnostics"] = retain(value["diagnostics"], "failed")
+                value["diagnostic_id"] = value["diagnostics"]["diagnostic_id"]
+            for key, disposition in (
+                ("secondary_diagnostics", "degraded"),
+                ("recovery_diagnostics", "recovered"),
+            ):
+                if isinstance(value.get(key), list):
+                    value[key] = [
+                        retain(item, disposition)
+                        for item in value[key]
+                        if isinstance(item, Mapping)
+                    ]
+
+        retain_evidence(diagnosis)
         summaries = []
         for candidate in diagnosis["candidates"]:
+            retain_evidence(candidate)
             route_id = hashlib.sha256(
                 json.dumps(
                     [
@@ -1865,7 +1981,10 @@ class ApplicationControlOwner:
                         "speech_threshold",
                     }
                 )
-                runtime_logging.emit_diagnostic(f"[Capture] {code} {tokens}")
+                try:
+                    runtime_logging.emit_diagnostic(f"[Capture] {code} {tokens}")
+                except Exception:
+                    pass
 
     def _notify_presentation(self, receipt: dict, primary: dict | None = None) -> None:
         try:
@@ -2169,7 +2288,9 @@ class ApplicationControlOwner:
                             result = await self.application.diagnose_audio(
                                 admission_revision=operation.audio_test_revision
                             )
-                            self._retain_audio_diagnosis(result)
+                            self._retain_audio_diagnosis(
+                                result, operation_id, operation.receipt["request_id"]
+                            )
                         elif deferred[0] == "probe":
                             result = await run_translation_probe(
                                 lambda: getattr(self.pipeline, "llm_runtime", None),
@@ -2233,6 +2354,23 @@ class ApplicationControlOwner:
                             }
                     operation.receipt.update(status=status, revision=self._current_revision())
                     if isinstance(result, dict):
+                        result = _json(
+                            result,
+                            diagnostic_projector=lambda diagnostic, disposition: self._retain_diagnostic(
+                                replace(
+                                    diagnostic,
+                                    operation_id=diagnostic.operation_id or operation_id,
+                                    request_id=diagnostic.request_id
+                                    or operation.receipt["request_id"],
+                                ),
+                                disposition=disposition,
+                            ),
+                            diagnostic_disposition=(
+                                status
+                                if status in {"failed", "degraded", "cancelled"}
+                                else "unknown"
+                            ),
+                        )
                         operation.receipt.update({k: v for k, v in result.items() if k != "status"})
                         if "status" in result and result["status"] != "applied":
                             operation.receipt["status"] = result["status"]
@@ -2257,7 +2395,7 @@ class ApplicationControlOwner:
                 operation.receipt.update(
                     {key: value for key, value in result.items() if key != "status"}
                 )
-                self._retain_audio_diagnosis(result)
+                self._retain_audio_diagnosis(result, operation_id, operation.receipt["request_id"])
         except PeerCaptureTargetUnavailable:
             operation.receipt.update(
                 status="action_required", error={"code": "capture_target_unavailable"}
@@ -2278,18 +2416,29 @@ class ApplicationControlOwner:
             )
             if owning_cause is not None:
                 operation.receipt["cause_diagnostics"] = owning_cause
-            diagnostics = ErrorDiagnostics(
-                component="application_control",
-                operation=command,
-                code="application_operation_failed",
-                category="unknown",
+            secondaries = tuple(
+                item
+                for item in getattr(exc, "secondary_diagnostics", ())
+                if isinstance(item, ErrorDiagnostics)
+            )
+            if secondaries:
+                operation.receipt["secondary_diagnostics"] = [
+                    self._retain_diagnostic(item, disposition="degraded")
+                    for item in secondaries[:4]
+                ]
+                operation.receipt["secondary_omitted_count"] = max(0, len(secondaries) - 4)
+                operation.receipt["secondary_truncated"] = len(secondaries) > 4
+            diagnostics = replace(
+                exception_diagnostics(
+                    exc,
+                    component="application_control",
+                    operation=command,
+                    code="application_operation_failed",
+                    category="unknown",
+                ),
                 visibility=(
                     "diagnostic_only" if owning_cause is not None else DIAGNOSTIC_VISIBILITY_BASIC
                 ),
-                content_policy=CONTENT_POLICY_METADATA_ONLY,
-                status_code=None,
-                retry_after_ms=None,
-                fields={},
                 operation_id=operation_id,
                 request_id=operation.receipt["request_id"],
                 cause_id=owning_cause["diagnostic_id"] if owning_cause is not None else None,
@@ -2344,6 +2493,29 @@ class ApplicationControlOwner:
                         transaction, operation.receipt["status"]
                     )
                 operation.receipt["revision"] = captured.committed_revision
+            if captured is not None and (
+                captured.secondary_diagnostics or captured.secondary_omitted_count
+            ):
+                if "transaction" in operation.receipt and captured.current is not None:
+                    operation.receipt["transaction"] = self._transaction_receipt(
+                        captured.current, operation.receipt["status"]
+                    )
+                else:
+                    retained = list(operation.receipt.get("secondary_diagnostics", ()))
+                    known_ids = {item["diagnostic_id"] for item in retained}
+                    retained.extend(
+                        self._retain_diagnostic(item, disposition="degraded")
+                        for item in captured.secondary_diagnostics
+                        if item.diagnostic_id not in known_ids
+                    )
+                    omitted = (
+                        operation.receipt.get("secondary_omitted_count", 0)
+                        + captured.secondary_omitted_count
+                        + max(0, len(retained) - 4)
+                    )
+                    operation.receipt["secondary_diagnostics"] = retained[:4]
+                    operation.receipt["secondary_omitted_count"] = omitted
+                    operation.receipt["secondary_truncated"] = omitted > 0
             if (
                 command in {"translation.probe", "recognition.probe", "audio.diagnose"}
                 and not self._open
@@ -2418,6 +2590,9 @@ class ApplicationControlOwner:
                 "status": "cancelled" if error.failure_code == "cancelled" else "failed",
                 "error": {"code": error.failure_code},
                 "asset": current.to_dict() if current is not None else None,
+                "diagnostics": error.failure_diagnostics,
+                "diagnostic_id": error.failure_diagnostics.diagnostic_id,
+                "secondary_diagnostics": list(error.secondary_diagnostics),
             }
         return {"status": "applied", "asset": entry.to_dict()}
 
@@ -2460,8 +2635,12 @@ class ApplicationControlOwner:
                 if result.cancelled
                 else "degraded" if result.failed_model_ids else "applied"
             ),
-            "models": _json(result.snapshot),
-            "failed_model_ids": list(result.failed_model_ids),
+            "models": result.snapshot,
+            **{
+                item.name: getattr(result, item.name)
+                for item in fields(result)
+                if item.name not in {"request", "snapshot", "cancelled"}
+            },
         }
 
     async def _dispatch(

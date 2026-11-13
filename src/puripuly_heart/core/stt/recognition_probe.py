@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 from uuid import uuid4
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity, AudioSegmentSettingsSnapshot
+from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.stt.backend import (
     STTIndependentRecognitionSession,
     STTProviderEpochEnded,
@@ -20,6 +22,7 @@ from puripuly_heart.core.stt.backend import (
     STTScopedTurnSession,
     scoped_event_for_delivery,
 )
+from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.core.stt.scoped_engine import (
     STTProbeSessionFactory,
     STTRecognitionWatchdogs,
@@ -33,6 +36,9 @@ class RecognitionProbeOutcome:
     failure_category: str | None = None
     final_event: str | None = None
     exercised_provider: str | None = None
+    diagnostics: ErrorDiagnostics | None = None
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    cleanup_complete: bool = True
 
 
 async def recognize_probe_audio(
@@ -52,16 +58,22 @@ async def recognize_probe_audio(
     )
     stream = RecognitionStreamIdentity(channel, 0, 0, epoch, identity.settings_scope)
     session = None
+    outcome = None
+    primary_error = None
+    cleanup_diagnostics = None
     scope = LifecycleScope(f"recognition-probe:{epoch}")
     try:
         async with asyncio.timeout(watchdogs.readiness_timeout_s):
             session, exercised_provider = await factory(settings, epoch)
 
         def terminal_outcome(
-            result: str, failure_category: str | None = None, final_event: str | None = None
+            result: str,
+            failure_category: str | None = None,
+            final_event: str | None = None,
+            diagnostics: ErrorDiagnostics | None = None,
         ) -> RecognitionProbeOutcome:
             return RecognitionProbeOutcome(
-                result, failure_category, final_event, exercised_provider
+                result, failure_category, final_event, exercised_provider, diagnostics
             )
 
         independent = (
@@ -124,18 +136,23 @@ async def recognize_probe_audio(
                     and event.identity == identity
                     and event.outcome != "submitted"
                 ):
-                    return terminal_outcome(
+                    outcome = terminal_outcome(
                         "failed",
                         event.failure_diagnostics.category if event.failure_diagnostics else None,
+                        diagnostics=event.failure_diagnostics,
                     )
+                    break
                 if isinstance(event, STTProviderTurnTerminal) and event.identity == identity:
                     if (
                         event.outcome == "final"
                         and event.text_authority == "authoritative"
                         and event.text.strip()
                     ):
-                        return terminal_outcome("succeeded", final_event="authoritative_turn_final")
-                    return terminal_outcome(
+                        outcome = terminal_outcome(
+                            "succeeded", final_event="authoritative_turn_final"
+                        )
+                        break
+                    outcome = terminal_outcome(
                         (
                             "empty"
                             if event.outcome == "empty"
@@ -143,24 +160,48 @@ async def recognize_probe_audio(
                             else "failed"
                         ),
                         event.failure_diagnostics.category if event.failure_diagnostics else None,
+                        diagnostics=event.failure_diagnostics,
                     )
+                    break
                 if isinstance(event, STTRecognitionUnit) and event.identity.stream == stream:
                     if event.text.strip():
-                        return terminal_outcome("succeeded", final_event="final_recognition_unit")
+                        outcome = terminal_outcome(
+                            "succeeded", final_event="final_recognition_unit"
+                        )
+                        break
                 if (
                     isinstance(event, STTRecognitionUnitTerminal)
                     and event.unit.identity.stream == stream
                 ):
                     if event.outcome == "final" and event.unit.text.strip():
-                        return terminal_outcome("succeeded", final_event="final_recognition_unit")
+                        outcome = terminal_outcome(
+                            "succeeded", final_event="final_recognition_unit"
+                        )
+                        break
                     if event.outcome in {"failed", "cancelled"}:
-                        return terminal_outcome("failed")
+                        outcome = terminal_outcome(
+                            "failed",
+                            diagnostics=recognition_failure_diagnostics(
+                                None,
+                                provider=exercised_provider or settings.provider_id,
+                                channel=channel,
+                                operation="recognition_probe",
+                                reason=event.failure_reason or "provider_protocol_error",
+                                identity=identity,
+                            ),
+                        )
+                        break
                 if isinstance(event, STTProviderEpochEnded) and event.provider_epoch_id == epoch:
-                    return terminal_outcome(
+                    outcome = terminal_outcome(
                         "no_result",
                         event.failure_diagnostics.category if event.failure_diagnostics else None,
+                        diagnostics=event.failure_diagnostics,
                     )
-        return terminal_outcome("no_result")
+                    break
+        if outcome is None:
+            outcome = terminal_outcome("no_result")
+    except BaseException as exc:
+        primary_error = exc
     finally:
         if session is not None:
 
@@ -182,8 +223,43 @@ async def recognize_probe_audio(
             failure = closing.result()
             await scope.close()
             if cancelled:
-                raise asyncio.CancelledError
+                cancellation = (
+                    primary_error
+                    if isinstance(primary_error, asyncio.CancelledError)
+                    else asyncio.CancelledError()
+                )
+                if primary_error is not None and not isinstance(
+                    primary_error, asyncio.CancelledError
+                ):
+                    cancellation.failure_diagnostics = exception_diagnostics(
+                        primary_error,
+                        component="recognition_probe",
+                        operation="recognition_probe",
+                        code="recognition_probe_failed",
+                    )
+                elif outcome is not None and outcome.diagnostics is not None:
+                    cancellation.failure_diagnostics = outcome.diagnostics
+                primary_error = cancellation
             if failure is not None:
-                raise RuntimeError("recognition_probe_cleanup_failed") from failure
+                cleanup_diagnostics = exception_diagnostics(
+                    failure,
+                    component="recognition_probe",
+                    operation="recognition_probe",
+                    code="recognition_probe_cleanup_failed",
+                )
         else:
             await scope.close()
+    if primary_error is not None:
+        if cleanup_diagnostics is not None:
+            primary_error.secondary_diagnostics = (cleanup_diagnostics,)
+        raise primary_error
+    if cleanup_diagnostics is not None:
+        return replace(
+            outcome,
+            diagnostics=outcome.diagnostics or cleanup_diagnostics,
+            secondary_diagnostics=(
+                (cleanup_diagnostics,) if outcome.diagnostics is not None else ()
+            ),
+            cleanup_complete=False,
+        )
+    return outcome

@@ -2332,12 +2332,11 @@ async def test_native_accounts_query_reads_existing_usage_without_refresh_or_acc
         ),
         chatgpt_sign_in_required=lambda: False,
     )
-    owner = SimpleNamespace(
-        application=application,
-        instance_id="account-context",
-        _current_revision=lambda: 11,
-        settings=SimpleNamespace(committed_settings=None),
-    )
+    owner = ApplicationControlOwner.__new__(ApplicationControlOwner)
+    owner.application = application
+    owner.instance_id = "account-context"
+    owner._revision = 11
+    owner.settings = SimpleNamespace(committed_settings=None)
     try:
         result = await ApplicationControlOwner.query(owner, "accounts.status", {})
         assert result["chatgpt"]["signed_in"] is True
@@ -2412,12 +2411,11 @@ async def test_native_account_unknown_credentials_are_not_signed_out(signed_in):
         chatgpt_account_snapshot=lambda: ChatGptAccountSnapshot(signed_in=signed_in),
         chatgpt_sign_in_required=lambda: True,
     )
-    owner = SimpleNamespace(
-        application=application,
-        instance_id="unknown-account-context",
-        _current_revision=lambda: 11,
-        settings=SimpleNamespace(committed_settings=None),
-    )
+    owner = ApplicationControlOwner.__new__(ApplicationControlOwner)
+    owner.application = application
+    owner.instance_id = "unknown-account-context"
+    owner._revision = 11
+    owner.settings = SimpleNamespace(committed_settings=None)
     observed = await ApplicationControlOwner.query(owner, "accounts.status", {})
     assert observed["chatgpt"]["signed_in"] is signed_in
     assert observed["chatgpt"]["sign_in_required"] is (True if signed_in is False else None)

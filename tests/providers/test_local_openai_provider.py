@@ -514,28 +514,26 @@ async def test_local_translate_propagates_cancellation(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_local_verify_connection_returns_false_for_http_and_request_failures(
+async def test_local_verify_connection_preserves_http_and_request_failures(
     monkeypatch,
 ) -> None:
     fake_client = FakeAsyncClient(response_status=307, response_data={"error": "redirect"})
     monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: fake_client)
 
-    assert (
+    with pytest.raises(RuntimeError) as failure:
         await LocalOpenAICompatibleLLMProvider.verify_connection(
             base_url="http://localhost:11434/v1", model="m"
         )
-        is False
-    )
+    assert failure.value.failure_diagnostics.status_code == 307
 
     failing_client = FakeAsyncClient(request_exception=httpx.ConnectError("refused"))
     monkeypatch.setattr("httpx.AsyncClient", lambda **kwargs: failing_client)
 
-    assert (
+    with pytest.raises(httpx.ConnectError) as failure:
         await LocalOpenAICompatibleLLMProvider.verify_connection(
             base_url="http://localhost:11434/v1", model="m"
         )
-        is False
-    )
+    assert failure.value.failure_diagnostics.category == "network"
 
 
 @pytest.mark.asyncio
@@ -574,3 +572,42 @@ async def test_local_verify_connection_disables_env_proxy_and_redirects(monkeypa
 def test_httpx_local_client_rejects_invalid_base_urls(base_url: str) -> None:
     with pytest.raises(ValueError, match="base URL"):
         HttpxLocalOpenAIClient(base_url=base_url, model="m")
+
+
+@pytest.mark.asyncio
+async def test_probe_preserves_primary_and_cleanup_failure_without_sink_dependency(monkeypatch):
+    primary = httpx.ConnectError("PRIVATE_SECRET")
+    fake_client = FakeAsyncClient(request_exception=primary)
+
+    async def fail_close():
+        raise PermissionError(13, "PRIVATE_SECRET", "C:/Users/private/file")
+
+    fake_client.aclose = fail_close
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
+    with pytest.raises(httpx.ConnectError) as failure:
+        await LocalOpenAICompatibleLLMProvider.verify_connection(
+            base_url="http://localhost:11434/v1", model="m"
+        )
+
+    assert failure.value is primary
+    diagnostics = failure.value.failure_diagnostics
+    assert diagnostics.category == "network"
+    assert diagnostics.causes[0].fields["cleanup_confirmed"] is False
+    assert diagnostics.causes[0].fields["errno"] == 13
+    assert diagnostics.causes[0].cause_id == diagnostics.diagnostic_id
+    assert "PRIVATE_SECRET" not in repr(diagnostics)
+
+
+@pytest.mark.asyncio
+async def test_probe_cleanup_does_not_replace_expected_cancellation(monkeypatch):
+    fake_client = FakeAsyncClient(request_exception=asyncio.CancelledError())
+
+    async def fail_close():
+        raise OSError("PRIVATE_SECRET")
+
+    fake_client.aclose = fail_close
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
+    with pytest.raises(asyncio.CancelledError):
+        await LocalOpenAICompatibleLLMProvider.verify_connection(
+            base_url="http://localhost:11434/v1", model="m"
+        )

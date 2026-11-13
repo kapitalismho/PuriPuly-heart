@@ -13,9 +13,11 @@ import numpy as np
 
 from puripuly_heart.core.audio.format import AudioFrameF32
 from puripuly_heart.core.audio.source import (
+    AudioSourceOpenFailure,
     CaptureProgressionSnapshot,
     PhysicalCaptureProgression,
 )
+from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime_logging import emit_basic_log
 
@@ -73,8 +75,8 @@ class DesktopLoopbackAudioSource:
     max_queue_frames: int = 64
 
     _queue: janus.Queue[AudioFrameF32 | None] = field(init=False, repr=False)
-    _stream: object = field(init=False, repr=False)
-    _manager: object = field(init=False, repr=False)
+    _stream: Any = field(init=False, default=None, repr=False)
+    _manager: Any = field(init=False, default=None, repr=False)
     _closed: bool = field(init=False, default=False)
     _actual_sample_rate_hz: int = field(init=False, repr=False)
     _resolved_device: DesktopLoopbackDevice = field(init=False, repr=False)
@@ -97,15 +99,25 @@ class DesktopLoopbackAudioSource:
         self._queue = janus.Queue(maxsize=self.max_queue_frames)
 
         manager = pyaudio.PyAudio()
+        self._manager = manager
         try:
             devices = _enumerate_loopback_devices(manager)
-            default_device = _get_default_loopback_device(manager)
+            selection_failures: list[Exception] = []
+            default_device = _get_default_loopback_device(manager, selection_failures)
             resolution = DesktopLoopbackDeviceResolver(
                 devices=devices, default_device=default_device
             ).resolve_with_metadata(saved_device_name=self.device_name)
             resolved = resolution.device
             if not isinstance(resolved, DesktopLoopbackDevice):
-                raise RuntimeError("No Windows loopback output device is available")
+                failure = RuntimeError("No Windows loopback output device is available")
+                if selection_failures:
+                    failure.failure_diagnostics = exception_diagnostics(
+                        ExceptionGroup("loopback device resolution failed", selection_failures),
+                        component="capture.peer",
+                        operation="device_resolution",
+                        code="capture.peer.source_open_failed",
+                    )
+                raise failure
             if resolution.used_default_fallback:
                 emit_basic_log(
                     logger,
@@ -117,7 +129,6 @@ class DesktopLoopbackAudioSource:
             self._resolved_device = resolved
             self._actual_sample_rate_hz = resolved.sample_rate_hz
             self._used_default_fallback = resolution.used_default_fallback
-            self._manager = manager
             self._progression = PhysicalCaptureProgression(sample_rate_hz=resolved.sample_rate_hz)
 
             continue_flag = getattr(pyaudio, "paContinue", 0)
@@ -167,11 +178,24 @@ class DesktopLoopbackAudioSource:
                 frames_per_buffer=self.frames_per_buffer,
                 stream_callback=_callback,
             )
-            stream.start_stream()
             self._stream = stream
-        except Exception:
-            with contextlib.suppress(Exception):
-                manager.terminate()
+            stream.start_stream()
+        except Exception as exc:
+            try:
+                self._close_native_resources()
+            except Exception as cleanup_exc:
+                failure = ExceptionGroup(
+                    "desktop capture setup and cleanup failed", [exc, cleanup_exc]
+                )
+                failure.failure_diagnostics = exception_diagnostics(
+                    failure,
+                    component="capture.peer",
+                    operation="source_open",
+                    code="capture.peer.source_open_failed",
+                    fields={"cleanup_confirmed": False},
+                )
+                raise AudioSourceOpenFailure(self, failure) from None
+            self._queue.close()
             raise
 
     @property
@@ -246,28 +270,52 @@ class DesktopLoopbackAudioSource:
             )
 
     async def close(self) -> None:
-        if self._closed:
+        if self._closed and self._stream is None and self._manager is None:
             return
         self._closed = True
 
-        def close_native() -> None:
-            with contextlib.suppress(Exception):
-                self._stream.stop_stream()
-            with contextlib.suppress(Exception):
-                self._stream.close()
-            with contextlib.suppress(Exception):
-                self._manager.terminate()
-
         try:
-            await run_owned_thread_call(close_native)
+            await run_owned_thread_call(self._close_native_resources)
         finally:
             try:
                 self._queue.sync_q.put_nowait(None)
-            except Exception:
+            except queue.Full, janus.SyncQueueShutDown:
                 pass
             self._queue.close()
-            with contextlib.suppress(Exception):
-                await self._queue.wait_closed()
+            await self._queue.wait_closed()
+
+    def _close_native_resources(self) -> None:
+        failures: list[Exception] = []
+        stream = self._stream
+        if stream is not None:
+            try:
+                stream.stop_stream()
+            except Exception as exc:
+                failures.append(exc)
+            try:
+                stream.close()
+            except Exception as exc:
+                failures.append(exc)
+            else:
+                self._stream = None
+        manager = self._manager
+        if manager is not None:
+            try:
+                manager.terminate()
+            except Exception as exc:
+                failures.append(exc)
+            else:
+                self._manager = None
+        if failures:
+            failure = ExceptionGroup("desktop capture cleanup failed", failures)
+            failure.failure_diagnostics = exception_diagnostics(
+                failure,
+                component="capture.peer",
+                operation="cleanup",
+                code="capture.peer.cleanup_failed",
+                fields={"cleanup_confirmed": self._stream is None and self._manager is None},
+            )
+            raise failure
 
 
 def _import_pyaudiowpatch() -> Any:
@@ -283,17 +331,21 @@ def _enumerate_loopback_devices(manager: Any) -> list[DesktopLoopbackDevice]:
     return [_coerce_device_info(info) for info in manager.get_loopback_device_info_generator()]
 
 
-def _get_default_loopback_device(manager: Any) -> DesktopLoopbackDevice | None:
-    with contextlib.suppress(Exception):
+def _get_default_loopback_device(
+    manager: Any, failures: list[Exception]
+) -> DesktopLoopbackDevice | None:
+    try:
         return _coerce_device_info(manager.get_default_wasapi_loopback())
-
-    with contextlib.suppress(Exception):
+    except Exception as exc:
+        failures.append(exc)
+    try:
         default_output = manager.get_default_wasapi_device(deviceType="output")
         if default_output is None:
             return None
         analogue = manager.get_wasapi_loopback_analogue_by_dict(default_output)
         return _coerce_device_info(analogue)
-
+    except Exception as exc:
+        failures.append(exc)
     return None
 
 

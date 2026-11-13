@@ -3,7 +3,11 @@ from __future__ import annotations
 import logging
 from dataclasses import replace
 
-from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
+from puripuly_heart.core.diagnostics import (
+    current_diagnostic_operation,
+    emit_failure,
+    sanitize_diagnostics,
+)
 from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.messages import DiagnosticCategory, ErrorDiagnostics
 
@@ -52,6 +56,7 @@ def record_probe_failure(
             "recognition_readiness": "unobserved",
         },
     )
+    diagnostics = sanitize_diagnostics(diagnostics)
     emit_failure(logging.getLogger(__name__), diagnostics, stage="probe", exception=exception)
     return diagnostics
 
@@ -61,22 +66,26 @@ def record_probe_cleanup_failure(
     *,
     provider: str,
     primary_failure: ErrorDiagnostics | None,
-) -> None:
+) -> ErrorDiagnostics:
     diagnostics = provider_failure_report(
         exception, provider=provider, operation="cleanup"
     ).diagnostics
-    emit_failure(
-        logging.getLogger(__name__),
+    diagnostics = sanitize_diagnostics(
         replace(
             diagnostics,
             **current_diagnostic_operation(),
             cause_id=primary_failure.diagnostic_id if primary_failure else None,
             fields={**diagnostics.fields, "cleanup_confirmed": False},
-        ),
+        )
+    )
+    emit_failure(
+        logging.getLogger(__name__),
+        diagnostics,
         severity="warning",
         disposition="degraded",
         stage="cleanup",
     )
+    return diagnostics
 
 
 __all__ = ["LLMResponseError", "record_probe_failure", "record_probe_cleanup_failure"]
